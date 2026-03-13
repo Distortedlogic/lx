@@ -1,0 +1,45 @@
+[workspace]
+members = [
+  "crates/lx",
+  "crates/lx-cli",
+]
+resolver = "2"
+
+[workspace.package]
+authors = ["Jeremy Meek"]
+edition = "2024"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Distortedlogic/lx"
+
+[profile.dev.package."*"]
+codegen-units = 1
+debug = false
+incremental = false
+opt-level = "z"
+strip = true
+
+[profile.release]
+codegen-units = 1
+debug = false
+incremental = false
+lto = true
+opt-level = 3
+panic = "abort"
+
+[workspace.dependencies]
+regex = { version = "1" }
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+elided_lifetimes_in_paths = "warn"
+trivial_numeric_casts = "warn"
+unused_extern_crates = "warn"
+unused_import_braces = "warn"
+unused_lifetimes = "warn"
+
+[workspace.lints.clippy]
+wildcard_imports = "warn"
+uninlined_format_args = "warn"
+needless_pass_by_value = "warn"
+manual_let_else = "warn"
+unwrap_used = "warn"

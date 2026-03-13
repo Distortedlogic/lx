@@ -1,0 +1,101 @@
+-- 03_arithmetic.lx
+-- Tests: spec/syntax.md (operators), spec/runtime.md (Numbers, Equality, Type Coercions)
+-- Phase: 1 (Lexer + Literal Expressions)
+
+-- basic arithmetic
+assert (2 + 3 == 5)
+assert (10 - 4 == 6)
+assert (3 * 7 == 21)
+assert (15 / 3 == 5)
+assert (17 % 5 == 2)
+assert (7 // 2 == 3)
+
+-- unary negation
+assert (-5 == 0 - 5)
+assert (-(-3) == 3)
+
+-- precedence: * before +
+assert (2 + 3 * 4 == 14)
+assert ((2 + 3) * 4 == 20)
+
+-- precedence: unary before binary
+assert (-2 * 3 == -6)
+assert (-(2 * 3) == -6)
+
+-- left associativity
+assert (10 - 3 - 2 == 5)
+assert (100 / 10 / 2 == 5)
+
+-- integer division
+assert (7 // 2 == 3)
+assert (-7 // 2 == -4)
+assert (0 // 5 == 0)
+
+-- modulo
+assert (10 % 3 == 1)
+assert (-10 % 3 == -1)
+
+-- bigint (no overflow)
+big = 999999999999999999999999999999
+assert (big + 1 == 1000000000000000000000000000000)
+assert (big * 2 == 1999999999999999999999999999998)
+
+-- float arithmetic
+assert (1.5 + 2.5 == 4.0)
+assert (3.0 * 2.0 == 6.0)
+assert (7.0 / 2.0 == 3.5)
+
+-- int-to-float widening
+assert (3 + 4.0 == 7.0)
+assert (2 * 3.5 == 7.0)
+assert (10 / 4.0 == 2.5)
+
+-- comparison operators
+assert (1 < 2)
+assert (2 > 1)
+assert (3 <= 3)
+assert (3 >= 3)
+assert (5 <= 6)
+assert (6 >= 5)
+assert (1 != 2)
+assert (3 == 3)
+
+-- logical operators
+assert (true && true)
+assert (!(true && false))
+assert (true || false)
+assert (!(false || false))
+assert (!false)
+assert (!!true)
+
+-- logical short-circuit
+-- && should not evaluate right side when left is false
+-- || should not evaluate right side when left is true
+assert ((false && true) == false)
+assert ((true || false) == true)
+
+-- string concatenation
+assert ("hello" ++ " " ++ "world" == "hello world")
+assert ("" ++ "a" == "a")
+
+-- equality is structural
+assert ([1 2 3] == [1 2 3])
+assert ({x: 1  y: 2} == {x: 1  y: 2})
+assert ((1 "a") == (1 "a"))
+
+-- inequality
+assert ([1 2] != [1 2 3])
+assert ({x: 1} != {x: 2})
+
+-- grouping
+assert ((1 + 2) * 3 == 9)
+assert (1 + (2 * 3) == 7)
+
+-- mixed precedence with comparison
+assert (1 + 2 > 2 == true)
+assert (3 * 4 == 12)
+
+-- not operator
+assert (not true == false)
+assert (not false == true)
+assert (not (1 == 2))

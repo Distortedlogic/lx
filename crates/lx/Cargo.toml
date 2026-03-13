@@ -1,0 +1,16 @@
+[package]
+name = "lx"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+miette = { version = "7", features = ["fancy"] }
+num-bigint = "0.4"
+num-traits = "0.2"
+thiserror = "2"
+indexmap = "2"
+regex.workspace = true
+
+[lints]
+workspace = true

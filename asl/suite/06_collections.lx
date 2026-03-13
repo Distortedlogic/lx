@@ -1,0 +1,163 @@
+-- 06_collections.lx
+-- Tests: spec/collections.md (Lists, Records, Maps, Sets, Tuples)
+-- Phase: 3 (Collections + Pattern Matching)
+
+-- list basics
+xs = [1 2 3 4 5]
+assert (xs == [1 2 3 4 5])
+assert (len xs == 5)
+assert (empty? [] == true)
+assert (empty? xs == false)
+
+-- list access
+assert (xs.0 == 1)
+assert (xs.4 == 5)
+assert (xs.-1 == 5)
+assert (xs.-2 == 4)
+
+-- safe access with get
+assert (get 0 xs == Some 1)
+assert (get 10 xs == None)
+
+-- list slicing
+assert (xs.1..3 == [2 3])
+assert (xs.2.. == [3 4 5])
+assert (xs...3 == [1 2 3])
+
+-- list spread
+assert ([0 ..xs 6] == [0 1 2 3 4 5 6])
+assert ([..xs ..xs] == [1 2 3 4 5 1 2 3 4 5])
+
+-- list concatenation
+assert ([1 2] ++ [3 4] == [1 2 3 4])
+
+-- list update via spread and slicing
+updated = [..xs.0..2  99  ..xs.3..]
+assert (updated == [1 2 99 4 5])
+
+-- record basics
+p = {x: 3.0  y: 4.0}
+assert (p.x == 3.0)
+assert (p.y == 4.0)
+
+-- record spread
+p2 = {..p  x: 5.0}
+assert (p2.x == 5.0)
+assert (p2.y == 4.0)
+
+-- record merge (later wins)
+a = {x: 1  y: 2}
+b = {y: 3  z: 4}
+merged = {..a  ..b}
+assert (merged.x == 1)
+assert (merged.y == 3)
+assert (merged.z == 4)
+
+-- record shorthand
+x = 10
+y = 20
+r = {x  y}
+assert (r.x == 10)
+assert (r.y == 20)
+
+-- map basics
+m = %{"alice": 1  "bob": 2}
+assert (m."alice" == 1)
+assert (get "carol" m == None)
+assert (get "alice" m == Some 1)
+assert (has_key? "alice" m == true)
+assert (has_key? "carol" m == false)
+
+-- map operations
+assert (keys m == ["alice" "bob"])
+assert (values m == [1 2])
+assert (entries m == [("alice" 1) ("bob" 2)])
+
+-- map spread
+m2 = %{..m  "carol": 3}
+assert (m2."carol" == 3)
+assert (len m2 == 3)
+
+-- map remove
+m3 = remove "bob" m
+assert (len m3 == 1)
+assert (has_key? "bob" m3 == false)
+
+-- map merge
+ma = %{"a": 1  "b": 2}
+mb = %{"b": 3  "c": 4}
+mm = merge ma mb
+assert (mm."b" == 3)
+assert (mm."c" == 4)
+
+-- set basics
+s = #{1 2 3 4 5}
+assert (contains? 3 s == true)
+assert (contains? 6 s == false)
+
+-- set operations
+sa = #{1 2 3}
+sb = #{2 3 4}
+assert (intersect sa sb == #{2 3})
+assert (difference sa sb == #{1})
+assert (sym_diff sa sb == #{1 4})
+assert (is_subset? #{1 2} sa == true)
+assert (is_subset? sa sb == false)
+
+-- set spread
+s2 = #{..sa 4 5}
+assert (contains? 4 s2 == true)
+assert (contains? 5 s2 == true)
+
+-- tuple basics
+t = (1 "hello" true)
+assert (t.0 == 1)
+assert (t.1 == "hello")
+assert (t.2 == true)
+
+-- tuple destructuring
+(a b c) = (10 20 30)
+assert (a == 10)
+assert (b == 20)
+assert (c == 30)
+
+-- conversions
+assert (to_set [1 2 2 3] == #{1 2 3})
+assert (to_list #{1 2 3} | sort == [1 2 3])
+
+-- record to map and back
+rm = to_map {x: 1  y: 2}
+assert (rm == %{"x": 1  "y": 2})
+rr = to_record rm
+assert (rr == {x: 1  y: 2})
+
+-- entries to map
+em = to_map [("a" 1) ("b" 2)]
+assert (em == %{"a": 1  "b": 2})
+
+-- structural equality
+assert ({x: 1  y: 2} == {x: 1  y: 2})
+assert (%{"a": 1} == %{"a": 1})
+assert (#{1 2 3} == #{3 2 1})
+assert ((1 2) == (1 2))
+
+-- first and last
+assert (first [10 20 30] == Some 10)
+assert (last [10 20 30] == Some 30)
+assert (first [] == None)
+assert (last [] == None)
+
+-- contains? on strings
+assert (contains? "ell" "hello" == true)
+assert (contains? "xyz" "hello" == false)
+
+-- record equality is order-independent
+assert ({x: 1  y: 2} == {y: 2  x: 1})
+assert ({a: "hello"  b: 42  c: true} == {c: true  a: "hello"  b: 42})
+
+-- sorted? predicate
+assert (sorted? [1 2 3 4 5])
+assert (sorted? [1])
+assert (sorted? [])
+assert (!(sorted? [3 1 2]))
+assert (sorted? ["a" "b" "c"])

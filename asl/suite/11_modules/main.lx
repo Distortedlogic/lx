@@ -1,0 +1,61 @@
+-- 11_modules/main.lx
+-- Tests: spec/modules.md (use, +exports, aliasing, selective imports)
+-- Phase: 7 (Modules + Type Checker)
+
+-- whole-module import
+use ./lib_math
+assert (lib_math.add 3 4 == 7)
+assert (lib_math.mul 3 4 == 12)
+assert (lib_math.square 5 == 25)
+
+-- accessing exported record
+assert (lib_math.origin.x == 0.0)
+assert (lib_math.origin.y == 0.0)
+
+-- exported function that uses private helper
+assert (lib_math.doubled_square 3 == 18)
+
+-- aliased import
+use ./lib_math : m
+assert (m.add 1 2 == 3)
+assert (m.square 4 == 16)
+
+-- selective import
+use ./lib_math {add square}
+assert (add 10 20 == 30)
+assert (square 6 == 36)
+
+-- type import
+use ./lib_types
+assert (lib_types.color_name Red == "red")
+assert (lib_types.color_name Green == "green")
+assert (lib_types.color_name Blue == "blue")
+
+-- selective type import
+use ./lib_types {make_pair swap_pair}
+p = make_pair 1 "hello"
+assert (p.fst == 1)
+assert (p.snd == "hello")
+
+swapped = swap_pair p
+assert (swapped.fst == "hello")
+assert (swapped.snd == 1)
+
+-- module functions in pipelines
+assert ([1 2 3] | map lib_math.square == [1 4 9])
+assert ([1 2 3] | map (lib_math.add 10) == [11 12 13])
+
+-- module function with currying
+add5 = lib_math.add 5
+assert (add5 10 == 15)
+
+-- clamping function from module
+assert (lib_math.clamp_to 0 100 50 == 50)
+assert (lib_math.clamp_to 0 100 (-10) == 0)
+assert (lib_math.clamp_to 0 100 200 == 100)
+
+-- aliased import in pipeline
+use ./lib_types : t
+colors = [Red Green Blue]
+names = colors | map t.color_name
+assert (names == ["red" "green" "blue"])

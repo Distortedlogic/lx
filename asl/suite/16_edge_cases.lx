@@ -1,0 +1,203 @@
+-- 16_edge_cases.lx
+-- Tests: disambiguation rules, precedence interactions, body extent, edge cases
+-- Phase: 1-4 (cross-cutting regression tests)
+
+-- grouping vs tuple vs unit
+assert ((42) == 42)
+assert ((1 + 2) == 3)
+assert (() == ())
+assert ((1 2) != 1)
+assert ((1 2).0 == 1)
+assert ((1 2).1 == 2)
+
+-- pipe precedence above comparison
+assert ([1 2 3] | sum == 6)
+assert ([1 2 3] | sum > 5)
+assert ([1 2 3] | sum > 5 == true)
+assert ([1 2 3 4] | len == 4)
+
+-- ^ and ?? below pipe
+unwrap_pipeline = () {
+  Ok 42 ^
+}
+assert (unwrap_pipeline () == 42)
+
+coalesce_pipeline = () {
+  (Err "x" ?? 10) | (* 2)
+}
+assert (coalesce_pipeline () == 20)
+
+-- ?? must be wrapped in parens when comparing
+assert ((Ok 42 ?? 0) == 42)
+assert ((Err "x" ?? 0) == 0)
+assert ((None ?? "default") == "default")
+assert ((Some "hi" ?? "nope") == "hi")
+
+-- function body extent: inline lambda consumes pipe
+double_then_sum = [1 2 3] | map (x) { x * 2 } | sum
+assert (double_then_sum == 12)
+
+-- sections: all operator forms
+assert ((+ 1) 5 == 6)
+assert ((- 1) 5 == 4)
+assert ((* 3) 4 == 12)
+assert ((/ 2) 10 == 5)
+assert ((% 3) 7 == 1)
+assert ((// 3) 10 == 3)
+assert ((++ "!") "hi" == "hi!")
+assert ((== 5) 5 == true)
+assert ((== 5) 6 == false)
+assert ((!= 5) 6 == true)
+assert ((< 10) 5 == true)
+assert ((< 10) 15 == false)
+assert ((> 0) 1 == true)
+assert ((<= 5) 5 == true)
+assert ((>= 0) 0 == true)
+
+-- left sections
+assert ((10 -) 3 == 7)
+assert ((100 /) 4 == 25)
+assert ((10 %) 3 == 1)
+
+-- field sections
+r = {x: 1  y: 2  z: 3}
+assert ((.x) r == 1)
+assert ((.y) r == 2)
+assert ([{a: 1} {a: 2} {a: 3}] | map (.a) == [1 2 3])
+
+-- composition direction: f <> g = (x) g(f(x))
+inc = (x) x + 1
+dbl = (x) x * 2
+assert ((inc <> dbl) 3 == 8)
+assert ((dbl <> inc) 3 == 7)
+
+-- predicate composition
+is_pos = (> 0)
+is_neg = is_pos <> not
+assert (is_neg (-1) == true)
+assert (is_neg 5 == false)
+
+-- ? { always starts match block
+result = 5 ? {
+  5 -> "five"
+  _ -> "other"
+}
+assert (result == "five")
+
+-- ternary with parens for record values
+val = true ? ({x: 1}) : ({x: 0})
+assert (val.x == 1)
+val2 = false ? ({x: 1}) : ({x: 0})
+assert (val2.x == 0)
+
+-- single-arm ? returns unit on false
+assert ((false ? "yes") == ())
+assert ((true ? "yes") == "yes")
+
+-- nested match
+data = Ok [1 2 3]
+inner = data ? {
+  Ok [x ..rest] -> x + (rest | sum)
+  Ok []         -> 0
+  Err _         -> -1
+}
+assert (inner == 6)
+
+-- tuple auto-spread in map/each
+assert ([(1 2) (3 4)] | map (a b) a + b == [3 7])
+
+-- auto-spread: 1-param function gets whole tuple
+get_pair = (t) t
+assert (get_pair (1 2) == (1 2))
+
+-- ranges: ascending only
+assert (10..1 | collect == [])
+assert (1..1 | collect == [])
+assert (1..=1 | collect == [1])
+
+-- negative index edge cases
+xs = [10 20 30]
+assert (xs.-1 == 30)
+assert (xs.-3 == 10)
+assert (get (-1) xs == Some 30)
+assert (get (-4) xs == None)
+
+-- record equality is order-independent
+assert ({a: 1  b: 2  c: 3} == {c: 3  b: 2  a: 1})
+assert ({a: 1  b: 2} != {a: 1  b: 3})
+
+-- shadowing: new binding hides old
+x = 10
+f = () x
+x = 20
+assert (x == 20)
+assert (f () == 10)
+
+-- empty collections
+assert ([] | map (* 2) == [])
+assert ([] | filter (> 0) == [])
+assert ([] | fold 0 (+) == 0)
+assert ([] | sum == 0)
+assert ([] | product == 1)
+assert (empty? [])
+assert (empty? "")
+assert (empty? %{})
+assert (empty? #{})
+
+-- string functions
+assert ("  hello  " | trim == "hello")
+assert ("hello" | upper == "HELLO")
+assert ("HELLO" | lower == "hello")
+assert ("hello world" | replace "world" "lx" == "hello lx")
+assert ("aaa" | replace_all "a" "b" == "bbb")
+assert ("ha" | repeat 3 == "hahaha")
+assert (starts? "he" "hello")
+assert (ends? "lo" "hello")
+assert ("hello" | chars | len == 5)
+assert ("hello" | byte_len == 5)
+
+-- multiline continuation: line starting with operator
+total = 1
+  + 2
+  + 3
+assert (total == 6)
+
+-- multiline continuation: line ending with operator
+total2 = 1 +
+  2 +
+  3
+assert (total2 == 6)
+
+-- multiline inside delimiters
+xs2 = [
+  1 2 3
+  4 5 6
+]
+assert (xs2 == [1 2 3 4 5 6])
+
+-- not function
+assert (not true == false)
+assert (not false == true)
+assert (not (1 == 2) == true)
+
+-- chained comparison
+assert ((1 < 2) && (2 < 3))
+assert ((1 < 2) == true)
+
+-- implicit Err early return in annotated functions
+validate = (n: Int) -> Int ^ Str {
+  n < 0 ? Err "negative"
+  n > 100 ? Err "too large"
+  n
+}
+assert (validate 50 == Ok 50)
+assert (validate (-1) == Err "negative")
+assert (validate 200 == Err "too large")
+
+-- Err early return: only in annotated functions
+no_annotation = (n) {
+  n < 0 ? Err "negative"
+  n
+}
+assert (no_annotation 5 == 5)
+assert (no_annotation (-1) == -1)

@@ -1,0 +1,87 @@
+-- 05_pipes.lx
+-- Tests: spec/syntax.md (Pipes, Sections, Composition, Multiline)
+-- Phase: 2 (Functions, Pipes, Sections)
+
+double = (x) x * 2
+add = (x y) x + y
+triple = (x) x * 3
+
+-- basic pipe
+assert (5 | double == 10)
+
+-- pipe is data-last
+assert ([1 2 3] | map (* 2) == [2 4 6])
+assert ([1 2 3 4] | filter (> 2) == [3 4])
+
+-- pipe chain
+result = [1 2 3]
+  | map (* 2)
+  | filter (> 3)
+assert (result == [4 6])
+
+-- pipe to sum
+assert ([1 2 3] | sum == 6)
+
+-- pipe to inline function
+result = 5 | (x) x * x
+assert (result == 25)
+
+-- pipe with block body
+result = 10 | (x) {
+  half = x / 2
+  half + 1
+}
+assert (result == 6)
+
+-- multi-stage pipeline
+result = [5 3 1 4 2]
+  | filter (> 1)
+  | sort
+  | rev
+  | take 3
+assert (result == [5 4 3])
+
+-- section with pipe
+assert ([1 2 3] | map (+ 10) == [11 12 13])
+assert (["a" "b" "c"] | map (++ "!") == ["a!" "b!" "c!"])
+
+-- field section with pipe
+people = [{name: "alice"  age: 30} {name: "bob"  age: 25}]
+names = people | map (.name)
+assert (names == ["alice" "bob"])
+
+ages = people | map (.age)
+assert (ages == [30 25])
+
+-- dbg is transparent (returns value unchanged)
+val = 42 | dbg
+assert (val == 42)
+
+-- tap is transparent (runs side effect, returns original)
+logged := false
+result = 42 | tap (_) { logged <- true } | (x) x + 1
+assert (result == 43)
+assert (logged == true)
+
+-- pipe threading inserts as LAST argument
+replace_x = replace "x" "y"
+assert ("xhellox" | replace_x == "yhellox")
+
+-- nested pipes
+assert ([1 2 3] | map double == [2 4 6])
+
+-- pipe with comparison produces Bool
+assert (5 | (> 0) == true)
+assert ((-1) | (> 0) == false)
+
+-- multiline pipe continuation
+long_result = [10 20 30 40 50]
+  | filter (> 15)
+  | map (* 2)
+  | sum
+assert (long_result == 240)
+
+-- pipe to each (side effects, returns unit)
+collected := []
+[1 2 3] | each (x) { collected <- [..collected x] }
+assert (collected == [1 2 3])
