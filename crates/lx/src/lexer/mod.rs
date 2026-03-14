@@ -170,16 +170,7 @@ impl<'src> Lexer<'src> {
           Ok(Some(self.tok(TokenKind::Percent, start)))
         }
       },
-      '#' => {
-        if self.peek() == Some('{') {
-          self.advance();
-          self.depth += 1;
-          self.brace_stack.push(true);
-          Ok(Some(self.tok2(TokenKind::HashLBrace, start)))
-        } else {
-          Err(LxError::parse("unexpected character: #", Span::new(start as u32, 1), None))
-        }
-      },
+      '#' => Err(LxError::parse("unexpected character: #", Span::new(start as u32, 1), None)),
       '+' => {
         if self.peek() == Some('+') {
           self.advance();
@@ -210,9 +201,6 @@ impl<'src> Lexer<'src> {
         if self.peek() == Some('-') {
           self.advance();
           Ok(Some(self.tok2(TokenKind::Reassign, start)))
-        } else if self.peek() == Some('>') {
-          self.advance();
-          Ok(Some(self.tok2(TokenKind::Diamond, start)))
         } else if self.peek() == Some('=') {
           self.advance();
           Ok(Some(self.tok2(TokenKind::LtEq, start)))
@@ -239,12 +227,7 @@ impl<'src> Lexer<'src> {
         }
       },
       '$' => {
-        if self.peek() == Some('$') {
-          self.advance();
-          self.push(TokenKind::DollarDollar, start, self.pos);
-          self.read_shell_line(false)?;
-          Ok(None)
-        } else if self.peek() == Some('^') {
+        if self.peek() == Some('^') {
           self.advance();
           self.push(TokenKind::DollarCaret, start, self.pos);
           self.read_shell_cmd()?;
@@ -262,7 +245,6 @@ impl<'src> Lexer<'src> {
       },
       '_' if !self.peek().is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '\'') => Ok(Some(self.tok(TokenKind::Underscore, start))),
       c if c.is_ascii_digit() => self.read_number(start).map(Some),
-      'r' if self.peek() == Some('/') => self.read_regex(start).map(Some),
       c if c.is_ascii_lowercase() || c == '_' => self.read_ident_or_keyword(start).map(Some),
       c if c.is_ascii_uppercase() => self.read_type_name(start).map(Some),
       other => Err(LxError::parse(format!("unexpected character: {other}"), Span::new(start as u32, other.len_utf8() as u16), None)),
@@ -307,27 +289,6 @@ impl<'src> Lexer<'src> {
     Ok(Token::new(kind, span))
   }
 
-  fn read_regex(&mut self, start: usize) -> Result<Token, LxError> {
-    self.advance();
-    let pat_start = self.pos;
-    loop {
-      match self.peek() {
-        Some('/') => break,
-        Some('\\') => { self.advance(); self.advance(); },
-        Some(_) => { self.advance(); },
-        None => return Err(LxError::parse("unterminated regex", Span::new(start as u32, 1), None)),
-      }
-    }
-    let pattern = self.source[pat_start..self.pos].to_string();
-    self.advance();
-    let flags_start = self.pos;
-    while self.peek().is_some_and(|c| c.is_ascii_lowercase()) {
-      self.advance();
-    }
-    let flags = self.source[flags_start..self.pos].to_string();
-    let span = Span::from_range(start as u32, self.pos as u32);
-    Ok(Token::new(TokenKind::Regex { pattern, flags }, span))
-  }
 
   fn read_type_name(&mut self, start: usize) -> Result<Token, LxError> {
     while self.peek().is_some_and(|c| c.is_ascii_alphanumeric()) {

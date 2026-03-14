@@ -1,4 +1,4 @@
-use crate::ast::{ListElem, RecordField, Expr, SExpr, MapEntry, SetElem};
+use crate::ast::{ListElem, RecordField, Expr, SExpr, MapEntry};
 use crate::error::LxError;
 use crate::value::{Value, ValueKey};
 use indexmap::IndexMap;
@@ -72,26 +72,4 @@ impl super::Interpreter {
     Ok(Value::Map(Arc::new(map)))
   }
 
-  pub(super) fn eval_set(&mut self, elems: &[SetElem]) -> Result<Value, LxError> {
-    let mut set = indexmap::IndexSet::new();
-    for elem in elems {
-      match elem {
-        SetElem::Single(e) => {
-          set.insert(ValueKey(self.eval(e)?));
-        },
-        SetElem::Spread(e) => {
-          let v = self.eval(e)?;
-          match v {
-            Value::Set(s) => {
-              for k in s.as_ref() {
-                set.insert(k.clone());
-              }
-            },
-            other => return Err(LxError::type_err(format!("spread requires Set, got {}", other.type_name()), e.span)),
-          }
-        },
-      }
-    }
-    Ok(Value::Set(Arc::new(set)))
-  }
 }

@@ -1,4 +1,4 @@
-use crate::ast::{SExpr, Expr, Literal, UnaryOp, StrPart, ListElem, RecordField, MapEntry, SetElem, Section, Param, SStmt, Stmt, Binding, BindTarget, SPattern, ShellMode, SelArm};
+use crate::ast::{SExpr, Expr, Literal, UnaryOp, StrPart, ListElem, RecordField, MapEntry, Section, Param, SStmt, Stmt, Binding, BindTarget, SPattern, ShellMode, SelArm};
 use crate::error::LxError;
 use crate::span::Span;
 use crate::token::TokenKind;
@@ -13,7 +13,6 @@ impl super::Parser {
       TokenKind::False => Ok(SExpr::new(Expr::Literal(Literal::Bool(false)), tok.span)),
       TokenKind::Unit => Ok(SExpr::new(Expr::Literal(Literal::Unit), tok.span)),
       TokenKind::RawStr(s) => Ok(SExpr::new(Expr::Literal(Literal::RawStr(s)), tok.span)),
-      TokenKind::Regex { pattern, flags } => Ok(SExpr::new(Expr::Literal(Literal::Regex { pattern, flags }), tok.span)),
       TokenKind::StrStart => self.parse_string(tok.span.offset),
       TokenKind::Ident(name) => Ok(SExpr::new(Expr::Ident(name), tok.span)),
       TokenKind::TypeName(name) => Ok(SExpr::new(Expr::TypeConstructor(name), tok.span)),
@@ -21,7 +20,6 @@ impl super::Parser {
       TokenKind::LBracket => self.parse_list(tok.span.offset),
       TokenKind::LBrace => self.parse_block_or_record(tok.span.offset),
       TokenKind::PercentLBrace => self.parse_map(tok.span.offset),
-      TokenKind::HashLBrace => self.parse_set(tok.span.offset),
       TokenKind::Minus => self.parse_unary(UnaryOp::Neg, tok.span.offset),
       TokenKind::Bang => self.parse_unary(UnaryOp::Not, tok.span.offset),
       TokenKind::Loop => {
@@ -61,7 +59,6 @@ impl super::Parser {
         Ok(SExpr::new(Expr::Assert { expr: Box::new(expr), msg }, Span::from_range(tok.span.offset, end)))
       },
       TokenKind::Dollar => self.parse_shell(ShellMode::Normal, tok.span.offset),
-      TokenKind::DollarDollar => self.parse_shell(ShellMode::Raw, tok.span.offset),
       TokenKind::DollarCaret => self.parse_shell(ShellMode::Propagate, tok.span.offset),
       TokenKind::DollarBrace => self.parse_shell(ShellMode::Block, tok.span.offset),
       _ => Err(LxError::parse(format!("unexpected token: {:?}", tok.kind), tok.span, None)),
@@ -471,12 +468,12 @@ impl super::Parser {
           }
         }
       },
-      TokenKind::PercentLBrace | TokenKind::HashLBrace => {
+      TokenKind::PercentLBrace => {
         self.advance();
         let mut depth = 1u32;
         while depth > 0 {
           match self.peek() {
-            TokenKind::LBrace | TokenKind::PercentLBrace | TokenKind::HashLBrace => { depth += 1; self.advance(); },
+            TokenKind::LBrace | TokenKind::PercentLBrace => { depth += 1; self.advance(); },
             TokenKind::RBrace => { depth -= 1; self.advance(); },
             TokenKind::Eof => break,
             _ => { self.advance(); },
@@ -565,24 +562,6 @@ impl super::Parser {
     Ok(SExpr::new(Expr::Map(entries), Span::from_range(start, end)))
   }
 
-  fn parse_set(&mut self, start: u32) -> Result<SExpr, LxError> {
-    let mut elems = Vec::new();
-    self.collection_depth += 1;
-    while *self.peek() != TokenKind::RBrace {
-      if *self.peek() == TokenKind::DotDot {
-        self.advance();
-        elems.push(SetElem::Spread(self.parse_expr(0)?));
-      } else {
-        elems.push(SetElem::Single(self.parse_expr(0)?));
-      }
-      if *self.peek() == TokenKind::Semi {
-        self.advance();
-      }
-    }
-    self.collection_depth -= 1;
-    let end = self.expect_kind(&TokenKind::RBrace)?.span.end();
-    Ok(SExpr::new(Expr::Set(elems), Span::from_range(start, end)))
-  }
 
   pub(crate) fn parse_stmts_until_rbrace(&mut self) -> Result<Vec<SStmt>, LxError> {
     self.skip_semis();
@@ -617,10 +596,7 @@ impl super::Parser {
         | TokenKind::Par
         | TokenKind::Sel
         | TokenKind::PercentLBrace
-        | TokenKind::HashLBrace
-        | TokenKind::Regex { .. }
         | TokenKind::Dollar
-        | TokenKind::DollarDollar
         | TokenKind::DollarCaret
         | TokenKind::DollarBrace
     )
@@ -705,12 +681,12 @@ impl super::Parser {
           }
         }
       },
-      Some(TokenKind::PercentLBrace) | Some(TokenKind::HashLBrace) => {
+      Some(TokenKind::PercentLBrace) => {
         i += 1;
         let mut depth = 1u32;
         while depth > 0 {
           match self.tokens.get(i).map(|t| &t.kind) {
-            Some(TokenKind::LBrace | TokenKind::PercentLBrace | TokenKind::HashLBrace) => { depth += 1; i += 1; },
+            Some(TokenKind::LBrace | TokenKind::PercentLBrace) => { depth += 1; i += 1; },
             Some(TokenKind::RBrace) => { depth -= 1; i += 1; },
             None | Some(TokenKind::Eof) => break,
             _ => { i += 1; },
@@ -746,10 +722,7 @@ fn is_expr_start_kind(k: &TokenKind) -> bool {
       | TokenKind::Par
       | TokenKind::Sel
       | TokenKind::PercentLBrace
-      | TokenKind::HashLBrace
-      | TokenKind::Regex { .. }
       | TokenKind::Dollar
-      | TokenKind::DollarDollar
       | TokenKind::DollarCaret
       | TokenKind::DollarBrace
   )

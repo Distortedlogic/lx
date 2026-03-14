@@ -130,14 +130,12 @@ impl Interpreter {
         }
       },
       Expr::Section(sec) => self.eval_section(sec, span),
-      Expr::Compose { left, right } => self.eval_compose(left, right, span),
       Expr::FieldAccess { expr: e, field } => self.eval_field_access(e, field, span),
       Expr::Block(stmts) => self.eval_block(stmts),
       Expr::Tuple(elems) => self.eval_tuple(elems),
       Expr::List(elems) => self.eval_list(elems),
       Expr::Record(fields) => self.eval_record(fields),
       Expr::Map(entries) => self.eval_map(entries),
-      Expr::Set(elems) => self.eval_set(elems),
       Expr::Func { params, body, returns_result } => self.eval_func(params, body, *returns_result),
       Expr::Match { scrutinee, arms } => self.eval_match(scrutinee, arms, span),
       Expr::Ternary { cond, then_, else_ } => self.eval_ternary(cond, then_, else_, span),
@@ -249,7 +247,6 @@ impl Interpreter {
       Literal::Bool(b) => Ok(Value::Bool(*b)),
       Literal::Str(parts) => self.eval_string_parts(parts),
       Literal::RawStr(s) => Ok(Value::Str(Arc::from(s.as_str()))),
-      Literal::Regex { pattern, flags } => Ok(Value::Regex { pattern: Arc::from(pattern.as_str()), flags: Arc::from(flags.as_str()) }),
       Literal::Unit => {
         let _ = span;
         Ok(Value::Unit)

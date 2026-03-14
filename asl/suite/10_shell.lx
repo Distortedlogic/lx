@@ -84,19 +84,6 @@ rec = {val: "fromrec"}
 rec_echo = $^echo "{rec.val}" | trim
 assert (rec_echo == "fromrec")
 
--- $$ raw (no interpolation)
-raw = $$echo "{not interpolated}"
-raw_val = raw ? { Ok v -> v.out | trim; _ -> "" }
-assert (raw_val == "\{not interpolated}")
-
--- $$ also returns Result ShellResult ShellErr
-assert (ok? raw)
-
--- $$ with literal braces
-raw2 = $$echo "hello {world}"
-raw2_val = raw2 ? { Ok v -> v.out | trim; _ -> "" }
-assert (raw2_val == "hello \{world}")
-
 -- $^ with pipe to language functions
 items = $^printf "a\nb\nc" | lines | filter (!= "")
 assert (items | len == 3)

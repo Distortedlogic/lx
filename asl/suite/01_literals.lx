@@ -67,10 +67,6 @@ empty_multi = "
   "
 assert (empty_multi == "")
 
--- regex literals (just construction, not matching)
-re = r/\d+/i
-assert (re != ())
-
 -- to_str representations
 assert ("{42}" == "42")
 assert ("{3.14}" == "3.14")

@@ -266,10 +266,10 @@ assert (r2 == "aXbXcX") "re.replace_all"
 parts = re.split "[,;]" "a,b;c,d"
 assert (parts == ["a" "b" "c" "d"]) "re.split"
 
--- works with regex literal
-assert (re.is_match r/\d+/ "abc123" == true) "re with regex literal"
-found2 = re.find_all r/[A-Z]+/i "Hello World"
-assert (found2 == ["Hello" "World"]) "re with regex flags"
+-- works with string patterns
+assert (re.is_match "\\d+" "abc123" == true) "re with string pattern"
+found2 = re.find_all "(?i)[A-Z]+" "Hello World"
+assert (found2 == ["Hello" "World"]) "re with inline flags"
 
 -- pipeline
 digits = "phone: 555-1234, ext: 42"

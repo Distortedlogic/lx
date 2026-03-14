@@ -91,15 +91,6 @@ p = {x: 3  y: 4}
 get_x = (.x)
 assert (get_x p == 3)
 
--- composition
-f = (x) x + 1
-g = (x) x * 2
-fg = f <> g
-assert (fg 5 == 12)
-
-gf = g <> f
-assert (gf 5 == 11)
-
 -- higher-order functions
 apply = (f x) f x
 assert (apply double 5 == 10)
@@ -116,9 +107,9 @@ assert (ops.2 5 == 2)
 assert (identity 42 == 42)
 assert (identity "hello" == "hello")
 
--- not as function (composable)
+-- not as function (pipeable)
 is_positive = (> 0)
-is_non_positive = is_positive <> not
+is_non_positive = (x) x | is_positive | not
 assert (is_non_positive 0 == true)
 assert (is_non_positive (-1) == true)
 assert (is_non_positive 5 == false)

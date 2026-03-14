@@ -244,29 +244,6 @@ impl Interpreter {
     })
   }
 
-  pub(super) fn eval_compose(&mut self, left: &SExpr, right: &SExpr, span: Span) -> Result<Value, LxError> {
-    let f = self.eval(left)?;
-    let g = self.eval(right)?;
-    let body = Expr::Pipe {
-      left: Box::new(Spanned::new(
-        Expr::Apply { func: Box::new(Spanned::new(Expr::Ident("_cf".into()), span)), arg: Box::new(Spanned::new(Expr::Ident("_cx".into()), span)) },
-        span,
-      )),
-      right: Box::new(Spanned::new(Expr::Ident("_cg".into()), span)),
-    };
-    let mut closure = self.env.child();
-    closure.bind("_cf".into(), f);
-    closure.bind("_cg".into(), g);
-    Ok(Value::Func(LxFunc {
-      params: vec!["_cx".into()],
-      defaults: vec![None],
-      body: Arc::new(Spanned::new(body, span)),
-      closure: closure.into_arc(),
-      arity: 1,
-      applied: vec![],
-      returns_result: false,
-    }))
-  }
 
   pub(super) fn eval_field_access(&mut self, expr: &SExpr, field: &FieldKind, span: Span) -> Result<Value, LxError> {
     let val = self.eval(expr)?;

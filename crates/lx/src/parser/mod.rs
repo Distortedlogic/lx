@@ -127,9 +127,9 @@ impl Parser {
           continue;
         };
         let mut arity = 0usize;
-        while matches!(self.peek(), TokenKind::TypeName(_) | TokenKind::Ident(_) | TokenKind::LParen | TokenKind::LBracket | TokenKind::LBrace | TokenKind::PercentLBrace | TokenKind::HashLBrace) {
+        while matches!(self.peek(), TokenKind::TypeName(_) | TokenKind::Ident(_) | TokenKind::LParen | TokenKind::LBracket | TokenKind::LBrace | TokenKind::PercentLBrace) {
           match self.peek() {
-            TokenKind::LParen | TokenKind::LBracket | TokenKind::LBrace | TokenKind::PercentLBrace | TokenKind::HashLBrace => {
+            TokenKind::LParen | TokenKind::LBracket | TokenKind::LBrace | TokenKind::PercentLBrace => {
               let close = match self.peek() {
                 TokenKind::LParen => TokenKind::RParen,
                 TokenKind::LBracket => TokenKind::RBracket,
@@ -141,7 +141,7 @@ impl Parser {
                 let k = self.peek().clone();
                 if k == TokenKind::Eof { break; }
                 if std::mem::discriminant(&k) == std::mem::discriminant(&close) { depth -= 1; }
-                else if matches!(k, TokenKind::LParen | TokenKind::LBracket | TokenKind::LBrace | TokenKind::PercentLBrace | TokenKind::HashLBrace) { depth += 1; }
+                else if matches!(k, TokenKind::LParen | TokenKind::LBracket | TokenKind::LBrace | TokenKind::PercentLBrace) { depth += 1; }
                 self.advance();
               }
             },
@@ -184,7 +184,6 @@ impl Parser {
           && matches!(
             next.kind,
             TokenKind::Pipe
-              | TokenKind::Diamond
               | TokenKind::QQ
               | TokenKind::Caret
               | TokenKind::Dot
@@ -268,11 +267,6 @@ impl Parser {
         let right = self.parse_expr(rbp)?;
         let span = Span::from_range(start, right.span.end());
         Ok(SExpr::new(Expr::Pipe { left: Box::new(left), right: Box::new(right) }, span))
-      },
-      TokenKind::Diamond => {
-        let right = self.parse_expr(rbp)?;
-        let span = Span::from_range(start, right.span.end());
-        Ok(SExpr::new(Expr::Compose { left: Box::new(left), right: Box::new(right) }, span))
       },
       TokenKind::TildeArrow => {
         let right = self.parse_expr(rbp)?;
@@ -417,7 +411,7 @@ impl Parser {
     let callable = if self.collection_depth > 0 {
       matches!(left.node, Expr::TypeConstructor(_)) && !matches!(self.peek(), TokenKind::TypeName(_))
     } else {
-      matches!(left.node, Expr::Ident(_) | Expr::TypeConstructor(_) | Expr::Apply { .. } | Expr::FieldAccess { .. } | Expr::Section(_) | Expr::Func { .. } | Expr::Compose { .. })
+      matches!(left.node, Expr::Ident(_) | Expr::TypeConstructor(_) | Expr::Apply { .. } | Expr::FieldAccess { .. } | Expr::Section(_) | Expr::Func { .. })
     };
     if !callable {
       return false;
@@ -436,9 +430,7 @@ impl Parser {
         | TokenKind::True
         | TokenKind::False
         | TokenKind::Unit
-        | TokenKind::HashLBrace
-        | TokenKind::PercentLBrace
-        | TokenKind::Regex { .. }
+               | TokenKind::PercentLBrace
     )
   }
 
@@ -635,7 +627,7 @@ fn infix_bp(kind: &TokenKind) -> Option<(u8, u8)> {
     TokenKind::And => Some((15, 16)),
     TokenKind::Eq | TokenKind::NotEq | TokenKind::Lt | TokenKind::Gt | TokenKind::LtEq | TokenKind::GtEq => Some((17, 18)),
     TokenKind::Pipe => Some((19, 20)),
-    TokenKind::PlusPlus | TokenKind::Diamond | TokenKind::TildeArrow | TokenKind::TildeArrowQ => Some((21, 22)),
+    TokenKind::PlusPlus | TokenKind::TildeArrow | TokenKind::TildeArrowQ => Some((21, 22)),
     TokenKind::DotDot | TokenKind::DotDotEq => Some((23, 24)),
     TokenKind::Plus | TokenKind::Minus => Some((25, 26)),
     TokenKind::Star | TokenKind::Slash | TokenKind::Percent | TokenKind::IntDiv => Some((27, 28)),

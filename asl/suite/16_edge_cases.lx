@@ -66,15 +66,9 @@ assert ((.x) r == 1)
 assert ((.y) r == 2)
 assert ([{a: 1} {a: 2} {a: 3}] | map (.a) == [1 2 3])
 
--- composition direction: f <> g = (x) g(f(x))
-inc = (x) x + 1
-dbl = (x) x * 2
-assert ((inc <> dbl) 3 == 8)
-assert ((dbl <> inc) 3 == 7)
-
--- predicate composition
+-- predicate negation via pipe
 is_pos = (> 0)
-is_neg = is_pos <> not
+is_neg = (x) x | is_pos | not
 assert (is_neg (-1) == true)
 assert (is_neg 5 == false)
 
@@ -143,7 +137,6 @@ assert ([] | product == 1)
 assert (empty? [])
 assert (empty? "")
 assert (empty? %{})
-assert (empty? #{})
 
 -- string functions
 assert ("  hello  " | trim == "hello")

@@ -21,9 +21,8 @@ pub fn build() -> IndexMap<String, Value> {
 fn get_pattern(v: &Value, span: Span) -> Result<(&str, &str), LxError> {
     match v {
         Value::Str(s) => Ok((s.as_ref(), "")),
-        Value::Regex { pattern, flags } => Ok((pattern.as_ref(), flags.as_ref())),
         other => Err(LxError::type_err(
-            format!("re: expected Str or Regex pattern, got {}", other.type_name()),
+            format!("re: expected Str pattern, got {}", other.type_name()),
             span,
         )),
     }

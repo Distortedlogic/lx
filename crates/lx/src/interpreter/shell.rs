@@ -19,7 +19,7 @@ impl Interpreter {
   ) -> Result<Value, LxError> {
     let cmd_str = self.build_shell_string(parts)?;
     match mode {
-      ShellMode::Normal | ShellMode::Raw | ShellMode::Block => self.exec_shell_full(&cmd_str, span),
+      ShellMode::Normal | ShellMode::Block => self.exec_shell_full(&cmd_str, span),
       ShellMode::Propagate => self.exec_shell_propagate(&cmd_str, span),
     }
   }

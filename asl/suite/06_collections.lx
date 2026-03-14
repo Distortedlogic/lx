@@ -90,25 +90,6 @@ mm = merge ma mb
 assert (mm."b" == 3)
 assert (mm."c" == 4)
 
--- set basics
-s = #{1 2 3 4 5}
-assert (contains? 3 s == true)
-assert (contains? 6 s == false)
-
--- set operations
-sa = #{1 2 3}
-sb = #{2 3 4}
-assert (intersect sa sb == #{2 3})
-assert (difference sa sb == #{1})
-assert (sym_diff sa sb == #{1 4})
-assert (is_subset? #{1 2} sa == true)
-assert (is_subset? sa sb == false)
-
--- set spread
-s2 = #{..sa 4 5}
-assert (contains? 4 s2 == true)
-assert (contains? 5 s2 == true)
-
 -- tuple basics
 t = (1 "hello" true)
 assert (t.0 == 1)
@@ -120,10 +101,6 @@ assert (t.2 == true)
 assert (a == 10)
 assert (b == 20)
 assert (c == 30)
-
--- conversions
-assert (to_set [1 2 2 3] == #{1 2 3})
-assert (to_list #{1 2 3} | sort == [1 2 3])
 
 -- record to map and back
 rm = to_map {x: 1  y: 2}
@@ -138,7 +115,6 @@ assert (em == %{"a": 1  "b": 2})
 -- structural equality
 assert ({x: 1  y: 2} == {x: 1  y: 2})
 assert (%{"a": 1} == %{"a": 1})
-assert (#{1 2 3} == #{3 2 1})
 assert ((1 2) == (1 2))
 
 -- first and last

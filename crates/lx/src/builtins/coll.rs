@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 
@@ -40,8 +40,7 @@ fn bi_contains(args: &[Value], span: Span) -> Result<Value, LxError> {
       Ok(Value::Bool(s.contains(needle)))
     },
     Value::List(l) => Ok(Value::Bool(l.iter().any(|v| v == &args[0]))),
-    Value::Set(s) => Ok(Value::Bool(s.contains(&ValueKey(args[0].clone())))),
-    other => Err(LxError::type_err(format!("contains? expects Str/List/Set, got {}", other.type_name()), span)),
+    other => Err(LxError::type_err(format!("contains? expects Str/List, got {}", other.type_name()), span)),
   }
 }
 fn bi_get(args: &[Value], span: Span) -> Result<Value, LxError> {
@@ -145,18 +144,13 @@ fn bi_flatten(args: &[Value], span: Span) -> Result<Value, LxError> {
   }
   Ok(Value::List(Arc::new(out)))
 }
-fn bi_to_set(args: &[Value], span: Span) -> Result<Value, LxError> {
-  let l = args[0].as_list().ok_or_else(|| LxError::type_err("to_set expects List", span))?;
-  Ok(Value::Set(Arc::new(l.iter().map(|v| ValueKey(v.clone())).collect())))
-}
 fn kv_tuple(k: Value, v: Value) -> Value {
   Value::Tuple(Arc::new(vec![k, v]))
 }
 fn bi_to_list(args: &[Value], span: Span) -> Result<Value, LxError> {
   match &args[0] {
-    Value::Set(s) => Ok(Value::List(Arc::new(s.iter().map(|k| k.0.clone()).collect()))),
     Value::Map(m) => Ok(Value::List(Arc::new(m.iter().map(|(k, v)| kv_tuple(k.0.clone(), v.clone())).collect()))),
-    other => Err(LxError::type_err(format!("to_list expects Set/Map, got {}", other.type_name()), span)),
+    other => Err(LxError::type_err(format!("to_list expects Map, got {}", other.type_name()), span)),
   }
 }
 fn bi_to_map(args: &[Value], span: Span) -> Result<Value, LxError> {
@@ -241,32 +235,6 @@ fn bi_merge(args: &[Value], span: Span) -> Result<Value, LxError> {
     _ => Err(LxError::type_err("merge expects two Maps", span)),
   }
 }
-fn get_set<'a>(v: &'a Value, name: &str, span: Span) -> Result<&'a IndexSet<ValueKey>, LxError> {
-  match v {
-    Value::Set(s) => Ok(s.as_ref()),
-    other => Err(LxError::type_err(format!("{name} expects Set, got {}", other.type_name()), span)),
-  }
-}
-fn bi_intersect(args: &[Value], span: Span) -> Result<Value, LxError> {
-  let (a, b) = (get_set(&args[0], "intersect", span)?, get_set(&args[1], "intersect", span)?);
-  Ok(Value::Set(Arc::new(a.intersection(b).cloned().collect())))
-}
-fn bi_difference(args: &[Value], span: Span) -> Result<Value, LxError> {
-  let (a, b) = (get_set(&args[0], "difference", span)?, get_set(&args[1], "difference", span)?);
-  Ok(Value::Set(Arc::new(a.difference(b).cloned().collect())))
-}
-fn bi_sym_diff(args: &[Value], span: Span) -> Result<Value, LxError> {
-  let (a, b) = (get_set(&args[0], "sym_diff", span)?, get_set(&args[1], "sym_diff", span)?);
-  Ok(Value::Set(Arc::new(a.symmetric_difference(b).cloned().collect())))
-}
-fn bi_is_subset(args: &[Value], span: Span) -> Result<Value, LxError> {
-  let (a, b) = (get_set(&args[0], "is_subset?", span)?, get_set(&args[1], "is_subset?", span)?);
-  Ok(Value::Bool(a.is_subset(b)))
-}
-fn bi_is_superset(args: &[Value], span: Span) -> Result<Value, LxError> {
-  let (a, b) = (get_set(&args[0], "is_superset?", span)?, get_set(&args[1], "is_superset?", span)?);
-  Ok(Value::Bool(a.is_superset(b)))
-}
 pub(super) fn register(env: &mut Env) {
   env.bind("first".into(), mk("first", 1, bi_first));
   env.bind("last".into(), mk("last", 1, bi_last));
@@ -281,7 +249,6 @@ pub(super) fn register(env: &mut Env) {
   env.bind("max".into(), mk("max", 1, bi_max));
   env.bind("uniq".into(), mk("uniq", 1, bi_uniq));
   env.bind("flatten".into(), mk("flatten", 1, bi_flatten));
-  env.bind("to_set".into(), mk("to_set", 1, bi_to_set));
   env.bind("to_list".into(), mk("to_list", 1, bi_to_list));
   env.bind("to_map".into(), mk("to_map", 1, bi_to_map));
   env.bind("to_record".into(), mk("to_record", 1, bi_to_record));
@@ -291,9 +258,4 @@ pub(super) fn register(env: &mut Env) {
   env.bind("has_key?".into(), mk("has_key?", 2, bi_has_key));
   env.bind("remove".into(), mk("remove", 2, bi_remove));
   env.bind("merge".into(), mk("merge", 2, bi_merge));
-  env.bind("intersect".into(), mk("intersect", 2, bi_intersect));
-  env.bind("difference".into(), mk("difference", 2, bi_difference));
-  env.bind("sym_diff".into(), mk("sym_diff", 2, bi_sym_diff));
-  env.bind("is_subset?".into(), mk("is_subset?", 2, bi_is_subset));
-  env.bind("is_superset?".into(), mk("is_superset?", 2, bi_is_superset));
 }

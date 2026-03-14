@@ -82,10 +82,6 @@ pub fn lx_to_json(val: &Value, span: Span) -> Result<serde_json::Value, LxError>
             obj.insert("values".into(), serde_json::Value::Array(arr?));
             Ok(serde_json::Value::Object(obj))
         },
-        Value::Set(elems) => {
-            let arr: Result<Vec<_>, _> = elems.iter().map(|e| lx_to_json(&e.0, span)).collect();
-            Ok(serde_json::Value::Array(arr?))
-        },
         other => Err(LxError::runtime(
             format!("json: cannot encode {}", other.type_name()),
             span,

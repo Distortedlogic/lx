@@ -2,7 +2,7 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use num_bigint::BigInt;
 
 use crate::ast::SExpr;
@@ -22,7 +22,6 @@ pub enum Value {
   List(Arc<Vec<Value>>),
   Record(Arc<IndexMap<String, Value>>),
   Map(Arc<IndexMap<ValueKey, Value>>),
-  Set(Arc<IndexSet<ValueKey>>),
   Tuple(Arc<Vec<Value>>),
 
   Func(LxFunc),
@@ -35,7 +34,6 @@ pub enum Value {
 
   Tagged { tag: Arc<str>, values: Arc<Vec<Value>> },
   TaggedCtor { tag: Arc<str>, arity: usize, applied: Vec<Value> },
-  Regex { pattern: Arc<str>, flags: Arc<str> },
   Range { start: i64, end: i64, inclusive: bool },
   Iterator(IterSource),
   Protocol { name: Arc<str>, fields: Arc<Vec<ProtoFieldDef>> },
@@ -85,13 +83,11 @@ impl Value {
         a_sorted.iter().zip(b_sorted.iter()).all(|((ak, av), (bk, bv))| ak == bk && av == bv)
       },
       (Value::Map(a), Value::Map(b)) => a == b,
-      (Value::Set(a), Value::Set(b)) => a == b,
       (Value::Ok(a), Value::Ok(b)) => a == b,
       (Value::Err(a), Value::Err(b)) => a == b,
       (Value::Some(a), Value::Some(b)) => a == b,
       (Value::None, Value::None) => true,
       (Value::Tagged { tag: t1, values: v1 }, Value::Tagged { tag: t2, values: v2 }) => t1 == t2 && v1 == v2,
-      (Value::Regex { pattern: p1, flags: f1 }, Value::Regex { pattern: p2, flags: f2 }) => p1 == p2 && f1 == f2,
       (Value::Range { start: s1, end: e1, inclusive: i1 }, Value::Range { start: s2, end: e2, inclusive: i2 }) => s1 == s2 && e1 == e2 && i1 == i2,
       (Value::Protocol { name: n1, .. }, Value::Protocol { name: n2, .. }) => n1 == n2,
       (Value::Func(_), _) | (_, Value::Func(_)) => false,
@@ -131,12 +127,6 @@ impl Value {
           v.hash_value(state);
         }
       },
-      Value::Set(elems) => {
-        elems.len().hash(state);
-        for e in elems.iter() {
-          e.hash(state);
-        }
-      },
       Value::Ok(v) | Value::Err(v) | Value::Some(v) => v.hash_value(state),
       Value::None => {},
       Value::Tagged { tag, values } => {
@@ -144,10 +134,6 @@ impl Value {
         for v in values.iter() {
           v.hash_value(state);
         }
-      },
-      Value::Regex { pattern, flags } => {
-        pattern.hash(state);
-        flags.hash(state);
       },
       Value::Range { start, end, inclusive } => {
         start.hash(state);
@@ -208,7 +194,6 @@ impl Value {
       Value::List(_) => "List",
       Value::Record(_) => "Record",
       Value::Map(_) => "Map",
-      Value::Set(_) => "Set",
       Value::Tuple(_) => "Tuple",
       Value::Func(_) | Value::BuiltinFunc(_) => "Func",
       Value::Ok(_) => "Ok",
@@ -217,7 +202,6 @@ impl Value {
       Value::None => "None",
       Value::Tagged { .. } => "Tagged",
       Value::TaggedCtor { .. } => "Func",
-      Value::Regex { .. } => "Regex",
       Value::Range { .. } => "Range",
       Value::Iterator(_) => "Iterator",
       Value::Protocol { .. } => "Protocol",
@@ -273,16 +257,6 @@ impl fmt::Display for Value {
         }
         write!(f, "}}")
       },
-      Value::Set(elems) => {
-        write!(f, "Set{{")?;
-        for (i, e) in elems.iter().enumerate() {
-          if i > 0 {
-            write!(f, " ")?;
-          }
-          write!(f, "{}", e.0)?;
-        }
-        write!(f, "}}")
-      },
       Value::Func(_) => write!(f, "<func>"),
       Value::BuiltinFunc(b) => write!(f, "<builtin {}/{}>", b.name, b.arity),
       Value::Ok(v) => write!(f, "Ok {v}"),
@@ -297,7 +271,6 @@ impl fmt::Display for Value {
         Ok(())
       },
       Value::TaggedCtor { tag, .. } => write!(f, "<ctor {tag}>"),
-      Value::Regex { pattern, flags } => write!(f, "r/{pattern}/{flags}"),
       Value::Range { start, end, inclusive } => {
         if *inclusive { write!(f, "{start}..={end}") } else { write!(f, "{start}..{end}") }
       },

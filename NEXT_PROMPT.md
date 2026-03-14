@@ -77,8 +77,8 @@ The core language is feature-complete through Phase 8. The agentic workflow loop
 
 ### Important syntax notes
 
-- Tuple creation with variables needs semicolons: `(b; a)` not `(b a)` (Idents are callable)
-- Generic return types need parens: `-> (Tree a)` not `-> Tree a`
+- Tuple creation with variables needs semicolons: `(b; a)` not `(b a)` — **marked for fix in Priority S** (switch to comma syntax `(a, b)`)
+- Generic return types need parens: `-> (Tree a)` not `-> Tree a` — **goes away with Priority S** (removing type annotations)
 - Records/maps use collection-mode: `{x: (f 42)}` for function calls in field values
 - Shell `$` consumes full line; wrap in parens for expressions: `($cmd) ? { ... }`
 - `~>?` composes with `^` and `|`: `agent ~>? msg ^ | process` = `((agent ~>? msg) ^) | process`
@@ -86,15 +86,32 @@ The core language is feature-complete through Phase 8. The agentic workflow loop
 
 ## Critical Reading
 
-**Read `asl/CURRENT_OPINION.md` for design context.** Priorities A–D.5 DONE. Remaining: E (implicit context scope), F (resumable workflows).
+**Read `asl/CURRENT_OPINION.md` for design context.** Priorities A–D.5 DONE. **Next: Priority S (surface area reduction) — remove 8 features that don't serve agentic workflows.** Then E (implicit context scope), F (resumable workflows).
 
 ## What To Work On Next
 
-The agentic core is complete. The next work falls into three categories:
+The agentic core is complete. **The language needs to get smaller before it gets bigger.**
 
-### 1. Remaining stdlib modules (Phase 9)
+### 1. Surface area reduction (Priority S — HIGH, DO THIS FIRST)
 
-These make lx useful for general scripting beyond agentic workflows.
+Remove features that don't serve agentic workflows. Each costs parser/interpreter complexity and widens the surface area an LLM must learn. Removing these cuts ~15-20% of parser/interpreter code and resolves 3 known spec tensions.
+
+| Feature to remove | Why | What replaces it |
+|-------------------|-----|-----------------|
+| Lazy iterator protocol | Agents deal with finite data only | Eager `map`/`filter`/`take` on lists |
+| Currying | #1 source of parser bugs (named-args tension, is_func_def heuristic) | Sections `(* 2)`, explicit closures `(x) f x y` |
+| Set literals `#{}` | No agentic use case | Lists + `unique` |
+| `$$` raw shell | Too niche | `${...}` blocks |
+| Type annotations (parse-and-skip) | Do nothing at runtime, add parser complexity, false safety | Protocol contracts for boundary validation |
+| Regex literals `r/.../` | Lexer mode complexity | `std/re` with string patterns |
+| `<>` composition | Direction confusion (3 sessions), `\|` covers it | Pipes |
+| Tuple semicolons `(a; b)` | #1 predicted LLM generation bug | Comma syntax `(a, b)` |
+
+**Order of operations:** Remove features one at a time, update tests after each, keep 17/17 PASS throughout. Start with the easiest (regex literals, `$$`, `<>`) and work toward the hardest (currying, tuple syntax).
+
+### 2. Remaining stdlib modules (Phase 9)
+
+These make lx useful for real agent workflows (HTTP for APIs, time for scheduling, etc.).
 
 | Module | Rust crate | Key functions |
 |--------|-----------|---------------|
@@ -107,22 +124,20 @@ These make lx useful for general scripting beyond agentic workflows.
 | `std/yaml` | `serde_yaml` | parse, encode |
 | `std/crypto` | `sha2`, `hmac` | sha256, hmac |
 | `std/os` | — | pid, hostname, platform |
-| `std/fmt` | — | pad, truncate |
-| `std/bit` | — | and, or, xor, shift |
 
-### 2. Language design work (Priorities E–F)
+### 3. Language design work (Priorities E–F)
 
 - **Implicit context scope (Priority E)** — eliminate manual state threading. `with` block or implicit parameter so agent functions don't manually pass state around.
 - **Resumable workflows (Priority F)** — workflows as inspectable, checkpointable values. If step 3 of 5 fails, resume from step 3.
 
-### 3. Technical debt
+### 4. Technical debt
 
-- **300-line limit violations**: prefix.rs (773), parser/mod.rs (640+), interpreter/mod.rs (520+), hof.rs (425), value.rs (330). These are the core files — splitting them improves readability and context-friendliness.
+- **300-line limit violations**: prefix.rs (773), parser/mod.rs (640+), interpreter/mod.rs (520+), hof.rs (425), value.rs (330). Note: Priority S removals will naturally shrink these files.
 - **Fake concurrency**: `par`/`sel`/`pmap` are sequential. Real threading/async requires `tokio`.
-- **Parser fragility**: named-arg/ternary conflict, assert greedy parsing, `is_func_def` heuristics.
+- **Parser fragility**: named-arg/ternary conflict, assert greedy parsing. Note: removing currying resolves the worst of these.
 - **Stale spec files**: `examples.md`, `examples-extended.md`, `toolchain.md` still use `agent.ask`/`agent.send` library syntax instead of `~>`/`~>?`.
 
-### 4. Toolchain (Phase 10)
+### 5. Toolchain (Phase 10)
 
 | Tool | Purpose | Crate |
 |------|---------|-------|

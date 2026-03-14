@@ -61,7 +61,6 @@ fn bi_len(args: &[Value], span: Span) -> Result<Value, LxError> {
     Value::List(l) => l.len(),
     Value::Record(r) => r.len(),
     Value::Map(m) => m.len(),
-    Value::Set(s) => s.len(),
     Value::Tuple(t) => t.len(),
     other => return Err(LxError::type_err(format!("len expects collection, got {}", other.type_name()), span)),
   };
@@ -74,7 +73,6 @@ fn bi_empty(args: &[Value], span: Span) -> Result<Value, LxError> {
     Value::List(l) => l.is_empty(),
     Value::Record(r) => r.is_empty(),
     Value::Map(m) => m.is_empty(),
-    Value::Set(s) => s.is_empty(),
     Value::Tuple(t) => t.is_empty(),
     other => return Err(LxError::type_err(format!("empty? expects collection, got {}", other.type_name()), span)),
   };

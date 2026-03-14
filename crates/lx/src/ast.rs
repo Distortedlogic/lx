@@ -58,7 +58,6 @@ pub enum Expr {
 
   Apply { func: Box<SExpr>, arg: Box<SExpr> },
   Section(Section),
-  Compose { left: Box<SExpr>, right: Box<SExpr> },
 
   FieldAccess { expr: Box<SExpr>, field: FieldKind },
 
@@ -68,7 +67,6 @@ pub enum Expr {
   List(Vec<ListElem>),
   Record(Vec<RecordField>),
   Map(Vec<MapEntry>),
-  Set(Vec<SetElem>),
 
   Func { params: Vec<Param>, body: Box<SExpr>, returns_result: bool },
   Match { scrutinee: Box<SExpr>, arms: Vec<MatchArm> },
@@ -96,7 +94,6 @@ pub enum Expr {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShellMode {
   Normal,
-  Raw,
   Propagate,
   Block,
 }
@@ -107,7 +104,6 @@ pub enum Literal {
   Float(f64),
   Str(Vec<StrPart>),
   RawStr(String),
-  Regex { pattern: String, flags: String },
   Bool(bool),
   Unit,
 }
@@ -152,12 +148,6 @@ pub struct MapEntry {
   pub key: Option<SExpr>,
   pub value: SExpr,
   pub is_spread: bool,
-}
-
-#[derive(Debug, Clone)]
-pub enum SetElem {
-  Single(SExpr),
-  Spread(SExpr),
 }
 
 #[derive(Debug, Clone)]
