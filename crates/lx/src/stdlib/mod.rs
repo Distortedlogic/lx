@@ -1,9 +1,13 @@
+pub(crate) mod agent;
 mod ctx;
 mod env;
 mod fs;
 mod json;
-pub(crate) mod json_conv;
+pub mod json_conv;
 mod math;
+mod mcp;
+mod md;
+mod md_build;
 mod re;
 
 use crate::interpreter::ModuleExports;
@@ -19,6 +23,9 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
         "fs" => fs::build(),
         "env" => env::build(),
         "re" => re::build(),
+        "md" => md::build(),
+        "agent" => agent::build(),
+        "mcp" => mcp::build(),
         _ => return None,
     };
     Some(ModuleExports {
@@ -31,5 +38,5 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
     if path.len() < 2 || path[0] != "std" {
         return false;
     }
-    matches!(path[1].as_str(), "json" | "ctx" | "math" | "fs" | "env" | "re")
+    matches!(path[1].as_str(), "json" | "ctx" | "math" | "fs" | "env" | "re" | "md" | "agent" | "mcp")
 }

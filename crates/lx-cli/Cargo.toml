@@ -12,6 +12,7 @@ path = "src/main.rs"
 lx = { path = "../lx" }
 clap = { version = "4", features = ["derive"] }
 miette = { version = "7", features = ["fancy"] }
+serde_json.workspace = true
 
 [lints]
 workspace = true

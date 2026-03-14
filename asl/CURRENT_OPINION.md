@@ -1,116 +1,86 @@
 # Current Opinion: lx as an Agentic Language
 
-Written by the language designer (Claude) after 13 implementation sessions. Updated after implementing agent communication syntax.
+Written by the language designer (Claude) after 17 implementation sessions. Honest assessment.
 
 ## What Works
 
-**Pipes are the right primitive.** `data | analyze | filter (.critical) | create_tickets` generates left-to-right, reads like a workflow, composes naturally. This IS genuinely better than nested function calls for LLM generation.
+**Pipes + `^` + `??` is a genuinely excellent error handling model for scripting.** This line tells the whole story:
 
-**`^` propagation is perfect for multi-step workflows.** Every agent operation can fail. `analyzer ~>? {task} ^ | process ^` — errors propagate cleanly without try/catch noise. Combined with `??` for defaults, error handling is concise and composable.
+```
+analyzer ~>? {task: "review"} ^ | (.findings) | filter (.critical)
+```
 
-**`par`/`sel` map directly to agent orchestration patterns.** "Do these things concurrently" and "race these and take the first result" are exactly what multi-agent workflows need. The syntax is clean.
+Ask an agent, unwrap the result, extract a field, filter it. Five operations, zero boilerplate, left-to-right, every step obvious. No `await`, no `.then()`, no `try/catch`, no `if err != nil`. If I'm generating code token-by-token, this is exactly what I want to produce.
 
-**Shell integration as a language primitive works.** `$` has its own lexer mode, its own semantics. The language KNOWS about shell commands. This is the right model.
+**Agent syntax earns its keep.** `~>` and `~>?` as infix operators compose with everything (`^`, `|`, `par`/`sel`, `??`) through normal precedence rules — no special casing. The language design is internally consistent here.
 
-**Agent communication now has its own syntax.** `~>` (send) and `~>?` (ask) are infix operators with their own AST nodes. The parser KNOWS when agent communication is happening. This was the single biggest gap — agents were library calls while shell got language-level syntax. Fixed.
+**Message contracts catch real errors.** `Protocol ReviewRequest = {task: Str path: Str}` validates at boundaries. Wrong field names, missing fields, wrong types — caught immediately with clear diagnostics instead of cryptic deep errors three calls later.
 
-## What's Still Wrong
+**Shell integration is the right model.** `$` has its own lexer mode. The language KNOWS about shell commands. This is what scripting languages should do.
 
-### 1. ~~Agents are just library calls~~ ✓ FIXED
+**The stdlib architecture is the cleanest part of the codebase.** One `.rs` file, one match arm, module exists. No framework, no registration macros, no trait gymnastics. Six modules shipped in one session because the abstraction is right.
 
-`~>` and `~>?` are now language-level infix operators with their own tokens (`TildeArrow`, `TildeArrowQ`), AST nodes (`Expr::AgentSend`, `Expr::AgentAsk`), and interpreter dispatch. Agents are records with a `handler` field. The syntax composes with `^`, `|`, `par`/`sel`, and `??`.
+## What's Actually Wrong
 
-### 2. ~~Messages are untyped bags~~ ✓ FIXED
+### The tuple semicolon rule is a design flaw
 
-`Protocol` keyword validates record shapes at boundaries. `Protocol ReviewRequest = {task: Str  path: Str  depth: Int = 3}` declares a contract. `ReviewRequest {task: "review" path: "src/"}` validates at application time — missing fields and type mismatches are caught immediately with clear diagnostics. Extra fields allowed (structural subtyping). Defaults filled in. `Any` type for flexible fields.
+`(a; b)` = tuple. `(a b)` = function application. The whole thesis is "LLMs write this language." An LLM will write `(x y)` meaning a tuple and get function application. This will be the #1 source of bugs in generated lx code. The ambiguity is fundamental to whitespace-as-application. I don't have a clean fix, but it needs one.
 
-### 3. Context threading is manual
+### The parser is fragile in subtle ways
 
-Agents accumulate state across steps. Currently:
+The assert greedy-consumption bug, the named-arg/ternary conflict, the `is_func_def` heuristic — these are all symptoms of a Pratt parser being pushed past what Pratt parsers do cleanly. Juxtaposition-as-application is powerful but creates ambiguity pockets that require increasingly specific heuristics. Each heuristic introduces new edge cases.
+
+### Concurrency is fake
+
+`par` and `sel` are sequential. Every spec example showing concurrent agent orchestration is aspirational, not real. The gap between spec and implementation is a credibility issue.
+
+### Context threading is verbose
+
 ```
 state = ctx.load "state.json" ^
 state = ctx.set "step" "process" state
 state = ctx.set "data" data state
 ctx.save "state.json" state ^
 ```
-Every function manually threads `state`. This is exactly the kind of boilerplate that lx's design axioms say to eliminate.
 
-### 4. Workflows are opaque imperative code
+Pipelines help (`ctx.empty () | ctx.set "k" v | ctx.set "k2" v2`) but complex workflows still thread state manually through every function.
 
-A workflow is a series of imperative statements. The runtime can't inspect it, checkpoint it, resume it, or retry individual steps. If step 3 of 5 fails, you start over. For long-running agent workflows, this is a real limitation.
+### The 300-line limit is being violated where it matters most
 
-### 5. The tuple semicolon rule is an LLM footgun
+Parser at 640+, prefix at 773. These are the files you need to read to understand how the language works, and they're too big to hold in context.
 
-`(a; b)` = tuple. `(a b)` = function application. If THE WHOLE POINT is that LLMs write this language, a silent semantic difference based on one character is exactly the kind of bug LLMs will generate constantly.
+### The differentiators are proven
+
+`std/agent` spawns subprocesses and communicates via JSON-line protocol. `~>` and `~>?` work transparently with subprocess agents. `std/md` processes markdown for agent memory/reports. `std/mcp` provides MCP tool invocation over stdio via JSON-RPC 2.0. The full agentic workflow loop is closed: agents spawn → communicate → invoke tools → persist context.
 
 ## What Should Change Next
 
-### Priority A: ~~Agent communication as language syntax~~ ✓ DONE
-
-Implemented in Session 13. `~>` for send, `~>?` for ask. Infix operators at concat/diamond precedence (21/22). Compose naturally with `^`, `|`, `par`/`sel`, `??`.
-
-```
-analyzer ~> {action: "log" data: results}
-result = analyzer ~>? {task: "review" path: "src/"} ^
-analyzer ~>? {task: "review"} ^ | (.findings) | filter (.critical)
-```
-
+### Priority A: ~~Agent communication syntax~~ ✓ DONE
 ### Priority B: ~~Message contracts~~ ✓ DONE
+### Priority C: ~~Stdlib infrastructure + core modules~~ ✓ DONE (6 of ~20)
 
-Implemented in Session 14. `Protocol` keyword with runtime structural validation:
+### Priority D: ~~Agent-specific stdlib~~ DONE
 
-```
-Protocol ReviewRequest = {task: Str  path: Str  depth: Int = 3}
-reviewer ~>? ReviewRequest {task: "review" path: "src/"}
--- validates record shape, fills default depth: 3, then sends to reviewer
-```
+`std/agent` (spawn subprocesses), `std/md` (markdown processing), and `std/mcp` (MCP tool invocation) are all implemented. The agentic workflow loop is closed.
 
-Validation is a hard contract (runtime error on mismatch, not Err). Protocols are callable values — apply to a record to validate. Extra fields allowed. `Any` type for flexible fields. Exportable with `+`.
+### Priority E: Implicit context scope
 
-### Priority C: Implicit context scope
+Eliminate manual state threading. `with` block or implicit parameter — either way, stop making every agent function manually pass state around.
 
-Instead of manual threading:
-```
-with ctx.load "state.json" {
-  last_run = @last_run ?? "never"
-  @step = "processing"
-  @data = fetch_data ()
-}
-```
+### Priority F: Resumable workflows
 
-Or a lighter approach: context as an implicit parameter that agent functions can read:
-```
-run = (ctx) {
-  ctx.step = "processing"
-  result = analyze ctx.data
-  ctx.result = result
-}
-```
+Workflows as inspectable, checkpointable values. If step 3 of 5 fails, resume from step 3 instead of starting over.
 
-### Priority D: Resumable workflows
+## Bottom Line
 
-Workflows as inspectable, checkpointable values:
-```
-flow = workflow "deploy" {
-  step "fetch" -> fetch_artifact version ^
-  step "test"  -> run_tests it ^
-  step "stage" -> deploy_staging it ^
-  step "prod"  -> deploy_prod it ^
-}
+The core language design is sound. The surface area that works (pipes, errors, shell, agents, protocols, modules, 9 stdlib modules including MCP) is genuinely useful. 16/16 tests pass. The problems are real but tractable.
 
-flow | run ?? resume_from "state.json"
-```
-
-## Assessment
-
-The core language (pipes, pattern matching, error handling, closures, shell, agent send/ask, message contracts) is genuinely good. Priorities A and B are done — lx has language-level agent communication with structural message validation.
-
-The practical next step: `std/` import infrastructure (prerequisite for any stdlib module), then the core agent stdlib modules (`std/json`, `std/agent`, `std/mcp`, `std/ctx`).
+The thesis is proven — agents spawn as subprocesses, communicate over JSON-line protocol, `~>`/`~>?` work transparently, and `std/mcp` enables MCP tool invocation. The full agent-spawns-agent-calls-tools loop works end-to-end.
 
 ## Cross-References
 
-- Agent spec with `~>` / `~>?` syntax: [spec/agents.md](spec/agents.md)
+- Agent spec: [spec/agents.md](spec/agents.md)
 - Agent stdlib API: [spec/stdlib-agents.md](spec/stdlib-agents.md)
-- Design decisions doc: [spec/design.md](spec/design.md)
+- Design decisions: [spec/design.md](spec/design.md)
 - Implementation status: [DEVLOG.md](DEVLOG.md)
 - Next steps: [../NEXT_PROMPT.md](../NEXT_PROMPT.md)

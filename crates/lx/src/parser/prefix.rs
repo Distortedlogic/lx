@@ -140,6 +140,14 @@ impl super::Parser {
   }
 
   fn parse_paren(&mut self, start: u32) -> Result<SExpr, LxError> {
+    let saved_depth = self.collection_depth;
+    self.collection_depth = 0;
+    let result = self.parse_paren_inner(start);
+    self.collection_depth = saved_depth;
+    result
+  }
+
+  fn parse_paren_inner(&mut self, start: u32) -> Result<SExpr, LxError> {
     if *self.peek() == TokenKind::RParen {
       if self.is_func_def() {
         return self.parse_func(start);

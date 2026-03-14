@@ -30,6 +30,7 @@ panic = "abort"
 regex = { version = "1" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
+pulldown-cmark = "0.12"
 
 [workspace.lints.rust]
 unsafe_code = "deny"

@@ -13,6 +13,7 @@ thiserror = "2"
 indexmap = "2"
 regex.workspace = true
 serde_json.workspace = true
+pulldown-cmark.workspace = true
 
 [lints]
 workspace = true

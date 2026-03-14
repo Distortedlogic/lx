@@ -492,9 +492,21 @@ impl Interpreter {
     }
   }
 
+  pub fn call(&mut self, func: Value, arg: Value) -> Result<Value, LxError> {
+    self.apply_func(func, arg, Span::default())
+  }
+
   fn eval_agent_send(&mut self, target_expr: &SExpr, msg_expr: &SExpr, span: Span) -> Result<Value, LxError> {
     let target = self.eval(target_expr)?;
     let msg = self.eval(msg_expr)?;
+    if let Value::Record(ref fields) = target
+      && let Some(pid_val) = fields.get("__pid") {
+        let pid: u32 = pid_val.as_int()
+          .and_then(|n| n.try_into().ok())
+          .ok_or_else(|| LxError::runtime("agent: invalid __pid", span))?;
+        crate::stdlib::agent::send_subprocess(pid, &msg, span)?;
+        return Ok(Value::Unit);
+      }
     let handler = self.get_agent_handler(&target, span)?;
     self.apply_func(handler, msg, span)?;
     Ok(Value::Unit)
@@ -503,6 +515,13 @@ impl Interpreter {
   fn eval_agent_ask(&mut self, target_expr: &SExpr, msg_expr: &SExpr, span: Span) -> Result<Value, LxError> {
     let target = self.eval(target_expr)?;
     let msg = self.eval(msg_expr)?;
+    if let Value::Record(ref fields) = target
+      && let Some(pid_val) = fields.get("__pid") {
+        let pid: u32 = pid_val.as_int()
+          .and_then(|n| n.try_into().ok())
+          .ok_or_else(|| LxError::runtime("agent: invalid __pid", span))?;
+        return crate::stdlib::agent::ask_subprocess(pid, &msg, span);
+      }
     let handler = self.get_agent_handler(&target, span)?;
     self.apply_func(handler, msg, span)
   }

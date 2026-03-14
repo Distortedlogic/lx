@@ -275,3 +275,169 @@ assert (found2 == ["Hello" "World"]) "re with regex flags"
 digits = "phone: 555-1234, ext: 42"
   | re.find_all "\\d+"
 assert (digits == ["555" "1234" "42"]) "re in pipeline"
+
+-- === std/md ===
+use std/md
+
+-- parse headings
+src = "# Title\n\nSome text.\n\n## Subtitle\n\nMore text."
+doc = md.parse src
+assert (len doc == 4) "md.parse node count"
+
+-- headings extraction
+hdgs = md.headings doc
+assert (len hdgs == 2) "md.headings count"
+assert (hdgs.0.level == 1) "md.headings level 1"
+assert (hdgs.0.text == "Title") "md.headings text 1"
+assert (hdgs.1.level == 2) "md.headings level 2"
+
+-- code blocks
+code_src = "# Test\n\n```rust\nfn main() \{}\n```\n\nParagraph."
+code_doc = md.parse code_src
+blocks = md.code_blocks code_doc
+assert (len blocks == 1) "md.code_blocks count"
+assert (blocks.0.lang == Some "rust") "md.code_blocks lang"
+assert (blocks.0.code == "fn main() \{}") "md.code_blocks code"
+
+-- links
+link_src = "Click [here](https://example.com) and [there](https://other.com)."
+link_list = md.links link_src
+assert (len link_list == 2) "md.links count"
+assert (link_list.0.text == "here") "md.links text"
+assert (link_list.0.url == "https://example.com") "md.links url"
+
+-- to_text
+plain = md.to_text "# Hello\n\nWorld **bold** text."
+assert (contains? "Hello" plain == true) "md.to_text has heading"
+assert (contains? "World" plain == true) "md.to_text has text"
+
+-- sections
+sec_src = "# Intro\n\nFirst para.\n\n## Details\n\nSecond para."
+sec_doc = md.parse sec_src
+secs = md.sections sec_doc
+assert (len secs == 2) "md.sections count"
+assert (secs.0.title == "Intro") "md.sections title"
+assert (secs.0.level == 1) "md.sections level"
+assert (contains? "First para" (secs.0.content) == true) "md.sections content"
+
+-- builders
+h1_node = md.h1 "Title"
+assert (h1_node.type == "heading") "md.h1 type"
+assert (h1_node.level == 1) "md.h1 level"
+assert (h1_node.text == "Title") "md.h1 text"
+
+para_node = md.para "Hello world"
+assert (para_node.type == "para") "md.para type"
+
+code_node = md.code "lx" "x = 42"
+assert (code_node.type == "code") "md.code type"
+assert (code_node.lang == Some "lx") "md.code lang"
+
+list_node = md.list ["apple" "banana"]
+assert (list_node.type == "list") "md.list type"
+assert (list_node.items == ["apple" "banana"]) "md.list items"
+
+link_node = md.link "Click" "https://example.com"
+assert (link_node.type == "link") "md.link type"
+
+hr_node = md.hr
+assert (hr_node.type == "hr") "md.hr type"
+
+-- render
+rendered = md.render [(md.h1 "Report") (md.para "All good.") md.hr (md.h2 "Details")]
+assert (contains? "# Report" rendered == true) "md.render heading"
+assert (contains? "All good." rendered == true) "md.render para"
+assert (contains? "---" rendered == true) "md.render hr"
+assert (contains? "## Details" rendered == true) "md.render h2"
+
+-- render code block
+code_rendered = md.render [(md.code "js" "console.log(1)")]
+assert (contains? "```js" code_rendered == true) "md.render code"
+
+-- render list
+list_rendered = md.render [(md.list ["a" "b" "c"])]
+assert (contains? "- a" list_rendered == true) "md.render list"
+
+-- render table
+tbl = md.table ["Name" "Age"] [["Alice" "30"] ["Bob" "25"]]
+tbl_rendered = md.render [tbl]
+assert (contains? "| Name | Age |" tbl_rendered == true) "md.render table header"
+assert (contains? "| Alice | 30 |" tbl_rendered == true) "md.render table row"
+
+-- doc + render roundtrip
+r_h1 = md.h1 "Status"
+r_para = md.para "Everything is fine."
+r_list = md.list ["task1" "task2"]
+report = md.doc [r_h1 r_para r_list]
+output = md.render report
+assert (contains? "# Status" output == true) "md.doc+render"
+
+-- === std/mcp ===
+use std/mcp
+
+-- connect to test MCP server
+client = mcp.connect {command: "python3" args: ["asl/suite/fixtures/mcp_test_server.py"]} ^
+
+-- list_tools
+tools = mcp.list_tools client ^
+assert (len tools == 2) "mcp.list_tools count"
+assert (tools.0.name == "echo") "mcp.list_tools first name"
+assert (tools.1.name == "add") "mcp.list_tools second name"
+
+-- call echo tool
+echo_result = mcp.call client "echo" {msg: "hello"} ^
+assert (contains? "hello" echo_result == true) "mcp.call echo"
+
+-- call add tool
+add_result = mcp.call client "add" {a: 3 b: 7} ^
+assert (add_result == "10") "mcp.call add"
+
+-- call tool that returns isError
+fail_result = mcp.call client "fail" {}
+assert (err? fail_result == true) "mcp.call fail returns Err"
+
+-- list_resources
+resources = mcp.list_resources client ^
+assert (len resources == 1) "mcp.list_resources count"
+assert (resources.0.name == "doc") "mcp.list_resources name"
+
+-- read_resource
+res_data = mcp.read_resource client "test://doc" ^
+assert (len res_data.contents > 0) "mcp.read_resource has contents"
+
+-- list_prompts
+prompts = mcp.list_prompts client ^
+assert (len prompts == 1) "mcp.list_prompts count"
+assert (prompts.0.name == "greet") "mcp.list_prompts name"
+
+-- get_prompt
+prompt = mcp.get_prompt client "greet" {name: "lx"} ^
+assert (len prompt.messages > 0) "mcp.get_prompt has messages"
+
+-- close
+mcp.close client
+
+-- === std/agent ===
+use std/agent
+
+-- spawn a subprocess agent
+a = agent.spawn {name: "echo" script: "asl/suite/fixtures/agent_echo.lx"} ^
+
+-- ask the agent
+result = agent.ask a {value: 21} ^
+assert (result.value == 42) "agent.ask value doubled"
+assert (result.echoed == true) "agent.ask echoed field"
+
+-- agent name
+assert (agent.name a == "echo") "agent.name"
+
+-- agent status
+st = agent.status a
+assert (st.state == "running") "agent.status running"
+
+-- kill the agent
+agent.kill a ^
+
+-- status after kill
+st2 = agent.status a
+assert (st2.state == "stopped") "agent.status after kill"

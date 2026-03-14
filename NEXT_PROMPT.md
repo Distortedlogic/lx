@@ -55,11 +55,12 @@ Then update this file (`NEXT_PROMPT.md`) with accurate current state.
 `just diagnose` is clean — zero warnings, zero clippy errors.
 `just test`: **16/16 PASS** — all tests passing.
 
-Phases 1–8 are all implemented (including Phase 7 modules), plus agent communication syntax, message contracts, and stdlib infrastructure. The interpreter handles:
+Phases 1–8 are all implemented (including Phase 7 modules), plus agent communication syntax, message contracts, stdlib infrastructure, and MCP tool invocation. The interpreter handles:
 - Arithmetic, bindings, strings, interpolation, collections, pattern matching
 - Functions, closures, currying, default params (with auto-execution), pipes, sections (right/left/binop/field/index), composition `<>`
 - Type annotations (parse-and-skip for params, return types, bindings, complex types like `{name: Str}`, `[Int]`, `%{Str: Int}`, `Int -> Int`, `(Int -> Int) -> Int`)
 - Shell integration: `$cmd` (full result), `$$cmd` (raw/no interp), `$^cmd` (stdout/propagate), `${...}` (multi-line block). Depth-aware paren stopping for `($cmd)` in expressions.
+- Collection-depth reset in parens: `[(f x)]` correctly applies `f` to `x` even inside list literals
 - Regex literals `r/pattern/flags`
 - Slicing `xs.1..3`, `xs.2..`, `xs...3`
 - Named args `f x name: "val"` with param-position matching
@@ -90,6 +91,10 @@ Phases 1–8 are all implemented (including Phase 7 modules), plus agent communi
 - `std/fs`: `read`, `write`, `append`, `exists`, `remove`, `mkdir`, `ls`, `stat`
 - `std/env`: `get`, `vars`, `args`, `cwd`, `home`
 - `std/re`: `match`, `find_all`, `is_match`, `replace`, `replace_all`, `split` (accepts Str or regex literal)
+- `std/md`: `parse`, `sections`, `code_blocks`, `headings`, `links`, `to_text`, `render` + builders (`h1`-`h3`, `para`, `code`, `list`, `ordered`, `table`, `link`, `blockquote`, `hr`, `raw`, `doc`) via `pulldown-cmark`
+- `std/agent`: `spawn`, `ask`, `send`, `kill`, `name`, `status` — subprocess agent lifecycle with JSON-line protocol
+- `std/mcp`: `connect`, `close`, `list_tools`, `call`, `list_resources`, `read_resource`, `list_prompts`, `get_prompt` — MCP client over stdio via JSON-RPC 2.0
+- `lx agent` subcommand: runs a script as an agent subprocess (handler function + JSON-line message loop)
 
 **Important syntax notes:**
 - Tuple creation with variables needs semicolons: `(b; a)` not `(b a)` (Idents are callable)
@@ -98,17 +103,19 @@ Phases 1–8 are all implemented (including Phase 7 modules), plus agent communi
 - Shell `$` consumes full line: to use shell results in expressions, wrap in parens: `($cmd) ? { ... }`
 - Shell `$^` stops at first `|` for language pipe: `$^pwd | trim` — `pwd` is shell, `| trim` is lx
 - Inside parens/brackets (depth > 0), `$` stops at `)`: `($echo "hello")` works
-- `~>` (send) and `~>?` (ask) are infix: `agent ~>? msg`. Agent = record with `handler` field.
+- `~>` (send) and `~>?` (ask) are infix: `agent ~>? msg`. Agent = record with `handler` field. Subprocess agents (from `agent.spawn`) have `__pid` field — `~>`/`~>?` transparently routes to subprocess I/O.
 - `~>?` composes with `^` and `|`: `agent ~>? msg ^ | process` = `((agent ~>? msg) ^) | process`
 - `Protocol Name = {field: Type}` declares record shape validators. Applied like functions: `Name {field: val}`. Runtime error on mismatch.
+- Strings: `{` starts interpolation, use `\{` for literal braces. `}` is literal outside interpolation. `\"` for literal quotes. JSON strings: `"\{\"key\": \"val\"}"`.
+- `assert (expr) "msg"` — if `(expr)` evaluates to something callable, the parser consumes `"msg"` as an arg. Use `assert (expr == true) "msg"` pattern.
 
 ## Critical Reading
 
-**Read `asl/CURRENT_OPINION.md` for design context.** Priorities A (agent communication syntax) and B (message contracts) are done. Remaining priorities: C (implicit context scope), D (resumable workflows).
+**Read `asl/CURRENT_OPINION.md` for design context.** Priorities A–D DONE (agent communication, message contracts, stdlib infrastructure, agent-specific stdlib including MCP). Remaining: E (implicit context scope), F (resumable workflows).
 
 ## What To Work On Next
 
-All 16 existing test files pass. The core language is feature-complete through Phase 8 (including modules) plus agent communication syntax, message contracts (Protocol), and stdlib infrastructure with `std/json`.
+All 16 existing test files pass. The core language is feature-complete through Phase 8, plus agent communication (`~>` / `~>?` with subprocess support), message contracts (`Protocol`), and 9 stdlib modules (`std/json`, `std/ctx`, `std/math`, `std/fs`, `std/env`, `std/re`, `std/md`, `std/agent`, `std/mcp`).
 
 ### Step 1: ~~Design agent communication syntax~~ ✓ DONE
 
@@ -122,17 +129,17 @@ Implemented `Protocol` keyword with runtime structural validation. `Protocol Nam
 
 Implemented `use std/...` routing in `interpreter/modules.rs`. Stdlib modules are Rust-native builtins in `crates/lx/src/stdlib/`. Adding a new module = add a file + match arm. `std/json` implemented with `parse`, `encode`, `encode_pretty`.
 
-### Step 4: Core agent stdlib modules
+### Step 4: ~~Core agent stdlib modules~~ DONE
 
-Build ON TOP of the language primitives from Steps 1-2. These are now thinner — the heavy lifting (send, ask, channel) is in the language.
+Built ON TOP of the language primitives from Steps 1-2. All three agent-specific modules implemented.
 
 | Module | Rust crate | Purpose |
 |--------|-----------|---------|
 | ~~`std/json`~~ ✓ | `serde_json` | parse, encode, encode_pretty |
 | ~~`std/ctx`~~ ✓ | `serde_json` | Context: empty, load, save, get, set, remove, keys, merge |
-| `std/md` | `pulldown-cmark` | Markdown parse/extract/render |
-| `std/mcp` | `rmcp` | MCP client: connect, list_tools, call |
-| `std/agent` | `tokio::process` | Agent spawn, process management (send/ask is in language) |
+| ~~`std/md`~~ ✓ | `pulldown-cmark` | Markdown parse/extract/build/render (20 functions) |
+| ~~`std/mcp`~~ ✓ | JSON-RPC/stdio | MCP client: connect, close, list_tools, call, list_resources, read_resource, list_prompts, get_prompt |
+| ~~`std/agent`~~ ✓ | `std::process` | Agent spawn, ask, send, kill, name, status + `lx agent` subcommand |
 
 ### Step 5: Remaining stdlib (Phase 9)
 
@@ -179,14 +186,16 @@ Lower priority — these make lx useful for general scripting but aren't the dif
 ### Other remaining work:
 - Real threading/async for `par`/`sel`/`pmap` (currently sequential)
 - Propagation traces for `^`
-- Implicit context scope (see CURRENT_OPINION.md Priority C)
-- Resumable workflows (see CURRENT_OPINION.md Priority D)
+- Implicit context scope (see CURRENT_OPINION.md Priority E)
+- Resumable workflows (see CURRENT_OPINION.md Priority F)
 
 ### Known technical debt:
 - Rust files exceeding 300-line limit: prefix.rs (773), parser/mod.rs (640+), interpreter/mod.rs (520+), hof.rs (425), value.rs (330)
 - `par`/`sel`/`pmap` and `~>`/`~>?` are sequential; the spec describes concurrent execution
 - Named-arg parser consumes ternary `:` separator: `true ? Ok x : 0` misparses because `x :` looks like a named arg. Workaround: `(Ok x)`
-- Stale spec files: `examples.md`, `examples-extended.md`, `stdlib-agents.md`, `toolchain.md` still use `agent.ask`/`agent.send` library syntax. These should use `~>` / `~>?` when updated. The authoritative agent spec is `agents.md`.
+- Assert parsing is greedy: `assert (expr) "msg"` can consume the message as a function application arg if `(expr)` is callable. Workaround: use `assert (expr == true) "msg"` or bind to a variable.
+- Stale spec files: `examples.md`, `examples-extended.md`, `toolchain.md` still use `agent.ask`/`agent.send` library syntax. These should use `~>` / `~>?` when updated. The authoritative agent spec is `agents.md`.
+- `stdlib-agents.md` spec shows `agent.ask`/`agent.send` as library functions — `std/agent` now implements these alongside `~>`/`~>?` (both work, library functions take explicit agent arg, operators use infix syntax).
 
 ## Codebase Layout
 
@@ -196,7 +205,7 @@ crates/lx/src/
   parser/    mod.rs, prefix.rs, pattern.rs
   interpreter/ mod.rs, apply.rs, collections.rs, modules.rs, patterns.rs, shell.rs
   builtins/  mod.rs, str.rs, coll.rs, hof.rs
-  stdlib/    mod.rs, json.rs, json_conv.rs, ctx.rs, math.rs, fs.rs, env.rs, re.rs
+  stdlib/    mod.rs, json.rs, json_conv.rs, ctx.rs, math.rs, fs.rs, env.rs, re.rs, md.rs, md_build.rs, agent.rs, mcp.rs, mcp_rpc.rs
   ast.rs, token.rs, value.rs, env.rs, error.rs, span.rs, iterator.rs, lib.rs
 crates/lx-cli/src/main.rs
 ```
@@ -212,7 +221,8 @@ External crates already cover every area where an established solution exists:
 | `num-bigint` / `num-traits` / `num-integer` | Arbitrary-precision integers |
 | `indexmap` | Ordered maps/sets (records, maps, sets) |
 | `regex` | Regex literals, string builtins, `std/re` |
-| `serde_json` (preserve_order) | `std/json`, `std/ctx` JSON conversion |
+| `serde_json` (preserve_order) | `std/json`, `std/ctx` JSON conversion, agent subprocess protocol |
+| `pulldown-cmark` | `std/md` markdown parsing |
 
 The remaining ~4800 lines of custom code (lexer, parser, interpreter, AST, env, builtins, iterators, span) is all language-implementation-specific — no generic crate replaces a Pratt parser with shell-mode lexing, or builtins operating on lx's `Value` type. Do not spend time looking for crate replacements for these; they were audited and none apply.
 
