@@ -53,127 +53,88 @@ Then update this file (`NEXT_PROMPT.md`) with accurate current state.
 ## Current State
 
 `just diagnose` is clean — zero warnings, zero clippy errors.
-`just test`: **16/16 PASS** — all tests passing.
+`just test`: **17/17 PASS** — all tests passing.
 
-Phases 1–8 are all implemented (including Phase 7 modules), plus agent communication syntax, message contracts, stdlib infrastructure, and MCP tool invocation. The interpreter handles:
+The core language is feature-complete through Phase 8. The agentic workflow loop is **closed**: agents spawn as subprocesses, communicate via `~>`/`~>?`, invoke MCP tools (stdio or HTTP), and persist context. 9 stdlib modules implemented. MCP HTTP streaming transport complete.
+
+### What's implemented
+
 - Arithmetic, bindings, strings, interpolation, collections, pattern matching
-- Functions, closures, currying, default params (with auto-execution), pipes, sections (right/left/binop/field/index), composition `<>`
-- Type annotations (parse-and-skip for params, return types, bindings, complex types like `{name: Str}`, `[Int]`, `%{Str: Int}`, `Int -> Int`, `(Int -> Int) -> Int`)
-- Shell integration: `$cmd` (full result), `$$cmd` (raw/no interp), `$^cmd` (stdout/propagate), `${...}` (multi-line block). Depth-aware paren stopping for `($cmd)` in expressions.
-- Collection-depth reset in parens: `[(f x)]` correctly applies `f` to `x` even inside list literals
-- Regex literals `r/pattern/flags`
-- Slicing `xs.1..3`, `xs.2..`, `xs...3`
-- Named args `f x name: "val"` with param-position matching
-- Type definitions `Shape = | Circle Float | Rect Float Float` with tagged values and pattern matching (including paren/bracket/brace-wrapped variant types like `Node (Tree a) (Tree a)`)
-- Nested tuple patterns in function params `fst = ((a _)) a` (desugars to synthetic names + destructuring)
-- Iterator protocol: `nat` (infinite naturals), `cycle` (infinite cycle), record-with-`next` custom iterators. Lazy composition via `map`/`filter` on iterators; eager consumption via `take`/`collect`.
-- Concurrency (sequential impl): `par { ... }` (parallel block → tuple), `sel { expr -> handler }` (race/select with `it` binding), `pmap` (parallel map), `pmap_n` (rate-limited pmap), `timeout`
-- 29 HOF builtins: map, filter, fold, flat_map, each, take, drop, zip, enumerate, find, any?, all?, none?, count, take_while, drop_while, sort_by, min_by, max_by, partition, group_by, chunks, windows, intersperse, scan, tap, find_index, pmap, pmap_n
-- ~30 collection/string/conversion builtins
-- Loop/break with values
-- Error propagation `^` (unwraps Ok/Some, propagates Err/None at function boundaries)
-- Coalescing `??` (unwraps Ok/Some, evaluates default for Err/None)
-- `(?? default)` sections
-- Implicit Err early return in `-> T ^ E` annotated functions
-- Match with record/list/constructor/string/tagged patterns, guards, destructuring
-- Collection-mode application in `[]`, `#{}`, `%{}`, and `{}` records (only TypeConstructors trigger application)
-- Tuple destructuring bindings `(a b) = expr`
-- Multiline continuation (leading and trailing operators)
-- Block-scoped function bodies `(x) { body }` don't consume pipes
-- Multiline string auto-dedent (strings starting with `\n` strip common indentation)
-- Module system: `use ./path` (whole), `use ./path : alias`, `use ./path {name1 name2}` (selective), variant constructor scoping, module caching, circular import detection
-- Agent communication: `~>` (send, fire-and-forget), `~>?` (ask, request-response). Infix operators at concat/diamond precedence. Agents are records with `handler` field.
-- Message contracts: `Protocol Name = {field: Type}` keyword. Runtime structural validation. Defaults, `Any` type, structural subtyping. Exportable/importable.
-- Stdlib infrastructure: `use std/json` routes to Rust-native modules via `crates/lx/src/stdlib/`
-- `std/json`: `parse`, `encode`, `encode_pretty` via `serde_json`
-- `std/ctx`: `empty`, `load`, `save`, `get`, `set`, `remove`, `keys`, `merge` — context persistence to JSON files
-- `std/math`: `abs`, `ceil`, `floor`, `round`, `pow`, `sqrt`, `min`, `max`, `pi`, `e`, `inf`
-- `std/fs`: `read`, `write`, `append`, `exists`, `remove`, `mkdir`, `ls`, `stat`
-- `std/env`: `get`, `vars`, `args`, `cwd`, `home`
-- `std/re`: `match`, `find_all`, `is_match`, `replace`, `replace_all`, `split` (accepts Str or regex literal)
-- `std/md`: `parse`, `sections`, `code_blocks`, `headings`, `links`, `to_text`, `render` + builders (`h1`-`h3`, `para`, `code`, `list`, `ordered`, `table`, `link`, `blockquote`, `hr`, `raw`, `doc`) via `pulldown-cmark`
-- `std/agent`: `spawn`, `ask`, `send`, `kill`, `name`, `status` — subprocess agent lifecycle with JSON-line protocol
-- `std/mcp`: `connect`, `close`, `list_tools`, `call`, `list_resources`, `read_resource`, `list_prompts`, `get_prompt` — MCP client over stdio via JSON-RPC 2.0
-- `lx agent` subcommand: runs a script as an agent subprocess (handler function + JSON-line message loop)
+- Functions, closures, currying, default params, pipes, sections, composition `<>`
+- Type annotations (parse-and-skip), regex literals, slicing, named args
+- Type definitions with tagged values and pattern matching
+- Iterator protocol (lazy `map`/`filter`/`take` on infinite sequences)
+- Concurrency: `par`, `sel`, `pmap`, `pmap_n`, `timeout` (sequential impl)
+- Shell integration: `$cmd`, `$$cmd`, `$^cmd`, `${...}` with interpolation
+- Error handling: `^` propagation, `??` coalescing, `(?? default)` sections, implicit Err return
+- Module system: `use ./path`, aliasing, selective imports, `+` exports
+- Agent communication: `~>` (send), `~>?` (ask) — infix operators, subprocess-transparent
+- Message contracts: `Protocol Name = {field: Type}` with runtime validation
+- 9 stdlib modules: `std/json`, `std/ctx`, `std/math`, `std/fs`, `std/env`, `std/re`, `std/md`, `std/agent`, `std/mcp`
+- MCP HTTP streaming transport (`reqwest` blocking, SSE parsing, session management)
+- `lx agent` subcommand for subprocess agent mode
 
-**Important syntax notes:**
+### Important syntax notes
+
 - Tuple creation with variables needs semicolons: `(b; a)` not `(b a)` (Idents are callable)
-- Generic return types need parens: `-> (Tree a)` not `-> Tree a` (parse-and-skip limitation)
+- Generic return types need parens: `-> (Tree a)` not `-> Tree a`
 - Records/maps use collection-mode: `{x: (f 42)}` for function calls in field values
-- Shell `$` consumes full line: to use shell results in expressions, wrap in parens: `($cmd) ? { ... }`
-- Shell `$^` stops at first `|` for language pipe: `$^pwd | trim` — `pwd` is shell, `| trim` is lx
-- Inside parens/brackets (depth > 0), `$` stops at `)`: `($echo "hello")` works
-- `~>` (send) and `~>?` (ask) are infix: `agent ~>? msg`. Agent = record with `handler` field. Subprocess agents (from `agent.spawn`) have `__pid` field — `~>`/`~>?` transparently routes to subprocess I/O.
+- Shell `$` consumes full line; wrap in parens for expressions: `($cmd) ? { ... }`
 - `~>?` composes with `^` and `|`: `agent ~>? msg ^ | process` = `((agent ~>? msg) ^) | process`
-- `Protocol Name = {field: Type}` declares record shape validators. Applied like functions: `Name {field: val}`. Runtime error on mismatch.
-- Strings: `{` starts interpolation, use `\{` for literal braces. `}` is literal outside interpolation. `\"` for literal quotes. JSON strings: `"\{\"key\": \"val\"}"`.
-- `assert (expr) "msg"` — if `(expr)` evaluates to something callable, the parser consumes `"msg"` as an arg. Use `assert (expr == true) "msg"` pattern.
+- `assert (expr) "msg"` — if `(expr)` is callable, parser consumes `"msg"` as arg. Use `assert (expr == true) "msg"`
 
 ## Critical Reading
 
-**Read `asl/CURRENT_OPINION.md` for design context.** Priorities A–D DONE (agent communication, message contracts, stdlib infrastructure, agent-specific stdlib including MCP). Remaining: E (implicit context scope), F (resumable workflows).
+**Read `asl/CURRENT_OPINION.md` for design context.** Priorities A–D DONE. Remaining: E (implicit context scope), F (resumable workflows).
 
 ## What To Work On Next
 
-All 16 existing test files pass. The core language is feature-complete through Phase 8, plus agent communication (`~>` / `~>?` with subprocess support), message contracts (`Protocol`), and 9 stdlib modules (`std/json`, `std/ctx`, `std/math`, `std/fs`, `std/env`, `std/re`, `std/md`, `std/agent`, `std/mcp`).
+The agentic core is complete. The next work falls into three categories:
 
-### Step 1: ~~Design agent communication syntax~~ ✓ DONE
+### 1. MCP HTTP Streaming Transport (HIGH PRIORITY)
 
-Implemented `~>` (send) and `~>?` (ask) as language-level infix operators. Tokens: `TildeArrow`, `TildeArrowQ`. AST: `Expr::AgentSend`, `Expr::AgentAsk`. Precedence: (21, 22) — same as concat/diamond. Sequential evaluation. Agents are records with `handler` field. Test: `14_agents.lx`.
+`std/mcp` currently uses stdio transport only. The real-world transport is **HTTP streaming (SSE)**. This requires adding `reqwest` + `tokio` dependencies and implementing Streamable HTTP transport in `mcp_rpc.rs`. The stdio transport stays as a fallback for local servers.
 
-### Step 2: ~~Message contracts~~ ✓ DONE
+### 2. Remaining stdlib modules (Phase 9)
 
-Implemented `Protocol` keyword with runtime structural validation. `Protocol Name = {field: Type  field2: Type = default}` declares record shape validators. Protocol values are callable — apply to a record to validate. Returns validated record on success (defaults filled in), runtime error on failure. Extra fields allowed (structural subtyping). `Any` type skips checking. Protocols are exportable/importable. Tests in `14_agents.lx`.
-
-### Step 3: ~~`std/` import infrastructure~~ ✓ DONE
-
-Implemented `use std/...` routing in `interpreter/modules.rs`. Stdlib modules are Rust-native builtins in `crates/lx/src/stdlib/`. Adding a new module = add a file + match arm. `std/json` implemented with `parse`, `encode`, `encode_pretty`.
-
-### Step 4: ~~Core agent stdlib modules~~ DONE
-
-Built ON TOP of the language primitives from Steps 1-2. All three agent-specific modules implemented.
-
-| Module | Rust crate | Purpose |
-|--------|-----------|---------|
-| ~~`std/json`~~ ✓ | `serde_json` | parse, encode, encode_pretty |
-| ~~`std/ctx`~~ ✓ | `serde_json` | Context: empty, load, save, get, set, remove, keys, merge |
-| ~~`std/md`~~ ✓ | `pulldown-cmark` | Markdown parse/extract/build/render (20 functions) |
-| ~~`std/mcp`~~ ✓ | JSON-RPC/stdio | MCP client: connect, close, list_tools, call, list_resources, read_resource, list_prompts, get_prompt |
-| ~~`std/agent`~~ ✓ | `std::process` | Agent spawn, ask, send, kill, name, status + `lx agent` subcommand |
-
-### Step 5: Remaining stdlib (Phase 9)
-
-Lower priority — these make lx useful for general scripting but aren't the differentiator.
+These make lx useful for general scripting beyond agentic workflows.
 
 | Module | Rust crate | Key functions |
 |--------|-----------|---------------|
-| ~~`std/fs`~~ ✓ | `std::fs` | read, write, append, exists, remove, mkdir, ls, stat |
-| ~~`std/env`~~ ✓ | `std::env` | get, vars, args, cwd, home |
-| ~~`std/re`~~ ✓ | `regex` | match, find_all, replace, replace_all, split, is_match |
-| ~~`std/math`~~ ✓ | — | abs, ceil, floor, round, pow, sqrt, min, max, pi, e, inf |
 | `std/http` | `reqwest` | get, post, put, delete |
 | `std/time` | `chrono` | now, format, parse, sleep |
+| `std/rand` | `rand` | int, float, choice, shuffle |
 | `std/io` | `std::io` | read_line, print |
 | `std/csv` | `csv` | parse, encode |
 | `std/toml` | `toml` | parse, encode |
 | `std/yaml` | `serde_yaml` | parse, encode |
-| `std/rand` | `rand` | int, float, choice, shuffle |
 | `std/crypto` | `sha2`, `hmac` | sha256, hmac |
 | `std/os` | — | pid, hostname, platform |
 | `std/fmt` | — | pad, truncate |
 | `std/bit` | — | and, or, xor, shift |
 
-### Step 6: Toolchain (Phase 10)
+### 3. Language design work (Priorities E–F)
+
+- **Implicit context scope (Priority E)** — eliminate manual state threading. `with` block or implicit parameter so agent functions don't manually pass state around.
+- **Resumable workflows (Priority F)** — workflows as inspectable, checkpointable values. If step 3 of 5 fails, resume from step 3.
+
+### 4. Technical debt
+
+- **300-line limit violations**: prefix.rs (773), parser/mod.rs (640+), interpreter/mod.rs (520+), hof.rs (425), value.rs (330). These are the core files — splitting them improves readability and context-friendliness.
+- **Fake concurrency**: `par`/`sel`/`pmap` are sequential. Real threading/async requires `tokio`.
+- **Parser fragility**: named-arg/ternary conflict, assert greedy parsing, `is_func_def` heuristics.
+- **Stale spec files**: `examples.md`, `examples-extended.md`, `toolchain.md` still use `agent.ask`/`agent.send` library syntax instead of `~>`/`~>?`.
+
+### 5. Toolchain (Phase 10)
 
 | Tool | Purpose | Crate |
 |------|---------|-------|
 | `lx fmt` | Canonical formatter | — |
 | `lx repl` | Interactive mode | `rustyline` |
 | `lx check` | Type/contract validation | — |
-| `lx agent` | Long-lived agent process | `tokio` |
 | `lx watch` | Re-run on file change | `notify` |
 
-### Step 7: Data ecosystem (Phase 11, optional)
+### 6. Data ecosystem (Phase 11, optional)
 
 | Module | Rust crate | Purpose |
 |--------|-----------|---------|
@@ -182,20 +143,6 @@ Lower priority — these make lx useful for general scripting but aren't the dif
 | `std/num` | `ndarray` | Vectors/stats |
 | `std/ml` | `candle-core` / `ort` | ML inference |
 | `std/plot` | `charming` | Charts |
-
-### Other remaining work:
-- Real threading/async for `par`/`sel`/`pmap` (currently sequential)
-- Propagation traces for `^`
-- Implicit context scope (see CURRENT_OPINION.md Priority E)
-- Resumable workflows (see CURRENT_OPINION.md Priority F)
-
-### Known technical debt:
-- Rust files exceeding 300-line limit: prefix.rs (773), parser/mod.rs (640+), interpreter/mod.rs (520+), hof.rs (425), value.rs (330)
-- `par`/`sel`/`pmap` and `~>`/`~>?` are sequential; the spec describes concurrent execution
-- Named-arg parser consumes ternary `:` separator: `true ? Ok x : 0` misparses because `x :` looks like a named arg. Workaround: `(Ok x)`
-- Assert parsing is greedy: `assert (expr) "msg"` can consume the message as a function application arg if `(expr)` is callable. Workaround: use `assert (expr == true) "msg"` or bind to a variable.
-- Stale spec files: `examples.md`, `examples-extended.md`, `toolchain.md` still use `agent.ask`/`agent.send` library syntax. These should use `~>` / `~>?` when updated. The authoritative agent spec is `agents.md`.
-- `stdlib-agents.md` spec shows `agent.ask`/`agent.send` as library functions — `std/agent` now implements these alongside `~>`/`~>?` (both work, library functions take explicit agent arg, operators use infix syntax).
 
 ## Codebase Layout
 
@@ -208,6 +155,9 @@ crates/lx/src/
   stdlib/    mod.rs, json.rs, json_conv.rs, ctx.rs, math.rs, fs.rs, env.rs, re.rs, md.rs, md_build.rs, agent.rs, mcp.rs, mcp_rpc.rs
   ast.rs, token.rs, value.rs, env.rs, error.rs, span.rs, iterator.rs, lib.rs
 crates/lx-cli/src/main.rs
+asl/suite/fixtures/
+  agent_echo.lx         -- echo handler for std/agent tests
+  mcp_test_server.py    -- minimal MCP server for std/mcp tests
 ```
 
 ## Dependencies (audited 2026-03-14)
@@ -221,12 +171,12 @@ External crates already cover every area where an established solution exists:
 | `num-bigint` / `num-traits` / `num-integer` | Arbitrary-precision integers |
 | `indexmap` | Ordered maps/sets (records, maps, sets) |
 | `regex` | Regex literals, string builtins, `std/re` |
-| `serde_json` (preserve_order) | `std/json`, `std/ctx` JSON conversion, agent subprocess protocol |
+| `serde_json` (preserve_order) | `std/json`, `std/ctx` JSON conversion, agent/MCP subprocess protocol |
 | `pulldown-cmark` | `std/md` markdown parsing |
 
-The remaining ~4800 lines of custom code (lexer, parser, interpreter, AST, env, builtins, iterators, span) is all language-implementation-specific — no generic crate replaces a Pratt parser with shell-mode lexing, or builtins operating on lx's `Value` type. Do not spend time looking for crate replacements for these; they were audited and none apply.
+The remaining ~5000 lines of custom code (lexer, parser, interpreter, AST, env, builtins, iterators, span, stdlib) is all language-implementation-specific — no generic crate replaces a Pratt parser with shell-mode lexing, or builtins operating on lx's `Value` type. Do not spend time looking for crate replacements for these; they were audited and none apply.
 
-When adding **new** stdlib modules (std/json, std/http, std/fs, etc.), use established crates for the heavy lifting: `serde_json`, `reqwest`, `tokio`, `chrono`, `rmcp`, etc.
+When adding **new** stdlib modules, use established crates for the heavy lifting: `reqwest`, `tokio`, `chrono`, etc.
 
 ## Rules
 

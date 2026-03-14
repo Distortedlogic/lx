@@ -1,6 +1,6 @@
 # Current Opinion: lx as an Agentic Language
 
-Written by the language designer (Claude) after 17 implementation sessions. Honest assessment.
+Written by the language designer (Claude) after 18 implementation sessions. Honest assessment.
 
 ## What Works
 
@@ -51,17 +51,16 @@ Parser at 640+, prefix at 773. These are the files you need to read to understan
 
 ### The differentiators are proven
 
-`std/agent` spawns subprocesses and communicates via JSON-line protocol. `~>` and `~>?` work transparently with subprocess agents. `std/md` processes markdown for agent memory/reports. `std/mcp` provides MCP tool invocation over stdio via JSON-RPC 2.0. The full agentic workflow loop is closed: agents spawn → communicate → invoke tools → persist context.
+`std/agent` spawns subprocesses and communicates via JSON-line protocol. `~>` and `~>?` work transparently with subprocess agents. `std/md` processes markdown for agent memory/reports. `std/mcp` provides MCP tool invocation over both stdio and HTTP streaming transports. The full agentic workflow loop is closed: agents spawn → communicate → invoke tools (local or remote) → persist context.
 
 ## What Should Change Next
 
-### Priority A: ~~Agent communication syntax~~ ✓ DONE
-### Priority B: ~~Message contracts~~ ✓ DONE
-### Priority C: ~~Stdlib infrastructure + core modules~~ ✓ DONE (6 of ~20)
+### Priorities A–D.5: ✓ ALL DONE
+Agent communication (`~>`/`~>?`), message contracts (`Protocol`), stdlib infrastructure (9 modules), agent-specific stdlib (`std/agent`, `std/md`, `std/mcp`), MCP HTTP streaming transport.
 
-### Priority D: ~~Agent-specific stdlib~~ DONE
+### Priority D.5: MCP HTTP Streaming ✓ DONE
 
-`std/agent` (spawn subprocesses), `std/md` (markdown processing), and `std/mcp` (MCP tool invocation) are all implemented. The agentic workflow loop is closed.
+`std/mcp` now supports both stdio and HTTP streaming transports. `reqwest` (blocking) added. Transport abstraction dispatches based on URI scheme. SSE response parsing, session management, all working. 17/17 tests pass.
 
 ### Priority E: Implicit context scope
 
@@ -73,9 +72,9 @@ Workflows as inspectable, checkpointable values. If step 3 of 5 fails, resume fr
 
 ## Bottom Line
 
-The core language design is sound. The surface area that works (pipes, errors, shell, agents, protocols, modules, 9 stdlib modules including MCP) is genuinely useful. 16/16 tests pass. The problems are real but tractable.
+The core language design is sound. The surface area that works (pipes, errors, shell, agents, protocols, modules, 9 stdlib modules including MCP with HTTP streaming) is genuinely useful. 17/17 tests pass. The problems are real but tractable.
 
-The thesis is proven — agents spawn as subprocesses, communicate over JSON-line protocol, `~>`/`~>?` work transparently, and `std/mcp` enables MCP tool invocation. The full agent-spawns-agent-calls-tools loop works end-to-end.
+The thesis is proven — agents spawn as subprocesses, communicate over JSON-line protocol, `~>`/`~>?` work transparently, and `std/mcp` enables MCP tool invocation over both stdio and HTTP. The full agent-spawns-agent-calls-tools loop works end-to-end, including remote MCP servers.
 
 ## Cross-References
 

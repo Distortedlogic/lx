@@ -79,11 +79,11 @@ Already in reference/. Powers `std/rand`.
 
 ### Agent Ecosystem (Phase 12)
 
-- **rmcp** — MCP client library for `std/mcp`. Handles stdio, HTTP+SSE, and WebSocket transports.
 - **pulldown-cmark** — Markdown parser for `std/md`. Produces an AST that maps to lx `MdDoc` values.
-- **cron** (or `tokio-cron-scheduler`) — Powers `std/cron` recurring tasks.
-- Agent spawning uses `tokio::process::Command` (same as shell integration) to launch subagent processes.
-- Agent channels use `tokio::sync::mpsc` for local communication, Unix domain sockets for cross-process.
+- **cron** (or `tokio-cron-scheduler`) — Powers `std/cron` recurring tasks (planned).
+- `std/mcp` — implemented via direct JSON-RPC 2.0 over subprocess stdin/stdout (no external crate). HTTP streaming transport planned (will need `reqwest` + `tokio`).
+- `std/agent` — subprocess spawning via `std::process::Command`, JSON-line protocol over stdin/stdout.
+- Agent channels use `tokio::sync::mpsc` for local communication (planned).
 
 ### Not Needed (v1)
 

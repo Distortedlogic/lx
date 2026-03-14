@@ -189,7 +189,7 @@ Each phase produces a working, testable increment. No phase depends on a later p
 
 **Deliverables:**
 - `std/agent` — Agent spawning via subprocess (lx scripts or external), message passing (JSON over stdin/stdout), channels (mpsc local, Unix domain sockets cross-process), task submission and polling
-- `std/mcp` — MCP client (rmcp crate): connect to stdio/HTTP/SSE servers, list tools/resources/prompts, invoke tools with structured args, read resources
+- `std/mcp` — MCP client (JSON-RPC 2.0 over stdio, HTTP streaming planned): connect, list tools/resources/prompts, invoke tools with structured args, read resources
 - `std/ctx` — Immutable key-value context backed by serde_json. load/save to JSON files, get/set/remove/merge operations
 - `std/md` — Markdown parsing (pulldown-cmark): parse to structured document, extract sections/code blocks/frontmatter/links, build documents from node list, render back to markdown string
 - `std/cron` — Recurring task scheduling: `every interval f`, `at cron_expr f`, cancel handles. Requires `lx agent` mode (long-lived process)
@@ -246,9 +246,8 @@ tokenizers = "0.21"
 ### Phase 12 Dependencies (Agent Ecosystem)
 
 ```toml
-rmcp = "0.1"
 pulldown-cmark = "0.12"
 tokio-cron-scheduler = "0.13"
 ```
 
-`rmcp` for MCP client. `pulldown-cmark` for markdown parsing. `tokio-cron-scheduler` for recurring tasks. Agent spawning and channels use tokio primitives already in the workspace.
+`pulldown-cmark` for markdown parsing. `tokio-cron-scheduler` for recurring tasks (planned). `std/mcp` uses direct JSON-RPC 2.0 over stdio (no external crate). HTTP streaming transport will require `reqwest` + `tokio` when added. Agent spawning uses `std::process::Command`.

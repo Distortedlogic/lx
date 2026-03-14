@@ -4,7 +4,7 @@ Self-continuity doc. Read this first when picking up lx work cold.
 
 ## Implementation Status
 
-Phases 1–8 all implemented, plus agent communication, message contracts, stdlib infrastructure, and 8 stdlib modules. **16/16 PASS** via `just test`:
+Phases 1–8 all implemented, plus agent communication, message contracts, stdlib infrastructure, and 9 stdlib modules. **16/16 PASS** via `just test`:
 
 1. **01_literals.lx** — PASS
 2. **02_bindings.lx** — PASS
@@ -20,14 +20,14 @@ Phases 1–8 all implemented, plus agent communication, message contracts, stdli
 12. **12_types.lx** — PASS
 13. **13_concurrency.lx** — PASS
 14. **14_agents.lx** — PASS ← Session 13-14 (agent communication + Protocol)
-15. **15_stdlib.lx** — PASS ← Session 15 (stdlib infrastructure + 6 modules)
+15. **15_stdlib.lx** — PASS ← Sessions 15-17 (stdlib infrastructure + 9 modules)
 16. **16_edge_cases.lx** — PASS
 
 ## What Exists
 
 - **spec/** (22 files): Complete language specification including agents.md, stdlib-agents.md. grammar.md has full EBNF.
 - **impl/** (11 files): Architecture, 12-phase plan, per-component design docs.
-- **suite/** (16 .lx files + 3 module files + README): Golden test files for phases 1–8, agent communication, stdlib, and edge cases (~960 assertions).
+- **suite/** (16 .lx files + 3 module files + fixtures/ + README): Golden test files for phases 1–8, agent communication, stdlib (including MCP), and edge cases (~960 assertions).
 - **crates/lx/** — Rust implementation: lexer (with shell mode), parser, tree-walking interpreter with ~80 builtins, iterator protocol, shell execution, regex literals, type annotations (parse-and-skip), slicing, named args, type definitions with tagged values, error propagation, `??` sections, collection-mode application, concurrency (`par`/`sel`/`pmap`/`pmap_n` — sequential impl), module system (`use` imports, `+` exports, aliasing, selective imports, variant constructor scoping, module caching, circular import detection), agent communication (`~>` send, `~>?` ask — language-level infix operators, with subprocess agent support via `__pid`), message contracts (`Protocol`), stdlib (`std/json`, `std/ctx`, `std/math`, `std/fs`, `std/env`, `std/re`, `std/md`, `std/agent`, `std/mcp`).
 
 ## Key Design Decisions to Remember
@@ -60,47 +60,32 @@ These are the non-obvious choices that are easy to forget and would cause confus
 
 ## What Needs Doing Next
 
-**16/16 PASS. All existing tests pass.** Phases 1–8 implemented, plus agent communication (`~>` / `~>?` with subprocess support), message contracts (`Protocol`), and 9 stdlib modules (`std/json`, `std/ctx`, `std/math`, `std/fs`, `std/env`, `std/re`, `std/md`, `std/agent`, `std/mcp`). See `NEXT_PROMPT.md` for full breakdown.
+**17/17 PASS.** Phases 1–8 + agent communication + message contracts + 9 stdlib modules + MCP HTTP transport all implemented. The agentic workflow loop is closed. See `NEXT_PROMPT.md` for full breakdown.
 
-### Priority order (revised):
-1. ~~**Agent communication syntax**~~ ✓ — `~>` (send) and `~>?` (ask) implemented as infix operators. Sequential evaluation for now.
-2. ~~**Message contracts**~~ ✓ — `Protocol` keyword with runtime structural validation. Catches malformed messages at send boundaries.
-3. ~~**`std/` import infrastructure + stdlib modules**~~ ✓ — `use std/...` paths route to Rust-native modules. 9 modules: `std/json`, `std/ctx`, `std/math`, `std/fs`, `std/env`, `std/re`, `std/md`, `std/agent`, `std/mcp`.
-4. ~~**Core agent stdlib**~~ ✓ — `std/md`, `std/agent`, `std/mcp` all implemented. The agentic workflow loop is closed: agents spawn subprocesses, communicate via `~>`/`~>?`, and invoke MCP tools.
-5. **Remaining stdlib** (Phase 9) — `std/http`, `std/time`, `std/rand`, etc.
-6. **Toolchain** (Phase 10) — `lx fmt`, `lx repl`, `lx check`, `lx agent`.
-7. **Data ecosystem** (Phase 11) — Optional. `std/df`, `std/db`, etc.
+### What's done:
+- Phases 1–8 ✓ (core language, shell, modules, concurrency)
+- Agent communication ✓ (`~>` send, `~>?` ask — infix operators, subprocess-transparent)
+- Message contracts ✓ (`Protocol` keyword, runtime structural validation)
+- 9 stdlib modules ✓ (`std/json`, `std/ctx`, `std/math`, `std/fs`, `std/env`, `std/re`, `std/md`, `std/agent`, `std/mcp`)
+- `lx agent` subcommand ✓ (subprocess agent mode with JSON-line protocol)
+- MCP HTTP streaming ✓ (`reqwest` blocking, SSE parsing, session management, transport abstraction)
 
-### Other remaining work:
-- Real threading/async for `par`/`sel`/`pmap` (currently sequential)
-- Propagation traces for `^`
-- Implicit context scope, resumable workflows (see CURRENT_OPINION.md)
+### Priority order (what's next):
+1. **Remaining stdlib** (Phase 9) — `std/http`, `std/time`, `std/rand`, etc.
+3. **Implicit context scope** (Priority E) — eliminate manual state threading
+4. **Resumable workflows** (Priority F) — checkpoint/resume for multi-step workflows
+5. **Toolchain** (Phase 10) — `lx fmt`, `lx repl`, `lx check`
+6. **Data ecosystem** (Phase 11) — Optional. `std/df`, `std/db`, etc.
 
 ### Technical debt:
 - Files exceeding 300-line limit: prefix.rs (773), parser/mod.rs (640+), interpreter/mod.rs (520+), hof.rs (425), value.rs (330)
+- `par`/`sel`/`pmap` are sequential; real async needs `tokio`
 - Named-arg parser consumes ternary `:` separator (workaround: parens around then-branch)
-
-### Completed phases:
-- ~~Phase 1–4~~ ✓ (literals, bindings, functions, pipes, collections, patterns, iteration)
-- ~~Phase 5~~ ✓ (error handling, `^`, `??`, implicit Err return)
-- ~~Phase 6~~ ✓ (shell integration, `$`/`$$`/`$^`/`${}`)
-- ~~Phase 7~~ ✓ (modules — `use` imports, `+` exports, aliasing, selective imports, variant constructor scoping)
-- ~~Phase 8~~ ✓ (concurrency — sequential impl)
-- ~~Agent communication syntax~~ ✓ (`~>` send, `~>?` ask — language-level infix operators)
-- ~~`std/` import infrastructure~~ ✓ (`use std/json` routes to Rust-native stdlib modules)
-- ~~`std/json`~~ ✓ (`parse`, `encode`, `encode_pretty` via `serde_json`)
-- ~~`std/ctx`~~ ✓ (`empty`, `load`, `save`, `get`, `set`, `remove`, `keys`, `merge`)
-- ~~`std/math`~~ ✓ (`abs`, `ceil`, `floor`, `round`, `pow`, `sqrt`, `min`, `max`, `pi`, `e`, `inf`)
-- ~~`std/fs`~~ ✓ (`read`, `write`, `append`, `exists`, `remove`, `mkdir`, `ls`, `stat`)
-- ~~`std/env`~~ ✓ (`get`, `vars`, `args`, `cwd`, `home`)
-- ~~`std/re`~~ ✓ (`match`, `find_all`, `is_match`, `replace`, `replace_all`, `split`)
-- ~~`std/md`~~ ✓ (`parse`, `sections`, `code_blocks`, `headings`, `links`, `to_text`, `render` + 13 builders via `pulldown-cmark`)
-- ~~`std/agent`~~ ✓ (`spawn`, `ask`, `send`, `kill`, `name`, `status` — subprocess management + `lx agent` subcommand)
-- ~~`std/mcp`~~ ✓ (`connect`, `close`, `list_tools`, `call`, `list_resources`, `read_resource`, `list_prompts`, `get_prompt` — MCP over stdio via JSON-RPC 2.0)
+- Stale spec files: `examples.md`, `examples-extended.md`, `toolchain.md` still use `agent.ask`/`agent.send` library syntax
 
 ### Language Direction
 
-See [CURRENT_OPINION.md](CURRENT_OPINION.md) — self-critique updated after Session 17. Priorities A–D DONE. Remaining: E (implicit context scope), F (resumable workflows).
+See [CURRENT_OPINION.md](CURRENT_OPINION.md) — self-critique updated after Session 18. Priorities A–D.5 DONE. Remaining: E (implicit context scope), F (resumable workflows).
 
 ### Known Spec Tensions
 
@@ -211,3 +196,30 @@ Implemented `std/mcp` — the last piece needed to close the agentic workflow lo
 - `rpc()` helper skips server notifications (messages without `id`) when reading responses
 - `call` text extraction: single text content blocks are returned as plain strings for ergonomic piping. Multi-content or non-text results returned as full records
 - `connect` URI parsing: `stdio:///path` extracts executable path. Space-separated args supported: `stdio:///usr/bin/env npx server`
+
+### Session 18 (2026-03-14) — MCP HTTP Streaming Transport
+
+Implemented HTTP streaming (Streamable HTTP) transport for `std/mcp`. MCP servers can now be connected via `http://` or `https://` URIs in addition to the existing `stdio://` subprocess transport. Test results: **17/17 PASS**.
+
+**Transport abstraction refactor:**
+- `mcp_rpc.rs` now contains `McpTransport` enum (Stdio | Http), `McpConnection` struct, registry, and dispatch logic
+- `mcp_stdio.rs` extracted from old `mcp_rpc.rs` — `StdioTransport` handles subprocess spawn, JSON-line I/O, shutdown
+- `mcp_http.rs` new — `HttpTransport` handles `reqwest::blocking` POST, SSE response parsing, `Mcp-Session-Id` session tracking
+- `mcp.rs` declares all three submodules via `#[path]`, exposes unchanged public API
+- All files under 300 lines (mcp.rs: 115, mcp_rpc.rs: 210, mcp_stdio.rs: 99, mcp_http.rs: 164)
+
+**HTTP transport features:**
+- `connect` accepts `http://` or `https://` URI strings, or config record `{url: "http://..."}`
+- JSON-RPC 2.0 over HTTP POST with `Content-Type: application/json`, `Accept: application/json, text/event-stream`
+- SSE response parsing: handles `text/event-stream` Content-Type, extracts JSON-RPC response matching request ID
+- `Mcp-Session-Id` header captured from server responses and sent with subsequent requests
+- `close` sends HTTP DELETE to terminate session (if session ID exists)
+- Notifications sent as POST, server 202 response expected
+
+**Dependencies:**
+- Added `reqwest` v0.12 with `blocking` + `json` features to workspace
+- `tokio` pulled in as transitive dependency (reqwest's internal runtime for blocking client)
+
+**Test fixture:**
+- `asl/suite/fixtures/mcp_test_http_server.py` — HTTP server implementing full MCP protocol (initialize, tools, resources, prompts), writes port/PID to temp files for test orchestration
+- `asl/suite/17_mcp_http.lx` — 17 assertions covering connect, list_tools, call, resources, prompts, close, and config record URIs

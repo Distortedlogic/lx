@@ -267,8 +267,9 @@ Protocols can be exported with `+` and imported via `use`:
 - `~>` (send) and `~>?` (ask) — implemented as infix operators
 - `Protocol` — implemented as keyword with runtime validation
 - Sequential evaluation (like par/sel); real async is future work
-- Agents are currently records with handler functions
-- `agent.spawn` (subprocess agents) — planned for std/agent
+- Agents are records with handler functions; subprocess agents via `std/agent` (`__pid` records)
+- `agent.spawn` — implemented in `std/agent` (subprocess spawning, JSON-line protocol)
+- `std/mcp` — implemented (MCP over stdio via JSON-RPC 2.0; HTTP streaming transport planned)
 - Channel receive syntax for `sel` — planned
 
 ## Cross-References

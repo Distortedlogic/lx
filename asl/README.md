@@ -80,7 +80,7 @@ asl/
 | [stdlib-data.md](spec/stdlib-data.md) | Data ecosystem: std/df (Polars), std/db (SQLite+DuckDB), std/num, std/ml, std/plot |
 | [stdlib-agents.md](spec/stdlib-agents.md) | Agent ecosystem: std/agent, std/mcp, std/ctx, std/md, std/cron |
 | [open-questions.md](spec/open-questions.md) | All v0.1 questions resolved; v2 considerations |
-| [CURRENT_OPINION.md](CURRENT_OPINION.md) | Self-critique: what works, what's wrong, priorities D–F (agent stdlib, context scope, workflows) |
+| [CURRENT_OPINION.md](CURRENT_OPINION.md) | Self-critique: what works, what's wrong, priorities E–F (context scope, workflows) |
 
 ## Implementation — `impl/`
 
@@ -117,10 +117,10 @@ asl/
 | [12_types.lx](suite/12_types.lx) | Type annotations, structural subtyping, tagged unions, generics | 7 |
 | [13_concurrency.lx](suite/13_concurrency.lx) | `par`, `sel`, `pmap`, timeout, mutable capture | 8 |
 | [14_agents.lx](suite/14_agents.lx) | `~>` send, `~>?` ask, propagation, piping, par, pmap, Protocol | Agent |
-| [15_stdlib.lx](suite/15_stdlib.lx) | `std/json`, `std/ctx`, `std/math`, `std/fs`, `std/env`, `std/re`, `std/md`, `std/agent` | 9 |
+| [15_stdlib.lx](suite/15_stdlib.lx) | `std/json`, `std/ctx`, `std/math`, `std/fs`, `std/env`, `std/re`, `std/md`, `std/mcp`, `std/agent` | 9 |
 | [16_edge_cases.lx](suite/16_edge_cases.lx) | Disambiguation, precedence, body extent, Err early return | 1-4 |
 | [11_modules/](suite/11_modules/) | `use`, `+` exports, aliasing, selective imports | 7 |
 
 ## Status
 
-v0.1 — Phases 1–8 + modules + agent communication + message contracts + stdlib implemented in Rust (`crates/lx/`). Lexer (with shell mode), parser, tree-walking interpreter with ~80 builtins, iterator protocol, shell execution via `sh -c`, concurrency primitives (`par`/`sel`/`pmap`/`pmap_n` — sequential impl), module system (`use` imports, `+` exports, aliasing, selective imports, variant constructor scoping), agent communication (`~>` send, `~>?` ask — language-level infix operators, with subprocess agent support), message contracts (`Protocol`), 8 stdlib modules (`std/json`, `std/ctx`, `std/math`, `std/fs`, `std/env`, `std/re`, `std/md`, `std/agent`), `lx agent` subcommand for subprocess agent mode. `just diagnose` passes clean. `just test`: **16/16 PASS**. The language name is **lx**, file extension `.lx`.
+v0.1 — Phases 1–8 + modules + agent communication + message contracts + stdlib implemented in Rust (`crates/lx/`). Lexer (with shell mode), parser, tree-walking interpreter with ~80 builtins, iterator protocol, shell execution via `sh -c`, concurrency primitives (`par`/`sel`/`pmap`/`pmap_n` — sequential impl), module system (`use` imports, `+` exports, aliasing, selective imports, variant constructor scoping), agent communication (`~>` send, `~>?` ask — language-level infix operators, with subprocess agent support), message contracts (`Protocol`), 9 stdlib modules (`std/json`, `std/ctx`, `std/math`, `std/fs`, `std/env`, `std/re`, `std/md`, `std/agent`, `std/mcp`), `lx agent` subcommand for subprocess agent mode. `just diagnose` passes clean. `just test`: **16/16 PASS**. The language name is **lx**, file extension `.lx`.

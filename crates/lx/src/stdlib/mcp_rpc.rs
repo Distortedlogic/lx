@@ -1,6 +1,4 @@
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, BufWriter, Write};
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
@@ -11,21 +9,27 @@ use crate::error::LxError;
 use crate::span::Span;
 use crate::value::Value;
 
-struct McpProcess {
-    _child: Child,
-    stdin: BufWriter<ChildStdin>,
-    stdout: BufReader<ChildStdout>,
+use super::mcp_http::HttpTransport;
+use super::mcp_stdio::StdioTransport;
+
+enum McpTransport {
+    Stdio(StdioTransport),
+    Http(HttpTransport),
+}
+
+struct McpConnection {
+    transport: McpTransport,
     next_id: u64,
 }
 
 static NEXT_CLIENT_ID: AtomicU64 = AtomicU64::new(1);
 
-fn registry() -> &'static Mutex<HashMap<u64, McpProcess>> {
-    static REG: OnceLock<Mutex<HashMap<u64, McpProcess>>> = OnceLock::new();
+fn registry() -> &'static Mutex<HashMap<u64, McpConnection>> {
+    static REG: OnceLock<Mutex<HashMap<u64, McpConnection>>> = OnceLock::new();
     REG.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-pub(super) fn get_id(client: &Value, span: Span) -> Result<u64, LxError> {
+fn get_id(client: &Value, span: Span) -> Result<u64, LxError> {
     match client {
         Value::Record(r) => r
             .get("__mcp_id")
@@ -37,65 +41,44 @@ pub(super) fn get_id(client: &Value, span: Span) -> Result<u64, LxError> {
 }
 
 fn rpc(
-    proc: &mut McpProcess,
+    conn: &mut McpConnection,
     method: &str,
     params: &serde_json::Value,
     span: Span,
 ) -> Result<serde_json::Value, LxError> {
-    proc.next_id += 1;
+    conn.next_id += 1;
     let req = serde_json::json!({
-        "jsonrpc": "2.0", "id": proc.next_id,
+        "jsonrpc": "2.0", "id": conn.next_id,
         "method": method, "params": params
     });
-    let s = serde_json::to_string(&req)
-        .map_err(|e| LxError::runtime(format!("mcp: encode: {e}"), span))?;
-    writeln!(proc.stdin, "{s}")
-        .map_err(|e| LxError::runtime(format!("mcp: write: {e}"), span))?;
-    proc.stdin
-        .flush()
-        .map_err(|e| LxError::runtime(format!("mcp: flush: {e}"), span))?;
-    loop {
-        let mut line = String::new();
-        proc.stdout
-            .read_line(&mut line)
-            .map_err(|e| LxError::runtime(format!("mcp: read: {e}"), span))?;
-        if line.is_empty() {
-            return Err(LxError::runtime("mcp: server disconnected", span));
-        }
-        let jv: serde_json::Value = serde_json::from_str(line.trim())
-            .map_err(|e| LxError::runtime(format!("mcp: decode: {e}"), span))?;
-        if jv.get("id").is_none() {
-            continue;
-        }
-        if let Some(err) = jv.get("error") {
-            let msg = err
-                .get("message")
-                .and_then(|v| v.as_str())
-                .unwrap_or("unknown");
-            return Err(LxError::runtime(
-                format!("mcp: server error: {msg}"),
-                span,
-            ));
-        }
-        return jv
-            .get("result")
-            .cloned()
-            .ok_or_else(|| LxError::runtime("mcp: no result in response", span));
+    let resp = match &mut conn.transport {
+        McpTransport::Stdio(t) => t.send(&req, span)?,
+        McpTransport::Http(t) => t.send(&req, span)?,
+    };
+    if let Some(err) = resp.get("error") {
+        let msg = err
+            .get("message")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
+        return Err(LxError::runtime(
+            format!("mcp: server error: {msg}"),
+            span,
+        ));
+    }
+    resp.get("result")
+        .cloned()
+        .ok_or_else(|| LxError::runtime("mcp: no result in response", span))
+}
+
+fn notify(conn: &mut McpConnection, method: &str, span: Span) -> Result<(), LxError> {
+    let req = serde_json::json!({"jsonrpc": "2.0", "method": method});
+    match &mut conn.transport {
+        McpTransport::Stdio(t) => t.send_notify(&req, span),
+        McpTransport::Http(t) => t.send_notify(&req, span),
     }
 }
 
-fn notify(proc: &mut McpProcess, method: &str, span: Span) -> Result<(), LxError> {
-    let s =
-        serde_json::to_string(&serde_json::json!({"jsonrpc": "2.0", "method": method}))
-            .map_err(|e| LxError::runtime(format!("mcp: encode: {e}"), span))?;
-    writeln!(proc.stdin, "{s}")
-        .map_err(|e| LxError::runtime(format!("mcp: write: {e}"), span))?;
-    proc.stdin
-        .flush()
-        .map_err(|e| LxError::runtime(format!("mcp: flush: {e}"), span))
-}
-
-fn parse_config(val: &Value, span: Span) -> Result<(String, Vec<String>), LxError> {
+fn parse_stdio_config(val: &Value, span: Span) -> Result<(String, Vec<String>), LxError> {
     match val {
         Value::Str(uri) => {
             let uri = uri.as_ref();
@@ -140,45 +123,54 @@ fn parse_config(val: &Value, span: Span) -> Result<(String, Vec<String>), LxErro
     }
 }
 
-pub(super) fn connect(args: &[Value], span: Span) -> Result<Value, LxError> {
-    let (cmd, cmd_args) = parse_config(&args[0], span)?;
-    let mut child = Command::new(&cmd)
-        .args(&cmd_args)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .map_err(|e| LxError::runtime(format!("mcp.connect: spawn: {e}"), span))?;
-    let stdin = BufWriter::new(
-        child
-            .stdin
-            .take()
-            .ok_or_else(|| LxError::runtime("mcp.connect: no stdin", span))?,
-    );
-    let stdout = BufReader::new(
-        child
-            .stdout
-            .take()
-            .ok_or_else(|| LxError::runtime("mcp.connect: no stdout", span))?,
-    );
-    let mut proc = McpProcess {
-        _child: child,
-        stdin,
-        stdout,
-        next_id: 0,
-    };
+fn is_http(val: &Value) -> bool {
+    match val {
+        Value::Str(s) => s.starts_with("http://") || s.starts_with("https://"),
+        Value::Record(r) => r.get("url").and_then(|v| v.as_str()).is_some(),
+        _ => false,
+    }
+}
+
+fn http_url(val: &Value, span: Span) -> Result<String, LxError> {
+    match val {
+        Value::Str(s) => Ok(s.to_string()),
+        Value::Record(r) => r
+            .get("url")
+            .and_then(|v| v.as_str())
+            .map(String::from)
+            .ok_or_else(|| LxError::runtime("mcp.connect: needs 'url' field", span)),
+        _ => Err(LxError::type_err("mcp.connect: expects URI or Record", span)),
+    }
+}
+
+fn init_handshake(conn: &mut McpConnection, span: Span) -> Result<(), LxError> {
     let init_params = serde_json::json!({
         "protocolVersion": "2024-11-05",
         "capabilities": {},
         "clientInfo": {"name": "lx", "version": "0.1.0"}
     });
-    rpc(&mut proc, "initialize", &init_params, span)?;
-    notify(&mut proc, "notifications/initialized", span)?;
+    rpc(conn, "initialize", &init_params, span)?;
+    notify(conn, "notifications/initialized", span)
+}
+
+pub(super) fn connect(args: &[Value], span: Span) -> Result<Value, LxError> {
+    let transport = if is_http(&args[0]) {
+        let url = http_url(&args[0], span)?;
+        McpTransport::Http(HttpTransport::new(url, span)?)
+    } else {
+        let (cmd, cmd_args) = parse_stdio_config(&args[0], span)?;
+        McpTransport::Stdio(StdioTransport::spawn(&cmd, &cmd_args, span)?)
+    };
+    let mut conn = McpConnection {
+        transport,
+        next_id: 0,
+    };
+    init_handshake(&mut conn, span)?;
     let client_id = NEXT_CLIENT_ID.fetch_add(1, Ordering::Relaxed);
     registry()
         .lock()
         .map_err(|e| LxError::runtime(format!("mcp registry lock: {e}"), span))?
-        .insert(client_id, proc);
+        .insert(client_id, conn);
     let mut rec = IndexMap::new();
     rec.insert("__mcp_id".into(), Value::Int(BigInt::from(client_id)));
     Ok(Value::Ok(Box::new(Value::Record(Arc::new(rec)))))
@@ -190,19 +182,10 @@ pub(super) fn close(args: &[Value], span: Span) -> Result<Value, LxError> {
         .lock()
         .map_err(|e| LxError::runtime(format!("mcp registry lock: {e}"), span))?;
     match reg.remove(&id) {
-        Some(mut proc) => {
-            drop(proc.stdin);
-            drop(proc.stdout);
-            match proc._child.try_wait() {
-                Ok(Some(_)) => {}
-                _ => {
-                    proc._child
-                        .kill()
-                        .map_err(|e| LxError::runtime(format!("mcp.close: {e}"), span))?;
-                    proc._child
-                        .wait()
-                        .map_err(|e| LxError::runtime(format!("mcp.close: {e}"), span))?;
-                }
+        Some(conn) => {
+            match conn.transport {
+                McpTransport::Stdio(t) => t.shutdown(span)?,
+                McpTransport::Http(t) => t.shutdown(span)?,
             }
             Ok(Value::Unit)
         }
@@ -220,8 +203,8 @@ pub(super) fn with_proc(
     let mut reg = registry()
         .lock()
         .map_err(|e| LxError::runtime(format!("mcp registry lock: {e}"), span))?;
-    let proc = reg
+    let conn = reg
         .get_mut(&id)
         .ok_or_else(|| LxError::runtime("mcp: client not found", span))?;
-    rpc(proc, method, params, span)
+    rpc(conn, method, params, span)
 }

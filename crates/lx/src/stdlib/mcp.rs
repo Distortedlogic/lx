@@ -1,5 +1,9 @@
 #[path = "mcp_rpc.rs"]
 mod mcp_rpc;
+#[path = "mcp_stdio.rs"]
+mod mcp_stdio;
+#[path = "mcp_http.rs"]
+mod mcp_http;
 
 use std::sync::Arc;
 

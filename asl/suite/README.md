@@ -6,33 +6,28 @@
 
 ```
 suite/
-  01_literals.lx        -- integers, floats, strings, bools, unit
-  02_bindings.lx        -- =, :=, <-, shadowing
-  03_arithmetic.lx      -- operators, precedence, bigint, float widening
-  04_functions.lx       -- definitions, closures, currying, recursion, TCO
-  05_pipes.lx           -- |, sections, <>, data-last threading
-  06_collections.lx     -- lists, records, maps, sets, tuples, spread, slicing
-  07_patterns.lx        -- ? (three modes), destructuring, guards, exhaustiveness
-  08_iteration.lx       -- map/filter/fold, ranges, lazy sequences, loop/break
-  09_errors.lx          -- Result/Maybe, ^, ??, require, implicit Ok
+  01_literals.lx        -- integers, floats, strings, bools, unit, interpolation, raw strings, regex
+  02_bindings.lx        -- =, :=, <-, shadowing, blocks, forward references
+  03_arithmetic.lx      -- operators, precedence, bigint, float widening, comparison, logical
+  04_functions.lx       -- definitions, closures, currying, recursion, TCO, sections, composition
+  05_pipes.lx           -- |, sections, <>, data-last threading, dbg, tap, multiline
+  06_collections.lx     -- lists, records, maps, sets, tuples, spread, slicing, conversions
+  07_patterns.lx        -- ? (three modes), destructuring, guards, tagged unions, Maybe/Result
+  08_iteration.lx       -- map/filter/fold, ranges, lazy sequences, loop/break, iterator protocol
+  09_errors.lx          -- Result/Maybe, ^, ??, require, implicit Ok, predicates
   10_shell.lx           -- $, $$, $^, ${}, interpolation, OS pipes
   11_modules/           -- multi-file import tests (main.lx, lib_math.lx, lib_types.lx)
-  12_types.lx           -- annotations, structural subtyping, tagged unions
+  12_types.lx           -- annotations, structural subtyping, tagged unions, generics
   13_concurrency.lx     -- par, sel, pmap, timeout, mutable capture
-  14_stdlib/            -- per-module test files (TODO)
-  15_diagnostics.lx     -- expected error output (TODO)
+  14_agents.lx          -- ~> send, ~>? ask, propagation, piping, par, pmap, Protocol
+  15_stdlib.lx          -- std/json, std/math, std/ctx, std/fs, std/env, std/re, std/md, std/mcp, std/agent
   16_edge_cases.lx      -- regression tests for disambiguation rules, precedence, body extent
-  17_dataframes.lx      -- std/df: read, filter, group_by, agg, join (TODO, Phase 11)
-  18_database.lx        -- std/db: SQLite/DuckDB CRUD, transactions (TODO, Phase 11)
-  19_numerical.lx       -- std/num: vectorized ops, statistics (TODO, Phase 11)
-  20_ml.lx              -- std/ml: embeddings, similarity, classify (TODO, Phase 11)
-  21_plot.lx            -- std/plot: chart construction, render (TODO, Phase 11)
-  22_agents.lx          -- std/agent: spawn, ask, channel, polling (TODO, Phase 12)
-  23_mcp.lx             -- std/mcp: connect, list_tools, call (TODO, Phase 12)
-  24_context.lx         -- std/ctx: load, save, get, set, merge (TODO, Phase 12)
-  25_markdown.lx        -- std/md: parse, sections, code_blocks, render (TODO, Phase 12)
-  26_cron.lx            -- std/cron: every, at, cancel (TODO, Phase 12)
+  fixtures/
+    agent_echo.lx       -- echo agent handler for std/agent tests
+    mcp_test_server.py  -- minimal MCP server for std/mcp tests
 ```
+
+**16/16 PASS** — all tests passing.
 
 ## Convention
 
@@ -65,19 +60,19 @@ Each file begins with a comment header noting:
 | 11_modules | modules.md |
 | 12_types | types.md |
 | 13_concurrency | concurrency.md |
-| 14_stdlib | stdlib.md, stdlib-modules.md |
-| 15_diagnostics | diagnostics.md |
+| 14_agents | agents.md |
+| 15_stdlib | stdlib.md, stdlib-modules.md, stdlib-agents.md |
 | 16_edge_cases | design.md, grammar.md, runtime.md, errors.md |
-| 17_dataframes | stdlib-data.md (std/df) |
-| 18_database | stdlib-data.md (std/db) |
-| 19_numerical | stdlib-data.md (std/num) |
-| 20_ml | stdlib-data.md (std/ml) |
-| 21_plot | stdlib-data.md (std/plot) |
-| 22_agents | agents.md, stdlib-agents.md (std/agent) |
-| 23_mcp | agents.md, stdlib-agents.md (std/mcp) |
-| 24_context | agents.md, stdlib-agents.md (std/ctx) |
-| 25_markdown | agents.md, stdlib-agents.md (std/md) |
-| 26_cron | agents.md, stdlib-agents.md (std/cron) |
+
+## Planned Test Files (not yet implemented)
+
+| File | Module | Phase |
+|---|---|---|
+| 17_dataframes.lx | std/df | Phase 11 (Data Ecosystem) |
+| 18_database.lx | std/db | Phase 11 |
+| 19_numerical.lx | std/num | Phase 11 |
+| 20_ml.lx | std/ml | Phase 11 |
+| 21_plot.lx | std/plot | Phase 11 |
 
 ## When to Update
 
