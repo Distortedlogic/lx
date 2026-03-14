@@ -79,7 +79,7 @@ long_result = [10 20 30 40 50]
   | filter (> 15)
   | map (* 2)
   | sum
-assert (long_result == 240)
+assert (long_result == 280)
 
 -- pipe to each (side effects, returns unit)
 collected := []

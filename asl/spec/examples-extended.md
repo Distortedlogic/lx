@@ -1,63 +1,78 @@
 # Examples — Extended
 
-Additional worked examples. See [examples.md](examples.md) for core examples.
+Additional worked examples. See [examples.md](examples.md) for core agentic examples.
 
-## Git Branch Cleanup
+## Continuous Monitoring Agent
 
 ```
-+main = () {
-  current = $^git branch --show-current | trim
-  merged = $^git branch --merged
-    | lines
-    | map trim
-    | filter (b) b != current && b != "main" && b != "master"
+use std/agent
+use std/cron
+use std/ctx
 
-  merged | empty? ? {
-    true  -> $echo "no branches to clean"
-    false -> {
-      $echo "branches merged into {current}:"
-      merged | each (b) $echo "  {b}"
-      $echo "\ndelete {merged | len} branches? [y/N]"
-      io.read_line ^ | trim | lower ? {
-        "y" -> merged | each (b) $^git branch -d {b}
-        _   -> $echo "cancelled"
++main = () {
+  state = ctx.load ".monitor-state.json" ?? ctx.empty ()
+
+  cron.every (time.min 5) () {
+    checks = ["api" "db" "cache"] | pmap (svc) {
+      result = sel {
+        agent.ask (agent.spawn {name: "health-{svc}" prompt: "Check {svc} health"} ^)
+          {service: svc} -> it
+        timeout 30 -> {status: "timeout" service: svc}
+      }
+      {service: svc  status: result.status  ts: time.now () | to_str}
+    }
+
+    failures = checks | filter (c) c.status != "ok"
+    failures | empty? ? () : {
+      agent.send (agent.connect "alerter" ^) {
+        severity: failures | len > 1 ? "critical" : "warn"
+        services: failures | map (.service)
+        details: checks
       }
     }
+
+    ctx.set "last_check" checks state
+      | ctx.set "history" [..(ctx.get "history" state ?? []) ..checks]
+      | (c) ctx.save ".monitor-state.json" c ^
   }
 }
 ```
 
-Uses: `$^` for pipeline-friendly shell, `lines`/`trim`/`filter` for parsing shell output, pattern matching on user input.
+Uses: `cron.every` for scheduling, `pmap` for parallel checks, `sel`/`timeout` for deadlines, context persistence, agent messaging.
 
-## Data Deduplication with Sets
+## Agent Memory with Markdown
 
 ```
+use std/agent
+use std/md
+use std/ctx
 use std/fs
-use std/crypto
 
 +main = () {
-  seen := #{}
-  dupes := []
+  doc = md.parse (fs.read "AGENT_MEMORY.md" ^)
+  prev_tasks = md.sections doc | find (s) s.title == "Active Tasks"
+  prev_findings = md.code_blocks doc
+    | filter (b) b.lang == Some "json")
+    | map (b) json.parse b.code ^
 
-  fs.walk "data/"
-    | filter (ends? ".json")
-    | each (path) {
-      content = fs.read path ^
-      hash = crypto.sha256 content
-      contains? hash seen ? {
-        true  -> dupes <- [..dupes path]
-        false -> seen <- #{..seen hash}
-      }
-    }
+  new_results = agent.ask (agent.spawn {name: "researcher" prompt: "Continue research"} ^)
+    {prior_findings: prev_findings action: "extend"} ^
 
-  dupes | empty? ? $echo "no duplicates" : {
-    $echo "found {dupes | len} duplicates:"
-    dupes | each (p) $echo "  {p}"
-  }
+  updated = md.doc [
+    md.h1 "Agent Memory"
+    md.para "Last updated: {time.now () | time.format "%Y-%m-%d %H:%M"}"
+    md.h2 "Active Tasks"
+    md.list (new_results.tasks | map (.summary))
+    md.h2 "Findings"
+    md.code "json" (new_results.findings | json.encode_pretty)
+    md.h2 "History"
+    md.list (prev_findings | map (f) "{f.date}: {f.summary}")
+  ]
+  md.render updated | (out) fs.write "AGENT_MEMORY.md" out ^
 }
 ```
 
-Uses: mutable set for tracking, `crypto.sha256`, `fs.walk`, set spread `#{..s val}`.
+Uses: markdown parsing for agent memory, structured extraction, markdown generation, agent delegation.
 
 ## CSV Report Generator
 

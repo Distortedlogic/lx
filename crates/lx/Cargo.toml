@@ -7,6 +7,7 @@ license.workspace = true
 [dependencies]
 miette = { version = "7", features = ["fancy"] }
 num-bigint = "0.4"
+num-integer = "0.1"
 num-traits = "0.2"
 thiserror = "2"
 indexmap = "2"

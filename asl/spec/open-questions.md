@@ -48,6 +48,22 @@ All v0.1 design questions have been resolved. Decisions and rationale are in [de
 
 All five are stdlib modules in Phase 11. No syntax changes. See [stdlib-data.md](stdlib-data.md).
 
+## Agentic Design Questions (v1)
+
+These are open questions for the agentic layer — to be resolved during implementation:
+
+| Question | Considerations |
+|---|---|
+| Agent process model | Are agents subprocesses (CLI invocations), API calls, or both? Should `agent.spawn` support both local and remote agents? |
+| Agent discovery | How do agents find each other? Registry, well-known names, URIs? |
+| Message serialization | What format for inter-agent messages? JSON? lx values? Protobuf? |
+| Channel backpressure | What happens when a channel sender outpaces the receiver? Buffer, drop, block? |
+| Context conflict resolution | When two agents update the same context key, who wins? Last-write-wins, CRDTs, error? |
+| MCP transport | Which MCP transports to support first? stdio, HTTP+SSE, WebSocket? |
+| Agent lifecycle | What happens to subagents when the parent dies? Orphan cleanup? |
+| Workflow resumability | How to serialize workflow state for checkpoint/resume across process restarts? |
+| Agent permissions | Can an agent restrict what tools its subagents can use? Capability model? |
+
 ## Considerations for v2
 
 These are not blockers for v1 implementation but worth revisiting after real-world usage:

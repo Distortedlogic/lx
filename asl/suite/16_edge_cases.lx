@@ -39,7 +39,8 @@ assert (double_then_sum == 12)
 
 -- sections: all operator forms
 assert ((+ 1) 5 == 6)
-assert ((- 1) 5 == 4)
+-- (- 1) is unary negation (-1), not a section. Use (+ (-1)) for "subtract 1"
+assert ((- 1) == -1)
 assert ((* 3) 4 == 12)
 assert ((/ 2) 10 == 5)
 assert ((% 3) 7 == 1)
@@ -104,7 +105,7 @@ inner = data ? {
 assert (inner == 6)
 
 -- tuple auto-spread in map/each
-assert ([(1 2) (3 4)] | map (a b) a + b == [3 7])
+assert ([(1 2) (3 4)] | map (a b) { a + b } == [3 7])
 
 -- auto-spread: 1-param function gets whole tuple
 get_pair = (t) t

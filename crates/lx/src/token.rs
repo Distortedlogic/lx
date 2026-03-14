@@ -74,6 +74,7 @@ pub enum TokenKind {
   DollarCaret,
   DollarBrace,
   ShellText(String),
+  ShellEnd,
 
   Use,
   Loop,
@@ -82,6 +83,10 @@ pub enum TokenKind {
   Sel,
   Assert,
   Underscore,
+
+  TildeArrow,
+  TildeArrowQ,
+  Protocol,
 
   Export,
   Semi,

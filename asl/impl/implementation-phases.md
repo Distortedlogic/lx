@@ -90,12 +90,20 @@ Each phase produces a working, testable increment. No phase depends on a later p
 
 **Goal:** `use` imports, `+` exports, structural type checking.
 
-**Deliverables:**
-- Module system: file = module, `use std/...`, `use ./...`, `use ../...`, aliasing `: name`, selective `{name1 name2}`
-- Export: `+` prefix at column 0
+**Status:** Module system is **implemented**. Type checker is **not yet implemented** (type annotations are parse-and-skip).
+
+**Implemented (Session 12):**
+- Module system: file = module, `use ./...`, `use ../...`, aliasing `: name`, selective `{name1 name2}`
+- Export: `+` prefix at column 0 (both lowercase and uppercase bindings/types)
 - Circular import detection
-- Import conflict detection (selective imports)
-- Forward references for top-level bindings
+- Module caching (same file loaded once)
+- Variant constructor scoping (tagged union constructors imported as bare names)
+- Test: `suite/11_modules/` (main.lx + lib_math.lx + lib_types.lx) — PASS
+
+**Not yet implemented:**
+- `use std/...` imports (needs stdlib infrastructure from Phase 9)
+- Import conflict detection (selective imports with same name)
+- Import shadowing warnings
 - Bidirectional type checker: annotation propagation, type synthesis, unification
 - Structural subtyping: record width subtyping, function types
 - Tagged union types: nominal, variant uniqueness within module
@@ -175,6 +183,22 @@ Each phase produces a working, testable increment. No phase depends on a later p
 
 **Test cases:** per-module test files. df: read CSV, filter/group/agg pipeline, join, write. db: CRUD, transactions, parameterized queries. num: vectorized ops, statistics, correlation. ml: embed + similarity. plot: chart construction, SVG output.
 
+## Phase 12: Agent Ecosystem
+
+**Goal:** `std/agent`, `std/mcp`, `std/ctx`, `std/md`, `std/cron` — the primitives that make lx an agentic workflow language. `lx agent` subcommand.
+
+**Deliverables:**
+- `std/agent` — Agent spawning via subprocess (lx scripts or external), message passing (JSON over stdin/stdout), channels (mpsc local, Unix domain sockets cross-process), task submission and polling
+- `std/mcp` — MCP client (rmcp crate): connect to stdio/HTTP/SSE servers, list tools/resources/prompts, invoke tools with structured args, read resources
+- `std/ctx` — Immutable key-value context backed by serde_json. load/save to JSON files, get/set/remove/merge operations
+- `std/md` — Markdown parsing (pulldown-cmark): parse to structured document, extract sections/code blocks/frontmatter/links, build documents from node list, render back to markdown string
+- `std/cron` — Recurring task scheduling: `every interval f`, `at cron_expr f`, cancel handles. Requires `lx agent` mode (long-lived process)
+- `lx agent script.lx` — CLI subcommand that runs scripts in agent mode (keeps process alive for cron/channels). `--daemon` flag for background execution
+
+**Phase 12 can be built incrementally:** `std/ctx` and `std/md` are simplest (pure data processing). `std/mcp` is the highest-value agentic primitive. `std/agent` requires the most design work (process model, message format). `std/cron` requires `lx agent` mode.
+
+**Test cases:** per-module test files. ctx: load/save/get/set round-trips. md: parse/extract/render round-trips. mcp: tool listing and invocation (mock server). agent: spawn/ask/channel (integration tests). cron: scheduling fires at correct intervals.
+
 ## Dependency Summary
 
 ```toml
@@ -218,3 +242,13 @@ tokenizers = "0.21"
 ```
 
 `polars` and `charming` are in reference/. `ndarray`, `rusqlite`, `duckdb`, `candle-*`, and `tokenizers` are new additions.
+
+### Phase 12 Dependencies (Agent Ecosystem)
+
+```toml
+rmcp = "0.1"
+pulldown-cmark = "0.12"
+tokio-cron-scheduler = "0.13"
+```
+
+`rmcp` for MCP client. `pulldown-cmark` for markdown parsing. `tokio-cron-scheduler` for recurring tasks. Agent spawning and channels use tokio primitives already in the workspace.

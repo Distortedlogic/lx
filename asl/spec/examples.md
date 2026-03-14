@@ -1,88 +1,102 @@
 # Examples
 
-Complete worked examples demonstrating lx features in realistic scenarios.
+Complete worked examples demonstrating lx features in realistic agentic scenarios.
 
-## Find Largest Source Files
+## Multi-Agent Code Review
 
 ```
-use std/fs
-use std/fmt
+use std/agent
+use std/ctx
 
 +main = () {
-  dir = $^pwd | trim
-  fs.walk dir
-    | filter (ends? ".rs")
-    | pmap (path) {
-      content = fs.read path ^
-      {path  lines: content | lines | len}
-    }
-    | sort_by (.lines) | rev | take 10
-    | each (f) {
-      padded = f.lines | fmt.pad_left 6
-      $echo "{padded}  {f.path}"
-    }
+  files = $^git diff --name-only HEAD~1 | lines | filter (!= "")
+
+  (security perf style) = par {
+    agent.ask (agent.spawn {name: "security" prompt: "Audit for vulnerabilities"} ^)
+      {files action: "review"} ^
+    agent.ask (agent.spawn {name: "perf" prompt: "Check for performance issues"} ^)
+      {files action: "review"} ^
+    agent.ask (agent.spawn {name: "style" prompt: "Check code style"} ^)
+      {files action: "review"} ^
+  }
+
+  findings = [..security.issues ..perf.issues ..style.issues]
+    | sort_by (.severity) | rev
+  findings | each (f) $echo "[{f.severity}] {f.file}:{f.line} — {f.message}"
+
+  ctx.set "last_review" findings (ctx.empty ())
+    | (c) ctx.save ".review-state.json" c ^
 }
 ```
 
-Uses: shell (`$^pwd`), pipes, `pmap` for parallel file reads, record literals, `sort_by` with field section.
+Uses: `par` for parallel agent work, `agent.spawn`/`agent.ask`, context persistence, shell + pipes.
 
-## HTTP API Client
+## MCP Tool Orchestration
 
 ```
-use std/net/http
-use std/json
+use std/mcp
 
-User = {name: Str  email: Str}
-ApiErr = {status: Int  body: Str}
++main = () {
+  client = mcp.connect "stdio:///usr/local/bin/code-tools" ^
+  tools = mcp.list_tools client ^
+  $echo "available tools: {tools | map (.name) | join ", "}"
 
-+fetch_users = (base_url: Str) -> [User] ^ ApiErr {
-  resp = http.get "{base_url}/users" ^
-  resp.status != 200 ? {
-    true  -> Err {status: resp.status  body: resp.body}
-    false -> resp.body | json.parse ^ | map (obj) {
-      {name: obj."name"  email: obj."email"}
+  files = mcp.call client "list_files" {pattern: "src/**/*.lx"} ^
+  results = files | pmap (f) {
+    content = mcp.call client "read_file" {path: f} ^
+    analysis = mcp.call client "analyze" {content code: content lang: "lx"} ^
+    {file: f  issues: analysis.issues}
+  }
+
+  results | filter (r) r.issues | len > 0
+    | each (r) {
+      $echo "\n{r.file}:"
+      r.issues | each (i) $echo "  [{i.severity}] {i.message}"
     }
+  mcp.close client
+}
+```
+
+Uses: MCP tool discovery and invocation, `pmap` for parallel analysis, pipeline filtering.
+
+## Agent Pipeline with Context
+
+```
+use std/agent
+use std/ctx
+use std/md
+
++main = () {
+  state = ctx.load ".pipeline-state.json" ?? ctx.empty ()
+  step = ctx.get "step" state ?? "fetch"
+
+  step ? {
+    "fetch" -> {
+      data = agent.ask (agent.spawn {name: "fetcher" prompt: "Gather data"} ^)
+        {sources: ["api" "db" "logs"]} ^
+      ctx.set "step" "analyze" state
+        | ctx.set "raw_data" data
+        | (c) ctx.save ".pipeline-state.json" c ^
+    }
+    "analyze" -> {
+      raw = ctx.get "raw_data" state ^
+      result = agent.ask (agent.spawn {name: "analyzer" prompt: "Analyze data"} ^)
+        {data: raw} ^
+      report = md.doc [
+        md.h1 "Analysis Report"
+        md.para "Processed {raw | len} sources"
+        md.h2 "Findings"
+        md.list (result.findings | map (.summary))
+      ]
+      md.render report | (out) fs.write "report.md" out ^
+      ctx.set "step" "done" state | (c) ctx.save ".pipeline-state.json" c ^
+    }
+    "done" -> $echo "pipeline complete"
   }
 }
-
-+main = () {
-  fetch_users "https://api.example.com" ?? []
-    | filter (u) { u.email | ends? "@company.com" }
-    | map (.name)
-    | each (name) $echo "employee: {name}"
-}
 ```
 
-Uses: type annotations, `^` propagation, `??` coalescing, pipeline filtering, sections.
-
-## Concurrent API Aggregation
-
-```
-use std/net/http
-use std/json
-
-+main = () {
-  urls = [
-    "https://api.a.com/data"
-    "https://api.b.com/data"
-    "https://api.c.com/data"
-  ]
-
-  results = urls | pmap (url) http.get url ^
-
-  all_items = results
-    | flat_map (r) { r.body | json.parse ^ | (.items) }
-    | sort_by (.date) | rev
-
-  slow_url = "https://slow.example.com/data"
-  fast = sel {
-    http.get slow_url -> it.body | json.parse ^
-    timeout 5         -> Err "too slow"
-  }
-}
-```
-
-Uses: `pmap` for parallel fetching, `flat_map`, `sel` for timeout racing.
+Uses: checkpoint/resume workflow, context persistence, markdown report generation, agent delegation.
 
 ## CLI Tool with Pattern Matching
 

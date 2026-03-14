@@ -4,11 +4,13 @@ Read this first when picking up lx work in a fresh agent.
 
 ## What This Is
 
-lx is a scripting language you (Claude) are designing and building for yourself. You are both the language designer and the implementer. The target user is an LLM that generates code one token at a time — every design decision optimizes for token efficiency, left-to-right generation, and minimal syntax surface area.
+lx is an agentic workflow language you (Claude) are designing and building. You are both the language designer and the implementer. The central purpose is enabling agents to write executable programs for agentic workflows — agent spawning, inter-agent communication, tool invocation (MCP), context persistence, and workflow orchestration. The syntax is optimized for LLM token generation: left-to-right, zero lookahead, minimal surface area.
+
+**Identity:** lx is not a general scripting language that happens to have agent features. It is an agentic workflow language where the core primitives are agent communication, tool invocation, and workflow composition. The LLM-optimized syntax is a property, not the purpose. The niche — "a language agents write in to orchestrate other agents" — is essentially empty.
 
 ## Continuity Protocol
 
-1. Read `asl/DEVLOG.md` — this is your memory across sessions. It has readiness criteria, key design decisions, known tensions, session history, and what needs doing next.
+1. Read `asl/DEVLOG.md` — your memory across sessions. Has implementation status, key design decisions, known tensions, session history, and what needs doing next.
 2. Read `asl/README.md` — directory structure and file index.
 3. The three folders are one system:
    - `asl/spec/` — what lx IS (language specification)
@@ -16,6 +18,7 @@ lx is a scripting language you (Claude) are designing and building for yourself.
    - `asl/suite/` — PROOF they agree (.lx golden test files)
 4. `crates/lx/` — the actual Rust implementation
 5. `crates/lx-cli/` — the `lx` binary
+6. `justfile` — build recipes (`just test`, `just diagnose`, `just fmt`, `just run <file>`)
 
 ## Your Authority
 
@@ -42,21 +45,192 @@ When you change something, update all places that reference it:
 At the end of every session, update `asl/DEVLOG.md`:
 - Add a session entry describing what you found and changed
 - Update "What Needs Doing Next"
-- Check readiness criteria — note any that changed status
-- Add new tensions or open questions you discovered
+- Note any new tensions or open questions
 - Trim anything no longer relevant
+
+Then update this file (`NEXT_PROMPT.md`) with accurate current state.
 
 ## Current State
 
-Phase 1 Rust implementation exists and compiles. Basic arithmetic, bindings, strings, collections, pattern matching, and ~50 builtins work. Run `cargo run -p lx-cli -- run <file.lx>` to test.
+`just diagnose` is clean — zero warnings, zero clippy errors.
+`just test`: **15/15 PASS** — all tests passing.
 
-Phases 2-10 are designed but not implemented. The implementation plan is in `asl/impl/implementation-phases.md`.
+Phases 1–8 are all implemented (including Phase 7 modules), plus agent communication syntax. The interpreter handles:
+- Arithmetic, bindings, strings, interpolation, collections, pattern matching
+- Functions, closures, currying, default params (with auto-execution), pipes, sections (right/left/binop/field/index), composition `<>`
+- Type annotations (parse-and-skip for params, return types, bindings, complex types like `{name: Str}`, `[Int]`, `%{Str: Int}`, `Int -> Int`, `(Int -> Int) -> Int`)
+- Shell integration: `$cmd` (full result), `$$cmd` (raw/no interp), `$^cmd` (stdout/propagate), `${...}` (multi-line block). Depth-aware paren stopping for `($cmd)` in expressions.
+- Regex literals `r/pattern/flags`
+- Slicing `xs.1..3`, `xs.2..`, `xs...3`
+- Named args `f x name: "val"` with param-position matching
+- Type definitions `Shape = | Circle Float | Rect Float Float` with tagged values and pattern matching (including paren/bracket/brace-wrapped variant types like `Node (Tree a) (Tree a)`)
+- Nested tuple patterns in function params `fst = ((a _)) a` (desugars to synthetic names + destructuring)
+- Iterator protocol: `nat` (infinite naturals), `cycle` (infinite cycle), record-with-`next` custom iterators. Lazy composition via `map`/`filter` on iterators; eager consumption via `take`/`collect`.
+- Concurrency (sequential impl): `par { ... }` (parallel block → tuple), `sel { expr -> handler }` (race/select with `it` binding), `pmap` (parallel map), `pmap_n` (rate-limited pmap), `timeout`
+- 29 HOF builtins: map, filter, fold, flat_map, each, take, drop, zip, enumerate, find, any?, all?, none?, count, take_while, drop_while, sort_by, min_by, max_by, partition, group_by, chunks, windows, intersperse, scan, tap, find_index, pmap, pmap_n
+- ~30 collection/string/conversion builtins
+- Loop/break with values
+- Error propagation `^` (unwraps Ok/Some, propagates Err/None at function boundaries)
+- Coalescing `??` (unwraps Ok/Some, evaluates default for Err/None)
+- `(?? default)` sections
+- Implicit Err early return in `-> T ^ E` annotated functions
+- Match with record/list/constructor/string/tagged patterns, guards, destructuring
+- Collection-mode application in `[]`, `#{}`, `%{}`, and `{}` records (only TypeConstructors trigger application)
+- Tuple destructuring bindings `(a b) = expr`
+- Multiline continuation (leading and trailing operators)
+- Block-scoped function bodies `(x) { body }` don't consume pipes
+- Multiline string auto-dedent (strings starting with `\n` strip common indentation)
+- Module system: `use ./path` (whole), `use ./path : alias`, `use ./path {name1 name2}` (selective), variant constructor scoping, module caching, circular import detection
+- Agent communication: `~>` (send, fire-and-forget), `~>?` (ask, request-response). Infix operators at concat/diamond precedence. Agents are records with `handler` field.
+
+**Important syntax notes:**
+- Tuple creation with variables needs semicolons: `(b; a)` not `(b a)` (Idents are callable)
+- Generic return types need parens: `-> (Tree a)` not `-> Tree a` (parse-and-skip limitation)
+- Records/maps use collection-mode: `{x: (f 42)}` for function calls in field values
+- Shell `$` consumes full line: to use shell results in expressions, wrap in parens: `($cmd) ? { ... }`
+- Shell `$^` stops at first `|` for language pipe: `$^pwd | trim` — `pwd` is shell, `| trim` is lx
+- Inside parens/brackets (depth > 0), `$` stops at `)`: `($echo "hello")` works
+- `~>` (send) and `~>?` (ask) are infix: `agent ~>? msg`. Agent = record with `handler` field.
+- `~>?` composes with `^` and `|`: `agent ~>? msg ^ | process` = `((agent ~>? msg) ^) | process`
+
+## Critical Reading
+
+**Read `asl/CURRENT_OPINION.md` for design context.** Priority A (agent communication syntax) is now addressed — `~>` and `~>?` are language-level operators. Remaining priorities: B (message contracts), C (implicit context scope), D (resumable workflows).
+
+## What To Work On Next
+
+All 15 existing test files pass. The core language is feature-complete through Phase 8 (including modules) plus agent communication syntax.
+
+### Step 1: ~~Design agent communication syntax~~ ✓ DONE
+
+Implemented `~>` (send) and `~>?` (ask) as language-level infix operators. Tokens: `TildeArrow`, `TildeArrowQ`. AST: `Expr::AgentSend`, `Expr::AgentAsk`. Precedence: (21, 22) — same as concat/diamond. Sequential evaluation. Agents are records with `handler` field. Test: `14_agents.lx`.
+
+### Step 2: Message contracts (LANGUAGE CHANGE)
+
+Structured validation for agent messages. Not a full type system — just record shape checking at send/receive boundaries.
+
+**What to design:**
+- Syntax for declaring message shapes (could reuse existing type annotation syntax or `Protocol` keyword)
+- Where validation happens (send-side, receive-side, or both)
+- Error reporting when a message doesn't match
+
+**Example direction:**
+```
+Protocol ReviewRequest = {task: Str  path: Str  depth: Int = 3}
+analyzer ~>? ReviewRequest {task: "review" path: "src/"} ^
+```
+
+### Step 3: `std/` import infrastructure (PLUMBING)
+
+Module system handles `./` and `../`. `use std/json` etc. requires extending `resolve_module_path` in `interpreter/modules.rs`.
+
+**Design decision:** How are stdlib modules implemented?
+- **Option A: Rust-native builtins** — Each `std/` module is a Rust module that builds a `Value::Record` of functions. Like existing builtins in `builtins/mod.rs`. Pros: fast. Cons: all Rust.
+- **Option B: `.lx` files** — Ship with binary. Cons: bootstrap problem.
+- **Option C: Mix** — Low-level (fs, json, http) in Rust; high-level (ctx, md) in `.lx`. Most pragmatic.
+
+Code change: in `resolve_module_path`, add branch for non-`./`/`../` paths.
+
+### Step 4: Core agent stdlib modules
+
+Build ON TOP of the language primitives from Steps 1-2. These are now thinner — the heavy lifting (send, ask, channel) is in the language.
+
+| Module | Rust crate | Purpose |
+|--------|-----------|---------|
+| `std/json` | `serde_json` | parse, encode (needed by agent communication) |
+| `std/ctx` | `serde_json` | Context load/save/get/set |
+| `std/md` | `pulldown-cmark` | Markdown parse/extract/render |
+| `std/mcp` | `rmcp` | MCP client: connect, list_tools, call |
+| `std/agent` | `tokio::process` | Agent spawn, process management (send/ask is in language) |
+
+### Step 5: Remaining stdlib (Phase 9)
+
+Lower priority — these make lx useful for general scripting but aren't the differentiator.
+
+| Module | Rust crate | Key functions |
+|--------|-----------|---------------|
+| `std/fs` | `std::fs` | read, write, walk, stat, mkdir, glob |
+| `std/http` | `reqwest` | get, post, put, delete |
+| `std/time` | `chrono` | now, format, parse, sleep |
+| `std/env` | `std::env` | get, set, args, exit |
+| `std/io` | `std::io` | read_line, print |
+| `std/csv` | `csv` | parse, encode |
+| `std/toml` | `toml` | parse, encode |
+| `std/yaml` | `serde_yaml` | parse, encode |
+| `std/re` | `regex` | match, find_all, replace, split |
+| `std/math` | — | abs, ceil, floor, pow, sqrt |
+| `std/rand` | `rand` | int, float, choice, shuffle |
+| `std/crypto` | `sha2`, `hmac` | sha256, hmac |
+| `std/os` | — | pid, hostname, platform |
+| `std/fmt` | — | pad, truncate |
+| `std/bit` | — | and, or, xor, shift |
+
+### Step 6: Toolchain (Phase 10)
+
+| Tool | Purpose | Crate |
+|------|---------|-------|
+| `lx fmt` | Canonical formatter | — |
+| `lx repl` | Interactive mode | `rustyline` |
+| `lx check` | Type/contract validation | — |
+| `lx agent` | Long-lived agent process | `tokio` |
+| `lx watch` | Re-run on file change | `notify` |
+
+### Step 7: Data ecosystem (Phase 11, optional)
+
+| Module | Rust crate | Purpose |
+|--------|-----------|---------|
+| `std/df` | `polars` | DataFrames |
+| `std/db` | `rusqlite`, `duckdb` | SQL |
+| `std/num` | `ndarray` | Vectors/stats |
+| `std/ml` | `candle-core` / `ort` | ML inference |
+| `std/plot` | `charming` | Charts |
+
+### Other remaining work:
+- Real threading/async for `par`/`sel`/`pmap` (currently sequential)
+- Propagation traces for `^`
+- Implicit context scope (see CURRENT_OPINION.md Priority C)
+- Resumable workflows (see CURRENT_OPINION.md Priority D)
+
+### Known technical debt:
+- Rust files exceeding 300-line limit: prefix.rs (773), parser/mod.rs (640+), interpreter/mod.rs (520+), hof.rs (425), value.rs (330)
+- `par`/`sel`/`pmap` and `~>`/`~>?` are sequential; the spec describes concurrent execution
+- Named-arg parser consumes ternary `:` separator: `true ? Ok x : 0` misparses because `x :` looks like a named arg. Workaround: `(Ok x)`
+- Stale spec files: `examples.md`, `examples-extended.md`, `stdlib-agents.md`, `toolchain.md` still use `agent.ask`/`agent.send` library syntax. These should use `~>` / `~>?` when updated. The authoritative agent spec is `agents.md`.
+
+## Codebase Layout
+
+```
+crates/lx/src/
+  lexer/     mod.rs, numbers.rs, strings.rs
+  parser/    mod.rs, prefix.rs, pattern.rs
+  interpreter/ mod.rs, apply.rs, collections.rs, modules.rs, patterns.rs, shell.rs
+  builtins/  mod.rs, str.rs, coll.rs, hof.rs
+  ast.rs, token.rs, value.rs, env.rs, error.rs, span.rs, iterator.rs, lib.rs
+crates/lx-cli/src/main.rs
+```
+
+## Dependencies (audited 2026-03-14)
+
+External crates already cover every area where an established solution exists:
+
+| Crate | Purpose |
+|-------|---------|
+| `miette` + `thiserror` | Error diagnostics with source context |
+| `clap` v4 derive | CLI argument parsing |
+| `num-bigint` / `num-traits` / `num-integer` | Arbitrary-precision integers |
+| `indexmap` | Ordered maps/sets (records, maps, sets) |
+| `regex` | Regex literals and string builtins |
+
+The remaining ~4800 lines of custom code (lexer, parser, interpreter, AST, env, builtins, iterators, span) is all language-implementation-specific — no generic crate replaces a Pratt parser with shell-mode lexing, or builtins operating on lx's `Value` type. Do not spend time looking for crate replacements for these; they were audited and none apply.
+
+When adding **new** stdlib modules (std/json, std/http, std/fs, etc.), use established crates for the heavy lifting: `serde_json`, `reqwest`, `tokio`, `chrono`, `rmcp`, etc.
 
 ## Rules
 
 - No code comments or doc strings in Rust files
 - No `#[allow(...)]` macros
-- 300 line file limit for ALL files (spec, impl, suite, Rust)
+- 300 line file limit for ALL files (spec, impl, suite, Rust) — some files currently exceed this, need refactoring
 - Never swallow errors (`let _ = ...`, `.ok()`, silent `unwrap_or_default()`)
-- Use `just diagnose` (check + clippy), `just test`, `just fmt` instead of raw cargo commands
+- `just diagnose` must stay clean (check + clippy with -D warnings)
+- `just test` to run all suite tests, `just run <file>` for single files
 - Prefer established crates over custom code — check `reference/` submodules first

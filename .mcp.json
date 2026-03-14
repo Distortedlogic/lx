@@ -1,0 +1,36 @@
+{
+  "mcpServers": {
+    "context-engine": {
+      "command": "just",
+      "args": ["--justfile", "mcp.justfile", "context-engine"]
+    },
+    "gritql": {
+      "command": "just",
+      "args": ["--justfile", "mcp.justfile", "gritql"]
+    },
+    "inference": {
+      "command": "just",
+      "args": ["--justfile", "mcp.justfile", "inference"]
+    },
+    "infisical": {
+      "command": "just",
+      "args": ["--justfile", "mcp.justfile", "infisical"]
+    },
+    "plane": {
+      "command": "just",
+      "args": ["--justfile", "mcp.justfile", "plane"]
+    },
+    "playwright": {
+      "command": "just",
+      "args": ["--justfile", "mcp.justfile", "playwright"]
+    },
+    "recipe": {
+      "command": "just",
+      "args": ["--justfile", "mcp.justfile", "recipe"]
+    },
+    "workflow": {
+      "command": "just",
+      "args": ["--justfile", "mcp.justfile", "workflow"]
+    }
+  }
+}

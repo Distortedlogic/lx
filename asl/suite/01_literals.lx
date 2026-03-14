@@ -39,7 +39,7 @@ assert ("\n" != "n")
 assert ("\t" != "t")
 assert ("\\" == "\\")
 assert ("\"" == "\"")
-assert ("\{" == "{")
+assert ("\{" == `{`)
 
 -- string interpolation
 x = 5
@@ -52,7 +52,7 @@ y = 3
 assert ("{"{y}"}" == "3")
 
 -- raw strings
-assert (`hello {not interpolated}` == "hello {not interpolated}")
+assert (`hello {not interpolated}` == "hello \{not interpolated}")
 assert (`no \n escapes` == "no \\n escapes")
 
 -- multiline strings

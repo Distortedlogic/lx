@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::ast::*;
+use crate::ast::{SExpr, MatchArm, Pattern, Literal};
 use crate::error::LxError;
 use crate::span::Span;
 use crate::value::Value;
@@ -49,15 +49,22 @@ impl super::Interpreter {
           (Literal::Bool(a), Value::Bool(b)) => a == b,
           (Literal::Unit, Value::Unit) => true,
           (Literal::RawStr(a), Value::Str(b)) => a.as_str() == b.as_ref(),
+          (Literal::Str(parts), Value::Str(b)) => {
+            let mut s = String::new();
+            for part in parts {
+              match part {
+                crate::ast::StrPart::Text(t) => s.push_str(t),
+                crate::ast::StrPart::Interp(_) => return None,
+              }
+            }
+            s.as_str() == b.as_ref()
+          },
           _ => false,
         };
         if matches { Some(vec![]) } else { None }
       },
       Pattern::Tuple(pats) => {
-        let items = match value {
-          Value::Tuple(t) => t,
-          _ => return None,
-        };
+        let Value::Tuple(items) = value else { return None };
         if pats.len() != items.len() {
           return None;
         }
@@ -68,10 +75,7 @@ impl super::Interpreter {
         Some(bindings)
       },
       Pattern::List { elems, rest } => {
-        let items = match value {
-          Value::List(l) => l,
-          _ => return None,
-        };
+        let Value::List(items) = value else { return None };
         if rest.is_some() {
           if items.len() < elems.len() {
             return None;
@@ -90,10 +94,7 @@ impl super::Interpreter {
         Some(bindings)
       },
       Pattern::Record { fields, rest } => {
-        let rec = match value {
-          Value::Record(r) => r,
-          _ => return None,
-        };
+        let Value::Record(rec) = value else { return None };
         let mut bindings = vec![];
         for fp in fields {
           let val = rec.get(&fp.name)?;
@@ -116,6 +117,13 @@ impl super::Interpreter {
         ("Err", Value::Err(v)) if args.len() == 1 => self.try_match_pattern(&args[0].node, v),
         ("Some", Value::Some(v)) if args.len() == 1 => self.try_match_pattern(&args[0].node, v),
         ("None", Value::None) if args.is_empty() => Some(vec![]),
+        (tag, Value::Tagged { tag: vtag, values }) if tag == vtag.as_ref() && args.len() == values.len() => {
+          let mut bindings = vec![];
+          for (p, v) in args.iter().zip(values.as_ref()) {
+            bindings.extend(self.try_match_pattern(&p.node, v)?);
+          }
+          Some(bindings)
+        },
         _ => None,
       },
     }

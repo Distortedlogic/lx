@@ -1,4 +1,4 @@
-use crate::ast::*;
+use crate::ast::{ListElem, RecordField, Expr, SExpr, MapEntry, SetElem};
 use crate::error::LxError;
 use crate::value::{Value, ValueKey};
 use indexmap::IndexMap;
@@ -63,7 +63,8 @@ impl super::Interpreter {
           other => return Err(LxError::type_err(format!("spread requires Map, got {}", other.type_name()), entry.value.span)),
         }
       } else {
-        let key = self.eval(entry.key.as_ref().unwrap())?;
+        let key_expr = entry.key.as_ref().expect("non-spread map entry must have a key");
+        let key = self.eval(key_expr)?;
         let val = self.eval(&entry.value)?;
         map.insert(ValueKey(key), val);
       }

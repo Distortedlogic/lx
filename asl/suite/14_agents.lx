@@ -1,0 +1,112 @@
+-- 14_agents.lx
+-- Tests: spec/agents.md (agent communication syntax)
+-- Phase: Agent primitives (~> send, ~>? ask)
+
+-- An agent is a record with a handler function.
+-- ~> sends fire-and-forget, ~>? sends and waits for response.
+
+-- basic ask: echo agent returns message unchanged
+echo = {handler: (msg) msg}
+result = echo ~>? {greeting: "hello"}
+assert (result == {greeting: "hello"}) "ask returns handler result"
+
+-- ask with simple value
+adder = {handler: (x) x + 10}
+assert (adder ~>? 5 == 15) "ask with int"
+
+-- ask returning Result
+safe_handler = (msg) msg.x > 0 ? Ok (msg.x * 2) : Err "negative"
+safe_agent = {handler: safe_handler}
+assert (safe_agent ~>? {x: 5} == Ok 10) "ask returns Ok"
+assert (safe_agent ~>? {x: -1} == Err "negative") "ask returns Err"
+
+-- ask with ^ propagation
+good = safe_agent ~>? {x: 3} ^
+assert (good == 6) "ask + propagate unwraps Ok"
+
+-- ask + propagate on error
+fail_ask = () {
+  safe_agent ~>? {x: -1} ^
+}
+assert (fail_ask () == Err "negative") "ask + propagate surfaces Err"
+
+-- send: fire-and-forget returns Unit
+log_agent = {handler: (msg) msg}
+result2 = log_agent ~> {action: "log"}
+assert (result2 == ()) "send returns unit"
+
+-- ask piped into processing
+analyzer_handler = (msg) {findings: [1 2 3] summary: msg.task}
+analyzer = {handler: analyzer_handler}
+findings = analyzer ~>? {task: "review"} | (.findings) | sum
+assert (findings == 6) "ask piped into field access and sum"
+
+-- ask with ^ then pipe
+ok_handler = (msg) Ok {data: msg.x * 2}
+ok_agent = {handler: ok_handler}
+piped = ok_agent ~>? {x: 5} ^ | (.data)
+assert (piped == 10) "ask + propagate + pipe"
+
+-- agent with closure over state
+make_multiplier = (factor) {handler: (x) x * factor}
+triple = make_multiplier 3
+assert (triple ~>? 7 == 21) "agent with closure"
+
+-- ask in par block
+a1 = {handler: (x) x + 1}
+a2 = {handler: (x) x * 2}
+(r1 r2) = par {
+  a1 ~>? 10
+  a2 ~>? 10
+}
+assert (r1 == 11) "ask in par (first)"
+assert (r2 == 20) "ask in par (second)"
+
+-- ask with pmap (fan-out)
+worker = {handler: (x) x * x}
+squares = [1 2 3 4 5] | pmap (x) worker ~>? x
+assert (squares == [1 4 9 16 25]) "ask in pmap"
+
+-- chained asks (pipeline agents)
+parser_handler = (raw) {parsed: raw ++ " parsed"}
+parser_agent = {handler: parser_handler}
+enricher_handler = (data) {enriched: data.parsed ++ " enriched"}
+enricher = {handler: enricher_handler}
+chain = parser_agent ~>? "input" | (r) enricher ~>? r
+assert (chain.enriched == "input parsed enriched") "chained asks"
+
+-- ask with record message and field processing
+router_handler = (msg) msg.action ? {
+  "double" -> msg.value * 2
+  "negate" -> 0 - msg.value
+  _ -> msg.value
+}
+router = {handler: router_handler}
+assert (router ~>? {action: "double" value: 5} == 10) "router double"
+assert (router ~>? {action: "negate" value: 3} == -3) "router negate"
+assert (router ~>? {action: "identity" value: 7} == 7) "router default"
+
+-- error: ask on non-agent is a type error (runtime panic)
+-- 42 ~>? "msg" would fail with "~> target must be an agent"
+-- {name: "broken"} ~>? "msg" would fail with "agent has no 'handler' field"
+-- these are programmer bugs, not recoverable errors
+
+-- multiline continuation
+long_result = analyzer
+  ~>? {task: "check"}
+  | (.findings)
+  | sum
+assert (long_result == 6) "multiline continuation with ~>?"
+
+-- ask with ?? coalescing
+maybe_handler = (x) { x > 0 ? (Ok x) : Err "negative" }
+maybe_agent = {handler: maybe_handler}
+coalesced = maybe_agent ~>? 5 ?? 0
+assert (coalesced == 5) "ask + coalesce on Ok"
+coalesced2 = maybe_agent ~>? -1 ?? 0
+assert (coalesced2 == 0) "ask + coalesce on Err"
+
+-- send in pipeline (returns unit, discards result)
+side_effect = {handler: (msg) msg}
+pipeline_send = side_effect ~> "hello"
+assert (pipeline_send == ()) "send always returns unit"

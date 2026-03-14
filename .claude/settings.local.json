@@ -1,0 +1,51 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch",
+      "WebFetch(domain:arxiv.org)",
+      "WebFetch(domain:crates.io)",
+      "WebFetch(domain:docs.rs)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:hub.docker.com)",
+      "WebFetch(domain:spacetimedb.com)",
+      "WebFetch(domain:anthropic.com)",
+      "Read(//tmp/**)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(just py-lint:*)",
+      "Bash(just py-fix:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(git grep:*)",
+      "Bash(git submodule:*)",
+      "Bash(cargo shear:*)",
+      "Bash(uv sync:*)",
+      "Bash(uv run:*)",
+      "Bash(pnpm:*)",
+      "Bash(pnpm install:*)",
+      "Bash(docker-compose:*)",
+      "mcp__workflow__task_done",
+      "mcp__workflow__verify",
+      "mcp__workflow__audit",
+      "mcp__workflow__cleanup_work_item",
+      "mcp__workflow__fmt",
+      "mcp__workflow__create_task",
+      "mcp__workflow__update_task",
+      "mcp__workflow__list_tasks",
+      "mcp__workflow__get_task"
+    ],
+    "deny": [
+      "Bash(git stash:*)",
+      "TaskCreate",
+      "TaskGet",
+      "TaskList",
+      "TaskOutput",
+      "TaskStop",
+      "TaskUpdate"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": ["workflow"]
+}

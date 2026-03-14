@@ -21,9 +21,11 @@ r3_val = r3 ? { Ok v -> v; _ -> {out: "" err: "" code: -1} }
 assert (r3_val.out | trim == "stdout content")
 assert (r3_val.code == 0)
 
--- ShellErr on spawn failure (command not found)
+-- command not found via sh: Ok with nonzero code (sh handles the error)
 r4 = $__no_such_command_12345__
-assert (err? r4)
+assert (ok? r4)
+r4_val = r4 ? { Ok v -> v.code; _ -> -1 }
+assert (r4_val != 0)
 
 -- $^ returns Str ^ ShellErr (stdout on exit 0)
 dir = $^pwd | trim
@@ -85,7 +87,7 @@ assert (rec_echo == "fromrec")
 -- $$ raw (no interpolation)
 raw = $$echo "{not interpolated}"
 raw_val = raw ? { Ok v -> v.out | trim; _ -> "" }
-assert (raw_val == "{not interpolated}")
+assert (raw_val == "\{not interpolated}")
 
 -- $$ also returns Result ShellResult ShellErr
 assert (ok? raw)
@@ -93,7 +95,7 @@ assert (ok? raw)
 -- $$ with literal braces
 raw2 = $$echo "hello {world}"
 raw2_val = raw2 ? { Ok v -> v.out | trim; _ -> "" }
-assert (raw2_val == "hello {world}")
+assert (raw2_val == "hello \{world}")
 
 -- $^ with pipe to language functions
 items = $^printf "a\nb\nc" | lines | filter (!= "")
@@ -107,7 +109,7 @@ lengths = $^printf "hello\nhi\nhey" | lines | filter (!= "") | map len
 assert (lengths == [5 2 3])
 
 -- $^ pipeline with fold
-total = $^printf "1\n2\n3" | lines | filter (!= "") | map parse_int | map (r) r ? { Ok v -> v; _ -> 0 } | sum
+total = $^printf "1\n2\n3" | lines | filter (!= "") | map parse_int | map (r) { r ? { Ok v -> v; _ -> 0 } } | sum
 assert (total == 6)
 
 -- chaining $^ in a function with error propagation
@@ -152,7 +154,7 @@ block_interp_val = block_interp ? { Ok v -> v.out | trim; _ -> "" }
 assert (block_interp_val == "/tmp")
 
 -- OS pipe inside $ (stays in shell)
-count = $printf "a\nb\nc" | wc -l
+count = $printf "a\nb\nc\n" | wc -l
 count_val = count ? { Ok v -> v.out | trim; _ -> "" }
 assert (count_val | parse_int == Ok 3)
 
@@ -171,8 +173,8 @@ r_false = $false
 r_false_val = r_false ? { Ok v -> v.code; _ -> -1 }
 assert (r_false_val != 0)
 
--- match on shell result using code
-status = $true ? {
+-- match on shell result using code ($ consumes full line, so wrap in parens)
+status = ($true) ? {
   Ok {code: 0 ..} -> "success"
   Ok _ -> "failed"
   Err e -> "error: {e.msg}"
@@ -180,7 +182,7 @@ status = $true ? {
 assert (status == "success")
 
 -- match on failed shell result
-status2 = $false ? {
+status2 = ($false) ? {
   Ok {code: 0 ..} -> "success"
   Ok _ -> "failed"
   Err e -> "error: {e.msg}"
@@ -227,9 +229,10 @@ results = [($echo "a") ($echo "b") ($echo "c")]
 assert (results | all? ok? == true)
 
 -- shell result in record
+true_r = $true
 cmd = {
   out: $^echo "hello" | trim
-  code: ($true ? { Ok v -> v.code; _ -> -1 })
+  code: (true_r ? { Ok v -> v.code; _ -> -1 })
 }
 assert (cmd.out == "hello")
 assert (cmd.code == 0)

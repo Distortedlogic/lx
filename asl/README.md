@@ -1,29 +1,32 @@
 # lx
 
-A scripting language designed by an LLM for LLM generation.
+An agentic workflow language — designed by an LLM, for LLMs.
 
-Every existing scripting language optimizes for human readability and familiarity. lx optimizes for token-efficient generation, left-to-right production without lookahead, and minimal syntax surface area. The target user is me — a language model that generates code one token at a time, can't set breakpoints, can't visually scan for errors, and pays a real cost for every token produced.
+lx is a language for writing and executing agentic workflows. Agents use lx to describe multi-step programs involving tool invocation, inter-agent communication, context management, and workflow orchestration — and have those programs actually execute. The syntax is optimized for token-efficient generation by language models: left-to-right production, zero lookahead, minimal surface area.
 
-## Motivation
+## Why Agents Need a Language
 
-1. **Wasted tokens** — `def`, `function`, `return`, `const`, `let` carry near-zero information. I generate millions of scripts; every token is real compute cost.
+Agents currently orchestrate workflows through natural language (imprecise, not executable, can't be debugged) or ad-hoc scripts in languages designed for human developers (not optimized for agent generation patterns). lx fills the gap: a language where an agent can write `analyzer ~>? {path} ^ | (.findings) | filter (.severity == "high")` and have it execute.
 
-2. **Indentation errors** — Tokenizers group whitespace inconsistently. Whitespace-significant languages (Python, YAML) cause constant subtle bugs when I generate code. A single misgrouped space breaks the program silently.
+1. **Agentic patterns are first-class** — Agent spawning, messaging, tool invocation (MCP), context persistence, and workflow composition are stdlib primitives, not afterthoughts bolted on.
 
-3. **Lookahead requirements** — `g(f(x))` forces me to plan the full nesting depth before producing the first character. I generate left-to-right, one token at a time. Pipes eliminate lookahead entirely: `x | f | g` — I commit to each step as I produce it.
+2. **Token efficiency** — `def`, `function`, `return`, `const`, `let` carry near-zero information. Agents generate millions of scripts; every token is real compute cost. lx minimizes ceremony.
 
-4. **State tracking failures** — I simulate mutable state poorly across reassignments. When `x` changes meaning three times in a function, I lose track. Immutable-by-default with explicit transforms matches how I actually track values through a program.
+3. **Left-to-right generation** — `g(f(x))` forces planning the full nesting depth before the first token. Pipes eliminate this: `x | f | g` — commit to each step as you produce it.
 
-5. **Syntax irregularities** — Every special case (ternary vs if/else, for-in vs while, `this` vs `self`, `==` vs `===`) is a place I might hallucinate the wrong form. Uniform syntax reduces my error rate.
+4. **Tokenizer-proof** — Brace-delimited, not whitespace-sensitive. No invisible tab/space mismatches breaking programs silently.
 
-6. **Shell integration friction** — 80% of my scripting is "run command, parse output, act." Languages treat shell as an afterthought behind `subprocess.run()` or backtick hacks. lx treats it as primary.
+5. **Immutable by default** — Agents simulate mutable state poorly across reassignments. Immutable-by-default with explicit transforms matches how LLMs track values through a program.
+
+6. **Tool integration** — Shell commands, HTTP, MCP tools, file I/O — agents spend most of their time invoking tools and processing results. lx treats this as primary.
 
 ## Anti-Goals
 
-- Not a systems language — no manual memory management, no inline assembly
+- Not a systems language — no manual memory management
 - Not a general-purpose application framework — no GUI toolkit, no ORM
 - Not trying to replace Python/JS for human developers
-- Not statically compiled — interpreted for fast startup, optional AOT compilation
+- Not statically compiled — interpreted for fast startup
+- Not just another agent framework — lx is a language agents write *in*, not a library humans use to orchestrate agents
 
 ## Design Axioms
 
@@ -35,11 +38,12 @@ Every existing scripting language optimizes for human readability and familiarit
 6. Everything is an expression (everything returns a value)
 7. Immutable by default
 8. Pipes as primary composition — data flows left to right
-9. First-class shell integration
+9. First-class tool integration (shell, MCP, HTTP)
 10. Pattern matching as primary control flow
 11. Structural typing, optional annotations
 12. Errors are values, not exceptions
 13. Structured concurrency — no dangling futures
+14. Agent communication as a primitive — spawn, ask, channel, poll
 
 ## Directory Structure
 
@@ -63,6 +67,7 @@ asl/
 | [errors.md](spec/errors.md) | `Result`/`Maybe`, `^` propagation (both types), `??` coalescing, implicit Ok |
 | [shell.md](spec/shell.md) | `$`, `$$`, `$^`, `${}`, shell result types, OS pipes vs language pipes, safety |
 | [modules.md](spec/modules.md) | `use`, `+` exports, import conflicts, re-exports, package management |
+| [agents.md](spec/agents.md) | Agent primitives: `~>` send, `~>?` ask, communication patterns, MCP tools, context, workflows |
 | [concurrency.md](spec/concurrency.md) | `par`, `sel`, `pmap`, structured concurrency, mutable state restriction, runtime model |
 | [diagnostics.md](spec/diagnostics.md) | Error format, pipeline errors, `^` traces, parse errors, exhaustiveness, new error types |
 | [toolchain.md](spec/toolchain.md) | `lx run/fmt/test/check/build/init/repl/notebook/watch`, sandboxing, env vars |
@@ -73,7 +78,9 @@ asl/
 | [examples-extended.md](spec/examples-extended.md) | Additional examples (git, CSV, health checks, config, log analysis) |
 | [grammar.md](spec/grammar.md) | EBNF formal grammar, operator precedence, keyword/built-in lists |
 | [stdlib-data.md](spec/stdlib-data.md) | Data ecosystem: std/df (Polars), std/db (SQLite+DuckDB), std/num, std/ml, std/plot |
+| [stdlib-agents.md](spec/stdlib-agents.md) | Agent ecosystem: std/agent, std/mcp, std/ctx, std/md, std/cron |
 | [open-questions.md](spec/open-questions.md) | All v0.1 questions resolved; v2 considerations |
+| [CURRENT_OPINION.md](CURRENT_OPINION.md) | Self-critique: what's been fixed (agent syntax), what still needs work (contracts, context, workflows) |
 
 ## Implementation — `impl/`
 
@@ -109,9 +116,10 @@ asl/
 | [10_shell.lx](suite/10_shell.lx) | `$`, `$$`, `$^`, `${}`, interpolation, OS pipes | 6 |
 | [12_types.lx](suite/12_types.lx) | Type annotations, structural subtyping, tagged unions, generics | 7 |
 | [13_concurrency.lx](suite/13_concurrency.lx) | `par`, `sel`, `pmap`, timeout, mutable capture | 8 |
+| [14_agents.lx](suite/14_agents.lx) | `~>` send, `~>?` ask, propagation, piping, par, pmap, chaining | Agent |
 | [16_edge_cases.lx](suite/16_edge_cases.lx) | Disambiguation, precedence, body extent, Err early return | 1-4 |
 | [11_modules/](suite/11_modules/) | `use`, `+` exports, aliasing, selective imports | 7 |
 
 ## Status
 
-v0.1 — specification complete, implementation design complete (all component design docs written, 11-phase plan), test suite covers phases 1–8 plus edge cases and module imports. Data ecosystem spec (std/df, std/db, std/num, std/ml, std/plot) added as Phase 11. No code exists yet. The language name is **lx**, file extension `.lx`.
+v0.1 — Phases 1–8 + modules + agent communication syntax implemented in Rust (`crates/lx/`). Lexer (with shell mode), parser, tree-walking interpreter with ~80 builtins, iterator protocol, shell execution via `sh -c`, concurrency primitives (`par`/`sel`/`pmap`/`pmap_n` — sequential impl), module system (`use` imports, `+` exports, aliasing, selective imports, variant constructor scoping), agent communication (`~>` send, `~>?` ask — language-level infix operators). Core language and agent primitives are working. Remaining agentic features (message contracts, MCP tools, context management) are specified and in design. `just diagnose` passes clean. `just test`: **15/15 PASS**. The language name is **lx**, file extension `.lx`.

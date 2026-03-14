@@ -3,6 +3,7 @@ pub mod builtins;
 pub mod env;
 pub mod error;
 pub mod interpreter;
+pub mod iterator;
 pub mod lexer;
 pub mod parser;
 pub mod span;

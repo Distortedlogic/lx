@@ -1,6 +1,6 @@
 # Standard Library — Module Details
 
-Detailed API for each core module. See [stdlib.md](stdlib.md) for conventions, built-in functions, and the module overview table.
+Detailed API for each core module. See [stdlib.md](stdlib.md) for conventions, built-in functions, and the module overview table. Agent ecosystem modules (std/agent, std/mcp, std/ctx, std/md, std/cron) are in [stdlib-agents.md](stdlib-agents.md).
 
 ## std/fs
 

@@ -5,7 +5,7 @@ use crate::span::Span;
 
 pub type LxResult<T> = Result<T, LxError>;
 
-#[derive(Debug, Error, Diagnostic)]
+#[derive(Debug, Clone, Error, Diagnostic)]
 pub enum LxError {
   #[error("parse error: {msg}")]
   #[diagnostic(code(lx::parse))]
@@ -41,6 +41,17 @@ pub enum LxError {
     #[label("{msg}")]
     span: SourceSpan,
   },
+
+  #[error("break")]
+  BreakSignal { value: Box<crate::value::Value> },
+
+  #[error("propagated error: {value}")]
+  #[diagnostic(code(lx::propagate))]
+  Propagate {
+    value: Box<crate::value::Value>,
+    #[label("error propagated here")]
+    span: SourceSpan,
+  },
 }
 
 impl LxError {
@@ -62,5 +73,13 @@ impl LxError {
 
   pub fn division_by_zero(span: Span) -> Self {
     Self::runtime("division by zero", span)
+  }
+
+  pub fn break_signal(value: crate::value::Value) -> Self {
+    Self::BreakSignal { value: Box::new(value) }
+  }
+
+  pub fn propagate(value: crate::value::Value, span: Span) -> Self {
+    Self::Propagate { value: Box::new(value), span: span.into() }
   }
 }

@@ -11,10 +11,11 @@ struct Lexer<'src> {
   tokens: Vec<Token>,
   depth: i32,
   last_was_semi: bool,
+  brace_stack: Vec<bool>,
 }
 
 pub fn lex(source: &str) -> Result<Vec<Token>, LxError> {
-  let mut lexer = Lexer { source, pos: 0, tokens: Vec::new(), depth: 0, last_was_semi: true };
+  let mut lexer = Lexer { source, pos: 0, tokens: Vec::new(), depth: 0, last_was_semi: true, brace_stack: Vec::new() };
   loop {
     lexer.skip_whitespace_and_comments();
     if lexer.pos >= source.len() {
@@ -73,8 +74,8 @@ impl<'src> Lexer<'src> {
           break;
         }
       }
-      if self.pos + 1 < self.source.len() && &self.source[self.pos..self.pos + 2] == "--" {
-        while self.pos < self.source.len() && self.source[self.pos..].chars().next() != Some('\n') {
+      if self.source[self.pos..].starts_with("--") {
+        while self.pos < self.source.len() && !self.source[self.pos..].starts_with('\n') {
           self.pos += 1;
         }
       } else {
@@ -103,7 +104,7 @@ impl<'src> Lexer<'src> {
       return Ok(None);
     }
     let start = self.pos;
-    let c = self.advance().unwrap();
+    let c = self.advance().expect("next_token called at end of source");
     match c {
       '"' => {
         self.read_string(start)?;
@@ -127,16 +128,31 @@ impl<'src> Lexer<'src> {
         Ok(Some(self.tok(TokenKind::RBracket, start)))
       },
       '{' => {
-        self.depth += 1;
+        self.brace_stack.push(false);
         Ok(Some(self.tok(TokenKind::LBrace, start)))
       },
       '}' => {
-        self.depth -= 1;
+        if let Some(suppresses) = self.brace_stack.pop()
+          && suppresses {
+            self.depth -= 1;
+          }
         Ok(Some(self.tok(TokenKind::RBrace, start)))
       },
       ';' | ',' => Ok(Some(self.tok(TokenKind::Semi, start))),
       '^' => Ok(Some(self.tok(TokenKind::Caret, start))),
-      '~' => Ok(Some(self.tok(TokenKind::Bang, start))),
+      '~' => {
+        if self.peek() == Some('>') {
+          self.advance();
+          if self.peek() == Some('?') {
+            self.advance();
+            Ok(Some(self.tok2(TokenKind::TildeArrowQ, start)))
+          } else {
+            Ok(Some(self.tok2(TokenKind::TildeArrow, start)))
+          }
+        } else {
+          Ok(Some(self.tok(TokenKind::Bang, start)))
+        }
+      },
       '?' => self.eat('?', TokenKind::QQ, TokenKind::Question, start),
       '&' => self.eat('&', TokenKind::And, TokenKind::Amp, start),
       '|' => self.eat('|', TokenKind::Or, TokenKind::Pipe, start),
@@ -148,6 +164,7 @@ impl<'src> Lexer<'src> {
         if self.peek() == Some('{') {
           self.advance();
           self.depth += 1;
+          self.brace_stack.push(true);
           Ok(Some(self.tok2(TokenKind::PercentLBrace, start)))
         } else {
           Ok(Some(self.tok(TokenKind::Percent, start)))
@@ -157,6 +174,7 @@ impl<'src> Lexer<'src> {
         if self.peek() == Some('{') {
           self.advance();
           self.depth += 1;
+          self.brace_stack.push(true);
           Ok(Some(self.tok2(TokenKind::HashLBrace, start)))
         } else {
           Err(LxError::parse("unexpected character: #", Span::new(start as u32, 1), None))
@@ -166,7 +184,7 @@ impl<'src> Lexer<'src> {
         if self.peek() == Some('+') {
           self.advance();
           Ok(Some(self.tok2(TokenKind::PlusPlus, start)))
-        } else if self.at_line_start(start) && self.peek().is_some_and(|ch| ch.is_ascii_lowercase() || ch == '_') {
+        } else if self.at_line_start(start) && self.peek().is_some_and(|ch| ch.is_ascii_alphabetic() || ch == '_') {
           Ok(Some(self.tok(TokenKind::Export, start)))
         } else {
           Ok(Some(self.tok(TokenKind::Plus, start)))
@@ -205,12 +223,16 @@ impl<'src> Lexer<'src> {
       '>' => self.eat('=', TokenKind::GtEq, TokenKind::Gt, start),
       '.' => {
         if self.peek() == Some('.') {
-          self.advance();
-          if self.peek() == Some('=') {
-            self.advance();
-            Ok(Some(Token::new(TokenKind::DotDotEq, Span::from_range(start as u32, self.pos as u32))))
+          if self.peek_ahead(1) == Some('.') {
+            Ok(Some(self.tok(TokenKind::Dot, start)))
           } else {
-            Ok(Some(self.tok2(TokenKind::DotDot, start)))
+            self.advance();
+            if self.peek() == Some('=') {
+              self.advance();
+              Ok(Some(Token::new(TokenKind::DotDotEq, Span::from_range(start as u32, self.pos as u32))))
+            } else {
+              Ok(Some(self.tok2(TokenKind::DotDot, start)))
+            }
           }
         } else {
           Ok(Some(self.tok(TokenKind::Dot, start)))
@@ -219,20 +241,28 @@ impl<'src> Lexer<'src> {
       '$' => {
         if self.peek() == Some('$') {
           self.advance();
-          Ok(Some(self.tok2(TokenKind::DollarDollar, start)))
+          self.push(TokenKind::DollarDollar, start, self.pos);
+          self.read_shell_line(false)?;
+          Ok(None)
         } else if self.peek() == Some('^') {
           self.advance();
-          Ok(Some(self.tok2(TokenKind::DollarCaret, start)))
+          self.push(TokenKind::DollarCaret, start, self.pos);
+          self.read_shell_cmd()?;
+          Ok(None)
         } else if self.peek() == Some('{') {
           self.advance();
-          self.depth += 1;
-          Ok(Some(self.tok2(TokenKind::DollarBrace, start)))
+          self.push(TokenKind::DollarBrace, start, self.pos);
+          self.read_shell_block()?;
+          Ok(None)
         } else {
-          Ok(Some(self.tok(TokenKind::Dollar, start)))
+          self.push(TokenKind::Dollar, start, start + 1);
+          self.read_shell_line(true)?;
+          Ok(None)
         }
       },
       '_' if !self.peek().is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '\'') => Ok(Some(self.tok(TokenKind::Underscore, start))),
       c if c.is_ascii_digit() => self.read_number(start).map(Some),
+      'r' if self.peek() == Some('/') => self.read_regex(start).map(Some),
       c if c.is_ascii_lowercase() || c == '_' => self.read_ident_or_keyword(start).map(Some),
       c if c.is_ascii_uppercase() => self.read_type_name(start).map(Some),
       other => Err(LxError::parse(format!("unexpected character: {other}"), Span::new(start as u32, other.len_utf8() as u16), None)),
@@ -277,12 +307,38 @@ impl<'src> Lexer<'src> {
     Ok(Token::new(kind, span))
   }
 
+  fn read_regex(&mut self, start: usize) -> Result<Token, LxError> {
+    self.advance();
+    let pat_start = self.pos;
+    loop {
+      match self.peek() {
+        Some('/') => break,
+        Some('\\') => { self.advance(); self.advance(); },
+        Some(_) => { self.advance(); },
+        None => return Err(LxError::parse("unterminated regex", Span::new(start as u32, 1), None)),
+      }
+    }
+    let pattern = self.source[pat_start..self.pos].to_string();
+    self.advance();
+    let flags_start = self.pos;
+    while self.peek().is_some_and(|c| c.is_ascii_lowercase()) {
+      self.advance();
+    }
+    let flags = self.source[flags_start..self.pos].to_string();
+    let span = Span::from_range(start as u32, self.pos as u32);
+    Ok(Token::new(TokenKind::Regex { pattern, flags }, span))
+  }
+
   fn read_type_name(&mut self, start: usize) -> Result<Token, LxError> {
     while self.peek().is_some_and(|c| c.is_ascii_alphanumeric()) {
       self.advance();
     }
     let text = &self.source[start..self.pos];
     let span = Span::from_range(start as u32, self.pos as u32);
-    Ok(Token::new(TokenKind::TypeName(text.to_string()), span))
+    let kind = match text {
+      "Protocol" => TokenKind::Protocol,
+      _ => TokenKind::TypeName(text.to_string()),
+    };
+    Ok(Token::new(kind, span))
   }
 }

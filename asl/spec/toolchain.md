@@ -18,11 +18,36 @@ lx check                       -- type-check without executing
 lx check --strict              -- treat warnings as errors
 lx build                       -- AOT compile to binary
 lx init                        -- create new project (pkg.lx, src/, test/)
+lx agent script.lx             -- run as long-lived agent (enables cron, channels)
+lx agent --daemon script.lx    -- daemonize agent process
+```
+
+## Agent Mode
+
+`lx agent script.lx` runs a script as a long-lived agent process. Unlike `lx run` (which exits after execution), agent mode keeps the process alive for:
+- `std/cron` scheduled tasks (recurring agent work)
+- `std/agent` channel listeners (persistent inter-agent communication)
+- Event-driven workflows (waiting for messages, file changes, etc.)
+
+`lx agent --daemon` detaches from the terminal. The agent process logs to `~/.lx/agents/<name>/log`.
+
+Agent scripts typically use `std/agent`, `std/cron`, and `std/ctx` to define their behavior. A simple agent:
+
+```
+use std/agent
+use std/cron
+use std/ctx
+
+state = ctx.load ".state.json" ?? ctx.empty ()
+cron.every (time.min 10) () {
+  results = agent.ask analyzer {action: "check" path: "src/"} ^
+  ctx.set "last_check" results state | (c) ctx.save ".state.json" c ^
+}
 ```
 
 ## Execution Model
 
-Default: interpreted. `lx run` parses and executes directly. Fast startup matters — I generate-then-execute; compilation latency is waste.
+Default: interpreted. `lx run` parses and executes directly. Fast startup matters — agents generate-then-execute; compilation latency is waste.
 
 `lx build` produces a native binary via AOT compilation. For deploying scripts as standalone tools.
 

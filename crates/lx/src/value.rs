@@ -4,11 +4,11 @@ use std::sync::Arc;
 
 use indexmap::{IndexMap, IndexSet};
 use num_bigint::BigInt;
-use num_traits::ToPrimitive;
 
 use crate::ast::SExpr;
 use crate::env::Env;
 use crate::error::LxError;
+use crate::iterator::IterSource;
 use crate::span::Span;
 
 #[derive(Debug, Clone)]
@@ -32,6 +32,13 @@ pub enum Value {
   Err(Box<Value>),
   Some(Box<Value>),
   None,
+
+  Tagged { tag: Arc<str>, values: Arc<Vec<Value>> },
+  TaggedCtor { tag: Arc<str>, arity: usize, applied: Vec<Value> },
+  Regex { pattern: Arc<str>, flags: Arc<str> },
+  Range { start: i64, end: i64, inclusive: bool },
+  Iterator(IterSource),
+  Protocol { name: Arc<str>, fields: Arc<Vec<ProtoFieldDef>> },
 }
 
 #[derive(Debug, Clone)]
@@ -73,8 +80,8 @@ impl Value {
         }
         let mut a_sorted: Vec<_> = a.iter().collect();
         let mut b_sorted: Vec<_> = b.iter().collect();
-        a_sorted.sort_by_key(|(k, _)| k.clone());
-        b_sorted.sort_by_key(|(k, _)| k.clone());
+        a_sorted.sort_by_key(|(k, _)| (*k).clone());
+        b_sorted.sort_by_key(|(k, _)| (*k).clone());
         a_sorted.iter().zip(b_sorted.iter()).all(|((ak, av), (bk, bv))| ak == bk && av == bv)
       },
       (Value::Map(a), Value::Map(b)) => a == b,
@@ -83,8 +90,13 @@ impl Value {
       (Value::Err(a), Value::Err(b)) => a == b,
       (Value::Some(a), Value::Some(b)) => a == b,
       (Value::None, Value::None) => true,
+      (Value::Tagged { tag: t1, values: v1 }, Value::Tagged { tag: t2, values: v2 }) => t1 == t2 && v1 == v2,
+      (Value::Regex { pattern: p1, flags: f1 }, Value::Regex { pattern: p2, flags: f2 }) => p1 == p2 && f1 == f2,
+      (Value::Range { start: s1, end: e1, inclusive: i1 }, Value::Range { start: s2, end: e2, inclusive: i2 }) => s1 == s2 && e1 == e2 && i1 == i2,
+      (Value::Protocol { name: n1, .. }, Value::Protocol { name: n2, .. }) => n1 == n2,
       (Value::Func(_), _) | (_, Value::Func(_)) => false,
       (Value::BuiltinFunc(_), _) | (_, Value::BuiltinFunc(_)) => false,
+      (Value::Iterator(_), _) | (_, Value::Iterator(_)) => false,
       _ => false,
     }
   }
@@ -106,7 +118,7 @@ impl Value {
       Value::Record(fields) => {
         fields.len().hash(state);
         let mut pairs: Vec<_> = fields.iter().collect();
-        pairs.sort_by_key(|(k, _)| k.clone());
+        pairs.sort_by_key(|(k, _)| (*k).clone());
         for (k, v) in pairs {
           k.hash(state);
           v.hash_value(state);
@@ -127,7 +139,23 @@ impl Value {
       },
       Value::Ok(v) | Value::Err(v) | Value::Some(v) => v.hash_value(state),
       Value::None => {},
-      Value::Func(_) | Value::BuiltinFunc(_) => {},
+      Value::Tagged { tag, values } => {
+        tag.hash(state);
+        for v in values.iter() {
+          v.hash_value(state);
+        }
+      },
+      Value::Regex { pattern, flags } => {
+        pattern.hash(state);
+        flags.hash(state);
+      },
+      Value::Range { start, end, inclusive } => {
+        start.hash(state);
+        end.hash(state);
+        inclusive.hash(state);
+      },
+      Value::Protocol { name, .. } => name.hash(state),
+      Value::Func(_) | Value::BuiltinFunc(_) | Value::TaggedCtor { .. } | Value::Iterator(_) => {},
     }
   }
 
@@ -187,6 +215,12 @@ impl Value {
       Value::Err(_) => "Err",
       Value::Some(_) => "Some",
       Value::None => "None",
+      Value::Tagged { .. } => "Tagged",
+      Value::TaggedCtor { .. } => "Func",
+      Value::Regex { .. } => "Regex",
+      Value::Range { .. } => "Range",
+      Value::Iterator(_) => "Iterator",
+      Value::Protocol { .. } => "Protocol",
     }
   }
 }
@@ -255,6 +289,19 @@ impl fmt::Display for Value {
       Value::Err(v) => write!(f, "Err {v}"),
       Value::Some(v) => write!(f, "Some {v}"),
       Value::None => write!(f, "None"),
+      Value::Tagged { tag, values } => {
+        write!(f, "{tag}")?;
+        for v in values.iter() {
+          write!(f, " {v}")?;
+        }
+        Ok(())
+      },
+      Value::TaggedCtor { tag, .. } => write!(f, "<ctor {tag}>"),
+      Value::Regex { pattern, flags } => write!(f, "r/{pattern}/{flags}"),
+      Value::Range { start, end, inclusive } => {
+        if *inclusive { write!(f, "{start}..={end}") } else { write!(f, "{start}..{end}") }
+      },
+      Value::Iterator(_) => write!(f, "<iterator>"),
     }
   }
 }
@@ -264,9 +311,10 @@ pub struct LxFunc {
   pub params: Vec<String>,
   pub defaults: Vec<Option<Value>>,
   pub body: Arc<SExpr>,
-  pub closure: Env,
+  pub closure: Arc<Env>,
   pub arity: usize,
   pub applied: Vec<Value>,
+  pub returns_result: bool,
 }
 
 pub type BuiltinFn = fn(&[Value], Span) -> Result<Value, LxError>;
@@ -277,6 +325,13 @@ pub struct BuiltinFunc {
   pub arity: usize,
   pub func: BuiltinFn,
   pub applied: Vec<Value>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ProtoFieldDef {
+  pub name: String,
+  pub type_name: String,
+  pub default: Option<Value>,
 }
 
 impl fmt::Debug for BuiltinFunc {

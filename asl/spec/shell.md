@@ -1,6 +1,6 @@
 # Shell Integration
 
-`$` enters shell mode. This is the most-used feature — 80% of scripting is "run command, parse output, act."
+`$` enters shell mode. One of lx's primary tool invocation mechanisms — agents frequently shell out to run commands, parse output, and act on results. For generalized tool invocation across MCP servers, see [agents.md](agents.md) and [stdlib-agents.md](stdlib-agents.md).
 
 ## Four Variants
 

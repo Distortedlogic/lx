@@ -52,7 +52,7 @@ write "out.txt" content ^
 
 ## Package Management
 
-Stdlib: `use std/...` — always available, no configuration needed.
+Stdlib: `use std/...` — always available, no configuration needed. This includes core modules (fs, http, json) and agent modules (agent, mcp, ctx, md, cron).
 
 Local: `use ./path` and `use ../path` — relative to the current file.
 

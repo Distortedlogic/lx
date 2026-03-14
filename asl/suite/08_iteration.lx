@@ -18,7 +18,7 @@ assert ([1 2 3 4] | fold 1 (*) == 24)
 assert ([] | fold 0 (+) == 0)
 
 -- flat_map
-assert ([1 2 3] | flat_map (x) [x x] == [1 1 2 2 3 3])
+assert ([1 2 3] | flat_map (x) { [x x] } == [1 1 2 2 3 3])
 assert ([[1 2] [3 4]] | flat_map identity == [1 2 3 4])
 
 -- each (side effects)

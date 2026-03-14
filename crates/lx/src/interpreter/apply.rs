@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use num_traits::ToPrimitive;
 
-use crate::ast::*;
+use crate::ast::{SExpr, Param, Expr, Spanned, Section, FieldKind};
 use crate::error::LxError;
 use crate::span::Span;
 use crate::value::{LxFunc, Value};
@@ -13,12 +13,29 @@ impl Interpreter {
   pub(super) fn apply_func(&mut self, func: Value, arg: Value, span: Span) -> Result<Value, LxError> {
     match func {
       Value::Func(mut lf) => {
-        lf.applied.push(arg);
+        if let Value::Unit = &arg
+          && lf.arity == 0 && lf.applied.is_empty() {
+            let saved = Arc::clone(&self.env);
+            self.env = Arc::clone(&lf.closure);
+            let result = self.eval_func_body(&lf.body, lf.returns_result);
+            self.env = saved;
+            return match result {
+              Err(LxError::Propagate { value, .. }) => Ok(*value),
+              other => other,
+            };
+          }
+        self.apply_named_args(&mut lf, arg);
+        if lf.applied.len() == 1 && lf.arity > 1
+          && let Value::Tuple(ref elems) = lf.applied[0]
+          && elems.len() == lf.arity {
+            let elems = elems.as_ref().clone();
+            lf.applied = elems;
+          }
         if lf.applied.len() < lf.arity {
           return Ok(Value::Func(lf));
         }
         let saved = Arc::clone(&self.env);
-        let mut call_env = lf.closure.clone();
+        let mut call_env = lf.closure.child();
         for (i, name) in lf.params.iter().enumerate() {
           if i < lf.applied.len() {
             call_env.bind(name.clone(), lf.applied[i].clone());
@@ -27,9 +44,12 @@ impl Interpreter {
           }
         }
         self.env = call_env.into_arc();
-        let result = self.eval(&lf.body);
+        let result = self.eval_func_body(&lf.body, lf.returns_result);
         self.env = saved;
-        result
+        match result {
+          Err(LxError::Propagate { value, .. }) => Ok(*value),
+          other => other,
+        }
       },
       Value::BuiltinFunc(mut bf) => {
         bf.applied.push(arg);
@@ -38,17 +58,112 @@ impl Interpreter {
         }
         (bf.func)(&bf.applied, span)
       },
+      Value::TaggedCtor { tag, arity, mut applied } => {
+        applied.push(arg);
+        if applied.len() < arity {
+          Ok(Value::TaggedCtor { tag, arity, applied })
+        } else {
+          Ok(Value::Tagged { tag, values: Arc::new(applied) })
+        }
+      },
       other => Err(LxError::type_err(format!("cannot call {}, not a function", other.type_name()), span)),
+    }
+  }
+
+  pub(super) fn force_defaults(&mut self, val: Value, _span: Span) -> Result<Value, LxError> {
+    match val {
+      Value::Func(ref lf) if lf.applied.len() < lf.arity
+        && (lf.applied.len()..lf.arity).all(|i| matches!(lf.defaults.get(i), Some(Some(_)))) => {
+          let Value::Func(lf) = val else { unreachable!() };
+          let saved = Arc::clone(&self.env);
+          let mut call_env = lf.closure.child();
+          for (i, name) in lf.params.iter().enumerate() {
+            if i < lf.applied.len() {
+              call_env.bind(name.clone(), lf.applied[i].clone());
+            } else if let Some(Some(def)) = lf.defaults.get(i) {
+              call_env.bind(name.clone(), def.clone());
+            }
+          }
+          self.env = call_env.into_arc();
+          let result = self.eval_func_body(&lf.body, lf.returns_result);
+          self.env = saved;
+          match result {
+            Err(LxError::Propagate { value, .. }) => Ok(*value),
+            other => other,
+          }
+        },
+      other => Ok(other),
     }
   }
 
   pub(super) fn eval_pipe(&mut self, left: &SExpr, right: &SExpr, span: Span) -> Result<Value, LxError> {
     let val = self.eval(left)?;
+    let val = self.force_defaults(val, span)?;
     let func = self.eval(right)?;
     self.apply_func(func, val, span)
   }
 
-  pub(super) fn eval_func(&mut self, params: &[Param], body: &SExpr) -> Result<Value, LxError> {
+  fn apply_named_args(&self, lf: &mut LxFunc, arg: Value) {
+    if let Value::Tagged { ref tag, ref values } = arg
+      && tag.as_ref() == "__named"
+      && values.len() == 2
+      && let Value::Str(ref name) = values[0]
+    {
+      if let Some(idx) = lf.params.iter().position(|p| p == name.as_ref()) {
+        while lf.applied.len() < idx {
+          lf.applied.push(Value::Unit);
+        }
+        if lf.applied.len() == idx {
+          lf.applied.push(values[1].clone());
+        } else {
+          lf.applied[idx] = values[1].clone();
+        }
+      } else {
+        lf.applied.push(arg);
+      }
+    } else {
+      lf.applied.push(arg);
+    }
+  }
+
+  fn eval_func_body(&mut self, body: &SExpr, returns_result: bool) -> Result<Value, LxError> {
+    if returns_result {
+      if let Expr::Block(stmts) = &body.node {
+        let saved = Arc::clone(&self.env);
+        self.env = Arc::new(self.env.child());
+        let mut result = Value::Unit;
+        for stmt in stmts {
+          result = self.eval_stmt_checking_err(stmt)?;
+          if matches!(&result, Value::Err(_)) {
+            self.env = saved;
+            return Ok(result);
+          }
+        }
+        self.env = saved;
+        if matches!(&result, Value::Ok(_) | Value::Err(_)) {
+          Ok(result)
+        } else {
+          Ok(Value::Ok(Box::new(result)))
+        }
+      } else {
+        let result = self.eval(body)?;
+        if matches!(&result, Value::Ok(_) | Value::Err(_)) {
+          Ok(result)
+        } else {
+          Ok(Value::Ok(Box::new(result)))
+        }
+      }
+    } else {
+      self.eval(body)
+    }
+  }
+
+  fn eval_stmt_checking_err(&mut self, stmt: &crate::ast::SStmt) -> Result<Value, LxError> {
+    let val = self.eval_stmt(stmt)?;
+    Ok(val)
+  }
+
+  pub(super) fn eval_func(&mut self, params: &[Param], body: &SExpr, returns_result: bool) -> Result<Value, LxError> {
     let param_names: Vec<String> = params.iter().map(|p| p.name.clone()).collect();
     let defaults: Vec<Option<Value>> = params
       .iter()
@@ -56,14 +171,20 @@ impl Interpreter {
         p.default
           .as_ref()
           .map(|d| {
-            let mut tmp = Interpreter { env: Arc::clone(&self.env), source: self.source.clone() };
+            let mut tmp = Interpreter {
+              env: Arc::clone(&self.env),
+              source: self.source.clone(),
+              source_dir: self.source_dir.clone(),
+              module_cache: Arc::clone(&self.module_cache),
+              loading: Arc::clone(&self.loading),
+            };
             tmp.eval(d)
           })
           .transpose()
       })
       .collect::<Result<_, _>>()?;
     let arity = params.len();
-    Ok(Value::Func(LxFunc { params: param_names, defaults, body: Arc::new(body.clone()), closure: self.env.as_ref().clone(), arity, applied: vec![] }))
+    Ok(Value::Func(LxFunc { params: param_names, defaults, body: Arc::new(body.clone()), closure: Arc::clone(&self.env), arity, applied: vec![], returns_result }))
   }
 
   fn make_section_func(&self, param: &str, body_expr: Expr, span: Span) -> Value {
@@ -72,9 +193,10 @@ impl Interpreter {
       params: vec![param.into()],
       defaults: vec![None],
       body: Arc::new(body),
-      closure: self.env.as_ref().clone(),
+      closure: Arc::clone(&self.env),
       arity: 1,
       applied: vec![],
+      returns_result: false,
     })
   }
 
@@ -92,13 +214,56 @@ impl Interpreter {
         let body = Expr::FieldAccess { expr: Box::new(Spanned::new(Expr::Ident("_x".into()), span)), field: FieldKind::Named(name.clone()) };
         Ok(self.make_section_func("_x", body, span))
       },
+      Section::Index(idx) => {
+        let body = Expr::FieldAccess { expr: Box::new(Spanned::new(Expr::Ident("_x".into()), span)), field: FieldKind::Index(*idx) };
+        Ok(self.make_section_func("_x", body, span))
+      },
+      Section::BinOp(op) => {
+        let body = Expr::Binary {
+          op: *op,
+          left: Box::new(Spanned::new(Expr::Ident("_a".into()), span)),
+          right: Box::new(Spanned::new(Expr::Ident("_b".into()), span)),
+        };
+        Ok(self.make_section_func_2("_a", "_b", body, span))
+      },
     }
   }
 
+  fn make_section_func_2(&self, p1: &str, p2: &str, body_expr: Expr, span: Span) -> Value {
+    let body = Spanned::new(body_expr, span);
+    Value::Func(LxFunc {
+      params: vec![p1.into(), p2.into()],
+      defaults: vec![None, None],
+      body: Arc::new(body),
+      closure: Arc::clone(&self.env),
+      arity: 2,
+      applied: vec![],
+      returns_result: false,
+    })
+  }
+
   pub(super) fn eval_compose(&mut self, left: &SExpr, right: &SExpr, span: Span) -> Result<Value, LxError> {
-    let _f = self.eval(left)?;
-    let _g = self.eval(right)?;
-    Err(LxError::runtime("compose not yet implemented", span))
+    let f = self.eval(left)?;
+    let g = self.eval(right)?;
+    let body = Expr::Pipe {
+      left: Box::new(Spanned::new(
+        Expr::Apply { func: Box::new(Spanned::new(Expr::Ident("_cf".into()), span)), arg: Box::new(Spanned::new(Expr::Ident("_cx".into()), span)) },
+        span,
+      )),
+      right: Box::new(Spanned::new(Expr::Ident("_cg".into()), span)),
+    };
+    let mut closure = self.env.child();
+    closure.bind("_cf".into(), f);
+    closure.bind("_cg".into(), g);
+    Ok(Value::Func(LxFunc {
+      params: vec!["_cx".into()],
+      defaults: vec![None],
+      body: Arc::new(Spanned::new(body, span)),
+      closure: closure.into_arc(),
+      arity: 1,
+      applied: vec![],
+      returns_result: false,
+    }))
   }
 
   pub(super) fn eval_field_access(&mut self, expr: &SExpr, field: &FieldKind, span: Span) -> Result<Value, LxError> {
@@ -123,6 +288,10 @@ impl Interpreter {
         let key = self.eval(key_expr)?;
         match (&val, &key) {
           (Value::Record(r), Value::Str(s)) => r.get(s.as_ref()).cloned().ok_or_else(|| LxError::runtime(format!("field '{s}' not found"), span)),
+          (Value::Map(m), Value::Str(s)) => {
+            let vk = crate::value::ValueKey(Value::Str(s.clone()));
+            m.get(&vk).cloned().ok_or_else(|| LxError::runtime(format!("key '{s}' not found"), span))
+          },
           (Value::List(items), Value::Int(n)) => {
             let i = n.to_i64().ok_or_else(|| LxError::runtime("index too large", span))?;
             let i = if i < 0 { items.len() as i64 + i } else { i } as usize;

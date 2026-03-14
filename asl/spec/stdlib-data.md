@@ -270,6 +270,7 @@ Backend: `charming` (in reference/) for SVG, custom terminal renderer for Unicod
 
 ## Cross-References
 
+- Agent ecosystem modules: [stdlib-agents.md](stdlib-agents.md) (std/agent, std/mcp, std/ctx, std/md, std/cron)
 - Core stdlib modules: [stdlib-modules.md](stdlib-modules.md)
 - Built-in functions and conventions: [stdlib.md](stdlib.md)
 - Stdlib loader design: [impl-stdlib.md](../impl/impl-stdlib.md)

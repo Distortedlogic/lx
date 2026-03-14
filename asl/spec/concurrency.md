@@ -2,6 +2,8 @@
 
 Structured concurrency only — no unstructured spawn/await. Every concurrent operation has a clear scope and lifetime. This prevents dangling futures, which are exactly the kind of state-tracking bug I'm worst at.
 
+These primitives are also the foundation for agentic workflows — `par` runs parallel agent tasks, `sel` races agent responses against timeouts, `pmap` fans out to agent pools. See [agents.md](agents.md) for agent-specific patterns built on these constructs.
+
 ## `pmap` — Parallel Map
 
 The most common concurrent pattern: apply a function to every element in parallel.
@@ -184,6 +186,8 @@ I/O operations (`fs.read`, `http.get`, shell commands) use async I/O internally 
 
 ## Cross-References
 
+- Agent patterns built on par/sel/pmap: [agents.md](agents.md)
+- Agent stdlib (spawn, ask, channel): [stdlib-agents.md](stdlib-agents.md)
 - Implementation: [impl-interpreter.md](../impl/impl-interpreter.md) (par/sel/pmap evaluation), [impl-builtins.md](../impl/impl-builtins.md) (pmap built-in)
 - Design decisions: [design.md](design.md) (structured concurrency, mutable capture restriction)
 - Test suite: [13_concurrency.lx](../suite/13_concurrency.lx)

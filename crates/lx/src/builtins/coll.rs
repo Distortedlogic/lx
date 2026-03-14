@@ -11,7 +11,7 @@ use crate::value::{Value, ValueKey};
 
 use super::mk;
 
-fn cmp_values(a: &Value, b: &Value) -> std::cmp::Ordering {
+pub(crate) fn cmp_values(a: &Value, b: &Value) -> std::cmp::Ordering {
   match (a, b) {
     (Value::Int(x), Value::Int(y)) => x.cmp(y),
     (Value::Float(x), Value::Float(y)) => x.total_cmp(y),
@@ -47,12 +47,13 @@ fn bi_contains(args: &[Value], span: Span) -> Result<Value, LxError> {
 fn bi_get(args: &[Value], span: Span) -> Result<Value, LxError> {
   match &args[1] {
     Value::List(l) => {
-      let idx = args[0]
+      let n = args[0]
         .as_int()
-        .ok_or_else(|| LxError::type_err("get: index must be Int for List", span))?
-        .to_usize()
-        .ok_or_else(|| LxError::runtime("get: index out of range", span))?;
-      Ok(maybe(l.get(idx)))
+        .ok_or_else(|| LxError::type_err("get: index must be Int for List", span))?;
+      let idx = n.to_i64().ok_or_else(|| LxError::runtime("get: index out of range", span))?;
+      let idx = if idx < 0 { l.len() as i64 + idx } else { idx };
+      if idx < 0 { return Ok(Value::None); }
+      Ok(maybe(l.get(idx as usize)))
     },
     Value::Record(r) => {
       let key = args[0].as_str().ok_or_else(|| LxError::type_err("get: key must be Str for Record", span))?;
@@ -127,7 +128,7 @@ fn bi_uniq(args: &[Value], span: Span) -> Result<Value, LxError> {
   let l = args[0].as_list().ok_or_else(|| LxError::type_err("uniq expects List", span))?;
   let mut out: Vec<Value> = Vec::with_capacity(l.len());
   for v in l.iter() {
-    if out.last().map_or(true, |p| p != v) {
+    if out.last() != Some(v) {
       out.push(v.clone());
     }
   }

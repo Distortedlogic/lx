@@ -27,6 +27,11 @@ suite/
   19_numerical.lx       -- std/num: vectorized ops, statistics (TODO, Phase 11)
   20_ml.lx              -- std/ml: embeddings, similarity, classify (TODO, Phase 11)
   21_plot.lx            -- std/plot: chart construction, render (TODO, Phase 11)
+  22_agents.lx          -- std/agent: spawn, ask, channel, polling (TODO, Phase 12)
+  23_mcp.lx             -- std/mcp: connect, list_tools, call (TODO, Phase 12)
+  24_context.lx         -- std/ctx: load, save, get, set, merge (TODO, Phase 12)
+  25_markdown.lx        -- std/md: parse, sections, code_blocks, render (TODO, Phase 12)
+  26_cron.lx            -- std/cron: every, at, cancel (TODO, Phase 12)
 ```
 
 ## Convention
@@ -68,6 +73,11 @@ Each file begins with a comment header noting:
 | 19_numerical | stdlib-data.md (std/num) |
 | 20_ml | stdlib-data.md (std/ml) |
 | 21_plot | stdlib-data.md (std/plot) |
+| 22_agents | agents.md, stdlib-agents.md (std/agent) |
+| 23_mcp | agents.md, stdlib-agents.md (std/mcp) |
+| 24_context | agents.md, stdlib-agents.md (std/ctx) |
+| 25_markdown | agents.md, stdlib-agents.md (std/md) |
+| 26_cron | agents.md, stdlib-agents.md (std/cron) |
 
 ## When to Update
 

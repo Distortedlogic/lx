@@ -79,11 +79,103 @@ impl<'src> Lexer<'src> {
       if c == '{' {
         brace_depth += 1;
       }
-      match self.next_token()? {
-        Some(tok) => self.emit(tok),
+      if let Some(tok) = self.next_token()? { self.emit(tok) }
+    }
+  }
+
+  pub(super) fn read_shell_line(&mut self, interpolate: bool) -> Result<(), LxError> {
+    let stop_at_rparen = self.depth > 0;
+    let mut buf = String::new();
+    let mut chunk_start = self.pos;
+    loop {
+      match self.peek() {
+        None | Some('\n') => break,
+        Some(')') if stop_at_rparen => break,
+        Some('{') if interpolate => {
+          if !buf.is_empty() {
+            self.push(TokenKind::ShellText(std::mem::take(&mut buf)), chunk_start, self.pos);
+          }
+          self.advance();
+          self.lex_interpolation(self.pos)?;
+          chunk_start = self.pos;
+        },
+        Some(c) => {
+          if buf.is_empty() { chunk_start = self.pos; }
+          self.advance();
+          buf.push(c);
+        },
+      }
+    }
+    if !buf.is_empty() {
+      self.push(TokenKind::ShellText(buf), chunk_start, self.pos);
+    }
+    self.push(TokenKind::ShellEnd, self.pos, self.pos);
+    Ok(())
+  }
+
+  pub(super) fn read_shell_cmd(&mut self) -> Result<(), LxError> {
+    let stop_at_rparen = self.depth > 0;
+    let mut buf = String::new();
+    let mut chunk_start = self.pos;
+    loop {
+      match self.peek() {
+        None | Some('\n') | Some('|') | Some(';') => break,
+        Some(')') if stop_at_rparen => break,
+        Some('{') => {
+          if !buf.is_empty() {
+            self.push(TokenKind::ShellText(std::mem::take(&mut buf)), chunk_start, self.pos);
+          }
+          self.advance();
+          self.lex_interpolation(self.pos)?;
+          chunk_start = self.pos;
+        },
+        Some(c) => {
+          if buf.is_empty() { chunk_start = self.pos; }
+          self.advance();
+          buf.push(c);
+        },
+      }
+    }
+    if !buf.is_empty() {
+      let trimmed = buf.trim_end().to_string();
+      if !trimmed.is_empty() {
+        self.push(TokenKind::ShellText(trimmed), chunk_start, self.pos);
+      }
+    }
+    self.push(TokenKind::ShellEnd, self.pos, self.pos);
+    Ok(())
+  }
+
+  pub(super) fn read_shell_block(&mut self) -> Result<(), LxError> {
+    let start = self.pos;
+    let mut buf = String::new();
+    let mut chunk_start = self.pos;
+    loop {
+      match self.peek() {
         None => {
-          let span = Span::from_range(str_start as u32, self.pos as u32);
-          return Err(LxError::parse("unterminated string interpolation", span, None));
+          let span = Span::from_range(start as u32, self.pos as u32);
+          return Err(LxError::parse("unterminated ${...} block", span, None));
+        },
+        Some('}') => {
+          if !buf.is_empty() {
+            self.push(TokenKind::ShellText(buf), chunk_start, self.pos);
+          }
+          self.advance();
+          self.push(TokenKind::ShellEnd, self.pos - 1, self.pos);
+          return Ok(());
+        },
+        Some('{') => {
+          if !buf.is_empty() {
+            self.push(TokenKind::ShellText(std::mem::take(&mut buf)), chunk_start, self.pos);
+          }
+          self.advance();
+          self.lex_interpolation(self.pos)?;
+          chunk_start = self.pos;
+        },
+        Some(c) => {
+          if buf.is_empty() { chunk_start = self.pos; }
+          self.advance();
+          buf.push(c);
         },
       }
     }

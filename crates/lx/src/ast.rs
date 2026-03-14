@@ -25,6 +25,9 @@ pub struct Program {
 #[derive(Debug, Clone)]
 pub enum Stmt {
   Binding(Binding),
+  TypeDef { name: String, variants: Vec<(String, usize)>, exported: bool },
+  Protocol { name: String, fields: Vec<ProtocolField>, exported: bool },
+  Use(UseStmt),
   Expr(SExpr),
 }
 
@@ -67,16 +70,35 @@ pub enum Expr {
   Map(Vec<MapEntry>),
   Set(Vec<SetElem>),
 
-  Func { params: Vec<Param>, body: Box<SExpr> },
+  Func { params: Vec<Param>, body: Box<SExpr>, returns_result: bool },
   Match { scrutinee: Box<SExpr>, arms: Vec<MatchArm> },
   Ternary { cond: Box<SExpr>, then_: Box<SExpr>, else_: Option<Box<SExpr>> },
 
   Propagate(Box<SExpr>),
   Coalesce { expr: Box<SExpr>, default: Box<SExpr> },
 
+  Slice { expr: Box<SExpr>, start: Option<Box<SExpr>>, end: Option<Box<SExpr>> },
+  NamedArg { name: String, value: Box<SExpr> },
+
   Loop(Vec<SStmt>),
   Break(Option<Box<SExpr>>),
   Assert { expr: Box<SExpr>, msg: Option<Box<SExpr>> },
+
+  Par(Vec<SStmt>),
+  Sel(Vec<SelArm>),
+
+  AgentSend { target: Box<SExpr>, msg: Box<SExpr> },
+  AgentAsk { target: Box<SExpr>, msg: Box<SExpr> },
+
+  Shell { mode: ShellMode, parts: Vec<StrPart> },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShellMode {
+  Normal,
+  Raw,
+  Propagate,
+  Block,
 }
 
 #[derive(Debug, Clone)]
@@ -85,6 +107,7 @@ pub enum Literal {
   Float(f64),
   Str(Vec<StrPart>),
   RawStr(String),
+  Regex { pattern: String, flags: String },
   Bool(bool),
   Unit,
 }
@@ -100,6 +123,8 @@ pub enum Section {
   Right { op: BinOp, operand: Box<SExpr> },
   Left { operand: Box<SExpr>, op: BinOp },
   Field(String),
+  Index(i64),
+  BinOp(BinOp),
 }
 
 #[derive(Debug, Clone)]
@@ -149,6 +174,25 @@ pub struct MatchArm {
 }
 
 #[derive(Debug, Clone)]
+pub struct SelArm {
+  pub expr: SExpr,
+  pub handler: SExpr,
+}
+
+#[derive(Debug, Clone)]
+pub struct UseStmt {
+  pub path: Vec<String>,
+  pub kind: UseKind,
+}
+
+#[derive(Debug, Clone)]
+pub enum UseKind {
+  Whole,
+  Alias(String),
+  Selective(Vec<String>),
+}
+
+#[derive(Debug, Clone)]
 pub enum Pattern {
   Literal(Literal),
   Bind(String),
@@ -157,6 +201,13 @@ pub enum Pattern {
   List { elems: Vec<SPattern>, rest: Option<String> },
   Record { fields: Vec<FieldPattern>, rest: Option<String> },
   Constructor { name: String, args: Vec<SPattern> },
+}
+
+#[derive(Debug, Clone)]
+pub struct ProtocolField {
+  pub name: String,
+  pub type_name: String,
+  pub default: Option<SExpr>,
 }
 
 #[derive(Debug, Clone)]

@@ -86,7 +86,7 @@ tree_sum = (t: Tree Int) -> Int  t ? {
 }
 assert (tree_sum t == 6)
 
-tree_map = (f: a -> b  t: Tree a) -> Tree b  t ? {
+tree_map = (f: a -> b  t: Tree a) -> (Tree b)  t ? {
   Leaf v     -> Leaf (f v)
   Node l r   -> Node (tree_map f l) (tree_map f r)
 }
@@ -160,7 +160,7 @@ json_to_str = (j: Json) -> Str  j ? {
   JNum n     -> to_str n
   JStr s     -> s
   JArr items -> "[{len items} items]"
-  JObj m     -> "{{{len (keys m)} keys}}"
+  JObj m     -> "{len (keys m)} keys"
 }
 assert (json_to_str JNull == "null")
 assert (json_to_str (JBool true) == "true")

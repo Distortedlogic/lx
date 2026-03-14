@@ -74,6 +74,14 @@ impl Env {
     None
   }
 
+  pub fn has_mut(&self, name: &str) -> bool {
+    match self.bindings.get(name) {
+      Some(Slot::Mutable(_)) => true,
+      Some(_) => false,
+      None => self.parent.as_ref().is_some_and(|p| p.has_mut(name)),
+    }
+  }
+
   pub fn into_arc(self) -> Arc<Self> {
     Arc::new(self)
   }

@@ -1,15 +1,15 @@
 # Implementation Plan
 
-Architecture, crate choices, and phased build plan for `lx`.
+Architecture, crate choices, and phased build plan for `lx` — an agentic workflow language.
 
 ## Architecture
 
 ```
 crates/lx/          -- core library (lexer, parser, type checker, interpreter)
-crates/lx-cli/      -- `lx` binary (run, fmt, test, check, build, repl, notebook, watch, init)
+crates/lx-cli/      -- `lx` binary (run, fmt, test, check, build, repl, notebook, watch, agent, init)
 ```
 
-Two crates. The library is the language engine — everything from source text to execution. The CLI is a thin shell that wires up subcommands to library calls. This split lets the lx engine be embedded in other tools (MCP server, editor integration, REPL) without pulling in CLI deps.
+Two crates. The library is the language engine — everything from source text to execution. The CLI is a thin shell that wires up subcommands to library calls. This split lets the lx engine be embedded in other tools (MCP server, agent processes, editor integration, REPL) without pulling in CLI deps. The `lx agent` subcommand runs scripts as long-lived agent processes with cron scheduling and channel listeners.
 
 ## Why Hand-Written Lexer + Pratt Parser
 
@@ -77,6 +77,14 @@ Already in reference/. Powers `std/rand`.
 - **candle-core** / **ort** — powers `std/ml`. Local ML inference (embeddings, classification).
 - **charming** — already in reference/. Powers `std/plot`. SVG chart generation.
 
+### Agent Ecosystem (Phase 12)
+
+- **rmcp** — MCP client library for `std/mcp`. Handles stdio, HTTP+SSE, and WebSocket transports.
+- **pulldown-cmark** — Markdown parser for `std/md`. Produces an AST that maps to lx `MdDoc` values.
+- **cron** (or `tokio-cron-scheduler`) — Powers `std/cron` recurring tasks.
+- Agent spawning uses `tokio::process::Command` (same as shell integration) to launch subagent processes.
+- Agent channels use `tokio::sync::mpsc` for local communication, Unix domain sockets for cross-process.
+
 ### Not Needed (v1)
 
 - **cranelift / LLVM** — AOT compilation (`lx build`) is v2. v1 is interpreted.
@@ -118,34 +126,38 @@ Env — scope chain (HashMap<String, Value> + parent pointer)
 
 The interpreter's `eval` function is `async fn eval(&mut self, expr: &Expr) -> Result<Value>`. Everything is async from the start — synchronous operations just `.await` immediately.
 
-## Module Structure
+## Module Structure (Actual)
 
 ```
 crates/lx/src/
-  lib.rs              -- pub use of all modules
-  span.rs             -- Span, source location types
-  token.rs            -- TokenKind enum, Token struct
-  lexer.rs            -- Lexer state machine (modes: normal, shell, regex, string interp)
-  ast.rs              -- Expr, Stmt, Pattern, Type enums
-  parser.rs           -- recursive descent + Pratt precedence
-  parser_expr.rs      -- expression parsing (split from parser.rs for 300-line limit)
-  parser_pattern.rs   -- pattern parsing
-  checker.rs          -- bidirectional type inference
-  checker_types.rs    -- TypeInfo, unification, structural subtyping
-  value.rs            -- Value enum, to_str, equality
-  env.rs              -- Env scope chain, variable lookup
-  interpreter.rs      -- tree-walking eval
-  interpreter_shell.rs -- shell command execution
-  interpreter_conc.rs -- par/sel/pmap implementation
-  builtins.rs         -- built-in functions (map, filter, fold, etc.)
-  builtins_str.rs     -- string functions
-  builtins_io.rs      -- io/fs/env functions
-  stdlib.rs           -- module loader for std/fs, std/net/http, etc.
-  error.rs            -- LxError type, diagnostic formatting
-  fmt.rs              -- lx fmt (canonical formatter)
+  lib.rs                        -- pub use of all modules
+  span.rs                       -- Span, source location types
+  token.rs                      -- TokenKind enum, Token struct
+  ast.rs                        -- Expr, Stmt, Pattern enums + UseStmt, UseKind
+  value.rs                      -- Value enum, structural equality, Display
+  env.rs                        -- Env scope chain (HashMap + parent Arc)
+  error.rs                      -- LxError type, diagnostic formatting
+  iterator.rs                   -- LxIter trait, IterSource (Nat/Cycle/Live)
+  lexer/mod.rs                  -- Lexer state machine (modes: normal, shell, regex, string interp)
+  lexer/numbers.rs              -- Number lexing
+  lexer/strings.rs              -- String/shell lexing with interpolation
+  parser/mod.rs                 -- Pratt parser, infix/postfix, use statements
+  parser/prefix.rs              -- Prefix parsing (literals, parens, sections, functions, shell)
+  parser/pattern.rs             -- Pattern parsing for match arms
+  interpreter/mod.rs            -- Tree-walking eval, stmt dispatch
+  interpreter/apply.rs          -- Function application, currying, pipes, sections, field access
+  interpreter/collections.rs    -- List/record/map/set/tuple evaluation
+  interpreter/modules.rs        -- Module loading, path resolution, export collection
+  interpreter/patterns.rs       -- Pattern matching
+  interpreter/shell.rs          -- Shell command execution via sh -c
+  builtins/mod.rs               -- Built-in registration, HOF helpers
+  builtins/str.rs               -- String functions
+  builtins/coll.rs              -- Collection functions
+  builtins/hof.rs               -- Higher-order functions (map, filter, fold, etc.)
+crates/lx-cli/src/main.rs      -- CLI: run, test (with subdirectory scanning)
 ```
 
-Each file ≤300 lines. The split points are natural — shell execution, concurrency, and string builtins are each independent concerns.
+Target: each file ≤300 lines. Some files currently exceed this (prefix.rs ~770, parser/mod.rs ~800, interpreter/mod.rs ~490, hof.rs ~430) — known tech debt.
 
 ## Phased Build Plan
 

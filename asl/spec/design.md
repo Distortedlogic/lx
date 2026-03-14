@@ -2,6 +2,18 @@
 
 Every non-obvious choice in lx, with rationale. These are decisions, not axioms — each one was chosen over alternatives and could theoretically be revisited. The axioms live in [README.md](../README.md).
 
+## Agentic Identity
+
+**lx is an agentic workflow language** — not a general scripting language with agent features bolted on. The core use case is: an agent writes an lx program that spawns subagents, invokes tools, manages context, and orchestrates multi-step workflows. The existing language primitives (pipes, pattern matching, closures, `par`/`sel`, `^`/`??`) are the instruction set for the agentic layer.
+
+**Agent communication has language-level syntax** — `~>` (send) and `~>?` (ask) are infix operators recognized by the parser, just as `$` identifies shell commands. The AST has distinct nodes for agent messages. Agent lifecycle (`agent.spawn`, `agent.channel`) and tools (`mcp.call`, `ctx.load`) remain library functions — they don't need special syntax because they're one-shot setup operations, not the core communication loop.
+
+**Agents are opaque values** — Like `Handle` and `Duration`, an `Agent` cannot be destructured. It's created by `agent.spawn`, communicated with via `~>` (send) / `~>?` (ask), and managed via `agent.channel`. This prevents agents from being accidentally serialized or compared — they're process handles, not data.
+
+**Context is immutable** — `ctx.set` returns a new context, not mutating in place. This matches lx's immutable-by-default principle and makes context threading through pipelines clean: `ctx.load path ^ | ctx.set "k" v | (c) ctx.save path c ^`.
+
+**MCP is the unified tool interface** — Shell (`$`), HTTP (`std/net/http`), and file I/O (`std/fs`) remain for direct use, but MCP (`std/mcp`) provides the generalized tool abstraction. An agent that needs to invoke arbitrary tools uses MCP. This follows the principle of specific tools for common cases, generic interface for extensibility.
+
 ## Syntax
 
 **Braces over indentation** — `}` is one token, unambiguously closes scope. Indentation requires counting whitespace tokens; my tokenizer makes this unreliable. Every Python-style generation I do risks an invisible tab/space mismatch.
@@ -52,7 +64,7 @@ The original design used `!` for shell, but `!cmd` vs `!expr` (logical not) vs `
 
 **Structured concurrency only** — `par { ... }` runs expressions concurrently, returns results as tuple. `pmap f xs` for parallel map. `sel { ... }` for racing. No unstructured `spawn`/`go` with manual `await` — those create dangling futures, which are exactly the state-tracking bugs I'm worst at. If a `par` block errors, all siblings are cancelled.
 
-**`<-` is exclusively reassignment** — `x := 5` creates mutable binding, `x <- 10` reassigns. No overloading with await or channel operations. Concurrency uses `par`/`sel` blocks, keeping `<-` unambiguous.
+**`<-` is exclusively reassignment** — `x := 5` creates mutable binding, `x <- 10` reassigns. No overloading with await or channel operations. Agent communication uses `~>` (send) and `~>?` (ask) — distinct operators that avoid `<-` ambiguity. Concurrency uses `par`/`sel` blocks.
 
 ## Types and Mutability
 

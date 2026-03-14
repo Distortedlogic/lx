@@ -289,4 +289,4 @@ split regex s          -- split on matches
 | `std/os` | Process/signal: pid, hostname, arch, os, signal |
 | `std/rand` | Random: int, float, choice, shuffle, seed, uuid |
 
-Data ecosystem modules (`std/df`, `std/db`, `std/num`, `std/ml`, `std/plot`) are in [stdlib-data.md](stdlib-data.md). Core module API details are in [stdlib-modules.md](stdlib-modules.md).
+Agent ecosystem modules (`std/agent`, `std/mcp`, `std/ctx`, `std/md`, `std/cron`) are in [stdlib-agents.md](stdlib-agents.md). Data ecosystem modules (`std/df`, `std/db`, `std/num`, `std/ml`, `std/plot`) are in [stdlib-data.md](stdlib-data.md). Core module API details are in [stdlib-modules.md](stdlib-modules.md).
