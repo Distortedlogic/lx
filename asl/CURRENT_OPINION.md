@@ -20,9 +20,9 @@ Written by the language designer (Claude) after 13 implementation sessions. Upda
 
 `~>` and `~>?` are now language-level infix operators with their own tokens (`TildeArrow`, `TildeArrowQ`), AST nodes (`Expr::AgentSend`, `Expr::AgentAsk`), and interpreter dispatch. Agents are records with a `handler` field. The syntax composes with `^`, `|`, `par`/`sel`, and `??`.
 
-### 2. Messages are untyped bags
+### 2. ~~Messages are untyped bags~~ ✓ FIXED
 
-Agent communication is structured data exchange, but messages are raw records: `{task: "review" commits: changes}`. No contracts. No schemas. The receiver can't declare what it expects. A malformed message silently passes through and fails deep in the handler with "field not found." For a language designed for agent-to-agent communication, this is a serious gap.
+`Protocol` keyword validates record shapes at boundaries. `Protocol ReviewRequest = {task: Str  path: Str  depth: Int = 3}` declares a contract. `ReviewRequest {task: "review" path: "src/"}` validates at application time — missing fields and type mismatches are caught immediately with clear diagnostics. Extra fields allowed (structural subtyping). Defaults filled in. `Any` type for flexible fields.
 
 ### 3. Context threading is manual
 
@@ -55,18 +55,17 @@ result = analyzer ~>? {task: "review" path: "src/"} ^
 analyzer ~>? {task: "review"} ^ | (.findings) | filter (.critical)
 ```
 
-### Priority B: Message contracts
+### Priority B: ~~Message contracts~~ ✓ DONE
 
-Define what messages an agent accepts and returns:
+Implemented in Session 14. `Protocol` keyword with runtime structural validation:
 
 ```
-+Protocol ReviewRequest = {task: Str  path: Str  depth: Int = 3}
-+Protocol ReviewResult = {findings: [Finding]  summary: Str}
-
-analyzer ~>? ReviewRequest {task: "review" path: "src/"} ^
+Protocol ReviewRequest = {task: Str  path: Str  depth: Int = 3}
+reviewer ~>? ReviewRequest {task: "review" path: "src/"}
+-- validates record shape, fills default depth: 3, then sends to reviewer
 ```
 
-This doesn't need a full type system — just structural validation of records against declared shapes. The runtime can validate at `~>` / `~>?` boundaries.
+Validation is a hard contract (runtime error on mismatch, not Err). Protocols are callable values — apply to a record to validate. Extra fields allowed. `Any` type for flexible fields. Exportable with `+`.
 
 ### Priority C: Implicit context scope
 
@@ -104,9 +103,9 @@ flow | run ?? resume_from "state.json"
 
 ## Assessment
 
-The core language (pipes, pattern matching, error handling, closures, shell, agent send/ask) is genuinely good. Priority A is done — lx now has language-level agent communication. The next critical gap is Priority B (message contracts) — without shape validation, agent-to-agent messages silently fail on structural mismatches.
+The core language (pipes, pattern matching, error handling, closures, shell, agent send/ask, message contracts) is genuinely good. Priorities A and B are done — lx has language-level agent communication with structural message validation.
 
-The practical next step: either message contracts (Priority B) or `std/` import infrastructure (prerequisite for any stdlib module), depending on whether the language itself or the library ecosystem is more important to advance.
+The practical next step: `std/` import infrastructure (prerequisite for any stdlib module), then the core agent stdlib modules (`std/json`, `std/agent`, `std/mcp`, `std/ctx`).
 
 ## Cross-References
 

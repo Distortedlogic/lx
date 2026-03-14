@@ -7,5 +7,6 @@ pub mod iterator;
 pub mod lexer;
 pub mod parser;
 pub mod span;
+pub mod stdlib;
 pub mod token;
 pub mod value;

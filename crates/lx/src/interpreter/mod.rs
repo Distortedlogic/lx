@@ -11,11 +11,11 @@ use std::sync::{Arc, Mutex};
 use indexmap::IndexMap;
 use num_traits::ToPrimitive;
 
-use crate::ast::{SExpr, Program, Expr, SStmt, Stmt, BindTarget, Literal, BinOp, UnaryOp, StrPart, SelArm};
+use crate::ast::{SExpr, Program, Expr, SStmt, Stmt, BindTarget, Literal, BinOp, UnaryOp, StrPart, SelArm, ProtocolField};
 use crate::env::Env;
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::{Value, ProtoFieldDef};
 
 #[derive(Debug, Clone)]
 pub(crate) struct ModuleExports {
@@ -234,6 +234,9 @@ impl Interpreter {
         }
         self.env = env.into_arc();
         Ok(Value::Unit)
+      },
+      Stmt::Protocol { name, fields, .. } => {
+        self.eval_protocol_def(name, fields, stmt.span)
       },
       Stmt::Expr(e) => self.eval(e),
     }
@@ -502,6 +505,23 @@ impl Interpreter {
     let msg = self.eval(msg_expr)?;
     let handler = self.get_agent_handler(&target, span)?;
     self.apply_func(handler, msg, span)
+  }
+
+  fn eval_protocol_def(&mut self, name: &str, fields: &[ProtocolField], span: Span) -> Result<Value, LxError> {
+    let mut proto_fields = Vec::new();
+    for f in fields {
+      let default = match &f.default {
+        Some(e) => Some(self.eval(e)?),
+        None => None,
+      };
+      proto_fields.push(ProtoFieldDef { name: f.name.clone(), type_name: f.type_name.clone(), default });
+    }
+    let val = Value::Protocol { name: Arc::from(name), fields: Arc::new(proto_fields) };
+    let mut env = self.env.child();
+    env.bind(name.to_string(), val);
+    self.env = env.into_arc();
+    let _ = span;
+    Ok(Value::Unit)
   }
 
   fn eval_assert(&mut self, expr: &SExpr, msg: &Option<Box<SExpr>>, span: Span) -> Result<Value, LxError> {

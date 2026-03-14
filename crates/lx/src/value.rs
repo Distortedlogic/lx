@@ -302,6 +302,7 @@ impl fmt::Display for Value {
         if *inclusive { write!(f, "{start}..={end}") } else { write!(f, "{start}..{end}") }
       },
       Value::Iterator(_) => write!(f, "<iterator>"),
+      Value::Protocol { name, .. } => write!(f, "<Protocol {name}>"),
     }
   }
 }

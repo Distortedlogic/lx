@@ -110,3 +110,70 @@ assert (coalesced2 == 0) "ask + coalesce on Err"
 side_effect = {handler: (msg) msg}
 pipeline_send = side_effect ~> "hello"
 assert (pipeline_send == ()) "send always returns unit"
+
+-- === Message Contracts (Protocol) ===
+
+-- basic protocol validation
+Protocol Greeting = {name: Str  message: Str}
+g = Greeting {name: "alice" message: "hello"}
+assert (g == {name: "alice" message: "hello"}) "protocol validates and returns record"
+
+-- protocol with defaults
+Protocol Config = {host: Str  port: Int  debug: Bool = false}
+c1 = Config {host: "localhost" port: 8080}
+assert (c1.host == "localhost") "protocol field access"
+assert (c1.port == 8080) "protocol field access int"
+assert (c1.debug == false) "protocol fills default"
+
+c2 = Config {host: "prod" port: 443 debug: true}
+assert (c2.debug == true) "protocol explicit override of default"
+
+-- protocol allows extra fields (structural subtyping)
+Protocol Minimal = {id: Int}
+m = Minimal {id: 1 name: "extra" tags: [1 2 3]}
+assert (m.id == 1) "protocol allows extra fields"
+assert (m.name == "extra") "extra field preserved"
+
+-- protocol with agent communication
+Protocol ReviewRequest = {task: Str  path: Str}
+review_handler = (msg) {findings: [1 2] summary: msg.task ++ " " ++ msg.path}
+reviewer = {handler: review_handler}
+review_result = reviewer ~>? ReviewRequest {task: "audit" path: "src/"}
+assert (review_result.summary == "audit src/") "protocol + ask"
+
+-- protocol validates at send boundary
+Protocol CalcRequest = {op: Str  value: Int}
+calc_handler = (msg) msg.op ? {
+  "double" -> msg.value * 2
+  "square" -> msg.value * msg.value
+  _ -> msg.value
+}
+calc = {handler: calc_handler}
+assert (calc ~>? CalcRequest {op: "double" value: 5} == 10) "protocol + ask + match"
+assert (calc ~>? CalcRequest {op: "square" value: 4} == 16) "protocol + ask + match 2"
+
+-- protocol in pipeline
+Protocol DataMsg = {data: List}
+sum_handler = (msg) msg.data | sum
+sum_agent = {handler: sum_handler}
+total = sum_agent ~>? DataMsg {data: [10 20 30]}
+assert (total == 60) "protocol in agent pipeline"
+
+-- protocol with Any type
+Protocol Flexible = {key: Str  value: Any}
+f1 = Flexible {key: "count" value: 42}
+f2 = Flexible {key: "name" value: "alice"}
+f3 = Flexible {key: "items" value: [1 2 3]}
+assert (f1.value == 42) "protocol Any accepts Int"
+assert (f2.value == "alice") "protocol Any accepts Str"
+assert (f3.value == [1 2 3]) "protocol Any accepts List"
+
+-- protocol as contract enforcer with agent
+Protocol Msg = {text: Str}
+msg_echo = {handler: (msg) msg.text ++ "!"}
+assert (msg_echo ~>? Msg {text: "hello"} == "hello!") "protocol + ask"
+
+-- protocol validation: type mismatch, missing field, non-record
+-- are all runtime errors (panics), not Err values
+-- Msg {text: 42} would fail: "Protocol Msg: field 'text' expected Str, got Int"
+-- these are programmer bugs caught at the boundary

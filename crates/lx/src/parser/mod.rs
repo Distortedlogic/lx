@@ -1,7 +1,7 @@
 mod pattern;
 mod prefix;
 
-use crate::ast::{Program, SStmt, Stmt, Binding, BindTarget, SExpr, Expr, FieldKind, MatchArm, SPattern, Pattern, Literal, BinOp, UseStmt, UseKind};
+use crate::ast::{Program, SStmt, Stmt, Binding, BindTarget, SExpr, Expr, FieldKind, MatchArm, SPattern, Pattern, Literal, BinOp, UseStmt, UseKind, ProtocolField};
 use crate::error::LxError;
 use crate::span::Span;
 use crate::token::{Token, TokenKind};
@@ -39,6 +39,9 @@ impl Parser {
     } else {
       false
     };
+    if *self.peek() == TokenKind::Protocol {
+      return self.parse_protocol(exported, start);
+    }
     if let Some(type_def) = self.try_parse_type_def(exported, start)? {
       return Ok(type_def);
     }
@@ -464,6 +467,39 @@ impl Parser {
     while *self.peek() == TokenKind::Semi {
       self.advance();
     }
+  }
+
+  fn parse_protocol(&mut self, exported: bool, start: u32) -> Result<SStmt, LxError> {
+    self.advance();
+    let name = match self.peek().clone() {
+      TokenKind::TypeName(n) => { self.advance(); n },
+      _ => return Err(LxError::parse("expected type name after 'Protocol'", self.tokens[self.pos].span, None)),
+    };
+    self.expect_kind(&TokenKind::Assign)?;
+    self.expect_kind(&TokenKind::LBrace)?;
+    let mut fields = Vec::new();
+    self.skip_semis();
+    while *self.peek() != TokenKind::RBrace {
+      let field_name = match self.peek().clone() {
+        TokenKind::Ident(n) => { self.advance(); n },
+        _ => return Err(LxError::parse("expected field name in Protocol", self.tokens[self.pos].span, None)),
+      };
+      self.expect_kind(&TokenKind::Colon)?;
+      let type_name = match self.peek().clone() {
+        TokenKind::TypeName(n) => { self.advance(); n },
+        _ => return Err(LxError::parse("expected type name after ':'", self.tokens[self.pos].span, None)),
+      };
+      let default = if *self.peek() == TokenKind::Assign {
+        self.advance();
+        Some(self.parse_expr(0)?)
+      } else {
+        None
+      };
+      fields.push(ProtocolField { name: field_name, type_name, default });
+      self.skip_semis();
+    }
+    let end = self.expect_kind(&TokenKind::RBrace)?.span.end();
+    Ok(SStmt::new(Stmt::Protocol { name, fields, exported }, Span::from_range(start, end)))
   }
 
   fn parse_use_stmt(&mut self, start: u32) -> Result<SStmt, LxError> {

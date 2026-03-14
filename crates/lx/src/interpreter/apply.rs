@@ -3,6 +3,7 @@ use std::sync::Arc;
 use num_traits::ToPrimitive;
 
 use crate::ast::{SExpr, Param, Expr, Spanned, Section, FieldKind};
+use crate::value::ProtoFieldDef;
 use crate::error::LxError;
 use crate::span::Span;
 use crate::value::{LxFunc, Value};
@@ -66,6 +67,7 @@ impl Interpreter {
           Ok(Value::Tagged { tag, values: Arc::new(applied) })
         }
       },
+      Value::Protocol { name, fields } => self.apply_protocol(&name, &fields, &arg, span),
       other => Err(LxError::type_err(format!("cannot call {}, not a function", other.type_name()), span)),
     }
   }
@@ -301,6 +303,39 @@ impl Interpreter {
         }
       },
     }
+  }
+
+  fn apply_protocol(&mut self, name: &str, fields: &Arc<Vec<ProtoFieldDef>>, arg: &Value, span: Span) -> Result<Value, LxError> {
+    let Value::Record(rec) = arg else {
+      return Err(LxError::runtime(
+        format!("Protocol {name}: expected Record, got {}", arg.type_name()),
+        span,
+      ));
+    };
+    let mut result = rec.as_ref().clone();
+    for field in fields.iter() {
+      match rec.get(&field.name) {
+        Some(val) => {
+          if field.type_name != "Any" && val.type_name() != field.type_name {
+            return Err(LxError::runtime(
+              format!("Protocol {name}: field '{}' expected {}, got {}", field.name, field.type_name, val.type_name()),
+              span,
+            ));
+          }
+        },
+        None => {
+          if let Some(ref default) = field.default {
+            result.insert(field.name.clone(), default.clone());
+          } else {
+            return Err(LxError::runtime(
+              format!("Protocol {name}: missing required field '{}'", field.name),
+              span,
+            ));
+          }
+        },
+      }
+    }
+    Ok(Value::Record(Arc::new(result)))
   }
 
   pub(super) fn eval_ternary(&mut self, cond: &SExpr, then_: &SExpr, else_: &Option<Box<SExpr>>, span: Span) -> Result<Value, LxError> {

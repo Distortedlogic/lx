@@ -1,0 +1,277 @@
+-- 15_stdlib.lx
+-- Tests: std/ module import infrastructure + std/json, std/ctx, std/math
+
+-- === std/json ===
+use std/json
+
+-- parse: valid JSON string -> Ok value
+obj = json.parse "\{\"name\": \"alice\", \"age\": 30}" ^
+assert (obj.name == "alice") "json parse object field str"
+assert (obj.age == 30) "json parse object field int"
+
+-- parse: array
+arr = json.parse "[1, 2, 3]" ^
+assert (arr == [1 2 3]) "json parse array"
+
+-- parse: nested
+nested = json.parse "\{\"a\": \{\"b\": [1, 2]}}" ^
+assert (nested.a.b == [1 2]) "json parse nested"
+
+-- parse: primitives
+assert (json.parse "true" ^ == true) "json parse bool"
+assert (json.parse "null" ^ == None) "json parse null"
+assert (json.parse "42" ^ == 42) "json parse int"
+assert (json.parse "3.14" ^ == 3.14) "json parse float"
+assert (json.parse "\"hello\"" ^ == "hello") "json parse string"
+
+-- parse: invalid JSON -> Err
+bad = json.parse "not json"
+assert (err? bad == true) "json parse invalid returns Err"
+
+-- parse + ?? coalescing
+fallback = json.parse "broken" ?? []
+assert (fallback == []) "json parse with coalesce"
+
+-- encode: record -> JSON string
+rec = {name: "bob" age: 25}
+encoded = json.encode rec
+assert (encoded == "\{\"name\":\"bob\",\"age\":25}") "json encode record"
+
+-- encode: list
+assert (json.encode [1 2 3] == "[1,2,3]") "json encode list"
+
+-- encode: primitives
+assert (json.encode true == "true") "json encode bool"
+assert (json.encode 42 == "42") "json encode int"
+assert (json.encode "hello" == "\"hello\"") "json encode string"
+assert (json.encode None == "null") "json encode None"
+assert (json.encode () == "null") "json encode Unit"
+
+-- encode_pretty: formatted output
+pretty = json.encode_pretty {x: 1}
+has_indent = contains? "\"x\": 1" pretty
+assert has_indent
+
+-- roundtrip: encode then parse
+original = {items: [1 2 3] active: true count: 42}
+roundtripped = json.encode original | json.parse ^
+assert (roundtripped == original) "json roundtrip"
+
+-- pipeline usage
+data = "[1, 2, 3]"
+total = json.parse data ^ | sum
+assert (total == 6) "json parse in pipeline"
+
+-- aliased import
+use std/json : j
+assert (j.parse "42" ^ == 42) "aliased json import"
+
+-- selective import
+use std/json {parse encode}
+val = parse "[10, 20]" ^
+assert (val == [10 20]) "selective json import parse"
+assert (encode val == "[10,20]") "selective json import encode"
+
+-- === std/math ===
+use std/math
+
+-- constants
+assert (math.pi > 3.14) "math.pi > 3.14"
+assert (math.pi < 3.15) "math.pi < 3.15"
+assert (math.e > 2.71) "math.e > 2.71"
+assert (math.e < 2.72) "math.e < 2.72"
+
+-- abs
+assert (math.abs 5 == 5) "math.abs positive"
+assert (math.abs (0 - 5) == 5) "math.abs negative"
+assert (math.abs 0 == 0) "math.abs zero"
+assert (math.abs (0.0 - 3.14) == 3.14) "math.abs float"
+
+-- ceil/floor/round
+assert (math.ceil 2.3 == 3) "math.ceil"
+assert (math.floor 2.7 == 2) "math.floor"
+assert (math.round 2.5 == 3) "math.round up"
+assert (math.round 2.4 == 2) "math.round down"
+
+-- pow
+assert (math.pow 2 10 == 1024) "math.pow int"
+assert (math.pow 3 0 == 1) "math.pow zero exp"
+
+-- sqrt
+sq = math.sqrt 16.0
+assert (sq == 4.0) "math.sqrt 16"
+
+-- min/max
+assert (math.min 3 7 == 3) "math.min"
+assert (math.max 3 7 == 7) "math.max"
+assert (math.min 5.0 2.0 == 2.0) "math.min float"
+
+-- pipeline usage
+assert ([1 (0 - 3) 5 (0 - 2)] | map math.abs | sum == 11) "math.abs in pipeline"
+
+-- === std/ctx ===
+use std/ctx
+
+-- empty context
+c = ctx.empty ()
+assert (len c == 0) "ctx.empty returns empty record"
+
+-- set and get
+c = ctx.set "name" "alice" c
+assert (ctx.get "name" c == Some "alice") "ctx.get existing key"
+assert (ctx.get "missing" c == None) "ctx.get missing key"
+
+-- multiple sets
+c = ctx.set "age" 30 c
+c = ctx.set "active" true c
+assert (ctx.get "name" c == Some "alice") "ctx.get after multiple sets"
+assert (ctx.get "age" c == Some 30) "ctx.get int value"
+
+-- get with ?? coalescing
+last_run = ctx.get "last_run" c ?? "never"
+assert (last_run == "never") "ctx.get with coalesce default"
+
+-- keys
+k = ctx.keys c
+assert (len k == 3) "ctx.keys count"
+
+-- remove
+c2 = ctx.remove "age" c
+assert (ctx.get "age" c2 == None) "ctx.remove"
+assert (ctx.get "name" c2 == Some "alice") "ctx.remove preserves others"
+
+-- merge
+a = ctx.set "x" 1 (ctx.empty ())
+b = ctx.set "y" 2 (ctx.empty ())
+merged = ctx.merge a b
+assert (ctx.get "x" merged == Some 1) "ctx.merge keeps a"
+assert (ctx.get "y" merged == Some 2) "ctx.merge keeps b"
+
+-- merge override
+c3 = ctx.set "x" 99 (ctx.empty ())
+override_test = ctx.merge a c3
+assert (ctx.get "x" override_test == Some 99) "ctx.merge b overrides a"
+
+-- pipeline: set chaining
+state = ctx.empty ()
+  | ctx.set "step" "init"
+  | ctx.set "count" 0
+assert (ctx.get "step" state == Some "init") "ctx pipeline set"
+assert (ctx.get "count" state == Some 0) "ctx pipeline set 2"
+
+-- save/load roundtrip
+tmp_path = "/tmp/lx_ctx_test.json"
+save_data = ctx.empty ()
+  | ctx.set "version" 1
+  | ctx.set "items" [10 20 30]
+ctx.save tmp_path save_data ^
+loaded = ctx.load tmp_path ^
+assert (ctx.get "version" loaded == Some 1) "ctx save/load roundtrip version"
+assert (ctx.get "items" loaded == Some [10 20 30]) "ctx save/load roundtrip list"
+
+-- load nonexistent file -> Err
+bad_load = ctx.load "/tmp/lx_nonexistent_file.json"
+assert (err? bad_load == true) "ctx.load nonexistent returns Err"
+
+-- === std/fs ===
+use std/fs
+
+-- write and read roundtrip
+fs_tmp = "/tmp/lx_fs_test.txt"
+fs.write fs_tmp "hello lx" ^
+content = fs.read fs_tmp ^
+assert (content == "hello lx") "fs write/read roundtrip"
+
+-- exists
+assert (fs.exists fs_tmp == true) "fs.exists for existing file"
+assert (fs.exists "/tmp/lx_no_such_file_xyz" == false) "fs.exists for missing file"
+
+-- append
+fs.append fs_tmp " world" ^
+content2 = fs.read fs_tmp ^
+assert (content2 == "hello lx world") "fs.append"
+
+-- stat
+info = fs.stat fs_tmp ^
+assert (info.is_file == true) "fs.stat is_file"
+assert (info.is_dir == false) "fs.stat is_dir"
+assert (info.size > 0) "fs.stat size"
+
+-- mkdir + ls
+test_dir = "/tmp/lx_fs_test_dir"
+fs.mkdir test_dir ^
+fs.write (test_dir ++ "/a.txt") "a" ^
+fs.write (test_dir ++ "/b.txt") "b" ^
+entries = fs.ls test_dir ^
+assert (entries == ["a.txt" "b.txt"]) "fs.ls sorted"
+
+-- remove file
+fs.remove fs_tmp ^
+assert (fs.exists fs_tmp == false) "fs.remove file"
+
+-- remove dir
+fs.remove test_dir ^
+assert (fs.exists test_dir == false) "fs.remove dir"
+
+-- read nonexistent -> Err
+bad_read = fs.read "/tmp/lx_no_such_file_xyz"
+assert (err? bad_read == true) "fs.read nonexistent returns Err"
+
+-- === std/env ===
+use std/env
+
+-- get existing var
+home = env.get "HOME"
+assert (some? home == true) "env.get HOME exists"
+
+-- get missing var
+missing = env.get "LX_NONEXISTENT_VAR_12345"
+assert (missing == None) "env.get missing returns None"
+
+-- get with ?? coalescing
+val_or_default = env.get "LX_NONEXISTENT_VAR_12345" ?? "fallback"
+assert (val_or_default == "fallback") "env.get with coalesce"
+
+-- cwd returns a string
+wd = env.cwd ()
+assert (len wd > 0) "env.cwd returns non-empty string"
+
+-- === std/re ===
+use std/re
+
+-- is_match
+assert (re.is_match "\\d+" "abc123" == true) "re.is_match digits"
+assert (re.is_match "^\\d+$" "abc123" == false) "re.is_match full string"
+
+-- match
+m = re.match "\\d+" "abc123def"
+assert (m == Some {text: "123" start: 3 end: 6}) "re.match result"
+
+-- match failure
+assert (re.match "\\d+" "abcdef" == None) "re.match no match"
+
+-- find_all
+found = re.find_all "\\d+" "a1b22c333"
+assert (found == ["1" "22" "333"]) "re.find_all"
+
+-- replace (first only)
+r1 = re.replace "\\d+" "X" "a1b2c3"
+assert (r1 == "aXb2c3") "re.replace first"
+
+-- replace_all
+r2 = re.replace_all "\\d+" "X" "a1b2c3"
+assert (r2 == "aXbXcX") "re.replace_all"
+
+-- split
+parts = re.split "[,;]" "a,b;c,d"
+assert (parts == ["a" "b" "c" "d"]) "re.split"
+
+-- works with regex literal
+assert (re.is_match r/\d+/ "abc123" == true) "re with regex literal"
+found2 = re.find_all r/[A-Z]+/i "Hello World"
+assert (found2 == ["Hello" "World"]) "re with regex flags"
+
+-- pipeline
+digits = "phone: 555-1234, ext: 42"
+  | re.find_all "\\d+"
+assert (digits == ["555" "1234" "42"]) "re in pipeline"

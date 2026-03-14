@@ -12,11 +12,19 @@ use super::{Interpreter, ModuleExports};
 
 impl Interpreter {
   pub(super) fn eval_use(&mut self, use_stmt: &UseStmt, span: Span) -> Result<(), LxError> {
-    let source_dir = self.source_dir.as_ref()
-      .ok_or_else(|| LxError::runtime("cannot resolve module path: no source directory", span))?
-      .clone();
-    let file_path = resolve_module_path(&source_dir, &use_stmt.path, span)?;
-    let exports = self.load_module(&file_path, span)?;
+    let exports = if crate::stdlib::std_module_exists(&use_stmt.path) {
+      crate::stdlib::get_std_module(&use_stmt.path)
+        .ok_or_else(|| LxError::runtime(
+          format!("unknown stdlib module: {}", use_stmt.path.join("/")),
+          span,
+        ))?
+    } else {
+      let source_dir = self.source_dir.as_ref()
+        .ok_or_else(|| LxError::runtime("cannot resolve module path: no source directory", span))?
+        .clone();
+      let file_path = resolve_module_path(&source_dir, &use_stmt.path, span)?;
+      self.load_module(&file_path, span)?
+    };
     let mut env = self.env.child();
     for name in &exports.variant_ctors {
       if let Some(val) = exports.bindings.get(name) {
@@ -110,7 +118,7 @@ fn resolve_module_path(source_dir: &std::path::Path, path: &[String], span: Span
     base
   } else {
     return Err(LxError::runtime(
-      format!("non-relative imports not yet supported: {}", path.join("/")),
+      format!("unknown module path: {} (use ./relative or std/module)", path.join("/")),
       span,
     ));
   };
@@ -135,6 +143,11 @@ fn collect_exports(program: &Program, interp: &Interpreter) -> ModuleExports {
             variant_ctors.push(ctor_name.clone());
             bindings.insert(ctor_name.clone(), val);
           }
+        }
+      },
+      Stmt::Protocol { exported: true, name, .. } => {
+        if let Some(val) = interp.env.get(name) {
+          bindings.insert(name.clone(), val);
         }
       },
       _ => {},

@@ -58,14 +58,14 @@ These are the non-obvious choices that are easy to forget and would cause confus
 
 ## What Needs Doing Next
 
-**15/15 PASS. All existing tests pass.** Phases 1–8 implemented, plus agent communication syntax (`~>` and `~>?`). See `NEXT_PROMPT.md` for full breakdown.
+**16/16 PASS. All existing tests pass.** Phases 1–8 implemented, plus agent communication syntax (`~>` and `~>?`), message contracts (`Protocol`), stdlib infrastructure, and `std/json`. See `NEXT_PROMPT.md` for full breakdown.
 
 ### Priority order (revised):
 1. ~~**Agent communication syntax**~~ ✓ — `~>` (send) and `~>?` (ask) implemented as infix operators. Sequential evaluation for now.
-2. **Message contracts** — LANGUAGE CHANGE. Record shape validation at agent communication boundaries. Catches malformed messages at send time.
-3. **`std/` import infrastructure** — Plumbing. Extend `interpreter/modules.rs` for `use std/...` paths.
-4. **Core agent stdlib** — `std/json`, `std/ctx`, `std/md`, `std/mcp`, `std/agent`. Built ON TOP of language primitives from #1-2.
-5. **Remaining stdlib** (Phase 9) — `std/fs`, `std/http`, `std/time`, etc. 15 modules.
+2. ~~**Message contracts**~~ ✓ — `Protocol` keyword with runtime structural validation. Catches malformed messages at send boundaries.
+3. ~~**`std/` import infrastructure + stdlib modules**~~ ✓ — `use std/...` paths route to Rust-native modules. 6 modules: `std/json`, `std/ctx`, `std/math`, `std/fs`, `std/env`, `std/re`.
+4. **Remaining core agent stdlib** — `std/md`, `std/mcp`, `std/agent`. Built ON TOP of language primitives from #1-2.
+5. **Remaining stdlib** (Phase 9) — `std/http`, `std/time`, `std/rand`, etc.
 6. **Toolchain** (Phase 10) — `lx fmt`, `lx repl`, `lx check`, `lx agent`.
 7. **Data ecosystem** (Phase 11) — Optional. `std/df`, `std/db`, etc.
 
@@ -85,10 +85,17 @@ These are the non-obvious choices that are easy to forget and would cause confus
 - ~~Phase 7~~ ✓ (modules — `use` imports, `+` exports, aliasing, selective imports, variant constructor scoping)
 - ~~Phase 8~~ ✓ (concurrency — sequential impl)
 - ~~Agent communication syntax~~ ✓ (`~>` send, `~>?` ask — language-level infix operators)
+- ~~`std/` import infrastructure~~ ✓ (`use std/json` routes to Rust-native stdlib modules)
+- ~~`std/json`~~ ✓ (`parse`, `encode`, `encode_pretty` via `serde_json`)
+- ~~`std/ctx`~~ ✓ (`empty`, `load`, `save`, `get`, `set`, `remove`, `keys`, `merge`)
+- ~~`std/math`~~ ✓ (`abs`, `ceil`, `floor`, `round`, `pow`, `sqrt`, `min`, `max`, `pi`, `e`, `inf`)
+- ~~`std/fs`~~ ✓ (`read`, `write`, `append`, `exists`, `remove`, `mkdir`, `ls`, `stat`)
+- ~~`std/env`~~ ✓ (`get`, `vars`, `args`, `cwd`, `home`)
+- ~~`std/re`~~ ✓ (`match`, `find_all`, `is_match`, `replace`, `replace_all`, `split`)
 
 ### Language Direction
 
-See [CURRENT_OPINION.md](CURRENT_OPINION.md) — self-critique updated after Session 13. Priority A (agent communication syntax) is DONE — `~>` and `~>?` are language-level operators. Remaining priorities: B (message contracts), C (implicit context scope), D (resumable workflows). Agent lifecycle and tools remain library functions (`agent.spawn`, `mcp.call`).
+See [CURRENT_OPINION.md](CURRENT_OPINION.md) — self-critique updated after Session 14. Priorities A (agent communication syntax) and B (message contracts) are DONE. Remaining priorities: C (implicit context scope), D (resumable workflows). Agent lifecycle and tools remain library functions (`agent.spawn`, `mcp.call`).
 
 ### Known Spec Tensions
 
@@ -276,3 +283,111 @@ Implemented `~>` (send) and `~>?` (ask) as language-level infix operators. Test 
 
 **Bug discovered (pre-existing, not fixed):**
 - Named-arg parser consumes `:` from ternary `? then : else` when then-branch ends with `Ident`. `true ? Ok x : 0` parses `x:` as named arg. Workaround: `true ? (Ok x) : 0`.
+
+### Session 14 (2026-03-14) — Message Contracts (Protocol)
+Implemented `Protocol` as a language keyword for structural message validation. Test results: **15/15 PASS**.
+
+**Design decisions:**
+- `Protocol Name = {field: Type  field2: Type = default}` — declares a record shape validator
+- Protocol application validates at runtime: required fields present, types match via `type_name()`, defaults filled in
+- Extra fields allowed (structural subtyping)
+- Validation success returns the (possibly augmented) record
+- Validation failure is a runtime error (contract violation, like a type error)
+- `Any` type skips type checking for a field
+- Protocols are exportable (`+Protocol Name = {...}`) and importable via `use`
+
+**Token changes:**
+- `Protocol` keyword added to `TokenKind`
+- Lexer `read_type_name` recognizes "Protocol" as keyword, not TypeName
+
+**AST changes:**
+- `Stmt::Protocol { name, fields, exported }` — protocol definition
+- `ProtocolField { name, type_name, default }` — field specification
+
+**Value changes:**
+- `Value::Protocol { name, fields }` — runtime protocol value
+- `ProtoFieldDef { name, type_name, default }` — runtime field definition
+- Protocol values are callable (applied via `apply_func`)
+
+**Parser changes:**
+- `parse_protocol` method: parses `Protocol TypeName = {field: Type ...}` syntax
+- Inserted before `try_parse_type_def` in `parse_stmt` flow
+
+**Interpreter changes:**
+- `eval_protocol_def`: evaluates defaults, creates `Value::Protocol`, binds in env
+- `apply_protocol`: validates record against protocol fields, fills defaults, returns record or runtime error
+
+**Module changes:**
+- `collect_exports` handles `Stmt::Protocol { exported: true, .. }`
+
+**Suite additions:**
+- Protocol tests in 14_agents.lx: basic validation, defaults, structural subtyping, agent integration, Any type, pipeline usage
+
+### Session 15 (2026-03-14) — `std/` Import Infrastructure + `std/json`
+Implemented stdlib module system and 6 stdlib modules. Test results: **16/16 PASS** (up from 15/15).
+
+**New test passing:** 15_stdlib — `std/json`, `std/ctx`, `std/math`, `std/fs`, `std/env`, `std/re`. All import styles (whole, aliased, selective). ~80 assertions.
+
+**Architecture:**
+- New directory `crates/lx/src/stdlib/` with `mod.rs` (registry) and `json.rs`
+- `stdlib::get_std_module(path)` maps `["std", "json"]` → `ModuleExports` with Rust-native builtins
+- `stdlib::std_module_exists(path)` for checking before resolution
+- Easily extensible: add a new file, add a match arm in `mod.rs`
+
+**Module system changes (`interpreter/modules.rs`):**
+- `eval_use` now checks `std_module_exists` BEFORE attempting file-based resolution
+- Stdlib modules bypass file I/O, lexing, parsing — they build `ModuleExports` directly from Rust
+- Non-relative, non-std paths get a clear error message
+
+**`std/json` module (`stdlib/json.rs`):**
+- `parse`: `Str -> Result` — parses JSON string via `serde_json`, returns `Ok(value)` or `Err(msg)`
+- `encode`: `Value -> Str` — encodes lx value to compact JSON string
+- `encode_pretty`: `Value -> Str` — encodes with indentation
+- Bidirectional conversion between `serde_json::Value` and lx `Value`
+- JSON null ↔ `None`, JSON object ↔ `Record`, JSON array ↔ `List`
+- `serde_json` with `preserve_order` feature to maintain record key order
+
+**`std/ctx` module (`stdlib/ctx.rs`):**
+- `empty`: `Unit -> Record` — returns empty context
+- `load`: `Str -> Result` — loads JSON file as context, returns `Ok(record)` or `Err(msg)`
+- `save`: `Str -> Record -> Result` — saves context to JSON file (pretty-printed)
+- `get`: `Str -> Record -> Maybe` — gets field value, returns `Some(val)` or `None`
+- `set`: `Str -> Value -> Record -> Record` — returns new record with key set
+- `remove`: `Str -> Record -> Record` — returns new record without key
+- `keys`: `Record -> List` — returns list of key strings
+- `merge`: `Record -> Record -> Record` — merges two records (second overrides first)
+- Context is immutable — `set`/`remove`/`merge` return new records
+
+**`std/math` module (`stdlib/math.rs`):**
+- `abs`, `ceil`, `floor`, `round`, `pow`, `sqrt`, `min`, `max`
+- Constants: `pi`, `e`, `inf`
+- Works with both Int and Float inputs
+
+**Shared JSON conversion (`stdlib/json_conv.rs`):**
+- Extracted `json_to_lx` and `lx_to_json` from `json.rs` for reuse by `ctx.rs`
+
+**`std/fs` module (`stdlib/fs.rs`):**
+- `read`, `write`, `append`: file I/O returning `Ok`/`Err`
+- `exists`: path existence check (returns Bool)
+- `remove`: removes files or directories recursively
+- `mkdir`: creates directories recursively
+- `ls`: lists directory entries sorted alphabetically
+- `stat`: returns `{size, is_file, is_dir, readonly}` record
+
+**`std/env` module (`stdlib/env.rs`):**
+- `get`: env var lookup, returns `Some(val)` or `None`
+- `vars`: returns all env vars as a Record
+- `args`: returns program args as a List
+- `cwd`: returns current working directory
+- `home`: returns `$HOME` or `None`
+- Note: `set` omitted because `std::env::set_var` is `unsafe` in Rust 2024
+
+**`std/re` module (`stdlib/re.rs`):**
+- `match`, `find_all`, `is_match`: pattern matching on strings
+- `replace`, `replace_all`: substitution
+- `split`: split by pattern
+- Accepts both `Str` and `Regex` (lx regex literal `r/pattern/flags`) patterns
+
+**Dependencies added:**
+- `serde_json` v1 (workspace dep with `preserve_order` feature)
+- `serde` v1 (workspace dep, not directly used yet but needed for future stdlib modules)
