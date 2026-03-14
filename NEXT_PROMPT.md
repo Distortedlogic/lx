@@ -60,12 +60,13 @@ The core language is feature-complete through Phase 8. The agentic workflow loop
 ### What's implemented
 
 - Arithmetic, bindings, strings, interpolation, collections, pattern matching
-- Functions, closures, currying, default params, pipes, sections, composition `<>`
-- Type annotations (parse-and-skip), regex literals, slicing, named args
+- Functions, closures, currying*, default params, pipes, sections, composition `<>`*
+- Type annotations (parse-and-skip)*, regex literals*, slicing, named args
 - Type definitions with tagged values and pattern matching
-- Iterator protocol (lazy `map`/`filter`/`take` on infinite sequences)
+- Iterator protocol (lazy `map`/`filter`/`take` on infinite sequences)*
 - Concurrency: `par`, `sel`, `pmap`, `pmap_n`, `timeout` (sequential impl)
-- Shell integration: `$cmd`, `$$cmd`, `$^cmd`, `${...}` with interpolation
+- Shell integration: `$cmd`, `$$cmd`*, `$^cmd`, `${...}` with interpolation
+- (* = marked for removal in Priority S surface area reduction)
 - Error handling: `^` propagation, `??` coalescing, `(?? default)` sections, implicit Err return
 - Module system: `use ./path`, aliasing, selective imports, `+` exports
 - Agent communication: `~>` (send), `~>?` (ask) — infix operators, subprocess-transparent
@@ -85,17 +86,13 @@ The core language is feature-complete through Phase 8. The agentic workflow loop
 
 ## Critical Reading
 
-**Read `asl/CURRENT_OPINION.md` for design context.** Priorities A–D DONE. Remaining: E (implicit context scope), F (resumable workflows).
+**Read `asl/CURRENT_OPINION.md` for design context.** Priorities A–D.5 DONE. Remaining: E (implicit context scope), F (resumable workflows).
 
 ## What To Work On Next
 
 The agentic core is complete. The next work falls into three categories:
 
-### 1. MCP HTTP Streaming Transport (HIGH PRIORITY)
-
-`std/mcp` currently uses stdio transport only. The real-world transport is **HTTP streaming (SSE)**. This requires adding `reqwest` + `tokio` dependencies and implementing Streamable HTTP transport in `mcp_rpc.rs`. The stdio transport stays as a fallback for local servers.
-
-### 2. Remaining stdlib modules (Phase 9)
+### 1. Remaining stdlib modules (Phase 9)
 
 These make lx useful for general scripting beyond agentic workflows.
 
@@ -113,19 +110,19 @@ These make lx useful for general scripting beyond agentic workflows.
 | `std/fmt` | — | pad, truncate |
 | `std/bit` | — | and, or, xor, shift |
 
-### 3. Language design work (Priorities E–F)
+### 2. Language design work (Priorities E–F)
 
 - **Implicit context scope (Priority E)** — eliminate manual state threading. `with` block or implicit parameter so agent functions don't manually pass state around.
 - **Resumable workflows (Priority F)** — workflows as inspectable, checkpointable values. If step 3 of 5 fails, resume from step 3.
 
-### 4. Technical debt
+### 3. Technical debt
 
 - **300-line limit violations**: prefix.rs (773), parser/mod.rs (640+), interpreter/mod.rs (520+), hof.rs (425), value.rs (330). These are the core files — splitting them improves readability and context-friendliness.
 - **Fake concurrency**: `par`/`sel`/`pmap` are sequential. Real threading/async requires `tokio`.
 - **Parser fragility**: named-arg/ternary conflict, assert greedy parsing, `is_func_def` heuristics.
 - **Stale spec files**: `examples.md`, `examples-extended.md`, `toolchain.md` still use `agent.ask`/`agent.send` library syntax instead of `~>`/`~>?`.
 
-### 5. Toolchain (Phase 10)
+### 4. Toolchain (Phase 10)
 
 | Tool | Purpose | Crate |
 |------|---------|-------|
@@ -134,7 +131,7 @@ These make lx useful for general scripting beyond agentic workflows.
 | `lx check` | Type/contract validation | — |
 | `lx watch` | Re-run on file change | `notify` |
 
-### 6. Data ecosystem (Phase 11, optional)
+### 5. Data ecosystem (Phase 11, optional)
 
 | Module | Rust crate | Purpose |
 |--------|-----------|---------|
@@ -152,12 +149,13 @@ crates/lx/src/
   parser/    mod.rs, prefix.rs, pattern.rs
   interpreter/ mod.rs, apply.rs, collections.rs, modules.rs, patterns.rs, shell.rs
   builtins/  mod.rs, str.rs, coll.rs, hof.rs
-  stdlib/    mod.rs, json.rs, json_conv.rs, ctx.rs, math.rs, fs.rs, env.rs, re.rs, md.rs, md_build.rs, agent.rs, mcp.rs, mcp_rpc.rs
+  stdlib/    mod.rs, json.rs, json_conv.rs, ctx.rs, math.rs, fs.rs, env.rs, re.rs, md.rs, md_build.rs, agent.rs, mcp.rs, mcp_rpc.rs, mcp_stdio.rs, mcp_http.rs
   ast.rs, token.rs, value.rs, env.rs, error.rs, span.rs, iterator.rs, lib.rs
 crates/lx-cli/src/main.rs
 asl/suite/fixtures/
-  agent_echo.lx         -- echo handler for std/agent tests
-  mcp_test_server.py    -- minimal MCP server for std/mcp tests
+  agent_echo.lx             -- echo handler for std/agent tests
+  mcp_test_server.py        -- minimal MCP stdio server for std/mcp tests
+  mcp_test_http_server.py   -- minimal MCP HTTP server for HTTP transport tests
 ```
 
 ## Dependencies (audited 2026-03-14)
@@ -173,6 +171,7 @@ External crates already cover every area where an established solution exists:
 | `regex` | Regex literals, string builtins, `std/re` |
 | `serde_json` (preserve_order) | `std/json`, `std/ctx` JSON conversion, agent/MCP subprocess protocol |
 | `pulldown-cmark` | `std/md` markdown parsing |
+| `reqwest` (blocking, json) | `std/mcp` HTTP streaming transport |
 
 The remaining ~5000 lines of custom code (lexer, parser, interpreter, AST, env, builtins, iterators, span, stdlib) is all language-implementation-specific — no generic crate replaces a Pratt parser with shell-mode lexing, or builtins operating on lx's `Value` type. Do not spend time looking for crate replacements for these; they were audited and none apply.
 

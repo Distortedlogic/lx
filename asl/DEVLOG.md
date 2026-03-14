@@ -71,11 +71,25 @@ These are the non-obvious choices that are easy to forget and would cause confus
 - MCP HTTP streaming ✓ (`reqwest` blocking, SSE parsing, session management, transport abstraction)
 
 ### Priority order (what's next):
-1. **Remaining stdlib** (Phase 9) — `std/http`, `std/time`, `std/rand`, etc.
+1. **Surface area reduction** (Priority S — HIGH) — Remove features that don't serve agentic workflows. See CURRENT_OPINION.md for the full list. Targets: lazy iterator protocol, currying, set literals, `$$` raw shell, type annotations (parse-and-skip), regex literals, `<>` composition, tuple semicolon rule (switch to comma syntax). Cuts ~15-20% of parser/interpreter surface area.
+2. **Remaining stdlib** (Phase 9) — `std/http`, `std/time`, `std/rand`, etc.
 3. **Implicit context scope** (Priority E) — eliminate manual state threading
 4. **Resumable workflows** (Priority F) — checkpoint/resume for multi-step workflows
 5. **Toolchain** (Phase 10) — `lx fmt`, `lx repl`, `lx check`
 6. **Data ecosystem** (Phase 11) — Optional. `std/df`, `std/db`, etc.
+
+### Surface area reduction details (Priority S):
+
+| Feature | Why remove | Parser/interpreter savings |
+|---------|-----------|--------------------------|
+| Lazy iterators | Agents deal with finite data only | iterator.rs, lazy map/filter/take paths in hof.rs |
+| Currying | #1 source of parser bugs, sections cover 90% | Simplifies apply.rs, removes is_func_def heuristic complexity |
+| Set literals `#{}` | No agentic use case | Remove collection-mode path for sets, Value::Set variant |
+| `$$` raw shell | Too niche, `${...}` covers it | Lexer shell mode simplification |
+| Type annotations | Parse-and-skip is worse than nothing | Remove skip_type_expr, skip_type_at, all annotation parsing |
+| Regex literals `r/.../` | `std/re` with strings is enough | Lexer regex mode removal |
+| `<>` composition | `\|` covers it, direction was confusing | Remove AST node, precedence entry, interpreter path |
+| Tuple semicolons | Switch to `(a, b)` comma syntax | Eliminates the #1 LLM generation ambiguity |
 
 ### Technical debt:
 - Files exceeding 300-line limit: prefix.rs (773), parser/mod.rs (640+), interpreter/mod.rs (520+), hof.rs (425), value.rs (330)
@@ -85,22 +99,24 @@ These are the non-obvious choices that are easy to forget and would cause confus
 
 ### Language Direction
 
-See [CURRENT_OPINION.md](CURRENT_OPINION.md) — self-critique updated after Session 18. Priorities A–D.5 DONE. Remaining: E (implicit context scope), F (resumable workflows).
+See [CURRENT_OPINION.md](CURRENT_OPINION.md) — rewritten after Session 18. Priorities A–D.5 DONE. **Next: Priority S (surface area reduction) before adding more features.** Then E (implicit context scope), F (resumable workflows).
 
 ### Known Spec Tensions
+
+Tensions marked ✂ are resolved by the Priority S surface area reduction.
 
 - **`it` in `sel` blocks** — only implicit binding in the language. Everything else is explicit.
 - **Shell line is single-line only** — no backslash continuation. Forces `${ }` blocks for anything complex.
 - **Function body extent** — inline lambdas consume everything. Block bodies `(x) { body }` stop at the block. Sections cover 80% of cases.
-- **Implicit Err early return scope** — only in `-> T ^ E` functions. Adding annotation changes runtime behavior.
-- **Juxtaposition in collections** — Session 7 added `collection_depth` flag: inside `[]` and `#{}`, only TypeName constructors (not Ident) trigger application. `[x y]` = two elements, `[Ok 1 None]` = three elements. Multi-arg constructors in lists need parens: `[(Pair 1 2)]`.
+- ✂ **Implicit Err early return scope** — only in `-> T ^ E` functions. Adding annotation changes runtime behavior. *Resolved: removing type annotations removes this tension entirely.*
+- **Juxtaposition in collections** — Session 7 added `collection_depth` flag: inside `[]` and `#{}`, only TypeName constructors (not Ident) trigger application. `[x y]` = two elements, `[Ok 1 None]` = three elements. Multi-arg constructors in lists need parens: `[(Pair 1 2)]`. *Partially resolved: removing set literals `#{}` removes one collection-mode path.*
 - **Minus sections** — `-` excluded from right-section detection. `(- 3)` = unary negation, not a section.
-- **Match arm bodies** — Session 7 removed `no_juxtapose` from match arms. Arms are separated by semis (newlines), so application within arm bodies works: `n -> n * factorial (n - 1)`. Single-line inline matches without semis could theoretically have body extent issues but haven't been a problem in practice.
-- **Named args + default params + currying** — `greet "bob" greeting: "hi"` fails because `greet "bob"` auto-executes with defaults before the named arg can be applied. The parser produces `(greet("bob"))(greeting: "hi")` but semantically all args belong to one call. Possible fixes: (1) defer default-execution until end of application chain, (2) pass named args as part of the first application, (3) require parens for named arg calls `greet "bob" (greeting: "hi")`. This is a fundamental tension between currying and named args.
-- **Agent orchestration design questions** — agent process model (subprocess vs API), discovery mechanism, message serialization format, channel backpressure, workflow resumability. See open-questions.md.
-- **Named-arg parser vs ternary `:` separator** — `true ? Ok x : 0` misparses because the named-arg check sees `x :` and consumes the `:` as a named-arg separator. Workaround: use parens `(Ok x)` in the then-branch. Fix: in the named-arg check, verify the Ident is not being used as the last token before a ternary else-separator.
-- **Parse-and-skip type annotations are fundamentally limited** — can't distinguish type params from body start without semantic info. `-> Tree b  t ? {}` works via `skip_type_at` (immutable, for is_func_def) which keeps `Ident` in guard, but `skip_type_expr` (mutable, for actual parsing) removes `Ident` from guard. Generic return types need parens: `-> (Tree a)`.
-- **Assert parsing is greedy** — `assert (expr) "msg"` can consume the message as an application argument when `(expr)` is parenthesized (parser considers it callable). Workaround: use comparison pattern `assert (expr == true) "msg"` or bind to a variable first. This affects `err?`, `ok?`, `some?` and other predicate tests in assert.
+- **Match arm bodies** — Session 7 removed `no_juxtapose` from match arms. Arms are separated by semis (newlines), so application within arm bodies works: `n -> n * factorial (n - 1)`.
+- ✂ **Named args + default params + currying** — `greet "bob" greeting: "hi"` fails because `greet "bob"` auto-executes with defaults before the named arg can be applied. *Resolved: removing currying eliminates the tension entirely. Functions always require all non-default args.*
+- **Agent orchestration design questions** — discovery mechanism, channel backpressure, workflow resumability. See open-questions.md.
+- **Named-arg parser vs ternary `:` separator** — `true ? Ok x : 0` misparses because the named-arg check sees `x :` and consumes the `:`. Workaround: use parens `(Ok x)` in the then-branch.
+- ✂ **Parse-and-skip type annotations are fundamentally limited** — can't distinguish type params from body start without semantic info. *Resolved: removing parse-and-skip annotations removes this entire class of bugs.*
+- **Assert parsing is greedy** — `assert (expr) "msg"` can consume the message as an application argument when `(expr)` is callable. Workaround: `assert (expr == true) "msg"`. *Partially helped by removing currying — fewer things are "callable" in ambiguous ways.*
 
 ## Session History
 

@@ -129,15 +129,20 @@ sel {
 
 ## Tool Invocation (MCP)
 
-MCP tools are invoked through `std/mcp`. A unified interface for any tool an agent can call.
+MCP tools are invoked through `std/mcp`. Supports both stdio (local subprocess) and HTTP streaming (remote server) transports.
 
 ```
 use std/mcp
 
-client = mcp.connect "stdio:///path/to/server" ^
-tools = mcp.list_tools client ^
-result = mcp.call client "read_file" {path: "src/main.rs"} ^
-mcp.close client
+-- Local MCP server via stdio
+local = mcp.connect {command: "npx" args: ["-y" "mcp-server"]} ^
+
+-- Remote MCP server via HTTP
+remote = mcp.connect "https://api.example.com/mcp" ^
+
+tools = mcp.list_tools remote ^
+result = mcp.call remote "read_file" {path: "src/main.rs"} ^
+mcp.close remote
 ```
 
 ## Context and Memory
@@ -269,7 +274,7 @@ Protocols can be exported with `+` and imported via `use`:
 - Sequential evaluation (like par/sel); real async is future work
 - Agents are records with handler functions; subprocess agents via `std/agent` (`__pid` records)
 - `agent.spawn` — implemented in `std/agent` (subprocess spawning, JSON-line protocol)
-- `std/mcp` — implemented (MCP over stdio via JSON-RPC 2.0; HTTP streaming transport planned)
+- `std/mcp` — implemented (MCP over stdio via JSON-RPC 2.0 + HTTP streaming via reqwest)
 - Channel receive syntax for `sel` — planned
 
 ## Cross-References

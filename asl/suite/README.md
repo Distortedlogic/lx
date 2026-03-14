@@ -22,12 +22,14 @@ suite/
   14_agents.lx          -- ~> send, ~>? ask, propagation, piping, par, pmap, Protocol
   15_stdlib.lx          -- std/json, std/math, std/ctx, std/fs, std/env, std/re, std/md, std/mcp, std/agent
   16_edge_cases.lx      -- regression tests for disambiguation rules, precedence, body extent
+  17_mcp_http.lx        -- MCP HTTP streaming transport tests
   fixtures/
-    agent_echo.lx       -- echo agent handler for std/agent tests
-    mcp_test_server.py  -- minimal MCP server for std/mcp tests
+    agent_echo.lx             -- echo agent handler for std/agent tests
+    mcp_test_server.py        -- minimal MCP stdio server for std/mcp tests
+    mcp_test_http_server.py   -- minimal MCP HTTP server for HTTP transport tests
 ```
 
-**16/16 PASS** — all tests passing.
+**17/17 PASS** — all tests passing.
 
 ## Convention
 
@@ -63,16 +65,17 @@ Each file begins with a comment header noting:
 | 14_agents | agents.md |
 | 15_stdlib | stdlib.md, stdlib-modules.md, stdlib-agents.md |
 | 16_edge_cases | design.md, grammar.md, runtime.md, errors.md |
+| 17_mcp_http | agents.md, stdlib-agents.md |
 
 ## Planned Test Files (not yet implemented)
 
 | File | Module | Phase |
 |---|---|---|
-| 17_dataframes.lx | std/df | Phase 11 (Data Ecosystem) |
-| 18_database.lx | std/db | Phase 11 |
-| 19_numerical.lx | std/num | Phase 11 |
-| 20_ml.lx | std/ml | Phase 11 |
-| 21_plot.lx | std/plot | Phase 11 |
+| 18_dataframes.lx | std/df | Phase 11 (Data Ecosystem) |
+| 19_database.lx | std/db | Phase 11 |
+| 20_numerical.lx | std/num | Phase 11 |
+| 21_ml.lx | std/ml | Phase 11 |
+| 22_plot.lx | std/plot | Phase 11 |
 
 ## When to Update
 
