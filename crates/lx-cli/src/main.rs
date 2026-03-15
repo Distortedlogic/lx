@@ -194,11 +194,10 @@ fn make_yield_handler() -> lx::interpreter::YieldHandler {
 }
 
 fn run_diagram(path: &str, output: Option<&str>) -> ExitCode {
-  let (source, program) = match read_and_parse(path) {
+  let (_source, program) = match read_and_parse(path) {
     Ok(sp) => sp,
     Err(code) => return code,
   };
-  let _ = source;
   let mermaid = lx::stdlib::diag::extract_mermaid(&program);
   match output {
     Some(out_path) => {

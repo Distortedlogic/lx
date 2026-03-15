@@ -15,7 +15,7 @@ Complete stdlib for the three use cases: agent communication, workflow orchestra
 | **Newly specified (not yet implemented):** | |
 | `std/blackboard` | Coordination |
 | `std/events` | Coordination |
-| `std/diag` | Visualization |
+| `std/diag` | Visualization (DONE) |
 
 ## Planned Modules (deterministic, Rust)
 
@@ -177,7 +177,7 @@ The dependency chain determines build order:
 19. std/agents/reviewer (depends on std/memory, std/trace, std/ai)
 20. MCP Embeddings (external service, can be added anytime)
 21. MCP Workflow (external service, can be added anytime)
-22. std/diag (no dependencies, uses existing lexer/parser, can be added anytime)
+22. ~~std/diag~~ (DONE — AST walker + Mermaid output + `lx diagram` CLI)
 23. std/saga (no dependencies, can be added anytime)
 24. `|>>` streaming pipe operator (parser + interpreter, depends on lazy sequence infra)
 25. `with context` ambient propagation (parser + interpreter extension to `with`)

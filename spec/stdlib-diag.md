@@ -1,6 +1,6 @@
 # Standard Library — Program Visualization (Future)
 
-**Status: Not implemented.** This module is planned for future phases.
+**Status: Implemented.** Session 36. `std/diag` library + `lx diagram` CLI subcommand.
 
 ## std/diag — Program Visualization (Mermaid)
 

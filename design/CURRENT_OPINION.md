@@ -51,7 +51,7 @@ Reviewed `mcp-toolbelt/packages/arch_diagrams` — 14 agentic flow architectures
 | Context compression | stdlib roadmap | Long-running agents fill context. Need `ai.summarize` for structured history compression. |
 | Enhanced retry | stdlib roadmap | `retry_with` needs: per-error-type strategy, jitter, circuit breaker integration. |
 
-**Filled (Session 35):** Standard agents (auditor/router/grader/planner/monitor/reviewer), tiered memory (`std/memory`), observability (`std/trace`), subagent QC (`std/agents/monitor`), learning from experience (`std/agents/reviewer`). **Remaining:** MCP Embeddings, `std/diag` visualization, `std/saga` transactions.
+**Filled (Session 35):** Standard agents (auditor/router/grader/planner/monitor/reviewer), tiered memory (`std/memory`), observability (`std/trace`), subagent QC (`std/agents/monitor`), learning from experience (`std/agents/reviewer`). **Filled (Session 36):** Program visualization (`std/diag` + `lx diagram` CLI). **Remaining:** MCP Embeddings, `std/saga` transactions.
 
 **Session 36 — Second self-assessment (what I keep working around):**
 
