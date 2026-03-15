@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
+use crate::backends::{AiOpts, RuntimeCtx};
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
@@ -142,7 +143,7 @@ fn extract_audit_from_json(jv: &serde_json::Value) -> Result<Value, LxError> {
     Ok(audit::build_eval_result(score, passed, categories, feedback, failed))
 }
 
-fn bi_audit(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_audit(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let fields = extract_fields(args, span)?;
     let structural = check_structural(&fields);
     if !structural.is_empty() {
@@ -150,16 +151,16 @@ fn bi_audit(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
     let system = build_system_prompt(&fields.rubric);
     let user = build_user_prompt(&fields);
-    let opts = ai::Opts {
+    let opts = AiOpts {
         system: Some(system),
         max_turns: Some(1),
-        ..ai::default_opts()
+        ..AiOpts::default()
     };
-    let llm_result = ai::run_claude(&user, &opts, span)?;
+    let llm_result = ctx.ai.prompt(&user, &opts, span)?;
     parse_llm_result(&llm_result, span)
 }
 
-fn bi_quick_audit(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_quick_audit(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let fields = extract_fields(args, span)?;
     let structural = check_structural(&fields);
     if structural.is_empty() {

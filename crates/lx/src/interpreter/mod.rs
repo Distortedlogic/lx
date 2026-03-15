@@ -15,12 +15,11 @@ use parking_lot::Mutex;
 use indexmap::IndexMap;
 
 use crate::ast::{SExpr, Program, Expr, SStmt, Stmt, BindTarget};
+use crate::backends::RuntimeCtx;
 use crate::env::Env;
 use crate::error::LxError;
 use crate::span::Span;
 use crate::value::Value;
-
-pub type YieldHandler = Arc<dyn Fn(Value, Span) -> Result<Value, LxError>>;
 
 #[derive(Debug, Clone)]
 pub(crate) struct ModuleExports {
@@ -34,11 +33,11 @@ pub struct Interpreter {
   pub(crate) source_dir: Option<PathBuf>,
   pub(crate) module_cache: Arc<Mutex<HashMap<PathBuf, ModuleExports>>>,
   pub(crate) loading: Arc<Mutex<HashSet<PathBuf>>>,
-  pub(crate) yield_handler: Option<YieldHandler>,
+  pub(crate) ctx: Arc<RuntimeCtx>,
 }
 
 impl Interpreter {
-  pub fn new(source: &str, source_dir: Option<PathBuf>) -> Self {
+  pub fn new(source: &str, source_dir: Option<PathBuf>, ctx: Arc<RuntimeCtx>) -> Self {
     let mut env = Env::new();
     crate::builtins::register(&mut env);
     Self {
@@ -47,23 +46,19 @@ impl Interpreter {
       source_dir,
       module_cache: Arc::new(Mutex::new(HashMap::new())),
       loading: Arc::new(Mutex::new(HashSet::new())),
-      yield_handler: None,
+      ctx,
     }
   }
 
-  pub fn with_env(env: &Env) -> Self {
+  pub fn with_env(env: &Env, ctx: Arc<RuntimeCtx>) -> Self {
     Self {
       env: Arc::new(env.clone()),
       source: String::new(),
       source_dir: None,
       module_cache: Arc::new(Mutex::new(HashMap::new())),
       loading: Arc::new(Mutex::new(HashSet::new())),
-      yield_handler: None,
+      ctx,
     }
-  }
-
-  pub fn set_yield_handler(&mut self, handler: YieldHandler) {
-    self.yield_handler = Some(handler);
   }
 
   pub fn set_env(&mut self, env: Env) {
@@ -165,10 +160,7 @@ impl Interpreter {
       Expr::AgentAsk { target, msg } => self.eval_agent_ask(target, msg, span),
       Expr::Yield { value } => {
         let v = self.eval(value)?;
-        match &self.yield_handler {
-          Some(handler) => handler(v, span),
-          None => Err(LxError::runtime("yield outside coroutine context", span)),
-        }
+        self.ctx.yield_.yield_value(v, span)
       },
       Expr::With { name, value, body, mutable } => {
         let val = self.eval(value)?;

@@ -7,6 +7,7 @@ use dashmap::DashMap;
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 
+use crate::backends::RuntimeCtx;
 use crate::builtins::{call_value, mk};
 use crate::error::LxError;
 use crate::span::Span;
@@ -31,7 +32,7 @@ pub fn build() -> IndexMap<String, Value> {
     m
 }
 
-fn bi_every(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_every(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let interval_ms = match &args[0] {
         Value::Int(n) => {
             let v: i64 = n.try_into()
@@ -76,7 +77,7 @@ fn bi_every(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Int(BigInt::from(id)))
 }
 
-fn bi_cancel(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_cancel(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = args[0].as_int()
         .ok_or_else(|| LxError::type_err("cron.cancel expects Int handle", span))?;
     let id: u64 = id.try_into()
@@ -94,7 +95,7 @@ fn bi_cancel(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
 }
 
-fn bi_run(args: &[Value], _span: Span) -> Result<Value, LxError> {
+fn bi_run(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let _ = &args[0];
     loop {
         if JOBS.is_empty() {
@@ -105,7 +106,7 @@ fn bi_run(args: &[Value], _span: Span) -> Result<Value, LxError> {
     Ok(Value::Unit)
 }
 
-fn bi_active(args: &[Value], _span: Span) -> Result<Value, LxError> {
+fn bi_active(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let _ = &args[0];
     Ok(Value::Int(BigInt::from(JOBS.len())))
 }

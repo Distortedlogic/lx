@@ -1,10 +1,16 @@
 use std::sync::Arc;
 
+use crate::backends::RuntimeCtx;
 use crate::error::LxError;
 use crate::span::Span;
 use crate::value::Value;
 
-pub(crate) fn call_value(f: &Value, arg: Value, span: Span) -> Result<Value, LxError> {
+pub(crate) fn call_value(
+  f: &Value,
+  arg: Value,
+  span: Span,
+  ctx: &Arc<RuntimeCtx>,
+) -> Result<Value, LxError> {
   match f {
     Value::Func(lf) => {
       let mut lf = lf.clone();
@@ -18,7 +24,7 @@ pub(crate) fn call_value(f: &Value, arg: Value, span: Span) -> Result<Value, LxE
       if lf.applied.len() < lf.arity {
         return Ok(Value::Func(lf));
       }
-      let mut interp = crate::interpreter::Interpreter::with_env(&lf.closure);
+      let mut interp = crate::interpreter::Interpreter::with_env(&lf.closure, Arc::clone(ctx));
       let mut call_env = lf.closure.child();
       for (i, name) in lf.params.iter().enumerate() {
         if i < lf.applied.len() {
@@ -40,7 +46,7 @@ pub(crate) fn call_value(f: &Value, arg: Value, span: Span) -> Result<Value, LxE
       if bf.applied.len() < bf.arity {
         return Ok(Value::BuiltinFunc(bf));
       }
-      (bf.func)(&bf.applied, span)
+      (bf.func)(&bf.applied, span, ctx)
     },
     Value::TaggedCtor { tag, arity, applied } => {
       let mut applied = applied.clone();

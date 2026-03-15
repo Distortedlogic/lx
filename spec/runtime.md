@@ -48,6 +48,12 @@ Record equality is order-independent: `{x: 1 y: 2} == {y: 2 x: 1}` is also `true
 
 Functions are not comparable. `f == g` is a runtime error regardless of whether they're "the same" function.
 
+## Backend Pluggability
+
+All I/O-touching operations (AI, HTTP, shell, emit, yield, logging) go through a `RuntimeCtx` that the embedder provides. This decouples language semantics from host-specific implementations. The CLI uses default backends (shell out to `claude`, `reqwest` for HTTP, stdin/stdout for yield). A server deployment can swap in API-direct AI, WebSocket emit, sandboxed shell, etc.
+
+See [runtime-backends.md](runtime-backends.md) for the full spec: traits, default implementations, migration plan, and scope of what routes through `RuntimeCtx` vs. what stays hardcoded.
+
 ## Interop
 
 **Exit codes** — `main` returning `()` exits 0. `main` returning `Err _` exits 1. `main` returning an `Int` exits with that code. `env.exit n` for explicit control anywhere.

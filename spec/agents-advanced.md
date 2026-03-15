@@ -30,9 +30,9 @@ Three modes depending on execution context:
 2. **Orchestrated** — calls an `EmitHandler` callback set by the host. The orchestrator decides how to render, route, or store the message.
 3. **Subprocess agent** — writes a JSON-line to stdout: `{"type":"emit","value":"seeding code-reviewer..."}`. The parent reads it alongside other protocol messages.
 
-### Callback-Based
+### Backend-Based
 
-Like `yield`, emit is callback-based. The host sets an `EmitHandler` callback before execution. Unlike `yield`, emit does not require a handler — without one, the default behavior is `println!` for strings, `serde_json::to_string` for structured values.
+Emit routes through `RuntimeCtx.emit` (see [runtime-backends.md](runtime-backends.md)). The embedder provides an `EmitBackend` implementation. Unlike `yield`, emit does not require a custom backend — the default `CliEmitBackend` prints strings directly and JSON-encodes structured values.
 
 ### Composition
 
@@ -109,9 +109,9 @@ The orchestrator communicates via JSON lines on stdin/stdout:
 
 The `lx` process reads one JSON line from stdin as the response. The orchestrator is any process that reads/writes JSON lines — a Python script, another agent, a human with a terminal.
 
-### Callback-Based
+### Backend-Based
 
-Yield is callback-based, not coroutine-based. The host sets a `YieldHandler` callback before execution. Without a handler, `yield` is a runtime error.
+Yield routes through `RuntimeCtx.yield_` (see [runtime-backends.md](runtime-backends.md)). The embedder provides a `YieldBackend` implementation. Without a backend, `yield` is a runtime error. The default `CliYieldBackend` uses the JSON-line protocol on stdin/stdout.
 
 ### Composition
 

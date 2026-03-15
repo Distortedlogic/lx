@@ -6,6 +6,7 @@ use dashmap::DashMap;
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 
+use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
@@ -41,7 +42,7 @@ fn get_pid(agent: &Value, span: Span) -> Result<u32, LxError> {
     }
 }
 
-fn bi_spawn(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_spawn(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let Value::Record(config) = &args[0] else {
         return Err(LxError::type_err("agent.spawn expects Record config", span));
     };
@@ -111,17 +112,17 @@ pub fn send_subprocess(pid: u32, msg: &Value, span: Span) -> Result<Value, LxErr
     Ok(Value::Ok(Box::new(Value::Unit)))
 }
 
-fn bi_ask(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_ask(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let pid = get_pid(&args[0], span)?;
     ask_subprocess(pid, &args[1], span)
 }
 
-fn bi_send(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_send(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let pid = get_pid(&args[0], span)?;
     send_subprocess(pid, &args[1], span)
 }
 
-fn bi_kill(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_kill(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let pid = get_pid(&args[0], span)?;
     match REGISTRY.remove(&pid) {
         Some((_, mut agent)) => {
@@ -133,7 +134,7 @@ fn bi_kill(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
 }
 
-fn bi_name(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_name(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     match &args[0] {
         Value::Record(r) => Ok(r.get("name")
             .cloned()
@@ -142,7 +143,7 @@ fn bi_name(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
 }
 
-fn bi_status(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_status(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let pid = get_pid(&args[0], span)?;
     let state = if REGISTRY.contains_key(&pid) { "running" } else { "stopped" };
     let mut rec = IndexMap::new();

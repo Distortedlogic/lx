@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
+use crate::backends::{AiOpts, RuntimeCtx};
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
@@ -182,7 +183,7 @@ fn assemble_result(
     Ok(audit::build_eval_result(final_score, overall, all_cats, &feedback, failed))
 }
 
-fn bi_grade(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_grade(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let fields = extract_fields(args, span)?;
     if fields.rubric.is_empty() {
         return Ok(audit::build_eval_result(0, false, vec![], "No rubric categories provided", vec![]));
@@ -194,16 +195,16 @@ fn bi_grade(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
     let system = build_system_prompt(&to_eval);
     let user = build_user_prompt(&fields);
-    let opts = ai::Opts {
+    let opts = AiOpts {
         system: Some(system),
         max_turns: Some(1),
-        ..ai::default_opts()
+        ..AiOpts::default()
     };
-    let llm_result = ai::run_claude(&user, &opts, span)?;
+    let llm_result = ctx.ai.prompt(&user, &opts, span)?;
     parse_llm_result(&llm_result, &kept, &fields.rubric, fields.threshold, span)
 }
 
-fn bi_quick_grade(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_quick_grade(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let fields = extract_fields(args, span)?;
     if fields.rubric.is_empty() {
         return Ok(audit::build_eval_result(0, false, vec![], "No rubric categories", vec![]));

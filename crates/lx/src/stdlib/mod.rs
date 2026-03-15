@@ -25,6 +25,7 @@ pub(crate) mod mcp;
 mod md;
 mod plan;
 mod md_build;
+mod saga;
 mod re;
 mod tasks;
 mod time;
@@ -68,6 +69,7 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
             "knowledge" => knowledge::build(),
             "memory" => memory::build(),
             "plan" => plan::build(),
+            "saga" => saga::build(),
             "introspect" => introspect::build(),
             "trace" => trace::build(),
             _ => return None,
@@ -86,5 +88,5 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
     if path[1] == "agents" && path.len() >= 3 {
         return matches!(path[2].as_str(), "auditor" | "grader" | "monitor" | "planner" | "reviewer" | "router");
     }
-    matches!(path[1].as_str(), "json" | "ctx" | "math" | "fs" | "env" | "re" | "md" | "agent" | "mcp" | "http" | "time" | "cron" | "ai" | "tasks" | "audit" | "circuit" | "diag" | "knowledge" | "memory" | "plan" | "introspect" | "trace")
+    matches!(path[1].as_str(), "json" | "ctx" | "math" | "fs" | "env" | "re" | "md" | "agent" | "mcp" | "http" | "time" | "cron" | "ai" | "tasks" | "audit" | "circuit" | "diag" | "knowledge" | "memory" | "plan" | "saga" | "introspect" | "trace")
 }

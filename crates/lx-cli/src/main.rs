@@ -1,5 +1,6 @@
 use std::path::Path;
 use std::process::ExitCode;
+use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
 
@@ -158,8 +159,8 @@ fn run(source: &str, filename: &str) -> Result<(), Vec<lx::error::LxError>> {
   let tokens = lx::lexer::lex(source).map_err(|e| vec![e])?;
   let program = lx::parser::parse(tokens).map_err(|e| vec![e])?;
   let source_dir = Path::new(filename).parent().map(|p| p.to_path_buf());
-  let mut interp = lx::interpreter::Interpreter::new(source, source_dir);
-  interp.set_yield_handler(make_yield_handler());
+  let ctx = Arc::new(lx::backends::RuntimeCtx::default());
+  let mut interp = lx::interpreter::Interpreter::new(source, source_dir, ctx);
   match interp.exec(&program) {
     Ok(val) => {
       if !matches!(val, lx::value::Value::Unit) {
@@ -169,28 +170,6 @@ fn run(source: &str, filename: &str) -> Result<(), Vec<lx::error::LxError>> {
     },
     Err(e) => Err(vec![e]),
   }
-}
-
-fn make_yield_handler() -> lx::interpreter::YieldHandler {
-  use std::sync::Arc;
-  Arc::new(|value: lx::value::Value, span: lx::span::Span| -> Result<lx::value::Value, lx::error::LxError> {
-    use std::io::{BufRead, Write};
-    let json = lx::stdlib::json_conv::lx_to_json(&value, span)
-      .map_err(|e| lx::error::LxError::runtime(format!("yield: {e}"), span))?;
-    let msg = serde_json::json!({"__yield": json});
-    println!("{msg}");
-    std::io::stdout().flush()
-      .map_err(|e| lx::error::LxError::runtime(format!("yield: stdout: {e}"), span))?;
-    let mut line = String::new();
-    std::io::stdin().lock().read_line(&mut line)
-      .map_err(|e| lx::error::LxError::runtime(format!("yield: stdin: {e}"), span))?;
-    if line.trim().is_empty() {
-      return Err(lx::error::LxError::runtime("yield: orchestrator closed stdin", span));
-    }
-    let response: serde_json::Value = serde_json::from_str(line.trim())
-      .map_err(|e| lx::error::LxError::runtime(format!("yield: JSON parse: {e}"), span))?;
-    Ok(lx::stdlib::json_conv::json_to_lx(response))
-  })
 }
 
 fn run_diagram(path: &str, output: Option<&str>) -> ExitCode {
@@ -247,7 +226,8 @@ fn run_agent(script_path: &str) -> ExitCode {
     Err(e) => { eprintln!("agent error: {e}"); return ExitCode::from(1); },
   };
   let source_dir = Path::new(script_path).parent().map(|p| p.to_path_buf());
-  let mut interp = lx::interpreter::Interpreter::new(&source, source_dir);
+  let ctx = Arc::new(lx::backends::RuntimeCtx::default());
+  let mut interp = lx::interpreter::Interpreter::new(&source, source_dir, ctx);
   let handler = match interp.exec(&program) {
     Ok(val) => val,
     Err(e) => { eprintln!("agent error: {e}"); return ExitCode::from(1); },

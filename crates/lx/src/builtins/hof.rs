@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::backends::RuntimeCtx;
 use crate::env::Env;
 use crate::error::LxError;
 use crate::span::Span;
@@ -39,8 +40,8 @@ pub(super) fn register(env: &mut Env) {
   env.bind("pmap_n".into(), mk("pmap_n", 3, super::hof_extra::bi_pmap_n));
 }
 
-pub(super) fn call(f: &Value, arg: Value, span: Span) -> Result<Value, LxError> {
-  crate::builtins::call_value(f, arg, span)
+pub(super) fn call(f: &Value, arg: Value, span: Span, ctx: &RuntimeCtx) -> Result<Value, LxError> {
+  crate::builtins::call_value(f, arg, span, ctx)
 }
 
 fn range_to_list(start: i64, end: i64, inclusive: bool) -> Vec<Value> {
@@ -74,20 +75,20 @@ pub(super) fn get_list<'a>(v: &'a Value, name: &str, sp: Span) -> Result<ListRef
   }
 }
 
-fn bi_map(args: &[Value], sp: Span) -> Result<Value, LxError> {
+fn bi_map(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Value, LxError> {
   let items = get_list(&args[1], "map", sp)?;
   let mut out = Vec::with_capacity(items.len());
   for v in items.iter() {
-    out.push(call(&args[0], v.clone(), sp)?);
+    out.push(call(&args[0], v.clone(), sp, ctx)?);
   }
   Ok(Value::List(Arc::new(out)))
 }
 
-fn bi_filter(args: &[Value], sp: Span) -> Result<Value, LxError> {
+fn bi_filter(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Value, LxError> {
   let items = get_list(&args[1], "filter", sp)?;
   let mut out = Vec::new();
   for v in items.iter() {
-    let result = call(&args[0], v.clone(), sp)?;
+    let result = call(&args[0], v.clone(), sp, ctx)?;
     match result.as_bool() {
       Some(true) => out.push(v.clone()),
       Some(false) => {},
@@ -97,22 +98,22 @@ fn bi_filter(args: &[Value], sp: Span) -> Result<Value, LxError> {
   Ok(Value::List(Arc::new(out)))
 }
 
-fn bi_fold(args: &[Value], sp: Span) -> Result<Value, LxError> {
+fn bi_fold(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Value, LxError> {
   let items = get_list(&args[2], "fold", sp)?;
   let mut acc = args[0].clone();
   let f = &args[1];
   for v in items.iter() {
-    let partial = call(f, acc, sp)?;
-    acc = call(&partial, v.clone(), sp)?;
+    let partial = call(f, acc, sp, ctx)?;
+    acc = call(&partial, v.clone(), sp, ctx)?;
   }
   Ok(acc)
 }
 
-fn bi_flat_map(args: &[Value], sp: Span) -> Result<Value, LxError> {
+fn bi_flat_map(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Value, LxError> {
   let items = get_list(&args[1], "flat_map", sp)?;
   let mut out = Vec::new();
   for v in items.iter() {
-    let result = call(&args[0], v.clone(), sp)?;
+    let result = call(&args[0], v.clone(), sp, ctx)?;
     match result {
       Value::List(l) => out.extend(l.as_ref().iter().cloned()),
       other => out.push(other),
@@ -121,46 +122,46 @@ fn bi_flat_map(args: &[Value], sp: Span) -> Result<Value, LxError> {
   Ok(Value::List(Arc::new(out)))
 }
 
-fn bi_each(args: &[Value], sp: Span) -> Result<Value, LxError> {
+fn bi_each(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Value, LxError> {
   let items = get_list(&args[1], "each", sp)?;
   for v in items.iter() {
-    call(&args[0], v.clone(), sp)?;
+    call(&args[0], v.clone(), sp, ctx)?;
   }
   Ok(Value::Unit)
 }
 
-fn bi_take(args: &[Value], sp: Span) -> Result<Value, LxError> {
+fn bi_take(args: &[Value], sp: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
   let n = args[0].as_int().ok_or_else(|| LxError::type_err("take: first arg must be Int", sp))?;
   let n = usize::try_from(n.clone()).unwrap_or(0);
   let items = get_list(&args[1], "take", sp)?;
   Ok(Value::List(Arc::new(items.iter().take(n).cloned().collect())))
 }
 
-fn bi_drop(args: &[Value], sp: Span) -> Result<Value, LxError> {
+fn bi_drop(args: &[Value], sp: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
   let n = args[0].as_int().ok_or_else(|| LxError::type_err("drop: first arg must be Int", sp))?;
   let n = usize::try_from(n.clone()).unwrap_or(0);
   let items = get_list(&args[1], "drop", sp)?;
   Ok(Value::List(Arc::new(items.iter().skip(n).cloned().collect())))
 }
 
-fn bi_zip(args: &[Value], sp: Span) -> Result<Value, LxError> {
+fn bi_zip(args: &[Value], sp: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
   let a = get_list(&args[0], "zip", sp)?;
   let b = get_list(&args[1], "zip", sp)?;
   let out: Vec<Value> = a.iter().zip(b.iter()).map(|(x, y)| Value::Tuple(Arc::new(vec![y.clone(), x.clone()]))).collect();
   Ok(Value::List(Arc::new(out)))
 }
 
-fn bi_enumerate(args: &[Value], sp: Span) -> Result<Value, LxError> {
+fn bi_enumerate(args: &[Value], sp: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
   let items = get_list(&args[0], "enumerate", sp)?;
   let out: Vec<Value> =
     items.iter().enumerate().map(|(i, v)| Value::Tuple(Arc::new(vec![Value::Int(i.into()), v.clone()]))).collect();
   Ok(Value::List(Arc::new(out)))
 }
 
-fn bi_find(args: &[Value], sp: Span) -> Result<Value, LxError> {
+fn bi_find(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Value, LxError> {
   let items = get_list(&args[1], "find", sp)?;
   for v in items.iter() {
-    let result = call(&args[0], v.clone(), sp)?;
+    let result = call(&args[0], v.clone(), sp, ctx)?;
     if result.as_bool() == Some(true) {
       return Ok(Value::Some(Box::new(v.clone())));
     }
@@ -168,41 +169,41 @@ fn bi_find(args: &[Value], sp: Span) -> Result<Value, LxError> {
   Ok(Value::None)
 }
 
-fn bi_any(args: &[Value], sp: Span) -> Result<Value, LxError> {
+fn bi_any(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Value, LxError> {
   let items = get_list(&args[1], "any?", sp)?;
   for v in items.iter() {
-    if call(&args[0], v.clone(), sp)?.as_bool() == Some(true) {
+    if call(&args[0], v.clone(), sp, ctx)?.as_bool() == Some(true) {
       return Ok(Value::Bool(true));
     }
   }
   Ok(Value::Bool(false))
 }
 
-fn bi_all(args: &[Value], sp: Span) -> Result<Value, LxError> {
+fn bi_all(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Value, LxError> {
   let items = get_list(&args[1], "all?", sp)?;
   for v in items.iter() {
-    if call(&args[0], v.clone(), sp)?.as_bool() != Some(true) {
+    if call(&args[0], v.clone(), sp, ctx)?.as_bool() != Some(true) {
       return Ok(Value::Bool(false));
     }
   }
   Ok(Value::Bool(true))
 }
 
-fn bi_none_q(args: &[Value], sp: Span) -> Result<Value, LxError> {
+fn bi_none_q(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Value, LxError> {
   let items = get_list(&args[1], "none?", sp)?;
   for v in items.iter() {
-    if call(&args[0], v.clone(), sp)?.as_bool() == Some(true) {
+    if call(&args[0], v.clone(), sp, ctx)?.as_bool() == Some(true) {
       return Ok(Value::Bool(false));
     }
   }
   Ok(Value::Bool(true))
 }
 
-fn bi_count(args: &[Value], sp: Span) -> Result<Value, LxError> {
+fn bi_count(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Value, LxError> {
   let items = get_list(&args[1], "count", sp)?;
   let mut n = 0usize;
   for v in items.iter() {
-    if call(&args[0], v.clone(), sp)?.as_bool() == Some(true) {
+    if call(&args[0], v.clone(), sp, ctx)?.as_bool() == Some(true) {
       n += 1;
     }
   }

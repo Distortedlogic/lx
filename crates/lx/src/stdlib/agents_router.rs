@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
+use crate::backends::{AiOpts, RuntimeCtx};
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
@@ -111,19 +112,19 @@ fn parse_llm_result(llm_response: &Value, catalog: &[CatalogEntry], span: Span)
     Ok(build_result(domain, agent, confidence, terminal))
 }
 
-fn bi_route(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_route(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let fields = extract_fields(args, span)?;
     if fields.catalog.is_empty() {
         return Ok(no_match());
     }
     let system = build_system_prompt();
     let user = build_user_prompt(&fields);
-    let opts = ai::Opts {
+    let opts = AiOpts {
         system: Some(system),
         max_turns: Some(1),
-        ..ai::default_opts()
+        ..AiOpts::default()
     };
-    let llm_result = ai::run_claude(&user, &opts, span)?;
+    let llm_result = ctx.ai.prompt(&user, &opts, span)?;
     parse_llm_result(&llm_result, &fields.catalog, span)
 }
 
@@ -152,7 +153,7 @@ fn keyword_score(prompt: &str, entry: &CatalogEntry) -> f64 {
     hits as f64 / words.len() as f64
 }
 
-fn bi_quick_route(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_quick_route(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let fields = extract_fields(args, span)?;
     if fields.catalog.is_empty() {
         return Ok(no_match());

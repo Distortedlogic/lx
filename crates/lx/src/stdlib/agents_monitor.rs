@@ -3,6 +3,7 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 
+use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
@@ -92,7 +93,7 @@ fn build_result(issues: &[(String, String, String)]) -> Value {
     Value::Record(Arc::new(r))
 }
 
-fn bi_check(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_check(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let Value::Record(fields) = &args[0] else {
         return Err(LxError::type_err("monitor.check expects Record", span));
     };
@@ -103,7 +104,7 @@ fn bi_check(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(build_result(&issues))
 }
 
-fn bi_scan_actions(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_scan_actions(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let Value::List(actions) = &args[0] else {
         return Err(LxError::type_err("monitor.scan_actions expects List", span));
     };

@@ -6,6 +6,7 @@ use dashmap::DashMap;
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 
+use crate::backends::RuntimeCtx;
 use crate::builtins::{call_value, mk};
 use crate::error::LxError;
 use crate::span::Span;
@@ -105,7 +106,7 @@ fn load_entries(path: &str, span: Span) -> Result<IndexMap<String, KBEntry>, LxE
     Ok(entries)
 }
 
-fn bi_create(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_create(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let path = args[0].as_str()
         .ok_or_else(|| LxError::type_err("knowledge.create expects Str path", span))?;
     let entries = load_entries(path, span)?;
@@ -114,7 +115,7 @@ fn bi_create(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(make_handle(id))
 }
 
-fn bi_store(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_store(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let key = args[0].as_str()
         .ok_or_else(|| LxError::type_err("knowledge.store: key must be Str", span))?;
     let val = args[1].clone();
@@ -131,7 +132,7 @@ fn bi_store(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(make_handle(id))
 }
 
-fn bi_get(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_get(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let key = args[0].as_str()
         .ok_or_else(|| LxError::type_err("knowledge.get: key must be Str", span))?;
     let id = kb_id(&args[1], span)?;

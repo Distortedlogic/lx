@@ -1,4 +1,4 @@
-# Standard Library — Program Visualization (Future)
+# Standard Library — Program Visualization
 
 **Status: Implemented.** Session 36. `std/diag` library + `lx diagram` CLI subcommand.
 

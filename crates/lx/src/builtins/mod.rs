@@ -10,6 +10,7 @@ use indexmap::IndexMap;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 
+use crate::backends::{LogLevel, RuntimeCtx};
 use crate::env::Env;
 use crate::error::LxError;
 use crate::span::Span;
@@ -20,24 +21,24 @@ pub fn mk(name: &'static str, arity: usize, func: BuiltinFn) -> Value {
 }
 
 fn make_log_builtin(level: &'static str) -> Value {
-  fn log_info(args: &[Value], span: Span) -> Result<Value, LxError> {
+  fn log_info(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let s = args[0].as_str().ok_or_else(|| LxError::type_err("log.info expects Str", span))?;
-    eprintln!("[INFO] {s}");
+    ctx.log.log(LogLevel::Info, s);
     Ok(Value::Unit)
   }
-  fn log_warn(args: &[Value], span: Span) -> Result<Value, LxError> {
+  fn log_warn(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let s = args[0].as_str().ok_or_else(|| LxError::type_err("log.warn expects Str", span))?;
-    eprintln!("[WARN] {s}");
+    ctx.log.log(LogLevel::Warn, s);
     Ok(Value::Unit)
   }
-  fn log_err(args: &[Value], span: Span) -> Result<Value, LxError> {
+  fn log_err(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let s = args[0].as_str().ok_or_else(|| LxError::type_err("log.err expects Str", span))?;
-    eprintln!("[ERR] {s}");
+    ctx.log.log(LogLevel::Err, s);
     Ok(Value::Unit)
   }
-  fn log_debug(args: &[Value], span: Span) -> Result<Value, LxError> {
+  fn log_debug(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let s = args[0].as_str().ok_or_else(|| LxError::type_err("log.debug expects Str", span))?;
-    eprintln!("[DEBUG] {s}");
+    ctx.log.log(LogLevel::Debug, s);
     Ok(Value::Unit)
   }
   match level {
@@ -49,14 +50,14 @@ fn make_log_builtin(level: &'static str) -> Value {
   }
 }
 
-fn bi_not(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_not(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   match &args[0] {
     Value::Bool(b) => Ok(Value::Bool(!b)),
     other => Err(LxError::type_err(format!("not expects Bool, got {}", other.type_name()), span)),
   }
 }
 
-fn bi_len(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_len(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let n = match &args[0] {
     Value::Str(s) => s.chars().count(),
     Value::List(l) => l.len(),
@@ -68,7 +69,7 @@ fn bi_len(args: &[Value], span: Span) -> Result<Value, LxError> {
   Ok(Value::Int(BigInt::from(n)))
 }
 
-fn bi_empty(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_empty(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let empty = match &args[0] {
     Value::Str(s) => s.is_empty(),
     Value::List(l) => l.is_empty(),
@@ -80,46 +81,46 @@ fn bi_empty(args: &[Value], span: Span) -> Result<Value, LxError> {
   Ok(Value::Bool(empty))
 }
 
-fn bi_to_str(args: &[Value], _span: Span) -> Result<Value, LxError> {
+fn bi_to_str(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   Ok(Value::Str(Arc::from(format!("{}", args[0]).as_str())))
 }
 
-fn bi_identity(args: &[Value], _span: Span) -> Result<Value, LxError> {
+fn bi_identity(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   Ok(args[0].clone())
 }
 
-fn bi_dbg(args: &[Value], _span: Span) -> Result<Value, LxError> {
+fn bi_dbg(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   eprintln!("[dbg] {}", args[0]);
   Ok(args[0].clone())
 }
 
-fn bi_ok_q(args: &[Value], _span: Span) -> Result<Value, LxError> {
+fn bi_ok_q(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   Ok(Value::Bool(matches!(&args[0], Value::Ok(_))))
 }
 
-fn bi_err_q(args: &[Value], _span: Span) -> Result<Value, LxError> {
+fn bi_err_q(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   Ok(Value::Bool(matches!(&args[0], Value::Err(_))))
 }
 
-fn bi_some_q(args: &[Value], _span: Span) -> Result<Value, LxError> {
+fn bi_some_q(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   Ok(Value::Bool(matches!(&args[0], Value::Some(_))))
 }
 
-fn bi_even(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_even(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   match &args[0] {
     Value::Int(n) => Ok(Value::Bool(n % BigInt::from(2) == BigInt::from(0))),
     other => Err(LxError::type_err(format!("even? expects Int, got {}", other.type_name()), span)),
   }
 }
 
-fn bi_odd(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_odd(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   match &args[0] {
     Value::Int(n) => Ok(Value::Bool(n % BigInt::from(2) != BigInt::from(0))),
     other => Err(LxError::type_err(format!("odd? expects Int, got {}", other.type_name()), span)),
   }
 }
 
-fn bi_collect(args: &[Value], _span: Span) -> Result<Value, LxError> {
+fn bi_collect(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   match &args[0] {
     Value::Range { start, end, inclusive } => {
       let items: Vec<Value> = if *inclusive {
@@ -133,7 +134,7 @@ fn bi_collect(args: &[Value], _span: Span) -> Result<Value, LxError> {
   }
 }
 
-fn bi_step(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_step(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let step = args[0].as_int().ok_or_else(|| LxError::type_err("step: first arg must be Int", span))?;
   let step = step.to_i64().ok_or_else(|| LxError::runtime("step: value too large", span))?;
   if step <= 0 {
@@ -158,8 +159,7 @@ fn bi_step(args: &[Value], span: Span) -> Result<Value, LxError> {
   }
 }
 
-
-fn bi_require(args: &[Value], _span: Span) -> Result<Value, LxError> {
+fn bi_require(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   match &args[1] {
     Value::Some(v) => Ok(Value::Ok(v.clone())),
     Value::None => Ok(Value::Err(Box::new(args[0].clone()))),
@@ -167,7 +167,7 @@ fn bi_require(args: &[Value], _span: Span) -> Result<Value, LxError> {
   }
 }
 
-fn bi_parse_int(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_parse_int(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   match &args[0] {
     Value::Str(s) => match s.parse::<BigInt>() {
       Ok(n) => Ok(Value::Ok(Box::new(Value::Int(n)))),
@@ -177,7 +177,7 @@ fn bi_parse_int(args: &[Value], span: Span) -> Result<Value, LxError> {
   }
 }
 
-fn bi_parse_float(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_parse_float(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   match &args[0] {
     Value::Str(s) => match s.parse::<f64>() {
       Ok(f) => Ok(Value::Ok(Box::new(Value::Float(f)))),
@@ -187,7 +187,7 @@ fn bi_parse_float(args: &[Value], span: Span) -> Result<Value, LxError> {
   }
 }
 
-fn bi_to_int(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_to_int(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   match &args[0] {
     Value::Int(_) => Ok(args[0].clone()),
     Value::Float(f) => Ok(Value::Int(BigInt::from(*f as i64))),
@@ -197,7 +197,7 @@ fn bi_to_int(args: &[Value], span: Span) -> Result<Value, LxError> {
   }
 }
 
-fn bi_to_float(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_to_float(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   match &args[0] {
     Value::Float(_) => Ok(args[0].clone()),
     Value::Int(n) => n.to_f64().map(Value::Float).ok_or_else(|| LxError::runtime("to_float: int too large", span)),
@@ -206,16 +206,16 @@ fn bi_to_float(args: &[Value], span: Span) -> Result<Value, LxError> {
   }
 }
 
-fn bi_type_of(args: &[Value], _span: Span) -> Result<Value, LxError> {
+fn bi_type_of(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   Ok(Value::Str(Arc::from(args[0].type_name())))
 }
 
-fn bi_print(args: &[Value], _span: Span) -> Result<Value, LxError> {
+fn bi_print(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   println!("{}", args[0]);
   Ok(Value::Unit)
 }
 
-fn bi_timeout(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_timeout(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let secs = match &args[0] {
     Value::Int(n) => n.to_f64().ok_or_else(|| LxError::runtime("timeout: value too large", span))?,
     Value::Float(f) => *f,
@@ -229,9 +229,9 @@ pub fn register(env: &mut Env) {
   env.bind("true".into(), Value::Bool(true));
   env.bind("false".into(), Value::Bool(false));
   env.bind("None".into(), Value::None);
-  env.bind("Ok".into(), mk("Ok", 1, |a, _| Ok(Value::Ok(Box::new(a[0].clone())))));
-  env.bind("Err".into(), mk("Err", 1, |a, _| Ok(Value::Err(Box::new(a[0].clone())))));
-  env.bind("Some".into(), mk("Some", 1, |a, _| Ok(Value::Some(Box::new(a[0].clone())))));
+  env.bind("Ok".into(), mk("Ok", 1, |a, _, _ctx| Ok(Value::Ok(Box::new(a[0].clone())))));
+  env.bind("Err".into(), mk("Err", 1, |a, _, _ctx| Ok(Value::Err(Box::new(a[0].clone())))));
+  env.bind("Some".into(), mk("Some", 1, |a, _, _ctx| Ok(Value::Some(Box::new(a[0].clone())))));
   env.bind("not".into(), mk("not", 1, bi_not));
   env.bind("len".into(), mk("len", 1, bi_len));
   env.bind("empty?".into(), mk("empty?", 1, bi_empty));
@@ -264,6 +264,11 @@ pub fn register(env: &mut Env) {
   hof::register(env);
 }
 
-pub(crate) fn call_value(f: &Value, arg: Value, span: Span) -> Result<Value, LxError> {
-  call::call_value(f, arg, span)
+pub(crate) fn call_value(
+  f: &Value,
+  arg: Value,
+  span: Span,
+  ctx: &Arc<RuntimeCtx>,
+) -> Result<Value, LxError> {
+  call::call_value(f, arg, span, ctx)
 }

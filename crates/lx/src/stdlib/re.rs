@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
+use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
@@ -45,7 +46,7 @@ fn to_regex<'a>(pat: &'a RePattern<'a>, span: Span) -> Result<std::borrow::Cow<'
     }
 }
 
-fn bi_match(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_match(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let pat = get_pattern(&args[0], span)?;
     let input = args[1].as_str()
         .ok_or_else(|| LxError::type_err("re.match expects Str input", span))?;
@@ -62,7 +63,7 @@ fn bi_match(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
 }
 
-fn bi_find_all(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_find_all(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let pat = get_pattern(&args[0], span)?;
     let input = args[1].as_str()
         .ok_or_else(|| LxError::type_err("re.find_all expects Str input", span))?;
@@ -73,7 +74,7 @@ fn bi_find_all(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::List(Arc::new(matches)))
 }
 
-fn bi_replace(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_replace(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let pat = get_pattern(&args[0], span)?;
     let replacement = args[1].as_str()
         .ok_or_else(|| LxError::type_err("re.replace expects Str replacement", span))?;

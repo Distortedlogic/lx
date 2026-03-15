@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
+use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
@@ -17,7 +18,7 @@ pub fn build() -> IndexMap<String, Value> {
     m
 }
 
-fn bi_get(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_get(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let key = args[0].as_str()
         .ok_or_else(|| LxError::type_err("env.get expects Str", span))?;
     match std::env::var(key) {
@@ -26,7 +27,7 @@ fn bi_get(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
 }
 
-fn bi_vars(args: &[Value], _span: Span) -> Result<Value, LxError> {
+fn bi_vars(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let _ = &args[0];
     let mut fields = IndexMap::new();
     for (k, v) in std::env::vars() {
@@ -35,7 +36,7 @@ fn bi_vars(args: &[Value], _span: Span) -> Result<Value, LxError> {
     Ok(Value::Record(Arc::new(fields)))
 }
 
-fn bi_args(args: &[Value], _span: Span) -> Result<Value, LxError> {
+fn bi_args(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let _ = &args[0];
     let items: Vec<Value> = std::env::args()
         .map(|a| Value::Str(Arc::from(a.as_str())))
@@ -43,7 +44,7 @@ fn bi_args(args: &[Value], _span: Span) -> Result<Value, LxError> {
     Ok(Value::List(Arc::new(items)))
 }
 
-fn bi_cwd(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_cwd(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let _ = &args[0];
     match std::env::current_dir() {
         Ok(p) => Ok(Value::Str(Arc::from(p.to_string_lossy().as_ref()))),
@@ -51,7 +52,7 @@ fn bi_cwd(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
 }
 
-fn bi_home(args: &[Value], _span: Span) -> Result<Value, LxError> {
+fn bi_home(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let _ = &args[0];
     match std::env::var("HOME") {
         Ok(h) => Ok(Value::Some(Box::new(Value::Str(Arc::from(h.as_str()))))),

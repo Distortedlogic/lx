@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
+use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
@@ -19,14 +20,14 @@ pub fn build() -> IndexMap<String, Value> {
     m
 }
 
-fn bi_extract(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_extract(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let src = args[0].as_str()
         .ok_or_else(|| LxError::type_err("diag.extract expects Str", span))?;
     let graph = extract_graph(src, span)?;
     Ok(graph_to_value(&graph))
 }
 
-fn bi_extract_file(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_extract_file(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let path = args[0].as_str()
         .ok_or_else(|| LxError::type_err("diag.extract_file expects Str", span))?;
     let src = std::fs::read_to_string(path)
@@ -35,7 +36,7 @@ fn bi_extract_file(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(graph_to_value(&graph))
 }
 
-fn bi_to_mermaid(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_to_mermaid(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let graph = value_to_graph(&args[0], span)?;
     Ok(Value::Str(Arc::from(to_mermaid(&graph).as_str())))
 }

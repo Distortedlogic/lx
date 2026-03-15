@@ -3,6 +3,7 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 
+use crate::backends::RuntimeCtx;
 use crate::builtins::{call_value, mk};
 use crate::error::LxError;
 use crate::span::Span;
@@ -70,12 +71,12 @@ pub(crate) fn check_empty(s: &str) -> bool {
     s.trim().is_empty()
 }
 
-fn bi_is_empty(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_is_empty(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let s = as_str_arg(&args[0], "audit.is_empty", span)?;
     Ok(Value::Bool(check_empty(s)))
 }
 
-fn bi_is_too_short(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_is_too_short(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let s = as_str_arg(&args[0], "audit.is_too_short", span)?;
     let min = args[1].as_int()
         .ok_or_else(|| LxError::type_err("audit.is_too_short: min_len must be Int", span))?;

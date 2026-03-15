@@ -6,6 +6,7 @@ use dashmap::DashMap;
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 
+use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
@@ -76,13 +77,13 @@ fn persist(store: &TaskStore, span: Span) -> Result<(), LxError> {
         .map_err(|e| LxError::runtime(format!("tasks: write {}: {e}", path.display()), span))
 }
 
-fn bi_empty(_args: &[Value], _span: Span) -> Result<Value, LxError> {
+fn bi_empty(_args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = NEXT_STORE.fetch_add(1, Ordering::Relaxed);
     STORES.insert(id, TaskStore { tasks: IndexMap::new(), path: None });
     Ok(store_val(id))
 }
 
-fn bi_load(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_load(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let path = args[0].as_str()
         .ok_or_else(|| LxError::type_err("tasks.load expects Str path", span))?;
     let content = match std::fs::read_to_string(path) {
@@ -109,7 +110,7 @@ fn bi_load(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(store_val(sid))
 }
 
-fn bi_save(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_save(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let sid = store_id(&args[0], span)?;
     let path = args[1].as_str()
         .ok_or_else(|| LxError::type_err("tasks.save expects Str path", span))?;
@@ -120,7 +121,7 @@ fn bi_save(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Ok(Box::new(Value::Unit)))
 }
 
-fn bi_create(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_create(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let sid = store_id(&args[0], span)?;
     let Value::Record(opts) = &args[1] else {
         return Err(LxError::type_err("tasks.create expects Record", span));
@@ -151,7 +152,7 @@ fn bi_create(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Ok(Box::new(Value::Str(Arc::from(id.as_str())))))
 }
 
-fn bi_get(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_get(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let sid = store_id(&args[0], span)?;
     let tid = args[1].as_str()
         .ok_or_else(|| LxError::type_err("tasks.get: id must be Str", span))?;
@@ -165,7 +166,7 @@ fn bi_get(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
 }
 
-fn bi_children(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_children(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let sid = store_id(&args[0], span)?;
     let parent = args[1].as_str()
         .ok_or_else(|| LxError::type_err("tasks.children: id must be Str", span))?;
@@ -178,7 +179,7 @@ fn bi_children(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::List(Arc::new(kids)))
 }
 
-fn bi_list(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_list(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let sid = store_id(&args[0], span)?;
     let store = STORES.get(&sid)
         .ok_or_else(|| LxError::runtime("tasks: store not found", span))?;
@@ -236,11 +237,11 @@ fn transition(
     Ok(Value::Ok(Box::new(Value::Unit)))
 }
 
-fn bi_start(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_start(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     transition(&args[0], &args[1], None, &["todo"], "in_progress", span)
 }
 
-fn bi_update(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_update(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let sid = store_id(&args[0], span)?;
     let tid = args[1].as_str()
         .ok_or_else(|| LxError::type_err("tasks.update: id must be Str", span))?;
@@ -267,29 +268,29 @@ fn bi_update(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Ok(Box::new(Value::Unit)))
 }
 
-fn bi_submit(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_submit(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     transition(&args[0], &args[1], Some(&args[2]),
         &["in_progress", "revision"], "submitted", span)
 }
 
-fn bi_audit(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_audit(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     transition(&args[0], &args[1], None, &["submitted"], "pending_audit", span)
 }
 
-fn bi_pass(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_pass(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     transition(&args[0], &args[1], None, &["pending_audit"], "passed", span)
 }
 
-fn bi_fail(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_fail(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     transition(&args[0], &args[1], Some(&args[2]),
         &["pending_audit"], "failed", span)
 }
 
-fn bi_revise(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_revise(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     transition(&args[0], &args[1], None, &["failed"], "revision", span)
 }
 
-fn bi_complete(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_complete(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     transition(&args[0], &args[1], Some(&args[2]),
         &["passed"], "complete", span)
 }

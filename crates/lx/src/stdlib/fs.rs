@@ -3,6 +3,7 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 
+use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
@@ -21,7 +22,7 @@ pub fn build() -> IndexMap<String, Value> {
     m
 }
 
-fn bi_read(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_read(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let path = args[0].as_str()
         .ok_or_else(|| LxError::type_err("fs.read expects Str path", span))?;
     match std::fs::read_to_string(path) {
@@ -30,7 +31,7 @@ fn bi_read(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
 }
 
-fn bi_write(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_write(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let path = args[0].as_str()
         .ok_or_else(|| LxError::type_err("fs.write expects Str path", span))?;
     let content = format!("{}", args[1]);
@@ -40,7 +41,7 @@ fn bi_write(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
 }
 
-fn bi_append(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_append(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     use std::io::Write;
     let path = args[0].as_str()
         .ok_or_else(|| LxError::type_err("fs.append expects Str path", span))?;
@@ -56,13 +57,13 @@ fn bi_append(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
 }
 
-fn bi_exists(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_exists(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let path = args[0].as_str()
         .ok_or_else(|| LxError::type_err("fs.exists expects Str path", span))?;
     Ok(Value::Bool(std::path::Path::new(path).exists()))
 }
 
-fn bi_remove(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_remove(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let path_str = args[0].as_str()
         .ok_or_else(|| LxError::type_err("fs.remove expects Str path", span))?;
     let path = std::path::Path::new(path_str);
@@ -77,7 +78,7 @@ fn bi_remove(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
 }
 
-fn bi_mkdir(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_mkdir(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let path = args[0].as_str()
         .ok_or_else(|| LxError::type_err("fs.mkdir expects Str path", span))?;
     match std::fs::create_dir_all(path) {
@@ -86,7 +87,7 @@ fn bi_mkdir(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
 }
 
-fn bi_ls(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_ls(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let path = args[0].as_str()
         .ok_or_else(|| LxError::type_err("fs.ls expects Str path", span))?;
     match std::fs::read_dir(path) {
@@ -113,7 +114,7 @@ fn bi_ls(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
 }
 
-fn bi_stat(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_stat(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let path = args[0].as_str()
         .ok_or_else(|| LxError::type_err("fs.stat expects Str path", span))?;
     match std::fs::metadata(path) {

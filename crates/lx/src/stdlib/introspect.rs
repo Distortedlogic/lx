@@ -5,6 +5,7 @@ use indexmap::IndexMap;
 use num_bigint::BigInt;
 use parking_lot::Mutex;
 
+use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
@@ -62,7 +63,7 @@ fn action_to_value(e: &ActionEntry) -> Value {
     Value::Record(Arc::new(f))
 }
 
-fn bi_self(_args: &[Value], _span: Span) -> Result<Value, LxError> {
+fn bi_self(_args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let pid = std::process::id();
     let mut f = IndexMap::new();
     f.insert("name".into(), Value::Str(Arc::from("main")));
@@ -71,23 +72,23 @@ fn bi_self(_args: &[Value], _span: Span) -> Result<Value, LxError> {
     Ok(Value::Record(Arc::new(f)))
 }
 
-fn bi_elapsed(_args: &[Value], _span: Span) -> Result<Value, LxError> {
+fn bi_elapsed(_args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let state = STATE.lock();
     Ok(Value::Float(state.start.elapsed().as_secs_f64()))
 }
 
-fn bi_turn_count(_args: &[Value], _span: Span) -> Result<Value, LxError> {
+fn bi_turn_count(_args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let state = STATE.lock();
     Ok(Value::Int(BigInt::from(state.turns)))
 }
 
-fn bi_tick_turn(_args: &[Value], _span: Span) -> Result<Value, LxError> {
+fn bi_tick_turn(_args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let mut state = STATE.lock();
     state.turns += 1;
     Ok(Value::Int(BigInt::from(state.turns)))
 }
 
-fn bi_budget(_args: &[Value], _span: Span) -> Result<Value, LxError> {
+fn bi_budget(_args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let mut f = IndexMap::new();
     f.insert("total".into(), Value::Int(BigInt::from(-1)));
     f.insert("spent".into(), Value::Int(BigInt::from(0)));
@@ -95,7 +96,7 @@ fn bi_budget(_args: &[Value], _span: Span) -> Result<Value, LxError> {
     Ok(Value::Record(Arc::new(f)))
 }
 
-fn bi_actions(_args: &[Value], _span: Span) -> Result<Value, LxError> {
+fn bi_actions(_args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let state = STATE.lock();
     let items: Vec<Value> = state.actions.iter()
         .filter(|a| !a.is_marker)
@@ -104,7 +105,7 @@ fn bi_actions(_args: &[Value], _span: Span) -> Result<Value, LxError> {
     Ok(Value::List(Arc::new(items)))
 }
 
-fn bi_actions_since(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_actions_since(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let marker = args[0].as_str()
         .ok_or_else(|| LxError::type_err("introspect.actions_since: expects Str marker", span))?;
     let state = STATE.lock();
@@ -116,7 +117,7 @@ fn bi_actions_since(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::List(Arc::new(items)))
 }
 
-fn bi_mark(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_mark(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let name = args[0].as_str()
         .ok_or_else(|| LxError::type_err("introspect.mark: expects Str name", span))?;
     let mut state = STATE.lock();
@@ -132,7 +133,7 @@ fn bi_mark(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Unit)
 }
 
-fn bi_record(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_record(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let Value::Record(r) = &args[0] else {
         return Err(LxError::type_err("introspect.record expects Record", span));
     };
@@ -149,7 +150,7 @@ fn bi_record(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Unit)
 }
 
-fn bi_is_stuck(_args: &[Value], _span: Span) -> Result<Value, LxError> {
+fn bi_is_stuck(_args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let state = STATE.lock();
     let real_actions: Vec<&ActionEntry> = state.actions.iter()
         .filter(|a| !a.is_marker)
@@ -163,7 +164,7 @@ fn bi_is_stuck(_args: &[Value], _span: Span) -> Result<Value, LxError> {
     Ok(Value::Bool(stuck))
 }
 
-fn bi_strategy_shift(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_strategy_shift(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let reason = args[0].as_str()
         .ok_or_else(|| LxError::type_err("introspect.strategy_shift: expects Str", span))?;
     let mut state = STATE.lock();
@@ -177,7 +178,7 @@ fn bi_strategy_shift(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Unit)
 }
 
-fn bi_similar(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_similar(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let n: usize = args[0].as_int()
         .ok_or_else(|| LxError::type_err("introspect.similar_actions: expects Int", span))?
         .try_into()

@@ -3,6 +3,7 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 
+use crate::backends::{AiOpts, RuntimeCtx};
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
@@ -138,19 +139,19 @@ fn parse_llm_result(llm_response: &Value, span: Span) -> Result<Value, LxError> 
     Ok(build_result(patterns, mistakes, facts, summary))
 }
 
-fn bi_review(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_review(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let fields = extract_fields(args, span)?;
     if fields.transcript.trim().is_empty() {
         return Ok(build_result(vec![], vec![], vec![], "Empty transcript"));
     }
     let system = build_system_prompt(&fields.focus);
     let user = build_user_prompt(&fields);
-    let opts = ai::Opts {
+    let opts = AiOpts {
         system: Some(system),
         max_turns: Some(1),
-        ..ai::default_opts()
+        ..AiOpts::default()
     };
-    let llm_result = ai::run_claude(&user, &opts, span)?;
+    let llm_result = ctx.ai.prompt(&user, &opts, span)?;
     parse_llm_result(&llm_result, span)
 }
 
@@ -194,7 +195,7 @@ fn extract_structural(transcript: &str) -> (Vec<Value>, Vec<Value>, Vec<Value>) 
     (patterns, mistakes, facts)
 }
 
-fn bi_quick_review(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_quick_review(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let fields = extract_fields(args, span)?;
     if fields.transcript.trim().is_empty() {
         return Ok(build_result(vec![], vec![], vec![], "Empty transcript"));

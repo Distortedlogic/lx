@@ -3,6 +3,7 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 
+use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
@@ -35,17 +36,17 @@ fn heading(level: i64, args: &[Value], span: Span) -> Result<Value, LxError> {
     ]))
 }
 
-fn bi_h1(args: &[Value], span: Span) -> Result<Value, LxError> { heading(1, args, span) }
-fn bi_h2(args: &[Value], span: Span) -> Result<Value, LxError> { heading(2, args, span) }
-fn bi_h3(args: &[Value], span: Span) -> Result<Value, LxError> { heading(3, args, span) }
+fn bi_h1(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> { heading(1, args, span) }
+fn bi_h2(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> { heading(2, args, span) }
+fn bi_h3(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> { heading(3, args, span) }
 
-fn bi_para(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_para(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let text = args[0].as_str()
         .ok_or_else(|| LxError::type_err("md.para expects Str", span))?;
     Ok(node_rec("para", vec![("text", Value::Str(Arc::from(text)))]))
 }
 
-fn bi_code(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_code(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let lang = args[0].as_str()
         .ok_or_else(|| LxError::type_err("md.code expects Str lang", span))?;
     let code = args[1].as_str()
@@ -56,19 +57,19 @@ fn bi_code(args: &[Value], span: Span) -> Result<Value, LxError> {
     ]))
 }
 
-fn bi_list(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_list(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let items = args[0].as_list()
         .ok_or_else(|| LxError::type_err("md.list expects List", span))?;
     Ok(node_rec("list", vec![("items", Value::List(items.clone()))]))
 }
 
-fn bi_ordered(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_ordered(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let items = args[0].as_list()
         .ok_or_else(|| LxError::type_err("md.ordered expects List", span))?;
     Ok(node_rec("ordered", vec![("items", Value::List(items.clone()))]))
 }
 
-fn bi_table(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_table(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let headers = args[0].as_list()
         .ok_or_else(|| LxError::type_err("md.table expects List headers", span))?;
     let rows = args[1].as_list()
@@ -79,7 +80,7 @@ fn bi_table(args: &[Value], span: Span) -> Result<Value, LxError> {
     ]))
 }
 
-fn bi_link(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_link(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let text = args[0].as_str()
         .ok_or_else(|| LxError::type_err("md.link expects Str text", span))?;
     let url = args[1].as_str()
@@ -90,19 +91,19 @@ fn bi_link(args: &[Value], span: Span) -> Result<Value, LxError> {
     ]))
 }
 
-fn bi_blockquote(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_blockquote(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let text = args[0].as_str()
         .ok_or_else(|| LxError::type_err("md.blockquote expects Str", span))?;
     Ok(node_rec("blockquote", vec![("text", Value::Str(Arc::from(text)))]))
 }
 
-fn bi_raw(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_raw(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let text = args[0].as_str()
         .ok_or_else(|| LxError::type_err("md.raw expects Str", span))?;
     Ok(node_rec("raw", vec![("text", Value::Str(Arc::from(text)))]))
 }
 
-fn bi_doc(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_doc(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     args[0].as_list()
         .ok_or_else(|| LxError::type_err("md.doc expects List of nodes", span))?;
     Ok(args[0].clone())
@@ -112,7 +113,7 @@ fn field_str(rec: &IndexMap<String, Value>, field: &str) -> Option<String> {
     rec.get(field).and_then(|v| v.as_str()).map(|s| s.to_string())
 }
 
-pub fn bi_render(args: &[Value], span: Span) -> Result<Value, LxError> {
+pub fn bi_render(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let nodes = args[0].as_list()
         .ok_or_else(|| LxError::type_err("md.render expects List", span))?;
     let mut out = String::new();

@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 use num_bigint::BigInt;
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 
+use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
@@ -117,7 +118,7 @@ fn parse_to_nodes(input: &str) -> Vec<Value> {
     nodes
 }
 
-fn bi_parse(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_parse(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let input = args[0].as_str()
         .ok_or_else(|| LxError::type_err("md.parse expects Str", span))?;
     Ok(Value::List(Arc::new(parse_to_nodes(input))))
@@ -132,7 +133,7 @@ fn get_nodes(val: &Value, span: Span) -> Result<&[Value], LxError> {
         .ok_or_else(|| LxError::type_err("md: expected List (parsed doc)", span))
 }
 
-fn bi_sections(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_sections(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let nodes = get_nodes(&args[0], span)?;
     let mut sections = Vec::new();
     let mut cur: Option<(i64, String, String)> = None;
@@ -173,15 +174,15 @@ fn nodes_by_type(nodes: &[Value], type_name: &str) -> Vec<Value> {
     }).cloned().collect()
 }
 
-fn bi_code_blocks(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_code_blocks(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     Ok(Value::List(Arc::new(nodes_by_type(get_nodes(&args[0], span)?, "code"))))
 }
 
-fn bi_headings(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_headings(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     Ok(Value::List(Arc::new(nodes_by_type(get_nodes(&args[0], span)?, "heading"))))
 }
 
-fn bi_links(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_links(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let input = args[0].as_str()
         .ok_or_else(|| LxError::type_err("md.links expects Str (markdown source)", span))?;
     let parser = Parser::new(input);
@@ -210,7 +211,7 @@ fn bi_links(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::List(Arc::new(links)))
 }
 
-fn bi_to_text(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_to_text(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let input = args[0].as_str()
         .ok_or_else(|| LxError::type_err("md.to_text expects Str (markdown source)", span))?;
     let parser = Parser::new(input);

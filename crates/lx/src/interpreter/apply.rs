@@ -56,7 +56,7 @@ impl Interpreter {
         if bf.applied.len() < bf.arity {
           return Ok(Value::BuiltinFunc(bf));
         }
-        (bf.func)(&bf.applied, span)
+        (bf.func)(&bf.applied, span, &self.ctx)
       },
       Value::TaggedCtor { tag, arity, mut applied } => {
         applied.push(arg);
@@ -142,7 +142,7 @@ impl Interpreter {
               source_dir: self.source_dir.clone(),
               module_cache: Arc::clone(&self.module_cache),
               loading: Arc::clone(&self.loading),
-              yield_handler: self.yield_handler.clone(),
+              ctx: Arc::clone(&self.ctx),
             };
             tmp.eval(d)
           })

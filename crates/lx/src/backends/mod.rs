@@ -1,0 +1,89 @@
+mod defaults;
+
+pub use defaults::*;
+
+use std::sync::Arc;
+
+use indexmap::IndexMap;
+
+use crate::error::LxError;
+use crate::span::Span;
+use crate::value::Value;
+
+pub struct RuntimeCtx {
+    pub ai: Arc<dyn AiBackend>,
+    pub emit: Arc<dyn EmitBackend>,
+    pub http: Arc<dyn HttpBackend>,
+    pub shell: Arc<dyn ShellBackend>,
+    pub yield_: Arc<dyn YieldBackend>,
+    pub log: Arc<dyn LogBackend>,
+}
+
+impl Default for RuntimeCtx {
+    fn default() -> Self {
+        Self {
+            ai: Arc::new(ClaudeCodeAiBackend),
+            emit: Arc::new(StdoutEmitBackend),
+            http: Arc::new(ReqwestHttpBackend),
+            shell: Arc::new(ProcessShellBackend),
+            yield_: Arc::new(StdinStdoutYieldBackend),
+            log: Arc::new(StderrLogBackend),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct AiOpts {
+    pub system: Option<String>,
+    pub model: Option<String>,
+    pub max_turns: Option<i64>,
+    pub resume: Option<String>,
+    pub tools: Option<Vec<String>>,
+    pub append_system: Option<String>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct HttpOpts {
+    pub headers: Option<IndexMap<String, String>>,
+    pub query: Option<IndexMap<String, String>>,
+    pub body: Option<serde_json::Value>,
+}
+
+pub trait AiBackend: Send + Sync {
+    fn prompt(&self, text: &str, opts: &AiOpts, span: Span) -> Result<Value, LxError>;
+}
+
+pub trait EmitBackend: Send + Sync {
+    fn emit(&self, value: &Value, span: Span) -> Result<(), LxError>;
+}
+
+pub trait HttpBackend: Send + Sync {
+    fn request(
+        &self,
+        method: &str,
+        url: &str,
+        opts: &HttpOpts,
+        span: Span,
+    ) -> Result<Value, LxError>;
+}
+
+pub trait ShellBackend: Send + Sync {
+    fn exec(&self, cmd: &str, span: Span) -> Result<Value, LxError>;
+    fn exec_capture(&self, cmd: &str, span: Span) -> Result<Value, LxError>;
+}
+
+pub trait YieldBackend: Send + Sync {
+    fn yield_value(&self, value: Value, span: Span) -> Result<Value, LxError>;
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum LogLevel {
+    Info,
+    Warn,
+    Err,
+    Debug,
+}
+
+pub trait LogBackend: Send + Sync {
+    fn log(&self, level: LogLevel, msg: &str);
+}

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
+use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
@@ -22,11 +23,11 @@ pub fn build() -> IndexMap<String, Value> {
     m
 }
 
-fn bi_empty(_args: &[Value], _span: Span) -> Result<Value, LxError> {
+fn bi_empty(_args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     Ok(Value::Record(Arc::new(IndexMap::new())))
 }
 
-fn bi_load(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_load(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let path = args[0].as_str()
         .ok_or_else(|| LxError::type_err("ctx.load expects Str path", span))?;
     match std::fs::read_to_string(path) {
@@ -42,7 +43,7 @@ fn bi_load(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
 }
 
-fn bi_save(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_save(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let path = args[0].as_str()
         .ok_or_else(|| LxError::type_err("ctx.save expects Str path", span))?;
     let jv = lx_to_json(&args[1], span)?;
@@ -56,7 +57,7 @@ fn bi_save(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
 }
 
-fn bi_get(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_get(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let key = args[0].as_str()
         .ok_or_else(|| LxError::type_err("ctx.get expects Str key", span))?;
     match &args[1] {
@@ -71,7 +72,7 @@ fn bi_get(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
 }
 
-fn bi_set(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_set(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let key = args[0].as_str()
         .ok_or_else(|| LxError::type_err("ctx.set expects Str key", span))?;
     match &args[2] {
@@ -87,7 +88,7 @@ fn bi_set(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
 }
 
-fn bi_remove(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_remove(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let key = args[0].as_str()
         .ok_or_else(|| LxError::type_err("ctx.remove expects Str key", span))?;
     match &args[1] {
@@ -103,7 +104,7 @@ fn bi_remove(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
 }
 
-fn bi_keys(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_keys(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     match &args[0] {
         Value::Record(fields) => {
             let keys: Vec<Value> = fields.keys()
@@ -118,7 +119,7 @@ fn bi_keys(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
 }
 
-fn bi_merge(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_merge(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     match (&args[0], &args[1]) {
         (Value::Record(a), Value::Record(b)) => {
             let mut merged = a.as_ref().clone();

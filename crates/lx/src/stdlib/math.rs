@@ -1,7 +1,10 @@
+use std::sync::Arc;
+
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 
+use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
@@ -31,7 +34,7 @@ fn to_f64(v: &Value, span: Span) -> Result<f64, LxError> {
     }
 }
 
-fn bi_abs(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_abs(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     match &args[0] {
         Value::Int(n) => {
             if n.sign() == num_bigint::Sign::Minus { Ok(Value::Int(-n)) } else { Ok(Value::Int(n.clone())) }
@@ -41,22 +44,22 @@ fn bi_abs(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
 }
 
-fn bi_ceil(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_ceil(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let f = to_f64(&args[0], span)?;
     Ok(Value::Int(BigInt::from(f.ceil() as i64)))
 }
 
-fn bi_floor(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_floor(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let f = to_f64(&args[0], span)?;
     Ok(Value::Int(BigInt::from(f.floor() as i64)))
 }
 
-fn bi_round(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_round(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let f = to_f64(&args[0], span)?;
     Ok(Value::Int(BigInt::from(f.round() as i64)))
 }
 
-fn bi_pow(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_pow(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     match (&args[0], &args[1]) {
         (Value::Int(base), Value::Int(exp)) => {
             let e: u32 = exp.try_into().map_err(|_| LxError::runtime("math.pow: exponent too large or negative", span))?;
@@ -70,12 +73,12 @@ fn bi_pow(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
 }
 
-fn bi_sqrt(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_sqrt(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let f = to_f64(&args[0], span)?;
     Ok(Value::Float(f.sqrt()))
 }
 
-fn bi_min(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_min(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     match (&args[0], &args[1]) {
         (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a.min(b).clone())),
         (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a.min(*b))),
@@ -87,7 +90,7 @@ fn bi_min(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
 }
 
-fn bi_max(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_max(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     match (&args[0], &args[1]) {
         (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a.max(b).clone())),
         (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a.max(*b))),

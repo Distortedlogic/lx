@@ -25,10 +25,11 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 
 ## Current State
 
-`just diagnose` clean. `just test`: **41/41 PASS**. All language features complete.
+`just diagnose` clean. `just test`: **42/42 PASS**. All core language features and stdlib modules implemented.
 
 ### What's implemented
 
+**Core language:**
 - Arithmetic, bindings, strings, interpolation, regex literals (`r/\d+/flags`), collections (lists, records, maps, tuples), pattern matching
 - Functions, closures, currying, default params, pipes, sections, slicing, named args
 - Type definitions with tagged values and pattern matching
@@ -42,45 +43,54 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 - Message contracts: `Protocol Name = {field: Type}` with runtime validation
 - `MCP` declarations: typed tool contracts, input/output validation, wrapper generation
 - `yield` coroutine: callback-based, JSON-line orchestrator protocol
-- `emit` agent-to-human output: fire-and-forget, callback-based, replaces `$echo` for user-facing output (planned)
 - `with` scoped bindings + record field update (`name.field <- value`)
-- 28 stdlib modules (12 original + 7 new + 6 standard agents + 2 infrastructure + 1 visualization):
-  - Data: `std/json`, `std/md`, `std/re`, `std/math`, `std/time`
-  - System: `std/fs`, `std/env`, `std/http`
-  - Communication: `std/agent`, `std/mcp`, `std/ai`
-  - Orchestration: `std/ctx`, `std/cron`, `std/tasks`, `std/audit`, `std/circuit`, `std/plan`
-  - Intelligence: `std/knowledge`, `std/introspect`
-  - Standard agents: `std/agents/auditor`, `std/agents/router`, `std/agents/grader`, `std/agents/planner`, `std/agents/monitor`, `std/agents/reviewer`
-  - Infrastructure: `std/memory`, `std/trace`
-  - Visualization: `std/diag`
-- LLM integration: `ai.prompt` (text → text) + `ai.prompt_with` (full options → result record). Backend: `claude -p --output-format json`. Shared utilities: `ai::parse_llm_json`, `ai::extract_llm_text`, `ai::strip_json_fences` (used by all standard agents)
+
+**29 stdlib modules:**
+- Data: `std/json`, `std/md`, `std/re`, `std/math`, `std/time`
+- System: `std/fs`, `std/env`, `std/http`
+- Communication: `std/agent`, `std/mcp`, `std/ai`
+- Orchestration: `std/ctx`, `std/cron`, `std/tasks`, `std/audit`, `std/circuit`, `std/plan`, `std/saga`
+- Intelligence: `std/knowledge`, `std/introspect`
+- Standard agents: `std/agents/auditor`, `std/agents/router`, `std/agents/grader`, `std/agents/planner`, `std/agents/monitor`, `std/agents/reviewer`
+- Infrastructure: `std/memory`, `std/trace`
+- Visualization: `std/diag`
+
+**Key stdlib details:**
+- LLM integration (`std/ai`): `ai.prompt` (text → text) + `ai.prompt_with` (full options → result record). Backend: Claude Code CLI (`claude -p --output-format json`). `RuntimeCtx` refactor (`spec/runtime-backends.md`) will put this behind an `AiBackend` trait so embedders can swap it. Shared utilities: `ai::parse_llm_json`, `ai::extract_llm_text`, `ai::strip_json_fences` (used by all standard agents)
 - Shared eval utilities: `audit::build_eval_result`, `audit::make_eval_category`, `audit::keyword_overlap`, `audit::check_empty/refusal/hedging/references_task` (used by auditor + grader)
-- Task state machine: `std/tasks` — create/start/submit/audit/pass/fail/revise/complete, auto-persist, hierarchical subtasks
-- Structural quality checks: `std/audit` — is_empty/is_hedging/is_refusal/has_diff/references_task + rubric evaluate + quick_check
-- Circuit breakers: `std/circuit` — turn/time/action limits, repetition detection
-- Shared knowledge: `std/knowledge` — file-backed, provenance metadata, query with filter functions, merge, expire
-- Dynamic plans: `std/plan` — dependency-ordered execution, replan/insert_after/skip/abort mid-flight
-- Agent introspection: `std/introspect` — identity, elapsed, turn count, action log, markers, stuck detection, strategy shift
-- MCP HTTP streaming transport, `lx agent`, `lx check`, and `lx diagram` subcommands
-- Program visualization: `std/diag` — AST walker extracts workflow graph (agents, messages, control flow), emits Mermaid flowchart. `lx diagram file.lx` CLI subcommand + `diag.extract`/`diag.to_mermaid` library API
-- Multi-turn dialogue: `agent.dialogue` / `agent.dialogue_turn` — session-based accumulated context (planned)
-- Message interceptors: `agent.intercept` — middleware for `~>`/`~>?` (tracing, rate-limiting, transformation) (planned)
-- Structured handoff: `agent.handoff` / `agent.as_context` + `Handoff` Protocol (planned)
-- Reactive dataflow: `|>>` streaming pipe — items flow downstream as they complete, lazy until consumed (planned)
-- Supervision trees: `agent.supervise` — Erlang-style restart strategies (one_for_one/one_for_all/rest_for_one) (planned)
-- Ambient context: `with context deadline: N budget: M { }` — auto-propagation to agent ops (planned)
-- Inline clarification: `caller` implicit binding in handlers — agents ask back without orchestrator (planned)
-- Approval gates: `agent.gate` — structured human-in-the-loop with timeout policies (planned)
-- Capability discovery: `Capabilities` protocol + `agent.capabilities` query (planned)
-- Saga pattern: `std/saga` — multi-agent transactions with compensating actions (planned)
-- Message priority: `_priority` field (`:critical`/`:high`/`:normal`/`:low`) on messages (planned)
-- Feedback loops: `refine` expression — first-class try-grade-revise with threshold + max_rounds (planned)
-- Consensus: `consensus` expression — multi-agent voting with quorum policies + deliberation (planned)
-- Diminishing returns: `introspect.progress` / `improvement_rate` / `should_stop` — gradient progress tracking (planned)
-- Result reconciliation: `agent.reconcile` — structured merge of parallel results with strategies (planned)
-- Workflow broadcasting: `workflow.peers` / `workflow.share` — passive sibling visibility in `par` (planned)
-- Goal/task protocols: `Goal`/`Task` standard protocols + `agent.send_goal`/`agent.send_task` (planned)
-- Deadlock detection: runtime wait-for graph, cycle detection on `~>?`, `DeadlockErr` (planned)
+- Task state machine (`std/tasks`): create/start/submit/audit/pass/fail/revise/complete, auto-persist, hierarchical subtasks
+- Structural quality checks (`std/audit`): is_empty/is_hedging/is_refusal/has_diff/references_task + rubric evaluate + quick_check
+- Circuit breakers (`std/circuit`): turn/time/action limits, repetition detection
+- Shared knowledge (`std/knowledge`): file-backed, provenance metadata, query with filter functions, merge, expire
+- Dynamic plans (`std/plan`): dependency-ordered execution, replan/insert_after/skip/abort mid-flight
+- Agent introspection (`std/introspect`): identity, elapsed, turn count, action log, markers, stuck detection, strategy shift
+- Multi-agent transactions (`std/saga`): `saga.run` executes steps in order with compensating undo on failure. `saga.run_with` adds options (timeout, max_retries, on_compensate callback). `saga.define`/`saga.execute` for reusable saga definitions with initial context. Supports dependency ordering.
+- Program visualization (`std/diag`): AST walker extracts workflow graph (agents, messages, control flow), emits Mermaid flowchart. `lx diagram file.lx` CLI subcommand + `diag.extract`/`diag.to_mermaid` library API
+
+**CLI subcommands:** `lx run`, `lx test`, `lx check`, `lx agent`, `lx diagram`
+
+### Planned features (not yet implemented)
+
+These have specs in `spec/` but no Rust implementation yet:
+
+- `emit` agent-to-human output: fire-and-forget, replaces `$echo` for user-facing output
+- `agent.dialogue` / `agent.dialogue_turn` — multi-turn sessions
+- `agent.intercept` — message middleware (tracing, rate-limiting, transformation)
+- `agent.handoff` / `agent.as_context` + `Handoff` Protocol — structured context transfer
+- `|>>` streaming pipe — reactive dataflow, lazy until consumed
+- `agent.supervise` — Erlang-style restart strategies (one_for_one/one_for_all/rest_for_one)
+- `with context` — ambient deadline/budget propagation to agent ops
+- `caller` implicit binding in handlers — agents ask back without orchestrator
+- `agent.gate` — structured human-in-the-loop with timeout policies
+- `agent.capabilities` — runtime capability discovery via `Capabilities` protocol
+- `_priority` field on messages (`:critical`/`:high`/`:normal`/`:low`)
+- `refine` expression — first-class try-grade-revise with threshold + max_rounds
+- `consensus` expression — multi-agent voting with quorum policies + deliberation
+- `introspect.progress` / `improvement_rate` / `should_stop` — gradient progress tracking
+- `agent.reconcile` — structured merge of parallel results with strategies
+- `workflow.peers` / `workflow.share` — passive sibling visibility in `par`
+- `Goal`/`Task` standard protocols + `agent.send_goal`/`agent.send_task`
+- Deadlock detection: runtime wait-for graph, cycle detection on `~>?`, `DeadlockErr`
 
 ### Syntax gotchas
 
@@ -91,7 +101,6 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 - `assert (expr) "msg"` — if `(expr)` is callable, parser consumes `"msg"` as arg. Use `assert (expr == true) "msg"`
 - Regex literals: `r/\d+/imsx` — `\/` escapes slash, `r` + `/` always starts regex (not an ident). `std/re` accepts both `r/pat/` and `"\\pat"` strings
 - `yield expr` pauses, sends to orchestrator, returns response. JSON-line protocol on stdin/stdout
-- `emit expr` sends to human/orchestrator, returns `()`, does not block. Strings to stdout, records JSON-encoded. Replaces `$echo` for user-facing output
 - `with name = expr { body }` scoped binding. `:=` or `mut` for mutable. Returns body's last value
 - `name.field <- value` updates mutable record field. Nested: `name.a.b <- value`. Requires `:=` binding
 - Type annotations: `(x: Int y: Str) -> Result Int Str { body }`. All optional. `lx check` validates, `lx run` ignores.
@@ -99,38 +108,34 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 
 ## What To Work On Next
 
-### Stdlib roadmap (full plan: `design/stdlib_roadmap.md`):
+Full plan: `design/stdlib_roadmap.md`. Specs for all planned features are in `spec/`.
 
-1. ~~**`std/ai`**~~ — DONE. LLM integration via Claude CLI.
-2. ~~**`std/tasks`**~~ — DONE. Task state machine with auto-persist.
-3. ~~**`std/audit`**~~ — DONE. Structural quality checks + rubric evaluate.
-4. ~~**`std/circuit`**~~ — DONE. Circuit breakers (turns/time/actions/repetition).
-5. ~~**`std/knowledge`**~~ — DONE. File-backed shared discovery cache.
-6. ~~**`std/plan`**~~ — DONE. Dynamic plan-as-data execution with revision.
-7. ~~**`std/introspect`**~~ — DONE. Agent self-awareness + action log.
-8. ~~**`std/agents/auditor`**~~ — DONE. LLM quality gate. Uses std/audit as pre-filter, std/ai for judgment.
-9. ~~**`std/agents/router`**~~ — DONE. Prompt → specialist classification. Uses std/ai.
-10. ~~**`std/agents/grader`**~~ — DONE. Rubric scoring, incremental re-grade. Uses std/ai.
-11. ~~**`std/agents/planner`**~~ — DONE. Task decomposition into ordered subtasks. Uses std/ai.
-12. ~~**`std/memory`**~~ — DONE. Tiered L0-L3 memory with confidence, promotion/demotion.
-13. ~~**`std/trace`**~~ — DONE. Trace collection, scoring, dataset export.
-14. ~~**`std/agents/monitor`**~~ — DONE. QC sampling of running subagents.
-15. ~~**`std/agents/reviewer`**~~ — DONE. Post-hoc transcript review, learning extraction.
-16. **`MCP Embeddings`** — typed interface to embedding services (similarity, retrieval).
-17. ~~**`std/diag`**~~ — DONE. Program visualization. `lx diagram` CLI + `std/diag` library. AST walker extracts agents/messages/control flow, emits Mermaid.
+### Completed stdlib roadmap items (1-18):
 
-Also planned as extensions to `std/agent` (not separate modules): `agent.dialogue` (multi-turn sessions), `agent.intercept` (message middleware), `agent.handoff` / `agent.as_context` (structured context transfer), `agent.supervise` (supervision trees), `agent.gate` (approval gates), `agent.capabilities` (runtime discovery). Specs: `spec/agents-dialogue.md`, `spec/agents-intercept.md`, `spec/agents-handoff.md`, `spec/agents-supervision.md`, `spec/agents-gates.md`, `spec/agents-capability.md`.
+All 18 stdlib items are done: std/ai, std/tasks, std/audit, std/circuit, std/knowledge, std/plan, std/introspect, std/agents/auditor, std/agents/router, std/agents/grader, std/agents/planner, std/memory, std/trace, std/agents/monitor, std/agents/reviewer, MCP Embeddings (typed decl), std/diag, std/saga.
 
-Also planned as new language features: `|>>` streaming pipe (`spec/concurrency-reactive.md`), `with context` ambient propagation (`spec/agents-ambient.md`), `caller` implicit binding (`spec/agents-clarify.md`), `_priority` message field (`spec/agents-priority.md`), `refine` expression (`spec/agents-refine.md`), `consensus` expression (`spec/agents-consensus.md`). New modules: `std/saga` (`spec/agents-saga.md`).
-
-Also planned as extensions to existing modules: `introspect.progress`/`improvement_rate`/`should_stop` (`spec/agents-progress.md`), `agent.reconcile` (`spec/agents-reconcile.md`), `workflow.peers`/`workflow.share` (`spec/agents-broadcast.md`), Goal/Task protocols + `agent.send_goal`/`agent.send_task` (`spec/agents-goals.md`), deadlock detection (`spec/agents-deadlock.md`).
-
-Design docs: `design/standard_agents.md`, `design/stdlib_roadmap.md`
+### Next priorities (pick from these):
+19. **`RuntimeCtx` backend refactor** — Put all I/O operations behind backend traits on a `RuntimeCtx` parameter passed to all builtins. Standard defaults: Claude Code CLI for AI, reqwest for HTTP, `std::process::Command` for shell, stdout for emit, stdin/stdout JSON-lines for yield, stderr for logging. Enables swapping backends for testing, server deployment, or sandboxing. Also implements `emit` AST node. Spec: `spec/runtime-backends.md`. Mechanical refactor touching all builtins + stdlib modules.
+20. **`refine` expression** — New keyword. First-class feedback loop: try → grade → revise with threshold + max_rounds. Spec: `spec/agents-refine.md`. Requires parser + interpreter changes.
+21. **`consensus` expression** — New keyword. Multi-agent voting with quorum policies. Spec: `spec/agents-consensus.md`. Requires parser + interpreter changes.
+22. **`introspect.progress`** — Extension to `std/introspect`. Gradient progress tracking, improvement rate, adaptive stopping. Spec: `spec/agents-progress.md`.
+23. **`agent.reconcile`** — Extension to `std/agent`. Structured merging of parallel results. Spec: `spec/agents-reconcile.md`.
+24. **`agent.dialogue`** — Extension to `std/agent`. Multi-turn session management. Spec: `spec/agents-dialogue.md`.
+25. **`agent.intercept`** — Extension to `std/agent`. Message middleware. Spec: `spec/agents-intercept.md`.
+26. **`agent.handoff`** — Extension to `std/agent`. Structured context transfer. Spec: `spec/agents-handoff.md`.
+27. **`|>>` streaming pipe** — New operator. Reactive dataflow. Spec: `spec/concurrency-reactive.md`. Requires parser + interpreter changes.
+28. **`agent.supervise` + `agent.gate` + `agent.capabilities`** — Extensions to `std/agent`. Spec: `spec/agents-supervision.md`, `spec/agents-gates.md`, `spec/agents-capability.md`.
+29. **`with context`** — Ambient context propagation. Spec: `spec/agents-ambient.md`. Requires parser + interpreter changes.
+30. **`caller` implicit binding + `_priority` field** — Interpreter-level. Spec: `spec/agents-clarify.md`, `spec/agents-priority.md`.
+31. **`workflow.peers` / `workflow.share`** — Sibling visibility in `par`. Spec: `spec/agents-broadcast.md`.
+32. **Goal/Task protocols** — `agent.send_goal`/`agent.send_task`. Spec: `spec/agents-goals.md`.
+33. **Deadlock detection** — Runtime wait-for graph. Spec: `spec/agents-deadlock.md`.
 
 ### Technical debt:
 
-18. **Currying removal** (deferred) — requires parser architecture change
-19. **Toolchain** — `lx fmt`, `lx repl`, `lx watch`
+34. **Currying removal** (deferred) — requires parser architecture change
+35. **Toolchain** — `lx fmt`, `lx repl`, `lx watch`
+36. **Unicode in lexer** — `→` and other multi-byte chars in comments cause panics (byte vs char indexing)
 
 ## Codebase Layout
 
@@ -141,12 +146,12 @@ crates/lx/src/
   checker/   mod.rs, synth.rs, types.rs
   interpreter/ mod.rs, agents.rs, apply.rs, collections.rs, eval.rs, modules.rs, patterns.rs, shell.rs
   builtins/  mod.rs, call.rs, str.rs, coll.rs, hof.rs, hof_extra.rs
-  stdlib/    mod.rs, agents_auditor.rs, agents_grader.rs, agents_monitor.rs, agents_planner.rs, agents_reviewer.rs, agents_router.rs, ai.rs, audit.rs, circuit.rs, diag.rs, diag_walk.rs, introspect.rs, knowledge.rs, memory.rs, plan.rs, tasks.rs, trace.rs, json.rs, json_conv.rs, ctx.rs, math.rs, fs.rs, env.rs, re.rs, md.rs, md_build.rs, agent.rs, mcp.rs, mcp_rpc.rs, mcp_stdio.rs, mcp_http.rs, http.rs, time.rs, cron.rs
+  stdlib/    mod.rs, agents_auditor.rs, agents_grader.rs, agents_monitor.rs, agents_planner.rs, agents_reviewer.rs, agents_router.rs, ai.rs, audit.rs, circuit.rs, diag.rs, diag_walk.rs, introspect.rs, knowledge.rs, memory.rs, plan.rs, saga.rs, tasks.rs, trace.rs, json.rs, json_conv.rs, ctx.rs, math.rs, fs.rs, env.rs, re.rs, md.rs, md_build.rs, agent.rs, mcp.rs, mcp_rpc.rs, mcp_stdio.rs, mcp_http.rs, http.rs, time.rs, cron.rs
   ast.rs, token.rs, value.rs, value_display.rs, env.rs, error.rs, span.rs, lib.rs
 crates/lx-cli/src/main.rs
 spec/          48 language spec files
 design/        11 impl design docs + DEVLOG + CURRENT_OPINION
-tests/         41 .lx test files
+tests/         42 .lx test files
   fixtures/    agent_echo.lx, mcp_test_server.py, yield_orchestrator.py, etc.
 flows/         14 .lx programs translating arch_diagrams
   specs/       14 target goal + scenario specs
@@ -169,7 +174,7 @@ flows/         14 .lx programs translating arch_diagrams
 | `dashmap` | Concurrent registries (agent, mcp, tool defs) |
 | `parking_lot` | Fast Mutex for Env, module cache |
 
-Custom code (~11000 lines: lexer, parser, checker, interpreter, AST, builtins, stdlib) is language-specific — no crate replaces it. When adding new stdlib, use established crates.
+Custom code (~11500 lines: lexer, parser, checker, interpreter, AST, builtins, stdlib) is language-specific — no crate replaces it. When adding new stdlib, use established crates.
 
 ## Adding a Stdlib Module
 
@@ -180,7 +185,7 @@ Custom code (~11000 lines: lexer, parser, checker, interpreter, AST, builtins, s
 
 ## Running Flows
 
-`flows/*.lx` are lx translations of real agentic architectures from `~/repos/mcp-toolbelt/packages/arch_diagrams/`. Each has a matching spec in `flows/specs/` with target goals and test scenarios. Run with `just run flows/scenario_research.lx`. Most require actual agent subprocesses or MCP servers to be running — they're structural demonstrations, not standalone tests.
+`flows/*.lx` are lx translations of real agentic architectures from `~/repos/mcp-toolbelt/packages/arch_diagrams/`. Each has a matching spec in `flows/specs/` with target goals and test scenarios. Run with `just run flows/scenario_research.lx`. Most require actual agent subprocesses or MCP servers to be running — they're structural demonstrations, not standalone tests. Note: flow files with unicode characters (like `→`) in comments will panic due to a lexer byte-indexing bug (technical debt #35).
 
 ## Rules
 

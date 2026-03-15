@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
+use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
@@ -17,7 +18,7 @@ pub fn build() -> IndexMap<String, Value> {
     m
 }
 
-fn bi_parse(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_parse(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let s = args[0].as_str()
         .ok_or_else(|| LxError::type_err("json.parse expects Str", span))?;
     match serde_json::from_str::<serde_json::Value>(s) {
@@ -26,7 +27,7 @@ fn bi_parse(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
 }
 
-fn bi_encode(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_encode(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let jv = lx_to_json(&args[0], span)?;
     match serde_json::to_string(&jv) {
         Ok(s) => Ok(Value::Str(Arc::from(s.as_str()))),
@@ -34,7 +35,7 @@ fn bi_encode(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
 }
 
-fn bi_encode_pretty(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_encode_pretty(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let jv = lx_to_json(&args[0], span)?;
     match serde_json::to_string_pretty(&jv) {
         Ok(s) => Ok(Value::Str(Arc::from(s.as_str()))),

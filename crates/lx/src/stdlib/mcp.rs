@@ -10,6 +10,7 @@ use std::sync::{Arc, LazyLock};
 use dashmap::DashMap;
 use indexmap::IndexMap;
 
+use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
@@ -60,7 +61,7 @@ pub fn build() -> IndexMap<String, Value> {
     m
 }
 
-fn bi_list_tools(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_list_tools(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let empty = serde_json::json!({});
     let result = mcp_rpc::with_proc(&args[0], "tools/list", &empty, span)?;
     let tools = result
@@ -89,7 +90,7 @@ fn extract_text(result: &serde_json::Value) -> String {
         .unwrap_or_default()
 }
 
-fn bi_call(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_call(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let tool = args[1]
         .as_str()
         .ok_or_else(|| LxError::type_err("mcp.call: tool name must be Str", span))?;
@@ -107,7 +108,7 @@ fn bi_call(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Ok(Box::new(json_conv::json_to_lx(result))))
 }
 
-fn bi_list_resources(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_list_resources(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let empty = serde_json::json!({});
     let result = mcp_rpc::with_proc(&args[0], "resources/list", &empty, span)?;
     let resources = result
@@ -117,7 +118,7 @@ fn bi_list_resources(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Ok(Box::new(json_conv::json_to_lx(resources))))
 }
 
-fn bi_read_resource(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_read_resource(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let uri = args[1]
         .as_str()
         .ok_or_else(|| LxError::type_err("mcp.read_resource: uri must be Str", span))?;
@@ -126,7 +127,7 @@ fn bi_read_resource(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Ok(Box::new(json_conv::json_to_lx(result))))
 }
 
-fn bi_list_prompts(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_list_prompts(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let empty = serde_json::json!({});
     let result = mcp_rpc::with_proc(&args[0], "prompts/list", &empty, span)?;
     let prompts = result
@@ -136,7 +137,7 @@ fn bi_list_prompts(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Ok(Box::new(json_conv::json_to_lx(prompts))))
 }
 
-fn bi_get_prompt(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_get_prompt(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let name = args[1]
         .as_str()
         .ok_or_else(|| LxError::type_err("mcp.get_prompt: name must be Str", span))?;
@@ -146,7 +147,7 @@ fn bi_get_prompt(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Ok(Box::new(json_conv::json_to_lx(result))))
 }
 
-pub(crate) fn typed_call(args: &[Value], span: Span) -> Result<Value, LxError> {
+pub(crate) fn typed_call(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let tool_name = args[1]
         .as_str()
         .ok_or_else(|| LxError::runtime("mcp typed call: invalid tool name", span))?;

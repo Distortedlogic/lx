@@ -79,10 +79,9 @@ impl Interpreter {
     let program = crate::parser::parse(tokens)
       .map_err(|e| LxError::runtime(format!("module '{}': {e}", file_path.display()), span))?;
     let module_dir = file_path.parent().map(|p| p.to_path_buf());
-    let mut mod_interp = Interpreter::new(&source, module_dir);
+    let mut mod_interp = Interpreter::new(&source, module_dir, Arc::clone(&self.ctx));
     mod_interp.module_cache = Arc::clone(&self.module_cache);
     mod_interp.loading = Arc::clone(&self.loading);
-    mod_interp.yield_handler = self.yield_handler.clone();
     mod_interp.exec(&program)
       .map_err(|e| LxError::runtime(format!("module '{}': {e}", file_path.display()), span))?;
     let exports = collect_exports(&program, &mod_interp);

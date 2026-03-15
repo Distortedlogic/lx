@@ -205,7 +205,7 @@ pub struct LxFunc {
   pub applied: Vec<Value>,
 }
 
-pub type BuiltinFn = fn(&[Value], Span) -> Result<Value, LxError>;
+pub type BuiltinFn = fn(&[Value], Span, &std::sync::Arc<crate::backends::RuntimeCtx>) -> Result<Value, LxError>;
 
 #[derive(Clone)]
 pub struct BuiltinFunc {
