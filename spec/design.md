@@ -180,3 +180,19 @@ Decisions made during the v0.1 specification pass. Each resolves an open questio
 **`std/knowledge` for shared discovery cache** — `std/blackboard` is in-memory, `par`-scoped, last-write-wins. `std/ctx` is per-agent, immutable. Neither prevents 3 agents from independently reading the same files. `std/knowledge` is file-backed (like `std/ctx` for consistency), shared via path, with provenance metadata (source, confidence, tags) and query support. Key convention: `"file:{path}"` for reads, `"tool:{name}:{hash}"` for tool calls, `"fact:{desc}"` for conclusions. This is session-scoped shared facts — distinct from `std/memory` which is long-term agent-internal learning.
 
 **`std/introspect` for agent self-awareness** — `std/circuit` fires when limits are breached. `std/introspect` lets agents proactively reason about their own state: budget remaining, actions taken, whether they're stuck. Separate module (not an extension of `std/agent`) because introspection is cross-cutting — it reads runtime metadata that goes beyond agent lifecycle. The interpreter collects action history as a side effect of evaluation, bounded to last 1000 entries.
+
+**`|>>` for reactive dataflow** — `par` is all-at-once-wait-for-all. Sequential is one-at-a-time. Neither expresses "as results arrive, feed them downstream." `|>>` is a streaming pipe — items flow downstream as they complete. Lazy until consumed by `each`/`collect`. `collect` bridges streaming and eager pipelines. Same precedence as `|`. Spec: `spec/concurrency-reactive.md`.
+
+**`agent.supervise` for crash recovery** — Library function (setup operation, like `agent.spawn`). Three Erlang strategies: `:one_for_one`, `:one_for_all`, `:rest_for_one`. Max restart intensity prevents infinite loops. Supervisors are agents — they can be supervised, forming trees. Spec: `spec/agents-supervision.md`.
+
+**`with context` for ambient propagation** — Extends `with` keyword. Deadline, budget, trace ID auto-propagate to all agent operations inside the block. Standard fields have runtime enforcement; custom fields pass through. Spec: `spec/agents-ambient.md`.
+
+**`caller` for inline clarification** — Implicit binding in agent handlers (like `it` in `sel`). Agents ask their caller questions inline without going through the top-level orchestrator. Spec: `spec/agents-clarify.md`.
+
+**`agent.gate` for human-in-the-loop** — Library function. Structured approval with timeout policies (`:abort`/`:approve`/`:reject`/`:escalate`). Integrates with `std/introspect` action log. Spec: `spec/agents-gates.md`.
+
+**`std/saga` for multi-agent transactions** — Library module (like `std/plan`). Compensating actions run in reverse on failure. Undo failures recorded and reported, not fatal. Spec: `spec/agents-saga.md`.
+
+**`_priority` for message urgency** — Metadata field stripped before handler delivery. Four levels: `:critical`, `:high`, `:normal`, `:low`. Runtime priority queue. No mid-handler preemption. Spec: `spec/agents-priority.md`.
+
+**`Capabilities` protocol for agent discovery** — Standard Protocol (not a keyword). Agents self-report protocols, tools, domains, budget, status. `agent.capabilities` convenience helper. Spec: `spec/agents-capability.md`.

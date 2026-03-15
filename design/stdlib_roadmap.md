@@ -9,7 +9,8 @@ Complete stdlib for the three use cases: agent communication, workflow orchestra
 | `std/json`, `std/md`, `std/re`, `std/math`, `std/time` | Data |
 | `std/fs`, `std/env`, `std/http` | System |
 | `std/agent`, `std/mcp`, `std/ai` | Communication |
-| `std/ctx`, `std/cron` | Orchestration |
+| `std/ctx`, `std/cron`, `std/tasks`, `std/audit`, `std/circuit`, `std/plan` | Orchestration |
+| `std/knowledge`, `std/introspect` | Intelligence |
 | — | — |
 | **Newly specified (not yet implemented):** | |
 | `std/blackboard` | Coordination |
@@ -110,6 +111,20 @@ QC sampling. Watches running subagent transcripts for anomalies. Three detection
 
 Post-hoc transcript review. Reads a completed session transcript. Extracts: patterns that worked (confirmed N times), mistakes to avoid (with lessons), environment facts discovered. Writes to std/memory (L0 → L1 entries). Creates training dataset items via std/trace. The compounding effect: more reviews → richer memory → better future performance.
 
+### std/saga
+
+Multi-agent transactional operations with compensating actions. `saga.run` executes steps in order; on failure, compensating `undo` functions run in reverse for all completed steps. Steps can declare dependencies for concurrent execution. Undo failures are recorded and reported (compensation chain never aborts). `saga.define` creates reusable saga definitions.
+
+Spec: `spec/agents-saga.md`
+
+### Enhanced retry_with
+
+Extend `retry_with` beyond simple count+delay. Add: `retry_if` predicate (only retry on matching errors), `:exponential` backoff strategy, `jitter: true` for randomized delays, `on_exhaust` policy (`:error` or `:fallback`), `fallback` function. Different error types need different strategies — rate limits need backoff, auth errors should fail immediately.
+
+### ai.summarize (extension to std/ai)
+
+Structured context compression for long-running agents. `ai.summarize history {keep: [...] drop: [...] max_tokens: N}`. Understands agent conversation structure — preserves decisions, errors, key findings; drops raw tool output and search results. Combined with `std/introspect.actions`, enables auto-compression of agent history.
+
 ## Planned MCP Declarations (typed external service interfaces)
 
 ### MCP Embeddings
@@ -144,16 +159,16 @@ The dependency chain determines build order:
 1. ~~Type annotations + type checker~~ (DONE — bidirectional inference, unification, `lx check`)
 2. ~~Regex literals~~ (DONE — `r/\d+/flags`, first-class Regex values)
 3. ~~std/ai~~ (DONE — `ai.prompt` + `ai.prompt_with`, Claude CLI backend)
-4. std/tasks (no dependencies, enables grading loops)
-5. std/audit (no dependencies, enables auditor agent)
+4. ~~std/tasks~~ (DONE — task state machine, auto-persist, hierarchical subtasks)
+5. ~~std/audit~~ (DONE — structural quality checks, rubric evaluate, quick_check)
 6. std/agents/auditor (depends on std/audit, std/ai)
 7. std/agents/router (depends on std/ai)
 8. std/agents/grader (depends on std/tasks, std/ai)
 9. std/agents/planner (depends on std/tasks, std/ai)
-10. std/circuit (no dependencies, enables monitor)
-11. std/introspect (no dependencies, enables adaptive agents and auto-populated handoffs)
-12. std/knowledge (no dependencies, enables cross-agent discovery sharing)
-13. std/plan (no dependencies, enables dynamic plan revision — enhances planner agent)
+10. ~~std/circuit~~ (DONE — turn/time/action limits, repetition detection)
+11. ~~std/introspect~~ (DONE — identity, elapsed, actions, stuck detection, strategy shift)
+12. ~~std/knowledge~~ (DONE — file-backed, provenance, query, merge, expire)
+13. ~~std/plan~~ (DONE — dependency-ordered execution, replan/insert_after/skip/abort)
 14. std/blackboard (no dependencies, enables parallel agent coordination)
 15. std/events (no dependencies, enables reactive agent patterns)
 16. std/memory (benefits from MCP Embeddings but works without)
@@ -163,8 +178,15 @@ The dependency chain determines build order:
 20. MCP Embeddings (external service, can be added anytime)
 21. MCP Workflow (external service, can be added anytime)
 22. std/diag (no dependencies, uses existing lexer/parser, can be added anytime)
+23. std/saga (no dependencies, can be added anytime)
+24. `|>>` streaming pipe operator (parser + interpreter, depends on lazy sequence infra)
+25. `with context` ambient propagation (parser + interpreter extension to `with`)
+26. `agent.supervise` + `agent.gate` + `agent.capabilities` (extensions to std/agent)
+27. `caller` implicit binding + `_priority` field (interpreter-level)
+28. Enhanced `retry_with` (built-in extension)
+29. `ai.summarize` (extension to std/ai)
 
-Note: `agent.dialogue`, `agent.intercept`, and `agent.handoff` are extensions to `std/agent` (item 3 dependency chain), not separate modules. They're implemented as additional functions in `stdlib/agent.rs`.
+Note: `agent.dialogue`, `agent.intercept`, `agent.handoff`, `agent.supervise`, `agent.gate`, and `agent.capabilities` are extensions to `std/agent`, not separate modules. They're implemented as additional functions in `stdlib/agent.rs`.
 
 ## Mapping to Arch Diagram Flows
 
@@ -185,7 +207,10 @@ Note: `agent.dialogue`, `agent.intercept`, and `agent.handoff` are extensions to
 | defense_layers | std/agents/monitor, std/circuit, std/trace, capability attenuation |
 | mcp_tool_audit | std/tasks, std/audit |
 | multi_agent_coordination | std/blackboard, std/events, `~>>?` streaming, std/knowledge, agent.dialogue |
-| safe_delegation | capability attenuation, checkpoint/rollback, agent.handoff |
+| safe_delegation | capability attenuation, checkpoint/rollback, agent.handoff, std/saga |
 | (any flow) | std/diag (visualize any flow's structure as a diagram) |
 | (any multi-step flow) | std/plan (dynamic plan revision), std/introspect (adaptive strategy) |
 | (any multi-agent flow) | agent.intercept (tracing/rate-limiting), agent.handoff (context transfer) |
+| (any pipeline flow) | `\|>>` (reactive dataflow), `with context` (deadline/budget propagation) |
+| (any supervised flow) | agent.supervise (crash recovery), agent.gate (human approval) |
+| (any routed flow) | agent.capabilities (dynamic discovery), `_priority` (urgency routing) |

@@ -25,7 +25,7 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 
 ## Current State
 
-`just diagnose` clean. `just test`: **26/26 PASS**. All language features complete.
+`just diagnose` clean. `just test`: **32/32 PASS**. All language features complete.
 
 ### What's implemented
 
@@ -44,15 +44,31 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 - `yield` coroutine: callback-based, JSON-line orchestrator protocol
 - `emit` agent-to-human output: fire-and-forget, callback-based, replaces `$echo` for user-facing output (planned)
 - `with` scoped bindings + record field update (`name.field <- value`)
-- 13 stdlib modules: `std/json`, `std/ctx`, `std/math`, `std/fs`, `std/env`, `std/re`, `std/md`, `std/agent`, `std/mcp`, `std/http`, `std/time`, `std/cron`, `std/ai`
-- LLM integration: `ai.prompt` (text → text) + `ai.prompt_with` (full options: system, model, max_turns, resume, tools, append_system → result record with text, session_id, cost, turns, duration_ms, model). Backend: `claude -p --output-format json`
+- 19 stdlib modules (12 original + 7 new):
+  - Data: `std/json`, `std/md`, `std/re`, `std/math`, `std/time`
+  - System: `std/fs`, `std/env`, `std/http`
+  - Communication: `std/agent`, `std/mcp`, `std/ai`
+  - Orchestration: `std/ctx`, `std/cron`, `std/tasks`, `std/audit`, `std/circuit`, `std/plan`
+  - Intelligence: `std/knowledge`, `std/introspect`
+- LLM integration: `ai.prompt` (text → text) + `ai.prompt_with` (full options → result record). Backend: `claude -p --output-format json`
+- Task state machine: `std/tasks` — create/start/submit/audit/pass/fail/revise/complete, auto-persist, hierarchical subtasks
+- Structural quality checks: `std/audit` — is_empty/is_hedging/is_refusal/has_diff/references_task + rubric evaluate + quick_check
+- Circuit breakers: `std/circuit` — turn/time/action limits, repetition detection
+- Shared knowledge: `std/knowledge` — file-backed, provenance metadata, query with filter functions, merge, expire
+- Dynamic plans: `std/plan` — dependency-ordered execution, replan/insert_after/skip/abort mid-flight
+- Agent introspection: `std/introspect` — identity, elapsed, turn count, action log, markers, stuck detection, strategy shift
 - MCP HTTP streaming transport, `lx agent` and `lx check` subcommands
 - Multi-turn dialogue: `agent.dialogue` / `agent.dialogue_turn` — session-based accumulated context (planned)
 - Message interceptors: `agent.intercept` — middleware for `~>`/`~>?` (tracing, rate-limiting, transformation) (planned)
 - Structured handoff: `agent.handoff` / `agent.as_context` + `Handoff` Protocol (planned)
-- Dynamic plan revision: `std/plan` — plan-as-data execution with `replan`/`insert_after`/`skip`/`abort` (planned)
-- Agent introspection: `std/introspect` — identity, budget, actions, stuck detection (planned)
-- Shared knowledge: `std/knowledge` — cross-agent discovery cache with provenance and queries (planned)
+- Reactive dataflow: `|>>` streaming pipe — items flow downstream as they complete, lazy until consumed (planned)
+- Supervision trees: `agent.supervise` — Erlang-style restart strategies (one_for_one/one_for_all/rest_for_one) (planned)
+- Ambient context: `with context deadline: N budget: M { }` — auto-propagation to agent ops (planned)
+- Inline clarification: `caller` implicit binding in handlers — agents ask back without orchestrator (planned)
+- Approval gates: `agent.gate` — structured human-in-the-loop with timeout policies (planned)
+- Capability discovery: `Capabilities` protocol + `agent.capabilities` query (planned)
+- Saga pattern: `std/saga` — multi-agent transactions with compensating actions (planned)
+- Message priority: `_priority` field (`:critical`/`:high`/`:normal`/`:low`) on messages (planned)
 
 ### Syntax gotchas
 
@@ -73,17 +89,17 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 
 ### Stdlib roadmap (full plan: `design/stdlib_roadmap.md`):
 
-1. ~~**`std/ai`**~~ — DONE. `ai.prompt` (text → text) + `ai.prompt_with` (full options → result record). Backend: `claude -p --output-format json`.
-2. **`std/tasks`** — task state machine, subtasks, auto-persist. Design doc: `design/std_tasks.md`.
-3. **`std/audit`** — structural quality checks. Design doc: `design/std_audit.md`.
-4. **`std/agents/auditor`** — LLM quality gate. Uses std/audit as pre-filter, std/ai for judgment.
-5. **`std/agents/router`** — prompt → specialist classification. Uses std/ai.
-6. **`std/agents/grader`** — rubric scoring, incremental re-grade. Uses std/ai.
-7. **`std/agents/planner`** — task decomposition into ordered subtasks. Uses std/ai.
-8. **`std/circuit`** — circuit breakers (turn/time/token limits, action repetition).
-9. **`std/introspect`** — agent self-awareness: identity, budget, actions, stuck detection. Spec: `spec/stdlib-introspect.md`.
-10. **`std/knowledge`** — shared cross-agent discovery cache with provenance and queries. Spec: `spec/stdlib-knowledge.md`.
-11. **`std/plan`** — dynamic plan-as-data execution with runtime revision. Spec: `spec/agents-plans.md`.
+1. ~~**`std/ai`**~~ — DONE. LLM integration via Claude CLI.
+2. ~~**`std/tasks`**~~ — DONE. Task state machine with auto-persist.
+3. ~~**`std/audit`**~~ — DONE. Structural quality checks + rubric evaluate.
+4. ~~**`std/circuit`**~~ — DONE. Circuit breakers (turns/time/actions/repetition).
+5. ~~**`std/knowledge`**~~ — DONE. File-backed shared discovery cache.
+6. ~~**`std/plan`**~~ — DONE. Dynamic plan-as-data execution with revision.
+7. ~~**`std/introspect`**~~ — DONE. Agent self-awareness + action log.
+8. **`std/agents/auditor`** — LLM quality gate. Uses std/audit as pre-filter, std/ai for judgment.
+9. **`std/agents/router`** — prompt → specialist classification. Uses std/ai.
+10. **`std/agents/grader`** — rubric scoring, incremental re-grade. Uses std/ai.
+11. **`std/agents/planner`** — task decomposition into ordered subtasks. Uses std/ai.
 12. **`std/memory`** — tiered L0-L3 memory with confidence, promotion/demotion.
 13. **`std/trace`** — trace collection, scoring, dataset export.
 14. **`std/agents/monitor`** — QC sampling of running subagents.
@@ -91,7 +107,9 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 16. **`MCP Embeddings`** — typed interface to embedding services (similarity, retrieval).
 17. **`std/diag`** — program visualization. `lx diagram` CLI subcommand + `std/diag` library. Extract workflow graph from lx source, emit Mermaid. Spec: `spec/stdlib-diag.md`.
 
-Also planned as extensions to `std/agent` (not separate modules): `agent.dialogue` (multi-turn sessions), `agent.intercept` (message middleware), `agent.handoff` / `agent.as_context` (structured context transfer). Specs: `spec/agents-dialogue.md`, `spec/agents-intercept.md`, `spec/agents-handoff.md`.
+Also planned as extensions to `std/agent` (not separate modules): `agent.dialogue` (multi-turn sessions), `agent.intercept` (message middleware), `agent.handoff` / `agent.as_context` (structured context transfer), `agent.supervise` (supervision trees), `agent.gate` (approval gates), `agent.capabilities` (runtime discovery). Specs: `spec/agents-dialogue.md`, `spec/agents-intercept.md`, `spec/agents-handoff.md`, `spec/agents-supervision.md`, `spec/agents-gates.md`, `spec/agents-capability.md`.
+
+Also planned as new language features: `|>>` streaming pipe (`spec/concurrency-reactive.md`), `with context` ambient propagation (`spec/agents-ambient.md`), `caller` implicit binding (`spec/agents-clarify.md`), `_priority` message field (`spec/agents-priority.md`). New module: `std/saga` (`spec/agents-saga.md`).
 
 Design docs: `design/standard_agents.md`, `design/stdlib_roadmap.md`
 
@@ -109,12 +127,12 @@ crates/lx/src/
   checker/   mod.rs, synth.rs, types.rs
   interpreter/ mod.rs, agents.rs, apply.rs, collections.rs, eval.rs, modules.rs, patterns.rs, shell.rs
   builtins/  mod.rs, call.rs, str.rs, coll.rs, hof.rs, hof_extra.rs
-  stdlib/    mod.rs, ai.rs, json.rs, json_conv.rs, ctx.rs, math.rs, fs.rs, env.rs, re.rs, md.rs, md_build.rs, agent.rs, mcp.rs, mcp_rpc.rs, mcp_stdio.rs, mcp_http.rs, http.rs, time.rs, cron.rs
+  stdlib/    mod.rs, ai.rs, audit.rs, circuit.rs, introspect.rs, knowledge.rs, plan.rs, tasks.rs, json.rs, json_conv.rs, ctx.rs, math.rs, fs.rs, env.rs, re.rs, md.rs, md_build.rs, agent.rs, mcp.rs, mcp_rpc.rs, mcp_stdio.rs, mcp_http.rs, http.rs, time.rs, cron.rs
   ast.rs, token.rs, value.rs, value_display.rs, env.rs, error.rs, span.rs, lib.rs
 crates/lx-cli/src/main.rs
 spec/          33 language spec files
 design/        11 impl design docs + DEVLOG + CURRENT_OPINION
-tests/         26 .lx test files
+tests/         32 .lx test files
   fixtures/    agent_echo.lx, mcp_test_server.py, yield_orchestrator.py, etc.
 flows/         14 .lx programs translating arch_diagrams
   specs/       14 target goal + scenario specs
@@ -137,7 +155,7 @@ flows/         14 .lx programs translating arch_diagrams
 | `dashmap` | Concurrent registries (agent, mcp, tool defs) |
 | `parking_lot` | Fast Mutex for Env, module cache |
 
-Custom code (~9200 lines: lexer, parser, checker, interpreter, AST, builtins, stdlib) is language-specific — no crate replaces it. When adding new stdlib, use established crates.
+Custom code (~10800 lines: lexer, parser, checker, interpreter, AST, builtins, stdlib) is language-specific — no crate replaces it. When adding new stdlib, use established crates.
 
 ## Adding a Stdlib Module
 

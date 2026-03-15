@@ -7,11 +7,14 @@ mod ctx;
 mod env;
 mod fs;
 mod http;
+mod introspect;
 mod json;
+mod knowledge;
 pub mod json_conv;
 mod math;
 pub(crate) mod mcp;
 mod md;
+mod plan;
 mod md_build;
 mod re;
 mod tasks;
@@ -40,6 +43,9 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
         "tasks" => tasks::build(),
         "audit" => audit::build(),
         "circuit" => circuit::build(),
+        "knowledge" => knowledge::build(),
+        "plan" => plan::build(),
+        "introspect" => introspect::build(),
         _ => return None,
     };
     Some(ModuleExports {
@@ -52,5 +58,5 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
     if path.len() < 2 || path[0] != "std" {
         return false;
     }
-    matches!(path[1].as_str(), "json" | "ctx" | "math" | "fs" | "env" | "re" | "md" | "agent" | "mcp" | "http" | "time" | "cron" | "ai" | "tasks" | "audit" | "circuit")
+    matches!(path[1].as_str(), "json" | "ctx" | "math" | "fs" | "env" | "re" | "md" | "agent" | "mcp" | "http" | "time" | "cron" | "ai" | "tasks" | "audit" | "circuit" | "knowledge" | "plan" | "introspect")
 }

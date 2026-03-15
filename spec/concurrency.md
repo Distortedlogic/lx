@@ -204,6 +204,7 @@ par {
 
 ## Cross-References
 
+- Reactive dataflow (`|>>`): [concurrency-reactive.md](concurrency-reactive.md)
 - Agent patterns built on par/sel/pmap: [agents.md](agents.md)
 - Agent streaming (`~>>?`): [agents.md](agents.md#streaming)
 - Agent stdlib (spawn, ask, channel): [stdlib-agents.md](stdlib-agents.md)

@@ -1,0 +1,83 @@
+-- 30_knowledge.lx
+-- Tests: std/knowledge module (shared discovery cache)
+
+use std/knowledge
+use std/fs
+
+kb_path = "/tmp/lx_knowledge_test.json"
+
+-- === Create ===
+kb = knowledge.create kb_path ^
+
+-- === Store entries ===
+kb = knowledge.store "auth_module" {entry: "src/auth/mod.rs"} {
+  source: "reviewer" confidence: 0.9 tags: ["architecture"]
+} kb ^
+
+kb = knowledge.store "token_flow" {refresh: true expiry: 3600} {
+  source: "analyzer" confidence: 0.8 tags: ["auth" "security"]
+} kb ^
+
+-- === Get ===
+entry = knowledge.get "auth_module" kb
+assert (some? entry == true) "get existing key"
+found = entry ?? {}
+assert (found.val.entry == "src/auth/mod.rs") "get value"
+assert (found.meta.source == "reviewer") "get meta source"
+assert (found.meta.confidence == 0.9) "get meta confidence"
+assert (len found.stored_at > 0) "get has timestamp"
+
+-- === Get missing ===
+missing = knowledge.get "nonexistent" kb
+assert (missing == None) "get missing returns None"
+
+-- === Keys ===
+k = knowledge.keys kb
+assert (len k == 2) "keys count"
+assert (k.0 == "auth_module") "keys first"
+assert (k.1 == "token_flow") "keys second"
+
+-- === Query with filter ===
+auth_entries = knowledge.query (e) {
+  tags = e.meta.tags ?? []
+  contains? "auth" tags
+} kb
+assert (len auth_entries == 1) "query by tag"
+assert (auth_entries.0.key == "token_flow") "query result key"
+
+high_conf = knowledge.query (e) (e.meta.confidence ?? 0) > 0.85 kb
+assert (len high_conf == 1) "query by confidence"
+
+all = knowledge.query (e) true kb
+assert (len all == 2) "query all"
+
+-- === Remove ===
+kb = knowledge.remove "token_flow" kb ^
+k2 = knowledge.keys kb
+assert (len k2 == 1) "remove reduces count"
+assert (knowledge.get "token_flow" kb == None) "removed key gone"
+
+-- === Persistence: reload from file ===
+kb2 = knowledge.create kb_path ^
+k3 = knowledge.keys kb2
+assert (len k3 == 1) "reload preserves entries"
+reloaded = knowledge.get "auth_module" kb2
+assert (some? reloaded == true) "reload preserves data"
+
+-- === Merge ===
+kb_path2 = "/tmp/lx_knowledge_test2.json"
+kb3 = knowledge.create kb_path2 ^
+kb3 = knowledge.store "new_fact" "hello" {source: "agent_b"} kb3 ^
+kb3 = knowledge.store "auth_module" {entry: "overridden"} {source: "agent_b"} kb3 ^
+
+kb2 = knowledge.merge kb2 kb3 ^
+merged_keys = knowledge.keys kb2
+assert (len merged_keys == 2) "merge adds keys"
+overridden = knowledge.get "auth_module" kb2 ?? {}
+assert (overridden.val.entry == "overridden") "merge: kb2 wins"
+
+-- cleanup
+fs.remove kb_path ^
+fs.remove kb_path2 ^
+
+log.info "30_knowledge: all passed"

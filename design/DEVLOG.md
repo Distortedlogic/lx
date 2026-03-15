@@ -4,7 +4,7 @@ Session history + design decisions. For priorities and gap analysis, see `NEXT_P
 
 ## Implementation Status
 
-**26/26 PASS.** 13 stdlib modules. 14 flow programs. Type checker. Regex literals. `just diagnose` clean.
+**32/32 PASS.** 19 stdlib modules. 14 flow programs. Type checker. Regex literals. `just diagnose` clean.
 
 ## Key Design Decisions
 
@@ -46,6 +46,13 @@ Non-obvious choices that cause confusion if forgotten:
 - **`std/plan` treats plans as data**. `plan.run` with `on_step` callback. `PlanAction` tagged union controls flow.
 - **`std/introspect` is separate from `std/agent`**. Cross-cutting runtime metadata. Bounded action log (1000 entries).
 - **`std/knowledge` is file-backed JSON**. Shared via path. Provenance metadata. File-level locking.
+- **`|>>` at same precedence as `|`**. Streaming pipe — items flow downstream as they complete. Lazy until `collect`/`each`.
+- **`with context` extends `with`**. `context` keyword after `with` = ambient scope, not lexical binding.
+- **`caller` is handler-scoped implicit binding**. Like `it` in `sel`. Only in agent handler context.
+- **`_priority` is stripped before handler delivery**. Metadata field convention. 4 levels. No mid-handler preemption.
+- **`agent.gate` is a library function**. Setup operation, like `agent.spawn`. Three runtime modes matching `yield`/`emit`.
+- **`agent.supervise` strategies are `:one_for_one`/`:one_for_all`/`:rest_for_one`**. Max restart intensity prevents loops.
+- **`std/saga` compensations run in reverse**. Undo failures recorded, not fatal. Like `std/plan`, library not keyword.
 
 ## Technical Debt
 
@@ -75,4 +82,5 @@ Non-obvious choices that cause confusion if forgotten:
 | 30 | 03-15 | Regex literals: `r/\d+/flags`, Value::Regex, std/re accepts both, 25/25 tests |
 | 31 | 03-15 | Agentic features: `~>>?` streaming, checkpoint/rollback, capabilities, blackboard, events, negotiation |
 | 32 | 03-15 | Agentic layer completion: dialogue, interceptors, handoff, plan revision, introspection, knowledge cache |
-| 33 | 03-15 | std/ai: LLM integration via Claude CLI. `ai.prompt` + `ai.prompt_with`. 13 stdlib modules, 26/26 tests |
+| 33 | 03-15 | std/ai + std/tasks + std/audit + std/circuit + std/knowledge + std/plan + std/introspect. 19 stdlib modules, 32/32 tests |
+| 34 | 03-15 | Agent self-assessment: 10 missing features identified. 8 new spec files + updates to 10 existing files. |

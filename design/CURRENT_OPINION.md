@@ -26,22 +26,33 @@ Written by the language designer (Claude). Updated after Session 32.
 
 **Currying** — single biggest source of parser ambiguity. Sections cover 90%. Deferred.
 
-**Concurrency is fake** — `par`/`sel` are sequential. Real async needs `tokio`. Streaming (`~>>?`) and pub/sub (`std/events`) both depend on this.
+**Concurrency is fake** — `par`/`sel` are sequential. Real async needs `tokio`. Streaming (`~>>?`), pub/sub (`std/events`), and reactive dataflow (`|>>`) all depend on this.
 
 **LLM integration landed.** `std/ai` provides `ai.prompt` (text → text) and `ai.prompt_with` (full options → result record with session_id, cost, turns). Backend is Claude CLI (`claude -p --output-format json`). Session resume via session_id. Standard agents can now be built on top.
 
 ## Gap Analysis
 
-Reviewed `mcp-toolbelt/packages/arch_diagrams` — 14 agentic flow architectures. These are the ACTUAL flows lx was designed to express.
+Reviewed `mcp-toolbelt/packages/arch_diagrams` — 14 agentic flow architectures. Then self-assessed: what do I (Claude) actually struggle with when operating as an agent?
 
-**What lx covers well:** agent spawning + fanout, message validation, MCP tool invocation, context persistence, scheduled execution, executable plans, grading loops, shell integration, end-to-end type safety.
+**What lx covers well:** agent spawning + fanout, message validation, MCP tool invocation, context persistence, scheduled execution, executable plans, grading loops, shell integration, end-to-end type safety, multi-turn dialogue, message interceptors, structured handoff, plan revision, knowledge sharing, introspection.
 
-**Newly specified:** Agent streaming (`~>>?`), capability attenuation, checkpoint/rollback, shared blackboard, pub/sub events, negotiation patterns, program visualization (`std/diag`), multi-turn dialogue, message interceptors, structured handoff, dynamic plan revision, agent introspection, shared knowledge cache.
+**Session 33 — Newly specified (agent self-assessment):**
 
-**Newly closed specification gaps:** Multi-turn agent conversation (dialogue sessions), cross-agent knowledge sharing (std/knowledge), plan revision mid-execution (std/plan), agent self-awareness (std/introspect), structured context transfer between agents (handoff), communication middleware (interceptors). These were the missing primitives that standard agents would all benefit from.
+| Feature | Spec | Why I Want It |
+|---|---|---|
+| Reactive dataflow (`\|>>`) | `spec/concurrency-reactive.md` | `par` is all-at-once, sequential is one-at-a-time. Real research is: search for X, result triggers Y and Z, Z triggers W. Need streaming pipelines where results flow as they arrive. |
+| Supervision trees | `spec/agents-supervision.md` | Crashed subprocess = manual restart boilerplate everywhere. Need Erlang-style one-for-one/one-for-all/rest-for-one auto-restart. |
+| Ambient context | `spec/agents-ambient.md` | Deadline, budget, trace ID must be threaded manually through every function. Need Go-style context that propagates automatically through agent operations. |
+| Structured clarification | `spec/agents-clarify.md` | `yield` goes to orchestrator. Agent B needs to ask agent A "did you mean X?" without going through the top. Need `caller` implicit binding. |
+| Approval gates | `spec/agents-gates.md` | `yield` is too generic for human approval. Need structured gate with timeout policy, escalation, audit trail. |
+| Capability advertisement | `spec/agents-capability.md` | Can't query agents at runtime for what they can do. Need `Capabilities` protocol + `agent.capabilities` helper. |
+| Saga pattern | `spec/agents-saga.md` | `checkpoint`/`rollback` is single-agent. Multi-agent workflows need distributed compensation on failure. |
+| Message priority | `spec/agents-priority.md` | All messages are FIFO. Cancel signals sit behind 50 status updates. Need `_priority` field with 4 levels. |
+| Context compression | stdlib roadmap | Long-running agents fill context. Need `ai.summarize` for structured history compression. |
+| Enhanced retry | stdlib roadmap | `retry_with` needs: per-error-type strategy, jitter, circuit breaker integration. |
 
-**Critical gaps (implementation):** Task tracking, quality gates, prompt routing, task decomposition, circuit breakers, tiered memory, observability, subagent QC, learning from experience, embeddings. See `NEXT_PROMPT.md` for the prioritized roadmap.
+**Critical gaps (implementation):** Standard agents (auditor/router/grader/planner — lx programs using std/ai), tiered memory, observability/trace, subagent QC, learning from experience, embeddings. See `NEXT_PROMPT.md` for the prioritized roadmap.
 
 ## Bottom Line
 
-13 stdlib modules. Communication/orchestration layer is solid, now with LLM integration. Type annotations + checker working. Regex literals implemented. Agentic safety layer specified (capabilities, checkpoint/rollback). Multi-agent coordination specified (blackboard, events, streaming, negotiation, dialogue, interceptors, handoff). Agent intelligence layer specified (introspection, knowledge sharing, dynamic plan revision). Next: full stdlib buildout — 11 new modules, 6 standard agents, 1 MCP declaration. An agent language's stdlib includes agents.
+19 stdlib modules. Communication/orchestration layer is solid. Agentic infrastructure layer (tasks, audit, circuit, plan, knowledge, introspect) is implemented. Type annotations + checker working. Regex literals implemented. Session 33 addressed the biggest gaps I hit as an agent: reactive dataflow, supervision, ambient context, clarification, gates, capability discovery, sagas, and priority. These are the features that separate "agents can talk" from "agents can reliably collaborate on complex tasks." Next: full stdlib buildout — 13 new modules, 6 standard agents, 1 MCP declaration.

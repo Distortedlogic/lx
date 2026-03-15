@@ -232,40 +232,58 @@ traced ~>? {task: "review"} ^
 
 ## Implementation Status
 
-- `~>` (send) and `~>?` (ask) — implemented as infix operators
-- `~>>?` (stream) — planned (depends on async runtime)
-- `Protocol` — implemented as keyword with runtime validation
-- `yield` — implemented as keyword with callback-based orchestrator protocol
-- `emit` — agent-to-human output primitive, callback-based, fire-and-forget (planned)
-- `MCP` declarations — implemented as keyword with typed tool contracts and validation
-- `with` / field update — implemented with scoped bindings and mutable record field assignment
-- `checkpoint`/`rollback` — planned
-- Capability attenuation on `agent.spawn` — planned
-- Multi-turn dialogue (`agent.dialogue`) — planned
-- Structured handoff (`agent.handoff`) — planned
-- Message interceptors (`agent.intercept`) — planned
-- Dynamic plan revision (`std/plan`) — planned
-- Agent introspection (`std/introspect`) — planned
-- Shared knowledge cache (`std/knowledge`) — planned
+**Implemented:**
+- `~>` (send) and `~>?` (ask) — infix operators
+- `Protocol` — keyword with runtime validation
+- `yield` — keyword with callback-based orchestrator protocol
+- `MCP` declarations — keyword with typed tool contracts and validation
+- `with` / field update — scoped bindings and mutable record field assignment
+- `agent.spawn` — subprocess spawning, JSON-line protocol
+- `std/mcp` — MCP over stdio (JSON-RPC 2.0) + HTTP streaming (reqwest)
 - Sequential evaluation (like par/sel); real async is future work
-- Agents are records with handler functions; subprocess agents via `std/agent` (`__pid` records)
-- `agent.spawn` — implemented in `std/agent` (subprocess spawning, JSON-line protocol)
-- `std/mcp` — implemented (MCP over stdio via JSON-RPC 2.0 + HTTP streaming via reqwest)
-- Channel receive syntax for `sel` — planned
+
+**Planned (specified):**
+- `~>>?` (stream) — depends on async runtime
+- `emit` — agent-to-human output, callback-based, fire-and-forget
+- `checkpoint`/`rollback` — transactional execution
+- Capability attenuation on `agent.spawn`
+- `agent.dialogue` / `agent.dialogue_turn` / `agent.dialogue_end` — multi-turn sessions
+- `agent.handoff` / `agent.as_context` — structured context transfer
+- `agent.intercept` — message middleware
+- `agent.supervise` — supervision trees with restart strategies
+- `agent.gate` — structured human-in-the-loop approval
+- `agent.capabilities` — runtime capability query
+- `caller` — implicit binding in handlers for inline clarification
+- `_priority` field — message urgency levels
+- `|>>` — reactive dataflow / streaming pipe
+- `with context` — ambient context propagation
+- `std/plan` — dynamic plan revision
+- `std/introspect` — agent self-awareness
+- `std/knowledge` — shared discovery cache
+- `std/saga` — multi-agent transactions with compensation
+- Channel receive syntax for `sel`
 
 ## Cross-References
 
 - Communication patterns build on: [concurrency.md](concurrency.md) (par/sel/pmap)
+- Reactive dataflow: [concurrency-reactive.md](concurrency-reactive.md) (`|>>` streaming pipe)
 - Tool invocation: [shell.md](shell.md) ($), stdlib-agents.md (MCP)
 - Module details: [stdlib-agents.md](stdlib-agents.md)
 - Error handling in agents: [errors.md](errors.md) (^, ??)
 - Design rationale: [design.md](design.md) (agent communication syntax)
-- Protocol details: [agents-protocol.md](agents-protocol.md) (structural subtyping, Any, errors, exports)
-- Advanced features: [agents-advanced.md](agents-advanced.md) (emit, yield, MCP declarations, with/field update)
+- Protocol details: [agents-protocol.md](agents-protocol.md)
+- Advanced features: [agents-advanced.md](agents-advanced.md) (emit, yield, MCP, with)
 - Multi-turn dialogue: [agents-dialogue.md](agents-dialogue.md)
 - Structured handoff: [agents-handoff.md](agents-handoff.md)
 - Message interceptors: [agents-intercept.md](agents-intercept.md)
 - Dynamic plan revision: [agents-plans.md](agents-plans.md)
+- Supervision trees: [agents-supervision.md](agents-supervision.md)
+- Approval gates: [agents-gates.md](agents-gates.md)
+- Ambient context: [agents-ambient.md](agents-ambient.md)
+- Inline clarification: [agents-clarify.md](agents-clarify.md)
+- Capability discovery: [agents-capability.md](agents-capability.md)
+- Saga pattern: [agents-saga.md](agents-saga.md)
+- Message priority: [agents-priority.md](agents-priority.md)
 - Agent introspection: [stdlib-introspect.md](stdlib-introspect.md)
 - Shared knowledge cache: [stdlib-knowledge.md](stdlib-knowledge.md)
 - Test suite: [../tests/14_agents.lx](../tests/14_agents.lx)

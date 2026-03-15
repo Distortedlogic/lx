@@ -194,6 +194,60 @@ Each phase produces a working, testable increment. No phase depends on a later p
 
 **Test cases:** plan execution with continue, plan replan mid-execution, plan insert_after, plan abort. Introspect actions list, budget tracking, is_stuck detection, strategy_shift reset. Knowledge create/store/get/query, provenance metadata, expire.
 
+## Phase 14: Reactive Dataflow
+
+**Goal:** `|>>` streaming pipe operator for lazy, element-at-a-time pipelines.
+
+**Status:** PLANNED.
+
+**Deliverables:**
+- Lexer: `|>>` as a single token
+- Parser: binary operator at same precedence as `|`
+- Interpreter: lazy sequence wrapping — `|>>` creates a deferred pipeline, `collect` / `each` forces evaluation
+- `collect` built-in to materialize lazy streams into lists
+- `par_n limit f` streaming concurrent variant
+- Backpressure: upstream blocks when downstream is slow
+
+**Test cases:** basic streaming, collect, cancellation via take, error passthrough, compose with `|`.
+
+Spec: `spec/concurrency-reactive.md`
+
+## Phase 15: Supervision, Gates, Ambient Context
+
+**Goal:** Agent resilience and orchestration infrastructure.
+
+**Status:** PLANNED.
+
+**Deliverables:**
+- `agent.supervise` — supervision trees with strategies (one_for_one, one_for_all, rest_for_one)
+- `agent.child` — access supervised child by ID
+- `agent.gate` — structured approval with timeout policies
+- `with context` — ambient context propagation (deadline, budget, request_id, trace_id)
+- `context.current`, `context.deadline`, etc. — read ambient context
+- `caller` implicit binding in agent handlers
+- `agent.check_critical` — poll for critical-priority messages
+- `_priority` field support in `~>` / `~>?` message routing
+
+**Test cases:** supervision restart, strategy types, max restarts, gate approve/reject/timeout, ambient context propagation, caller clarification, priority ordering.
+
+Specs: `spec/agents-supervision.md`, `spec/agents-gates.md`, `spec/agents-ambient.md`, `spec/agents-clarify.md`, `spec/agents-priority.md`
+
+## Phase 16: Saga and Capability Discovery
+
+**Goal:** Multi-agent transactions and dynamic routing.
+
+**Status:** PLANNED.
+
+**Deliverables:**
+- `std/saga` — saga execution with compensating actions, dependency support, undo failure reporting
+- `Capabilities` protocol — standard capability advertisement shape
+- `agent.capabilities` — query helper
+- `agent.advertise` — self-registration
+
+**Test cases:** saga success, saga compensation, nested saga, undo failure report, capability query, can-handle pattern.
+
+Specs: `spec/agents-saga.md`, `spec/agents-capability.md`
+
 ## Future Phases
 
 For the stdlib buildout roadmap (std/ai, std/tasks, std/audit, standard agents, etc.), see [stdlib_roadmap.md](stdlib_roadmap.md) and `NEXT_PROMPT.md`.

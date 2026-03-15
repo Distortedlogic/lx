@@ -69,6 +69,21 @@ All v0.1 design questions have been resolved. Decisions and rationale are in [de
 | Interceptor ordering | Outside-in execution, inside-out response. Compose by wrapping: outer interceptor sees message first. |
 | Knowledge eviction | `knowledge.expire before_time kb` — explicit eviction by caller. No auto-TTL. |
 
+## Resolved Post-v0.1 (Session 33)
+
+| Question | Decision |
+|---|---|
+| Reactive dataflow | `\|>>` streaming pipe operator. Same precedence as `\|`. Lazy — items flow downstream as they complete. `collect` materializes. Spec: `spec/concurrency-reactive.md`. |
+| Agent crash recovery | `agent.supervise` library function with Erlang-style strategies (one_for_one, one_for_all, rest_for_one). Spec: `spec/agents-supervision.md`. |
+| Context propagation | `with context key: val { }` — ambient context that auto-propagates deadline, budget, request_id, trace_id to all agent ops. Spec: `spec/agents-ambient.md`. |
+| Agent back-channel | `caller` implicit binding in handler (like `it` in `sel`). Agents can ask their caller questions inline. Spec: `spec/agents-clarify.md`. |
+| Human-in-the-loop | `agent.gate` library function. Structured approval with timeout policy (:abort/:approve/:reject/:escalate). Spec: `spec/agents-gates.md`. |
+| Agent capability query | `Capabilities` protocol + `agent.capabilities` query helper. Agents self-report protocols, tools, domains, budget, status. Spec: `spec/agents-capability.md`. |
+| Multi-agent transactions | `std/saga` module. Saga pattern with compensating actions in reverse order. Spec: `spec/agents-saga.md`. |
+| Message urgency | `_priority` field on messages (`:critical`, `:high`, `:normal`, `:low`). Runtime priority queue. Spec: `spec/agents-priority.md`. |
+| Context compression | `ai.summarize` function in `std/ai`. Structured compression of agent history with keep/drop policies. |
+| Retry strategies | Enhanced `retry_with` with per-error-type strategy, exponential backoff, jitter, circuit breaker integration. |
+
 ## Agentic Design Questions (v1)
 
 These are open questions for the agentic layer — to be resolved during implementation:
@@ -87,6 +102,11 @@ These are open questions for the agentic layer — to be resolved during impleme
 | Checkpoint scope | Should `checkpoint` track shell commands via compensating actions? Current design: shell/MCP not rolled back. |
 | Blackboard consistency | Should `std/blackboard` support CRDTs or transactional multi-key updates beyond last-write-wins? |
 | Stream backpressure | When a `~>>?` consumer is slower than the producer, buffer or block? |
+
+| Saga undo failures | Record and continue — don't fail the compensation chain. Return full report of what succeeded/failed. |
+| Priority preemption | No mid-handler interruption. Critical messages queued and processed next. Long handlers can poll with `agent.check_critical`. |
+| Ambient context custom fields | Pass through as-is, no runtime enforcement. Available via `context.current ()`. |
+| `\|>>` ordering | Completion order by default (fastest first). Caller uses `sort_by` for input order if needed. |
 
 ## Considerations for v2
 

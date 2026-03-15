@@ -10,6 +10,10 @@ Total: **13**
 
 Additionally, `Protocol` and `MCP` are recognized as declaration keywords when they appear at statement level followed by a type name.
 
+`context` is recognized as a modifier keyword after `with`: `with context key: val { body }`. See [agents-ambient.md](agents-ambient.md).
+
+`caller` is an implicit binding (like `it` in `sel`) available inside agent handler functions. See [agents-clarify.md](agents-clarify.md).
+
 Every other construct uses sigils (`$`, `^`, `?`, `+`, `??`, `<-`, `:=`) or function application. `dbg`, `tap`, `log`, `not`, `defer`, `require`, `identity`, `collect`, `rollback` are built-in functions, not keywords — they can technically be shadowed.
 
 ## Built-in Names
@@ -46,7 +50,7 @@ Macros, operator overloading, inheritance/class hierarchies, unstructured spawn/
  4.  * / % //    multiplicative
  5.  + -         additive
  6.  ..  ..=     range
- 7.  ++ ~> ~>? ~>>?  concatenation / agent communication
+ 7.  ++ ~> ~>? ~>>? |>>  concat / agent comm / streaming pipe
  8.  |           pipe
  9.  == != < > <= >=   comparison
 10.  &&          logical and
@@ -155,15 +159,17 @@ expr        = literal | IDENT | TYPE | section
             | "emit" expr
             | "with" IDENT "=" expr "{" (stmt SEP)* "}"
             | "with" IDENT ":=" expr "{" (stmt SEP)* "}"
+            | "with" "context" field* "{" (stmt SEP)* "}"
             | expr "~>" expr
             | expr "~>?" expr
             | expr "~>>?" expr
+            | expr "|>>" expr
             | "checkpoint" STR "{" (stmt SEP)* "}"
             | IDENT ("." IDENT)+ "<-" expr
             | "(" params ")" ("->" type)? expr
 
 binop       = "+" | "-" | "*" | "/" | "%" | "//"
-            | "++" | "~>" | "~>?" | "~>>?"
+            | "++" | "~>" | "~>?" | "~>>?" | "|>>"
             | "==" | "!=" | "<" | ">" | "<=" | ">="
             | "&&" | "||"
             | "??" | ".." | "..="
@@ -235,6 +241,8 @@ map_entry   = expr ":" expr | ".." expr
 - `yield expr` suspends the current script and sends `expr` to the orchestrator. Execution resumes when the orchestrator provides a response.
 - `emit expr` sends `expr` to the human/orchestrator as fire-and-forget output. Returns `()`. Does not block. Strings print directly; records are JSON-encoded.
 - `with name = expr { body }` binds `name` to `expr` for the duration of `body` (immutable). `with name := expr { body }` is the mutable variant.
+- `with context key: val { body }` establishes ambient context for the block. See [agents-ambient.md](agents-ambient.md).
+- `|>>` is a streaming pipe operator — pushes items downstream as they complete. See [concurrency-reactive.md](concurrency-reactive.md).
 - `Protocol TypeName = { ... }` defines a typed protocol (set of message/response pairs). `MCP TypeName = { ... }` defines an MCP tool declaration.
 - `~>` sends a message to an agent synchronously. `~>?` sends a message and returns `Ok result` or `Err error` instead of propagating failures. `~>>?` sends a message and returns a lazy stream of partial results.
 - `checkpoint "name" { body }` snapshots mutable state. `rollback "name"` (built-in function) restores the snapshot and exits the block with `Err`.
