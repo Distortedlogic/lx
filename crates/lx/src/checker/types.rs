@@ -8,6 +8,7 @@ pub enum Type {
   Float,
   Bool,
   Str,
+  Regex,
   Unit,
   Bytes,
 
@@ -191,6 +192,7 @@ pub fn display(ty: &Type) -> String {
     Type::Float => "Float".into(),
     Type::Bool => "Bool".into(),
     Type::Str => "Str".into(),
+    Type::Regex => "Regex".into(),
     Type::Unit => "()".into(),
     Type::Bytes => "Bytes".into(),
     Type::List(inner) => format!("[{}]", display(inner)),

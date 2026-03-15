@@ -13,6 +13,7 @@ impl super::Parser {
       TokenKind::False => Ok(SExpr::new(Expr::Literal(Literal::Bool(false)), tok.span)),
       TokenKind::Unit => Ok(SExpr::new(Expr::Literal(Literal::Unit), tok.span)),
       TokenKind::RawStr(s) => Ok(SExpr::new(Expr::Literal(Literal::RawStr(s)), tok.span)),
+      TokenKind::Regex(s) => Ok(SExpr::new(Expr::Literal(Literal::Regex(s)), tok.span)),
       TokenKind::StrStart => self.parse_string(tok.span.offset),
       TokenKind::Ident(name) => Ok(SExpr::new(Expr::Ident(name), tok.span)),
       TokenKind::TypeName(name) => Ok(SExpr::new(Expr::TypeConstructor(name), tok.span)),
@@ -255,6 +256,7 @@ impl super::Parser {
         | TokenKind::Float(_)
         | TokenKind::StrStart
         | TokenKind::RawStr(_)
+        | TokenKind::Regex(_)
         | TokenKind::Ident(_)
         | TokenKind::TypeName(_)
         | TokenKind::LParen

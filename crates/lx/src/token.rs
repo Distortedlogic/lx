@@ -21,6 +21,7 @@ pub enum TokenKind {
   StrChunk(String),
   StrEnd,
   RawStr(String),
+  Regex(String),
   True,
   False,
   Unit,

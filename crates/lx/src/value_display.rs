@@ -76,6 +76,7 @@ impl fmt::Display for Value {
       Value::Float(v) => write!(f, "{v}"),
       Value::Bool(b) => write!(f, "{b}"),
       Value::Str(s) => write!(f, "{s}"),
+      Value::Regex(r) => write!(f, "r/{}/", r.as_str()),
       Value::Unit => write!(f, "()"),
       Value::List(items) => {
         write!(f, "[")?;

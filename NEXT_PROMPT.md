@@ -32,6 +32,8 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 - Arithmetic, bindings, strings, interpolation, collections (lists, records, maps, tuples), pattern matching
 - Functions, closures, currying, default params, pipes, sections, slicing, named args
 - Type definitions with tagged values and pattern matching
+- Type annotations: `(x: Int y: Str) -> Result Int Str { ... }` on params, return types, bindings
+- Type checker: `lx check` — bidirectional inference, unification, structural subtyping
 - Concurrency: `par`, `sel`, `pmap`, `pmap_n`, `timeout` (sequential impl)
 - Shell: `$cmd`, `$^cmd`, `${...}` with interpolation
 - Error handling: `^` propagation, `??` coalescing, `(?? default)` sections
@@ -42,9 +44,7 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 - `yield` coroutine: callback-based, JSON-line orchestrator protocol
 - `with` scoped bindings + record field update (`name.field <- value`)
 - 12 stdlib modules: `std/json`, `std/ctx`, `std/math`, `std/fs`, `std/env`, `std/re`, `std/md`, `std/agent`, `std/mcp`, `std/http`, `std/time`, `std/cron`
-- MCP HTTP streaming transport, `lx agent` subcommand
-- Type annotations: `(x: Int y: Str) -> Result Int Str { ... }` on params, return types, bindings
-- Type checker: `lx check` — bidirectional inference, unification, structural subtyping
+- MCP HTTP streaming transport, `lx agent` and `lx check` subcommands
 
 ### Syntax gotchas
 
@@ -57,65 +57,54 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 - `yield expr` pauses, sends to orchestrator, returns response. JSON-line protocol on stdin/stdout
 - `with name = expr { body }` scoped binding. `:=` or `mut` for mutable. Returns body's last value
 - `name.field <- value` updates mutable record field. Nested: `name.a.b <- value`. Requires `:=` binding
-- Type annotations: `(x: Int y: Str) -> Result Int Str { body }`. Param types, return type, error type all optional
+- Type annotations: `(x: Int y: Str) -> Result Int Str { body }`. All optional. `lx check` validates, `lx run` ignores.
 - Type args after uppercase names only: `Maybe Int` works, `Maybe a` requires `(Maybe a)` parens for lowercase type vars
-- `lx check file.lx` — runs type checker without executing. `lx run` skips checking
 
 ## What To Work On Next
 
 ### Language priorities:
 
-1. ~~**Type annotations + type checker**~~ — DONE (Session 29). `(x: Int) -> Str ^ Err` on params/returns/bindings. `lx check` runs bidirectional inference + unification. `lx run` still dynamic.
-2. **Regex literals** — bring back `r/\d+/`. String patterns with double escaping is hostile to LLM generation. Lexer already had this; re-add.
+1. **Regex literals** — bring back `r/\d+/`. String patterns with double escaping is hostile to LLM generation. Lexer already had this; re-add.
 
 ### Stdlib roadmap (full plan: `design/stdlib_roadmap.md`):
 
-3. **`std/ai`** — LLM integration. Generic interface, Claude Code CLI backend. `ai.prompt` (simple) + `ai.prompt_with` (full: system/model/tools/schema/budget/resume). Foundation for all standard agents — auditor/grader/router all depend on this.
-4. **`std/tasks`** — task state machine, subtasks, auto-persist. Design doc: `design/std_tasks.md`.
-5. **`std/audit`** — structural quality checks. Design doc: `design/std_audit.md`.
-6. **`std/agents/auditor`** — LLM quality gate. Uses std/audit as pre-filter, std/ai for judgment.
-7. **`std/agents/router`** — prompt → specialist classification. Uses std/ai.
-8. **`std/agents/grader`** — rubric scoring, incremental re-grade. Uses std/ai.
-9. **`std/agents/planner`** — task decomposition into ordered subtasks. Uses std/ai.
-10. **`std/circuit`** — circuit breakers (turn/time/token limits, action repetition).
-11. **`std/memory`** — tiered L0-L3 memory with confidence, promotion/demotion.
-12. **`std/trace`** — trace collection, scoring, dataset export.
-13. **`std/agents/monitor`** — QC sampling of running subagents.
-14. **`std/agents/reviewer`** — post-hoc transcript review, learning extraction.
-15. **`MCP Embeddings`** — typed interface to embedding services (similarity, retrieval).
+2. **`std/ai`** — LLM integration. Generic interface, Claude Code CLI backend. `ai.prompt` (simple) + `ai.prompt_with` (full: system/model/tools/schema/budget/resume). Foundation for all standard agents — auditor/grader/router all depend on this.
+3. **`std/tasks`** — task state machine, subtasks, auto-persist. Design doc: `design/std_tasks.md`.
+4. **`std/audit`** — structural quality checks. Design doc: `design/std_audit.md`.
+5. **`std/agents/auditor`** — LLM quality gate. Uses std/audit as pre-filter, std/ai for judgment.
+6. **`std/agents/router`** — prompt → specialist classification. Uses std/ai.
+7. **`std/agents/grader`** — rubric scoring, incremental re-grade. Uses std/ai.
+8. **`std/agents/planner`** — task decomposition into ordered subtasks. Uses std/ai.
+9. **`std/circuit`** — circuit breakers (turn/time/token limits, action repetition).
+10. **`std/memory`** — tiered L0-L3 memory with confidence, promotion/demotion.
+11. **`std/trace`** — trace collection, scoring, dataset export.
+12. **`std/agents/monitor`** — QC sampling of running subagents.
+13. **`std/agents/reviewer`** — post-hoc transcript review, learning extraction.
+14. **`MCP Embeddings`** — typed interface to embedding services (similarity, retrieval).
 
 Design docs: `design/standard_agents.md`, `design/stdlib_roadmap.md`
 
 ### Technical debt:
 
-16. **Currying removal** (deferred) — requires parser architecture change
-17. **Toolchain** (Phase 10) — `lx fmt`, `lx repl`, `lx check`, `lx watch`
+15. **Currying removal** (deferred) — requires parser architecture change
+16. **Toolchain** — `lx fmt`, `lx repl`, `lx watch`
 
-### Real-flow coverage map:
+### Remaining gaps:
 
-| Flow Pattern | lx Status |
+| Gap | Solution |
 |---|---|
-| Agent spawn + fanout | Covered (`pmap` + `~>?`) |
-| Message validation | Covered (`Protocol`) |
-| MCP tool invocation | Covered (`std/mcp` + `MCP` decls) |
-| Context persistence | Covered (`std/ctx`) |
-| Scheduled execution | Covered (`std/cron`) |
-| Executable plans | Covered (`yield`) |
-| Grading loops | Covered (`loop` + `~>?`) |
-| Shell integration | Covered (`$`/`$^`/`${}`) |
-| LLM integration | **GAP** → `std/ai` |
-| End-to-end type safety | Covered (`lx check` + annotations) |
-| Regex patterns | **GAP** → `r/pattern/` literals |
-| Task tracking | **GAP** → `std/tasks` |
-| Quality checks | **GAP** → `std/audit` + `std/agents/auditor` + `std/agents/grader` |
-| Prompt routing | **GAP** → `std/agents/router` |
-| Task decomposition | **GAP** → `std/agents/planner` |
-| Circuit breakers | **GAP** → `std/circuit` |
-| Tiered memory | **GAP** → `std/memory` |
-| Observability | **GAP** → `std/trace` |
-| Subagent QC | **GAP** → `std/agents/monitor` |
-| Learning from experience | **GAP** → `std/agents/reviewer` |
-| Embeddings/similarity | **GAP** → `MCP Embeddings` |
+| LLM integration | `std/ai` |
+| Regex patterns | `r/pattern/` literals |
+| Task tracking | `std/tasks` |
+| Quality checks | `std/audit` + `std/agents/auditor` + `std/agents/grader` |
+| Prompt routing | `std/agents/router` |
+| Task decomposition | `std/agents/planner` |
+| Circuit breakers | `std/circuit` |
+| Tiered memory | `std/memory` |
+| Observability | `std/trace` |
+| Subagent QC | `std/agents/monitor` |
+| Learning from experience | `std/agents/reviewer` |
+| Embeddings/similarity | `MCP Embeddings` |
 
 ## Codebase Layout
 
@@ -131,7 +120,7 @@ crates/lx/src/
 crates/lx-cli/src/main.rs
 spec/          23 language spec files
 design/        11 impl design docs + DEVLOG + CURRENT_OPINION
-tests/         23 .lx test files
+tests/         24 .lx test files
   fixtures/    agent_echo.lx, mcp_test_server.py, yield_orchestrator.py, etc.
 flows/         14 .lx programs translating arch_diagrams
   specs/       14 target goal + scenario specs
@@ -154,7 +143,7 @@ flows/         14 .lx programs translating arch_diagrams
 | `dashmap` | Concurrent registries (agent, mcp, tool defs) |
 | `parking_lot` | Fast Mutex for Env, module cache |
 
-Custom code (~8300 lines: lexer, parser, interpreter, AST, builtins, stdlib) is language-specific — no crate replaces it. When adding new stdlib, use established crates.
+Custom code (~9200 lines: lexer, parser, checker, interpreter, AST, builtins, stdlib) is language-specific — no crate replaces it. When adding new stdlib, use established crates.
 
 ## Adding a Stdlib Module
 

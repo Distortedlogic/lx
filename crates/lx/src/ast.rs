@@ -113,6 +113,7 @@ pub enum Literal {
   Float(f64),
   Str(Vec<StrPart>),
   RawStr(String),
+  Regex(String),
   Bool(bool),
   Unit,
 }

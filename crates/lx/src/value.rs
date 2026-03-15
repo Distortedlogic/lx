@@ -16,6 +16,7 @@ pub enum Value {
   Float(f64),
   Bool(bool),
   Str(Arc<str>),
+  Regex(Arc<regex::Regex>),
   Unit,
 
   List(Arc<Vec<Value>>),
@@ -71,6 +72,7 @@ impl Value {
       (Value::Float(a), Value::Float(b)) => a.to_bits() == b.to_bits(),
       (Value::Bool(a), Value::Bool(b)) => a == b,
       (Value::Str(a), Value::Str(b)) => a == b,
+      (Value::Regex(a), Value::Regex(b)) => a.as_str() == b.as_str(),
       (Value::Unit, Value::Unit) => true,
       (Value::List(a), Value::List(b)) => a == b,
       (Value::Tuple(a), Value::Tuple(b)) => a == b,
@@ -106,6 +108,7 @@ impl Value {
       Value::Float(f) => f.to_bits().hash(state),
       Value::Bool(b) => b.hash(state),
       Value::Str(s) => s.hash(state),
+      Value::Regex(r) => r.as_str().hash(state),
       Value::Unit => {},
       Value::List(items) | Value::Tuple(items) => {
         items.len().hash(state);

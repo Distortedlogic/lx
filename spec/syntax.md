@@ -41,31 +41,7 @@ msg = "
 -- result: "hello\nworld\n"
 ```
 
-The stripping algorithm:
-1. If the first character after the opening delimiter is a newline, remove it
-2. Find the closing delimiter's column (indentation level)
-3. Strip that many leading whitespace characters from each line
-4. Trailing newline before the closing delimiter is preserved
-
-```
-sql = "
-  SELECT *
-  FROM users
-  WHERE active = true
-  "
--- result: "SELECT *\nFROM users\nWHERE active = true\n"
-```
-
-Single-line strings are not affected: `"hello world"` is just `"hello world"`. Use `\n` for explicit newlines in single-line strings.
-
-For heredoc-style content with no interpolation, use backticks:
-
-```
-script = `
-  #!/bin/bash
-  echo "hello {not interpolated}"
-  `
-```
+The stripping algorithm: remove leading newline after opening delimiter, strip indentation matching closing delimiter's column, preserve trailing newline. Single-line strings are not affected. Backticks work the same way but with no interpolation.
 
 ## Bindings
 
@@ -73,9 +49,12 @@ script = `
 x = 5          -- immutable (default)
 x := 5         -- mutable
 x <- 10        -- reassign mutable
+x: Int = 5     -- immutable with type annotation
 ```
 
 No `let`/`const`/`var`. `=` is always immutable binding. `:=` creates a mutable binding. `<-` reassigns an existing mutable. Shadowing with `=` is allowed (creates a new immutable binding that shadows the old one).
+
+Type annotations on bindings are optional. When present, `lx check` validates the value matches the declared type.
 
 ## Functions
 
@@ -90,6 +69,22 @@ process = (data) {
 }
 now = () $date
 ```
+
+### Type annotations
+
+Parameters and return types can be annotated. Annotations are optional — omitted types are inferred by the checker or ignored at runtime:
+
+```
+add = (x: Int y: Int) -> Int x + y
+greet = (name: Str) "hello {name}"
+safe_div = (a: Int b: Int) -> Int ^ Str {
+  b == 0 ? Err "division by zero" : Ok (a / b)
+}
+```
+
+`-> Type` after the closing `)` declares the return type. `-> Type ^ ErrType` declares a fallible return. Complex type arguments must be parenthesized: `(x: (Maybe Int))` not `(x: Maybe a)` (since lowercase `a` would be treated as the next parameter name).
+
+### Default parameters and named arguments
 
 Default parameters use `=`. Named arguments at call site use `:`:
 

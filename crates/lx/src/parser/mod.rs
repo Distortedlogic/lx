@@ -215,6 +215,7 @@ impl Parser {
         | TokenKind::Float(_)
         | TokenKind::StrStart
         | TokenKind::RawStr(_)
+        | TokenKind::Regex(_)
         | TokenKind::Ident(_)
         | TokenKind::TypeName(_)
         | TokenKind::LParen

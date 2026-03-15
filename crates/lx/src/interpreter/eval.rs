@@ -41,6 +41,11 @@ impl Interpreter {
       Literal::Bool(b) => Ok(Value::Bool(*b)),
       Literal::Str(parts) => self.eval_string_parts(parts),
       Literal::RawStr(s) => Ok(Value::Str(Arc::from(s.as_str()))),
+      Literal::Regex(s) => {
+        let re = regex::Regex::new(s)
+          .map_err(|e| LxError::runtime(format!("invalid regex: {e}"), span))?;
+        Ok(Value::Regex(Arc::new(re)))
+      },
       Literal::Unit => {
         let _ = span;
         Ok(Value::Unit)

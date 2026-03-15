@@ -245,6 +245,7 @@ impl<'src> Lexer<'src> {
       },
       '_' if !self.peek().is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '\'') => Ok(Some(self.tok(TokenKind::Underscore, start))),
       c if c.is_ascii_digit() => self.read_number(start).map(Some),
+      'r' if self.peek() == Some('/') => self.read_regex(start).map(Some),
       c if c.is_ascii_lowercase() || c == '_' => self.read_ident_or_keyword(start).map(Some),
       c if c.is_ascii_uppercase() => self.read_type_name(start).map(Some),
       other => Err(LxError::parse(format!("unexpected character: {other}"), Span::new(start as u32, other.len_utf8() as u16), None)),
@@ -282,6 +283,40 @@ impl<'src> Lexer<'src> {
       _ => TokenKind::Ident(text.to_string()),
     };
     Ok(Token::new(kind, span))
+  }
+
+  fn read_regex(&mut self, start: usize) -> Result<Token, LxError> {
+    self.advance();
+    let mut pattern = String::new();
+    loop {
+      match self.peek() {
+        None | Some('\n') => {
+          return Err(LxError::parse("unterminated regex literal", Span::new(start as u32, 1), None));
+        },
+        Some('/') => {
+          self.advance();
+          break;
+        },
+        Some('\\') => {
+          self.advance();
+          match self.peek() {
+            Some('/') => { self.advance(); pattern.push('/'); },
+            Some(c) => { self.advance(); pattern.push('\\'); pattern.push(c); },
+            None => {
+              return Err(LxError::parse("unterminated regex literal", Span::new(start as u32, 1), None));
+            },
+          }
+        },
+        Some(c) => { self.advance(); pattern.push(c); },
+      }
+    }
+    let mut flags = String::new();
+    while self.peek().is_some_and(|c| matches!(c, 'i' | 'm' | 's' | 'x')) {
+      flags.push(self.advance().unwrap());
+    }
+    let full = if flags.is_empty() { pattern } else { format!("(?{flags}){pattern}") };
+    let span = Span::from_range(start as u32, self.pos as u32);
+    Ok(Token::new(TokenKind::Regex(full), span))
   }
 
   fn read_type_name(&mut self, start: usize) -> Result<Token, LxError> {

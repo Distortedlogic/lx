@@ -156,7 +156,7 @@ expr        = literal | IDENT | TYPE | section
             | expr "~>" expr
             | expr "~>?" expr
             | IDENT ("." IDENT)+ "<-" expr
-            | "(" params ")" expr
+            | "(" params ")" ("->" type)? expr
 
 binop       = "+" | "-" | "*" | "/" | "%" | "//"
             | "++" | "~>" | "~>?"
@@ -232,3 +232,5 @@ map_entry   = expr ":" expr | ".." expr
 - `with name = expr { body }` binds `name` to `expr` for the duration of `body` (immutable). `with name := expr { body }` is the mutable variant.
 - `Protocol TypeName = { ... }` defines a typed protocol (set of message/response pairs). `MCP TypeName = { ... }` defines an MCP tool declaration.
 - `~>` sends a message to an agent synchronously. `~>?` sends a message and returns `Ok result` or `Err error` instead of propagating failures.
+- Type annotations are optional on function parameters (`x: Int`), return types (`-> Int`), fallible returns (`-> Int ^ Str`), and bindings (`name: Int = 5`). The checker validates annotations; the interpreter ignores them.
+- In type application `TYPE type+`, only uppercase `TYPE` and delimited tokens (`[`, `(`, `%{`) are consumed as arguments. Lowercase identifiers are NOT consumed to avoid ambiguity with parameter names. Use parens for type variable arguments: `(x: (Maybe a))` not `(x: Maybe a)`.

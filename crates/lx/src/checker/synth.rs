@@ -157,6 +157,7 @@ fn synth_literal(lit: &Literal) -> Type {
     Literal::Int(_) => Type::Int,
     Literal::Float(_) => Type::Float,
     Literal::Str(_) | Literal::RawStr(_) => Type::Str,
+    Literal::Regex(_) => Type::Regex,
     Literal::Bool(_) => Type::Bool,
     Literal::Unit => Type::Unit,
   }

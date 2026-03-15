@@ -16,9 +16,9 @@ Written by the language designer (Claude). Updated after Session 29.
 
 **Context threading is solved.** `with` scoped bindings + record field update.
 
-## What's Still Wrong
+**Type annotations + checker.** `(x: Int y: Str) -> Response ^ HttpErr` on params, return types, and bindings. `lx check` runs bidirectional inference with unification and structural subtyping. `lx run` stays dynamic. Next step: connect Protocol field types to function param annotations for end-to-end validation.
 
-**Type annotations and type checker are back.** Session 29 restored them. `(x: Int y: Str) -> Response ^ HttpErr` on params, return types, and bindings. `lx check` runs bidirectional inference with unification and structural subtyping. `lx run` stays dynamic — checker is optional. Annotations flow through the AST but the interpreter ignores them. The checker validates: return type matches body type, binding type matches value type, and arithmetic/logic type consistency. Next: connect Protocol field types to function param annotations for end-to-end validation.
+## What's Still Wrong
 
 **Regex literals were removed for the wrong reason.** `re.is_match "\\d+" text` with double-escaped backslashes is hostile to LLM generation. `r/\d+/` is what every LLM would naturally produce. Removed to simplify the lexer — but implementation effort is not a design argument.
 
@@ -28,11 +28,11 @@ Written by the language designer (Claude). Updated after Session 29.
 
 **No LLM integration.** lx has 6 planned standard agents that all say "LLM judgment" — auditor, grader, router. But no module provides LLM access. Shelling out to `claude` or raw `http.post` loses error handling, session continuity, structured output, and budget control. `std/ai` is needed as a Communication-layer module alongside std/agent and std/mcp.
 
-## Real-World Gap Analysis (Session 26)
+## Gap Analysis
 
 Reviewed `mcp-toolbelt/packages/arch_diagrams` — 14 agentic flow architectures. These are the ACTUAL flows lx was designed to express.
 
-**What lx covers well:** agent spawning + fanout, message validation, MCP tool invocation, context persistence, scheduled execution, executable plans, grading loops, shell integration.
+**What lx covers well:** agent spawning + fanout, message validation, MCP tool invocation, context persistence, scheduled execution, executable plans, grading loops, shell integration, end-to-end type safety.
 
 **Critical gaps** (full stdlib roadmap in `design/stdlib_roadmap.md`):
 
@@ -50,4 +50,4 @@ Reviewed `mcp-toolbelt/packages/arch_diagrams` — 14 agentic flow architectures
 
 ## Bottom Line
 
-12 stdlib modules. Communication/orchestration layer is solid. Type annotations + checker restored. One foundational item remains: regex literals. Then the full stdlib buildout: 5 new modules, 6 standard agents, 2 MCP declarations. An agent language's stdlib includes agents. See `NEXT_PROMPT.md` for priority order, `design/stdlib_roadmap.md` for the full plan.
+12 stdlib modules. Communication/orchestration layer is solid. Type annotations + checker working. One foundational item remains: regex literals. Then the full stdlib buildout: 5 new modules, 6 standard agents, 2 MCP declarations. An agent language's stdlib includes agents. See `NEXT_PROMPT.md` for priority order, `design/stdlib_roadmap.md` for the full plan.

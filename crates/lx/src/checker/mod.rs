@@ -177,6 +177,7 @@ fn named_to_type(name: &str) -> Type {
     "Float" => Type::Float,
     "Bool" => Type::Bool,
     "Str" => Type::Str,
+    "Regex" => Type::Regex,
     "Unit" => Type::Unit,
     "Bytes" => Type::Bytes,
     _ => Type::Unknown,

@@ -9,6 +9,7 @@ The `lx` CLI and its subcommands.
 ```
 lx run script.lx              -- interpret and execute
 lx run script.lx -- arg1 arg2 -- pass arguments (available as env.args)
+lx check script.lx            -- type-check without executing
 lx agent script.lx             -- run as MCP agent (streamable HTTP transport)
 ```
 
@@ -18,7 +19,6 @@ lx agent script.lx             -- run as MCP agent (streamable HTTP transport)
 lx fmt                         -- format all .lx files in project
 lx fmt --check                 -- exit nonzero if unformatted (CI mode)
 lx test                        -- run test/ scripts, collect assert failures
-lx check                       -- type-check without executing
 lx build                       -- AOT compile to binary
 lx init                        -- create new project
 lx repl                        -- interactive session
@@ -82,22 +82,23 @@ assert (double 5 == 10) "double should multiply by 2"
 
 ## Type Checker
 
-**Status: Not yet implemented.** Planned — will validate function signatures against Protocol and MCP type boundaries.
+**Status: Implemented (Session 29).** Bidirectional inference with unification and structural subtyping.
 
-`lx check` runs type inference and reports errors without executing the script. Useful for catching type mismatches in code that hasn't been run yet.
+`lx check` runs type inference and reports errors without executing the script. `lx run` skips checking entirely — annotations are documentation at runtime.
 
-Checks performed:
-- Type inference and compatibility
-- Exhaustiveness of pattern matches
+Currently checks:
+- Return type matches body type when `-> Type` is annotated
+- Binding type matches value type when `name: Type = expr` is annotated
+- Arithmetic/logic type consistency (e.g., `Int + Str` is a mismatch)
 - `^` applied to non-Result/non-Maybe types
-- Non-Bool expressions in ternary `?` position
-- Mutable captures in concurrent contexts (`par`/`sel`/`pmap`)
-- Import conflicts and circular imports
-- Variant name uniqueness within a module
-- Unused bindings (warning, not error)
-- Shadowing of built-in functions (warning)
+- Ternary condition must be Bool
 
-`lx check --strict` treats warnings as errors.
+Planned but not yet implemented:
+- Exhaustiveness of pattern matches
+- Mutable captures in concurrent contexts (`par`/`sel`/`pmap`)
+- Protocol field types ↔ function param annotations
+- Import conflict detection
+- `lx check --strict` for warnings-as-errors
 
 ## Sandboxing
 
