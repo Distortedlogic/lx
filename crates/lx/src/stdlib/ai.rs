@@ -17,13 +17,13 @@ pub fn build() -> IndexMap<String, Value> {
     m
 }
 
-struct Opts {
-    system: Option<String>,
-    model: Option<String>,
-    max_turns: Option<i64>,
-    resume: Option<String>,
-    tools: Option<Vec<String>>,
-    append_system: Option<String>,
+pub(crate) struct Opts {
+    pub(crate) system: Option<String>,
+    pub(crate) model: Option<String>,
+    pub(crate) max_turns: Option<i64>,
+    pub(crate) resume: Option<String>,
+    pub(crate) tools: Option<Vec<String>>,
+    pub(crate) append_system: Option<String>,
 }
 
 fn build_command(opts: &Opts) -> Command {
@@ -53,7 +53,7 @@ fn build_command(opts: &Opts) -> Command {
     cmd
 }
 
-fn run_claude(prompt: &str, opts: &Opts, span: Span) -> Result<Value, LxError> {
+pub(crate) fn run_claude(prompt: &str, opts: &Opts, span: Span) -> Result<Value, LxError> {
     let mut cmd = build_command(opts);
     let mut child = match cmd.spawn() {
         Ok(c) => c,
@@ -112,7 +112,7 @@ fn parse_response(jv: &serde_json::Value) -> Result<Value, LxError> {
     Ok(Value::Ok(Box::new(Value::Record(Arc::new(fields)))))
 }
 
-fn default_opts() -> Opts {
+pub(crate) fn default_opts() -> Opts {
     Opts {
         system: None,
         model: None,

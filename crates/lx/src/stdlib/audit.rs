@@ -62,7 +62,7 @@ fn bi_is_repetitive(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Bool(dupes * 2 >= sentences.len()))
 }
 
-const HEDGING: &[&str] = &[
+pub(crate) const HEDGING: &[&str] = &[
     "i think", "maybe", "possibly", "i'm not sure", "perhaps",
     "it might", "it could be", "i believe", "not entirely sure",
 ];
@@ -73,7 +73,7 @@ fn bi_is_hedging(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Bool(HEDGING.iter().any(|h| lower.contains(h))))
 }
 
-const REFUSAL: &[&str] = &[
+pub(crate) const REFUSAL: &[&str] = &[
     "i can't", "i'm unable", "as an ai", "i cannot",
     "i'm not able", "i don't have the ability",
 ];

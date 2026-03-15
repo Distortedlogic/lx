@@ -25,7 +25,7 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 
 ## Current State
 
-`just diagnose` clean. `just test`: **32/32 PASS**. All language features complete.
+`just diagnose` clean. `just test`: **33/33 PASS**. All language features complete.
 
 ### What's implemented
 
