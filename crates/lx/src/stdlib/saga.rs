@@ -4,6 +4,7 @@ use std::time::Instant;
 
 use indexmap::IndexMap;
 
+use crate::backends::RuntimeCtx;
 use crate::builtins::{call_value, mk};
 use crate::error::LxError;
 use crate::span::Span;
@@ -77,10 +78,10 @@ fn step_fn(step: &Value, field: &str) -> Option<Value> {
     }
 }
 
-fn try_step(do_fn: &Value, prev: &Value, retries: usize, span: Span) -> Result<Value, Value> {
+fn try_step(do_fn: &Value, prev: &Value, retries: usize, span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, Value> {
     for attempt in 0..=retries {
         let last = attempt == retries;
-        match call_value(do_fn, prev.clone(), span) {
+        match call_value(do_fn, prev.clone(), span, ctx) {
             Ok(Value::Err(e)) if last => return Err(*e),
             Ok(Value::Err(_)) => continue,
             Ok(v) => return Ok(v),
@@ -97,16 +98,17 @@ fn compensate(
     completed: &[(String, Value, Value)],
     opts: &SagaOpts,
     span: Span,
+    ctx: &Arc<RuntimeCtx>,
 ) -> (Vec<String>, Vec<Value>) {
     let mut compensated = Vec::new();
     let mut comp_errors = Vec::new();
     for (id, result, undo_fn) in completed.iter().rev() {
         if let Some(ref on_comp) = opts.on_compensate {
             let id_val = Value::Str(Arc::from(id.as_str()));
-            let _ = call_value(on_comp, id_val, span)
-                .and_then(|partial| call_value(&partial, result.clone(), span));
+            let _ = call_value(on_comp, id_val, span, ctx)
+                .and_then(|partial| call_value(&partial, result.clone(), span, ctx));
         }
-        let undo_result = call_value(undo_fn, result.clone(), span);
+        let undo_result = call_value(undo_fn, result.clone(), span, ctx);
         match undo_result {
             Ok(Value::Err(e)) => {
                 let mut f = IndexMap::new();
@@ -144,6 +146,7 @@ fn run_saga(
     initial_prev: Vec<(String, Value)>,
     opts: &SagaOpts,
     span: Span,
+    ctx: &Arc<RuntimeCtx>,
 ) -> Result<Value, LxError> {
     let start = Instant::now();
     let mut remaining: Vec<Value> = steps.to_vec();
@@ -156,7 +159,7 @@ fn run_saga(
             break;
         }
         if let Some(timeout) = opts.timeout_secs && start.elapsed().as_secs() >= timeout {
-            let (comp, comp_err) = compensate(&completed, opts, span);
+            let (comp, comp_err) = compensate(&completed, opts, span, ctx);
             return Ok(make_err("__timeout", Value::Str(Arc::from("saga timeout exceeded")), &comp, comp_err));
         }
         let Some(idx) = next_ready(&remaining, &completed_ids) else {
@@ -170,14 +173,14 @@ fn run_saga(
             .ok_or_else(|| LxError::type_err(format!("saga step '{sid}' missing 'undo' function"), span))?;
         let prev = build_prev(&results);
 
-        match try_step(&do_fn, &prev, opts.max_retries, span) {
+        match try_step(&do_fn, &prev, opts.max_retries, span, ctx) {
             Ok(result) => {
                 results.push((sid.clone(), result.clone()));
                 completed.push((sid.clone(), result, undo_fn));
                 completed_ids.insert(sid);
             }
             Err(error) => {
-                let (comp, comp_err) = compensate(&completed, opts, span);
+                let (comp, comp_err) = compensate(&completed, opts, span, ctx);
                 return Ok(make_err(&sid, error, &comp, comp_err));
             }
         }
@@ -187,20 +190,20 @@ fn run_saga(
     Ok(Value::Ok(Box::new(Value::Record(Arc::new(result_fields)))))
 }
 
-fn bi_run(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_run(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let steps = args[0].as_list()
         .ok_or_else(|| LxError::type_err("saga.run expects List of steps", span))?;
-    run_saga(steps, Vec::new(), &SagaOpts::default(), span)
+    run_saga(steps, Vec::new(), &SagaOpts::default(), span, ctx)
 }
 
-fn bi_run_with(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_run_with(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let steps = args[0].as_list()
         .ok_or_else(|| LxError::type_err("saga.run_with: first arg must be List of steps", span))?;
     let opts = parse_opts(&args[1], span)?;
-    run_saga(steps, Vec::new(), &opts, span)
+    run_saga(steps, Vec::new(), &opts, span, ctx)
 }
 
-fn bi_define(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_define(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let Value::List(_) = &args[0] else {
         return Err(LxError::type_err("saga.define expects List of steps", span));
     };
@@ -210,7 +213,7 @@ fn bi_define(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Record(Arc::new(fields)))
 }
 
-fn bi_execute(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_execute(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let Value::Record(def) = &args[0] else {
         return Err(LxError::type_err("saga.execute: first arg must be a saga definition", span));
     };
@@ -221,5 +224,5 @@ fn bi_execute(args: &[Value], span: Span) -> Result<Value, LxError> {
         Value::Record(r) => r.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
         _ => Vec::new(),
     };
-    run_saga(steps, initial, &SagaOpts::default(), span)
+    run_saga(steps, initial, &SagaOpts::default(), span, ctx)
 }

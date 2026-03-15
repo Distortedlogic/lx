@@ -28,13 +28,13 @@ fn maybe(v: Option<&Value>) -> Value {
   v.map_or(Value::None, |v| Value::Some(Box::new(v.clone())))
 }
 
-fn bi_first(args: &[Value], sp: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
+fn bi_first(args: &[Value], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   Ok(maybe(args[0].as_list().ok_or_else(|| LxError::type_err("first expects List", sp))?.first()))
 }
-fn bi_last(args: &[Value], sp: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
+fn bi_last(args: &[Value], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   Ok(maybe(args[0].as_list().ok_or_else(|| LxError::type_err("last expects List", sp))?.last()))
 }
-fn bi_contains(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
+fn bi_contains(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   match &args[1] {
     Value::Str(s) => {
       let needle = args[0].as_str().ok_or_else(|| LxError::type_err("contains?: needle must be Str for Str haystack", span))?;
@@ -44,7 +44,7 @@ fn bi_contains(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, L
     other => Err(LxError::type_err(format!("contains? expects Str/List, got {}", other.type_name()), span)),
   }
 }
-fn bi_get(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
+fn bi_get(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   match &args[1] {
     Value::List(l) => {
       let n = args[0]
@@ -63,17 +63,17 @@ fn bi_get(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, LxErro
     other => Err(LxError::type_err(format!("get expects List/Record/Map, got {}", other.type_name()), span)),
   }
 }
-fn bi_sort(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
+fn bi_sort(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let l = args[0].as_list().ok_or_else(|| LxError::type_err("sort expects List", span))?;
   let mut items = l.as_ref().clone();
   items.sort_by(cmp_values);
   Ok(Value::List(Arc::new(items)))
 }
-fn bi_sorted_q(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
+fn bi_sorted_q(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let l = args[0].as_list().ok_or_else(|| LxError::type_err("sorted? expects List", span))?;
   Ok(Value::Bool(l.windows(2).all(|w| cmp_values(&w[0], &w[1]).is_le())))
 }
-fn bi_rev(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
+fn bi_rev(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let l = args[0].as_list().ok_or_else(|| LxError::type_err("rev expects List", span))?;
   let mut items = l.as_ref().clone();
   items.reverse();
@@ -108,23 +108,23 @@ fn num_fold(
   }
   if has_float { Ok(Value::Float(fa)) } else { Ok(Value::Int(ia)) }
 }
-fn bi_sum(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
+fn bi_sum(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let l = args[0].as_list().ok_or_else(|| LxError::type_err("sum expects List", span))?;
   num_fold("sum", l, BigInt::from(0), 0.0, |a, b| a + b, |a, b| a + b, span)
 }
-fn bi_product(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
+fn bi_product(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let l = args[0].as_list().ok_or_else(|| LxError::type_err("product expects List", span))?;
   num_fold("product", l, BigInt::from(1), 1.0, |a, b| a * b, |a, b| a * b, span)
 }
-fn bi_min(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
+fn bi_min(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let l = args[0].as_list().ok_or_else(|| LxError::type_err("min expects List", span))?;
   l.iter().min_by(|a, b| cmp_values(a, b)).cloned().ok_or_else(|| LxError::runtime("min: empty list", span))
 }
-fn bi_max(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
+fn bi_max(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let l = args[0].as_list().ok_or_else(|| LxError::type_err("max expects List", span))?;
   l.iter().max_by(|a, b| cmp_values(a, b)).cloned().ok_or_else(|| LxError::runtime("max: empty list", span))
 }
-fn bi_uniq(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
+fn bi_uniq(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let l = args[0].as_list().ok_or_else(|| LxError::type_err("uniq expects List", span))?;
   let mut out: Vec<Value> = Vec::with_capacity(l.len());
   for v in l.iter() {
@@ -134,7 +134,7 @@ fn bi_uniq(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, LxErr
   }
   Ok(Value::List(Arc::new(out)))
 }
-fn bi_flatten(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
+fn bi_flatten(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let l = args[0].as_list().ok_or_else(|| LxError::type_err("flatten expects List", span))?;
   let mut out = Vec::new();
   for v in l.iter() {
@@ -148,13 +148,13 @@ fn bi_flatten(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, Lx
 fn kv_tuple(k: Value, v: Value) -> Value {
   Value::Tuple(Arc::new(vec![k, v]))
 }
-fn bi_to_list(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
+fn bi_to_list(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   match &args[0] {
     Value::Map(m) => Ok(Value::List(Arc::new(m.iter().map(|(k, v)| kv_tuple(k.0.clone(), v.clone())).collect()))),
     other => Err(LxError::type_err(format!("to_list expects Map, got {}", other.type_name()), span)),
   }
 }
-fn bi_to_map(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
+fn bi_to_map(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   match &args[0] {
     Value::Record(r) => Ok(Value::Map(Arc::new(r.iter().map(|(k, v)| (ValueKey(Value::Str(Arc::from(k.as_str()))), v.clone())).collect()))),
     Value::List(l) => {
@@ -172,7 +172,7 @@ fn bi_to_map(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, LxE
     other => Err(LxError::type_err(format!("to_map expects Record/List, got {}", other.type_name()), span)),
   }
 }
-fn bi_to_record(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
+fn bi_to_record(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let m = match &args[0] {
     Value::Map(m) => m,
     other => return Err(LxError::type_err(format!("to_record expects Map, got {}", other.type_name()), span)),
@@ -184,28 +184,28 @@ fn bi_to_record(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, 
   }
   Ok(Value::Record(Arc::new(r)))
 }
-fn bi_keys(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
+fn bi_keys(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   match &args[0] {
     Value::Map(m) => Ok(Value::List(Arc::new(m.keys().map(|k| k.0.clone()).collect()))),
     Value::Record(r) => Ok(Value::List(Arc::new(r.keys().map(|k| Value::Str(Arc::from(k.as_str()))).collect()))),
     other => Err(LxError::type_err(format!("keys expects Map/Record, got {}", other.type_name()), span)),
   }
 }
-fn bi_values(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
+fn bi_values(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   match &args[0] {
     Value::Map(m) => Ok(Value::List(Arc::new(m.values().cloned().collect()))),
     Value::Record(r) => Ok(Value::List(Arc::new(r.values().cloned().collect()))),
     other => Err(LxError::type_err(format!("values expects Map/Record, got {}", other.type_name()), span)),
   }
 }
-fn bi_entries(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
+fn bi_entries(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   match &args[0] {
     Value::Map(m) => Ok(Value::List(Arc::new(m.iter().map(|(k, v)| kv_tuple(k.0.clone(), v.clone())).collect()))),
     Value::Record(r) => Ok(Value::List(Arc::new(r.iter().map(|(k, v)| kv_tuple(Value::Str(Arc::from(k.as_str())), v.clone())).collect()))),
     other => Err(LxError::type_err(format!("entries expects Map/Record, got {}", other.type_name()), span)),
   }
 }
-fn bi_has_key(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
+fn bi_has_key(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   match &args[1] {
     Value::Map(m) => Ok(Value::Bool(m.contains_key(&ValueKey(args[0].clone())))),
     Value::Record(r) => {
@@ -215,7 +215,7 @@ fn bi_has_key(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, Lx
     other => Err(LxError::type_err(format!("has_key? expects Map/Record, got {}", other.type_name()), span)),
   }
 }
-fn bi_remove(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
+fn bi_remove(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let m = match &args[1] {
     Value::Map(m) => m,
     other => return Err(LxError::type_err(format!("remove expects Map, got {}", other.type_name()), span)),
@@ -224,7 +224,7 @@ fn bi_remove(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, LxE
   out.shift_remove(&ValueKey(args[0].clone()));
   Ok(Value::Map(Arc::new(out)))
 }
-fn bi_merge(args: &[Value], span: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
+fn bi_merge(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   match (&args[0], &args[1]) {
     (Value::Map(m1), Value::Map(m2)) => {
       let mut merged = m1.as_ref().clone();

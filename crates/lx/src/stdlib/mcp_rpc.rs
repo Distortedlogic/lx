@@ -5,6 +5,7 @@ use dashmap::DashMap;
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 
+use crate::backends::RuntimeCtx;
 use crate::error::LxError;
 use crate::span::Span;
 use crate::value::Value;
@@ -149,7 +150,7 @@ fn init_handshake(conn: &mut McpConnection, span: Span) -> Result<(), LxError> {
     notify(conn, "notifications/initialized", span)
 }
 
-pub(super) fn connect(args: &[Value], span: Span) -> Result<Value, LxError> {
+pub(super) fn connect(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let transport = if is_http(&args[0]) {
         let url = http_url(&args[0], span)?;
         McpTransport::Http(HttpTransport::new(url, span)?)
@@ -169,7 +170,7 @@ pub(super) fn connect(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Ok(Box::new(Value::Record(Arc::new(rec)))))
 }
 
-pub(super) fn close(args: &[Value], span: Span) -> Result<Value, LxError> {
+pub(super) fn close(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = get_id(&args[0], span)?;
     match REGISTRY.remove(&id) {
         Some((_, conn)) => {

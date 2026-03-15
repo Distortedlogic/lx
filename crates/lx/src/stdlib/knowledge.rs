@@ -144,7 +144,7 @@ fn bi_get(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, L
     }
 }
 
-fn bi_query(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_query(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let filter_fn = &args[0];
     let id = kb_id(&args[1], span)?;
     let kb = KBS.get(&id)
@@ -152,7 +152,7 @@ fn bi_query(args: &[Value], span: Span) -> Result<Value, LxError> {
     let mut results = Vec::new();
     for (key, entry) in kb.entries.iter() {
         let entry_val = entry_to_value(key, entry);
-        let result = call_value(filter_fn, entry_val.clone(), span)?;
+        let result = call_value(filter_fn, entry_val.clone(), span, ctx)?;
         if matches!(result, Value::Bool(true)) {
             results.push(entry_val);
         }
@@ -160,7 +160,7 @@ fn bi_query(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::List(Arc::new(results)))
 }
 
-fn bi_keys(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_keys(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = kb_id(&args[0], span)?;
     let kb = KBS.get(&id)
         .ok_or_else(|| LxError::runtime("knowledge: KB not found", span))?;
@@ -170,7 +170,7 @@ fn bi_keys(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::List(Arc::new(keys)))
 }
 
-fn bi_remove(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_remove(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let key = args[0].as_str()
         .ok_or_else(|| LxError::type_err("knowledge.remove: key must be Str", span))?;
     let id = kb_id(&args[1], span)?;
@@ -181,7 +181,7 @@ fn bi_remove(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(make_handle(id))
 }
 
-fn bi_merge(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_merge(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id1 = kb_id(&args[0], span)?;
     let id2 = kb_id(&args[1], span)?;
     let other_entries: IndexMap<String, KBEntry> = {
@@ -202,7 +202,7 @@ fn bi_merge(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(make_handle(id1))
 }
 
-fn bi_expire(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_expire(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let before = args[0].as_str()
         .ok_or_else(|| LxError::type_err("knowledge.expire: timestamp must be Str", span))?;
     let id = kb_id(&args[1], span)?;

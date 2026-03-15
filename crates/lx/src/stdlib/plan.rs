@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
+use crate::backends::RuntimeCtx;
 use crate::builtins::{call_value, mk};
 use crate::error::LxError;
 use crate::span::Span;
@@ -25,7 +26,7 @@ fn make_action(action: &str) -> Value {
     Value::Record(Arc::new(fields))
 }
 
-fn bi_replan(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_replan(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let Value::List(_) = &args[0] else {
         return Err(LxError::type_err("plan.replan expects List of steps", span));
     };
@@ -35,7 +36,7 @@ fn bi_replan(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Record(Arc::new(fields)))
 }
 
-fn bi_abort(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_abort(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let reason = args[0].as_str()
         .ok_or_else(|| LxError::type_err("plan.abort expects Str reason", span))?;
     let mut fields = IndexMap::new();
@@ -44,7 +45,7 @@ fn bi_abort(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Record(Arc::new(fields)))
 }
 
-fn bi_insert_after(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_insert_after(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let after_id = args[0].as_str()
         .ok_or_else(|| LxError::type_err("plan.insert_after: first arg must be Str", span))?;
     let Value::List(_) = &args[1] else {
@@ -57,15 +58,15 @@ fn bi_insert_after(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Record(Arc::new(fields)))
 }
 
-fn call2(f: &Value, a: Value, b: Value, span: Span) -> Result<Value, LxError> {
-    let partial = call_value(f, a, span)?;
-    call_value(&partial, b, span)
+fn call2(f: &Value, a: Value, b: Value, span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+    let partial = call_value(f, a, span, ctx)?;
+    call_value(&partial, b, span, ctx)
 }
 
-fn call3(f: &Value, a: Value, b: Value, c: Value, span: Span) -> Result<Value, LxError> {
-    let p1 = call_value(f, a, span)?;
-    let p2 = call_value(&p1, b, span)?;
-    call_value(&p2, c, span)
+fn call3(f: &Value, a: Value, b: Value, c: Value, span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+    let p1 = call_value(f, a, span, ctx)?;
+    let p2 = call_value(&p1, b, span, ctx)?;
+    call_value(&p2, c, span, ctx)
 }
 
 fn step_id(step: &Value) -> Option<&str> {
@@ -128,7 +129,7 @@ fn get_action(v: &Value) -> Option<&str> {
     }
 }
 
-fn bi_run(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_run(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let Value::List(initial_steps) = &args[0] else {
         return Err(LxError::type_err("plan.run: first arg must be List of steps", span));
     };
@@ -149,9 +150,9 @@ fn bi_run(args: &[Value], span: Span) -> Result<Value, LxError> {
         let step = remaining.remove(idx);
         let sid = step_id(&step).unwrap_or("unknown").to_string();
         let context = build_context(&completed_results);
-        let result = call2(executor, step.clone(), context, span)?;
+        let result = call2(executor, step.clone(), context, span, ctx)?;
         let plan_state = build_plan_state(&completed_results, &remaining, &step);
-        let action = call3(on_step, step.clone(), result.clone(), plan_state, span)?;
+        let action = call3(on_step, step.clone(), result.clone(), plan_state, span, ctx)?;
         completed_results.push((sid.clone(), result));
         completed_ids.insert(sid.clone());
         match get_action(&action) {

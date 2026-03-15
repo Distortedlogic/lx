@@ -26,9 +26,11 @@ Written by the language designer (Claude). Updated after Session 36.
 
 **Code architecture is clean.** Shared LLM parsing (`ai::parse_llm_json`, `ai::extract_llm_text`, `ai::strip_json_fences`). Shared eval records (`audit::build_eval_result`, `audit::make_eval_category`). Shared keyword matching (`audit::keyword_overlap`). Auditor delegates to audit module for structural checks.
 
+**Backend pluggability is real.** `RuntimeCtx` with 6 backend traits (AI, HTTP, shell, emit, yield, log). Every builtin receives `&Arc<RuntimeCtx>`. Standard defaults are production-ready (Claude Code CLI, reqwest, POSIX shell, stdout/stderr). Embedders construct custom `RuntimeCtx` to swap any backend. Testing mock example: `RuntimeCtx { ai: Arc::new(MockAiBackend::new(responses)), ..RuntimeCtx::default() }`.
+
 ## What's Still Wrong
 
-**Backends not behind traits** — The implementations are correct (Claude Code CLI for AI, reqwest for HTTP, etc.) but they're inlined in the builtin functions, not behind abstraction boundaries. An embedder cannot swap them for testing, server deployment, or sandboxing. `yield` has its own callback field separate from everything else. `emit` isn't implemented. The `RuntimeCtx` refactor (`spec/runtime-backends.md`) fixes this: a context parameter threaded through all builtins, with backend traits for AI, HTTP, shell, emit, yield, and logging. Standard defaults stay the same. This is the idiomatic Rust approach (every serious runtime does it).
+**`emit` not yet a keyword** — `RuntimeCtx` refactor is done (backends for AI, HTTP, shell, yield, log behind traits, `EmitBackend` trait exists with `StdoutEmitBackend` default). But `emit` isn't in the AST/parser yet — needs lexer keyword, parser rule, and interpreter eval path. Currently `print` works but isn't the right semantic.
 
 **Currying** — single biggest source of parser ambiguity. Sections cover 90%. Deferred.
 
@@ -72,6 +74,6 @@ Reviewed `mcp-toolbelt/packages/arch_diagrams` — 14 agentic flow architectures
 
 ## Bottom Line
 
-28 stdlib modules (incl. 6 standard agents + visualization). Communication/orchestration layer is solid. Agentic infrastructure (tasks, audit, circuit, plan, knowledge, introspect, memory, trace) is implemented. Type checker working. Standard agents working. Program visualization working. Code architecture is clean with shared utilities.
+29 stdlib modules (incl. 6 standard agents + visualization + saga). Communication/orchestration layer is solid. Agentic infrastructure (tasks, audit, circuit, plan, knowledge, introspect, memory, trace) is implemented. Type checker working. Standard agents working. Program visualization working. Code architecture is clean with shared utilities. RuntimeCtx backend abstraction in place.
 
-The core language and stdlib are feature-complete for the three use cases. What remains is the "efficiency layer" — patterns I keep hand-rolling (`refine`, `reconcile`, `consensus`) and runtime safety (`deadlock detection`, `diminishing returns`, `peer visibility`). These are all specified with full specs in `spec/`. The next implementation pass should focus on the new language features (`refine`, `consensus`, `|>>`) since they require parser+interpreter changes, or on `std/saga` which is the largest remaining stdlib module.
+The core language and stdlib are feature-complete for the three use cases. Backend pluggability is solved. What remains is the "efficiency layer" — patterns I keep hand-rolling (`refine`, `reconcile`, `consensus`) and runtime safety (`deadlock detection`, `diminishing returns`, `peer visibility`). These are all specified with full specs in `spec/`. The next implementation pass should focus on the new language features (`refine`, `consensus`, `|>>`) since they require parser+interpreter changes.

@@ -18,7 +18,6 @@ use crate::ast::{SExpr, Program, Expr, SStmt, Stmt, BindTarget};
 use crate::backends::RuntimeCtx;
 use crate::env::Env;
 use crate::error::LxError;
-use crate::span::Span;
 use crate::value::Value;
 
 #[derive(Debug, Clone)]

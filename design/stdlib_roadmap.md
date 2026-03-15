@@ -21,7 +21,6 @@ Complete stdlib for the three use cases: agent communication, workflow orchestra
 
 | Module / Feature | Layer | Spec |
 |---|---|---|
-| `RuntimeCtx` backend refactor | Infrastructure | `spec/runtime-backends.md` |
 | `std/blackboard` | Coordination | — |
 | `std/events` | Coordination | — |
 
@@ -137,7 +136,7 @@ Handler-scoped. Agents ask back without going through orchestrator. Spec: `spec/
 | `workflow.peers` / `workflow.share` | std/agent | `spec/agents-broadcast.md` |
 | Goal/Task protocols + `agent.send_goal`/`agent.send_task` | std/agent | `spec/agents-goals.md` |
 | Deadlock detection | interpreter | `spec/agents-deadlock.md` |
-| `RuntimeCtx` backends | interpreter + all stdlib | `spec/runtime-backends.md` |
+| `RuntimeCtx` backends | interpreter + all stdlib | `spec/runtime-backends.md` | DONE |
 | Enhanced `retry_with` | built-in | stdlib roadmap |
 | `ai.summarize` | std/ai | stdlib roadmap |
 

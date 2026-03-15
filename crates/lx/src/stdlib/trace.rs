@@ -6,6 +6,7 @@ use dashmap::DashMap;
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 
+use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
@@ -95,7 +96,7 @@ fn persist(store: &TraceStore, span: Span) -> Result<(), LxError> {
         .map_err(|e| LxError::runtime(format!("trace: write: {e}"), span))
 }
 
-fn bi_create(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_create(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let path = args[0].as_str()
         .ok_or_else(|| LxError::type_err("trace.create expects Str path", span))?;
     let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
@@ -103,7 +104,7 @@ fn bi_create(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(make_handle(id))
 }
 
-fn bi_record(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_record(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let Value::Record(fields) = &args[0] else {
         return Err(LxError::type_err("trace.record: first arg must be Record", span));
     };
@@ -128,7 +129,7 @@ fn bi_record(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Ok(Box::new(Value::Int(BigInt::from(span_id)))))
 }
 
-fn bi_score(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_score(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let span_id: u64 = args[0].as_int()
         .and_then(|n| n.try_into().ok())
         .ok_or_else(|| LxError::type_err("trace.score: span_id must be Int", span))?;
@@ -144,7 +145,7 @@ fn bi_score(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Ok(Box::new(Value::Unit)))
 }
 
-fn bi_spans(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_spans(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let sid = store_id(&args[0], span)?;
     let store = STORES.get(&sid)
         .ok_or_else(|| LxError::runtime("trace: store not found", span))?;
@@ -152,7 +153,7 @@ fn bi_spans(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::List(Arc::new(results)))
 }
 
-fn bi_export(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_export(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let export_path = args[0].as_str()
         .ok_or_else(|| LxError::type_err("trace.export: path must be Str", span))?;
     let sid = store_id(&args[1], span)?;
@@ -177,7 +178,7 @@ fn bi_export(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Ok(Box::new(Value::Int(BigInt::from(lines.len() as i64)))))
 }
 
-fn bi_summary(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_summary(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let sid = store_id(&args[0], span)?;
     let store = STORES.get(&sid)
         .ok_or_else(|| LxError::runtime("trace: store not found", span))?;
@@ -198,7 +199,7 @@ fn bi_summary(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Record(Arc::new(r)))
 }
 
-fn bi_filter(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_filter(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let Value::Record(criteria) = &args[0] else {
         return Err(LxError::type_err("trace.filter: first arg must be Record", span));
     };

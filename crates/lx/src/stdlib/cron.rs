@@ -32,7 +32,7 @@ pub fn build() -> IndexMap<String, Value> {
     m
 }
 
-fn bi_every(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_every(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let interval_ms = match &args[0] {
         Value::Int(n) => {
             let v: i64 = n.try_into()
@@ -61,13 +61,14 @@ fn bi_every(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value,
     let cancel = Arc::new(AtomicBool::new(false));
     let cancel_flag = cancel.clone();
 
+    let ctx = Arc::clone(ctx);
     let handle = thread::spawn(move || {
         while !cancel_flag.load(Ordering::Relaxed) {
             thread::sleep(Duration::from_millis(interval_ms));
             if cancel_flag.load(Ordering::Relaxed) {
                 break;
             }
-            if let Err(e) = call_value(&callback, Value::Unit, span) {
+            if let Err(e) = call_value(&callback, Value::Unit, span, &ctx) {
                 eprintln!("[cron] job {id} error: {e}");
             }
         }

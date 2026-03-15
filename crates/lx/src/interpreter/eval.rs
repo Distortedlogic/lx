@@ -297,5 +297,4 @@ impl Interpreter {
       _ => Err(LxError::type_err("assert requires Bool", span)),
     }
   }
-
 }

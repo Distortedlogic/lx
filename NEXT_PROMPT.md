@@ -25,7 +25,7 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 
 ## Current State
 
-`just diagnose` clean. `just test`: **42/42 PASS**. All core language features and stdlib modules implemented.
+`just diagnose` clean. `just test`: **42/42 PASS**. All core language features and stdlib modules implemented. `RuntimeCtx` backend refactor complete.
 
 ### What's implemented
 
@@ -56,7 +56,7 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 - Visualization: `std/diag`
 
 **Key stdlib details:**
-- LLM integration (`std/ai`): `ai.prompt` (text → text) + `ai.prompt_with` (full options → result record). Backend: Claude Code CLI (`claude -p --output-format json`). `RuntimeCtx` refactor (`spec/runtime-backends.md`) will put this behind an `AiBackend` trait so embedders can swap it. Shared utilities: `ai::parse_llm_json`, `ai::extract_llm_text`, `ai::strip_json_fences` (used by all standard agents)
+- LLM integration (`std/ai`): `ai.prompt` (text → text) + `ai.prompt_with` (full options → result record). Backend: `AiBackend` trait on `RuntimeCtx` — default `ClaudeCodeAiBackend` wraps Claude Code CLI (`claude -p --output-format json`). Embedders swap backends for testing/server/sandbox. Shared utilities: `ai::parse_llm_json`, `ai::extract_llm_text`, `ai::strip_json_fences` (used by all standard agents)
 - Shared eval utilities: `audit::build_eval_result`, `audit::make_eval_category`, `audit::keyword_overlap`, `audit::check_empty/refusal/hedging/references_task` (used by auditor + grader)
 - Task state machine (`std/tasks`): create/start/submit/audit/pass/fail/revise/complete, auto-persist, hierarchical subtasks
 - Structural quality checks (`std/audit`): is_empty/is_hedging/is_refusal/has_diff/references_task + rubric evaluate + quick_check
@@ -66,6 +66,13 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 - Agent introspection (`std/introspect`): identity, elapsed, turn count, action log, markers, stuck detection, strategy shift
 - Multi-agent transactions (`std/saga`): `saga.run` executes steps in order with compensating undo on failure. `saga.run_with` adds options (timeout, max_retries, on_compensate callback). `saga.define`/`saga.execute` for reusable saga definitions with initial context. Supports dependency ordering.
 - Program visualization (`std/diag`): AST walker extracts workflow graph (agents, messages, control flow), emits Mermaid flowchart. `lx diagram file.lx` CLI subcommand + `diag.extract`/`diag.to_mermaid` library API
+
+**Runtime backends (`RuntimeCtx`):**
+- All I/O-touching builtins receive `&Arc<RuntimeCtx>` — backend traits for AI, HTTP, shell, emit, yield, logging
+- Standard defaults: `ClaudeCodeAiBackend` (Claude Code CLI), `ReqwestHttpBackend`, `ProcessShellBackend`, `StdoutEmitBackend`, `StdinStdoutYieldBackend`, `StderrLogBackend`
+- Embedders construct custom `RuntimeCtx` to swap backends for testing, server deployment, or sandboxing
+- `BuiltinFn` signature: `fn(&[Value], Span, &Arc<RuntimeCtx>) -> Result<Value, LxError>`
+- Traits + defaults in `crates/lx/src/backends/`
 
 **CLI subcommands:** `lx run`, `lx test`, `lx check`, `lx agent`, `lx diagram`
 
@@ -110,12 +117,11 @@ These have specs in `spec/` but no Rust implementation yet:
 
 Full plan: `design/stdlib_roadmap.md`. Specs for all planned features are in `spec/`.
 
-### Completed stdlib roadmap items (1-18):
+### Completed stdlib roadmap items (1-19):
 
-All 18 stdlib items are done: std/ai, std/tasks, std/audit, std/circuit, std/knowledge, std/plan, std/introspect, std/agents/auditor, std/agents/router, std/agents/grader, std/agents/planner, std/memory, std/trace, std/agents/monitor, std/agents/reviewer, MCP Embeddings (typed decl), std/diag, std/saga.
+All 18 stdlib items + RuntimeCtx backend refactor done: std/ai, std/tasks, std/audit, std/circuit, std/knowledge, std/plan, std/introspect, std/agents/auditor, std/agents/router, std/agents/grader, std/agents/planner, std/memory, std/trace, std/agents/monitor, std/agents/reviewer, MCP Embeddings (typed decl), std/diag, std/saga, RuntimeCtx backends.
 
 ### Next priorities (pick from these):
-19. **`RuntimeCtx` backend refactor** — Put all I/O operations behind backend traits on a `RuntimeCtx` parameter passed to all builtins. Standard defaults: Claude Code CLI for AI, reqwest for HTTP, `std::process::Command` for shell, stdout for emit, stdin/stdout JSON-lines for yield, stderr for logging. Enables swapping backends for testing, server deployment, or sandboxing. Also implements `emit` AST node. Spec: `spec/runtime-backends.md`. Mechanical refactor touching all builtins + stdlib modules.
 20. **`refine` expression** — New keyword. First-class feedback loop: try → grade → revise with threshold + max_rounds. Spec: `spec/agents-refine.md`. Requires parser + interpreter changes.
 21. **`consensus` expression** — New keyword. Multi-agent voting with quorum policies. Spec: `spec/agents-consensus.md`. Requires parser + interpreter changes.
 22. **`introspect.progress`** — Extension to `std/introspect`. Gradient progress tracking, improvement rate, adaptive stopping. Spec: `spec/agents-progress.md`.
@@ -141,6 +147,7 @@ All 18 stdlib items are done: std/ai, std/tasks, std/audit, std/circuit, std/kno
 
 ```
 crates/lx/src/
+  backends/  mod.rs (traits + RuntimeCtx), defaults.rs (standard backend impls)
   lexer/     mod.rs, numbers.rs, strings.rs
   parser/    mod.rs, func.rs, infix.rs, paren.rs, pattern.rs, prefix.rs, statements.rs, type_ann.rs
   checker/   mod.rs, synth.rs, types.rs

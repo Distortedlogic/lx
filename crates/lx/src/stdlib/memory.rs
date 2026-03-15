@@ -6,6 +6,7 @@ use dashmap::DashMap;
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 
+use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
@@ -129,7 +130,7 @@ fn load_entries(path: &str, span: Span) -> Result<(IndexMap<String, MemEntry>, u
     Ok((entries, max_id))
 }
 
-fn bi_create(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_create(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let path = args[0].as_str()
         .ok_or_else(|| LxError::type_err("memory.create expects Str path", span))?;
     let (entries, next_entry_id) = load_entries(path, span)?;
@@ -138,7 +139,7 @@ fn bi_create(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(make_handle(id))
 }
 
-fn bi_store(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_store(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let Value::Record(fields) = &args[0] else {
         return Err(LxError::type_err("memory.store: first arg must be Record", span));
     };
@@ -164,7 +165,7 @@ fn bi_store(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Ok(Box::new(Value::Str(Arc::from(entry_id.as_str())))))
 }
 
-fn bi_recall(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_recall(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let query = args[0].as_str()
         .ok_or_else(|| LxError::type_err("memory.recall: query must be Str", span))?;
     let sid = store_id(&args[1], span)?;
@@ -191,7 +192,7 @@ fn bi_recall(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::List(Arc::new(results)))
 }
 
-fn bi_promote(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_promote(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let entry_id = args[0].as_str()
         .ok_or_else(|| LxError::type_err("memory.promote: id must be Str", span))?;
     let sid = store_id(&args[1], span)?;
@@ -210,7 +211,7 @@ fn bi_promote(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Ok(Box::new(Value::Unit)))
 }
 
-fn bi_demote(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_demote(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let entry_id = args[0].as_str()
         .ok_or_else(|| LxError::type_err("memory.demote: id must be Str", span))?;
     let sid = store_id(&args[1], span)?;
@@ -227,7 +228,7 @@ fn bi_demote(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Ok(Box::new(Value::Unit)))
 }
 
-fn bi_forget(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_forget(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let entry_id = args[0].as_str()
         .ok_or_else(|| LxError::type_err("memory.forget: id must be Str", span))?;
     let sid = store_id(&args[1], span)?;
@@ -238,7 +239,7 @@ fn bi_forget(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Ok(Box::new(Value::Unit)))
 }
 
-fn bi_consolidate(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_consolidate(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let sid = store_id(&args[0], span)?;
     let mut store = STORES.get_mut(&sid)
         .ok_or_else(|| LxError::runtime("memory: store not found", span))?;
@@ -271,7 +272,7 @@ fn bi_consolidate(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Record(Arc::new(r)))
 }
 
-fn bi_tier(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_tier(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let level = args[0].as_int()
         .and_then(|n| -> Option<i64> { n.try_into().ok() })
         .ok_or_else(|| LxError::type_err("memory.tier: level must be Int", span))?;
@@ -285,7 +286,7 @@ fn bi_tier(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::List(Arc::new(results)))
 }
 
-fn bi_all(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_all(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let sid = store_id(&args[0], span)?;
     let store = STORES.get(&sid)
         .ok_or_else(|| LxError::runtime("memory: store not found", span))?;

@@ -4,6 +4,7 @@ use chrono::{DateTime, Local, TimeZone, Utc};
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 
+use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
@@ -18,13 +19,13 @@ pub fn build() -> IndexMap<String, Value> {
     m
 }
 
-fn bi_now(args: &[Value], _span: Span) -> Result<Value, LxError> {
+fn bi_now(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let _ = &args[0];
     let now = Utc::now();
     Ok(timestamp_to_record(now))
 }
 
-fn bi_sleep(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_sleep(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let ms = match &args[0] {
         Value::Int(n) => {
             let v: i64 = n.try_into()
@@ -46,7 +47,7 @@ fn bi_sleep(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Unit)
 }
 
-fn bi_format(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_format(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let fmt = args[0].as_str()
         .ok_or_else(|| LxError::type_err("time.format expects Str format", span))?;
     let ts = record_to_datetime(&args[1], span)?;
@@ -54,7 +55,7 @@ fn bi_format(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Str(Arc::from(formatted.as_str())))
 }
 
-fn bi_parse(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_parse(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let fmt = args[0].as_str()
         .ok_or_else(|| LxError::type_err("time.parse expects Str format", span))?;
     let input = args[1].as_str()

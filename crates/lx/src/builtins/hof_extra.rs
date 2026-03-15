@@ -7,7 +7,7 @@ use crate::value::Value;
 
 use super::hof::{call, get_list};
 
-pub(super) fn bi_take_while(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Value, LxError> {
+pub(super) fn bi_take_while(args: &[Value], sp: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let items = get_list(&args[1], "take_while", sp)?;
   let mut out = Vec::new();
   for v in items.iter() {
@@ -19,7 +19,7 @@ pub(super) fn bi_take_while(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Resul
   Ok(Value::List(Arc::new(out)))
 }
 
-pub(super) fn bi_drop_while(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Value, LxError> {
+pub(super) fn bi_drop_while(args: &[Value], sp: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let items = get_list(&args[1], "drop_while", sp)?;
   let mut dropping = true;
   let mut out = Vec::new();
@@ -33,7 +33,7 @@ pub(super) fn bi_drop_while(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Resul
   Ok(Value::List(Arc::new(out)))
 }
 
-pub(super) fn bi_sort_by(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Value, LxError> {
+pub(super) fn bi_sort_by(args: &[Value], sp: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let items = get_list(&args[1], "sort_by", sp)?;
   let mut keyed: Vec<(Value, Value)> = Vec::with_capacity(items.len());
   for v in items.iter() {
@@ -44,7 +44,7 @@ pub(super) fn bi_sort_by(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<V
   Ok(Value::List(Arc::new(keyed.into_iter().map(|(_, v)| v).collect())))
 }
 
-pub(super) fn bi_min_by(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Value, LxError> {
+pub(super) fn bi_min_by(args: &[Value], sp: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let items = get_list(&args[1], "min_by", sp)?;
   if items.is_empty() {
     return Err(LxError::runtime("min_by: empty list", sp));
@@ -61,7 +61,7 @@ pub(super) fn bi_min_by(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Va
   Ok(best.clone())
 }
 
-pub(super) fn bi_max_by(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Value, LxError> {
+pub(super) fn bi_max_by(args: &[Value], sp: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let items = get_list(&args[1], "max_by", sp)?;
   if items.is_empty() {
     return Err(LxError::runtime("max_by: empty list", sp));
@@ -78,7 +78,7 @@ pub(super) fn bi_max_by(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Va
   Ok(best.clone())
 }
 
-pub(super) fn bi_partition(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Value, LxError> {
+pub(super) fn bi_partition(args: &[Value], sp: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let items = get_list(&args[1], "partition", sp)?;
   let (mut yes, mut no) = (Vec::new(), Vec::new());
   for v in items.iter() {
@@ -91,7 +91,7 @@ pub(super) fn bi_partition(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result
   Ok(Value::Tuple(Arc::new(vec![Value::List(Arc::new(yes)), Value::List(Arc::new(no))])))
 }
 
-pub(super) fn bi_group_by(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Value, LxError> {
+pub(super) fn bi_group_by(args: &[Value], sp: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let items = get_list(&args[1], "group_by", sp)?;
   let mut groups = indexmap::IndexMap::new();
   for v in items.iter() {
@@ -103,7 +103,7 @@ pub(super) fn bi_group_by(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<
   Ok(Value::Map(Arc::new(map)))
 }
 
-pub(super) fn bi_chunks(args: &[Value], sp: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
+pub(super) fn bi_chunks(args: &[Value], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let n = args[0].as_int().ok_or_else(|| LxError::type_err("chunks: size must be Int", sp))?;
   let items = get_list(&args[1], "chunks", sp)?;
   let n = usize::try_from(n.clone()).map_err(|_| LxError::runtime("chunks: invalid size", sp))?;
@@ -114,7 +114,7 @@ pub(super) fn bi_chunks(args: &[Value], sp: Span, _ctx: &RuntimeCtx) -> Result<V
   Ok(Value::List(Arc::new(out)))
 }
 
-pub(super) fn bi_windows(args: &[Value], sp: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
+pub(super) fn bi_windows(args: &[Value], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let n = args[0].as_int().ok_or_else(|| LxError::type_err("windows: size must be Int", sp))?;
   let items = get_list(&args[1], "windows", sp)?;
   let n = usize::try_from(n.clone()).map_err(|_| LxError::runtime("windows: invalid size", sp))?;
@@ -125,7 +125,7 @@ pub(super) fn bi_windows(args: &[Value], sp: Span, _ctx: &RuntimeCtx) -> Result<
   Ok(Value::List(Arc::new(out)))
 }
 
-pub(super) fn bi_intersperse(args: &[Value], sp: Span, _ctx: &RuntimeCtx) -> Result<Value, LxError> {
+pub(super) fn bi_intersperse(args: &[Value], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let items = get_list(&args[1], "intersperse", sp)?;
   let sep = &args[0];
   let mut out = Vec::with_capacity(items.len() * 2);
@@ -138,7 +138,7 @@ pub(super) fn bi_intersperse(args: &[Value], sp: Span, _ctx: &RuntimeCtx) -> Res
   Ok(Value::List(Arc::new(out)))
 }
 
-pub(super) fn bi_scan(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Value, LxError> {
+pub(super) fn bi_scan(args: &[Value], sp: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let items = get_list(&args[2], "scan", sp)?;
   let mut acc = args[0].clone();
   let f = &args[1];
@@ -152,13 +152,13 @@ pub(super) fn bi_scan(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Valu
   Ok(Value::List(Arc::new(out)))
 }
 
-pub(super) fn bi_tap(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Value, LxError> {
+pub(super) fn bi_tap(args: &[Value], sp: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let val = &args[1];
   call(&args[0], val.clone(), sp, ctx)?;
   Ok(val.clone())
 }
 
-pub(super) fn bi_pmap(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Value, LxError> {
+pub(super) fn bi_pmap(args: &[Value], sp: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let items = get_list(&args[1], "pmap", sp)?;
   let mut out = Vec::with_capacity(items.len());
   for v in items.iter() {
@@ -167,7 +167,7 @@ pub(super) fn bi_pmap(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Valu
   Ok(Value::List(Arc::new(out)))
 }
 
-pub(super) fn bi_pmap_n(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Value, LxError> {
+pub(super) fn bi_pmap_n(args: &[Value], sp: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let items = get_list(&args[2], "pmap_n", sp)?;
   let mut out = Vec::with_capacity(items.len());
   for v in items.iter() {
@@ -176,7 +176,7 @@ pub(super) fn bi_pmap_n(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Va
   Ok(Value::List(Arc::new(out)))
 }
 
-pub(super) fn bi_find_index(args: &[Value], sp: Span, ctx: &RuntimeCtx) -> Result<Value, LxError> {
+pub(super) fn bi_find_index(args: &[Value], sp: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
   let items = get_list(&args[1], "find_index", sp)?;
   for (i, v) in items.iter().enumerate() {
     let result = call(&args[0], v.clone(), sp, ctx)?;

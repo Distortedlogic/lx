@@ -6,6 +6,7 @@ use dashmap::DashMap;
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 
+use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
@@ -70,7 +71,7 @@ fn float_field(r: &IndexMap<String, Value>, key: &str, default: f64) -> f64 {
         .unwrap_or(default)
 }
 
-fn bi_create(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_create(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let Value::Record(opts) = &args[0] else {
         return Err(LxError::type_err("circuit.create expects Record", span));
     };
@@ -114,7 +115,7 @@ fn trip_check(b: &mut Breaker) {
     }
 }
 
-fn bi_tick(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_tick(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = breaker_id(&args[0], span)?;
     let mut b = BREAKERS.get_mut(&id)
         .ok_or_else(|| LxError::runtime("circuit: breaker not found", span))?;
@@ -123,7 +124,7 @@ fn bi_tick(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Ok(Box::new(Value::Unit)))
 }
 
-fn bi_record(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_record(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = breaker_id(&args[0], span)?;
     let action = args[1].as_str()
         .ok_or_else(|| LxError::type_err("circuit.record: action must be Str", span))?;
@@ -134,7 +135,7 @@ fn bi_record(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Ok(Box::new(Value::Unit)))
 }
 
-fn bi_check(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_check(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = breaker_id(&args[0], span)?;
     let mut b = BREAKERS.get_mut(&id)
         .ok_or_else(|| LxError::runtime("circuit: breaker not found", span))?;
@@ -149,14 +150,14 @@ fn bi_check(args: &[Value], span: Span) -> Result<Value, LxError> {
     }
 }
 
-fn bi_is_tripped(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_is_tripped(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = breaker_id(&args[0], span)?;
     let b = BREAKERS.get(&id)
         .ok_or_else(|| LxError::runtime("circuit: breaker not found", span))?;
     Ok(Value::Bool(b.tripped.is_some()))
 }
 
-fn bi_reset(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_reset(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = breaker_id(&args[0], span)?;
     let mut b = BREAKERS.get_mut(&id)
         .ok_or_else(|| LxError::runtime("circuit: breaker not found", span))?;
@@ -167,7 +168,7 @@ fn bi_reset(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Ok(Box::new(Value::Unit)))
 }
 
-fn bi_status(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_status(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = breaker_id(&args[0], span)?;
     let b = BREAKERS.get(&id)
         .ok_or_else(|| LxError::runtime("circuit: breaker not found", span))?;

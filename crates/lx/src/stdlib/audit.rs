@@ -85,7 +85,7 @@ fn bi_is_too_short(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result
     Ok(Value::Bool(s.len() < min))
 }
 
-fn bi_is_repetitive(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_is_repetitive(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let s = as_str_arg(&args[0], "audit.is_repetitive", span)?;
     let sentences: Vec<&str> = s.split(['.', '\n'])
         .map(|s| s.trim())
@@ -115,7 +115,7 @@ pub(crate) fn check_hedging(s: &str) -> bool {
     HEDGING.iter().any(|h| lower.contains(h))
 }
 
-fn bi_is_hedging(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_is_hedging(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let s = as_str_arg(&args[0], "audit.is_hedging", span)?;
     Ok(Value::Bool(check_hedging(s)))
 }
@@ -130,12 +130,12 @@ pub(crate) fn check_refusal(s: &str) -> bool {
     REFUSAL.iter().any(|r| lower.contains(r))
 }
 
-fn bi_is_refusal(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_is_refusal(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let s = as_str_arg(&args[0], "audit.is_refusal", span)?;
     Ok(Value::Bool(check_refusal(s)))
 }
 
-fn bi_references_task(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_references_task(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let output = as_str_arg(&args[0], "audit.references_task(output)", span)?;
     let task = as_str_arg(&args[1], "audit.references_task(task)", span)?;
     Ok(Value::Bool(check_references_task(output, task)))
@@ -147,7 +147,7 @@ pub(crate) fn check_references_task(output: &str, task: &str) -> bool {
     hits * 3 >= total
 }
 
-fn bi_files_exist(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_files_exist(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let Value::List(paths) = &args[0] else {
         return Err(LxError::type_err("audit.files_exist expects List of Str", span));
     };
@@ -161,21 +161,21 @@ fn bi_files_exist(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Bool(true))
 }
 
-fn bi_has_diff(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_has_diff(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let s = as_str_arg(&args[0], "audit.has_diff", span)?;
     let has = s.contains("diff --git") || s.contains("@@")
         || (s.contains("+++") && s.contains("---"));
     Ok(Value::Bool(has))
 }
 
-fn bi_rubric(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_rubric(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let Value::List(_) = &args[0] else {
         return Err(LxError::type_err("audit.rubric expects List of categories", span));
     };
     Ok(args[0].clone())
 }
 
-fn bi_evaluate(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_evaluate(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let Value::List(categories) = &args[0] else {
         return Err(LxError::type_err("audit.evaluate: first arg must be rubric List", span));
     };
@@ -201,7 +201,7 @@ fn bi_evaluate(args: &[Value], span: Span) -> Result<Value, LxError> {
             .ok_or_else(|| LxError::runtime(
                 format!("audit.evaluate: category '{name}' missing 'check' function"), span,
             ))?;
-        let result = call_value(check_fn, data.clone(), span)?;
+        let result = call_value(check_fn, data.clone(), span, ctx)?;
         let passed = matches!(result, Value::Bool(true));
         let score: i64 = if passed { 100 } else { 0 };
         total_score += score * weight;
@@ -228,7 +228,7 @@ fn bi_evaluate(args: &[Value], span: Span) -> Result<Value, LxError> {
     Ok(Value::Record(Arc::new(result)))
 }
 
-fn bi_quick_check(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_quick_check(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let Value::Record(opts) = &args[0] else {
         return Err(LxError::type_err("audit.quick_check expects Record", span));
     };
