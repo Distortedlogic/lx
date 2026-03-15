@@ -21,6 +21,9 @@ enum Command {
     #[arg(help = "Directory containing .lx test files")]
     dir: String,
   },
+  Check {
+    file: String,
+  },
   Agent {
     #[arg(help = "Agent script file (must evaluate to a handler function)")]
     script: String,
@@ -31,6 +34,7 @@ fn main() -> ExitCode {
   let cli = Cli::parse();
   match cli.command {
     Command::Run { file, json } => run_file(&file, json),
+    Command::Check { file } => check_file(&file),
     Command::Test { dir } => run_tests(&dir),
     Command::Agent { script } => run_agent(&script),
   }
@@ -54,6 +58,47 @@ fn run_file(path: &str, _json: bool) -> ExitCode {
       }
       ExitCode::from(1)
     },
+  }
+}
+
+fn check_file(path: &str) -> ExitCode {
+  let source = match std::fs::read_to_string(path) {
+    Ok(s) => s,
+    Err(e) => {
+      eprintln!("error: cannot read {path}: {e}");
+      return ExitCode::from(1);
+    },
+  };
+  let tokens = match lx::lexer::lex(&source) {
+    Ok(t) => t,
+    Err(e) => {
+      let named = miette::NamedSource::new(path, source.clone());
+      let report = miette::Report::new(e).with_source_code(named);
+      eprintln!("{report:?}");
+      return ExitCode::from(1);
+    },
+  };
+  let program = match lx::parser::parse(tokens) {
+    Ok(p) => p,
+    Err(e) => {
+      let named = miette::NamedSource::new(path, source.clone());
+      let report = miette::Report::new(e).with_source_code(named);
+      eprintln!("{report:?}");
+      return ExitCode::from(1);
+    },
+  };
+  let result = lx::checker::check(&program);
+  if result.diagnostics.is_empty() {
+    println!("ok: {path}");
+    ExitCode::SUCCESS
+  } else {
+    for d in &result.diagnostics {
+      let err = lx::error::LxError::type_err(&d.msg, d.span);
+      let named = miette::NamedSource::new(path, source.clone());
+      let report = miette::Report::new(err).with_source_code(named);
+      eprintln!("{report:?}");
+    }
+    ExitCode::from(1)
   }
 }
 

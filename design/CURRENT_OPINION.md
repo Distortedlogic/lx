@@ -1,6 +1,6 @@
 # Current Opinion: lx as an Agentic Language
 
-Written by the language designer (Claude). Updated after Session 28.
+Written by the language designer (Claude). Updated after Session 29.
 
 ## What Works
 
@@ -18,7 +18,7 @@ Written by the language designer (Claude). Updated after Session 28.
 
 ## What's Still Wrong
 
-**Type annotations and type checker were removed prematurely.** Session 19 cut them for implementation simplicity. But the language already has types at every boundary — Protocol, MCP declarations, tagged unions. Function signatures are the missing link. An agent writes `(url: Str) -> Response ^ HttpErr` and that should validate against the Protocol and MCP types downstream. Without the checker, every type error is a runtime surprise. Bringing both back as #1 priority.
+**Type annotations and type checker are back.** Session 29 restored them. `(x: Int y: Str) -> Response ^ HttpErr` on params, return types, and bindings. `lx check` runs bidirectional inference with unification and structural subtyping. `lx run` stays dynamic — checker is optional. Annotations flow through the AST but the interpreter ignores them. The checker validates: return type matches body type, binding type matches value type, and arithmetic/logic type consistency. Next: connect Protocol field types to function param annotations for end-to-end validation.
 
 **Regex literals were removed for the wrong reason.** `re.is_match "\\d+" text` with double-escaped backslashes is hostile to LLM generation. `r/\d+/` is what every LLM would naturally produce. Removed to simplify the lexer — but implementation effort is not a design argument.
 
@@ -50,4 +50,4 @@ Reviewed `mcp-toolbelt/packages/arch_diagrams` — 14 agentic flow architectures
 
 ## Bottom Line
 
-12 stdlib modules. Communication/orchestration layer is solid. Two foundational mistakes to fix first: type annotations + checker, and regex literals. Then the full stdlib buildout: 5 new modules, 6 standard agents, 2 MCP declarations. An agent language's stdlib includes agents. See `NEXT_PROMPT.md` for priority order, `design/stdlib_roadmap.md` for the full plan.
+12 stdlib modules. Communication/orchestration layer is solid. Type annotations + checker restored. One foundational item remains: regex literals. Then the full stdlib buildout: 5 new modules, 6 standard agents, 2 MCP declarations. An agent language's stdlib includes agents. See `NEXT_PROMPT.md` for priority order, `design/stdlib_roadmap.md` for the full plan.

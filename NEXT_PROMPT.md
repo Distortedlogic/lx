@@ -25,7 +25,7 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 
 ## Current State
 
-`just diagnose` clean. `just test`: **23/23 PASS**. All language features complete.
+`just diagnose` clean. `just test`: **24/24 PASS**. All language features complete.
 
 ### What's implemented
 
@@ -43,6 +43,8 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 - `with` scoped bindings + record field update (`name.field <- value`)
 - 12 stdlib modules: `std/json`, `std/ctx`, `std/math`, `std/fs`, `std/env`, `std/re`, `std/md`, `std/agent`, `std/mcp`, `std/http`, `std/time`, `std/cron`
 - MCP HTTP streaming transport, `lx agent` subcommand
+- Type annotations: `(x: Int y: Str) -> Result Int Str { ... }` on params, return types, bindings
+- Type checker: `lx check` — bidirectional inference, unification, structural subtyping
 
 ### Syntax gotchas
 
@@ -55,12 +57,15 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 - `yield expr` pauses, sends to orchestrator, returns response. JSON-line protocol on stdin/stdout
 - `with name = expr { body }` scoped binding. `:=` or `mut` for mutable. Returns body's last value
 - `name.field <- value` updates mutable record field. Nested: `name.a.b <- value`. Requires `:=` binding
+- Type annotations: `(x: Int y: Str) -> Result Int Str { body }`. Param types, return type, error type all optional
+- Type args after uppercase names only: `Maybe Int` works, `Maybe a` requires `(Maybe a)` parens for lowercase type vars
+- `lx check file.lx` — runs type checker without executing. `lx run` skips checking
 
 ## What To Work On Next
 
 ### Language priorities:
 
-1. **Type annotations + type checker** — bring back `(url: Str) -> Response ^ HttpErr` on functions. Bidirectional inference (annotations optional). Validates function signatures → Protocol fields → MCP tool schemas end-to-end. Every flow program benefits. This is foundational.
+1. ~~**Type annotations + type checker**~~ — DONE (Session 29). `(x: Int) -> Str ^ Err` on params/returns/bindings. `lx check` runs bidirectional inference + unification. `lx run` still dynamic.
 2. **Regex literals** — bring back `r/\d+/`. String patterns with double escaping is hostile to LLM generation. Lexer already had this; re-add.
 
 ### Stdlib roadmap (full plan: `design/stdlib_roadmap.md`):
@@ -99,7 +104,7 @@ Design docs: `design/standard_agents.md`, `design/stdlib_roadmap.md`
 | Grading loops | Covered (`loop` + `~>?`) |
 | Shell integration | Covered (`$`/`$^`/`${}`) |
 | LLM integration | **GAP** → `std/ai` |
-| End-to-end type safety | **GAP** → type annotations + checker |
+| End-to-end type safety | Covered (`lx check` + annotations) |
 | Regex patterns | **GAP** → `r/pattern/` literals |
 | Task tracking | **GAP** → `std/tasks` |
 | Quality checks | **GAP** → `std/audit` + `std/agents/auditor` + `std/agents/grader` |
@@ -117,7 +122,8 @@ Design docs: `design/standard_agents.md`, `design/stdlib_roadmap.md`
 ```
 crates/lx/src/
   lexer/     mod.rs, numbers.rs, strings.rs
-  parser/    mod.rs, infix.rs, paren.rs, pattern.rs, prefix.rs, statements.rs
+  parser/    mod.rs, func.rs, infix.rs, paren.rs, pattern.rs, prefix.rs, statements.rs, type_ann.rs
+  checker/   mod.rs, synth.rs, types.rs
   interpreter/ mod.rs, agents.rs, apply.rs, collections.rs, eval.rs, modules.rs, patterns.rs, shell.rs
   builtins/  mod.rs, call.rs, str.rs, coll.rs, hof.rs, hof_extra.rs
   stdlib/    mod.rs, json.rs, json_conv.rs, ctx.rs, math.rs, fs.rs, env.rs, re.rs, md.rs, md_build.rs, agent.rs, mcp.rs, mcp_rpc.rs, mcp_stdio.rs, mcp_http.rs, http.rs, time.rs, cron.rs

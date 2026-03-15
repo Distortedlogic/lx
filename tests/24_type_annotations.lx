@@ -1,0 +1,68 @@
+-- Type annotations on function parameters and return types
+-- Annotations are parsed and stored but not yet checked (checker is next)
+
+-- Basic param annotations
+add = (x: Int y: Int) x + y
+assert (add 3 4 == 7) "typed params"
+
+-- String param
+greet = (name: Str) "hello {name}"
+assert (greet "world" == "hello world") "typed string param"
+
+-- Return type annotation
+double = (x: Int) -> Int x * 2
+assert (double 5 == 10) "return type annotation"
+
+-- Return type with error type
+safe_div = (a: Int b: Int) -> Int ^ Str {
+  b == 0 ? Err "division by zero" : Ok (a / b)
+}
+assert (safe_div 10 2 == Ok 5) "fallible return type"
+assert (safe_div 10 0 == Err "division by zero") "fallible error case"
+
+-- Mixed: some params typed, some not
+mixed = (x: Int y) x + y
+assert (mixed 3 4 == 7) "mixed typed/untyped params"
+
+-- Complex type annotations: list type
+sum_list = (xs: [Int]) xs | fold 0 (+)
+assert (sum_list [1 2 3] == 6) "list type param"
+
+-- Record type annotation
+get_name = (r: {name: Str}) r.name
+assert (get_name {name: "alice"} == "alice") "record type param"
+
+-- Generic type annotation with applied types
+maybe_val = (m: Maybe Int) m ?? 0
+assert (maybe_val (Some 42) == 42) "maybe type param unwrap"
+assert (maybe_val None == 0) "maybe type param default"
+
+-- Type annotation on bindings
+x: Int = 42
+assert (x == 42) "typed binding"
+
+msg: Str = "hello"
+assert (msg == "hello") "typed string binding"
+
+-- Default params with type annotations
+inc = (x: Int step: Int = 1) x + step
+assert (inc 5 == 6) "typed param with default"
+assert (inc 5 3 == 8) "typed param override default"
+
+-- Underscore params still work
+ignore = (x: Int _) x
+assert (ignore 42 "unused" == 42) "underscore with typed"
+
+-- Nested function types (parenthesized)
+apply_fn = (f: (Int -> Int) x: Int) f x
+assert (apply_fn (+ 1) 5 == 6) "function type param"
+
+-- Zero-param function with return type
+unit_fn = () -> Int 42
+assert (unit_fn () == 42) "nullary with return type"
+
+-- Map type annotation
+lookup = (m: %{Str: Int} k: Str) m | get k
+assert (lookup %{"a": 1 "b": 2} "a" == Some 1) "map type param"
+
+log.info "24_type_annotations: all passed"

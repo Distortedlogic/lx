@@ -63,16 +63,24 @@ impl super::Parser {
     loop {
       match self.tokens.get(i).map(|t| &t.kind) {
         Some(TokenKind::TypeName(_)) => i += 1,
-        Some(TokenKind::Ident(n)) => {
-          let next = self.tokens.get(i + 1).map(|t| &t.kind);
-          if matches!(next, Some(TokenKind::Colon | TokenKind::Assign))
-            || n == "_" {
-            break;
-          }
-          i += 1;
-        },
         Some(TokenKind::Arrow | TokenKind::Caret) => i += 1,
-        Some(TokenKind::LParen | TokenKind::LBracket | TokenKind::LBrace | TokenKind::PercentLBrace) => {
+        Some(TokenKind::LBrace)
+          if matches!(
+            (self.tokens.get(i + 1).map(|t| &t.kind), self.tokens.get(i + 2).map(|t| &t.kind)),
+            (Some(TokenKind::Ident(_)), Some(TokenKind::Colon))
+          ) => {
+          i += 1;
+          let mut depth = 1u32;
+          while depth > 0 {
+            match self.tokens.get(i).map(|t| &t.kind) {
+              None | Some(TokenKind::Eof) => return i,
+              Some(TokenKind::RBrace) => { depth -= 1; i += 1; },
+              Some(TokenKind::LBrace) => { depth += 1; i += 1; },
+              _ => i += 1,
+            }
+          }
+        },
+        Some(TokenKind::LParen | TokenKind::LBracket | TokenKind::PercentLBrace) => {
           let close = match self.tokens[i].kind {
             TokenKind::LParen => TokenKind::RParen,
             TokenKind::LBracket => TokenKind::RBracket,
@@ -84,7 +92,7 @@ impl super::Parser {
             match self.tokens.get(i).map(|t| &t.kind) {
               None | Some(TokenKind::Eof) => return i,
               Some(k) if std::mem::discriminant(k) == std::mem::discriminant(&close) => { depth -= 1; i += 1; },
-              Some(TokenKind::LParen | TokenKind::LBracket | TokenKind::LBrace | TokenKind::PercentLBrace) => { depth += 1; i += 1; },
+              Some(TokenKind::LParen | TokenKind::LBracket | TokenKind::PercentLBrace) => { depth += 1; i += 1; },
               _ => i += 1,
             }
           }

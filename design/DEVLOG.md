@@ -4,7 +4,7 @@ Session history + design decisions. For priorities and gap analysis, see `NEXT_P
 
 ## Implementation Status
 
-**23/23 PASS.** 12 stdlib modules. 14 flow programs. `just diagnose` clean.
+**24/24 PASS.** 12 stdlib modules. 14 flow programs. Type checker. `just diagnose` clean.
 
 ## Key Design Decisions
 
@@ -61,3 +61,4 @@ Non-obvious choices that cause confusion if forgotten:
 | 26 | 03-14 | std/cron, real-flow gap analysis vs mcp-toolbelt arch_diagrams | 23/23 PASS |
 | 27 | 03-15 | Repo reorg (asl/ → spec/design/tests/flows), 14 flow programs + specs | 23/23 PASS |
 | 28 | 03-15 | Design review: types + regex back, full stdlib roadmap (5 modules, 6 agents, 2 MCPs) | Decision |
+| 29 | 03-15 | Type annotations + checker: AST, parser, bidirectional inference, `lx check` | 24/24 PASS |

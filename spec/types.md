@@ -1,6 +1,6 @@
 # Types
 
-Type definitions define shapes for records and tagged unions. There is no type checker — types are documentation and used by `Protocol` validation at runtime.
+Type definitions define shapes for records and tagged unions. Type annotations on function parameters, return types, and bindings are optional. The type checker (`lx check`) validates annotations via bidirectional inference; `lx run` skips checking and relies on runtime semantics.
 
 ## Record Types
 

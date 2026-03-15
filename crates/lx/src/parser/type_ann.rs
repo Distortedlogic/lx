@@ -123,24 +123,11 @@ impl super::Parser {
     }
   }
 
-  pub(crate) fn is_type_start(&self) -> bool {
-    matches!(
-      self.peek(),
-      TokenKind::TypeName(_)
-        | TokenKind::Ident(_)
-        | TokenKind::LBracket
-        | TokenKind::LBrace
-        | TokenKind::PercentLBrace
-        | TokenKind::LParen
-    )
-  }
-
   fn is_type_app_arg_start(&self) -> bool {
     matches!(
       self.peek(),
       TokenKind::TypeName(_)
         | TokenKind::LBracket
-        | TokenKind::LBrace
         | TokenKind::PercentLBrace
         | TokenKind::LParen
     )
