@@ -14,13 +14,14 @@ lx is an agentic workflow language you (Claude) are designing and building. Thre
 
 ## Continuity
 
-1. `asl/DEVLOG.md` — design decisions, known tensions, session history, what's next
-2. `asl/CURRENT_OPINION.md` — design self-critique
-3. `asl/spec/` — what lx IS | `asl/impl/` — how to BUILD it | `asl/suite/` — PROOF they agree
+1. `design/DEVLOG.md` — session history, design decisions, technical debt
+2. `design/CURRENT_OPINION.md` — self-critique, gap analysis vs real agentic flows
+3. `spec/` — what lx IS | `design/` — how it was PLANNED | `tests/` — PROOF they agree
 4. `crates/lx/` — Rust implementation | `crates/lx-cli/` — the `lx` binary
-5. `justfile` — `just test`, `just diagnose`, `just fmt`, `just run <file>`
+5. `flows/` — lx programs translating real agentic architectures | `flows/specs/` — target goals + scenarios
+6. `justfile` — `just test`, `just diagnose`, `just fmt`, `just run <file>`
 
-You own this language. Change spec, impl, suite, Rust code freely. Only constraint: internal consistency. When you change something, update all references. At session end, update DEVLOG and this file.
+You own this language. Change spec, design, tests, flows, Rust code freely. Only constraint: internal consistency. When you change something, update all references. At session end, update DEVLOG and this file.
 
 ## Current State
 
@@ -54,21 +55,36 @@ You own this language. Change spec, impl, suite, Rust code freely. Only constrai
 - `yield expr` pauses, sends to orchestrator, returns response. JSON-line protocol on stdin/stdout
 - `with name = expr { body }` scoped binding. `:=` or `mut` for mutable. Returns body's last value
 - `name.field <- value` updates mutable record field. Nested: `name.a.b <- value`. Requires `:=` binding
-- Removed in Session 19: regex literals, `$$`, `<>`, `#{}` sets, lazy iterators, type annotations
 
 ## What To Work On Next
 
-**All language features complete. Specs up to date. 12 stdlib modules.** Gap analysis against real agentic architectures (Session 26) identified what's missing.
+### Language priorities:
 
-### Stdlib priorities (driven by real flows in mcp-toolbelt/arch_diagrams):
+1. **Type annotations + type checker** — bring back `(url: Str) -> Response ^ HttpErr` on functions. Bidirectional inference (annotations optional). Validates function signatures → Protocol fields → MCP tool schemas end-to-end. Every flow program benefits. This is foundational.
+2. **Regex literals** — bring back `r/\d+/`. String patterns with double escaping is hostile to LLM generation. Lexer already had this; re-add.
 
-1. **`std/memory`** — tiered memory (L0 episodic → L1 working → L2 consolidated → L3 procedural). Confidence tracking, promotion/demotion rules, retention policies, consolidation reviews. The agent lifecycle flow depends on this — it's the biggest gap.
-2. **Circuit breakers** — doom loop detection (turn limits, token budgets, action similarity tracking). The agentic loop monitor needs this.
-3. **`std/trace`** — observability via langfuse integration. The fine-tuning pipeline collects traces, scores, and feeds training.
+### Stdlib roadmap (full plan: `design/stdlib_roadmap.md`):
+
+3. **`std/ai`** — LLM integration. Generic interface, Claude Code CLI backend. `ai.prompt` (simple) + `ai.prompt_with` (full: system/model/tools/schema/budget/resume). Foundation for all standard agents — auditor/grader/router all depend on this.
+4. **`std/tasks`** — task state machine, subtasks, auto-persist. Design doc: `design/std_tasks.md`.
+5. **`std/audit`** — structural quality checks. Design doc: `design/std_audit.md`.
+6. **`std/agents/auditor`** — LLM quality gate. Uses std/audit as pre-filter, std/ai for judgment.
+7. **`std/agents/router`** — prompt → specialist classification. Uses std/ai.
+8. **`std/agents/grader`** — rubric scoring, incremental re-grade. Uses std/ai.
+9. **`std/agents/planner`** — task decomposition into ordered subtasks. Uses std/ai.
+10. **`std/circuit`** — circuit breakers (turn/time/token limits, action repetition).
+11. **`std/memory`** — tiered L0-L3 memory with confidence, promotion/demotion.
+12. **`std/trace`** — trace collection, scoring, dataset export.
+13. **`std/agents/monitor`** — QC sampling of running subagents.
+14. **`std/agents/reviewer`** — post-hoc transcript review, learning extraction.
+15. **`MCP Embeddings`** — typed interface to embedding services (similarity, retrieval).
+
+Design docs: `design/standard_agents.md`, `design/stdlib_roadmap.md`
 
 ### Technical debt:
-1. **Currying removal** (deferred) — requires parser architecture change
-2. **Toolchain** (Phase 10) — `lx fmt`, `lx repl`, `lx check`, `lx watch`
+
+16. **Currying removal** (deferred) — requires parser architecture change
+17. **Toolchain** (Phase 10) — `lx fmt`, `lx repl`, `lx check`, `lx watch`
 
 ### Real-flow coverage map:
 
@@ -82,11 +98,19 @@ You own this language. Change spec, impl, suite, Rust code freely. Only constrai
 | Executable plans | Covered (`yield`) |
 | Grading loops | Covered (`loop` + `~>?`) |
 | Shell integration | Covered (`$`/`$^`/`${}`) |
-| Tiered memory (L0-L3) | **GAP** — need `std/memory` |
-| Circuit breakers | **GAP** — no doom loop detection |
-| Observability/tracing | **GAP** — no langfuse integration |
-| Context budget mgmt | **GAP** — no token window management |
-| Subagent routing | Expressible but no builtin catalog/classifier |
+| LLM integration | **GAP** → `std/ai` |
+| End-to-end type safety | **GAP** → type annotations + checker |
+| Regex patterns | **GAP** → `r/pattern/` literals |
+| Task tracking | **GAP** → `std/tasks` |
+| Quality checks | **GAP** → `std/audit` + `std/agents/auditor` + `std/agents/grader` |
+| Prompt routing | **GAP** → `std/agents/router` |
+| Task decomposition | **GAP** → `std/agents/planner` |
+| Circuit breakers | **GAP** → `std/circuit` |
+| Tiered memory | **GAP** → `std/memory` |
+| Observability | **GAP** → `std/trace` |
+| Subagent QC | **GAP** → `std/agents/monitor` |
+| Learning from experience | **GAP** → `std/agents/reviewer` |
+| Embeddings/similarity | **GAP** → `MCP Embeddings` |
 
 ## Codebase Layout
 
@@ -96,13 +120,15 @@ crates/lx/src/
   parser/    mod.rs, infix.rs, paren.rs, pattern.rs, prefix.rs, statements.rs
   interpreter/ mod.rs, agents.rs, apply.rs, collections.rs, eval.rs, modules.rs, patterns.rs, shell.rs
   builtins/  mod.rs, call.rs, str.rs, coll.rs, hof.rs, hof_extra.rs
-  stdlib/    mod.rs, json.rs, json_conv.rs, ctx.rs, math.rs, fs.rs, env.rs, re.rs, md.rs, md_build.rs, agent.rs, mcp.rs, mcp_rpc.rs, mcp_stdio.rs, mcp_http.rs, http.rs, time.rs
+  stdlib/    mod.rs, json.rs, json_conv.rs, ctx.rs, math.rs, fs.rs, env.rs, re.rs, md.rs, md_build.rs, agent.rs, mcp.rs, mcp_rpc.rs, mcp_stdio.rs, mcp_http.rs, http.rs, time.rs, cron.rs
   ast.rs, token.rs, value.rs, value_display.rs, env.rs, error.rs, span.rs, lib.rs
 crates/lx-cli/src/main.rs
-asl/suite/fixtures/
-  agent_echo.lx, mcp_test_server.py, mcp_test_http_server.py,
-  yield_orchestrator.py, yield_simple.lx, yield_multi.lx, yield_pipeline.lx,
-  http_test_server.py
+spec/          23 language spec files
+design/        11 impl design docs + DEVLOG + CURRENT_OPINION
+tests/         23 .lx test files
+  fixtures/    agent_echo.lx, mcp_test_server.py, yield_orchestrator.py, etc.
+flows/         14 .lx programs translating arch_diagrams
+  specs/       14 target goal + scenario specs
 ```
 
 ## Dependencies (audited 2026-03-14)
@@ -122,7 +148,18 @@ asl/suite/fixtures/
 | `dashmap` | Concurrent registries (agent, mcp, tool defs) |
 | `parking_lot` | Fast Mutex for Env, module cache |
 
-Custom code (~4500 lines: lexer, parser, interpreter, AST, builtins, stdlib) is language-specific — no crate replaces it. When adding new stdlib, use established crates.
+Custom code (~8300 lines: lexer, parser, interpreter, AST, builtins, stdlib) is language-specific — no crate replaces it. When adding new stdlib, use established crates.
+
+## Adding a Stdlib Module
+
+1. Create `crates/lx/src/stdlib/mymod.rs` with `pub fn build() -> IndexMap<String, Value>` returning functions via `mk("mymod.fn_name", arity, bi_fn)`
+2. Register in `crates/lx/src/stdlib/mod.rs`: add `mod mymod;`, add `"mymod" => mymod::build()` in `get_std_module`, add `| "mymod"` in `std_module_exists`
+3. Write test in `tests/NN_mymod.lx`
+4. Builtins calling lx functions use `crate::builtins::call_value(f, arg, span)` (see `builtins/hof.rs` for examples, `builtins/call.rs` for implementation)
+
+## Running Flows
+
+`flows/*.lx` are lx translations of real agentic architectures from `~/repos/mcp-toolbelt/packages/arch_diagrams/`. Each has a matching spec in `flows/specs/` with target goals and test scenarios. Run with `just run flows/scenario_research.lx`. Most require actual agent subprocesses or MCP servers to be running — they're structural demonstrations, not standalone tests.
 
 ## Rules
 

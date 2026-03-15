@@ -1,0 +1,76 @@
+-- 17_mcp_http.lx
+-- Tests: MCP HTTP streaming transport (Streamable HTTP)
+-- Requires: python3 for test HTTP server fixture
+
+use std/mcp
+use std/fs
+
+-- Clean up any stale files from previous runs
+$rm -f /tmp/lx_mcp_http_port /tmp/lx_mcp_http_pid
+
+-- Start HTTP MCP server in background
+${
+  python3 tests/fixtures/mcp_test_http_server.py >/dev/null 2>&1 &
+}
+
+-- Wait for server to write port file
+${
+  while [ ! -s /tmp/lx_mcp_http_port ]; do sleep 0.05; done
+}
+
+-- Read port
+http_port = fs.read "/tmp/lx_mcp_http_port" ^ | trim
+
+-- Connect via HTTP transport
+client = mcp.connect "http://127.0.0.1:{http_port}" ^
+
+-- list_tools
+tools = mcp.list_tools client ^
+assert (len tools == 2) "mcp http list_tools count"
+assert (tools.0.name == "echo") "mcp http list_tools first"
+assert (tools.1.name == "add") "mcp http list_tools second"
+
+-- call echo tool
+echo_result = mcp.call client "echo" {msg: "http-hello"} ^
+assert (contains? "http-hello" echo_result == true) "mcp http call echo"
+
+-- call add tool
+add_result = mcp.call client "add" {a: 10 b: 20} ^
+assert (add_result == "30") "mcp http call add"
+
+-- call tool that returns isError
+fail_result = mcp.call client "fail" {}
+assert (err? fail_result == true) "mcp http call fail returns Err"
+
+-- list_resources
+resources = mcp.list_resources client ^
+assert (len resources == 1) "mcp http list_resources count"
+assert (resources.0.name == "doc") "mcp http list_resources name"
+
+-- read_resource
+res_data = mcp.read_resource client "test://doc" ^
+assert (len res_data.contents > 0) "mcp http read_resource has contents"
+
+-- list_prompts
+prompts = mcp.list_prompts client ^
+assert (len prompts == 1) "mcp http list_prompts count"
+assert (prompts.0.name == "greet") "mcp http list_prompts name"
+
+-- get_prompt
+prompt = mcp.get_prompt client "greet" {name: "lx-http"} ^
+assert (len prompt.messages > 0) "mcp http get_prompt has messages"
+
+-- close (sends DELETE to terminate session)
+mcp.close client
+
+-- config record with url field also works
+client2 = mcp.connect {url: "http://127.0.0.1:{http_port}"} ^
+tools2 = mcp.list_tools client2 ^
+assert (len tools2 == 2) "mcp http config record list_tools"
+mcp.close client2
+
+-- Cleanup: kill the server
+http_pid = fs.read "/tmp/lx_mcp_http_pid" ^ | trim
+$kill {http_pid}
+$rm -f /tmp/lx_mcp_http_port /tmp/lx_mcp_http_pid
+()

@@ -18,6 +18,7 @@ impl<T> Spanned<T> {
 pub type SExpr = Spanned<Expr>;
 pub type SStmt = Spanned<Stmt>;
 pub type SPattern = Spanned<Pattern>;
+pub type SType = Spanned<TypeExpr>;
 
 #[derive(Debug, Clone)]
 pub struct Program {
@@ -40,6 +41,7 @@ pub struct Binding {
   pub exported: bool,
   pub mutable: bool,
   pub target: BindTarget,
+  pub type_ann: Option<SType>,
   pub value: SExpr,
 }
 
@@ -72,7 +74,7 @@ pub enum Expr {
   Record(Vec<RecordField>),
   Map(Vec<MapEntry>),
 
-  Func { params: Vec<Param>, body: Box<SExpr> },
+  Func { params: Vec<Param>, ret_type: Option<SType>, body: Box<SExpr> },
   Match { scrutinee: Box<SExpr>, arms: Vec<MatchArm> },
   Ternary { cond: Box<SExpr>, then_: Box<SExpr>, else_: Option<Box<SExpr>> },
 
@@ -160,6 +162,7 @@ pub struct MapEntry {
 #[derive(Debug, Clone)]
 pub struct Param {
   pub name: String,
+  pub type_ann: Option<SType>,
   pub default: Option<SExpr>,
 }
 
@@ -225,6 +228,25 @@ pub enum McpOutputType {
 pub struct FieldPattern {
   pub name: String,
   pub pattern: Option<SPattern>,
+}
+
+#[derive(Debug, Clone)]
+pub enum TypeExpr {
+  Named(String),
+  Var(String),
+  Applied(String, Vec<SType>),
+  List(Box<SType>),
+  Map { key: Box<SType>, value: Box<SType> },
+  Record(Vec<TypeField>),
+  Tuple(Vec<SType>),
+  Func { param: Box<SType>, ret: Box<SType> },
+  Fallible { ok: Box<SType>, err: Box<SType> },
+}
+
+#[derive(Debug, Clone)]
+pub struct TypeField {
+  pub name: String,
+  pub ty: SType,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]

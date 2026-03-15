@@ -8,7 +8,7 @@ diagnose:
 
 # run all .lx suite tests
 test:
-  cargo run -p lx-cli -- test asl/suite/
+  cargo run -p lx-cli -- test tests/
 
 # run a single .lx file
 run file:
