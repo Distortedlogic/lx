@@ -6,7 +6,7 @@ The lexer is a modal state machine. It reads `&str` source and produces `Vec<Tok
 
 ```
 Normal      -- default: identifiers, operators, literals, keywords
-Shell       -- after `$`/`$$`/`$^`: raw text until newline, with {expr} holes
+Shell       -- after `$`/`$^`: raw text until newline, with {expr} holes
 ShellBlock  -- after `${`: raw text until `}`, with {expr} holes
 StringInterp -- inside `"..."`: literal chars until `{` (re-enter Normal) or `"`
 Regex       -- after `r/`: raw chars until unescaped `/`, then flag chars
@@ -16,10 +16,9 @@ Regex       -- after `r/`: raw chars until unescaped `/`, then flag chars
 
 ```
 Normal:
-  sees `$`  followed by `$`  → emit Token::DollarDollar, enter Shell(raw=true)
-  sees `$`  followed by `^`  → emit Token::DollarCaret, enter Shell(raw=false)
+  sees `$`  followed by `^`  → emit Token::DollarCaret, enter Shell
   sees `$`  followed by `{`  → emit Token::DollarBrace, enter ShellBlock
-  sees `$`  followed by other → emit Token::Dollar, enter Shell(raw=false)
+  sees `$`  followed by other → emit Token::Dollar, enter Shell
   sees `"`                   → emit Token::StrStart, enter StringInterp
   sees `r` followed by `/` (no space) → enter Regex
   sees `` ` ``               → scan raw string to closing `` ` ``, emit Token::RawStr
@@ -62,7 +61,7 @@ enum TokenKind {
     StrChunk(String),   // text between interpolation holes
     StrEnd,             // closing "
     RawStr(String),     // `...` complete raw string
-    Regex(String, String), // (pattern, flags)
+    Regex(String),          // pattern with flags prepended as (?flags)
     True,
     False,
     Unit,               // ()
@@ -73,7 +72,7 @@ enum TokenKind {
 
     // Operators
     Plus, Minus, Star, Slash, Percent, IntDiv,   // + - * / % //
-    PlusPlus, Diamond,                            // ++ <>
+    PlusPlus,                                       // ++
     Eq, NotEq, Lt, Gt, LtEq, GtEq,             // == != < > <= >=
     And, Or,                                      // && ||
     Pipe,                                         // |
@@ -93,17 +92,17 @@ enum TokenKind {
     LBracket, RBracket,                          // [ ]
     LBrace, RBrace,                              // { }
     PercentLBrace,                               // %{
-    HashLBrace,                                  // #{
 
     // Shell
     Dollar,                                       // $
-    DollarDollar,                                // $$
     DollarCaret,                                 // $^
     DollarBrace,                                 // ${
     ShellText(String),                           // raw shell text (between interpolation holes)
 
     // Keywords
-    Use, Loop, Break, Par, Sel, Assert, Underscore,
+    Use, Loop, Break, Par, Sel, Assert, Underscore, Yield, With,
+    TildeArrow, TildeArrowQ,   // ~> ~>?
+    Protocol, Mcp,             // declaration keywords
 
     // Structure
     Export,                                       // + at column 0
@@ -116,7 +115,7 @@ enum TokenKind {
 
 Newlines become `Semi` tokens EXCEPT:
 1. Inside unmatched `(`, `[`, `{` — suppressed (track delimiter depth)
-2. When the next line starts with a continuation operator (`|`, `+`, `-`, `*`, `/`, `%`, `//`, `++`, `<>`, `&&`, `||`, `??`, `==`, `!=`, `<`, `>`, `<=`, `>=`, `..`, `..=`) — suppress the preceding newline
+2. When the next line starts with a continuation operator (`|`, `+`, `-`, `*`, `/`, `%`, `//`, `++`, `&&`, `||`, `??`, `==`, `!=`, `<`, `>`, `<=`, `>=`, `..`, `..=`, `~>`, `~>?`) — suppress the preceding newline
 3. When the current line ends with a binary operator — suppress
 
 Implementation: the lexer tracks delimiter depth. On newline, if depth > 0, skip. Otherwise, peek at the next non-whitespace token. If it's a continuation operator, skip. Otherwise emit `Semi`.

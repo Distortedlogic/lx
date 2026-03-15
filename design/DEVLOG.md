@@ -4,7 +4,7 @@ Session history + design decisions. For priorities and gap analysis, see `NEXT_P
 
 ## Implementation Status
 
-**24/24 PASS.** 12 stdlib modules. 14 flow programs. Type checker. `just diagnose` clean.
+**25/25 PASS.** 12 stdlib modules. 14 flow programs. Type checker. Regex literals. `just diagnose` clean.
 
 ## Key Design Decisions
 
@@ -44,7 +44,6 @@ Non-obvious choices that cause confusion if forgotten:
 - Currying removal deferred — requires parser architecture change
 - `it` in `sel` blocks — only implicit binding
 - Shell line is single-line only — forces `${ }` for complex commands
-- Function body extent — inline lambdas consume everything
 - Named args + default params + currying interaction
 
 ## Session History
@@ -62,3 +61,4 @@ Non-obvious choices that cause confusion if forgotten:
 | 27 | 03-15 | Repo reorg (asl/ → spec/design/tests/flows), 14 flow programs + specs |
 | 28 | 03-15 | Design review: types + regex back, full stdlib roadmap |
 | 29 | 03-15 | Type annotations + checker: AST, parser, bidirectional inference, `lx check` |
+| 30 | 03-15 | Regex literals: `r/\d+/flags`, Value::Regex, std/re accepts both, 25/25 tests |

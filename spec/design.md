@@ -28,7 +28,7 @@ Every non-obvious choice in lx, with rationale. These are decisions, not axioms 
 
 **`--` for comments** — `#` was reserved for sets (removed). `//` creates ambiguity in division contexts. `--` is always unambiguous and typically one token.
 
-**Regex via stdlib** — `std/re` with string patterns. `re.is_match "\\d+" text`. Regex literals (`r/pattern/`) were considered but removed to reduce lexer complexity.
+**Regex literals** — `r/\d+/` compiles at evaluation time to a first-class `Regex` value. Flags after the closing slash: `r/hello/i`. All `std/re` functions accept both regex literals and string patterns. The literal form eliminates double-escaping (`\\d+`) that is hostile to LLM generation.
 
 **`?` suffix for predicates** — `empty?`, `sorted?`, `prime?`. Single trailing `?` in identifiers. No `is_` prefix overhead. Not ambiguous with `?` match operator because `ident?` (no space) is a name while `expr ?` (space + block) is a match.
 
@@ -65,7 +65,7 @@ The original design used `!` for shell, but `!cmd` vs `!expr` (logical not) vs `
 
 ## Types and Mutability
 
-**No type annotations** — The language has no type checker. Type definitions exist for tagged unions and Protocol validation, but parameter/return annotations were removed.
+**Optional type annotations** — Parameters, return types, and bindings can be annotated: `(x: Int y: Str) -> Result Int Str { ... }`. `lx check` validates annotations via bidirectional inference + unification. `lx run` ignores them — the language stays dynamic at runtime.
 
 **No formal traits in v1** — Structural subtyping means any record with matching fields satisfies a type constraint. No explicit trait/interface definitions needed for scripting.
 

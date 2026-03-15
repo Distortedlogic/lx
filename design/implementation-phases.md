@@ -23,20 +23,20 @@ Each phase produces a working, testable increment. No phase depends on a later p
 
 **Deliverables:**
 - Lexer: `|`, `->`, function params `(x y)`
-- Parser: function definitions `name = (params) body`, application by juxtaposition, pipe `|`, sections `(* 2)` `(.field)`, composition `<>`
+- Parser: function definitions `name = (params) body`, application by juxtaposition, pipe `|`, sections `(* 2)` `(.field)`
 - Interpreter: closures (Env capture), function application, pipe threading (data-last), sections as anonymous functions, currying for all-positional functions
 - `[1 2 3] | map (* 2) | sum` works
 
-**Test cases:** closures capture scope, currying, pipe left-to-right, section for each operator, composition, data-last threading.
+**Test cases:** closures capture scope, currying, pipe left-to-right, section for each operator, data-last threading.
 
 ## Phase 3: Collections + Pattern Matching
 
-**Goal:** Lists, records, maps, sets, tuples. The `?` operator in all three modes.
+**Goal:** Lists, records, maps, tuples. The `?` operator in all three modes.
 
 **Deliverables:**
-- Lexer: `[`, `]`, `{`, `}`, `%{`, `#{`, `..`, `..=`, `_`
-- Parser: list/record/map/set/tuple literals, spread `..`, field access `.`, slicing, destructuring patterns, `?` (multi-arm, ternary, single-arm), guards `&`
-- Interpreter: collection values, structural equality, `get`/`contains?`/`len`/`empty?`, pattern matching with destructuring, exhaustiveness checking (warnings)
+- Lexer: `[`, `]`, `{`, `}`, `%{`, `..`, `..=`, `_`
+- Parser: list/record/map/tuple literals, spread `..`, field access `.`, slicing, destructuring patterns, `?` (multi-arm, ternary, single-arm), guards `&`
+- Interpreter: collection values, structural equality, `get`/`contains?`/`len`/`empty?`, pattern matching with destructuring
 - Value: implement `PartialEq` for structural equality
 
 **Test cases:** each collection type, spread merge, negative indexing, slicing, nested destructuring, guard conditions, exhaustiveness warnings, no truthiness (non-Bool in ternary is type error).

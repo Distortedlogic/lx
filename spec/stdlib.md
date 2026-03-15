@@ -229,17 +229,19 @@ pad_right width s      -- pad with spaces
 
 ### Regex Functions (std/re)
 
-Use `std/re` for pattern matching with string patterns:
+Use `std/re` with regex literals (`r/pattern/flags`) or string patterns:
 
 ```
 use std/re
-re.is_match "\\d+" text       -- Bool: does it match?
-re.match "(\\w+)" text         -- Maybe {match groups}: capture groups
-re.replace "old" "new" text    -- replace first match
-re.replace_all "old" "new" text -- replace all matches
-re.split "\\s+" text           -- split on matches
-re.find_all "\\d+" text        -- [Str]: all matches
+re.is_match r/\d+/ text        -- Bool: does it match?
+re.match r/(\w+)/ text          -- Maybe {text start end}: first match
+re.replace r/old/ "new" text    -- replace first match
+re.replace_all r/old/ "new" text -- replace all matches
+re.split r/\s+/ text            -- split on matches
+re.find_all r/\d+/ text         -- [Str]: all matches
 ```
+
+Regex literals are preferred — they avoid double-escaping. String patterns still work: `re.is_match "\\d+" text`.
 
 ## Core Modules
 

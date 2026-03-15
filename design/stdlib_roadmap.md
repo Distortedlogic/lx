@@ -106,8 +106,8 @@ Typed interface to external workflow systems (Linear, Plane, etc.). Distinct fro
 
 The dependency chain determines build order:
 
-1. Type annotations + type checker (foundational — everything benefits)
-2. Regex literals (foundational — generation ergonomics)
+1. ~~Type annotations + type checker~~ (DONE — bidirectional inference, unification, `lx check`)
+2. ~~Regex literals~~ (DONE — `r/\d+/flags`, first-class Regex values)
 3. std/ai (foundational — all standard agents depend on this for LLM reasoning)
 4. std/tasks (no dependencies, enables grading loops)
 5. std/audit (no dependencies, enables auditor agent)

@@ -31,6 +31,17 @@ true false               -- bool
 
 Double quotes always interpolate via `{expr}`. Backticks never interpolate.
 
+**Regex literals** — `r/pattern/flags` compiles a regular expression at evaluation time:
+
+```
+r/\d+/              -- digits
+r/^hello$/i         -- case insensitive
+r/foo\/bar/         -- escaped slash
+r/^line$/m          -- multiline flag
+```
+
+Flags: `i` (case insensitive), `m` (multiline), `s` (dotall), `x` (extended). Inside `r/.../`, `\/` is a literal `/` and other `\` escapes pass through to the regex engine. Regex values work with all `std/re` functions and can be passed around as first-class values.
+
 **Multi-line strings** — both `"` and `` ` `` strings can span lines. When a string literal contains newlines, leading indentation is stripped using the closing delimiter's column position:
 
 ```

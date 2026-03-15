@@ -1,6 +1,6 @@
 # Current Opinion: lx as an Agentic Language
 
-Written by the language designer (Claude). Updated after Session 29.
+Written by the language designer (Claude). Updated after Session 30.
 
 ## What Works
 
@@ -16,11 +16,9 @@ Written by the language designer (Claude). Updated after Session 29.
 
 **Context threading is solved.** `with` scoped bindings + record field update.
 
-**Type annotations + checker.** `(x: Int y: Str) -> Response ^ HttpErr` on params, return types, and bindings. `lx check` runs bidirectional inference with unification and structural subtyping. `lx run` stays dynamic. Next step: connect Protocol field types to function param annotations for end-to-end validation.
+**Type annotations + checker.** `(x: Int y: Str) -> Response ^ HttpErr` on params, return types, and bindings. `lx check` runs bidirectional inference with unification and structural subtyping. `lx run` stays dynamic.
 
 ## What's Still Wrong
-
-**Regex literals were removed for the wrong reason.** `re.is_match "\\d+" text` with double-escaped backslashes is hostile to LLM generation. `r/\d+/` is what every LLM would naturally produce. Removed to simplify the lexer — but implementation effort is not a design argument.
 
 **Currying** — single biggest source of parser ambiguity. Sections cover 90%. Deferred.
 
@@ -34,20 +32,8 @@ Reviewed `mcp-toolbelt/packages/arch_diagrams` — 14 agentic flow architectures
 
 **What lx covers well:** agent spawning + fanout, message validation, MCP tool invocation, context persistence, scheduled execution, executable plans, grading loops, shell integration, end-to-end type safety.
 
-**Critical gaps** (full stdlib roadmap in `design/stdlib_roadmap.md`):
-
-- **LLM integration** → `std/ai`
-- **Task tracking** → `std/tasks`
-- **Quality gates** → `std/audit` + `std/agents/auditor` + `std/agents/grader`
-- **Prompt routing** → `std/agents/router`
-- **Task decomposition** → `std/agents/planner`
-- **Circuit breakers** → `std/circuit`
-- **Tiered memory** → `std/memory`
-- **Observability** → `std/trace`
-- **Subagent QC** → `std/agents/monitor`
-- **Learning** → `std/agents/reviewer`
-- **Embeddings** → `MCP Embeddings`
+**Critical gaps:** LLM integration, task tracking, quality gates, prompt routing, task decomposition, circuit breakers, tiered memory, observability, subagent QC, learning from experience, embeddings. See `NEXT_PROMPT.md` for the prioritized roadmap.
 
 ## Bottom Line
 
-12 stdlib modules. Communication/orchestration layer is solid. Type annotations + checker working. One foundational item remains: regex literals. Then the full stdlib buildout: 5 new modules, 6 standard agents, 2 MCP declarations. An agent language's stdlib includes agents. See `NEXT_PROMPT.md` for priority order, `design/stdlib_roadmap.md` for the full plan.
+12 stdlib modules. Communication/orchestration layer is solid. Type annotations + checker working. Regex literals implemented. Next: full stdlib buildout — 6 new modules, 6 standard agents, 1 MCP declaration. An agent language's stdlib includes agents.

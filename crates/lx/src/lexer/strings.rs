@@ -181,6 +181,41 @@ impl<'src> Lexer<'src> {
     }
   }
 
+  pub(super) fn read_regex(&mut self, start: usize) -> Result<Token, LxError> {
+    self.advance();
+    let mut pattern = String::new();
+    loop {
+      match self.peek() {
+        None | Some('\n') => {
+          return Err(LxError::parse("unterminated regex literal", Span::new(start as u32, 1), None));
+        },
+        Some('/') => {
+          self.advance();
+          break;
+        },
+        Some('\\') => {
+          self.advance();
+          match self.peek() {
+            Some('/') => { self.advance(); pattern.push('/'); },
+            Some(c) => { self.advance(); pattern.push('\\'); pattern.push(c); },
+            None => {
+              return Err(LxError::parse("unterminated regex literal", Span::new(start as u32, 1), None));
+            },
+          }
+        },
+        Some(c) => { self.advance(); pattern.push(c); },
+      }
+    }
+    let mut flags = String::new();
+    while let Some(c @ ('i' | 'm' | 's' | 'x')) = self.peek() {
+      self.advance();
+      flags.push(c);
+    }
+    let full = if flags.is_empty() { pattern } else { format!("(?{flags}){pattern}") };
+    let span = Span::from_range(start as u32, self.pos as u32);
+    Ok(Token::new(TokenKind::Regex(full), span))
+  }
+
   pub(super) fn read_raw_string(&mut self, start: usize) -> Result<Token, LxError> {
     let mut buf = String::new();
     loop {

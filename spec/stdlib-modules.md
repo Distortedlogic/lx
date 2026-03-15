@@ -130,12 +130,12 @@ To require an env var: `env.get "KEY" | require "KEY must be set" ^`.
 ## std/re
 
 ```
-match regex s          -- Maybe [Str]: full match + capture groups
-test regex s           -- Bool: does it match?
-replace regex new s    -- replace first match
-replace_all regex new s-- replace all matches
-split regex s          -- split on matches
-find_all regex s       -- [[Str]]: all matches with capture groups
+is_match pattern s       -- Bool: does it match?
+match pattern s          -- Maybe {text start end}: first match
+replace pattern new s    -- replace first match
+replace_all pattern new s -- replace all matches
+split pattern s          -- split on matches -> [Str]
+find_all pattern s       -- [Str]: all match texts
 ```
 
-All patterns are passed as string arguments.
+Patterns can be regex literals (`r/\d+/`) or strings (`"\\d+"`). Regex literals are preferred — no double-escaping. Flags: `r/pattern/i` (case insensitive), `m` (multiline), `s` (dotall), `x` (extended).

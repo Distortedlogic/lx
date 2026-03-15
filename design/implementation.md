@@ -157,7 +157,7 @@ crates/lx/src/
 crates/lx-cli/src/main.rs      -- CLI: run, test (with subdirectory scanning)
 ```
 
-Target: each file ≤300 lines. Some files currently exceed this (prefix.rs ~770, parser/mod.rs ~800, interpreter/mod.rs ~490, hof.rs ~430) — known tech debt.
+Target: each file ≤300 lines. Files have been split to stay near this limit. `parser/mod.rs` (~300) is the largest.
 
 ## Phased Build Plan
 

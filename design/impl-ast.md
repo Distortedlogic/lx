@@ -77,7 +77,7 @@ enum Literal {
     Float(f64),
     Str(Vec<StrPart>),
     RawStr(String),
-    Regex { pattern: String, flags: String },
+    Regex(String),  // pattern with flags prepended as (?flags)
     Bool(bool),
     Unit,
 }

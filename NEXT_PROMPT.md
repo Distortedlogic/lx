@@ -25,11 +25,11 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 
 ## Current State
 
-`just diagnose` clean. `just test`: **24/24 PASS**. All language features complete.
+`just diagnose` clean. `just test`: **25/25 PASS**. All language features complete.
 
 ### What's implemented
 
-- Arithmetic, bindings, strings, interpolation, collections (lists, records, maps, tuples), pattern matching
+- Arithmetic, bindings, strings, interpolation, regex literals (`r/\d+/flags`), collections (lists, records, maps, tuples), pattern matching
 - Functions, closures, currying, default params, pipes, sections, slicing, named args
 - Type definitions with tagged values and pattern matching
 - Type annotations: `(x: Int y: Str) -> Result Int Str { ... }` on params, return types, bindings
@@ -53,7 +53,7 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 - Shell `$` consumes full line; wrap in parens for expressions: `($cmd) ? { ... }`
 - `~>?` composes with `^` and `|`: `agent ~>? msg ^ | process` = `((agent ~>? msg) ^) | process`
 - `assert (expr) "msg"` — if `(expr)` is callable, parser consumes `"msg"` as arg. Use `assert (expr == true) "msg"`
-- `std/re` uses string patterns: `re.is_match "\\d+" text`
+- Regex literals: `r/\d+/imsx` — `\/` escapes slash, `r` + `/` always starts regex (not an ident). `std/re` accepts both `r/pat/` and `"\\pat"` strings
 - `yield expr` pauses, sends to orchestrator, returns response. JSON-line protocol on stdin/stdout
 - `with name = expr { body }` scoped binding. `:=` or `mut` for mutable. Returns body's last value
 - `name.field <- value` updates mutable record field. Nested: `name.a.b <- value`. Requires `:=` binding
@@ -62,49 +62,28 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 
 ## What To Work On Next
 
-### Language priorities:
-
-1. **Regex literals** — bring back `r/\d+/`. String patterns with double escaping is hostile to LLM generation. Lexer already had this; re-add.
-
 ### Stdlib roadmap (full plan: `design/stdlib_roadmap.md`):
 
-2. **`std/ai`** — LLM integration. Generic interface, Claude Code CLI backend. `ai.prompt` (simple) + `ai.prompt_with` (full: system/model/tools/schema/budget/resume). Foundation for all standard agents — auditor/grader/router all depend on this.
-3. **`std/tasks`** — task state machine, subtasks, auto-persist. Design doc: `design/std_tasks.md`.
-4. **`std/audit`** — structural quality checks. Design doc: `design/std_audit.md`.
-5. **`std/agents/auditor`** — LLM quality gate. Uses std/audit as pre-filter, std/ai for judgment.
-6. **`std/agents/router`** — prompt → specialist classification. Uses std/ai.
-7. **`std/agents/grader`** — rubric scoring, incremental re-grade. Uses std/ai.
-8. **`std/agents/planner`** — task decomposition into ordered subtasks. Uses std/ai.
-9. **`std/circuit`** — circuit breakers (turn/time/token limits, action repetition).
-10. **`std/memory`** — tiered L0-L3 memory with confidence, promotion/demotion.
-11. **`std/trace`** — trace collection, scoring, dataset export.
-12. **`std/agents/monitor`** — QC sampling of running subagents.
-13. **`std/agents/reviewer`** — post-hoc transcript review, learning extraction.
-14. **`MCP Embeddings`** — typed interface to embedding services (similarity, retrieval).
+1. **`std/ai`** — LLM integration. Generic interface, Claude Code CLI backend. `ai.prompt` (simple) + `ai.prompt_with` (full: system/model/tools/schema/budget/resume). Foundation for all standard agents — auditor/grader/router all depend on this.
+2. **`std/tasks`** — task state machine, subtasks, auto-persist. Design doc: `design/std_tasks.md`.
+3. **`std/audit`** — structural quality checks. Design doc: `design/std_audit.md`.
+4. **`std/agents/auditor`** — LLM quality gate. Uses std/audit as pre-filter, std/ai for judgment.
+5. **`std/agents/router`** — prompt → specialist classification. Uses std/ai.
+6. **`std/agents/grader`** — rubric scoring, incremental re-grade. Uses std/ai.
+7. **`std/agents/planner`** — task decomposition into ordered subtasks. Uses std/ai.
+8. **`std/circuit`** — circuit breakers (turn/time/token limits, action repetition).
+9. **`std/memory`** — tiered L0-L3 memory with confidence, promotion/demotion.
+10. **`std/trace`** — trace collection, scoring, dataset export.
+11. **`std/agents/monitor`** — QC sampling of running subagents.
+12. **`std/agents/reviewer`** — post-hoc transcript review, learning extraction.
+13. **`MCP Embeddings`** — typed interface to embedding services (similarity, retrieval).
 
 Design docs: `design/standard_agents.md`, `design/stdlib_roadmap.md`
 
 ### Technical debt:
 
-15. **Currying removal** (deferred) — requires parser architecture change
-16. **Toolchain** — `lx fmt`, `lx repl`, `lx watch`
-
-### Remaining gaps:
-
-| Gap | Solution |
-|---|---|
-| LLM integration | `std/ai` |
-| Regex patterns | `r/pattern/` literals |
-| Task tracking | `std/tasks` |
-| Quality checks | `std/audit` + `std/agents/auditor` + `std/agents/grader` |
-| Prompt routing | `std/agents/router` |
-| Task decomposition | `std/agents/planner` |
-| Circuit breakers | `std/circuit` |
-| Tiered memory | `std/memory` |
-| Observability | `std/trace` |
-| Subagent QC | `std/agents/monitor` |
-| Learning from experience | `std/agents/reviewer` |
-| Embeddings/similarity | `MCP Embeddings` |
+14. **Currying removal** (deferred) — requires parser architecture change
+15. **Toolchain** — `lx fmt`, `lx repl`, `lx watch`
 
 ## Codebase Layout
 
@@ -118,9 +97,9 @@ crates/lx/src/
   stdlib/    mod.rs, json.rs, json_conv.rs, ctx.rs, math.rs, fs.rs, env.rs, re.rs, md.rs, md_build.rs, agent.rs, mcp.rs, mcp_rpc.rs, mcp_stdio.rs, mcp_http.rs, http.rs, time.rs, cron.rs
   ast.rs, token.rs, value.rs, value_display.rs, env.rs, error.rs, span.rs, lib.rs
 crates/lx-cli/src/main.rs
-spec/          23 language spec files
+spec/          24 language spec files
 design/        11 impl design docs + DEVLOG + CURRENT_OPINION
-tests/         24 .lx test files
+tests/         25 .lx test files
   fixtures/    agent_echo.lx, mcp_test_server.py, yield_orchestrator.py, etc.
 flows/         14 .lx programs translating arch_diagrams
   specs/       14 target goal + scenario specs
@@ -134,7 +113,7 @@ flows/         14 .lx programs translating arch_diagrams
 | `clap` v4 derive | CLI argument parsing |
 | `num-bigint` / `num-traits` / `num-integer` | Arbitrary-precision integers |
 | `indexmap` | Ordered maps (records, maps) |
-| `regex` | `std/re` string pattern matching |
+| `regex` | `r/pattern/` literals + `std/re` pattern matching |
 | `serde_json` (preserve_order) | JSON conversion, agent/MCP protocol |
 | `pulldown-cmark` | `std/md` markdown parsing |
 | `reqwest` (blocking, json) | `std/mcp` HTTP transport, `std/http` |

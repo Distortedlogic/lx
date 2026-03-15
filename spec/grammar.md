@@ -76,6 +76,7 @@ INT       = [0-9][0-9_]* | 0x[0-9a-fA-F_]+ | 0b[01_]+ | 0o[0-7_]+
 FLOAT     = [0-9][0-9_]*\.[0-9][0-9_]* ([eE][+-]?[0-9]+)?
 STR       = " (char | \escape | { EXPR })* "
 RAW_STR   = ` char* `
+REGEX     = r/ (char | \/)* / [imsx]*
 SEP       = NEWLINE | ;
 COMMENT   = -- to end of line
 ```
@@ -203,7 +204,7 @@ type        = TYPE
 
 field_type  = IDENT ":" type
 
-literal     = INT | FLOAT | STR | RAW_STR
+literal     = INT | FLOAT | STR | RAW_STR | REGEX
             | "true" | "false" | "()"
             | "[" expr* "]"
             | "{" field* "}"

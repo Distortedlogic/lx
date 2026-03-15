@@ -23,7 +23,7 @@ Each operator has a left and right binding power. Higher binding power means tig
 * / % //    → (27, 28)     multiplicative
 + -         → (25, 26)     additive
 .. ..=      → (23, 24)     range
-++ <>       → (21, 22)     concat/compose
+++ ~> ~>?   → (21, 22)     concat/agent comm
 |           → (19, 20)     pipe
 == != < > <= >= → (17, 18) comparison
 &&          → (15, 16)     logical and
@@ -46,14 +46,13 @@ Each operator has a left and right binding power. Higher binding power means tig
 2. Loop: peek at the next token. If it has a left binding power ≥ min_bp, consume it and parse the right side
 
 Prefix parsing dispatches on token kind:
-- `Int/Float/Str*/Bool/Unit` → literal AST node
+- `Int/Float/Str*/Bool/Unit/Regex` → literal AST node
 - `Ident` → check for `=`/`:=` after it (binding), else identifier expression
 - `TypeName` → type constructor or type definition
 - `(` → section, tuple, function def, or grouping (see disambiguation below)
 - `[` → list literal
 - `{` → record literal or block
 - `%{` → map literal
-- `#{` → set literal
 - `$` variants → shell expression
 - `!` → unary not
 - `-` → unary negate
@@ -62,6 +61,8 @@ Prefix parsing dispatches on token kind:
 - `loop` → loop block
 - `break` → break expression
 - `assert` → assert expression
+- `yield` → yield expression
+- `with` → scoped binding
 
 **Function body extent in pipe chains** — When `(params) body` appears as an argument to a HOF in a pipe chain, the body is parsed at binding power 0, consuming everything to the right including pipe operators. This means `map (x) x * 2 | sum` gives `map` a function whose body is `x * 2 | sum`. For inline functions with multi-expression bodies in pipe chains, use block delimiters: `map (x) { x * 2 } | sum`. Sections (`(* 2)`, `(> 0)`, `(.field)`) remain the primary mechanism for simple inline functions — they have no body extent ambiguity.
 
@@ -98,13 +99,13 @@ Per spec: `expr ? {` always starts a multi-arm match. For record literals in ter
 
 ### `$` — Shell Mode
 
-After `$`, `$$`, `$^`, or `${`, the parser delegates to the lexer's shell tokens. Shell text tokens and interpolation hole tokens alternate. The parser produces a `ShellExpr` AST node containing literal text segments and interpolated expression nodes.
+After `$`, `$^`, or `${`, the parser delegates to the lexer's shell tokens. Shell text tokens and interpolation hole tokens alternate. The parser produces a `ShellExpr` AST node containing literal text segments and interpolated expression nodes.
 
 ## Function Application
 
 Function application by juxtaposition has high binding power (31, 32). `f x y` parses as `(f x) y`. The parser detects application when the current token could start an expression AND the previous expression is a callable form.
 
-Callable forms (left side can be applied): `Ident`, `TypeName`, `Apply`, `FieldAccess`, `Section`, `Func`. Non-callable forms (application NOT attempted): `Literal`, `Binary`, `Unary`, `List`, `Record`, `Map`, `Set`, `Tuple`, `Match`, `Shell`, `Par`, `Sel`, `Loop`, `Break`, `Assert`, `Propagate`, `Coalesce`. This ensures `[1 2 3]` parses as three list elements, not `Apply(Apply(1, 2), 3)`.
+Callable forms (left side can be applied): `Ident`, `TypeName`, `Apply`, `FieldAccess`, `Section`, `Func`. Non-callable forms (application NOT attempted): `Literal`, `Binary`, `Unary`, `List`, `Record`, `Map`, `Tuple`, `Match`, `Shell`, `Par`, `Sel`, `Loop`, `Break`, `Assert`, `Propagate`, `Coalesce`. This ensures `[1 2 3]` parses as three list elements, not `Apply(Apply(1, 2), 3)`.
 
 Tokens that start an argument: `Int`, `Float`, `Str*`, `Ident`, `TypeName`, `(`, `[`, `{`, `true`, `false`, `r/`.
 

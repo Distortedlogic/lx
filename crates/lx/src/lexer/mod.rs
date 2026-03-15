@@ -100,9 +100,7 @@ impl<'src> Lexer<'src> {
   }
 
   fn next_token(&mut self) -> Result<Option<Token>, LxError> {
-    if self.pos >= self.source.len() {
-      return Ok(None);
-    }
+    if self.pos >= self.source.len() { return Ok(None); }
     let start = self.pos;
     let c = self.advance().expect("next_token called at end of source");
     match c {
@@ -283,40 +281,6 @@ impl<'src> Lexer<'src> {
       _ => TokenKind::Ident(text.to_string()),
     };
     Ok(Token::new(kind, span))
-  }
-
-  fn read_regex(&mut self, start: usize) -> Result<Token, LxError> {
-    self.advance();
-    let mut pattern = String::new();
-    loop {
-      match self.peek() {
-        None | Some('\n') => {
-          return Err(LxError::parse("unterminated regex literal", Span::new(start as u32, 1), None));
-        },
-        Some('/') => {
-          self.advance();
-          break;
-        },
-        Some('\\') => {
-          self.advance();
-          match self.peek() {
-            Some('/') => { self.advance(); pattern.push('/'); },
-            Some(c) => { self.advance(); pattern.push('\\'); pattern.push(c); },
-            None => {
-              return Err(LxError::parse("unterminated regex literal", Span::new(start as u32, 1), None));
-            },
-          }
-        },
-        Some(c) => { self.advance(); pattern.push(c); },
-      }
-    }
-    let mut flags = String::new();
-    while self.peek().is_some_and(|c| matches!(c, 'i' | 'm' | 's' | 'x')) {
-      flags.push(self.advance().unwrap());
-    }
-    let full = if flags.is_empty() { pattern } else { format!("(?{flags}){pattern}") };
-    let span = Span::from_range(start as u32, self.pos as u32);
-    Ok(Token::new(TokenKind::Regex(full), span))
   }
 
   fn read_type_name(&mut self, start: usize) -> Result<Token, LxError> {

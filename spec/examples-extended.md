@@ -144,10 +144,10 @@ use std/re
 
 analyze = (path) {
   levels = fs.read_lines path ^
-    | filter (line) re.is_match "\\[(ERROR|WARN|INFO|DEBUG)\\]" line
+    | filter (line) re.is_match r/\[(ERROR|WARN|INFO|DEBUG)\]/ line
     | map (line) {
-      re.match "\\[(ERROR|WARN|INFO|DEBUG)\\]" line ? {
-        Some groups -> groups.1
+      re.match r/\[(ERROR|WARN|INFO|DEBUG)\]/ line ? {
+        Some groups -> groups.text
         None        -> "UNKNOWN"
       }
     }

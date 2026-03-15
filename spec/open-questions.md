@@ -78,6 +78,6 @@ These are not blockers for v1 implementation but worth revisiting after real-wor
 
 **WASM target** — `lx build --target wasm` for running lx scripts in browsers or edge runtimes. The runtime model (async I/O, work-stealing) needs adaptation.
 
-**Pattern matching on regex** — Using string patterns directly in match arms instead of guards with `std/re`. Currently requires guards: `s & (re.is_match "\\d+" s)`.
+**Pattern matching on regex** — Using regex directly in match arms instead of guards with `std/re`. Currently requires guards: `s & (re.is_match r/\d+/ s)`.
 
 **`where` clauses for type constraints** — Currently there's no way to express "this generic type must support equality" or "must be sortable." Structural typing handles fields, but behavioral constraints (like "has a `<` operator") are implicit. Revisit if the lack of constraints causes confusing error messages.

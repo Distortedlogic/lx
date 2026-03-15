@@ -67,12 +67,12 @@ Prefer `map`/`filter`/`fold` over `loop`. Use `loop` only when the iteration dep
 
 ## Pattern Matching with std/re
 
-For regex operations, use `std/re` with string patterns:
+For regex operations, use `std/re` with regex literals:
 
 ```
 use std/re
-re.is_match "\\d+" input
-re.match "(\\w+)-(\\d+)" text
+re.is_match r/\d+/ input
+re.match r/(\w+)-(\d+)/ text
 ```
 
 See [stdlib-modules.md](stdlib-modules.md) for the full `std/re` API.
