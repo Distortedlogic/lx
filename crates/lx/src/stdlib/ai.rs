@@ -112,6 +112,51 @@ fn parse_response(jv: &serde_json::Value) -> Result<Value, LxError> {
     Ok(Value::Ok(Box::new(Value::Record(Arc::new(fields)))))
 }
 
+pub(crate) fn extract_llm_text(response: &Value) -> Result<String, String> {
+    match response {
+        Value::Ok(inner) => match inner.as_ref() {
+            Value::Record(f) => Ok(f.get("text")
+                .and_then(|v| v.as_str()).unwrap_or("").to_string()),
+            Value::Str(s) => Ok(s.to_string()),
+            _ => Err("LLM returned unexpected format".to_string()),
+        },
+        Value::Err(e) => {
+            let msg = match e.as_ref() {
+                Value::Str(s) => s.to_string(),
+                Value::Record(r) => r.get("msg")
+                    .and_then(|v| v.as_str()).unwrap_or("unknown error").to_string(),
+                _ => "LLM error".to_string(),
+            };
+            Err(format!("LLM error: {msg}"))
+        }
+        _ => Err("LLM returned unexpected value".to_string()),
+    }
+}
+
+pub(crate) fn strip_json_fences(text: &str) -> &str {
+    let trimmed = text.trim();
+    trimmed
+        .strip_prefix("```json").or_else(|| trimmed.strip_prefix("```"))
+        .and_then(|s| s.strip_suffix("```"))
+        .map(|s| s.trim())
+        .unwrap_or(trimmed)
+}
+
+pub(crate) fn parse_llm_json(
+    response: &Value,
+    context: &str,
+    span: Span,
+) -> Result<Result<serde_json::Value, String>, LxError> {
+    let text = match extract_llm_text(response) {
+        Ok(t) => t,
+        Err(msg) => return Ok(Err(msg)),
+    };
+    let jv = serde_json::from_str::<serde_json::Value>(text.trim())
+        .or_else(|_| serde_json::from_str(strip_json_fences(&text)))
+        .map_err(|e| LxError::runtime(format!("{context}: JSON parse: {e}"), span))?;
+    Ok(Ok(jv))
+}
+
 pub(crate) fn default_opts() -> Opts {
     Opts {
         system: None,

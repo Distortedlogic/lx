@@ -208,3 +208,4 @@ fn trim_actions(state: &mut State) {
         });
     }
 }
+

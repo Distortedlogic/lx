@@ -1,0 +1,69 @@
+-- 36_agents_planner.lx
+-- Tests: std/agents/planner module (task decomposition)
+
+use std/agents/planner
+
+-- === quick_plan (sentence splitting, no LLM) ===
+
+-- single task stays as one step
+single = planner.quick_plan {
+  task: "Fix the authentication bug in the login handler"
+}
+assert (single.step_count == 1) "quick_plan: single step"
+assert (single.task != "") "quick_plan: has task"
+step = single.steps.0
+assert (step.id == 0) "quick_plan: step id 0"
+assert (step.title != "") "quick_plan: step has title"
+assert (step.status == "pending") "quick_plan: step pending"
+assert (len step.deps == 0) "quick_plan: first step no deps"
+
+-- multi-sentence task splits into steps
+multi = planner.quick_plan {
+  task: "Read the error logs. Identify the failing endpoint. Write a fix. Add tests."
+}
+assert (multi.step_count == 4) "quick_plan: 4 steps from 4 sentences"
+assert (multi.steps.0.id == 0) "quick_plan: first id 0"
+assert (multi.steps.1.id == 1) "quick_plan: second id 1"
+assert (len multi.steps.0.deps == 0) "quick_plan: first has no deps"
+assert (len multi.steps.1.deps == 1) "quick_plan: second depends on first"
+
+-- max_steps limits output
+limited = planner.quick_plan {
+  task: "Step one. Step two. Step three. Step four. Step five."
+  max_steps: 3
+}
+assert (limited.step_count == 3) "quick_plan: max_steps limits"
+
+-- empty task returns empty plan
+empty = planner.quick_plan {task: ""}
+assert (empty.step_count == 0) "quick_plan: empty task"
+assert (len empty.steps == 0) "quick_plan: no steps"
+
+-- context is accepted but ignored in quick_plan
+ctx = planner.quick_plan {
+  task: "Analyze the codebase. Write a report."
+  context: "The codebase is a Rust project with 10 crates."
+}
+assert (ctx.step_count == 2) "quick_plan: context accepted"
+
+-- constraints are accepted
+constr = planner.quick_plan {
+  task: "Build the feature. Test it."
+  constraints: ["must not break existing tests" "maximum 2 hours"]
+}
+assert (constr.step_count == 2) "quick_plan: constraints accepted"
+
+-- === plan with empty task (short-circuits before LLM) ===
+
+empty_plan = planner.plan {task: ""}
+assert (empty_plan.step_count == 0) "plan: empty task short-circuits"
+
+-- step structure
+s = multi.steps.2
+assert (s.id == 2) "step: has id"
+assert (s.title != "") "step: has title"
+assert (s.description != "") "step: has description"
+assert (s.complexity == "medium") "step: has complexity"
+assert (s.status == "pending") "step: has status"
+
+log.info "36_agents_planner: all passed"

@@ -1,0 +1,62 @@
+-- 38_trace.lx
+-- Tests: std/trace module (trace collection, scoring, dataset export)
+
+use std/trace
+use std/fs
+
+path = "/tmp/lx_trace_test.json"
+export_path = "/tmp/lx_trace_export.jsonl"
+fs.remove path ?? ()
+fs.remove export_path ?? ()
+
+-- create trace store
+t = trace.create path ^
+
+-- record spans
+s1 = trace.record {name: "search" input: "find auth bugs" output: "found 3 issues" tags: ["research"]} t ^
+s2 = trace.record {name: "fix" input: "fix token refresh" output: "patched validate.rs" duration_ms: 5000 tags: ["coding"]} t ^
+s3 = trace.record {name: "review" input: "review the fix" output: "looks good" score: 0.9 tags: ["review"]} t ^
+
+-- spans returns all
+all = trace.spans t
+assert (len all == 3) "spans: 3 recorded"
+assert (all.0.name == "search") "spans: first name"
+assert (all.1.name == "fix") "spans: second name"
+
+-- score a span
+trace.score s1 0.85 t ^
+after = trace.spans t
+scored_span = after.0
+assert (scored_span.score == 0.85) "score: updated"
+
+-- summary
+sum = trace.summary t
+assert (sum.total == 3) "summary: total"
+assert (sum.scored == 2) "summary: scored count"
+assert (sum.avg_score > 0.0) "summary: has avg score"
+
+-- filter by name
+by_name = trace.filter {name: "fix"} t
+assert (len by_name == 1) "filter: by name"
+assert (by_name.0.name == "fix") "filter: correct name"
+
+-- filter by tag
+by_tag = trace.filter {tag: "research"} t
+assert (len by_tag == 1) "filter: by tag"
+assert (by_tag.0.name == "search") "filter: correct tag match"
+
+-- filter by min_score
+by_score = trace.filter {min_score: 0.85} t
+assert (len by_score == 2) "filter: by min_score"
+
+-- export as JSONL
+count = trace.export export_path t ^
+assert (count == 3) "export: 3 lines"
+exported = fs.read export_path ^
+assert (len exported > 0) "export: file has content"
+
+-- cleanup
+fs.remove path ^
+fs.remove export_path ^
+
+log.info "38_trace: all passed"

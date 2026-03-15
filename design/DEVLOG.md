@@ -4,7 +4,7 @@ Session history + design decisions. For priorities and gap analysis, see `NEXT_P
 
 ## Implementation Status
 
-**33/33 PASS.** 20 stdlib modules (incl. 1 standard agent). 14 flow programs. Type checker. Regex literals. `just diagnose` clean.
+**40/40 PASS.** 27 stdlib modules (incl. 6 standard agents). 14 flow programs. Type checker. Regex literals. `just diagnose` clean.
 
 ## Key Design Decisions
 
@@ -84,4 +84,4 @@ Non-obvious choices that cause confusion if forgotten:
 | 32 | 03-15 | Agentic layer completion: dialogue, interceptors, handoff, plan revision, introspection, knowledge cache |
 | 33 | 03-15 | std/ai + std/tasks + std/audit + std/circuit + std/knowledge + std/plan + std/introspect. 19 stdlib modules, 32/32 tests |
 | 34 | 03-15 | Agent self-assessment: 10 missing features identified. 8 new spec files + updates to 10 existing files. |
-| 35 | 03-15 | std/agents/auditor: structural pre-filter + LLM judgment quality gate. 3-part module paths (std/agents/*). 33/33 tests. |
+| 35 | 03-15 | Standard agents (auditor/router/grader/planner/monitor/reviewer) + std/memory + std/trace. 3-part module paths. 40/40 tests. |

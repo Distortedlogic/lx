@@ -1,0 +1,46 @@
+-- 40_agents_reviewer.lx
+-- Tests: std/agents/reviewer module (post-hoc transcript review)
+
+use std/agents/reviewer
+
+-- quick_review extracts structural patterns
+transcript = "Step 1: Read config.rs. Error: file not found. Step 2: Retry with correct path. Step 3: Read src/config.rs. Success: found configuration. Step 4: Applied fix. Tests passed. Complete."
+
+result = reviewer.quick_review {transcript: transcript task: "fix config loading"}
+assert (result.summary != "") "quick_review: has summary"
+assert (result.patterns | len > 0) "quick_review: found patterns"
+
+-- recovery pattern detected (error + success)
+found_recovery = result.patterns | any? (p) p.kind == "recovery"
+assert (found_recovery == true) "quick_review: recovery pattern"
+
+-- facts detected (errors occurred)
+assert (result.facts | len > 0) "quick_review: has facts"
+
+-- empty transcript
+empty = reviewer.quick_review {transcript: "" task: "do something"}
+assert (empty.summary == "Empty transcript") "quick_review: empty transcript"
+assert (len empty.patterns == 0) "quick_review: no patterns from empty"
+
+-- clean transcript
+clean = "Step 1: Analyzed requirements. Step 2: Implemented solution. Step 3: Verified correctness."
+clean_result = reviewer.quick_review {transcript: clean task: "implement feature"}
+assert (clean_result.mistake_count == 0) "quick_review: clean no mistakes"
+
+-- review with empty transcript (short-circuits before LLM)
+empty_review = reviewer.review {transcript: "" task: "test"}
+assert (empty_review.summary == "Empty transcript") "review: empty short-circuits"
+
+-- result structure
+assert (result.pattern_count >= 0) "result: has pattern_count"
+assert (result.mistake_count >= 0) "result: has mistake_count"
+
+-- focus field accepted
+focus_result = reviewer.quick_review {
+  transcript: "Found bug. Error in auth. Fixed auth. Success."
+  task: "fix auth"
+  focus: ["error handling" "recovery"]
+}
+assert (focus_result.summary != "") "quick_review: focus accepted"
+
+log.info "40_agents_reviewer: all passed"

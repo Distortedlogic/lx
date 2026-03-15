@@ -1,0 +1,88 @@
+-- 35_agents_grader.lx
+-- Tests: std/agents/grader module (rubric scoring, incremental re-grade)
+
+use std/agents/grader
+
+rubric = [
+  {name: "correctness" description: "solution correctly fixes the bug and handles edge cases" weight: 3}
+  {name: "testing" description: "includes unit tests covering the fix" weight: 2}
+  {name: "style" description: "follows coding conventions and is readable" weight: 1}
+]
+
+-- === quick_grade (keyword matching, no LLM) ===
+
+-- good work scores well
+good = grader.quick_grade {
+  work: "The solution correctly fixes the bug and handles edge cases. It includes unit tests covering the fix. The code follows coding conventions and is readable."
+  task: "fix the authentication bug"
+  rubric: rubric
+}
+assert (good.passed == true) "quick_grade: good work passes"
+assert (good.score > 0) "quick_grade: has score"
+assert (len good.failed == 0) "quick_grade: no failures"
+assert (len good.categories == 3) "quick_grade: all categories graded"
+
+-- each category has structure
+cat = good.categories.0
+assert (cat.name == "correctness") "quick_grade: category name"
+assert (cat.score >= 0) "quick_grade: category has score"
+assert (cat.feedback != "") "quick_grade: category has feedback"
+
+-- empty rubric returns failure
+no_rubric = grader.quick_grade {
+  work: "some work"
+  task: "do something"
+  rubric: []
+}
+assert (no_rubric.passed == false) "quick_grade: empty rubric fails"
+
+-- low keyword overlap fails
+bad = grader.quick_grade {
+  work: "Hello world program."
+  task: "fix the bug"
+  rubric: rubric
+}
+assert (bad.passed == false) "quick_grade: bad work fails"
+assert (len bad.failed > 0) "quick_grade: has failures"
+
+-- custom threshold
+lenient = grader.quick_grade {
+  work: "Fixed the bug. Readable code."
+  task: "fix it"
+  rubric: rubric
+  threshold: 20
+}
+assert (lenient.score >= 0) "quick_grade: custom threshold has score"
+
+-- === grade with empty rubric (short-circuits before LLM) ===
+
+empty_grade = grader.grade {
+  work: "some work"
+  task: "do something"
+  rubric: []
+}
+assert (empty_grade.passed == false) "grade: empty rubric short-circuits"
+
+-- === incremental re-grading logic ===
+
+-- simulate previous grades where correctness passed but testing failed
+prev = [
+  {name: "correctness" score: 90 passed: true}
+  {name: "testing" score: 30 passed: false}
+  {name: "style" score: 80 passed: true}
+]
+
+-- quick_grade ignores previous_grades (always evaluates all)
+full = grader.quick_grade {
+  work: "The solution correctly fixes the bug and handles edge cases. Includes unit tests covering the fix. Follows coding conventions and is readable."
+  task: "fix the bug"
+  rubric: rubric
+}
+assert (len full.categories == 3) "quick_grade: evaluates all categories"
+
+-- result structure
+assert (full.categories.0.name == "correctness") "result: first category name"
+assert (full.categories.1.name == "testing") "result: second category name"
+assert (full.categories.2.name == "style") "result: third category name"
+
+log.info "35_agents_grader: all passed"

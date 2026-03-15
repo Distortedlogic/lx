@@ -1,16 +1,24 @@
 pub(crate) mod agent;
 mod agents_auditor;
+mod agents_grader;
+mod agents_monitor;
+mod agents_planner;
+mod agents_reviewer;
+mod agents_router;
 mod ai;
 mod audit;
 mod circuit;
 mod cron;
 mod ctx;
+pub mod diag;
+mod diag_walk;
 mod env;
 mod fs;
 mod http;
 mod introspect;
 mod json;
 mod knowledge;
+mod memory;
 pub mod json_conv;
 mod math;
 pub(crate) mod mcp;
@@ -20,6 +28,7 @@ mod md_build;
 mod re;
 mod tasks;
 mod time;
+mod trace;
 
 use crate::interpreter::ModuleExports;
 
@@ -30,6 +39,11 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
     let bindings = if path[1] == "agents" && path.len() >= 3 {
         match path[2].as_str() {
             "auditor" => agents_auditor::build(),
+            "grader" => agents_grader::build(),
+            "monitor" => agents_monitor::build(),
+            "planner" => agents_planner::build(),
+            "reviewer" => agents_reviewer::build(),
+            "router" => agents_router::build(),
             _ => return None,
         }
     } else {
@@ -50,9 +64,12 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
             "tasks" => tasks::build(),
             "audit" => audit::build(),
             "circuit" => circuit::build(),
+            "diag" => diag::build(),
             "knowledge" => knowledge::build(),
+            "memory" => memory::build(),
             "plan" => plan::build(),
             "introspect" => introspect::build(),
+            "trace" => trace::build(),
             _ => return None,
         }
     };
@@ -67,7 +84,7 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
         return false;
     }
     if path[1] == "agents" && path.len() >= 3 {
-        return matches!(path[2].as_str(), "auditor");
+        return matches!(path[2].as_str(), "auditor" | "grader" | "monitor" | "planner" | "reviewer" | "router");
     }
-    matches!(path[1].as_str(), "json" | "ctx" | "math" | "fs" | "env" | "re" | "md" | "agent" | "mcp" | "http" | "time" | "cron" | "ai" | "tasks" | "audit" | "circuit" | "knowledge" | "plan" | "introspect")
+    matches!(path[1].as_str(), "json" | "ctx" | "math" | "fs" | "env" | "re" | "md" | "agent" | "mcp" | "http" | "time" | "cron" | "ai" | "tasks" | "audit" | "circuit" | "diag" | "knowledge" | "memory" | "plan" | "introspect" | "trace")
 }

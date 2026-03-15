@@ -1,13 +1,12 @@
 use std::sync::Arc;
 
 use indexmap::IndexMap;
-use num_bigint::BigInt;
 
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
 use crate::stdlib::ai;
-use crate::stdlib::audit::{HEDGING, REFUSAL};
+use crate::stdlib::audit;
 use crate::value::Value;
 
 pub fn build() -> IndexMap<String, Value> {
@@ -49,67 +48,32 @@ fn extract_fields(args: &[Value], span: Span) -> Result<AuditFields, LxError> {
 
 fn check_structural(fields: &AuditFields) -> Vec<(String, String)> {
     let mut failures = Vec::new();
-    if fields.output.trim().is_empty() {
+    if audit::check_empty(&fields.output) {
         failures.push(("empty_output".into(), "Output is empty".into()));
     }
-    let lower = fields.output.to_lowercase();
-    if REFUSAL.iter().any(|r| lower.contains(r)) {
+    if audit::check_refusal(&fields.output) {
         failures.push(("refusal".into(), "Output contains refusal language".into()));
     }
-    let hedge_count = HEDGING.iter().filter(|h| lower.contains(**h)).count();
+    let lower = fields.output.to_lowercase();
+    let hedge_count = audit::HEDGING.iter().filter(|h| lower.contains(**h)).count();
     if hedge_count >= 3 {
         failures.push((
             "excessive_hedging".into(),
             format!("Output contains {hedge_count} hedging phrases"),
         ));
     }
-    if !fields.task.is_empty() {
-        let output_lower = fields.output.to_lowercase();
-        let keywords: Vec<&str> = fields.task.split_whitespace()
-            .filter(|w| w.len() > 3)
-            .collect();
-        if !keywords.is_empty() {
-            let hits = keywords.iter()
-                .filter(|kw| output_lower.contains(&kw.to_lowercase()))
-                .count();
-            if hits * 3 < keywords.len() {
-                failures.push((
-                    "no_task_reference".into(),
-                    "Output doesn't reference key terms from the task".into(),
-                ));
-            }
-        }
+    if !fields.task.is_empty() && !audit::check_references_task(&fields.output, &fields.task) {
+        failures.push((
+            "no_task_reference".into(),
+            "Output doesn't reference key terms from the task".into(),
+        ));
     }
     failures
 }
 
-fn make_category(name: &str, passed: bool, reason: &str) -> Value {
-    let mut cat = IndexMap::new();
-    cat.insert("name".into(), Value::Str(Arc::from(name)));
-    cat.insert("passed".into(), Value::Bool(passed));
-    cat.insert("reason".into(), Value::Str(Arc::from(reason)));
-    Value::Record(Arc::new(cat))
-}
-
-fn build_result(
-    score: i64,
-    passed: bool,
-    categories: Vec<Value>,
-    feedback: &str,
-    failed: Vec<Value>,
-) -> Value {
-    let mut r = IndexMap::new();
-    r.insert("score".into(), Value::Int(BigInt::from(score)));
-    r.insert("passed".into(), Value::Bool(passed));
-    r.insert("categories".into(), Value::List(Arc::new(categories)));
-    r.insert("feedback".into(), Value::Str(Arc::from(feedback)));
-    r.insert("failed".into(), Value::List(Arc::new(failed)));
-    Value::Record(Arc::new(r))
-}
-
 fn structural_result(failures: &[(String, String)]) -> Value {
     let categories: Vec<Value> = failures.iter()
-        .map(|(name, reason)| make_category(name, false, reason))
+        .map(|(name, reason)| audit::make_eval_category(name, 0, false, reason))
         .collect();
     let failed: Vec<Value> = failures.iter()
         .map(|(name, _)| Value::Str(Arc::from(name.as_str())))
@@ -118,7 +82,7 @@ fn structural_result(failures: &[(String, String)]) -> Value {
         .map(|(_, reason)| reason.as_str())
         .collect::<Vec<_>>()
         .join("; ");
-    build_result(0, false, categories, &feedback, failed)
+    audit::build_eval_result(0, false, categories, &feedback, failed)
 }
 
 fn build_system_prompt(rubric: &[String]) -> String {
@@ -150,47 +114,11 @@ fn build_user_prompt(fields: &AuditFields) -> String {
     p
 }
 
-fn parse_llm_result(llm_response: Value, span: Span) -> Result<Value, LxError> {
-    let text = match llm_response {
-        Value::Ok(inner) => match *inner {
-            Value::Record(ref fields) => fields.get("text")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string(),
-            Value::Str(ref s) => s.to_string(),
-            _ => return Ok(build_result(
-                0, false, vec![], "LLM returned unexpected format", vec![],
-            )),
-        },
-        Value::Err(e) => {
-            let msg = match *e {
-                Value::Str(ref s) => s.to_string(),
-                Value::Record(ref r) => r.get("msg")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("unknown error")
-                    .to_string(),
-                _ => "LLM error".to_string(),
-            };
-            return Ok(build_result(
-                0, false, vec![], &format!("LLM error: {msg}"), vec![],
-            ));
-        }
-        _ => return Ok(build_result(
-            0, false, vec![], "LLM returned unexpected value", vec![],
-        )),
-    };
-    let jv: serde_json::Value = serde_json::from_str(text.trim())
-        .or_else(|_| {
-            let stripped = text.trim()
-                .strip_prefix("```json").or_else(|| text.trim().strip_prefix("```"))
-                .and_then(|s| s.strip_suffix("```"))
-                .unwrap_or(&text);
-            serde_json::from_str(stripped.trim())
-        })
-        .map_err(|e| LxError::runtime(
-            format!("auditor: cannot parse LLM JSON: {e}"), span,
-        ))?;
-    extract_audit_from_json(&jv)
+fn parse_llm_result(llm_response: &Value, span: Span) -> Result<Value, LxError> {
+    match ai::parse_llm_json(llm_response, "auditor", span)? {
+        Ok(jv) => extract_audit_from_json(&jv),
+        Err(msg) => Ok(audit::build_eval_result(0, false, vec![], &msg, vec![])),
+    }
 }
 
 fn extract_audit_from_json(jv: &serde_json::Value) -> Result<Value, LxError> {
@@ -203,14 +131,15 @@ fn extract_audit_from_json(jv: &serde_json::Value) -> Result<Value, LxError> {
             let name = cat.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
             let passed = cat.get("passed").and_then(|v| v.as_bool()).unwrap_or(false);
             let reason = cat.get("reason").and_then(|v| v.as_str()).unwrap_or("");
-            categories.push(make_category(name, passed, reason));
+            let cat_score = if passed { 100 } else { 0 };
+            categories.push(audit::make_eval_category(name, cat_score, passed, reason));
             if !passed {
                 failed.push(Value::Str(Arc::from(name)));
             }
         }
     }
     let passed = score >= 70 && failed.is_empty();
-    Ok(build_result(score, passed, categories, feedback, failed))
+    Ok(audit::build_eval_result(score, passed, categories, feedback, failed))
 }
 
 fn bi_audit(args: &[Value], span: Span) -> Result<Value, LxError> {
@@ -227,15 +156,15 @@ fn bi_audit(args: &[Value], span: Span) -> Result<Value, LxError> {
         ..ai::default_opts()
     };
     let llm_result = ai::run_claude(&user, &opts, span)?;
-    parse_llm_result(llm_result, span)
+    parse_llm_result(&llm_result, span)
 }
 
 fn bi_quick_audit(args: &[Value], span: Span) -> Result<Value, LxError> {
     let fields = extract_fields(args, span)?;
     let structural = check_structural(&fields);
     if structural.is_empty() {
-        Ok(build_result(100, true, vec![
-            make_category("structure", true, "All structural checks passed"),
+        Ok(audit::build_eval_result(100, true, vec![
+            audit::make_eval_category("structure", 100, true, "All structural checks passed"),
         ], "Structural checks passed", vec![]))
     } else {
         Ok(structural_result(&structural))

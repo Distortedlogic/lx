@@ -24,13 +24,55 @@ pub fn build() -> IndexMap<String, Value> {
     m
 }
 
+pub(crate) fn make_eval_category(name: &str, score: i64, passed: bool, detail: &str) -> Value {
+    let mut cat = IndexMap::new();
+    cat.insert("name".into(), Value::Str(Arc::from(name)));
+    cat.insert("score".into(), Value::Int(BigInt::from(score)));
+    cat.insert("passed".into(), Value::Bool(passed));
+    cat.insert("feedback".into(), Value::Str(Arc::from(detail)));
+    Value::Record(Arc::new(cat))
+}
+
+pub(crate) fn build_eval_result(
+    score: i64,
+    passed: bool,
+    categories: Vec<Value>,
+    feedback: &str,
+    failed: Vec<Value>,
+) -> Value {
+    let mut r = IndexMap::new();
+    r.insert("score".into(), Value::Int(BigInt::from(score)));
+    r.insert("passed".into(), Value::Bool(passed));
+    r.insert("categories".into(), Value::List(Arc::new(categories)));
+    r.insert("feedback".into(), Value::Str(Arc::from(feedback)));
+    r.insert("failed".into(), Value::List(Arc::new(failed)));
+    Value::Record(Arc::new(r))
+}
+
+pub(crate) fn keyword_overlap(haystack: &str, keywords_source: &str, min_word_len: usize) -> (usize, usize) {
+    let haystack_lower = haystack.to_lowercase();
+    let keywords: Vec<String> = keywords_source.split_whitespace()
+        .filter(|w| w.len() > min_word_len)
+        .map(|w| w.to_lowercase())
+        .collect();
+    if keywords.is_empty() {
+        return (0, 0);
+    }
+    let hits = keywords.iter().filter(|kw| haystack_lower.contains(kw.as_str())).count();
+    (hits, keywords.len())
+}
+
 fn as_str_arg<'a>(v: &'a Value, name: &str, span: Span) -> Result<&'a str, LxError> {
     v.as_str().ok_or_else(|| LxError::type_err(format!("{name} expects Str"), span))
 }
 
+pub(crate) fn check_empty(s: &str) -> bool {
+    s.trim().is_empty()
+}
+
 fn bi_is_empty(args: &[Value], span: Span) -> Result<Value, LxError> {
     let s = as_str_arg(&args[0], "audit.is_empty", span)?;
-    Ok(Value::Bool(s.trim().is_empty()))
+    Ok(Value::Bool(check_empty(s)))
 }
 
 fn bi_is_too_short(args: &[Value], span: Span) -> Result<Value, LxError> {
@@ -67,10 +109,14 @@ pub(crate) const HEDGING: &[&str] = &[
     "it might", "it could be", "i believe", "not entirely sure",
 ];
 
+pub(crate) fn check_hedging(s: &str) -> bool {
+    let lower = s.to_lowercase();
+    HEDGING.iter().any(|h| lower.contains(h))
+}
+
 fn bi_is_hedging(args: &[Value], span: Span) -> Result<Value, LxError> {
     let s = as_str_arg(&args[0], "audit.is_hedging", span)?;
-    let lower = s.to_lowercase();
-    Ok(Value::Bool(HEDGING.iter().any(|h| lower.contains(h))))
+    Ok(Value::Bool(check_hedging(s)))
 }
 
 pub(crate) const REFUSAL: &[&str] = &[
@@ -78,26 +124,26 @@ pub(crate) const REFUSAL: &[&str] = &[
     "i'm not able", "i don't have the ability",
 ];
 
+pub(crate) fn check_refusal(s: &str) -> bool {
+    let lower = s.to_lowercase();
+    REFUSAL.iter().any(|r| lower.contains(r))
+}
+
 fn bi_is_refusal(args: &[Value], span: Span) -> Result<Value, LxError> {
     let s = as_str_arg(&args[0], "audit.is_refusal", span)?;
-    let lower = s.to_lowercase();
-    Ok(Value::Bool(REFUSAL.iter().any(|r| lower.contains(r))))
+    Ok(Value::Bool(check_refusal(s)))
 }
 
 fn bi_references_task(args: &[Value], span: Span) -> Result<Value, LxError> {
     let output = as_str_arg(&args[0], "audit.references_task(output)", span)?;
     let task = as_str_arg(&args[1], "audit.references_task(task)", span)?;
-    let output_lower = output.to_lowercase();
-    let keywords: Vec<&str> = task.split_whitespace()
-        .filter(|w| w.len() > 3)
-        .collect();
-    if keywords.is_empty() {
-        return Ok(Value::Bool(true));
-    }
-    let hits = keywords.iter()
-        .filter(|kw| output_lower.contains(&kw.to_lowercase()))
-        .count();
-    Ok(Value::Bool(hits * 3 >= keywords.len()))
+    Ok(Value::Bool(check_references_task(output, task)))
+}
+
+pub(crate) fn check_references_task(output: &str, task: &str) -> bool {
+    let (hits, total) = keyword_overlap(output, task, 3);
+    if total == 0 { return true; }
+    hits * 3 >= total
 }
 
 fn bi_files_exist(args: &[Value], span: Span) -> Result<Value, LxError> {
@@ -210,17 +256,10 @@ fn bi_quick_check(args: &[Value], span: Span) -> Result<Value, LxError> {
             reasons.push(Value::Str(Arc::from("output contains refusal language")));
         }
     }
-    if let Some(task) = opts.get("task").and_then(|v| v.as_str()) {
-        let output_lower = output.to_lowercase();
-        let keywords: Vec<&str> = task.split_whitespace()
-            .filter(|w| w.len() > 3).collect();
-        if !keywords.is_empty() {
-            let hits = keywords.iter()
-                .filter(|kw| output_lower.contains(&kw.to_lowercase())).count();
-            if hits * 3 < keywords.len() {
-                reasons.push(Value::Str(Arc::from("output doesn't reference task")));
-            }
-        }
+    let references_task = opts.get("task").and_then(|v| v.as_str())
+        .map(|t| check_references_task(output, t)).unwrap_or(true);
+    if !references_task {
+        reasons.push(Value::Str(Arc::from("output doesn't reference task")));
     }
     let mut result = IndexMap::new();
     result.insert("passed".into(), Value::Bool(reasons.is_empty()));

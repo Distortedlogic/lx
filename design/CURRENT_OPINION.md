@@ -51,8 +51,29 @@ Reviewed `mcp-toolbelt/packages/arch_diagrams` — 14 agentic flow architectures
 | Context compression | stdlib roadmap | Long-running agents fill context. Need `ai.summarize` for structured history compression. |
 | Enhanced retry | stdlib roadmap | `retry_with` needs: per-error-type strategy, jitter, circuit breaker integration. |
 
-**Critical gaps (implementation):** Standard agents (auditor/router/grader/planner — lx programs using std/ai), tiered memory, observability/trace, subagent QC, learning from experience, embeddings. See `NEXT_PROMPT.md` for the prioritized roadmap.
+**Filled (Session 35):** Standard agents (auditor/router/grader/planner/monitor/reviewer), tiered memory (`std/memory`), observability (`std/trace`), subagent QC (`std/agents/monitor`), learning from experience (`std/agents/reviewer`). **Remaining:** MCP Embeddings, `std/diag` visualization, `std/saga` transactions.
+
+**Session 36 — Second self-assessment (what I keep working around):**
+
+| Feature | Spec | Why I Want It |
+|---|---|---|
+| Feedback loops (`refine`) | `spec/agents-refine.md` | Try-grade-revise is the #1 pattern in every flow. 15-20 lines of boilerplate each time. Need a first-class `refine` expression that captures the entire loop in 5 lines. |
+| Consensus / quorum | `spec/agents-consensus.md` | Multi-reviewer agreement (not just fan-out + collect). Deliberation rounds, weighted voting, configurable quorum policies. Security audits and code review need this. |
+| Diminishing returns | `spec/agents-progress.md` | Circuit breakers are walls, stuck detection is binary. Need a gradient — improvement rate over time — so I can stop when effort isn't paying off, not when I hit an arbitrary limit. |
+| Result reconciliation | `spec/agents-reconcile.md` | Fan-out gives me N conflicting results. No structured merge: dedup by key, vote, confidence-weighted selection, union with conflict resolution. Hand-rolled every time. |
+| Workflow status broadcasting | `spec/agents-broadcast.md` | In `par`, siblings can't see each other. Duplicate work, missed opportunities. Need passive peer visibility — not opt-in pub/sub, automatic status sharing. |
+| Goal vs task communication | `spec/agents-goals.md` | All messages are flat. No protocol-level distinction between "achieve this outcome" (goal — agent plans how) and "do this action" (task — execute directly). |
+| Deadlock detection | `spec/agents-deadlock.md` | A `~>?` B, B `~>?` A = silent hang. With `caller` for clarification, this gets more likely. Need runtime wait-for graph with cycle detection. |
+
+**Session 36 — Deduplication audit:** Found and fixed 5 code-level overlaps:
+1. LLM response parsing (text extraction + fence stripping + JSON parse) duplicated in 5 agent modules → extracted `ai::parse_llm_json` + `ai::extract_llm_text` + `ai::strip_json_fences`
+2. Eval result record builders (`build_result`, `make_category`) identical in auditor + grader → extracted `audit::build_eval_result` + `audit::make_eval_category`
+3. Keyword overlap logic duplicated in 4 places → extracted `audit::keyword_overlap` + `audit::check_references_task`
+4. Auditor reimplemented audit checks → now calls `audit::check_empty`, `audit::check_refusal`, `audit::check_hedging`, `audit::check_references_task`
+5. Circuit and introspect both track actions/turns independently — kept separate because circuit is per-breaker-instance scoped while introspect is global. Unification deferred to when real async lands and we can share a per-agent (not global) state. Spec notes added.
+
+Also fixed 3 planned-feature overlaps at spec level: `workflow.peers` now specified as convenience layer on `std/blackboard` (not a separate DashMap); consensus and reconcile will share vote-tallying logic; progress tracking in introspect will be readable by circuit via pub(crate) accessors.
 
 ## Bottom Line
 
-19 stdlib modules. Communication/orchestration layer is solid. Agentic infrastructure layer (tasks, audit, circuit, plan, knowledge, introspect) is implemented. Type annotations + checker working. Regex literals implemented. Session 33 addressed the biggest gaps I hit as an agent: reactive dataflow, supervision, ambient context, clarification, gates, capability discovery, sagas, and priority. These are the features that separate "agents can talk" from "agents can reliably collaborate on complex tasks." Next: full stdlib buildout — 13 new modules, 6 standard agents, 1 MCP declaration.
+27 stdlib modules (incl. 6 standard agents). Communication/orchestration layer is solid. Agentic infrastructure layer (tasks, audit, circuit, plan, knowledge, introspect) is implemented. Type annotations + checker working. Session 33 addressed "agents can reliably collaborate." Session 36 addresses "agents can collaborate *efficiently*" — the patterns I keep hand-rolling (refine, reconcile, consensus) and the runtime safety I keep wishing for (deadlock detection, diminishing returns, peer visibility). Code architecture cleaned: shared LLM parsing, shared eval records, shared keyword matching, auditor delegates to audit. Next: full stdlib buildout + the 7 new features.

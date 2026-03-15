@@ -28,6 +28,11 @@ enum Command {
     #[arg(help = "Agent script file (must evaluate to a handler function)")]
     script: String,
   },
+  Diagram {
+    file: String,
+    #[arg(short, long, help = "Write Mermaid output to file instead of stdout")]
+    output: Option<String>,
+  },
 }
 
 fn main() -> ExitCode {
@@ -37,6 +42,7 @@ fn main() -> ExitCode {
     Command::Check { file } => check_file(&file),
     Command::Test { dir } => run_tests(&dir),
     Command::Agent { script } => run_agent(&script),
+    Command::Diagram { file, output } => run_diagram(&file, output.as_deref()),
   }
 }
 
@@ -62,30 +68,9 @@ fn run_file(path: &str, _json: bool) -> ExitCode {
 }
 
 fn check_file(path: &str) -> ExitCode {
-  let source = match std::fs::read_to_string(path) {
-    Ok(s) => s,
-    Err(e) => {
-      eprintln!("error: cannot read {path}: {e}");
-      return ExitCode::from(1);
-    },
-  };
-  let tokens = match lx::lexer::lex(&source) {
-    Ok(t) => t,
-    Err(e) => {
-      let named = miette::NamedSource::new(path, source.clone());
-      let report = miette::Report::new(e).with_source_code(named);
-      eprintln!("{report:?}");
-      return ExitCode::from(1);
-    },
-  };
-  let program = match lx::parser::parse(tokens) {
-    Ok(p) => p,
-    Err(e) => {
-      let named = miette::NamedSource::new(path, source.clone());
-      let report = miette::Report::new(e).with_source_code(named);
-      eprintln!("{report:?}");
-      return ExitCode::from(1);
-    },
+  let (source, program) = match read_and_parse(path) {
+    Ok(sp) => sp,
+    Err(code) => return code,
   };
   let result = lx::checker::check(&program);
   if result.diagnostics.is_empty() {
@@ -206,6 +191,44 @@ fn make_yield_handler() -> lx::interpreter::YieldHandler {
       .map_err(|e| lx::error::LxError::runtime(format!("yield: JSON parse: {e}"), span))?;
     Ok(lx::stdlib::json_conv::json_to_lx(response))
   })
+}
+
+fn run_diagram(path: &str, output: Option<&str>) -> ExitCode {
+  let (source, program) = match read_and_parse(path) {
+    Ok(sp) => sp,
+    Err(code) => return code,
+  };
+  let _ = source;
+  let mermaid = lx::stdlib::diag::extract_mermaid(&program);
+  match output {
+    Some(out_path) => {
+      if let Err(e) = std::fs::write(out_path, &mermaid) {
+        eprintln!("error: cannot write {out_path}: {e}");
+        return ExitCode::from(1);
+      }
+      println!("wrote diagram to {out_path}");
+    }
+    None => print!("{mermaid}"),
+  }
+  ExitCode::SUCCESS
+}
+
+fn read_and_parse(path: &str) -> Result<(String, lx::ast::Program), ExitCode> {
+  let source = std::fs::read_to_string(path).map_err(|e| {
+    eprintln!("error: cannot read {path}: {e}");
+    ExitCode::from(1)
+  })?;
+  let tokens = lx::lexer::lex(&source).map_err(|e| {
+    let named = miette::NamedSource::new(path, source.clone());
+    eprintln!("{:?}", miette::Report::new(e).with_source_code(named));
+    ExitCode::from(1)
+  })?;
+  let program = lx::parser::parse(tokens).map_err(|e| {
+    let named = miette::NamedSource::new(path, source.clone());
+    eprintln!("{:?}", miette::Report::new(e).with_source_code(named));
+    ExitCode::from(1)
+  })?;
+  Ok((source, program))
 }
 
 fn run_agent(script_path: &str) -> ExitCode {

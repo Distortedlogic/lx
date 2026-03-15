@@ -1,0 +1,92 @@
+-- 41_diag.lx
+-- Tests: std/diag module (program visualization / Mermaid diagram extraction)
+
+use std/diag
+
+-- === Extract from source string ===
+src = `
+use std/agent
+
+worker = agent.spawn {command: "analyzer"} ^
+result = worker ~>? {action: "analyze" topic: "test"} ^
+worker ~> {action: "done"}
+agent.kill worker ^
+`
+
+graph = diag.extract src
+assert (len graph.nodes > 1) "found nodes"
+assert (len graph.edges > 0) "found edges"
+
+-- === Check node structure ===
+first = graph.nodes.0
+assert (first.id == "main") "first node is main"
+assert (first.kind == "agent") "main is agent kind"
+
+-- === Check agent node extracted ===
+agent_nodes = graph.nodes | filter (n) n.kind == "agent" && n.id != "main"
+assert (len agent_nodes >= 1) "found agent node"
+
+-- === Check edges extracted ===
+ask_edges = graph.edges | filter (e) e.style == "solid"
+send_edges = graph.edges | filter (e) e.style == "dashed"
+assert (len ask_edges >= 1) "found ask edge (solid)"
+assert (len send_edges >= 1) "found send edge (dashed)"
+
+-- === Check edge labels ===
+labeled = graph.edges | filter (e) e.label == "analyze"
+assert (len labeled >= 1) "edge has action label"
+
+-- === to_mermaid ===
+mermaid = diag.to_mermaid graph
+assert (mermaid | starts? "flowchart TD") "starts with flowchart TD"
+assert (mermaid | contains? "main") "mermaid contains main"
+assert (mermaid | contains? "-->") "mermaid contains solid arrow"
+assert (mermaid | contains? "-.->") "mermaid contains dashed arrow"
+
+-- === Extract with match (decision node) ===
+src2 = `
+x = 1
+x ? {
+  1 -> "one"
+  _ -> "other"
+}
+`
+g2 = diag.extract src2
+decisions = g2.nodes | filter (n) n.kind == "decision"
+assert (len decisions >= 1) "found decision node from match"
+
+-- === Extract with par (fork node) ===
+src3 = `
+par {
+  a = 1
+  b = 2
+}
+`
+g3 = diag.extract src3
+forks = g3.nodes | filter (n) n.kind == "fork"
+assert (len forks >= 1) "found fork node from par"
+
+-- === Graph round-trip through to_mermaid ===
+manual_graph = {
+  nodes: [
+    {id: "start" label: "Start" kind: "agent" children: []}
+    {id: "tool1" label: "search" kind: "tool" children: []}
+  ]
+  edges: [
+    {from: "start" to: "tool1" label: "query" style: "solid"}
+  ]
+}
+m = diag.to_mermaid manual_graph
+assert (m | contains? "Start") "manual graph has Start label"
+assert (m | contains? "search") "manual graph has search label"
+assert (m | contains? "query") "manual graph has query label"
+
+-- === extract_file ===
+use std/fs
+tmp = "/tmp/lx_diag_test.lx"
+fs.write tmp `worker = agent.spawn {command: "test_agent"}` ^
+g4 = diag.extract_file tmp
+assert (len g4.nodes >= 1) "extract_file found nodes"
+fs.remove tmp ^
+
+log.info "41_diag: all passed"

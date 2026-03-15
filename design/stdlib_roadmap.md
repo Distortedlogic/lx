@@ -185,8 +185,43 @@ The dependency chain determines build order:
 27. `caller` implicit binding + `_priority` field (interpreter-level)
 28. Enhanced `retry_with` (built-in extension)
 29. `ai.summarize` (extension to std/ai)
+30. `refine` expression (new keyword — parser + interpreter)
+31. `consensus` expression (new keyword — parser + interpreter)
+32. `introspect.progress` / `improvement_rate` / `should_stop` (extension to std/introspect)
+33. `agent.reconcile` (extension to std/agent)
+34. `workflow.peers` / `workflow.share` (extension to std/agent, `par` block infra)
+35. Goal/Task protocols + `agent.send_goal` / `agent.send_task` (extension to std/agent)
+36. Deadlock detection (runtime wait-for graph in interpreter)
 
 Note: `agent.dialogue`, `agent.intercept`, `agent.handoff`, `agent.supervise`, `agent.gate`, and `agent.capabilities` are extensions to `std/agent`, not separate modules. They're implemented as additional functions in `stdlib/agent.rs`.
+
+### `refine` expression (new keyword)
+
+First-class feedback loop: try → grade → revise → re-grade with threshold and max_rounds. Desugars to the mutable-binding loop pattern. Spec: `spec/agents-refine.md`.
+
+### `consensus` expression (new keyword)
+
+Multi-agent voting with quorum policies (`:unanimous`, `:majority`, `:any`, `(n K)`). Optional deliberation rounds where agents see each other's reasoning. Spec: `spec/agents-consensus.md`.
+
+### `introspect.progress` / `introspect.improvement_rate` (extension to std/introspect)
+
+Gradient-based progress tracking. Records scored checkpoints, computes improvement rate, classifies trend (`:improving`/`:diminishing`/`:plateau`/`:regressing`). `introspect.should_stop` for adaptive stopping. Spec: `spec/agents-progress.md`.
+
+### `agent.reconcile` (extension to std/agent)
+
+Structured merging of parallel results. Strategies: `:union`, `:intersection`, `:vote`, `:highest_confidence`, `:merge_fields`, custom fn. Dedup by key, conflict resolution function. Spec: `spec/agents-reconcile.md`.
+
+### `workflow.peers` / `workflow.share` (extension to std/agent)
+
+Passive sibling visibility within `par` blocks. Automatic `:working`/`:complete`/`:failed` status. Explicit `workflow.share` for findings/progress. `workflow.on_peer_update` for reactive coordination. Spec: `spec/agents-broadcast.md`.
+
+### `Goal` / `Task` protocols + `agent.send_goal` / `agent.send_task` (extension to std/agent)
+
+Standard protocols distinguishing intent-level (goal — agent plans how) from instruction-level (task — execute directly). Goals include constraints, budget, acceptance criteria. Integrates with `std/plan` for decomposition. Spec: `spec/agents-goals.md`.
+
+### Deadlock detection (runtime)
+
+Wait-for graph tracking `~>?` waits. Cycle detection before every send. `DeadlockErr` with full cycle chain. Composes with `^` and `??`. Spec: `spec/agents-deadlock.md`.
 
 ## Mapping to Arch Diagram Flows
 
@@ -214,3 +249,7 @@ Note: `agent.dialogue`, `agent.intercept`, `agent.handoff`, `agent.supervise`, `
 | (any pipeline flow) | `\|>>` (reactive dataflow), `with context` (deadline/budget propagation) |
 | (any supervised flow) | agent.supervise (crash recovery), agent.gate (human approval) |
 | (any routed flow) | agent.capabilities (dynamic discovery), `_priority` (urgency routing) |
+| (any grading flow) | `refine` (feedback loops), `introspect.progress` (diminishing returns) |
+| (any fan-out flow) | `agent.reconcile` (result merging), `consensus` (multi-agent agreement) |
+| (any parallel flow) | `workflow.peers` (sibling visibility), deadlock detection |
+| (any delegation flow) | Goal/Task protocols (intent vs instruction level) |

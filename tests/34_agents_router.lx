@@ -1,0 +1,53 @@
+-- 34_agents_router.lx
+-- Tests: std/agents/router module (prompt classification)
+
+use std/agents/router
+
+catalog = [
+  {name: "code_reviewer" domain: "code_review" description: "reviews code changes and pull requests" terminal: false}
+  {name: "perf_analyzer" domain: "performance" description: "analyzes performance bottlenecks and optimization" terminal: false}
+  {name: "security_scanner" domain: "security" description: "scans for security vulnerabilities and threats" terminal: true}
+  {name: "doc_writer" domain: "documentation" description: "writes and updates documentation and README files" terminal: false}
+]
+
+-- === quick_route (keyword matching, no LLM) ===
+
+-- matches code review
+cr = router.quick_route {prompt: "review the pull request changes" catalog: catalog}
+assert (cr.domain == "code_review") "quick_route: code review domain"
+assert (cr.agent == "code_reviewer") "quick_route: code review agent"
+assert (cr.confidence > 0.0) "quick_route: has confidence"
+assert (cr.terminal == false) "quick_route: not terminal"
+
+-- matches security
+sec = router.quick_route {prompt: "scan for security vulnerabilities in the auth module" catalog: catalog}
+assert (sec.domain == "security") "quick_route: security domain"
+assert (sec.agent == "security_scanner") "quick_route: security agent"
+assert (sec.terminal == true) "quick_route: security is terminal"
+
+-- matches performance
+perf = router.quick_route {prompt: "analyze performance bottlenecks in the API" catalog: catalog}
+assert (perf.domain == "performance") "quick_route: performance domain"
+assert (perf.agent == "perf_analyzer") "quick_route: performance agent"
+
+-- matches documentation
+doc = router.quick_route {prompt: "update the README documentation" catalog: catalog}
+assert (doc.domain == "documentation") "quick_route: documentation domain"
+assert (doc.agent == "doc_writer") "quick_route: doc agent"
+
+-- no match returns none
+no = router.quick_route {prompt: "hello world" catalog: catalog}
+assert (no.domain == "none") "quick_route: no match domain"
+assert (no.confidence == 0.0) "quick_route: no match confidence"
+
+-- empty catalog returns none
+empty = router.quick_route {prompt: "anything" catalog: []}
+assert (empty.domain == "none") "quick_route: empty catalog"
+
+-- === route with structural short-circuit (empty catalog) ===
+
+empty_route = router.route {prompt: "do something" catalog: []}
+assert (empty_route.domain == "none") "route: empty catalog short-circuits"
+assert (empty_route.confidence == 0.0) "route: empty catalog confidence 0"
+
+log.info "34_agents_router: all passed"
