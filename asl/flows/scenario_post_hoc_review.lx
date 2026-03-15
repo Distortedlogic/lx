@@ -1,0 +1,113 @@
+-- GOAL: Post-task reflection — review transcripts and extract learnings.
+-- Phase 1 (primary execution): lean context, no overhead, automatic transcript saved.
+-- Phase 2 (post-hoc review): separate agent reads transcript, distills learnings.
+-- Distill into: experience.md (patterns + mistakes), environment.md (facts about system).
+-- Langfuse capture: create-score and create-dataset-item for training data.
+-- Compounding effect: run 1 captures basics, run 10 forms patterns, run 100 compounds.
+-- Source: mcp-toolbelt/arch_diagrams/scenario_post_hoc_review
+
+use std/fs
+use std/json
+use std/md
+use std/re
+use std/ctx
+use std/agent
+
++main = () {
+  transcript_path = $^ls -t ~/.claude/projects/*/*.jsonl | trim | lines | first
+  transcript_path ? {
+    Some path -> review path
+    None -> $echo "no transcripts found"
+  }
+}
+
+review = (path) {
+  $echo "reviewing: {path}"
+  content = fs.read path ^
+  entries = content | lines | filter (!= "") | map (l) json.parse l ^
+
+  tool_calls = entries | filter (e) {
+    get "type" e ?? "" == "tool_use"
+  }
+  results = entries | filter (e) {
+    get "type" e ?? "" == "tool_result"
+  }
+
+  patterns = extract_patterns tool_calls results
+  mistakes = extract_mistakes tool_calls results
+  env_facts = extract_environment tool_calls
+
+  experience_update = md.doc [
+    md.h2 "Session Review — {path}"
+    md.h3 "Patterns That Worked"
+    md.list (patterns | map (.description))
+    md.h3 "Mistakes to Avoid"
+    md.list (mistakes | map (m) "{m.what}: {m.lesson}")
+  ]
+
+  experience_path = "memory/experience.md"
+  existing = fs.read experience_path ?? ""
+  new_content = existing ++ "\n" ++ (md.render experience_update)
+  fs.write experience_path new_content ^
+
+  env_facts | empty? ? {
+    false -> {
+      env_path = "memory/environment.md"
+      env_existing = fs.read env_path ?? ""
+      env_update = env_facts | map (f) "- {f}") | join "\n"
+      fs.write env_path (env_existing ++ "\n" ++ env_update) ^
+    }
+    true -> ()
+  }
+
+  $echo "distilled {patterns | len} patterns, {mistakes | len} mistakes, {env_facts | len} env facts"
+}
+
+extract_patterns = (tool_calls results) {
+  tool_calls
+    | zip results
+    | filter (call, result) {
+      success = get "success" result ?? false
+      success == true
+    }
+    | map (call, result) {
+      tool = get "name" call ?? "unknown"
+      {tool: tool  description: "successful {tool} call"}
+    }
+    | group_by (.tool)
+    | entries
+    | filter (tool, uses) uses | len >= 2
+    | map (tool, uses) {
+      description: "{tool} used {uses | len} times successfully"
+    }
+}
+
+extract_mistakes = (tool_calls results) {
+  tool_calls
+    | zip results
+    | filter (call, result) {
+      success = get "success" result ?? true
+      success == false
+    }
+    | map (call, result) {
+      tool = get "name" call ?? "unknown"
+      error = get "error" result ?? "unknown error"
+      {what: "failed {tool}" lesson: error}
+    }
+}
+
+extract_environment = (tool_calls) {
+  tool_calls
+    | filter (c) {
+      name = get "name" c ?? ""
+      name == "Bash" || name == "Read"
+    }
+    | flat_map (c) {
+      input = get "input" c ?? %{}
+      cmd = get "command" input ?? ""
+      re.is_match "(pwd|uname|whoami|cat /etc)" cmd ? {
+        true -> [cmd]
+        false -> []
+      }
+    }
+}

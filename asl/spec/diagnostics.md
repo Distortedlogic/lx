@@ -207,4 +207,4 @@ error[type]: src/types.lx:5
 - Implementation: [impl-error.md](../impl/impl-error.md) (error types, diagnostic generation)
 - Error handling spec: [errors.md](errors.md)
 - Toolchain JSON output: [toolchain.md](toolchain.md)
-- Test suite: suite/15_diagnostics.lx (TODO)
+- Test suite: diagnostics are tested implicitly across all suite files.

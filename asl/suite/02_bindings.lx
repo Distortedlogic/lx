@@ -63,10 +63,6 @@ assert (nested == 17)
 p = 1; q = 2; r = p + q
 assert (r == 3)
 
--- type-annotated binding
-typed : Int = 42
-assert (typed == 42)
-
 -- binding with complex expression
 calc = (1 + 2) * (3 + 4)
 assert (calc == 21)

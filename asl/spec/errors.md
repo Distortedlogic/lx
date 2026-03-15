@@ -9,13 +9,7 @@ Result a e = | Ok a | Err e
 Maybe a = | Some a | None
 ```
 
-Functions that can fail return `Result`:
-
-```
-read = (path: Str) -> Str ^ IoErr
-```
-
-The `^ IoErr` in the type signature is syntactic sugar for `-> Result Str IoErr`.
+Functions that can fail return `Result`.
 
 ## Explicit Matching
 
@@ -34,18 +28,18 @@ r ? {
 `^` propagates errors to the caller — like Rust's `?` operator:
 
 ```
-transform = (path: Str) -> Data ^ IoErr {
-  content = read path ^       -- if Err, return Err immediately
-  parse content ^             -- same: propagate on error
+transform = (path) {
+  content = read path ^
+  parse content ^
 }
 ```
 
-`expr ^` unwraps `Ok` or returns `Err` to the enclosing function. The enclosing function's return type must be compatible with the error type.
+`expr ^` unwraps `Ok` or returns `Err` to the enclosing function.
 
 Multiple `^` in a function chain through naturally:
 
 ```
-pipeline = (input: Str) -> Output ^ ProcessErr {
+pipeline = (input) {
   raw = fetch input ^
   parsed = parse raw ^
   validated = validate parsed ^
@@ -93,14 +87,12 @@ results = data | map fetch    -- [Result a e]
 Create errors directly with `Err`:
 
 ```
-validate = (age: Int) -> Int ^ Str {
+validate = (age) {
   age < 0 ? Err "age cannot be negative"
   age > 150 ? Err "age unrealistic"
   age
 }
 ```
-
-The last expression in a block is the return value. If it's not wrapped in `Ok`, it's implicitly `Ok` (the compiler wraps it).
 
 ## Chaining Fallible Operations
 
@@ -129,61 +121,24 @@ name = get "name" config | require "name field required" ^
 
 ## Error Type Compatibility
 
-In unannotated functions, `^` works with any error type — errors propagate dynamically:
+`^` works with any error type — errors propagate dynamically:
 
 ```
 load = (path) {
-  content = fs.read path ^     -- IoErr
-  json.parse content ^         -- ParseErr
+  content = fs.read path ^
+  json.parse content ^
 }
 ```
 
 Both error types propagate without wrapping. The caller receives whichever error occurred.
 
-In annotated functions, declare a union error type:
-
-```
-AppErr = | Io IoErr | Parse ParseErr
-
-load = (path: Str) -> Data ^ AppErr {
-  content = fs.read path ^     -- auto-wrapped as Io
-  json.parse content ^         -- auto-wrapped as Parse
-}
-```
-
-The compiler wraps each `^` site's error into the declared union variant when the types don't match directly.
-
 ## Implicit Err Early Return
 
-In a function with a `Result` return annotation (`-> T ^ E`), any bare expression statement (not a binding, not the final expression) that evaluates to an `Err` value immediately returns that `Err` from the function. This enables validation-style code without nesting:
-
-```
-validate = (age: Int) -> Int ^ Str {
-  age < 0 ? Err "negative"         -- if true: Err returned immediately
-  age > 150 ? Err "unrealistic"    -- if true: Err returned immediately
-  age                               -- last expr: implicitly Ok age
-}
-```
-
-When `age < 0` is true, the single-arm `?` evaluates to `Err "negative"`. Because this is a bare expression in a Result-annotated function, the function immediately returns `Err "negative"`. When the condition is false, the single-arm `?` evaluates to `()` (unit), which is not an `Err`, so execution continues.
-
-This rule applies **only** to functions with an explicit `-> T ^ E` annotation. In unannotated functions, `Err` values in non-final position are ordinary values with no special behavior.
-
-Bindings are not affected: `x = Err "msg"` stores the Err in `x` without early return.
+Implicit Err early return was tied to `-> T ^ E` annotations, which have been removed. In current lx, `Err` values in non-final position are ordinary values.
 
 ## Implicit `Ok` Wrapping
 
-The last expression in a function with a `Result` return type is implicitly wrapped in `Ok`:
-
-```
-validate = (age: Int) -> Int ^ Str {
-  age < 0 ? Err "negative"         -- early return on Err
-  age > 150 ? Err "unrealistic"    -- early return on Err
-  age                               -- implicitly Ok age
-}
-```
-
-The last expression is wrapped. Intermediate Err values cause early return (see above).
+Implicit `Ok` wrapping was tied to `-> T ^ E` annotations, which have been removed. In current lx, functions return values as-is without automatic `Ok` wrapping.
 
 ## Cross-References
 

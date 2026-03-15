@@ -1,0 +1,39 @@
+-- 21_time.lx
+-- Tests: std/time module (now, sleep, format, parse)
+
+use std/time
+
+-- time.now returns a record with epoch, ms, iso, local
+ts = time.now ()
+assert (ts.epoch > 0) "time now epoch positive"
+assert (ts.ms > 0) "time now ms positive"
+assert (ts.ms > ts.epoch) "time now ms > epoch"
+assert (contains? "T" ts.iso == true) "time now iso contains T"
+
+-- time.sleep pauses execution
+before = time.now ()
+time.sleep 50
+after = time.now ()
+assert (after.ms >= before.ms + 50) "time sleep 50ms elapsed"
+
+-- time.format with chrono format strings
+formatted = time.format "%Y" ts
+assert (len formatted == 4) "time format year length"
+
+-- time.format with more complex format
+day_fmt = time.format "%Y-%m-%d" ts
+assert (contains? "-" day_fmt == true) "time format date has dashes"
+
+-- time.parse round-trip with format
+parsed = time.parse "%Y-%m-%dT%H:%M:%S%.f%:z" ts.iso ^
+assert (parsed.epoch == ts.epoch) "time parse round-trip epoch"
+
+-- time.parse error returns Err
+bad = time.parse "%Y-%m-%d" "not-a-date"
+assert (err? bad == true) "time parse bad input returns Err"
+
+-- timestamp record can be constructed from epoch
+reconstructed = {epoch: ts.epoch}
+formatted2 = time.format "%Y" reconstructed
+assert (formatted2 == formatted) "time format from epoch record"
+()

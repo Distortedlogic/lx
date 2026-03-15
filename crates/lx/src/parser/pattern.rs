@@ -1,4 +1,4 @@
-use crate::ast::{SPattern, Pattern, Literal, StrPart, FieldPattern};
+use crate::ast::{SExpr, SPattern, Pattern, Expr, Literal, StrPart, FieldPattern};
 use crate::error::LxError;
 use crate::span::Span;
 use crate::token::TokenKind;
@@ -138,5 +138,72 @@ impl super::Parser {
     }
     let end = args.last().map(|a| a.span.end()).unwrap_or(name_span.end());
     Ok(SPattern::new(Pattern::Constructor { name, args }, Span::from_range(name_span.offset, end)))
+  }
+
+  pub(super) fn expr_to_pattern(&self, expr: &SExpr) -> Result<SPattern, LxError> {
+    let span = expr.span;
+    match &expr.node {
+      Expr::Ident(name) => Ok(SPattern::new(Pattern::Bind(name.clone()), span)),
+      Expr::Literal(Literal::Unit) => Ok(SPattern::new(Pattern::Wildcard, span)),
+      Expr::Tuple(elems) => {
+        let mut pats = Vec::new();
+        for e in elems {
+          pats.push(self.expr_to_pattern(e)?);
+        }
+        Ok(SPattern::new(Pattern::Tuple(pats), span))
+      },
+      Expr::Apply { .. } => {
+        let mut parts = vec![];
+        self.flatten_apply(expr, &mut parts)?;
+        Ok(SPattern::new(Pattern::Tuple(parts), span))
+      },
+      Expr::Record(fields) => {
+        let mut fps = Vec::new();
+        for f in fields {
+          if f.is_spread {
+            continue;
+          }
+          if let Some(ref name) = f.name {
+            let pattern = if let Expr::Ident(ref id) = f.value.node
+              && id == name {
+                None
+              } else {
+                Some(self.expr_to_pattern(&f.value)?)
+              };
+            fps.push(FieldPattern { name: name.clone(), pattern });
+          }
+        }
+        Ok(SPattern::new(Pattern::Record { fields: fps, rest: None }, span))
+      },
+      Expr::List(elems) => {
+        let mut pats = Vec::new();
+        let mut rest = None;
+        for e in elems {
+          match e {
+            crate::ast::ListElem::Single(e) => pats.push(self.expr_to_pattern(e)?),
+            crate::ast::ListElem::Spread(e) => {
+              if let Expr::Ident(name) = &e.node {
+                rest = Some(name.clone());
+              }
+            },
+          }
+        }
+        Ok(SPattern::new(Pattern::List { elems: pats, rest }, span))
+      },
+      _ => Err(LxError::parse("expected pattern on left side of '='", span, None)),
+    }
+  }
+
+  fn flatten_apply(&self, expr: &SExpr, out: &mut Vec<SPattern>) -> Result<(), LxError> {
+    match &expr.node {
+      Expr::Apply { func, arg } => {
+        self.flatten_apply(func, out)?;
+        out.push(self.expr_to_pattern(arg)?);
+      },
+      _ => {
+        out.push(self.expr_to_pattern(expr)?);
+      },
+    }
+    Ok(())
   }
 }

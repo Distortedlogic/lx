@@ -11,12 +11,11 @@ INT       = [0-9][0-9_]* | 0x[0-9a-fA-F_]+ | 0b[01_]+ | 0o[0-7_]+
 FLOAT     = [0-9][0-9_]*\.[0-9][0-9_]* ([eE][+-]?[0-9]+)?
 STR       = " (char | \escape | { EXPR })* "
 RAW_STR   = ` char* `
-REGEX     = r/ char* / [gimsux]*
 SEP       = \n | ;
 COMMENT   = -- to end of line
 ```
 
-No commas. Whitespace separates all elements. Newlines and `;` terminate statements (interchangeable). Underscores in numeric literals are ignored (`1_000_000`). `?` appears at most once, only as the final character of an identifier. `r/` (no space) triggers regex lexing; `r /` (with space) is identifier then division. `'` can appear in identifiers for mutating variants (`sort'`). The full operator set and precedence table are in [grammar.md](grammar.md).
+No commas. Whitespace separates all elements. Newlines and `;` terminate statements (interchangeable). Underscores in numeric literals are ignored (`1_000_000`). `?` appears at most once, only as the final character of an identifier. `'` can appear in identifiers for mutating variants (`sort'`). The full operator set and precedence table are in [grammar.md](grammar.md).
 
 ## Literals
 
@@ -28,7 +27,6 @@ true false               -- bool
 ()                       -- unit (nothing/void)
 "hello {name}"           -- interpolated string
 `raw {not interpolated}` -- raw string
-r/\d+/i                  -- regex
 ```
 
 Double quotes always interpolate via `{expr}`. Backticks never interpolate.
@@ -93,12 +91,6 @@ process = (data) {
 now = () $date
 ```
 
-Type annotations go after parameter names with `:`, return type after `->`:
-
-```
-add = (x:Int y:Int) -> Int  x + y
-```
-
 Default parameters use `=`. Named arguments at call site use `:`:
 
 ```
@@ -106,7 +98,7 @@ greet = (name  greeting = "hello") "{greeting} {name}"
 greet "alice"                    -- "hello alice"
 greet "alice" greeting: "hi"     -- "hi alice"
 
-pad = (s:Str  width:Int = 20) s | fmt.pad_left width
+pad = (s  width = 20) s | pad_left width
 ```
 
 Application by juxtaposition. Parens only for grouping:
@@ -196,7 +188,7 @@ point = {
 }
 ```
 
-**Continuation operators** — a line starting with a binary operator (`|` `+` `-` `*` `/` `%` `//` `++` `<>` `&&` `||` `??` `==` `!=` `<` `>` `<=` `>=` `..` `..=`) continues the previous statement:
+**Continuation operators** — a line starting with a binary operator (`|` `+` `-` `*` `/` `%` `//` `++` `&&` `||` `??` `==` `!=` `<` `>` `<=` `>=` `..` `..=` `~>` `~>?`) continues the previous statement:
 
 ```
 data
@@ -287,9 +279,9 @@ factorial = (n  acc = 1) n ? {
 
 For literal construction, spread is preferred: `[..a ..b]`, `"prefix {middle} suffix"`. Use `++` when concatenating values computed at runtime in pipelines.
 
-## Composition and Negation
+## Negation
 
-`<>` composes left-to-right: `f <> g` = `(x) f x | g`. `!` is prefix logical not; `not` is the function form for composition: `filter (empty? <> not)`.
+`!` is prefix logical not. `not` is the function form for pipelines: `data | filter (x) !(empty? x)`.
 
 ## Cross-References
 

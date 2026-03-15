@@ -1,0 +1,100 @@
+-- GOAL: MCP tool generation pipeline — detect gap, build tool, register, test.
+-- Gap detection: 4 signals (tool call failure, capability dead-end, inefficient workaround, cross-agent learning).
+-- Tool-maker agent: dedicated specialist with 7-phase pipeline:
+--   Phase 0: Target analysis (REST API spec, CLI --help, crate source).
+--   Phase 1: Tool design (manifest, names, params, read-before-write).
+--   Phase 2: Scaffold (Cargo.toml, main.rs, client.rs, handler.rs, tools.rs).
+--   Phase 3: Code generation (#[mcp_tool] structs, tool_box! dispatch).
+--   Phase 4: Compilation — HARD GATE (just diagnose, zero warnings).
+--   Phase 5: Registration (workspace Cargo.toml, mcp.justfile, .mcp.json).
+--   Phase 6: Smoke testing (list tools, call each read tool, verify round-trip).
+-- Source: mcp-toolbelt/arch_diagrams/tool_generation
+
+use std/agent
+use std/json
+use std/fs
+use std/mcp
+
+Protocol ToolGap = {signal: Str  tool: Str  context: Str}
+Protocol ToolManifest = {name: Str  tools: List  transport: Str}
+
++main = () {
+  gap = ToolGap {
+    signal: "capability_dead_end"
+    tool: "docker-engine"
+    context: "cannot manage containers — blocks 5 scenarios"
+  }
+
+  $echo "=== Tool Generation Pipeline ==="
+  $echo "Gap: {gap.tool} ({gap.signal})"
+
+  tool_maker = agent.spawn {command: "lx" args: ["run" "agents/tool_maker.lx"]} ^
+  result = generate_tool tool_maker gap
+  agent.kill tool_maker ^
+
+  result ? {
+    Ok r -> $echo "\ntool {gap.tool} generated and registered"
+    Err e -> $echo "\nFAILED: {e}"
+  }
+}
+
+generate_tool = (maker gap) {
+  $echo "\nPhase 0: Target Analysis..."
+  analysis = maker ~>? {phase: "analyze" target: gap.tool} ^
+
+  $echo "Phase 1: Tool Design..."
+  manifest = maker ~>? {phase: "design" analysis: analysis} ^
+
+  $echo "Phase 2: Scaffold..."
+  scaffold = maker ~>? {phase: "scaffold" manifest: manifest} ^
+  workspace = scaffold.path
+
+  $echo "Phase 3: Code Generation..."
+  maker ~>? {phase: "codegen" workspace: workspace manifest: manifest} ^
+
+  $echo "Phase 4: Compilation (HARD GATE)..."
+  compile_result = $cargo check --manifest-path {workspace}/Cargo.toml 2>&1
+  compile_result ? {
+    Ok {code: 0 ..} -> ()
+    _ -> {
+      maker ~>? {phase: "fix_compile" workspace: workspace errors: compile_result} ^
+      recheck = $cargo check --manifest-path {workspace}/Cargo.toml 2>&1
+      recheck ? {
+        Ok {code: 0 ..} -> ()
+        _ -> Err "compilation failed after fix attempt"
+      }
+    }
+  }
+
+  clippy_result = $cargo clippy --manifest-path {workspace}/Cargo.toml -- -D warnings 2>&1
+  clippy_result ? {
+    Ok {code: 0 ..} -> ()
+    _ -> Err "clippy warnings — zero tolerance"
+  }
+
+  $echo "Phase 5: Registration..."
+  $echo "  adding to .mcp.json..."
+  mcp_config = fs.read ".mcp.json" ^ | json.parse ^
+  new_entry = %{
+    (gap.tool): %{
+      "command": "{workspace}/target/debug/{gap.tool}"
+      "args": []
+    }
+  }
+  updated = merge mcp_config new_entry
+  fs.write ".mcp.json" (json.encode_pretty updated) ^
+
+  $echo "Phase 6: Smoke Testing..."
+  test_server = mcp.connect {command: "{workspace}/target/debug/{gap.tool}" args: []} ^
+  tools = mcp.list_tools test_server ^
+  $echo "  {tools | len} tools available"
+
+  read_tools = tools | filter (t) re.is_match "list|get|read|show" t.name
+  read_tools | each (t) {
+    result = mcp.call test_server t.name {} ?? "error"
+    $echo "  {t.name}: ok"
+  }
+
+  mcp.close test_server
+  Ok {tool: gap.tool  tools_count: tools | len  workspace: workspace}
+}

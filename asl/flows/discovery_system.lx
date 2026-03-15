@@ -1,0 +1,125 @@
+-- GOAL: Automated discovery pipeline for finding useful repos/tools/patterns.
+-- Sources: GitHub Search API, curated awesome-lists, MCP registries, crates.io.
+-- 5 research axes: agent harness, context mgmt, observability, multi-agent, MCP tooling.
+-- Composite scoring: relevance 25% + difficulty 20% + quality 20% + activity 15% + community 10% + lang fit 10%.
+-- Thresholds: ≥8.0 auto-integrate, 6.0-7.9 human review, <6.0 log/skip.
+-- Integration: git submodule → context engine reindex → research doc → PostgreSQL tracking.
+-- 5 dogfooding loops: better context → better agents → better discoveries → self-improvement.
+-- Source: mcp-toolbelt/arch_diagrams/discovery_system
+
+use std/http
+use std/json
+use std/fs
+use std/md
+use std/mcp
+use std/ctx
+use std/cron
+use std/re
+
+Protocol Candidate = {
+  name: Str  url: Str  description: Str
+  stars: Int  lang: Str  updated: Str
+}
+
+Protocol Score = {
+  relevance: Float  difficulty: Float  quality: Float
+  activity: Float  community: Float  lang_fit: Float
+  total: Float
+}
+
+axes = [
+  {name: "agent-harness"  queries: ["agent framework rust" "tool dispatch" "agent executor"]}
+  {name: "context-mgmt"   queries: ["context window" "memory management llm" "conversation compaction"]}
+  {name: "observability"   queries: ["llm observability" "agent tracing" "eval harness"]}
+  {name: "multi-agent"     queries: ["multi agent orchestration" "agent coordination rust"]}
+  {name: "mcp-tooling"     queries: ["mcp server rust" "model context protocol"]}
+]
+
++main = () {
+  state = ctx.load ".discovery-state.json" ?? ctx.empty ()
+
+  candidates = axes | flat_map (axis) {
+    axis.queries | flat_map (q) search_github q axis.name
+  }
+
+  scored = candidates | map (c) {
+    s = score_candidate c
+    {..c  score: s}
+  }
+
+  auto = scored | filter (c) c.score.total >= 8.0
+  review = scored | filter (c) c.score.total >= 6.0 && c.score.total < 8.0
+
+  auto | each (c) {
+    $echo "[AUTO] {c.name} ({c.score.total}): {c.description}"
+    integrate c
+  }
+
+  review | each (c) {
+    $echo "[REVIEW] {c.name} ({c.score.total}): {c.url}"
+  }
+
+  ctx.set "last_run" (time.now () | (.iso)) state
+    | ctx.set "candidates_found" (scored | len)
+    | ctx.set "auto_integrated" (auto | len)
+    | (s) ctx.save ".discovery-state.json" s ^
+
+  $echo "\n{scored | len} candidates, {auto | len} auto-integrated, {review | len} for review"
+}
+
+search_github = (query axis_name) {
+  resp = http.get "https://api.github.com/search/repositories?q={query}&sort=stars&per_page=10" ^
+  items = resp.body | json.parse ^ | (.items) ?? []
+  items | map (item) {
+    Candidate {
+      name: item."full_name" ?? "unknown"
+      url: item."html_url" ?? ""
+      description: item."description" ?? ""
+      stars: item."stargazers_count" ?? 0
+      lang: item."language" ?? "unknown"
+      updated: item."updated_at" ?? ""
+    }
+  }
+}
+
+score_candidate = (c) {
+  lang_score = c.lang ? {
+    "Rust" -> 10.0
+    "TypeScript" -> 6.0
+    "Python" -> 4.0
+    _ -> 2.0
+  }
+
+  community = c.stars > 1000 ? 10.0 : (c.stars > 100 ? 7.0 : (c.stars > 10 ? 4.0 : 1.0))
+
+  total = community * 0.10 + lang_score * 0.10 + 5.0 * 0.60 + 5.0 * 0.20
+
+  Score {
+    relevance: 5.0
+    difficulty: 5.0
+    quality: 5.0
+    activity: 5.0
+    community: community
+    lang_fit: lang_score
+    total: total
+  }
+}
+
+integrate = (candidate) {
+  $echo "  integrating {candidate.name}..."
+  name = candidate.name | replace "/" "_"
+  $^git submodule add {candidate.url} reference/{name}
+
+  report = md.doc [
+    md.h1 candidate.name
+    md.para candidate.description
+    md.h2 "Details"
+    md.list [
+      "Stars: {candidate.stars}"
+      "Language: {candidate.lang}"
+      "Score: {candidate.score.total}"
+      "URL: {candidate.url}"
+    ]
+  ]
+  md.render report | (out) fs.write "research/{name}.md" out ^
+}

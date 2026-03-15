@@ -6,11 +6,11 @@ All v0.1 design questions have been resolved. Decisions and rationale are in [de
 
 | Question | Decision |
 |---|---|
-| User-defined generators | Iterator protocol: record with `next: () -> Maybe a` |
+| User-defined generators | Removed — use `loop`/`break` for custom iteration |
 | Duration literals | Stdlib functions: `time.sec 5`, `time.ms 100` |
 | Retry combinator | Stdlib: `retry n f` with optional backoff config |
 | Interactive/notebook mode | `lx notebook` — shared environment, `---` separated blocks |
-| Shell string escapes | `$` interpolates `{expr}`, `$$` is raw |
+| Shell string escapes | `$` interpolates `{expr}` (raw shell `$$` was removed) |
 | Error code taxonomy | Flat codes in v1: `error[type]`, `error[parse]` |
 | Bytes/Str boundary | Three functions: `fs.read`, `fs.read_bytes`, `fs.read_lossy` |
 | Signal handling | `defer` built-in: `defer () cleanup`. LIFO on scope exit |
@@ -40,13 +40,9 @@ All v0.1 design questions have been resolved. Decisions and rationale are in [de
 
 | Question | Decision |
 |---|---|
-| Data processing at scale | `std/df` — Polars-backed dataframes as stdlib module. No language changes. |
-| Persistence/embedded DB | `std/db` — SQLite (transactional) + DuckDB (analytical). |
-| Numerical computation | `std/num` — ndarray-backed typed arrays. Vectorized ops, statistics. |
-| ML inference | `std/ml` — candle/ONNX for embeddings, classification, generation. |
-| Visualization | `std/plot` — charming (SVG) + terminal Unicode charts. |
-
-All five are stdlib modules in Phase 11. No syntax changes. See [stdlib-data.md](stdlib-data.md).
+| Data processing at scale | Deferred — no stdlib modules for dataframes, databases, or ML in v1 |
+| MCP transport | Both stdio and HTTP+SSE are implemented |
+| Message serialization | JSON (serde_json) for inter-agent messages |
 
 ## Agentic Design Questions (v1)
 
@@ -56,10 +52,8 @@ These are open questions for the agentic layer — to be resolved during impleme
 |---|---|
 | Agent process model | Are agents subprocesses (CLI invocations), API calls, or both? Should `agent.spawn` support both local and remote agents? |
 | Agent discovery | How do agents find each other? Registry, well-known names, URIs? |
-| Message serialization | What format for inter-agent messages? JSON? lx values? Protobuf? |
 | Channel backpressure | What happens when a channel sender outpaces the receiver? Buffer, drop, block? |
 | Context conflict resolution | When two agents update the same context key, who wins? Last-write-wins, CRDTs, error? |
-| MCP transport | Which MCP transports to support first? stdio, HTTP+SSE, WebSocket? |
 | Agent lifecycle | What happens to subagents when the parent dies? Orphan cleanup? |
 | Workflow resumability | How to serialize workflow state for checkpoint/resume across process restarts? |
 | Agent permissions | Can an agent restrict what tools its subagents can use? Capability model? |
@@ -84,6 +78,6 @@ These are not blockers for v1 implementation but worth revisiting after real-wor
 
 **WASM target** — `lx build --target wasm` for running lx scripts in browsers or edge runtimes. The runtime model (async I/O, work-stealing) needs adaptation.
 
-**Pattern matching on regex** — Using `r/pattern/` directly in match arms as a pattern that binds capture groups. Currently requires guards: `s & (match r/(\d+)/ s)`. A first-class regex pattern would be more ergonomic.
+**Pattern matching on regex** — Using string patterns directly in match arms instead of guards with `std/re`. Currently requires guards: `s & (re.is_match "\\d+" s)`.
 
 **`where` clauses for type constraints** — Currently there's no way to express "this generic type must support equality" or "must be sortable." Structural typing handles fields, but behavioral constraints (like "has a `<` operator") are implicit. Revisit if the lack of constraints causes confusing error messages.

@@ -1,0 +1,10 @@
+{
+  "iconDefinitions": {
+    "lx-file": {
+      "iconPath": "./lx-file-icon.svg"
+    }
+  },
+  "fileExtensions": {
+    "lx": "lx-file"
+  }
+}

@@ -1,3 +1,5 @@
+use strum::Display;
+
 use crate::span::Span;
 use num_bigint::BigInt;
 
@@ -27,6 +29,8 @@ pub enum Stmt {
   Binding(Binding),
   TypeDef { name: String, variants: Vec<(String, usize)>, exported: bool },
   Protocol { name: String, fields: Vec<ProtocolField>, exported: bool },
+  McpDecl { name: String, tools: Vec<McpToolDecl>, exported: bool },
+  FieldUpdate { name: String, fields: Vec<String>, value: SExpr },
   Use(UseStmt),
   Expr(SExpr),
 }
@@ -68,7 +72,7 @@ pub enum Expr {
   Record(Vec<RecordField>),
   Map(Vec<MapEntry>),
 
-  Func { params: Vec<Param>, body: Box<SExpr>, returns_result: bool },
+  Func { params: Vec<Param>, body: Box<SExpr> },
   Match { scrutinee: Box<SExpr>, arms: Vec<MatchArm> },
   Ternary { cond: Box<SExpr>, then_: Box<SExpr>, else_: Option<Box<SExpr>> },
 
@@ -87,6 +91,9 @@ pub enum Expr {
 
   AgentSend { target: Box<SExpr>, msg: Box<SExpr> },
   AgentAsk { target: Box<SExpr>, msg: Box<SExpr> },
+
+  Yield { value: Box<SExpr> },
+  With { name: String, value: Box<SExpr>, body: Vec<SStmt>, mutable: bool },
 
   Shell { mode: ShellMode, parts: Vec<StrPart> },
 }
@@ -201,69 +208,48 @@ pub struct ProtocolField {
 }
 
 #[derive(Debug, Clone)]
+pub struct McpToolDecl {
+  pub name: String,
+  pub input: Vec<ProtocolField>,
+  pub output: McpOutputType,
+}
+
+#[derive(Debug, Clone)]
+pub enum McpOutputType {
+  Named(String),
+  List(Box<McpOutputType>),
+  Record(Vec<ProtocolField>),
+}
+
+#[derive(Debug, Clone)]
 pub struct FieldPattern {
   pub name: String,
   pub pattern: Option<SPattern>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
 pub enum BinOp {
-  Add,
-  Sub,
-  Mul,
-  Div,
-  Mod,
-  IntDiv,
-  Concat,
-  Range,
-  RangeInclusive,
-  Eq,
-  NotEq,
-  Lt,
-  Gt,
-  LtEq,
-  GtEq,
-  And,
-  Or,
+  #[strum(to_string = "+")] Add,
+  #[strum(to_string = "-")] Sub,
+  #[strum(to_string = "*")] Mul,
+  #[strum(to_string = "/")] Div,
+  #[strum(to_string = "%")] Mod,
+  #[strum(to_string = "//")] IntDiv,
+  #[strum(to_string = "++")] Concat,
+  #[strum(to_string = "..")] Range,
+  #[strum(to_string = "..=")] RangeInclusive,
+  #[strum(to_string = "==")] Eq,
+  #[strum(to_string = "!=")] NotEq,
+  #[strum(to_string = "<")] Lt,
+  #[strum(to_string = ">")] Gt,
+  #[strum(to_string = "<=")] LtEq,
+  #[strum(to_string = ">=")] GtEq,
+  #[strum(to_string = "&&")] And,
+  #[strum(to_string = "||")] Or,
 }
 
-impl std::fmt::Display for BinOp {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let s = match self {
-      BinOp::Add => "+",
-      BinOp::Sub => "-",
-      BinOp::Mul => "*",
-      BinOp::Div => "/",
-      BinOp::Mod => "%",
-      BinOp::IntDiv => "//",
-      BinOp::Concat => "++",
-      BinOp::Range => "..",
-      BinOp::RangeInclusive => "..=",
-      BinOp::Eq => "==",
-      BinOp::NotEq => "!=",
-      BinOp::Lt => "<",
-      BinOp::Gt => ">",
-      BinOp::LtEq => "<=",
-      BinOp::GtEq => ">=",
-      BinOp::And => "&&",
-      BinOp::Or => "||",
-    };
-    f.write_str(s)
-  }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
 pub enum UnaryOp {
-  Neg,
-  Not,
-}
-
-impl std::fmt::Display for UnaryOp {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let s = match self {
-      UnaryOp::Neg => "-",
-      UnaryOp::Not => "!",
-    };
-    f.write_str(s)
-  }
+  #[strum(to_string = "-")] Neg,
+  #[strum(to_string = "!")] Not,
 }

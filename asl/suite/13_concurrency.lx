@@ -158,7 +158,7 @@ assert (b2 == 40)
 -- (not testable at runtime, static check only)
 
 -- nested par
-((p; q) (r2; s2)) = par {
+((p, q) (r2, s2)) = par {
   par { 1 + 1; 2 + 2 }
   par { 3 + 3; 4 + 4 }
 }

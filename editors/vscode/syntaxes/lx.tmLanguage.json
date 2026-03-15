@@ -1,0 +1,345 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "lx",
+  "scopeName": "source.lx",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#string" },
+    { "include": "#raw-string" },
+    { "include": "#shell" },
+    { "include": "#declaration" },
+    { "include": "#keyword" },
+    { "include": "#constant" },
+    { "include": "#type" },
+    { "include": "#number" },
+    { "include": "#operator" },
+    { "include": "#function-call" },
+    { "include": "#identifier" },
+    { "include": "#punctuation" }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.double-dash.lx",
+      "match": "--.*$"
+    },
+
+    "string": {
+      "name": "string.quoted.double.lx",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.lx",
+          "match": "\\\\[nrt\\\\\"0]"
+        },
+        {
+          "name": "meta.interpolation.lx",
+          "begin": "\\{",
+          "end": "\\}",
+          "beginCaptures": { "0": { "name": "punctuation.section.interpolation.begin.lx" } },
+          "endCaptures": { "0": { "name": "punctuation.section.interpolation.end.lx" } },
+          "patterns": [{ "include": "source.lx" }]
+        }
+      ]
+    },
+
+    "raw-string": {
+      "name": "string.quoted.other.raw.lx",
+      "begin": "`",
+      "end": "`"
+    },
+
+    "shell": {
+      "patterns": [
+        {
+          "comment": "Shell block: ${...}",
+          "name": "meta.embedded.shell.lx",
+          "begin": "(\\$\\{)",
+          "end": "(\\})",
+          "beginCaptures": { "1": { "name": "keyword.operator.shell.lx" } },
+          "endCaptures": { "1": { "name": "keyword.operator.shell.lx" } },
+          "patterns": [
+            {
+              "name": "meta.interpolation.lx",
+              "begin": "\\{",
+              "end": "\\}",
+              "beginCaptures": { "0": { "name": "punctuation.section.interpolation.begin.lx" } },
+              "endCaptures": { "0": { "name": "punctuation.section.interpolation.end.lx" } },
+              "patterns": [{ "include": "source.lx" }]
+            },
+            {
+              "name": "string.unquoted.shell.lx",
+              "match": "[^{}]+"
+            }
+          ]
+        },
+        {
+          "comment": "Shell line: $^ or $",
+          "name": "meta.embedded.shell.lx",
+          "match": "(\\$\\^|\\$)(.*)$",
+          "captures": {
+            "1": { "name": "keyword.operator.shell.lx" },
+            "2": { "name": "string.unquoted.shell.lx" }
+          }
+        }
+      ]
+    },
+
+    "declaration": {
+      "patterns": [
+        {
+          "comment": "Protocol declaration",
+          "match": "\\b(Protocol)\\s+([A-Z][a-zA-Z0-9]*)\\s*(=)",
+          "captures": {
+            "1": { "name": "storage.type.protocol.lx" },
+            "2": { "name": "entity.name.type.lx" },
+            "3": { "name": "keyword.operator.assignment.lx" }
+          }
+        },
+        {
+          "comment": "MCP declaration",
+          "match": "\\b(MCP)\\s+([A-Z][a-zA-Z0-9]*)\\s*(=)",
+          "captures": {
+            "1": { "name": "storage.type.mcp.lx" },
+            "2": { "name": "entity.name.type.lx" },
+            "3": { "name": "keyword.operator.assignment.lx" }
+          }
+        },
+        {
+          "comment": "Type definition",
+          "match": "^([A-Z][a-zA-Z0-9]*)\\s*(=)",
+          "captures": {
+            "1": { "name": "entity.name.type.lx" },
+            "2": { "name": "keyword.operator.assignment.lx" }
+          }
+        },
+        {
+          "comment": "Export marker",
+          "match": "^(\\+)(?=[a-zA-Z_])",
+          "captures": {
+            "1": { "name": "keyword.other.export.lx" }
+          }
+        },
+        {
+          "comment": "Use import",
+          "match": "\\b(use)\\s+",
+          "captures": {
+            "1": { "name": "keyword.control.import.lx" }
+          }
+        },
+        {
+          "comment": "Binding (name = ...)",
+          "match": "([a-z_][a-zA-Z0-9_']*\\??)\\s*(=)(?!=)",
+          "captures": {
+            "1": { "name": "variable.other.lx" },
+            "2": { "name": "keyword.operator.assignment.lx" }
+          }
+        },
+        {
+          "comment": "Mutable binding (name := ...)",
+          "match": "([a-z_][a-zA-Z0-9_']*\\??)\\s*(:=)",
+          "captures": {
+            "1": { "name": "variable.other.mutable.lx" },
+            "2": { "name": "keyword.operator.assignment.lx" }
+          }
+        },
+        {
+          "comment": "Reassignment (name <- ...)",
+          "match": "([a-z_][a-zA-Z0-9_']*\\??)\\s*(<-)",
+          "captures": {
+            "1": { "name": "variable.other.mutable.lx" },
+            "2": { "name": "keyword.operator.assignment.lx" }
+          }
+        }
+      ]
+    },
+
+    "keyword": {
+      "patterns": [
+        {
+          "name": "keyword.control.lx",
+          "match": "\\b(loop|break|par|sel|yield|assert|use)\\b"
+        },
+        {
+          "name": "storage.type.lx",
+          "match": "\\b(Protocol|MCP)\\b"
+        }
+      ]
+    },
+
+    "constant": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean.lx",
+          "match": "\\b(true|false)\\b"
+        },
+        {
+          "name": "constant.language.none.lx",
+          "match": "\\b(None)\\b"
+        },
+        {
+          "name": "constant.language.unit.lx",
+          "match": "\\(\\)"
+        }
+      ]
+    },
+
+    "type": {
+      "patterns": [
+        {
+          "comment": "Result/Maybe constructors",
+          "name": "support.type.lx",
+          "match": "\\b(Ok|Err|Some|None)\\b"
+        },
+        {
+          "comment": "Built-in type names in Protocol/MCP contexts",
+          "name": "support.type.primitive.lx",
+          "match": "\\b(Int|Float|Str|Bool|Any|List|Record|Map|Tuple|Func)\\b"
+        },
+        {
+          "comment": "User type names (capitalized)",
+          "name": "entity.name.type.lx",
+          "match": "\\b[A-Z][a-zA-Z0-9]*\\b"
+        }
+      ]
+    },
+
+    "number": {
+      "patterns": [
+        {
+          "name": "constant.numeric.float.lx",
+          "match": "\\b[0-9][0-9_]*\\.[0-9][0-9_]*([eE][+-]?[0-9]+)?\\b"
+        },
+        {
+          "name": "constant.numeric.hex.lx",
+          "match": "\\b0x[0-9a-fA-F_]+\\b"
+        },
+        {
+          "name": "constant.numeric.binary.lx",
+          "match": "\\b0b[01_]+\\b"
+        },
+        {
+          "name": "constant.numeric.octal.lx",
+          "match": "\\b0o[0-7_]+\\b"
+        },
+        {
+          "name": "constant.numeric.integer.lx",
+          "match": "\\b[0-9][0-9_]*\\b"
+        }
+      ]
+    },
+
+    "operator": {
+      "patterns": [
+        {
+          "comment": "Agent communication",
+          "name": "keyword.operator.agent.lx",
+          "match": "~>\\?|~>"
+        },
+        {
+          "comment": "Error handling",
+          "name": "keyword.operator.error.lx",
+          "match": "\\?\\?|\\^"
+        },
+        {
+          "comment": "Pipe",
+          "name": "keyword.operator.pipe.lx",
+          "match": "\\|(?!\\|)"
+        },
+        {
+          "comment": "Arrow",
+          "name": "keyword.operator.arrow.lx",
+          "match": "->"
+        },
+        {
+          "comment": "Range operators",
+          "name": "keyword.operator.range.lx",
+          "match": "\\.\\.\\.?=?"
+        },
+        {
+          "comment": "Comparison",
+          "name": "keyword.operator.comparison.lx",
+          "match": "==|!=|<=|>=|<|>"
+        },
+        {
+          "comment": "Logical",
+          "name": "keyword.operator.logical.lx",
+          "match": "&&|\\|\\||!"
+        },
+        {
+          "comment": "Concatenation",
+          "name": "keyword.operator.concat.lx",
+          "match": "\\+\\+"
+        },
+        {
+          "comment": "Arithmetic",
+          "name": "keyword.operator.arithmetic.lx",
+          "match": "//|[+\\-*/%]"
+        },
+        {
+          "comment": "Assignment variants",
+          "name": "keyword.operator.assignment.lx",
+          "match": ":=|<-|="
+        }
+      ]
+    },
+
+    "function-call": {
+      "patterns": [
+        {
+          "comment": "Stdlib module access (std/...)",
+          "match": "\\b([a-z_][a-zA-Z0-9_]*)(\\.)",
+          "captures": {
+            "1": { "name": "entity.name.namespace.lx" },
+            "2": { "name": "punctuation.accessor.lx" }
+          }
+        },
+        {
+          "comment": "Built-in functions",
+          "name": "support.function.builtin.lx",
+          "match": "\\b(map|filter|fold|flat_map|each|take|drop|zip|enumerate|find|sort_by|min_by|max_by|partition|group_by|chunks|windows|intersperse|scan|tap|pmap|pmap_n|find_index|take_while|drop_while|count|any\\?|all\\?|none\\?|len|empty\\?|not|to_str|to_int|to_float|identity|dbg|print|ok\\?|err\\?|some\\?|even\\?|odd\\?|collect|step|require|parse_int|parse_float|type_of|timeout|sort|reverse|uniq|flatten|head|tail|last|join|lines|words|keys|values|contains\\?|sum|product|min|max|range|push|insert|remove|merge|split|trim|upper|lower|starts_with\\?|ends_with\\?|replace|index_of|char_at|chars|repeat|pad_left|pad_right|substr)\\b"
+        }
+      ]
+    },
+
+    "identifier": {
+      "patterns": [
+        {
+          "comment": "Wildcard",
+          "name": "variable.language.wildcard.lx",
+          "match": "\\b_\\b"
+        },
+        {
+          "comment": "Named argument label",
+          "match": "([a-z_][a-zA-Z0-9_']*)(:\\s)",
+          "captures": {
+            "1": { "name": "variable.parameter.named.lx" },
+            "2": { "name": "punctuation.separator.named-arg.lx" }
+          }
+        },
+        {
+          "comment": "Field access name after dot",
+          "match": "(?<=\\.)([a-z_][a-zA-Z0-9_']*\\??)",
+          "captures": {
+            "1": { "name": "variable.other.member.lx" }
+          }
+        },
+        {
+          "comment": "Regular identifier",
+          "name": "variable.other.lx",
+          "match": "\\b[a-z_][a-zA-Z0-9_']*\\??\\b"
+        }
+      ]
+    },
+
+    "punctuation": {
+      "patterns": [
+        { "name": "punctuation.brackets.round.lx", "match": "[()]" },
+        { "name": "punctuation.brackets.square.lx", "match": "[\\[\\]]" },
+        { "name": "punctuation.brackets.curly.lx", "match": "[{}]" },
+        { "name": "punctuation.separator.lx", "match": "[;,]" },
+        { "name": "punctuation.accessor.lx", "match": "\\." }
+      ]
+    }
+  }
+}

@@ -125,37 +125,13 @@ assert (0..3 | collect == [0 1 2])
 -- ranges are ascending only
 assert (10..1 | collect == [])
 
--- ranges are lazy (this doesn't allocate a million elements)
-assert (1..1000000 | take 3 | collect == [1 2 3])
-
--- lazy pipeline
+-- ranges with eager pipeline
 result = 1..100
+  | collect
   | filter even?
   | map (* 3)
   | take 5
-  | collect
 assert (result == [6 12 18 24 30])
-
--- nat (infinite sequence)
-assert (nat | take 5 | collect == [0 1 2 3 4])
-assert (nat | drop 10 | take 3 | collect == [10 11 12])
-
--- cycle
-assert (cycle [1 2 3] | take 7 | collect == [1 2 3 1 2 3 1])
-
--- iterator protocol (custom generator)
-counter = (start end) {
-  n := start
-  {next: () n >= end ? None : { val = n; n <- n + 1; Some val }}
-}
-assert (counter 1 5 | map (* 2) | collect == [2 4 6 8])
-
--- fibonacci via iterator protocol
-fib = () {
-  a := 0; b := 1
-  {next: () { val = a; tmp = a + b; a <- b; b <- tmp; Some val }}
-}
-assert (fib () | take 10 | collect == [0 1 1 2 3 5 8 13 21 34])
 
 -- loop with break
 result = loop {
@@ -188,9 +164,8 @@ assert ("hello world" | lines == ["hello world"])
 assert ("a\nb\nc" | lines == ["a" "b" "c"])
 assert ("a,b,c" | split "," == ["a" "b" "c"])
 
--- collect forces lazy to concrete
-lazy = 1..5 | map (* 2)
-concrete = lazy | collect
+-- collect materializes range
+concrete = 1..5 | collect | map (* 2)
 assert (concrete == [2 4 6 8])
 
 -- enumerate with tuple auto-spread

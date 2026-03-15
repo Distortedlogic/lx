@@ -12,12 +12,12 @@ use std/ctx
   files = $^git diff --name-only HEAD~1 | lines | filter (!= "")
 
   (security perf style) = par {
-    agent.ask (agent.spawn {name: "security" prompt: "Audit for vulnerabilities"} ^)
-      {files action: "review"} ^
-    agent.ask (agent.spawn {name: "perf" prompt: "Check for performance issues"} ^)
-      {files action: "review"} ^
-    agent.ask (agent.spawn {name: "style" prompt: "Check code style"} ^)
-      {files action: "review"} ^
+    (agent.spawn {name: "security" prompt: "Audit for vulnerabilities"} ^)
+      ~>? {files action: "review"} ^
+    (agent.spawn {name: "perf" prompt: "Check for performance issues"} ^)
+      ~>? {files action: "review"} ^
+    (agent.spawn {name: "style" prompt: "Check code style"} ^)
+      ~>? {files action: "review"} ^
   }
 
   findings = [..security.issues ..perf.issues ..style.issues]
@@ -29,7 +29,7 @@ use std/ctx
 }
 ```
 
-Uses: `par` for parallel agent work, `agent.spawn`/`agent.ask`, context persistence, shell + pipes.
+Uses: `par` for parallel agent work, `agent.spawn`/`~>?`, context persistence, shell + pipes.
 
 ## MCP Tool Orchestration
 
@@ -72,16 +72,16 @@ use std/md
 
   step ? {
     "fetch" -> {
-      data = agent.ask (agent.spawn {name: "fetcher" prompt: "Gather data"} ^)
-        {sources: ["api" "db" "logs"]} ^
+      data = (agent.spawn {name: "fetcher" prompt: "Gather data"} ^)
+        ~>? {sources: ["api" "db" "logs"]} ^
       ctx.set "step" "analyze" state
         | ctx.set "raw_data" data
         | (c) ctx.save ".pipeline-state.json" c ^
     }
     "analyze" -> {
       raw = ctx.get "raw_data" state ^
-      result = agent.ask (agent.spawn {name: "analyzer" prompt: "Analyze data"} ^)
-        {data: raw} ^
+      result = (agent.spawn {name: "analyzer" prompt: "Analyze data"} ^)
+        ~>? {data: raw} ^
       report = md.doc [
         md.h1 "Analysis Report"
         md.para "Processed {raw | len} sources"
@@ -198,61 +198,57 @@ use std/fs
 }
 ```
 
-Uses: `par` block for concurrent setup, `pmap` for parallel processing, `collect` to force lazy sequence.
+Uses: `par` block for concurrent setup, `pmap` for parallel processing, `collect` to materialize results.
 
-## Iterator Protocol: Fibonacci
+## Fibonacci via Loop
 
 ```
-fib = () {
-  a := 0; b := 1
-  {next: () { val = a; tmp = a + b; a <- b; b <- tmp; Some val }}
-}
-
 +main = () {
-  fib () | take 20 | each (n) $echo "{n}"
+  a := 0; b := 1
+  n := 0
+  loop {
+    n >= 20 ? break
+    $echo "{a}"
+    tmp = a + b
+    a <- b
+    b <- tmp
+    n <- n + 1
+  }
 }
 ```
 
-Uses: iterator protocol (record with `next`), closures over mutable state, lazy consumption with `take`.
+Uses: mutable bindings with `:=` and `<-`, `loop`/`break`, simple numeric computation.
 
-## Interactive Loop with Defer
+## Shell Command Runner with Defer
 
 ```
 use std/fs
-use std/io
 
 +main = () {
   log_file = fs.open "session.log" ^
   defer () fs.close log_file
 
-  loop {
-    io.print "> "
-    line = io.read_line ^
-    line | trim ? {
-      "quit" -> break
-      ""     -> ()
-      cmd    -> {
-        result = $sh -c "{cmd}"
-        result ? {
-          Ok {out ..} -> {
-            $echo "{out}"
-            fs.append "session.log" "{cmd}: {out}\n" ^
-          }
-          Err e -> $echo "error: {e}"
-        }
+  commands = ["ls -la" "uname -a" "date"]
+  commands | each (cmd) {
+    result = $sh -c "{cmd}"
+    result ? {
+      Ok {out ..} -> {
+        $echo "{out}"
+        fs.append "session.log" "{cmd}: {out}\n" ^
       }
+      Err e -> $echo "error running {cmd}: {e}"
     }
   }
 }
 ```
 
-Uses: `defer` for cleanup, `loop`/`break`, pattern matching for control flow, shell execution.
+Uses: `defer` for cleanup, pattern matching for control flow, shell execution, list iteration.
 
 ## Retry with Backoff
 
 ```
 use std/time
-use std/net/http
+use std/http
 
 with_retry = (n delay f) {
   attempt := 0

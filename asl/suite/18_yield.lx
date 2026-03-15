@@ -1,0 +1,28 @@
+-- 18_yield.lx
+-- Tests: yield coroutine primitive for executable agent plans
+-- Requires: python3 for orchestrator fixture
+
+use std/json
+
+-- Test 1: single yield --orchestrator sends 42, program asserts it
+result1 = $^python3 asl/suite/fixtures/yield_orchestrator.py asl/suite/fixtures/yield_simple.lx '[42]'
+parsed1 = json.parse result1 ^
+assert (parsed1.exit_code == 0) "single yield: exit code 0"
+assert (len parsed1.yields == 1) "single yield: one yield seen"
+assert (parsed1.yields.0.question == "what is 1+1?") "single yield: yielded value"
+
+-- Test 2: multiple yields --chain values through
+result2 = $^python3 asl/suite/fixtures/yield_orchestrator.py asl/suite/fixtures/yield_multi.lx '[10, 20]'
+parsed2 = json.parse result2 ^
+assert (parsed2.exit_code == 0) "multi yield: exit code 0"
+assert (len parsed2.yields == 2) "multi yield: two yields seen"
+assert (parsed2.yields.0.step == "first") "multi yield: first yield value"
+assert (parsed2.yields.1.step == "second") "multi yield: second yield value"
+assert (parsed2.yields.1.prev == 10) "multi yield: second yield sees first response"
+assert (parsed2.output == "30") "multi yield: final result is 10+20"
+
+-- Test 3: yield with list response --piped into processing
+result3 = $^python3 asl/suite/fixtures/yield_orchestrator.py asl/suite/fixtures/yield_pipeline.lx '[[10, 20, 30]]'
+parsed3 = json.parse result3 ^
+assert (parsed3.exit_code == 0) "pipeline yield: exit code 0"
+assert (parsed3.output == "60") "pipeline yield: sum of yielded list"

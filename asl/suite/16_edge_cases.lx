@@ -178,20 +178,14 @@ assert (not (1 == 2) == true)
 assert ((1 < 2) && (2 < 3))
 assert ((1 < 2) == true)
 
--- implicit Err early return in annotated functions
-validate = (n: Int) -> Int ^ Str {
-  n < 0 ? Err "negative"
-  n > 100 ? Err "too large"
-  n
+-- explicit error handling
+validate = (n) n < 0 ? {
+  true -> Err "negative"
+  false -> n > 100 ? {
+    true -> Err "too large"
+    false -> Ok n
+  }
 }
 assert (validate 50 == Ok 50)
 assert (validate (-1) == Err "negative")
 assert (validate 200 == Err "too large")
-
--- Err early return: only in annotated functions
-no_annotation = (n) {
-  n < 0 ? Err "negative"
-  n
-}
-assert (no_annotation 5 == 5)
-assert (no_annotation (-1) == -1)

@@ -1,6 +1,6 @@
 # Standard Library — Module Details
 
-Detailed API for each core module. See [stdlib.md](stdlib.md) for conventions, built-in functions, and the module overview table. Agent ecosystem modules (std/agent, std/mcp, std/ctx, std/md, std/cron) are in [stdlib-agents.md](stdlib-agents.md).
+Detailed API for each core module. See [stdlib.md](stdlib.md) for conventions, built-in functions, and the module overview table. Agent ecosystem modules (std/agent, std/mcp, std/ctx, std/md) are in [stdlib-agents.md](stdlib-agents.md).
 
 ## std/fs
 
@@ -25,11 +25,11 @@ read_lines path        -- lazy [Str] ^ IoErr (line-by-line streaming)
 glob pattern           -- lazy [Str] of matching file paths
 ```
 
-`read_lines` returns a lazy sequence of lines — suitable for large files that shouldn't be loaded entirely into memory. `glob` matches shell-style patterns: `fs.glob "src/**/*.lx"`.
+`read_lines` returns a list of lines. `glob` matches shell-style patterns: `fs.glob "src/**/*.lx"`.
 
 `Handle` is an opaque type — it cannot be destructured or inspected by user code. Created by `open`, consumed by `close` and streaming read/write operations.
 
-## std/net/http
+## std/http
 
 ```
 get url                -- {status: Int  headers: %{Str: Str}  body: Str} ^ HttpErr
@@ -56,26 +56,6 @@ data."users".0."name"
 ```
 
 JSON types map to lx types: objects become maps (`%{}`), arrays become lists, strings/numbers/booleans map directly, `null` becomes `None`.
-
-## std/csv
-
-```
-parse str              -- [[Str]] ^ ParseErr (list of rows, each a list of fields)
-parse_with opts str    -- [[Str]] ^ ParseErr (opts: {delimiter: Str  header: Bool})
-encode rows            -- Str
-encode_with opts rows  -- Str
-```
-
-When `header: true`, the first row is treated as headers and each subsequent row is returned as a map `%{header: value}` instead of a list.
-
-## std/toml / std/yaml
-
-```
-parse str              -- a ^ ParseErr
-encode val             -- Str
-```
-
-Same interface as `std/json`. Parsed values use the same lx types (maps, lists, strings, numbers, booleans, `None`).
 
 ## std/time
 
@@ -107,21 +87,6 @@ sel {
 
 Use `time.timeout` when you need sub-second precision: `time.timeout (time.ms 500)`.
 
-## std/fmt
-
-```
-pad_left width str     -- left-pad with spaces
-pad_right width str    -- right-pad with spaces
-pad_left_with ch width str -- left-pad with character
-fixed n num            -- format float to n decimal places
-hex n                  -- format int as hexadecimal
-oct n                  -- format int as octal
-bin n                  -- format int as binary
-truncate n str         -- truncate to n characters with "..."
-```
-
-Use inside string interpolation: `"{price | fmt.fixed 2}"`, `"{n | fmt.hex}"`.
-
 ## std/math
 
 ```
@@ -149,41 +114,6 @@ max a b        -- larger of two values
 
 `safe_div` and `safe_mod` return `Result` instead of panicking on zero. Use these in data pipelines where zero divisors are expected input.
 
-## std/bit
-
-```
-and a b     -- bitwise AND
-or a b      -- bitwise OR
-xor a b     -- bitwise XOR
-not n       -- bitwise NOT
-shl n bits  -- shift left
-shr n bits  -- shift right
-```
-
-Bitwise operations use stdlib functions because `|`, `&`, and `^` are already used for pipes, guards, and error propagation.
-
-## std/rand
-
-```
-int lo hi              -- random Int in [lo hi)
-float ()               -- random Float in [0.0 1.0)
-choice xs              -- random element from list
-shuffle xs             -- randomly shuffled list
-seed n                 -- set RNG seed for reproducibility
-uuid ()                -- random UUID v4 as Str
-```
-
-## std/io
-
-```
-stdin                  -- lazy sequence of lines from stdin
-read_line ()           -- Str ^ IoErr (one line)
-print str              -- () (to stdout, no newline)
-println str            -- () (to stdout, with newline)
-```
-
-`io.stdin` is iterable: `io.stdin | filter (!= "") | each process`.
-
 ## std/env
 
 ```
@@ -197,25 +127,6 @@ cwd ()                 -- Str: current working directory
 
 To require an env var: `env.get "KEY" | require "KEY must be set" ^`.
 
-## std/crypto
-
-```
-sha256 data            -- Str (hex digest)
-sha512 data            -- Str (hex digest)
-md5 data               -- Str (hex digest)
-hmac algo key data     -- Str (hex digest). algo: "sha256" | "sha512"
-```
-
-## std/os
-
-```
-pid ()                 -- Int: current process ID
-hostname ()            -- Str
-arch ()                -- Str: "x86_64", "aarch64", etc.
-os ()                  -- Str: "linux", "macos", "windows"
-signal sig             -- registers a handler for the given signal
-```
-
 ## std/re
 
 ```
@@ -227,4 +138,4 @@ split regex s          -- split on matches
 find_all regex s       -- [[Str]]: all matches with capture groups
 ```
 
-Also available via `r/pattern/` literals — `r/\d+/` is syntactic sugar for constructing a regex value.
+All patterns are passed as string arguments.

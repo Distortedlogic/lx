@@ -4,9 +4,11 @@ EBNF grammar, operator precedence, and keyword list.
 
 ## Keywords
 
-Total: **9**
+Total: **11**
 
-`true` `false` `use` `loop` `break` `par` `sel` `assert` `_`
+`true` `false` `use` `loop` `break` `par` `sel` `assert` `yield` `with` `_`
+
+Additionally, `Protocol` and `MCP` are recognized as declaration keywords when they appear at statement level followed by a type name.
 
 Every other construct uses sigils (`$`, `^`, `?`, `+`, `??`, `<-`, `:=`) or function application. `dbg`, `tap`, `log`, `not`, `defer`, `require`, `identity`, `collect` are built-in functions, not keywords — they can technically be shadowed.
 
@@ -25,8 +27,7 @@ These are always in scope but are not reserved words:
 `starts?` `ends?` `upper` `lower` `replace` `replace_all` `repeat`
 `pad_left` `pad_right`
 `keys` `values` `entries` `has_key?` `remove` `merge`
-`intersect` `difference` `sym_diff` `is_subset?` `is_superset?`
-`to_map` `to_record` `to_set` `to_list` `to_str` `parse_int` `parse_float` `encode` `decode`
+`to_map` `to_record` `to_list` `to_str` `parse_int` `parse_float`
 `ok?` `err?` `some?` `even?` `odd?` `sorted?`
 `match` `test` `Ok` `Err` `Some` `None`
 
@@ -45,7 +46,7 @@ Macros, operator overloading, inheritance/class hierarchies, unstructured spawn/
  4.  * / % //    multiplicative
  5.  + -         additive
  6.  ..  ..=     range
- 7.  ++ <>       concatenation / composition
+ 7.  ++ ~> ~>?   concatenation / agent communication
  8.  |           pipe
  9.  == != < > <= >=   comparison
 10.  &&          logical and
@@ -75,12 +76,11 @@ INT       = [0-9][0-9_]* | 0x[0-9a-fA-F_]+ | 0b[01_]+ | 0o[0-7_]+
 FLOAT     = [0-9][0-9_]*\.[0-9][0-9_]* ([eE][+-]?[0-9]+)?
 STR       = " (char | \escape | { EXPR })* "
 RAW_STR   = ` char* `
-REGEX     = r/ char* / [gimsux]*
 SEP       = NEWLINE | ;
 COMMENT   = -- to end of line
 ```
 
-Underscores in numeric literals are ignored: `1_000_000`, `0xff_ff`. `?` appears at most once, only as the final character of an identifier. `'` can appear in identifiers for mutating variants (`sort'`). `r/` (no space) triggers regex lexing; `r /` (with space) is identifier then division.
+Underscores in numeric literals are ignored: `1_000_000`, `0xff_ff`. `?` appears at most once, only as the final character of an identifier. `'` can appear in identifiers for mutating variants (`sort'`).
 
 ## String Escapes
 
@@ -123,6 +123,8 @@ binding     = "+"? IDENT "=" expr
             | IDENT ":=" expr
             | IDENT "<-" expr
             | pattern "=" expr
+            | "Protocol" TYPE "=" "{" proto_field* "}"
+            | "MCP" TYPE "=" "{" mcp_tool* "}"
 
 type_def    = "{" field_type* "}"
             | ("|" TYPE type*)+
@@ -141,7 +143,6 @@ expr        = literal | IDENT | TYPE | section
             | prefix expr
             | "{" (stmt SEP)* "}"
             | "$" shell_line
-            | "$$" shell_line
             | "$^" shell_line
             | "${" shell_block "}"
             | "par" "{" (stmt SEP)* "}"
@@ -149,11 +150,16 @@ expr        = literal | IDENT | TYPE | section
             | "assert" expr expr?
             | "loop" "{" (stmt SEP)* "}"
             | "break" expr?
+            | "yield" expr
+            | "with" IDENT "=" expr "{" (stmt SEP)* "}"
+            | "with" IDENT ":=" expr "{" (stmt SEP)* "}"
+            | expr "~>" expr
+            | expr "~>?" expr
+            | IDENT ("." IDENT)+ "<-" expr
             | "(" params ")" expr
-            | REGEX
 
 binop       = "+" | "-" | "*" | "/" | "%" | "//"
-            | "++" | "<>"
+            | "++" | "~>" | "~>?"
             | "==" | "!=" | "<" | ">" | "<=" | ">="
             | "&&" | "||"
             | "??" | ".." | "..="
@@ -190,7 +196,6 @@ type        = TYPE
             | "[" type "]"
             | "{" field_type* "}"
             | "%{" type ":" type "}"
-            | "#{" type "}"
             | "(" type* ")"
             | type "->" type
             | type "^" type
@@ -198,12 +203,11 @@ type        = TYPE
 
 field_type  = IDENT ":" type
 
-literal     = INT | FLOAT | STR | RAW_STR | REGEX
+literal     = INT | FLOAT | STR | RAW_STR
             | "true" | "false" | "()"
             | "[" expr* "]"
             | "{" field* "}"
             | "%{" map_entry* "}"
-            | "#{" expr* "}"
             | "(" expr expr+ ")"
 
 field       = IDENT (":" expr)? | ".." expr
@@ -215,7 +219,6 @@ map_entry   = expr ":" expr | ".." expr
 - `;` and newline are interchangeable statement separators.
 - `+` before a top-level binding marks it as exported.
 - `$^` is a single token (error-propagating shell prefix).
-- `r/` (no space) triggers regex lexing mode; `r /` is identifier then division.
 - `?` at end of identifier (`empty?`) is part of the identifier; `expr ?` (with space) is the match operator.
 - `'` in identifiers (`sort'`) marks mutating variants; part of the `IDENT` production.
 - `()` is unit (the only 0-tuple). `(expr)` is grouping. `(expr expr+)` is a tuple.
@@ -225,3 +228,7 @@ map_entry   = expr ":" expr | ".." expr
 - Tuple auto-spread: when a function with N params receives a single N-tuple argument, the tuple is spread. This is a runtime behavior, not a grammar production.
 - Named arguments (`name: value`) at call sites are disambiguated from record fields by context: inside `{ }` they are record fields, in application position they are named arguments. Named args can only follow positional args.
 - `../` in module paths is a single token (parent directory reference), not separate `.` `.` `/` tokens.
+- `yield expr` suspends the current script and sends `expr` to the orchestrator. Execution resumes when the orchestrator provides a response.
+- `with name = expr { body }` binds `name` to `expr` for the duration of `body` (immutable). `with name := expr { body }` is the mutable variant.
+- `Protocol TypeName = { ... }` defines a typed protocol (set of message/response pairs). `MCP TypeName = { ... }` defines an MCP tool declaration.
+- `~>` sends a message to an agent synchronously. `~>?` sends a message and returns `Ok result` or `Err error` instead of propagating failures.

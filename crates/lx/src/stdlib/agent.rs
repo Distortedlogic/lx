@@ -1,10 +1,8 @@
-use std::collections::HashMap;
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, LazyLock};
 
-use std::sync::Arc;
-
+use dashmap::DashMap;
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 
@@ -20,10 +18,7 @@ struct AgentProcess {
     stdout: BufReader<ChildStdout>,
 }
 
-fn registry() -> &'static Mutex<HashMap<u32, AgentProcess>> {
-    static REG: OnceLock<Mutex<HashMap<u32, AgentProcess>>> = OnceLock::new();
-    REG.get_or_init(|| Mutex::new(HashMap::new()))
-}
+static REGISTRY: LazyLock<DashMap<u32, AgentProcess>> = LazyLock::new(DashMap::new);
 
 pub fn build() -> IndexMap<String, Value> {
     let mut m = IndexMap::new();
@@ -72,9 +67,7 @@ fn bi_spawn(args: &[Value], span: Span) -> Result<Value, LxError> {
     let stdout = BufReader::new(child.stdout.take()
         .ok_or_else(|| LxError::runtime("agent.spawn: no stdout pipe", span))?);
     let pid = child.id();
-    let mut reg = registry().lock()
-        .map_err(|e| LxError::runtime(format!("agent registry lock: {e}"), span))?;
-    reg.insert(pid, AgentProcess { _child: child, stdin, stdout });
+    REGISTRY.insert(pid, AgentProcess { _child: child, stdin, stdout });
     let mut rec = IndexMap::new();
     rec.insert("__pid".into(), Value::Int(BigInt::from(pid)));
     rec.insert("name".into(), Value::Str(Arc::from(name.as_str())));
@@ -85,9 +78,7 @@ pub fn ask_subprocess(pid: u32, msg: &Value, span: Span) -> Result<Value, LxErro
     let json = json_conv::lx_to_json(msg, span)?;
     let json_str = serde_json::to_string(&json)
         .map_err(|e| LxError::runtime(format!("agent.ask: JSON encode: {e}"), span))?;
-    let mut reg = registry().lock()
-        .map_err(|e| LxError::runtime(format!("agent registry lock: {e}"), span))?;
-    let agent = reg.get_mut(&pid)
+    let mut agent = REGISTRY.get_mut(&pid)
         .ok_or_else(|| LxError::runtime(format!("agent.ask: agent {pid} not found"), span))?;
     writeln!(agent.stdin, "{json_str}")
         .map_err(|e| LxError::runtime(format!("agent.ask: write error: {e}"), span))?;
@@ -111,9 +102,7 @@ pub fn send_subprocess(pid: u32, msg: &Value, span: Span) -> Result<Value, LxErr
     let json = json_conv::lx_to_json(msg, span)?;
     let json_str = serde_json::to_string(&json)
         .map_err(|e| LxError::runtime(format!("agent.send: JSON encode: {e}"), span))?;
-    let mut reg = registry().lock()
-        .map_err(|e| LxError::runtime(format!("agent registry lock: {e}"), span))?;
-    let agent = reg.get_mut(&pid)
+    let mut agent = REGISTRY.get_mut(&pid)
         .ok_or_else(|| LxError::runtime(format!("agent.send: agent {pid} not found"), span))?;
     writeln!(agent.stdin, "{json_str}")
         .map_err(|e| LxError::runtime(format!("agent.send: write: {e}"), span))?;
@@ -134,10 +123,8 @@ fn bi_send(args: &[Value], span: Span) -> Result<Value, LxError> {
 
 fn bi_kill(args: &[Value], span: Span) -> Result<Value, LxError> {
     let pid = get_pid(&args[0], span)?;
-    let mut reg = registry().lock()
-        .map_err(|e| LxError::runtime(format!("agent registry lock: {e}"), span))?;
-    match reg.remove(&pid) {
-        Some(mut agent) => {
+    match REGISTRY.remove(&pid) {
+        Some((_, mut agent)) => {
             let _ = agent._child.kill();
             let _ = agent._child.wait();
             Ok(Value::Ok(Box::new(Value::Unit)))
@@ -157,9 +144,7 @@ fn bi_name(args: &[Value], span: Span) -> Result<Value, LxError> {
 
 fn bi_status(args: &[Value], span: Span) -> Result<Value, LxError> {
     let pid = get_pid(&args[0], span)?;
-    let reg = registry().lock()
-        .map_err(|e| LxError::runtime(format!("agent registry lock: {e}"), span))?;
-    let state = if reg.contains_key(&pid) { "running" } else { "stopped" };
+    let state = if REGISTRY.contains_key(&pid) { "running" } else { "stopped" };
     let mut rec = IndexMap::new();
     rec.insert("state".into(), Value::Str(Arc::from(state)));
     rec.insert("pid".into(), Value::Int(BigInt::from(pid)));

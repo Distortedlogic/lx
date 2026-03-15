@@ -1,0 +1,39 @@
+{
+  "name": "lx-lang",
+  "displayName": "lx",
+  "description": "Language support for the lx agentic workflow language",
+  "version": "0.1.0",
+  "publisher": "lx-lang",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": ["Programming Languages"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "lx",
+        "aliases": ["lx", "LX"],
+        "extensions": [".lx"],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/lx-icon-light.svg",
+          "dark": "./icons/lx-icon-dark.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "lx",
+        "scopeName": "source.lx",
+        "path": "./syntaxes/lx.tmLanguage.json"
+      }
+    ],
+    "iconThemes": [
+      {
+        "id": "lx-icons",
+        "label": "lx File Icons",
+        "path": "./icons/lx-icon-theme.json"
+      }
+    ]
+  }
+}

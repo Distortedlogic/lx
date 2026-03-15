@@ -3,7 +3,6 @@ use std::sync::Arc;
 use num_traits::ToPrimitive;
 
 use crate::ast::{SExpr, Param, Expr, Spanned, Section, FieldKind};
-use crate::value::ProtoFieldDef;
 use crate::error::LxError;
 use crate::span::Span;
 use crate::value::{LxFunc, Value};
@@ -18,7 +17,7 @@ impl Interpreter {
           && lf.arity == 0 && lf.applied.is_empty() {
             let saved = Arc::clone(&self.env);
             self.env = Arc::clone(&lf.closure);
-            let result = self.eval_func_body(&lf.body, lf.returns_result);
+            let result = self.eval(&lf.body);
             self.env = saved;
             return match result {
               Err(LxError::Propagate { value, .. }) => Ok(*value),
@@ -45,7 +44,7 @@ impl Interpreter {
           }
         }
         self.env = call_env.into_arc();
-        let result = self.eval_func_body(&lf.body, lf.returns_result);
+        let result = self.eval(&lf.body);
         self.env = saved;
         match result {
           Err(LxError::Propagate { value, .. }) => Ok(*value),
@@ -68,6 +67,7 @@ impl Interpreter {
         }
       },
       Value::Protocol { name, fields } => self.apply_protocol(&name, &fields, &arg, span),
+      Value::McpDecl { name, tools } => self.apply_mcp_decl(&name, &tools, &arg, span),
       other => Err(LxError::type_err(format!("cannot call {}, not a function", other.type_name()), span)),
     }
   }
@@ -87,7 +87,7 @@ impl Interpreter {
             }
           }
           self.env = call_env.into_arc();
-          let result = self.eval_func_body(&lf.body, lf.returns_result);
+          let result = self.eval(&lf.body);
           self.env = saved;
           match result {
             Err(LxError::Propagate { value, .. }) => Ok(*value),
@@ -128,44 +128,7 @@ impl Interpreter {
     }
   }
 
-  fn eval_func_body(&mut self, body: &SExpr, returns_result: bool) -> Result<Value, LxError> {
-    if returns_result {
-      if let Expr::Block(stmts) = &body.node {
-        let saved = Arc::clone(&self.env);
-        self.env = Arc::new(self.env.child());
-        let mut result = Value::Unit;
-        for stmt in stmts {
-          result = self.eval_stmt_checking_err(stmt)?;
-          if matches!(&result, Value::Err(_)) {
-            self.env = saved;
-            return Ok(result);
-          }
-        }
-        self.env = saved;
-        if matches!(&result, Value::Ok(_) | Value::Err(_)) {
-          Ok(result)
-        } else {
-          Ok(Value::Ok(Box::new(result)))
-        }
-      } else {
-        let result = self.eval(body)?;
-        if matches!(&result, Value::Ok(_) | Value::Err(_)) {
-          Ok(result)
-        } else {
-          Ok(Value::Ok(Box::new(result)))
-        }
-      }
-    } else {
-      self.eval(body)
-    }
-  }
-
-  fn eval_stmt_checking_err(&mut self, stmt: &crate::ast::SStmt) -> Result<Value, LxError> {
-    let val = self.eval_stmt(stmt)?;
-    Ok(val)
-  }
-
-  pub(super) fn eval_func(&mut self, params: &[Param], body: &SExpr, returns_result: bool) -> Result<Value, LxError> {
+  pub(super) fn eval_func(&mut self, params: &[Param], body: &SExpr) -> Result<Value, LxError> {
     let param_names: Vec<String> = params.iter().map(|p| p.name.clone()).collect();
     let defaults: Vec<Option<Value>> = params
       .iter()
@@ -179,6 +142,7 @@ impl Interpreter {
               source_dir: self.source_dir.clone(),
               module_cache: Arc::clone(&self.module_cache),
               loading: Arc::clone(&self.loading),
+              yield_handler: self.yield_handler.clone(),
             };
             tmp.eval(d)
           })
@@ -186,7 +150,7 @@ impl Interpreter {
       })
       .collect::<Result<_, _>>()?;
     let arity = params.len();
-    Ok(Value::Func(LxFunc { params: param_names, defaults, body: Arc::new(body.clone()), closure: Arc::clone(&self.env), arity, applied: vec![], returns_result }))
+    Ok(Value::Func(LxFunc { params: param_names, defaults, body: Arc::new(body.clone()), closure: Arc::clone(&self.env), arity, applied: vec![] }))
   }
 
   fn make_section_func(&self, param: &str, body_expr: Expr, span: Span) -> Value {
@@ -198,7 +162,6 @@ impl Interpreter {
       closure: Arc::clone(&self.env),
       arity: 1,
       applied: vec![],
-      returns_result: false,
     })
   }
 
@@ -240,10 +203,8 @@ impl Interpreter {
       closure: Arc::clone(&self.env),
       arity: 2,
       applied: vec![],
-      returns_result: false,
     })
   }
-
 
   pub(super) fn eval_field_access(&mut self, expr: &SExpr, field: &FieldKind, span: Span) -> Result<Value, LxError> {
     let val = self.eval(expr)?;
@@ -280,39 +241,6 @@ impl Interpreter {
         }
       },
     }
-  }
-
-  fn apply_protocol(&mut self, name: &str, fields: &Arc<Vec<ProtoFieldDef>>, arg: &Value, span: Span) -> Result<Value, LxError> {
-    let Value::Record(rec) = arg else {
-      return Err(LxError::runtime(
-        format!("Protocol {name}: expected Record, got {}", arg.type_name()),
-        span,
-      ));
-    };
-    let mut result = rec.as_ref().clone();
-    for field in fields.iter() {
-      match rec.get(&field.name) {
-        Some(val) => {
-          if field.type_name != "Any" && val.type_name() != field.type_name {
-            return Err(LxError::runtime(
-              format!("Protocol {name}: field '{}' expected {}, got {}", field.name, field.type_name, val.type_name()),
-              span,
-            ));
-          }
-        },
-        None => {
-          if let Some(ref default) = field.default {
-            result.insert(field.name.clone(), default.clone());
-          } else {
-            return Err(LxError::runtime(
-              format!("Protocol {name}: missing required field '{}'", field.name),
-              span,
-            ));
-          }
-        },
-      }
-    }
-    Ok(Value::Record(Arc::new(result)))
   }
 
   pub(super) fn eval_ternary(&mut self, cond: &SExpr, then_: &SExpr, else_: &Option<Box<SExpr>>, span: Span) -> Result<Value, LxError> {

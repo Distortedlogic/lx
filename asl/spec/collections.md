@@ -1,6 +1,6 @@
 # Collections
 
-Lists, records, maps, sets, and tuples — their literals, access patterns, and operations.
+Lists, records, maps, and tuples — their literals, access patterns, and operations.
 
 ## Literals
 
@@ -8,7 +8,6 @@ Lists, records, maps, sets, and tuples — their literals, access patterns, and 
 xs = [1 2 3 4 5]              -- list (ordered, homogeneous)
 p = {x: 3.0  y: 4.0}          -- record (ordered name-value pairs)
 m = %{"alice": 1  "bob": 2}   -- map (arbitrary keys)
-s = #{1 2 3}                   -- set (unordered, unique)
 t = (1 "hello" true)           -- tuple (fixed-size, heterogeneous)
 ```
 
@@ -104,30 +103,6 @@ Spread works like records:
 ```
 %{..m  "carol": 3}   -- merge
 ```
-
-## Sets
-
-Unordered, unique values. Prefixed with `#`.
-
-```
-s = #{1 2 3 4 5}
-contains? 3 s         -- true
-#{..a ..b}            -- union via spread
-```
-
-Set operations:
-
-```
-a = #{1 2 3}
-b = #{2 3 4}
-intersect a b         -- #{2 3}
-difference a b        -- #{1}
-sym_diff a b          -- #{1 4}
-is_subset? a b        -- false
-is_superset? a b      -- false
-```
-
-Sets are iterable — they work with `map`, `filter`, `fold`, and other pipeline functions. The iteration order is not guaranteed.
 
 ## Tuples
 
@@ -229,15 +204,13 @@ to_map record         -- {x: 1  y: 2} -> %{"x": 1  "y": 2}
 to_map entries        -- [("a" 1) ("b" 2)] -> %{"a": 1  "b": 2}
 to_record map         -- %{"x": 1  "y": 2} -> {x: 1  y: 2} (keys must be valid identifiers)
 to_list map           -- %{"a": 1} -> [("a" 1)]
-to_list set           -- #{1 2 3} -> [1 2 3] (order not guaranteed)
-to_set list           -- [1 2 2 3] -> #{1 2 3}
 ```
 
 `to_record` fails at runtime if any map key is not a valid identifier (starts with `[a-z_]`, contains only `[a-z0-9_]`).
 
 ## Collection Size Limits
 
-No artificial limits. Lists, maps, and sets grow as needed, bounded only by available memory. For large datasets that don't fit in memory, use lazy sequences with streaming pipelines.
+No artificial limits. Lists and maps grow as needed, bounded only by available memory.
 
 ## Cross-References
 

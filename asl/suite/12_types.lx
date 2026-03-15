@@ -1,37 +1,33 @@
 -- 12_types.lx
--- Tests: spec/types.md (annotations, structural subtyping, tagged unions, generics)
--- Phase: 7 (Modules + Type Checker)
+-- Tests: type definitions, tagged unions, pattern matching on types
+-- Phase: 7 (Modules + Type Definitions)
 
--- type annotations on function parameters and return
-add = (x:Int y:Int) -> Int  x + y
+-- functions without type annotations
+add = (x y) x + y
 assert (add 3 4 == 7)
 
-double = (x:Float) -> Float  x * 2.0
+double = (x) x * 2.0
 assert (double 3.5 == 7.0)
 
-greet = (name:Str) -> Str  "hello {name}"
+greet = (name) "hello {name}"
 assert (greet "alice" == "hello alice")
 
--- multi-param with mixed annotation
-weighted_sum = (a:Int b:Int w:Float) -> Float  (a + b) * w
-assert (weighted_sum 3 7 2.0 == 20.0)
-
--- record type definition
+-- record as value
 Point = {x: Float  y: Float}
 
-origin : Point = {x: 0.0  y: 0.0}
+origin = {x: 0.0  y: 0.0}
 assert (origin.x == 0.0)
 assert (origin.y == 0.0)
 
--- structural subtyping: extra fields satisfy smaller type
-greet_thing = (thing: {name: Str}) -> Str  "hello {thing.name}"
+-- structural subtyping via duck typing
+greet_thing = (thing) "hello {thing.name}"
 assert (greet_thing {name: "alice"} == "hello alice")
 assert (greet_thing {name: "bob"  age: 30} == "hello bob")
 assert (greet_thing {name: "carol"  email: "c@x.com"  role: "admin"} == "hello carol")
 
--- record with extra fields satisfies Point
+-- record with extra fields
 p3d = {x: 1.0  y: 2.0  z: 3.0}
-dist_sq = (p: Point) -> Float  p.x * p.x + p.y * p.y
+dist_sq = (p) p.x * p.x + p.y * p.y
 assert (dist_sq p3d == dist_sq {x: 1.0  y: 2.0})
 
 -- tagged union definition
@@ -44,7 +40,7 @@ c = Circle 5.0
 r = Rect 3.0 4.0
 d = Dot
 
-area = (s: Shape) -> Float  s ? {
+area = (s) s ? {
   Circle r    -> 3.14159 * r * r
   Rect w h    -> w * h
   Dot         -> 0.0
@@ -61,17 +57,17 @@ Entity =
 hero = Player {name: "Ada"  hp: 100}
 villager = NPC {name: "Bob"  dialog: "Welcome!"}
 
-get_name = (e: Entity) -> Str  e ? {
+get_name = (e) e ? {
   Player {name ..} -> name
   NPC {name ..}    -> name
 }
 assert (get_name hero == "Ada")
 assert (get_name villager == "Bob")
 
--- generic types
+-- generic tagged union
 Pair a b = {fst: a  snd: b}
 
-p : Pair Int Str = {fst: 42  snd: "hello"}
+p = {fst: 42  snd: "hello"}
 assert (p.fst == 42)
 assert (p.snd == "hello")
 
@@ -80,67 +76,39 @@ Tree a = | Leaf a | Node (Tree a) (Tree a)
 
 t = Node (Leaf 1) (Node (Leaf 2) (Leaf 3))
 
-tree_sum = (t: Tree Int) -> Int  t ? {
+tree_sum = (t) t ? {
   Leaf v       -> v
   Node l r     -> tree_sum l + tree_sum r
 }
 assert (tree_sum t == 6)
 
-tree_map = (f: a -> b  t: Tree a) -> (Tree b)  t ? {
+tree_map = (f t) t ? {
   Leaf v     -> Leaf (f v)
   Node l r   -> Node (tree_map f l) (tree_map f r)
 }
 doubled = tree_map (* 2) t
 assert (tree_sum doubled == 12)
 
--- type aliases are structural (interchangeable)
-Velocity = {x: Float  y: Float}
-pt : Point = {x: 1.0  y: 2.0}
-vel : Velocity = pt
-assert (vel.x == 1.0)
-assert (vel.y == 2.0)
-
-scale_point = (p: Point  s: Float) -> Point  {x: p.x * s  y: p.y * s}
-v : Velocity = {x: 3.0  y: 4.0}
-scaled = scale_point v 2.0
-assert (scaled.x == 6.0)
-assert (scaled.y == 8.0)
-
--- Result/Maybe type annotations with ^
-safe_div = (a:Float b:Float) -> Float ^ Str {
-  b == 0.0 ? {
-    true  -> Err "division by zero"
-    false -> Ok (a / b)
-  }
-}
-assert (safe_div 10.0 2.0 == Ok 5.0)
-assert (safe_div 1.0 0.0 == Err "division by zero")
-
--- implicit Ok wrapping in annotated functions
-inc = (x:Int) -> Int ^ Str  x + 1
-assert (inc 5 == Ok 6)
-
--- function types in annotations
-apply = (f: Int -> Int  x: Int) -> Int  f x
+-- higher-order functions
+apply = (f x) f x
 assert (apply (+ 1) 5 == 6)
 assert (apply (* 3) 4 == 12)
 
-compose = (f: b -> c  g: a -> b) -> (a -> c)  (x) x | g | f
+compose = (f g) {
+  (x) x | g | f
+}
 inc_then_double = compose (* 2) (+ 1)
 assert (inc_then_double 3 == 8)
 
-higher = (f: (Int -> Int) -> Int  g: Int -> Int) -> Int  f g
-assert (higher ((fn) fn 10) (+ 5) == 15)
-
--- empty collection type annotation
-xs : [Int] = []
+-- empty collections
+xs = []
 assert (len xs == 0)
 assert (xs == [])
 
-ys : [Str] = []
+ys = []
 assert (empty? ys)
 
-m : %{Str: Int} = %{}
+m = %{}
 assert (len m == 0)
 
 -- recursive type (Json)
@@ -154,7 +122,7 @@ Json =
 
 j = JObj %{"name": JStr "lx"  "version": JNum 1.0  "tags": JArr [JStr "lang" JStr "script"]}
 
-json_to_str = (j: Json) -> Str  j ? {
+json_to_str = (j) j ? {
   JNull      -> "null"
   JBool b    -> b ? { true -> "true"; false -> "false" }
   JNum n     -> to_str n
@@ -167,17 +135,12 @@ assert (json_to_str (JBool true) == "true")
 assert (json_to_str (JStr "hi") == "hi")
 assert (json_to_str (JArr [JNum 1.0 JNum 2.0]) == "[2 items]")
 
--- variant constructor uniqueness:
--- two tagged unions in the same module cannot share variant names
--- e.g. `Foo = | X Int` and `Bar = | X Str` is a compile error
--- (not testable at runtime, static check only)
-
--- standalone type annotation on binding
-count : Int = 42
+-- standalone bindings
+count = 42
 assert (count == 42)
 
-name : Str = "lx"
+name = "lx"
 assert (name == "lx")
 
-total : Int = [1 2 3 4 5] | sum
+total = [1 2 3 4 5] | sum
 assert (total == 15)

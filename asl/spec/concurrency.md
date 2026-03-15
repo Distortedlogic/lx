@@ -180,9 +180,9 @@ xs | pmap (x) {
 
 ## Runtime Model
 
-Concurrent tasks (`par`, `sel`, `pmap`) run on a work-stealing thread pool. The number of threads defaults to the CPU core count but can be set with `LX_THREADS` env var.
+**Current implementation**: `par`, `sel`, and `pmap` execute sequentially — statements run one at a time. This simplifies the interpreter but means no actual parallelism. Real concurrent execution via `tokio` is planned for a future phase.
 
-I/O operations (`fs.read`, `http.get`, shell commands) use async I/O internally — a blocking I/O call in one concurrent task does not block other tasks. The synchronous API is a convenience; under the hood, the runtime schedules I/O cooperatively.
+The `LX_THREADS` env var is reserved for future concurrent execution.
 
 ## Cross-References
 

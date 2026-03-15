@@ -8,70 +8,45 @@ See [agents.md](agents.md) for patterns and design rationale. See [stdlib-module
 
 ```
 spawn config              -- Agent ^ AgentErr
-                          --   config: {name prompt model? tools? context? timeout?}
-connect uri               -- Agent ^ AgentErr (connect to running agent)
-kill agent                -- () ^ AgentErr (terminate agent)
-
-send agent msg            -- () (fire-and-forget, msg is any value)
-ask agent msg             -- a ^ AgentErr (request-response, blocks until reply)
-ask_with opts agent msg   -- a ^ AgentErr (opts: {timeout: Duration  retries: Int})
-
-submit agent msg          -- Task ^ AgentErr (async task, returns handle)
-poll interval task        -- lazy [Status] (periodic status checks)
-                          --   Status = {state: Str  progress: Maybe Float  result: Maybe a}
-await_task task           -- a ^ AgentErr (block until task completes)
-cancel task               -- () ^ AgentErr
-
-channel agent             -- Channel ^ AgentErr (open persistent dialogue)
-ch_send ch msg            -- () ^ AgentErr
-ch_recv ch                -- a ^ AgentErr (blocks until message received)
-ch_recv_timeout dur ch    -- Maybe a ^ AgentErr
-ch_close ch               -- ()
-
-name agent                -- Str
-status agent              -- {state: Str  uptime: Duration}
+                          --   config: {command: Str  args: [Str]}
+kill agent                -- () ^ AgentErr (terminate subprocess)
 ```
 
-`Agent`, `Task`, and `Channel` are opaque types.
+Subprocess agents communicate via JSON-line protocol over stdin/stdout. Use `~>` (send, fire-and-forget) and `~>?` (ask, request-response) as infix operators on agents with a `__pid` field.
+
+`Agent` is an opaque type.
 
 `AgentErr` variants:
 ```
-AgentErr = | SpawnFailed Str | Timeout | Disconnected | TaskFailed Str | ChannelClosed
+AgentErr = | SpawnFailed Str | Timeout | Disconnected
 ```
 
 ### Patterns
 
 Parallel fan-out:
 ```
-agents | pmap (a) agent.ask a {action: "process"} ^
+agents | pmap (a) a ~>? {action: "process"} ^
 ```
 
 Race with fallback:
 ```
 sel {
-  agent.ask primary req   -> it
-  agent.ask secondary req -> it
-  timeout 30              -> Err "all agents timed out"
+  primary ~>? req   -> it
+  secondary ~>? req -> it
+  timeout 30        -> Err "all agents timed out"
 }
 ```
 
 ## std/mcp — Model Context Protocol
 
 ```
-connect uri               -- McpClient ^ McpErr
-                          --   uri: "stdio:///path" | "http://host:port" | "sse://host:port"
+connect target            -- McpClient ^ McpErr
+                          --   target: {command: Str  args: [Str]} (stdio)
+                          --         | Str (HTTP URL)
 close client              -- ()
 
 list_tools client         -- [{name: Str  description: Str  schema: a}] ^ McpErr
 call client tool args     -- a ^ McpErr (invoke tool by name with args record)
-call_with opts client tool args
-                          -- a ^ McpErr (opts: {timeout: Duration})
-
-list_resources client     -- [{uri: Str  name: Str  mime: Str}] ^ McpErr
-read_resource client uri  -- {content: Str  mime: Str} ^ McpErr
-
-list_prompts client       -- [{name: Str  description: Str  args: [Str]}] ^ McpErr
-get_prompt client name args -- {messages: [{role: Str  content: Str}]} ^ McpErr
 ```
 
 `McpClient` is an opaque type. `McpErr` variants:
@@ -83,7 +58,7 @@ McpErr = | ConnectionFailed Str | ToolNotFound Str | ToolError Str | Timeout | P
 
 Tool discovery and invocation:
 ```
-client = mcp.connect "stdio:///usr/local/bin/server" ^
+client = mcp.connect {command: "server" args: []} ^
 tools = mcp.list_tools client ^
 tools | filter (t) contains? "file" t.name | each (t) $echo "{t.name}: {t.description}"
 result = mcp.call client "read_file" {path: "src/main.rs"} ^
@@ -92,8 +67,8 @@ result = mcp.call client "read_file" {path: "src/main.rs"} ^
 Multi-server orchestration:
 ```
 (fs_client code_client) = par {
-  mcp.connect "stdio:///fs-server" ^
-  mcp.connect "stdio:///code-server" ^
+  mcp.connect {command: "fs-server" args: []} ^
+  mcp.connect {command: "code-server" args: []} ^
 }
 files = mcp.call fs_client "list_dir" {path: "src/"} ^
 files | pmap (f) mcp.call code_client "analyze" {path: f.path}
@@ -193,30 +168,10 @@ md.doc [
 ] | md.render | (out) fs.write "deploy-report.md" out ^
 ```
 
-## std/cron — Scheduling
-
-Recurring task execution for long-running agent processes.
-
-```
-every interval f          -- Handle (run f every interval)
-at cron_expr f            -- Handle (cron expression: "0 */5 * * *")
-cancel handle             -- ()
-```
-
-```
-use std/cron
-health_check = cron.every (time.min 5) () {
-  status = agent.ask monitor {action: "check"} ^
-  status.healthy ? () : agent.send alerter {severity: "warn" msg: status.msg}
-}
--- later: cron.cancel health_check
-```
-
 ## Cross-References
 
 - Agent patterns and design: [agents.md](agents.md)
 - Concurrency primitives: [concurrency.md](concurrency.md)
 - Core stdlib modules: [stdlib-modules.md](stdlib-modules.md)
-- Data ecosystem: [stdlib-data.md](stdlib-data.md)
 - Built-in functions: [stdlib.md](stdlib.md)
 - Implementation: [implementation-phases.md](../impl/implementation-phases.md) (Phase 12)

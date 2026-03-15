@@ -1,0 +1,54 @@
+-- GOAL: Performance analysis via 5 parallel domain specialists.
+-- Orchestrator (code-perf) fans out to: perf-db, perf-memory, perf-compute, perf-threading, perf-network.
+-- Each specialist analyzes its domain, returns findings with severity + location + fix.
+-- Aggregation: collect findings, resolve conflicts (same location, different fixes), prioritize.
+-- Source: mcp-toolbelt/arch_diagrams/scenario_perf_analysis
+
+use std/agent
+use std/json
+
+Protocol PerfRequest = {path: Str  concern: Str}
+Protocol PerfFinding = {domain: Str  severity: Str  location: Str  issue: Str  fix: Str}
+
+domains = ["db" "memory" "compute" "threading" "network"]
+
++main = () {
+  request = PerfRequest {path: "src/" concern: "high latency on API endpoints"}
+
+  specialists = domains | map (d) {
+    agent.spawn {command: "lx" args: ["run" "agents/perf_{d}.lx"]} ^
+  }
+
+  results = specialists
+    | zip domains
+    | pmap (agent, domain) {
+      agent ~>? {path: request.path concern: request.concern domain: domain} ^
+    }
+
+  findings = results | flat_map (.findings)
+    | sort_by (.severity)
+    | rev
+
+  conflicts = find_conflicts findings
+  conflicts | each (c) {
+    $echo "CONFLICT: {c.a.domain} says '{c.a.fix}' but {c.b.domain} says '{c.b.fix}'"
+  }
+
+  $echo "\n=== Performance Analysis ==="
+  $echo "Concern: {request.concern}"
+  $echo "Findings: {findings | len}"
+  findings | each (f) {
+    $echo "[{f.severity}] {f.domain}: {f.location} — {f.issue}"
+    $echo "  Fix: {f.fix}"
+  }
+
+  specialists | each (a) agent.kill a ^
+}
+
+find_conflicts = (findings) {
+  findings | flat_map (a) {
+    findings | filter (b) {
+      a.location == b.location && a.domain != b.domain && a.fix != b.fix
+    } | map (b) {conflict: true  a: a  b: b}
+  }
+}

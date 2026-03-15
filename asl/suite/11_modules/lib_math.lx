@@ -14,4 +14,4 @@ helper = (x) x * 2
 
 +Point = {x: Float  y: Float}
 
-+origin : Point = {x: 0.0  y: 0.0}
++origin = {x: 0.0  y: 0.0}

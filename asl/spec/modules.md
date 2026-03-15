@@ -8,7 +8,7 @@ File = module. Every `.lx` file is a module. No explicit module declarations.
 
 ```
 use std/fs                 -- import entire module
-use std/net/http           -- nested module
+use std/http               -- HTTP module
 use std/fs {read write}    -- selective import
 use ./util                 -- relative path (same directory)
 use ../shared/types        -- relative path (parent directory)
@@ -17,7 +17,7 @@ use ../shared/types        -- relative path (parent directory)
 Aliasing with `:`:
 
 ```
-use std/net/http : h       -- h.get, h.post, etc.
+use std/http : h           -- h.get, h.post, etc.
 use std/fs : f             -- f.read, f.write, etc.
 ```
 
@@ -52,7 +52,7 @@ write "out.txt" content ^
 
 ## Package Management
 
-Stdlib: `use std/...` — always available, no configuration needed. This includes core modules (fs, http, json) and agent modules (agent, mcp, ctx, md, cron).
+Stdlib: `use std/...` — always available, no configuration needed. This includes core modules (fs, http, json, math, env, re, time) and agent modules (agent, mcp, ctx, md).
 
 Local: `use ./path` and `use ../path` — relative to the current file.
 
@@ -62,7 +62,7 @@ External deps: Declared in `pkg.lx` at the project root (like `Cargo.toml` but i
 -- pkg.lx
 deps = {
   http_client: {url: "https://pkg.lx/http/v2"  hash: "sha256:abc123"}
-  csv: {url: "https://pkg.lx/csv/v1"  hash: "sha256:def456"}
+  utils: {url: "https://pkg.lx/utils/v1"  hash: "sha256:def456"}
 }
 ```
 
@@ -70,7 +70,7 @@ External deps are imported by their declared name:
 
 ```
 use http_client
-use csv
+use utils
 ```
 
 ## Variant Constructor Scoping

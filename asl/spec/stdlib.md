@@ -32,17 +32,6 @@ some? m       -- is the Maybe a Some?
 sorted? xs    -- is the list sorted?
 ```
 
-**Mutating suffix `'`** — functions that modify in place:
-
-```
-sort xs     -- returns new sorted list
-sort' xs    -- sorts in place (xs must be mutable)
-rev xs      -- returns new reversed list
-rev' xs     -- reverses in place
-```
-
-Mutation is rare. Only use `'` variants in performance-critical inner loops where allocation matters.
-
 ## Built-in Functions
 
 Always in scope. No `use` required.
@@ -52,7 +41,7 @@ Always in scope. No `use` required.
 ```
 dbg x          -- prints [file:line] x = <value> to stderr, returns x
 tap f x        -- applies (f x) for side effects, returns x
-collect xs     -- forces lazy sequence into concrete list
+collect xs     -- converts iterable into list
 identity x     -- returns x unchanged
 not x          -- logical negation: not true = false
 defer f        -- registers f for execution on scope exit (LIFO order)
@@ -104,27 +93,12 @@ to_list m          -- convert map to [(k v)]
 
 Maps are iterable — `map`, `filter`, `each` iterate over `(key value)` tuples.
 
-### Set Functions
-
-```
-intersect a b      -- elements in both sets
-difference a b     -- elements in a but not b
-sym_diff a b       -- elements in exactly one set
-is_subset? a b     -- every element of a is in b
-is_superset? a b   -- every element of b is in a
-to_set xs          -- convert list to set (dedup)
-to_list s          -- convert set to list (order not guaranteed)
-```
-
 ### Sequence Constructors
 
 ```
-nat                -- infinite lazy sequence: 0 1 2 3 ...
-cycle xs           -- infinite lazy repetition of xs
-step n xs          -- take every nth element from sequence
+cycle xs           -- repeating list of xs
+step n xs          -- take every nth element from list
 ```
-
-See [iteration.md](iteration.md) for custom sequence constructors via the iterator protocol.
 
 ### Concurrent Functions
 
@@ -140,8 +114,7 @@ pmap_n limit f xs  -- parallel map with concurrency limit
 ```
 to_map x           -- record or [(k v)] to map
 to_record m        -- map to record (keys must be valid identifiers)
-to_set xs          -- list to set
-to_list x          -- map, set, or iterable to list
+to_list x          -- map or iterable to list
 parse_int s        -- Str -> Result Int ParseErr
 parse_float s      -- Str -> Result Float ParseErr
 to_str x           -- any value to Str
@@ -248,45 +221,40 @@ replace_all old new s  -- replace all (string or regex)
 repeat n s             -- repeat n times
 chars s                -- list of codepoint strings
 byte_len s             -- byte count
-pad_left width s       -- pad with spaces (also in std/fmt)
+pad_left width s       -- pad with spaces
 pad_right width s      -- pad with spaces
 ```
 
 `contains?`, `starts?`, `ends?` are polymorphic — they work on both strings and collections.
 
-### Regex Functions
+### Regex Functions (std/re)
 
-Available both as standalone functions and via `r/pattern/` literals:
+Use `std/re` for pattern matching with string patterns:
 
 ```
-match regex s          -- Maybe [Str]: full match + capture groups
-test regex s           -- Bool: does it match?
-replace regex new s    -- replace first match
-replace_all regex new s-- replace all matches
-split regex s          -- split on matches
+use std/re
+re.is_match "\\d+" text       -- Bool: does it match?
+re.match "(\\w+)" text         -- Maybe {match groups}: capture groups
+re.replace "old" "new" text    -- replace first match
+re.replace_all "old" "new" text -- replace all matches
+re.split "\\s+" text           -- split on matches
+re.find_all "\\d+" text        -- [Str]: all matches
 ```
-
-`match` returns `Some groups` where `groups.0` is the full match and `groups.1`, `groups.2`, etc. are capture groups.
 
 ## Core Modules
 
 | Module | Provides |
 |---|---|
-| `std/fs` | Filesystem: read, write, walk, stat, mkdir, rm, copy, move, glob |
-| `std/net/http` | HTTP client: get, post, put, delete, request |
-| `std/json` | JSON: parse, encode |
-| `std/csv` | CSV: parse, encode |
-| `std/toml` | TOML: parse, encode |
-| `std/yaml` | YAML: parse, encode |
-| `std/env` | Environment: args, get, set, vars, exit, cwd |
-| `std/fmt` | Formatting: pad_left, pad_right, fixed, hex, oct, bin, truncate |
-| `std/re` | Regex: match, replace, split, test, find_all |
-| `std/time` | Time: now, elapsed, sleep, timeout, sec, ms, min, format, parse |
-| `std/math` | Math: abs, sqrt, pow, log, sin, cos, pi, e, floor, ceil, round, clamp |
-| `std/io` | I/O: stdin, read_line, print, println |
-| `std/bit` | Bitwise: and, or, xor, not, shl, shr |
-| `std/crypto` | Hashing: sha256, sha512, md5, hmac |
-| `std/os` | Process/signal: pid, hostname, arch, os, signal |
-| `std/rand` | Random: int, float, choice, shuffle, seed, uuid |
+| `std/fs` | Filesystem: read, write, exists, mkdir, rm, copy, move, glob, walk |
+| `std/http` | HTTP client: get, post, put, delete |
+| `std/json` | JSON: parse, encode, encode_pretty |
+| `std/env` | Environment: args, get, set, cwd |
+| `std/re` | Regex: is_match, match, replace, split, find_all |
+| `std/time` | Time: now, format, parse, sleep, sec, ms, min |
+| `std/math` | Math: abs, sqrt, pow, log, sin, cos, pi, e, floor, ceil, round, clamp, safe_div |
+| `std/ctx` | Context: load, save, get, set, empty, merge |
+| `std/md` | Markdown: parse, sections, code_blocks, headings, render, doc, h1, h2, para, code, list |
+| `std/agent` | Agent: spawn, kill, subprocess communication |
+| `std/mcp` | MCP: connect, list_tools, call, close (stdio + HTTP transports) |
 
-Agent ecosystem modules (`std/agent`, `std/mcp`, `std/ctx`, `std/md`, `std/cron`) are in [stdlib-agents.md](stdlib-agents.md). Data ecosystem modules (`std/df`, `std/db`, `std/num`, `std/ml`, `std/plot`) are in [stdlib-data.md](stdlib-data.md). Core module API details are in [stdlib-modules.md](stdlib-modules.md).
+Agent ecosystem modules (`std/agent`, `std/mcp`, `std/ctx`, `std/md`) are in [stdlib-agents.md](stdlib-agents.md). Module API details are in [stdlib-modules.md](stdlib-modules.md).

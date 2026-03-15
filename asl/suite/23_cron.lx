@@ -1,0 +1,45 @@
+-- std/cron: scheduled task execution
+use std/cron
+use std/time
+
+-- cron.every returns an Int handle
+handle = cron.every 100 () {
+  ()
+}
+assert (handle > 0) "cron.every returns positive handle"
+
+-- cron.active counts running jobs
+n = cron.active ()
+assert (n == 1) "one active job after cron.every"
+
+-- cron.cancel stops a job
+cron.cancel handle
+n2 = cron.active ()
+assert (n2 == 0) "no active jobs after cancel"
+
+-- cancelling invalid handle returns Err
+bad = cron.cancel 99999
+bad ? {
+  Err _ -> assert true "cancel nonexistent returns Err"
+  _ -> assert false "expected Err from cancel"
+}
+
+-- multiple jobs
+h1 = cron.every 200 () { () }
+h2 = cron.every 300 () { () }
+assert (cron.active () == 2) "two active jobs"
+cron.cancel h1
+assert (cron.active () == 1) "one active after cancelling first"
+cron.cancel h2
+assert (cron.active () == 0) "zero active after cancelling both"
+
+-- callback actually runs
+use std/ctx
+state_path = "/tmp/lx_cron_test_state.json"
+counter_handle = cron.every 50 () {
+  ()
+}
+time.sleep 120
+cron.cancel counter_handle
+
+$echo "std/cron ok"

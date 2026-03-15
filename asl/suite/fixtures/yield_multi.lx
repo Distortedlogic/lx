@@ -1,0 +1,3 @@
+a = yield {step: "first"}
+b = yield {step: "second", prev: a}
+a + b

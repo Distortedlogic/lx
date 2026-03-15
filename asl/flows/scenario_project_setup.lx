@@ -1,0 +1,101 @@
+-- GOAL: New service scaffolding with dependency-ordered steps.
+-- Orchestrator (project-bootstrap) runs 5 steps in order:
+--   Step 1: scaffold project (scaffolding specialist).
+--   Step 2: create Forgejo repo (forgejo MCP).
+--   Step 3: create database (postgresql MCP).
+--   Step 4: add health monitor (uptime-kuma MCP).
+--   Step 5: verify all resources exist.
+-- Dependency order matters: repo before DB, DB before monitor, etc.
+-- Source: mcp-toolbelt/arch_diagrams/scenario_project_setup
+
+use std/agent
+use std/mcp
+use std/json
+
+Protocol SetupConfig = {
+  name: Str
+  lang: Str
+  db: Bool
+  monitoring: Bool
+}
+
++main = () {
+  config = SetupConfig {
+    name: "billing-service"
+    lang: "rust"
+    db: true
+    monitoring: true
+  }
+
+  scaffolder = agent.spawn {command: "lx" args: ["run" "agents/scaffolder.lx"]} ^
+  forgejo = mcp.connect {command: "forgejo-mcp" args: []} ^
+  pg = mcp.connect {command: "postgresql-mcp" args: []} ^
+
+  $echo "Step 1: Scaffold project..."
+  scaffold_result = scaffolder ~>? {
+    action: "scaffold"
+    name: config.name
+    lang: config.lang
+    template: "service"
+  } ^
+  $echo "  created {scaffold_result.path}"
+
+  $echo "Step 2: Create repository..."
+  repo = mcp.call forgejo "create_repo" {
+    name: config.name
+    description: "{config.name} service"
+    private: true
+  } ^
+  $echo "  repo: {repo.url}"
+
+  config.db ? {
+    true -> {
+      $echo "Step 3: Create database..."
+      mcp.call pg "execute" {
+        query: "CREATE DATABASE {config.name |  replace "-" "_"}"
+      } ^
+      $echo "  database created"
+    }
+    false -> $echo "Step 3: Skipping database (not requested)"
+  }
+
+  config.monitoring ? {
+    true -> {
+      $echo "Step 4: Add monitoring..."
+      monitor = mcp.connect {command: "uptime-kuma-mcp" args: []} ^
+      mcp.call monitor "add_monitor" {
+        name: config.name
+        url: "http://{config.name}:8080/health"
+        interval: 60
+      } ^
+      mcp.close monitor
+      $echo "  health check monitor added"
+    }
+    false -> $echo "Step 4: Skipping monitoring"
+  }
+
+  $echo "\nStep 5: Verify setup..."
+  checks = [
+    ("repo" (mcp.call forgejo "get_repo" {name: config.name}))
+    ("scaffold" (fs.exists? scaffold_result.path))
+  ]
+  failures = checks | filter (name, result) {
+    result ? {
+      Ok _ -> false
+      Err _ -> true
+      false -> true
+      _ -> false
+    }
+  }
+
+  failures | empty? ? {
+    true -> $echo "all checks passed"
+    false -> {
+      failures | each (name, _) $echo "  FAIL: {name}"
+    }
+  }
+
+  agent.kill scaffolder ^
+  mcp.close forgejo
+  mcp.close pg
+}

@@ -58,15 +58,13 @@ impl Interpreter {
     let canonical = std::fs::canonicalize(file_path)
       .map_err(|e| LxError::runtime(format!("cannot resolve module '{}': {e}", file_path.display()), span))?;
     {
-      let cache = self.module_cache.lock()
-        .map_err(|e| LxError::runtime(format!("module cache lock: {e}"), span))?;
+      let cache = self.module_cache.lock();
       if let Some(exports) = cache.get(&canonical) {
         return Ok(exports.clone());
       }
     }
     {
-      let mut loading = self.loading.lock()
-        .map_err(|e| LxError::runtime(format!("loading lock: {e}"), span))?;
+      let mut loading = self.loading.lock();
       if !loading.insert(canonical.clone()) {
         return Err(LxError::runtime(
           format!("circular import: {}", canonical.display()),
@@ -84,19 +82,12 @@ impl Interpreter {
     let mut mod_interp = Interpreter::new(&source, module_dir);
     mod_interp.module_cache = Arc::clone(&self.module_cache);
     mod_interp.loading = Arc::clone(&self.loading);
+    mod_interp.yield_handler = self.yield_handler.clone();
     mod_interp.exec(&program)
       .map_err(|e| LxError::runtime(format!("module '{}': {e}", file_path.display()), span))?;
     let exports = collect_exports(&program, &mod_interp);
-    {
-      let mut cache = self.module_cache.lock()
-        .map_err(|e| LxError::runtime(format!("module cache lock: {e}"), span))?;
-      cache.insert(canonical.clone(), exports.clone());
-    }
-    {
-      let mut loading = self.loading.lock()
-        .map_err(|e| LxError::runtime(format!("loading lock: {e}"), span))?;
-      loading.remove(&canonical);
-    }
+    self.module_cache.lock().insert(canonical.clone(), exports.clone());
+    self.loading.lock().remove(&canonical);
     Ok(exports)
   }
 }
@@ -146,6 +137,11 @@ fn collect_exports(program: &Program, interp: &Interpreter) -> ModuleExports {
         }
       },
       Stmt::Protocol { exported: true, name, .. } => {
+        if let Some(val) = interp.env.get(name) {
+          bindings.insert(name.clone(), val);
+        }
+      },
+      Stmt::McpDecl { exported: true, name, .. } => {
         if let Some(val) = interp.env.get(name) {
           bindings.insert(name.clone(), val);
         }

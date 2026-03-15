@@ -1,5 +1,7 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+
+use parking_lot::Mutex;
 
 use crate::value::Value;
 
@@ -40,8 +42,7 @@ impl Env {
     if let Some(slot) = self.bindings.get(name) {
       match slot {
         Slot::Mutable(cell) => {
-          let mut guard = cell.lock().map_err(|e| format!("lock poisoned for '{name}': {e}"))?;
-          *guard = value;
+          *cell.lock() = value;
           return Ok(());
         },
         Slot::Immutable(_) => {
@@ -59,13 +60,7 @@ impl Env {
     if let Some(slot) = self.bindings.get(name) {
       return Some(match slot {
         Slot::Immutable(v) => v.clone(),
-        Slot::Mutable(cell) => {
-          let guard = match cell.lock() {
-            Ok(g) => g,
-            Err(poisoned) => poisoned.into_inner(),
-          };
-          guard.clone()
-        },
+        Slot::Mutable(cell) => cell.lock().clone(),
       });
     }
     if let Some(parent) = &self.parent {

@@ -53,12 +53,9 @@ Functions are not comparable. `f == g` is a runtime error regardless of whether 
 **Exit codes** — `main` returning `()` exits 0. `main` returning `Err _` exits 1. `main` returning an `Int` exits with that code. `env.exit n` for explicit control anywhere.
 
 **Stdin/stdout/stderr**:
-- `$echo` goes to stdout
+- `$echo` goes to stdout (returns result with `.out`)
 - `log` goes to stderr
-- `io.read_line` reads one line from stdin
-- `io.stdin` is a lazy sequence of lines from stdin
-
-Pipeline from shell: `$cat file | lx run script.lx` — stdin is available via `io.stdin`.
+- Shell commands handle stdin/stdout interaction
 
 **Logging** — Built-in `log` namespace with four level functions:
 
@@ -124,14 +121,7 @@ This prevents data races without locks or atomics.
 
 ## Bitwise Operations
 
-Bitwise operators are not available as infix syntax — `|`, `&`, and `^` are used for pipes, guards, and error propagation respectively. Use `std/bit`:
-
-```
-use std/bit
-bit.and 0xff 0x0f     -- 0x0f
-bit.shl 1 8           -- 256
-n | bit.and 0xff      -- mask lower byte (pipe to bit.and)
-```
+Bitwise operators are not available — `|`, `&`, and `^` are used for pipes, guards, and error propagation. Bitwise operations are not implemented in v1.
 
 ## Tuple Disambiguation
 
@@ -150,7 +140,7 @@ There is no one-element tuple. If you need a single-element container, use `[x]`
 
 A block `{ stmt1; stmt2; ...; stmtN }` evaluates each statement in order and returns the value of the last statement. In normal blocks, intermediate expression values are discarded.
 
-In a function body with a `Result` return annotation (`-> T ^ E`), intermediate expression statements that evaluate to `Err e` cause immediate return of `Err e` from the function. See [errors.md](errors.md) for details and examples.
+In a function body, intermediate expression statements that evaluate to `Err e` cause the function to return `Err e` immediately. See [errors.md](errors.md) for details and examples.
 
 `break` without a value expression returns unit `()` from the enclosing `loop`. `break val` returns `val`.
 

@@ -1,105 +1,92 @@
 # Current Opinion: lx as an Agentic Language
 
-Written by the language designer (Claude) after 18 implementation sessions. Honest assessment.
+Written by the language designer (Claude). Updated after Session 26.
 
 ## What Works
 
-**Pipes + `^` + `??` is a genuinely excellent error handling model for scripting.** This line tells the whole story:
+**Pipes + `^` + `??` is a genuinely excellent error handling model for scripting:**
 
 ```
 analyzer ~>? {task: "review"} ^ | (.findings) | filter (.critical)
 ```
 
-Ask an agent, unwrap the result, extract a field, filter it. Five operations, zero boilerplate, left-to-right, every step obvious. No `await`, no `.then()`, no `try/catch`, no `if err != nil`. If I'm generating code token-by-token, this is exactly what I want to produce.
+Ask an agent, unwrap the result, extract a field, filter it. Five operations, zero boilerplate, left-to-right. No `await`, no `.then()`, no `try/catch`. If I'm generating code token-by-token, this is exactly what I want to produce.
 
-**Agent syntax earns its keep.** `~>` and `~>?` as infix operators compose with everything (`^`, `|`, `par`/`sel`, `??`) through normal precedence rules — no special casing. The language design is internally consistent here.
+**Agent syntax earns its keep.** `~>` and `~>?` as infix operators compose with everything through normal precedence rules.
 
-**Message contracts catch real errors.** `Protocol ReviewRequest = {task: Str path: Str}` validates at boundaries. Wrong field names, missing fields, wrong types — caught immediately with clear diagnostics instead of cryptic deep errors three calls later.
+**Boundary validation is complete.** `Protocol` validates agent-to-agent. `MCP` declarations validate agent-to-tool. Both callable, composable, return `Err` for failures.
 
-**Shell integration is the right model.** `$` has its own lexer mode. The language KNOWS about shell commands. This is what scripting languages should do.
+**Shell integration is the right model.** `$` has its own lexer mode. The language KNOWS about shell commands.
 
-**The stdlib architecture is the cleanest part of the codebase.** One `.rs` file, one match arm, module exists. No framework, no registration macros, no trait gymnastics.
+**The stdlib architecture is clean.** One `.rs` file, one match arm, module exists. No framework, no macros.
 
-## What's Actually Wrong
+**Context threading is solved.** `with` scoped bindings + record field update:
 
-### The language has too much surface area for its niche
+```
+with mut state = ctx.load "state.json" ^ {
+  state.step <- "process"
+  state.data <- data
+  ctx.save "state.json" state ^
+}
+```
 
-lx's purpose is "agents write programs that orchestrate other agents." Several features serve "nice scripting language" but not "agentic workflow language." Each costs parser/interpreter complexity and widens the surface area an LLM must learn to generate correctly. The following should be removed:
+## What's Still Wrong
 
-**1. Lazy iterator protocol** — Infinite sequences (`nat`, `cycle`, custom `{next: fn}` iterators) serve functional programming, not agentic workflows. Agents deal with finite data — API responses, file contents, message batches. Eager `map`/`filter`/`take` on lists covers everything. The lazy machinery adds interpreter complexity for a use case that doesn't arise.
+### Currying is the last major surface area issue
 
-**2. Currying** — Automatic partial application is the single biggest source of parser bugs. The named-args + default-params + currying tension is fundamental and can't be fixed without choosing a side. Sections (`(* 2)`, `(> 5)`, `(.field)`) already cover 90% of the partial-application use case in pipelines. Explicit closures `(x) f x y` are unambiguous and easier for an LLM to generate correctly. Kill currying, keep sections.
-
-**3. Set literals (`#{}`)** — No agentic use case. Message payloads are records. Collections are lists. Deduplication is `unique`. Sets add a collection-mode parsing path and a Value variant for nothing.
-
-**4. `$$` raw shell (no interpolation)** — Too niche. `${echo '{not interpolated}'}` covers the rare case. Two shell escape mechanisms is one too many.
-
-**5. Type annotations (parse-and-skip)** — Worst of both worlds. They add parser complexity, give a false sense of safety, and do nothing at runtime. Either build a real type checker or remove the syntax. Protocol contracts already provide runtime validation at message boundaries, which is where it matters.
-
-**6. Regex literals (`r/pattern/flags`)** — Lexer needs a dedicated mode for these. `std/re` with string patterns works fine. Agents rarely need inline regex — they call tools that return structured data.
-
-**7. Composition operator (`<>`)** — `f <> g` is just `(x) x | f | g`. Caused direction confusion in 3 separate sessions. Pipes are the primary composition mechanism and they're unambiguous. Point-free composition is a Haskell-ism that doesn't pay for itself here.
-
-**8. Tuple semicolon rule** — `(a; b)` vs `(a b)` is the #1 predicted LLM generation bug. Fix: require commas in tuples `(a, b)`. One more token, but zero ambiguity.
-
-### Removing these cuts ~15-20% of parser/interpreter surface area
-
-The language becomes smaller, more predictable for LLM generation, and more focused on its actual purpose.
-
-### The parser is fragile in subtle ways
-
-The assert greedy-consumption bug, the named-arg/ternary conflict, the `is_func_def` heuristic — symptoms of a Pratt parser pushed past what Pratt parsers do cleanly. Removing currying eliminates the worst of these.
+Automatic partial application is the single biggest source of parser ambiguity. Sections (`(* 2)`, `(> 5)`, `(.field)`) cover 90% of the use case. Removing currying requires parser architecture change — nested `Apply(Apply(f,a),b)` → multi-arg Apply nodes. Deferred.
 
 ### Concurrency is fake
 
-`par` and `sel` are sequential. Every spec example showing concurrent agent orchestration is aspirational, not real.
+`par` and `sel` are sequential. Every spec example showing concurrent agent orchestration is aspirational.
 
-### Context threading is verbose
+### Parser fragility
 
-```
-state = ctx.load "state.json" ^
-state = ctx.set "step" "process" state
-state = ctx.set "data" data state
-ctx.save "state.json" state ^
-```
+Named-arg/ternary `:` conflict and assert greedy-consumption are symptoms of a Pratt parser pushed past its sweet spot.
 
-Pipelines help but complex workflows still thread state manually.
+## Real-World Gap Analysis (Session 26)
 
-### The 300-line limit is being violated where it matters most
+Reviewed the user's `mcp-toolbelt/packages/arch_diagrams` — 10+ agentic flow architectures covering agent lifecycle, subagent orchestration, fine-tuning pipelines, security auditing, research, context engineering, and discovery systems. These are the ACTUAL flows lx was designed to express. Findings:
 
-Parser at 640+, prefix at 773. These are the files you need to read to understand how the language works.
+### What lx covers well
 
-## What to Keep (looks tangential but isn't)
+- Agent spawning + fanout (`pmap` + `~>?`) — maps directly to subagent dispatch patterns
+- Message validation (`Protocol`) — maps to the boundary contracts between agents
+- MCP tool invocation — maps to the tool audit's 204 tools across 22 servers
+- Context persistence (`std/ctx`) — maps to checkpoint/resume patterns
+- Scheduled execution (`std/cron`) — maps to daily/weekly review cycles
+- Executable plans (`yield`) — maps to plan-and-execute variant of the agentic loop
+- Shell integration — maps to the heavy use of Bash/grep/git in scenarios
 
-- **Shell integration** (`$`, `$^`, `${...}`) — agents invoke local tools via shell, this is core
-- **Pattern matching** — message routing, destructuring agent responses, essential
-- **Named args** (if currying removed, the tension disappears) — `mcp.call client "tool" {x: 1}` reads better than positional
-- **Slicing** — cheap, and agents do slice text/lists
-- **`pmap`/`pmap_n`** — batch operations over agent pools are a real pattern
-- **Sections** (`(* 2)`, `(.field)`, `(> 5)`) — covers the partial-application use case without currying's ambiguity
+### Critical gaps exposed by real flows
+
+1. **Tiered memory (L0/L1/L2/L3)** — The agent lifecycle flow has a full LSM-tree-inspired memory hierarchy: episodic (L0, 7-day retention) → working (L1, confidence 0.0-0.7) → consolidated (L2, confidence 0.7-0.95) → procedural (L3, always-loaded system prompt). `std/ctx` is flat key-value. Need `std/memory` with confidence tracking, promotion/demotion, retention policies.
+
+2. **Circuit breakers / doom loop detection** — The agentic loop has a monitor tracking last 3 actions via embedding similarity, classifying as productive/stagnating/stuck/failing. External circuit breaker (25 turns max, 300s timeout, token budget). lx has nothing for this.
+
+3. **Observability / tracing** — The subagent fine-tuning flow collects langfuse traces (input, output, model, timing, scores) and feeds training pipelines. No `std/trace` module.
+
+4. **Subagent routing / classification** — A router agent reads a catalog and classifies prompts to domains. Pattern is expressible but has no builtin support.
+
+5. **Context budget management** — Context engineering has degradation zones (green/yellow/orange/red), compaction levels (raw → compaction → summarization), JIT retrieval. lx has no concept of token budgets.
+
+6. **Grading loops with rubrics** — The full pipeline uses a 10-category rubric, incremental re-grading, and a grade≥95 threshold. The pattern works in lx but a standard grading protocol would help.
+
+## The Three Use Cases
+
+All implemented and proven:
+
+1. **Agent-to-agent communication** — `~>`, `~>?`, `Protocol`. The foundation.
+2. **Agentic workflow programs** — orchestrating agents and tools via `par`/`sel`/`pmap`, `std/mcp`, `std/agent`.
+3. **Executable agent plans** — the agent's plan IS an lx program, with `yield` for LLM-filled holes.
 
 ## Priority Order
 
-### Done: Priorities A–D.5
-Agent communication (`~>`/`~>?`), message contracts (`Protocol`), stdlib infrastructure (9 modules), agent-specific stdlib (`std/agent`, `std/md`, `std/mcp`), MCP HTTP streaming transport.
-
-### Priority S: Surface area reduction (NEW — HIGH)
-Remove the 8 features listed above. This makes the language smaller, the parser simpler, and LLM generation more reliable. Should happen BEFORE adding more features.
-
-### Priority E: Implicit context scope
-Eliminate manual state threading. `with` block or implicit parameter.
-
-### Priority F: Resumable workflows
-Workflows as inspectable, checkpointable values. If step 3 of 5 fails, resume from step 3.
+**Remaining:**
+1. **`std/memory`** — tiered memory with confidence, promotion, retention (biggest gap for real flows)
+2. Currying removal (deferred — parser architecture change)
+3. Toolchain (Phase 10) — `lx fmt`, `lx repl`, `lx check`
 
 ## Bottom Line
 
-The core composition model (`|` + `^` + `??` + `~>?`) is the language's reason to exist and it works. The agentic loop is proven end-to-end. But the language is carrying dead weight from its "general scripting language" origins — lazy iterators, currying, sets, regex literals, parse-and-skip types, composition operator, raw shell, tuple semicolons. Each is individually small but collectively they bloat the surface area, add parser fragility, and make LLM generation harder. Cutting them makes lx a sharper tool for its actual purpose.
-
-## Cross-References
-
-- Agent spec: [spec/agents.md](spec/agents.md)
-- Agent stdlib API: [spec/stdlib-agents.md](spec/stdlib-agents.md)
-- Design decisions: [spec/design.md](spec/design.md)
-- Implementation status: [DEVLOG.md](DEVLOG.md)
-- Next steps: [../NEXT_PROMPT.md](../NEXT_PROMPT.md)
+All language features complete. 12 stdlib modules. Specs up to date. The gap analysis against real agentic architectures shows lx covers the communication/orchestration layer well but lacks the **memory/observability/safety** layer that production agent systems need. `std/memory` is the highest-impact next module.

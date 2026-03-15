@@ -1,0 +1,2 @@
+x = yield {question: "what is 1+1?"}
+assert (x == 42)

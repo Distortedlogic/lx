@@ -8,7 +8,7 @@ Shell commands get `$` — their own lexer mode, AST node, and runtime semantics
 
 - The runtime can automatically add tracing, timeouts, retries
 - Error messages say "agent communication failed" not "function returned Err"
-- The type checker can validate message shapes at send boundaries
+- `Protocol` validates message shapes at send boundaries
 - `~>` and `~>?` compose naturally with `^`, `|`, `par`/`sel`
 
 ## Agent Values
@@ -65,7 +65,7 @@ fallback_agent ~>? request ?? default_response
 
 ### Precedence
 
-`~>` and `~>?` bind at the same level as `++` and `<>` (tighter than pipe, looser than arithmetic):
+`~>` and `~>?` bind at the same level as `++` (tighter than pipe, looser than arithmetic):
 
 ```
 agent ~>? msg ^ | process
@@ -206,7 +206,7 @@ Protocol ReviewRequest = {task: Str  path: Str  depth: Int = 3}
 Protocol CalcRequest = {op: Str  value: Int}
 ```
 
-Fields have a name and a type. Optional fields have defaults (filled in when missing). Type checking uses runtime type names: `Str`, `Int`, `Float`, `Bool`, `List`, `Record`, `Map`, `Set`, `Tuple`, `Any`.
+Fields have a name and a type. Optional fields have defaults (filled in when missing). Type checking uses runtime type names: `Str`, `Int`, `Float`, `Bool`, `List`, `Record`, `Map`, `Tuple`, `Any`.
 
 ### Using Protocols
 
@@ -271,6 +271,9 @@ Protocols can be exported with `+` and imported via `use`:
 
 - `~>` (send) and `~>?` (ask) — implemented as infix operators
 - `Protocol` — implemented as keyword with runtime validation
+- `yield` — implemented as keyword with callback-based orchestrator protocol
+- `MCP` declarations — implemented as keyword with typed tool contracts and validation
+- `with` / field update — implemented with scoped bindings and mutable record field assignment
 - Sequential evaluation (like par/sel); real async is future work
 - Agents are records with handler functions; subprocess agents via `std/agent` (`__pid` records)
 - `agent.spawn` — implemented in `std/agent` (subprocess spawning, JSON-line protocol)
@@ -284,4 +287,5 @@ Protocols can be exported with `+` and imported via `use`:
 - Module details: [stdlib-agents.md](stdlib-agents.md)
 - Error handling in agents: [errors.md](errors.md) (^, ??)
 - Design rationale: [design.md](design.md) (agent communication syntax)
+- Advanced features: [agents-advanced.md](agents-advanced.md) (yield, MCP declarations, with/field update)
 - Test suite: [../suite/14_agents.lx](../suite/14_agents.lx)

@@ -1,7 +1,7 @@
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, LazyLock};
 
+use dashmap::DashMap;
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 
@@ -23,11 +23,7 @@ struct McpConnection {
 }
 
 static NEXT_CLIENT_ID: AtomicU64 = AtomicU64::new(1);
-
-fn registry() -> &'static Mutex<HashMap<u64, McpConnection>> {
-    static REG: OnceLock<Mutex<HashMap<u64, McpConnection>>> = OnceLock::new();
-    REG.get_or_init(|| Mutex::new(HashMap::new()))
-}
+static REGISTRY: LazyLock<DashMap<u64, McpConnection>> = LazyLock::new(DashMap::new);
 
 fn get_id(client: &Value, span: Span) -> Result<u64, LxError> {
     match client {
@@ -167,10 +163,7 @@ pub(super) fn connect(args: &[Value], span: Span) -> Result<Value, LxError> {
     };
     init_handshake(&mut conn, span)?;
     let client_id = NEXT_CLIENT_ID.fetch_add(1, Ordering::Relaxed);
-    registry()
-        .lock()
-        .map_err(|e| LxError::runtime(format!("mcp registry lock: {e}"), span))?
-        .insert(client_id, conn);
+    REGISTRY.insert(client_id, conn);
     let mut rec = IndexMap::new();
     rec.insert("__mcp_id".into(), Value::Int(BigInt::from(client_id)));
     Ok(Value::Ok(Box::new(Value::Record(Arc::new(rec)))))
@@ -178,11 +171,8 @@ pub(super) fn connect(args: &[Value], span: Span) -> Result<Value, LxError> {
 
 pub(super) fn close(args: &[Value], span: Span) -> Result<Value, LxError> {
     let id = get_id(&args[0], span)?;
-    let mut reg = registry()
-        .lock()
-        .map_err(|e| LxError::runtime(format!("mcp registry lock: {e}"), span))?;
-    match reg.remove(&id) {
-        Some(conn) => {
+    match REGISTRY.remove(&id) {
+        Some((_, conn)) => {
             match conn.transport {
                 McpTransport::Stdio(t) => t.shutdown(span)?,
                 McpTransport::Http(t) => t.shutdown(span)?,
@@ -200,11 +190,8 @@ pub(super) fn with_proc(
     span: Span,
 ) -> Result<serde_json::Value, LxError> {
     let id = get_id(client, span)?;
-    let mut reg = registry()
-        .lock()
-        .map_err(|e| LxError::runtime(format!("mcp registry lock: {e}"), span))?;
-    let conn = reg
+    let mut conn = REGISTRY
         .get_mut(&id)
         .ok_or_else(|| LxError::runtime("mcp: client not found", span))?;
-    rpc(conn, method, params, span)
+    rpc(&mut conn, method, params, span)
 }

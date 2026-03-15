@@ -1,4 +1,6 @@
-# Standard Library — Data Ecosystem
+# Standard Library — Data Ecosystem (Future)
+
+**Status: Not implemented.** These modules are planned for future phases. None of this code works today.
 
 Data processing, persistence, numerical computation, ML inference, and visualization modules. These are stdlib modules — no language changes required. All follow data-last conventions and compose naturally with pipes and sections.
 
@@ -270,7 +272,7 @@ Backend: `charming` (in reference/) for SVG, custom terminal renderer for Unicod
 
 ## Cross-References
 
-- Agent ecosystem modules: [stdlib-agents.md](stdlib-agents.md) (std/agent, std/mcp, std/ctx, std/md, std/cron)
+- Agent ecosystem modules: [stdlib-agents.md](stdlib-agents.md) (std/agent, std/mcp, std/ctx, std/md)
 - Core stdlib modules: [stdlib-modules.md](stdlib-modules.md)
 - Built-in functions and conventions: [stdlib.md](stdlib.md)
 - Stdlib loader design: [impl-stdlib.md](../impl/impl-stdlib.md)

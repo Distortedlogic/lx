@@ -1,17 +1,16 @@
-use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use indexmap::IndexMap;
 use num_bigint::BigInt;
+use strum::IntoStaticStr;
 
 use crate::ast::SExpr;
 use crate::env::Env;
 use crate::error::LxError;
-use crate::iterator::IterSource;
 use crate::span::Span;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, IntoStaticStr)]
 pub enum Value {
   Int(BigInt),
   Float(f64),
@@ -24,7 +23,9 @@ pub enum Value {
   Map(Arc<IndexMap<ValueKey, Value>>),
   Tuple(Arc<Vec<Value>>),
 
+  #[strum(serialize = "Func")]
   Func(LxFunc),
+  #[strum(serialize = "Func")]
   BuiltinFunc(BuiltinFunc),
 
   Ok(Box<Value>),
@@ -33,10 +34,11 @@ pub enum Value {
   None,
 
   Tagged { tag: Arc<str>, values: Arc<Vec<Value>> },
+  #[strum(serialize = "Func")]
   TaggedCtor { tag: Arc<str>, arity: usize, applied: Vec<Value> },
   Range { start: i64, end: i64, inclusive: bool },
-  Iterator(IterSource),
   Protocol { name: Arc<str>, fields: Arc<Vec<ProtoFieldDef>> },
+  McpDecl { name: Arc<str>, tools: Arc<Vec<McpToolDef>> },
 }
 
 #[derive(Debug, Clone)]
@@ -90,9 +92,9 @@ impl Value {
       (Value::Tagged { tag: t1, values: v1 }, Value::Tagged { tag: t2, values: v2 }) => t1 == t2 && v1 == v2,
       (Value::Range { start: s1, end: e1, inclusive: i1 }, Value::Range { start: s2, end: e2, inclusive: i2 }) => s1 == s2 && e1 == e2 && i1 == i2,
       (Value::Protocol { name: n1, .. }, Value::Protocol { name: n2, .. }) => n1 == n2,
+      (Value::McpDecl { name: n1, .. }, Value::McpDecl { name: n2, .. }) => n1 == n2,
       (Value::Func(_), _) | (_, Value::Func(_)) => false,
       (Value::BuiltinFunc(_), _) | (_, Value::BuiltinFunc(_)) => false,
-      (Value::Iterator(_), _) | (_, Value::Iterator(_)) => false,
       _ => false,
     }
   }
@@ -141,7 +143,8 @@ impl Value {
         inclusive.hash(state);
       },
       Value::Protocol { name, .. } => name.hash(state),
-      Value::Func(_) | Value::BuiltinFunc(_) | Value::TaggedCtor { .. } | Value::Iterator(_) => {},
+      Value::McpDecl { name, .. } => name.hash(state),
+      Value::Func(_) | Value::BuiltinFunc(_) | Value::TaggedCtor { .. } => {},
     }
   }
 
@@ -185,98 +188,7 @@ impl Value {
   }
 
   pub fn type_name(&self) -> &'static str {
-    match self {
-      Value::Int(_) => "Int",
-      Value::Float(_) => "Float",
-      Value::Bool(_) => "Bool",
-      Value::Str(_) => "Str",
-      Value::Unit => "Unit",
-      Value::List(_) => "List",
-      Value::Record(_) => "Record",
-      Value::Map(_) => "Map",
-      Value::Tuple(_) => "Tuple",
-      Value::Func(_) | Value::BuiltinFunc(_) => "Func",
-      Value::Ok(_) => "Ok",
-      Value::Err(_) => "Err",
-      Value::Some(_) => "Some",
-      Value::None => "None",
-      Value::Tagged { .. } => "Tagged",
-      Value::TaggedCtor { .. } => "Func",
-      Value::Range { .. } => "Range",
-      Value::Iterator(_) => "Iterator",
-      Value::Protocol { .. } => "Protocol",
-    }
-  }
-}
-
-impl fmt::Display for Value {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      Value::Int(n) => write!(f, "{n}"),
-      Value::Float(v) => write!(f, "{v}"),
-      Value::Bool(b) => write!(f, "{b}"),
-      Value::Str(s) => write!(f, "{s}"),
-      Value::Unit => write!(f, "()"),
-      Value::List(items) => {
-        write!(f, "[")?;
-        for (i, item) in items.iter().enumerate() {
-          if i > 0 {
-            write!(f, " ")?;
-          }
-          write!(f, "{item}")?;
-        }
-        write!(f, "]")
-      },
-      Value::Tuple(items) => {
-        write!(f, "(")?;
-        for (i, item) in items.iter().enumerate() {
-          if i > 0 {
-            write!(f, " ")?;
-          }
-          write!(f, "{item}")?;
-        }
-        write!(f, ")")
-      },
-      Value::Record(fields) => {
-        write!(f, "{{")?;
-        for (i, (k, v)) in fields.iter().enumerate() {
-          if i > 0 {
-            write!(f, "  ")?;
-          }
-          write!(f, "{k}: {v}")?;
-        }
-        write!(f, "}}")
-      },
-      Value::Map(entries) => {
-        write!(f, "Map{{")?;
-        for (i, (k, v)) in entries.iter().enumerate() {
-          if i > 0 {
-            write!(f, "  ")?;
-          }
-          write!(f, "{}: {v}", k.0)?;
-        }
-        write!(f, "}}")
-      },
-      Value::Func(_) => write!(f, "<func>"),
-      Value::BuiltinFunc(b) => write!(f, "<builtin {}/{}>", b.name, b.arity),
-      Value::Ok(v) => write!(f, "Ok {v}"),
-      Value::Err(v) => write!(f, "Err {v}"),
-      Value::Some(v) => write!(f, "Some {v}"),
-      Value::None => write!(f, "None"),
-      Value::Tagged { tag, values } => {
-        write!(f, "{tag}")?;
-        for v in values.iter() {
-          write!(f, " {v}")?;
-        }
-        Ok(())
-      },
-      Value::TaggedCtor { tag, .. } => write!(f, "<ctor {tag}>"),
-      Value::Range { start, end, inclusive } => {
-        if *inclusive { write!(f, "{start}..={end}") } else { write!(f, "{start}..{end}") }
-      },
-      Value::Iterator(_) => write!(f, "<iterator>"),
-      Value::Protocol { name, .. } => write!(f, "<Protocol {name}>"),
-    }
+    self.into()
   }
 }
 
@@ -288,7 +200,6 @@ pub struct LxFunc {
   pub closure: Arc<Env>,
   pub arity: usize,
   pub applied: Vec<Value>,
-  pub returns_result: bool,
 }
 
 pub type BuiltinFn = fn(&[Value], Span) -> Result<Value, LxError>;
@@ -308,8 +219,16 @@ pub struct ProtoFieldDef {
   pub default: Option<Value>,
 }
 
-impl fmt::Debug for BuiltinFunc {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "<builtin {}/{}>", self.name, self.arity)
-  }
+#[derive(Debug, Clone)]
+pub struct McpToolDef {
+  pub name: String,
+  pub input: Vec<ProtoFieldDef>,
+  pub output: McpOutputDef,
+}
+
+#[derive(Debug, Clone)]
+pub enum McpOutputDef {
+  Simple(String),
+  Record(Vec<ProtoFieldDef>),
+  List(Box<McpOutputDef>),
 }

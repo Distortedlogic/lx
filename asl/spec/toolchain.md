@@ -4,46 +4,32 @@ The `lx` CLI and its subcommands.
 
 ## Commands
 
+### Implemented
+
 ```
 lx run script.lx              -- interpret and execute
 lx run script.lx -- arg1 arg2 -- pass arguments (available as env.args)
-lx run --json script.lx       -- structured diagnostics to stderr
-lx run --sandbox script.lx    -- restricted capability mode
-lx run --deny-net script.lx   -- selective denial
+lx agent script.lx             -- run as MCP agent (streamable HTTP transport)
+```
+
+### Planned (Not Yet Implemented)
+
+```
 lx fmt                         -- format all .lx files in project
 lx fmt --check                 -- exit nonzero if unformatted (CI mode)
 lx test                        -- run test/ scripts, collect assert failures
-lx test test/specific_test.lx  -- run a specific test file
 lx check                       -- type-check without executing
-lx check --strict              -- treat warnings as errors
 lx build                       -- AOT compile to binary
-lx init                        -- create new project (pkg.lx, src/, test/)
-lx agent script.lx             -- run as long-lived agent (enables cron, channels)
-lx agent --daemon script.lx    -- daemonize agent process
+lx init                        -- create new project
+lx repl                        -- interactive session
+lx watch script.lx             -- re-run on file changes
 ```
 
 ## Agent Mode
 
-`lx agent script.lx` runs a script as a long-lived agent process. Unlike `lx run` (which exits after execution), agent mode keeps the process alive for:
-- `std/cron` scheduled tasks (recurring agent work)
-- `std/agent` channel listeners (persistent inter-agent communication)
-- Event-driven workflows (waiting for messages, file changes, etc.)
+`lx agent script.lx` runs a script as an MCP server with streamable HTTP transport. The script's exported MCP declarations become available as tools.
 
-`lx agent --daemon` detaches from the terminal. The agent process logs to `~/.lx/agents/<name>/log`.
-
-Agent scripts typically use `std/agent`, `std/cron`, and `std/ctx` to define their behavior. A simple agent:
-
-```
-use std/agent
-use std/cron
-use std/ctx
-
-state = ctx.load ".state.json" ?? ctx.empty ()
-cron.every (time.min 10) () {
-  results = agent.ask analyzer {action: "check" path: "src/"} ^
-  ctx.set "last_check" results state | (c) ctx.save ".state.json" c ^
-}
-```
+The agent listens for MCP requests over HTTP, executing tool calls against the lx script's declared tools.
 
 ## Execution Model
 
@@ -59,6 +45,8 @@ Scripts can be executed directly with a shebang:
 ```
 
 ## Formatter
+
+**Status: Not implemented.**
 
 `lx fmt` — one canonical format. Zero options. Zero configuration.
 
@@ -77,6 +65,8 @@ Rules:
 
 ## Test Runner
 
+**Status: Not implemented.** Tests are currently run via `just test` which uses `cargo run -p lx-cli` to execute suite files.
+
 `lx test` runs all `.lx` files in `test/`. Tests use `assert`:
 
 ```
@@ -91,6 +81,8 @@ assert (double 5 == 10) "double should multiply by 2"
 `assert expr` fails the test if `expr` is `false`. `assert expr msg` includes the message in the failure output. All assertions in a file are run (no short-circuit on first failure). Results collected and reported.
 
 ## Type Checker
+
+**Status: Not implemented.** Type annotations were removed — there is no type checker.
 
 `lx check` runs type inference and reports errors without executing the script. Useful for catching type mismatches in code that hasn't been run yet.
 
@@ -108,6 +100,8 @@ Checks performed:
 `lx check --strict` treats warnings as errors.
 
 ## Sandboxing
+
+**Status: Not implemented.**
 
 Default is full access — restricting shell/fs/net defeats the purpose of a scripting language. But for running generated code from untrusted contexts:
 
@@ -131,6 +125,8 @@ Capability denial is enforced at the runtime level. A denied operation returns `
 
 ## REPL
 
+**Status: Not implemented.**
+
 `lx repl` starts an interactive session:
 
 ```
@@ -147,6 +143,8 @@ Bindings persist across lines. The result of each expression is printed (unless 
 `lx repl --json` outputs structured results for programmatic use.
 
 ## Notebook Mode
+
+**Status: Not implemented.**
 
 `lx notebook` starts an incremental execution session where blocks separated by `---` execute in a shared environment:
 
@@ -165,11 +163,15 @@ Each block executes with all previous bindings in scope. Results are printed aft
 
 ## Watch Mode
 
+**Status: Not implemented.**
+
 `lx watch script.lx` re-runs the script on file changes. Useful during development: edit the script, save, see output immediately.
 
 `lx watch --test` re-runs tests on changes to `src/` or `test/` files.
 
 ## Project Initialization
+
+**Status: Not implemented.**
 
 `lx init` creates a project skeleton:
 

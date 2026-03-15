@@ -1,0 +1,107 @@
+-- GOAL: Agent lifecycle management with tiered memory (LSM-tree inspired).
+-- L0 (episodic): raw transcripts, 7-day retention, never loaded directly.
+-- L1 (working): pattern-action pairs, confidence 0.0-0.7, high plasticity.
+-- L2 (consolidated): verified patterns, confidence 0.7-0.95, low plasticity.
+-- L3 (procedural): core identity + rules, IS the system prompt, always loaded.
+-- Seeding phase: transfer learning at birth via seeder agent (10-30 L1 entries).
+-- Review loops: daily (L0→L1 promotion), weekly (L1→L2), monthly (L2→L3).
+-- Developmental stages: embryonic → infant → juvenile → competent → expert → mentor.
+-- Source: mcp-toolbelt/arch_diagrams/agent_lifecycle
+
+use std/agent
+use std/ctx
+use std/json
+use std/fs
+use std/md
+use std/cron
+use std/time
+
+Protocol AgentDef = {name: Str  purpose: Str  domain: Str}
+Protocol MemoryEntry = {content: Str  confidence: Float  source: Str  tier: Str}
+
++main = () {
+  def = AgentDef {name: "code-reviewer" purpose: "review PRs" domain: "code-quality"}
+
+  seed_agent def
+
+  daily_handle = cron.every 86400000 () daily_review def
+  weekly_handle = cron.every 604800000 () weekly_review def
+
+  cron.run ()
+}
+
+seed_agent = (def) {
+  $echo "seeding {def.name}..."
+  memory_dir = "agents/{def.name}/memory"
+  $^mkdir -p {memory_dir}
+
+  seeder = agent.spawn {command: "lx" args: ["run" "agents/seeder.lx"]} ^
+
+  l1_entries = seeder ~>? {
+    action: "seed"
+    agent: def.name
+    purpose: def.purpose
+    domain: def.domain
+  } ^
+
+  l1_entries.patterns | each (p) {
+    entry = MemoryEntry {
+      content: p.content
+      confidence: p.confidence
+      source: "seeded"
+      tier: "L1"
+    }
+    save_memory def.name entry
+  }
+
+  agent.kill seeder ^
+  $echo "  seeded {l1_entries.patterns | len} L1 entries"
+}
+
+save_memory = (agent_name entry) {
+  path = "agents/{agent_name}/memory/{entry.tier}.json"
+  existing = fs.read path ?? "[]"
+  entries = json.parse existing ?? []
+  updated = [..entries entry]
+  fs.write path (json.encode updated) ^
+}
+
+load_tier = (agent_name tier) {
+  path = "agents/{agent_name}/memory/{tier}.json"
+  content = fs.read path ?? "[]"
+  json.parse content ?? []
+}
+
+daily_review = (def) {
+  $echo "daily review for {def.name}..."
+  l1 = load_tier def.name "L1"
+
+  promote = l1 | filter (e) e.confidence >= 0.7
+  promote | each (e) {
+    promoted = {..e  tier: "L2"}
+    save_memory def.name promoted
+  }
+
+  demote = l1 | filter (e) e.confidence < 0.1
+  remaining = l1 | filter (e) e.confidence >= 0.1 && e.confidence < 0.7
+  fs.write "agents/{def.name}/memory/L1.json" (json.encode remaining) ^
+
+  $echo "  promoted {promote | len} to L2, removed {demote | len} low-confidence"
+}
+
+weekly_review = (def) {
+  $echo "weekly review for {def.name}..."
+  l2 = load_tier def.name "L2"
+
+  high_conf = l2 | filter (e) e.confidence >= 0.95
+  high_conf | empty? ? {
+    false -> {
+      l3_content = high_conf
+        | map (.content)
+        | join "\n"
+      fs.write "agents/{def.name}/memory/L3_system_prompt.md" l3_content ^
+      $echo "  promoted {high_conf | len} entries to L3 system prompt"
+    }
+    true -> ()
+  }
+}

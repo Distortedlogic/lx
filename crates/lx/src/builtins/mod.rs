@@ -1,5 +1,7 @@
+mod call;
 pub(crate) mod coll;
 mod hof;
+mod hof_extra;
 mod str;
 
 use std::sync::Arc;
@@ -10,7 +12,6 @@ use num_traits::ToPrimitive;
 
 use crate::env::Env;
 use crate::error::LxError;
-use crate::iterator::IterSource;
 use crate::span::Span;
 use crate::value::{BuiltinFn, BuiltinFunc, Value};
 
@@ -118,7 +119,7 @@ fn bi_odd(args: &[Value], span: Span) -> Result<Value, LxError> {
   }
 }
 
-fn bi_collect(args: &[Value], span: Span) -> Result<Value, LxError> {
+fn bi_collect(args: &[Value], _span: Span) -> Result<Value, LxError> {
   match &args[0] {
     Value::Range { start, end, inclusive } => {
       let items: Vec<Value> = if *inclusive {
@@ -126,17 +127,6 @@ fn bi_collect(args: &[Value], span: Span) -> Result<Value, LxError> {
       } else {
         (*start..*end).map(|i| Value::Int(BigInt::from(i))).collect()
       };
-      Ok(Value::List(Arc::new(items)))
-    },
-    Value::Iterator(source) => {
-      let live = crate::iterator::instantiate(source);
-      let items = crate::iterator::collect_all(&live, span)?;
-      Ok(Value::List(Arc::new(items)))
-    },
-    Value::Record(fields) if fields.contains_key("next") => {
-      let next_fn = fields["next"].clone();
-      let live = crate::iterator::from_record_next(next_fn);
-      let items = crate::iterator::collect_all(&live, span)?;
       Ok(Value::List(Arc::new(items)))
     },
     other => Ok(other.clone()),
@@ -168,17 +158,6 @@ fn bi_step(args: &[Value], span: Span) -> Result<Value, LxError> {
   }
 }
 
-fn bi_cycle(args: &[Value], span: Span) -> Result<Value, LxError> {
-  match &args[0] {
-    Value::List(items) => {
-      if items.is_empty() {
-        return Err(LxError::runtime("cycle: empty list", span));
-      }
-      Ok(Value::Iterator(IterSource::Cycle(items.clone())))
-    },
-    other => Err(LxError::type_err(format!("cycle expects List, got {}", other.type_name()), span)),
-  }
-}
 
 fn bi_require(args: &[Value], _span: Span) -> Result<Value, LxError> {
   match &args[1] {
@@ -268,8 +247,6 @@ pub fn register(env: &mut Env) {
   env.bind("odd?".into(), mk("odd?", 1, bi_odd));
   env.bind("collect".into(), mk("collect", 1, bi_collect));
   env.bind("step".into(), mk("step", 2, bi_step));
-  env.bind("nat".into(), Value::Iterator(IterSource::Nat));
-  env.bind("cycle".into(), mk("cycle", 1, bi_cycle));
   env.bind("require".into(), mk("require", 2, bi_require));
   env.bind("parse_int".into(), mk("parse_int", 1, bi_parse_int));
   env.bind("parse_float".into(), mk("parse_float", 1, bi_parse_float));
@@ -288,62 +265,5 @@ pub fn register(env: &mut Env) {
 }
 
 pub(crate) fn call_value(f: &Value, arg: Value, span: Span) -> Result<Value, LxError> {
-  match f {
-    Value::Func(lf) => {
-      let mut lf = lf.clone();
-      lf.applied.push(arg);
-      if lf.applied.len() == 1 && lf.arity > 1
-        && let Value::Tuple(ref elems) = lf.applied[0]
-        && elems.len() == lf.arity {
-          let elems = elems.as_ref().clone();
-          lf.applied = elems;
-        }
-      if lf.applied.len() < lf.arity {
-        return Ok(Value::Func(lf));
-      }
-      let mut interp = crate::interpreter::Interpreter::with_env(&lf.closure);
-      let mut call_env = lf.closure.child();
-      for (i, name) in lf.params.iter().enumerate() {
-        if i < lf.applied.len() {
-          call_env.bind(name.clone(), lf.applied[i].clone());
-        } else if let Some(Some(def)) = lf.defaults.get(i) {
-          call_env.bind(name.clone(), def.clone());
-        }
-      }
-      interp.set_env(call_env);
-      if lf.returns_result {
-        let result = interp.eval_expr(&lf.body);
-        match result {
-          Err(LxError::Propagate { value, .. }) => Ok(*value),
-          Ok(v) if matches!(&v, Value::Ok(_) | Value::Err(_)) => Ok(v),
-          Ok(v) => Ok(Value::Ok(Box::new(v))),
-          other => other,
-        }
-      } else {
-        let result = interp.eval_expr(&lf.body);
-        match result {
-          Err(LxError::Propagate { value, .. }) => Ok(*value),
-          other => other,
-        }
-      }
-    },
-    Value::BuiltinFunc(bf) => {
-      let mut bf = bf.clone();
-      bf.applied.push(arg);
-      if bf.applied.len() < bf.arity {
-        return Ok(Value::BuiltinFunc(bf));
-      }
-      (bf.func)(&bf.applied, span)
-    },
-    Value::TaggedCtor { tag, arity, applied } => {
-      let mut applied = applied.clone();
-      applied.push(arg);
-      if applied.len() < *arity {
-        Ok(Value::TaggedCtor { tag: tag.clone(), arity: *arity, applied })
-      } else {
-        Ok(Value::Tagged { tag: tag.clone(), values: Arc::new(applied) })
-      }
-    },
-    other => Err(LxError::type_err(format!("cannot call {}, not a function", other.type_name()), span)),
-  }
+  call::call_value(f, arg, span)
 }

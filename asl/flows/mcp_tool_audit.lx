@@ -1,0 +1,119 @@
+-- GOAL: Audit all MCP servers against 10 engineering scenarios.
+-- 10 scenarios: writing code, debugging, testing, code review, deploying, incidents,
+--   refactoring, new service setup, data investigation, secret rotation.
+-- Connect to each server, list tools, assess coverage per scenario.
+-- Classify: pass (works for scenarios), partial (missing some tools), fail (broken/useless).
+-- Identify dead weight (tools that serve no scenario) and critical gaps (missing tools).
+-- Output: markdown report with summary, failures, and priority fix order.
+-- Source: mcp-toolbelt/arch_diagrams/mcp_tool_audit
+
+use std/mcp
+use std/json
+use std/fs
+use std/md
+
+Protocol ServerStatus = {name: Str  status: Str  tool_count: Int  issues: List}
+
+scenarios = [
+  {name: "writing-code"    freq: "daily"     weight: 10}
+  {name: "debugging"       freq: "daily"     weight: 10}
+  {name: "testing"         freq: "daily"     weight: 8}
+  {name: "code-review"     freq: "daily"     weight: 9}
+  {name: "deploying"       freq: "weekly"    weight: 7}
+  {name: "incidents"       freq: "monthly"   weight: 8}
+  {name: "refactoring"     freq: "weekly"    weight: 6}
+  {name: "new-service"     freq: "quarterly" weight: 5}
+  {name: "investigation"   freq: "weekly"    weight: 7}
+  {name: "secret-rotation" freq: "monthly"   weight: 4}
+]
+
++main = () {
+  mcp_config = fs.read ".mcp.json" ^ | json.parse ^
+  server_names = mcp_config | keys
+
+  $echo "auditing {server_names | len} MCP servers against {scenarios | len} scenarios\n"
+
+  results = server_names | map (name) {
+    config = mcp_config | get name ^
+    audit_server name config
+  }
+
+  pass = results | filter (r) r.status == "pass"
+  partial = results | filter (r) r.status == "partial"
+  fail = results | filter (r) r.status == "fail"
+
+  total_tools = results | map (.tool_count) | sum
+  dead_weight = results
+    | filter (r) r.status == "fail"
+    | map (.tool_count) | sum
+
+  report = md.doc [
+    md.h1 "MCP Tool Audit"
+    md.para "{results | len} servers, {total_tools} tools"
+    md.h2 "Summary"
+    md.list [
+      "Pass: {pass | len}"
+      "Partial: {partial | len}"
+      "Fail: {fail | len}"
+      "Dead weight: {dead_weight} tools ({dead_weight * 100 / total_tools}%)"
+    ]
+    md.h2 "Failed Servers"
+    md.table ["Server" "Tools" "Issues"]
+      (fail | map (r) [r.name (to_str r.tool_count) (r.issues | join ", ")])
+    md.h2 "Partial Servers"
+    md.table ["Server" "Tools" "Issues"]
+      (partial | map (r) [r.name (to_str r.tool_count) (r.issues | join ", ")])
+  ]
+
+  md.render report | (out) fs.write "audit_report.md" out ^
+  $echo "report written to audit_report.md"
+}
+
+audit_server = (name config) {
+  command = config."command" ?? name
+  args = config."args" ?? []
+
+  result = mcp.connect {command: command args: args}
+  result ? {
+    Ok client -> {
+      tools_result = mcp.list_tools client
+      tools_result ? {
+        Ok tools -> {
+          mcp.close client
+          issues = assess_tools name tools
+          status = issues | empty? ? "pass" : (issues | len > 3 ? "fail" : "partial")
+          $echo "[{status}] {name}: {tools | len} tools, {issues | len} issues"
+          ServerStatus {name: name status: status tool_count: (tools | len) issues: issues}
+        }
+        Err e -> {
+          $echo "[fail] {name}: cannot list tools — {e}"
+          ServerStatus {name: name status: "fail" tool_count: 0 issues: ["cannot list tools"]}
+        }
+      }
+    }
+    Err e -> {
+      $echo "[fail] {name}: cannot connect — {e}"
+      ServerStatus {name: name status: "fail" tool_count: 0 issues: ["connection failed"]}
+    }
+  }
+}
+
+assess_tools = (server_name tools) {
+  tool_names = tools | map (.name)
+  issues := []
+
+  tool_names | empty? ? {
+    true -> issues <- [..issues "no tools"]
+    false -> ()
+  }
+
+  read_tools = tool_names | filter (t) re.is_match "list|get|read|show|search" t
+  write_tools = tool_names | filter (t) re.is_match "create|update|delete|set|write" t
+
+  read_tools | empty? ? {
+    true -> issues <- [..issues "no read tools"]
+    false -> ()
+  }
+
+  issues
+}

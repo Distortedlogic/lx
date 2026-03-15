@@ -1,0 +1,119 @@
+-- GOAL: Fine-tuning pipeline for specialist subagents.
+-- 4 candidates: audit-verifier, classifier, grader, db-query.
+-- Runtime: subagents self-report via langfuse-data-collector (traces, scores, datasets).
+-- Data pipeline: harvest ≥5K scored traces → filter by score → teacher enhancement for low-scored.
+-- Teacher: frontier model generates ideal responses for traces scoring below threshold.
+-- Training: Qwen2.5-Coder-32B base + QLoRA SFT (r=64, α=128, bf16, ~4-6h per type).
+-- Deployment: vLLM with specialist LoRAs (~200MB each), router decides specialist vs frontier.
+-- Feedback loop: deployed specialists feed traces back into langfuse for continuous refinement.
+-- Source: mcp-toolbelt/arch_diagrams/subagent_fine_tuning
+
+use std/agent
+use std/json
+use std/fs
+use std/http
+use std/mcp
+use std/ctx
+
+Protocol TraceData = {input: Str  output: Str  model: Str  score: Float}
+
+fine_tune_candidates = [
+  {name: "audit-verifier"  min_traces: 5000}
+  {name: "classifier"      min_traces: 5000}
+  {name: "grader"           min_traces: 5000}
+  {name: "db-query"         min_traces: 5000}
+]
+
++main = () {
+  langfuse = mcp.connect {command: "langfuse-mcp" args: []} ^
+
+  fine_tune_candidates | each (candidate) {
+    $echo "\n=== {candidate.name} ==="
+
+    traces = harvest_traces langfuse candidate.name candidate.min_traces
+    traces ? {
+      Err e -> $echo "  not ready: {e}"
+      Ok data -> {
+        $echo "  harvested {data | len} traces"
+        enhanced = teacher_enhance data
+        training_file = format_chatml candidate.name enhanced
+        $echo "  training file: {training_file}"
+        train candidate.name training_file
+      }
+    }
+  }
+
+  mcp.close langfuse
+}
+
+harvest_traces = (langfuse agent_name min_count) {
+  traces = mcp.call langfuse "list_traces" {
+    name: agent_name
+    limit: 10000
+  } ^
+
+  scored = traces | filter (t) {
+    score = get "score" t
+    score ? { Some _ -> true; None -> false }
+  }
+
+  scored | len < min_count ? {
+    true -> Err "only {scored | len}/{min_count} scored traces"
+    false -> {
+      good = scored | filter (t) t.score >= 0.7
+        | map (t) TraceData {
+          input: t.input
+          output: t.output
+          model: t.model ?? "unknown"
+          score: t.score
+        }
+      Ok good
+    }
+  }
+}
+
+teacher_enhance = (traces) {
+  low_scored = traces | filter (t) t.score < 0.5
+  high_scored = traces | filter (t) t.score >= 0.7
+
+  teacher = agent.spawn {command: "lx" args: ["run" "agents/teacher.lx"]} ^
+
+  enhanced = low_scored | pmap_n 3 (trace) {
+    improved = teacher ~>? {
+      action: "enhance"
+      input: trace.input
+      bad_output: trace.output
+      examples: high_scored | take 3
+    } ^
+    {..trace  output: improved.ideal_output  score: 0.9  source: "teacher"}
+  }
+
+  agent.kill teacher ^
+  [..high_scored ..enhanced]
+}
+
+format_chatml = (agent_name data) {
+  system_prompt = fs.read "agents/{agent_name}/system_prompt.md" ?? ""
+
+  chatml_lines = data | map (d) {
+    json.encode %{
+      "messages": [
+        %{"role": "system"  "content": system_prompt}
+        %{"role": "user"    "content": d.input}
+        %{"role": "assistant" "content": d.output}
+      ]
+    }
+  }
+
+  path = "training/{agent_name}_train.jsonl"
+  $^mkdir -p training
+  fs.write path (chatml_lines | join "\n") ^
+  path
+}
+
+train = (agent_name training_file) {
+  $echo "  submitting QLoRA SFT job..."
+  $echo "  base: Qwen2.5-Coder-32B, r=64, alpha=128, bf16"
+  $echo "  training file: {training_file}"
+  $echo "  (training would take ~4-6 hours)"
+}

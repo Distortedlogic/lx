@@ -251,19 +251,12 @@ impl<'src> Lexer<'src> {
     }
   }
 
-  fn tok(&self, kind: TokenKind, start: usize) -> Token {
-    Token::new(kind, Span::new(start as u32, 1))
-  }
-  fn tok2(&self, kind: TokenKind, start: usize) -> Token {
-    Token::new(kind, Span::from_range(start as u32, self.pos as u32))
-  }
+  fn tok(&self, kind: TokenKind, start: usize) -> Token { Token::new(kind, Span::new(start as u32, 1)) }
+  fn tok2(&self, kind: TokenKind, start: usize) -> Token { Token::new(kind, Span::from_range(start as u32, self.pos as u32)) }
+
   fn eat(&mut self, expected: char, yes: TokenKind, no: TokenKind, start: usize) -> Result<Option<Token>, LxError> {
-    if self.peek() == Some(expected) {
-      self.advance();
-      Ok(Some(self.tok2(yes, start)))
-    } else {
-      Ok(Some(self.tok(no, start)))
-    }
+    if self.peek() == Some(expected) { self.advance(); Ok(Some(self.tok2(yes, start))) }
+    else { Ok(Some(self.tok(no, start))) }
   }
 
   fn read_ident_or_keyword(&mut self, start: usize) -> Result<Token, LxError> {
@@ -284,11 +277,12 @@ impl<'src> Lexer<'src> {
       "par" => TokenKind::Par,
       "sel" => TokenKind::Sel,
       "assert" => TokenKind::Assert,
+      "yield" => TokenKind::Yield,
+      "with" => TokenKind::With,
       _ => TokenKind::Ident(text.to_string()),
     };
     Ok(Token::new(kind, span))
   }
-
 
   fn read_type_name(&mut self, start: usize) -> Result<Token, LxError> {
     while self.peek().is_some_and(|c| c.is_ascii_alphanumeric()) {
@@ -298,6 +292,7 @@ impl<'src> Lexer<'src> {
     let span = Span::from_range(start as u32, self.pos as u32);
     let kind = match text {
       "Protocol" => TokenKind::Protocol,
+      "MCP" => TokenKind::Mcp,
       _ => TokenKind::TypeName(text.to_string()),
     };
     Ok(Token::new(kind, span))

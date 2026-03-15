@@ -2,7 +2,7 @@
 
 `$` enters shell mode. One of lx's primary tool invocation mechanisms — agents frequently shell out to run commands, parse output, and act on results. For generalized tool invocation across MCP servers, see [agents.md](agents.md) and [stdlib-agents.md](stdlib-agents.md).
 
-## Four Variants
+## Three Variants
 
 ### `$` — Interpolated Shell
 
@@ -17,15 +17,6 @@ $echo "hello {name}"
 ```
 
 Everything after `$` until the newline is shell. `{expr}` sequences are evaluated by lx and substituted before the shell sees the command.
-
-### `$$` — Raw Shell
-
-No `{expr}` interpolation. For commands with literal braces:
-
-```
-$$find . -name "*.rs" -exec echo {} \;
-$$awk '{print $1}'
-```
 
 ### `$^` — Error-Propagating Shell
 
@@ -83,8 +74,6 @@ Extracts `.out` on exit code 0, propagates error on nonzero exit or spawn failur
 dir = $^pwd | trim
 lines = $^wc -l file.txt | trim | parse_int ^
 ```
-
-**`$$cmd`** — same return type as `$` (full `ShellResult`), no interpolation.
 
 **`${ ... }`** — returns `Result ShellResult ShellErr` for the last command in the block.
 

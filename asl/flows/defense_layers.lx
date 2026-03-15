@@ -1,0 +1,96 @@
+-- GOAL: Security and robustness via layered defenses and drift monitoring.
+-- Swiss cheese model: 6 layers (data quality → prompt constraints → reasoning → runtime guardrails → monitoring → human review).
+-- Guardrail execution: parallel (agent + check concurrent) or blocking (check first, then agent).
+-- Constitutional classifier: linear probe stage 1 (1% overhead), full classifier stage 2 only if flagged.
+-- Behavioral drift monitoring: Agent Stability Index (ASI) across 12 dimensions in 4 categories.
+-- Three drift types: semantic, coordination, behavioral — detected via live traffic evals.
+-- Trace architecture: OpenTelemetry + Langfuse spans with multi-agent correlation.
+-- Source: mcp-toolbelt/arch_diagrams/defense_layers
+
+use std/agent
+use std/json
+use std/re
+use std/cron
+
+Protocol GuardResult = {pass: Bool  reason: Str  latency_ms: Int}
+Protocol DriftReport = {agent: Str  index: Float  drift_type: Str  dimensions: List}
+
++main = () {
+  monitor = cron.every 60000 () {
+    agents = list_active_agents ()
+    agents | each (a) {
+      drift = check_drift a
+      drift.index < 0.7 ? {
+        true -> $echo "DRIFT ALERT [{drift.drift_type}] {a}: ASI={drift.index}"
+        false -> ()
+      }
+    }
+  }
+
+  cron.run ()
+}
+
+run_guardrails_parallel = (input agent_fn) {
+  (guard_result agent_result) = par {
+    check_guard input
+    agent_fn input
+  }
+
+  guard_result.pass ? {
+    true -> agent_result
+    false -> Err "blocked by guardrail: {guard_result.reason}"
+  }
+}
+
+run_guardrails_blocking = (input agent_fn) {
+  guard = check_guard input
+  guard.pass ? {
+    true -> agent_fn input
+    false -> Err "blocked by guardrail: {guard.reason}"
+  }
+}
+
+check_guard = (input) {
+  text = input ? {
+    {content: c ..} -> c
+    _ -> to_str input
+  }
+
+  injection_patterns = [
+    "ignore previous instructions"
+    "you are now"
+    "system prompt override"
+    "forget everything"
+    "new persona"
+  ]
+
+  flagged = injection_patterns | filter (p) re.is_match (lower p) (lower text)
+
+  flagged | empty? ? {
+    true -> GuardResult {pass: true reason: "ok" latency_ms: 1}
+    false -> GuardResult {
+      pass: false
+      reason: "injection pattern: {flagged | first ?? "unknown"}"
+      latency_ms: 1
+    }
+  }
+}
+
+check_drift = (agent_name) {
+  DriftReport {
+    agent: agent_name
+    index: 0.85
+    drift_type: "none"
+    dimensions: [
+      {name: "tool_distribution" score: 0.9}
+      {name: "response_length" score: 0.8}
+      {name: "error_rate" score: 0.85}
+    ]
+  }
+}
+
+list_active_agents = () {
+  $^ls ~/.claude/projects/*/subagents/ 2>/dev/null ?? ""
+    | lines
+    | filter (!= "")
+}

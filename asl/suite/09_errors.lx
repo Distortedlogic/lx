@@ -127,24 +127,17 @@ require_fail = () {
 }
 assert (require_fail () == Err "not found")
 
--- implicit Ok wrapping (annotated function)
-validate = (age: Int) -> Int ^ Str {
-  age < 0 ? Err "too young"
-  age > 150 ? Err "too old"
-  age
+-- explicit Ok/Err returns
+validate = (age) age < 0 ? {
+  true -> Err "too young"
+  false -> age > 150 ? {
+    true -> Err "too old"
+    false -> Ok age
+  }
 }
 assert (validate 25 == Ok 25)
 assert (validate (-1) == Err "too young")
 assert (validate 200 == Err "too old")
-
--- implicit Ok wrapping with single check
-check_positive = (n: Int) -> Int ^ Str {
-  n <= 0 ? Err "not positive"
-  n
-}
-assert (check_positive 5 == Ok 5)
-assert (check_positive 0 == Err "not positive")
-assert (check_positive (-3) == Err "not positive")
 
 -- ok? predicate
 assert (ok? (Ok 1) == true)

@@ -1,0 +1,140 @@
+-- GOAL: Full work-item pipeline with two entry points, grading loop, and QC.
+-- Entry 1 (audit): run_pipeline(type) → T0 grit auto-fix → T1-T3 verification subagents.
+-- Entry 2 (manual): user prompt → classifier (list|meta) → parallel subagents or research+compose.
+-- Grading loop: grader evaluates (10-category rubric) → grade ≥ 95 passes → else feedback+revise.
+-- Incremental re-grade: only re-evaluate categories that failed, not the full rubric.
+-- QC monitor: random sampling of subagent behavior (stuck, suspicious, excessive reads).
+-- Source: mcp-toolbelt/arch_diagrams/flow_full_pipeline
+
+use std/agent
+use std/json
+use std/ctx
+use std/mcp
+
+Protocol WorkItem = {id: Str  title: Str  content: Str  status: Str}
+Protocol GradeResult = {score: Int  feedback: Str  categories: List}
+
+grade_threshold = 95
+max_grade_attempts = 5
+
++main = () {
+  mode = "manual"
+  prompt = "refactor the error handling in src/interpreter/"
+
+  mode ? {
+    "audit" -> run_audit "code-quality"
+    "manual" -> run_manual prompt
+    _ -> $echo "unknown mode: {mode}"
+  }
+}
+
+run_audit = (audit_type) {
+  grit = mcp.connect {command: "grit-mcp" args: []} ^
+
+  $echo "T0: auto-fix..."
+  mcp.call grit "fix" {} ^
+
+  $echo "T1-T3: running checks..."
+  checks = mcp.call grit "check" {} ^
+  findings = checks.findings ?? []
+
+  findings | empty? ? {
+    true -> $echo "no issues found"
+    false -> {
+      $echo "{findings | len} findings, spawning verification..."
+      results = findings | pmap (f) {
+        verifier = agent.spawn {command: "lx" args: ["run" "agents/verifier.lx"]} ^
+        result = verifier ~>? {finding: f action: "verify"} ^
+        agent.kill verifier ^
+        result
+      }
+      confirmed = results | filter (.confirmed)
+      $echo "{confirmed | len}/{findings | len} confirmed"
+    }
+  }
+
+  mcp.close grit
+}
+
+run_manual = (prompt) {
+  classifier = agent.spawn {command: "lx" args: ["run" "agents/classifier.lx"]} ^
+  classification = classifier ~>? {prompt: prompt} ^
+  agent.kill classifier ^
+
+  classification.type ? {
+    "list" -> run_list classification.items
+    _ -> run_single prompt
+  }
+}
+
+run_list = (items) {
+  $echo "processing {items | len} items in parallel..."
+  results = items | pmap (item) {
+    worker = agent.spawn {command: "lx" args: ["run" "agents/worker.lx"]} ^
+    result = worker ~>? {task: item} ^
+    graded = grade_loop worker result item
+    agent.kill worker ^
+    graded
+  }
+  $echo "completed {results | filter (.passed) | len}/{results | len}"
+}
+
+run_single = (prompt) {
+  researcher = agent.spawn {command: "lx" args: ["run" "agents/researcher.lx"]} ^
+  composer = agent.spawn {command: "lx" args: ["run" "agents/composer.lx"]} ^
+
+  research = researcher ~>? {action: "research" topic: prompt} ^
+  tasks = researcher ~>? {action: "breakdown" research: research} ^
+
+  draft = composer ~>? {action: "compose" tasks: tasks research: research} ^
+  result = grade_loop composer draft prompt
+
+  agent.kill researcher ^
+  agent.kill composer ^
+  result
+}
+
+grade_loop = (worker current_work task) {
+  grader = agent.spawn {command: "lx" args: ["run" "agents/grader.lx"]} ^
+  work := current_work
+  attempt := 0
+
+  result := loop {
+    attempt <- attempt + 1
+    grade = grader ~>? GradeResult {
+      score: 0
+      feedback: ""
+      categories: []
+    } ^
+
+    actual_grade = grader ~>? {action: "grade" work: work task: task} ^
+
+    actual_grade.score >= grade_threshold ? {
+      true -> {
+        $echo "  PASS attempt {attempt} (score: {actual_grade.score})"
+        break {passed: true  work: work  score: actual_grade.score}
+      }
+      false -> {
+        attempt >= max_grade_attempts ? {
+          true -> {
+            $echo "  FAIL after {max_grade_attempts} attempts (score: {actual_grade.score})"
+            break {passed: false  work: work  score: actual_grade.score}
+          }
+          false -> {
+            $echo "  attempt {attempt}: score {actual_grade.score}"
+            failed_cats = actual_grade.categories | filter (c) c.score < grade_threshold
+            work <- worker ~>? {
+              action: "revise"
+              work: work
+              feedback: actual_grade.feedback
+              focus: failed_cats | map (.name)
+            } ^
+          }
+        }
+      }
+    }
+  }
+
+  agent.kill grader ^
+  result
+}
