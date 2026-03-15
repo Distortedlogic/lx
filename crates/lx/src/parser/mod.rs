@@ -1,8 +1,10 @@
+mod func;
 mod infix;
 mod paren;
 mod pattern;
 mod prefix;
 mod statements;
+mod type_ann;
 
 pub(crate) use infix::token_to_binop;
 
@@ -69,7 +71,7 @@ impl Parser {
       let value = self.parse_expr(0)?;
       let end = value.span.end();
       return Ok(SStmt::new(
-        Stmt::Binding(Binding { exported: false, mutable, target: BindTarget::Pattern(pat), value }),
+        Stmt::Binding(Binding { exported: false, mutable, target: BindTarget::Pattern(pat), type_ann: None, value }),
         Span::from_range(start, end),
       ));
     }
@@ -272,7 +274,6 @@ fn looks_like_record(p: &Parser) -> bool {
   }
   false
 }
-
 fn infix_bp(kind: &TokenKind) -> Option<(u8, u8)> {
   match kind {
     TokenKind::Question => Some((3, 4)),
@@ -297,4 +298,3 @@ fn postfix_bp(kind: &TokenKind) -> Option<u8> {
     _ => None,
   }
 }
-

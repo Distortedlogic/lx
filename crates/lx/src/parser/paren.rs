@@ -91,7 +91,8 @@ impl super::Parser {
             default: Box::new(operand),
           };
           let func = Expr::Func {
-            params: vec![Param { name: "_x".into(), default: None }],
+            params: vec![Param { name: "_x".into(), type_ann: None, default: None }],
+            ret_type: None,
             body: Box::new(SExpr::new(body, span)),
           };
           return Ok(Some(SExpr::new(func, span)));
@@ -116,74 +117,6 @@ impl super::Parser {
     Ok(None)
   }
 
-  pub(super) fn is_func_def(&self) -> bool {
-    let mut i = self.pos;
-    let mut strong = false;
-    let mut param_count = 0u32;
-    loop {
-      match self.tokens.get(i).map(|t| &t.kind) {
-        Some(TokenKind::LParen) => {
-          strong = true;
-          param_count += 1;
-          i += 1;
-          let mut depth = 1u32;
-          while depth > 0 {
-            match self.tokens.get(i).map(|t| &t.kind) {
-              Some(TokenKind::LParen) => { depth += 1; i += 1; },
-              Some(TokenKind::RParen) => { depth -= 1; i += 1; },
-              None | Some(TokenKind::Eof) => return false,
-              _ => { i += 1; },
-            }
-          }
-        },
-        Some(TokenKind::Ident(_)) | Some(TokenKind::Underscore) => {
-          if matches!(self.tokens.get(i).map(|t| &t.kind), Some(TokenKind::Underscore)) {
-            strong = true;
-          }
-          param_count += 1;
-          i += 1;
-          if self.tokens.get(i).map(|t| &t.kind) == Some(&TokenKind::Assign) {
-            strong = true;
-            i += 1;
-            let mut depth = 0i32;
-            loop {
-              match self.tokens.get(i).map(|t| &t.kind) {
-                None | Some(TokenKind::Eof) => return false,
-                Some(TokenKind::LParen | TokenKind::LBracket | TokenKind::LBrace) => {
-                  depth += 1;
-                  i += 1;
-                },
-                Some(TokenKind::RParen) if depth > 0 => {
-                  depth -= 1;
-                  i += 1;
-                },
-                Some(TokenKind::RBracket | TokenKind::RBrace) if depth > 0 => {
-                  depth -= 1;
-                  i += 1;
-                },
-                Some(TokenKind::RParen) if depth == 0 => break,
-                Some(TokenKind::Ident(_)) if depth == 0 => break,
-                _ => i += 1,
-              }
-            }
-          }
-        },
-        Some(TokenKind::RParen) => {
-          i += 1;
-          let is_body = self.tokens.get(i).map(|t| is_expr_start_kind(&t.kind)).unwrap_or(false);
-          if !is_body {
-            return false;
-          }
-          if !strong && param_count >= 2 && matches!(self.tokens.get(i).map(|t| &t.kind), Some(TokenKind::LParen)) {
-            return false;
-          }
-          return true;
-        },
-        _ => return false,
-      }
-    }
-  }
-
   pub(super) fn parse_func(&mut self, start: u32) -> Result<SExpr, LxError> {
     let mut params = Vec::new();
     let mut pat_desugars: Vec<(String, crate::ast::SPattern)> = Vec::new();
@@ -192,28 +125,40 @@ impl super::Parser {
       let tok = self.advance().clone();
       match tok.kind {
         TokenKind::Ident(name) => {
+          let type_ann = if *self.peek() == TokenKind::Colon {
+            self.advance();
+            Some(self.parse_type()?)
+          } else {
+            None
+          };
           let default = if *self.peek() == TokenKind::Assign {
             self.advance();
             Some(self.parse_expr(0)?)
           } else {
             None
           };
-          params.push(Param { name, default });
+          params.push(Param { name, type_ann, default });
         },
         TokenKind::Underscore => {
-          params.push(Param { name: "_".into(), default: None });
+          params.push(Param { name: "_".into(), type_ann: None, default: None });
         },
         TokenKind::LParen => {
           let pat = self.parse_tuple_pattern(tok.span.offset)?;
           let name = format!("_pat{pat_count}");
           pat_count += 1;
           pat_desugars.push((name.clone(), pat));
-          params.push(Param { name, default: None });
+          params.push(Param { name, type_ann: None, default: None });
         },
         _ => return Err(LxError::parse("expected parameter name", tok.span, None)),
       }
     }
     self.expect_kind(&TokenKind::RParen)?;
+    let ret_type = if *self.peek() == TokenKind::Arrow {
+      self.advance();
+      Some(self.parse_type()?)
+    } else {
+      None
+    };
     let mut body = if *self.peek() == TokenKind::LBrace && !super::looks_like_record(self) {
       self.parse_prefix()?
     } else {
@@ -226,6 +171,7 @@ impl super::Parser {
           exported: false,
           mutable: false,
           target: BindTarget::Pattern(pat),
+          type_ann: None,
           value: SExpr::new(Expr::Ident(name), body_span),
         }), body_span)
       }).collect();
@@ -233,39 +179,8 @@ impl super::Parser {
       body = SExpr::new(Expr::Block(stmts), Span::from_range(start, body_span.end()));
     }
     let end = body.span.end();
-    Ok(SExpr::new(Expr::Func { params, body: Box::new(body) }, Span::from_range(start, end)))
+    Ok(SExpr::new(Expr::Func { params, ret_type, body: Box::new(body) }, Span::from_range(start, end)))
   }
-}
-
-fn is_expr_start_kind(k: &TokenKind) -> bool {
-  matches!(
-    k,
-    TokenKind::Int(_)
-      | TokenKind::Float(_)
-      | TokenKind::StrStart
-      | TokenKind::RawStr(_)
-      | TokenKind::Ident(_)
-      | TokenKind::TypeName(_)
-      | TokenKind::LParen
-      | TokenKind::LBracket
-      | TokenKind::LBrace
-      | TokenKind::True
-      | TokenKind::False
-      | TokenKind::Unit
-      | TokenKind::Minus
-      | TokenKind::Bang
-      | TokenKind::Loop
-      | TokenKind::Break
-      | TokenKind::Assert
-      | TokenKind::Par
-      | TokenKind::Sel
-      | TokenKind::PercentLBrace
-      | TokenKind::Yield
-      | TokenKind::With
-      | TokenKind::Dollar
-      | TokenKind::DollarCaret
-      | TokenKind::DollarBrace
-  )
 }
 
 fn is_op_or_minus(k: &TokenKind) -> bool {

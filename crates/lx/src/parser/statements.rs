@@ -9,17 +9,34 @@ impl super::Parser {
       return Ok(None);
     }
     let next = self.tokens.get(self.pos + 1).map(|t| &t.kind);
-    let (mutable, reassign) = match next {
-      Some(TokenKind::Assign) => (false, false),
-      Some(TokenKind::DeclMut) => (true, false),
-      Some(TokenKind::Reassign) => (false, true),
+    let (mutable, reassign, has_type) = match next {
+      Some(TokenKind::Assign) => (false, false, false),
+      Some(TokenKind::DeclMut) => (true, false, false),
+      Some(TokenKind::Reassign) => (false, true, false),
+      Some(TokenKind::Colon) => {
+        if self.is_typed_binding() { (false, false, true) } else { return Ok(None); }
+      },
       _ => return Ok(None),
     };
     let TokenKind::Ident(name) = self.advance().clone().kind else { unreachable!() };
-    self.advance();
+    let type_ann = if has_type {
+      self.advance();
+      let ty = self.parse_type()?;
+      self.expect_kind(&TokenKind::Assign)?;
+      Some(ty)
+    } else {
+      self.advance();
+      None
+    };
     let value = self.parse_expr(0)?;
     let target = if reassign { BindTarget::Reassign(name) } else { BindTarget::Name(name) };
-    Ok(Some(Binding { exported, mutable, target, value }))
+    Ok(Some(Binding { exported, mutable, target, type_ann, value }))
+  }
+
+  fn is_typed_binding(&self) -> bool {
+    let mut j = self.pos + 2;
+    j = self.skip_type_tokens(j);
+    matches!(self.tokens.get(j).map(|t| &t.kind), Some(TokenKind::Assign))
   }
 
   pub(super) fn try_parse_type_def(&mut self, exported: bool, start: u32) -> Result<Option<SStmt>, LxError> {

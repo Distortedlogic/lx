@@ -124,7 +124,7 @@ impl Interpreter {
       Expr::List(elems) => self.eval_list(elems),
       Expr::Record(fields) => self.eval_record(fields),
       Expr::Map(entries) => self.eval_map(entries),
-      Expr::Func { params, body } => self.eval_func(params, body),
+      Expr::Func { params, body, .. } => self.eval_func(params, body),
       Expr::Match { scrutinee, arms } => self.eval_match(scrutinee, arms, span),
       Expr::Ternary { cond, then_, else_ } => self.eval_ternary(cond, then_, else_, span),
       Expr::Assert { expr: e, msg } => self.eval_assert(e, msg, span),

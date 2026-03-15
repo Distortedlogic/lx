@@ -38,14 +38,14 @@ impl super::Parser {
     if let TokenKind::TypeName(name) = self.peek().clone() {
       let tok = self.advance().clone();
       let mut args = Vec::new();
-      while self.is_type_atom_start() {
+      while self.is_type_app_arg_start() {
         args.push(self.parse_type_atom()?);
       }
-      if args.is_empty() {
-        Ok(SType::new(TypeExpr::Named(name), tok.span))
-      } else {
-        let end = args.last().unwrap().span.end();
+      if let Some(last) = args.last() {
+        let end = last.span.end();
         Ok(SType::new(TypeExpr::Applied(name, args), Span::from_range(tok.span.offset, end)))
+      } else {
+        Ok(SType::new(TypeExpr::Named(name), tok.span))
       }
     } else {
       self.parse_type_atom()
@@ -123,11 +123,22 @@ impl super::Parser {
     }
   }
 
-  pub(crate) fn is_type_atom_start(&self) -> bool {
+  pub(crate) fn is_type_start(&self) -> bool {
     matches!(
       self.peek(),
       TokenKind::TypeName(_)
         | TokenKind::Ident(_)
+        | TokenKind::LBracket
+        | TokenKind::LBrace
+        | TokenKind::PercentLBrace
+        | TokenKind::LParen
+    )
+  }
+
+  fn is_type_app_arg_start(&self) -> bool {
+    matches!(
+      self.peek(),
+      TokenKind::TypeName(_)
         | TokenKind::LBracket
         | TokenKind::LBrace
         | TokenKind::PercentLBrace
