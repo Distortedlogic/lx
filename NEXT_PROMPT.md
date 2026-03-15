@@ -44,12 +44,13 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 - `yield` coroutine: callback-based, JSON-line orchestrator protocol
 - `emit` agent-to-human output: fire-and-forget, callback-based, replaces `$echo` for user-facing output (planned)
 - `with` scoped bindings + record field update (`name.field <- value`)
-- 19 stdlib modules (12 original + 7 new):
+- 20 stdlib modules (12 original + 7 new + 1 standard agent):
   - Data: `std/json`, `std/md`, `std/re`, `std/math`, `std/time`
   - System: `std/fs`, `std/env`, `std/http`
   - Communication: `std/agent`, `std/mcp`, `std/ai`
   - Orchestration: `std/ctx`, `std/cron`, `std/tasks`, `std/audit`, `std/circuit`, `std/plan`
   - Intelligence: `std/knowledge`, `std/introspect`
+  - Standard agents: `std/agents/auditor`
 - LLM integration: `ai.prompt` (text → text) + `ai.prompt_with` (full options → result record). Backend: `claude -p --output-format json`
 - Task state machine: `std/tasks` — create/start/submit/audit/pass/fail/revise/complete, auto-persist, hierarchical subtasks
 - Structural quality checks: `std/audit` — is_empty/is_hedging/is_refusal/has_diff/references_task + rubric evaluate + quick_check
@@ -96,7 +97,7 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 5. ~~**`std/knowledge`**~~ — DONE. File-backed shared discovery cache.
 6. ~~**`std/plan`**~~ — DONE. Dynamic plan-as-data execution with revision.
 7. ~~**`std/introspect`**~~ — DONE. Agent self-awareness + action log.
-8. **`std/agents/auditor`** — LLM quality gate. Uses std/audit as pre-filter, std/ai for judgment.
+8. ~~**`std/agents/auditor`**~~ — DONE. LLM quality gate. Uses std/audit as pre-filter, std/ai for judgment.
 9. **`std/agents/router`** — prompt → specialist classification. Uses std/ai.
 10. **`std/agents/grader`** — rubric scoring, incremental re-grade. Uses std/ai.
 11. **`std/agents/planner`** — task decomposition into ordered subtasks. Uses std/ai.
@@ -127,12 +128,12 @@ crates/lx/src/
   checker/   mod.rs, synth.rs, types.rs
   interpreter/ mod.rs, agents.rs, apply.rs, collections.rs, eval.rs, modules.rs, patterns.rs, shell.rs
   builtins/  mod.rs, call.rs, str.rs, coll.rs, hof.rs, hof_extra.rs
-  stdlib/    mod.rs, ai.rs, audit.rs, circuit.rs, introspect.rs, knowledge.rs, plan.rs, tasks.rs, json.rs, json_conv.rs, ctx.rs, math.rs, fs.rs, env.rs, re.rs, md.rs, md_build.rs, agent.rs, mcp.rs, mcp_rpc.rs, mcp_stdio.rs, mcp_http.rs, http.rs, time.rs, cron.rs
+  stdlib/    mod.rs, agents_auditor.rs, ai.rs, audit.rs, circuit.rs, introspect.rs, knowledge.rs, plan.rs, tasks.rs, json.rs, json_conv.rs, ctx.rs, math.rs, fs.rs, env.rs, re.rs, md.rs, md_build.rs, agent.rs, mcp.rs, mcp_rpc.rs, mcp_stdio.rs, mcp_http.rs, http.rs, time.rs, cron.rs
   ast.rs, token.rs, value.rs, value_display.rs, env.rs, error.rs, span.rs, lib.rs
 crates/lx-cli/src/main.rs
-spec/          33 language spec files
+spec/          34 language spec files
 design/        11 impl design docs + DEVLOG + CURRENT_OPINION
-tests/         32 .lx test files
+tests/         33 .lx test files
   fixtures/    agent_echo.lx, mcp_test_server.py, yield_orchestrator.py, etc.
 flows/         14 .lx programs translating arch_diagrams
   specs/       14 target goal + scenario specs
@@ -155,7 +156,7 @@ flows/         14 .lx programs translating arch_diagrams
 | `dashmap` | Concurrent registries (agent, mcp, tool defs) |
 | `parking_lot` | Fast Mutex for Env, module cache |
 
-Custom code (~10800 lines: lexer, parser, checker, interpreter, AST, builtins, stdlib) is language-specific — no crate replaces it. When adding new stdlib, use established crates.
+Custom code (~11000 lines: lexer, parser, checker, interpreter, AST, builtins, stdlib) is language-specific — no crate replaces it. When adding new stdlib, use established crates.
 
 ## Adding a Stdlib Module
 
