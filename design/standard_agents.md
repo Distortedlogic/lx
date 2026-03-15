@@ -1,4 +1,4 @@
-# Standard Agents (std/agents/*)
+# Standard Agents (std/agents/*) — PLANNED, NOT IMPLEMENTED
 
 Standard agents are stdlib. They're imported with `use std/agents/auditor`, spawned, and communicated with via `~>?` like any agent. They ship with the language because an agent language's stdlib includes agents — the same way a general-purpose language's stdlib includes string functions.
 
@@ -146,7 +146,35 @@ Standard agents are `.lx` files that ship with the lx binary. `use std/agents/au
 
 Standard agents use `std/ai` internally for LLM reasoning. The auditor calls `ai.prompt_with` with a system prompt for quality evaluation. The grader calls it with the rubric as structured context. The router calls it with the catalog for classification. `std/ai` is the foundation — standard agents are compositions built on top.
 
+Standard agents use `emit` for progress reporting and status updates. Orchestrators can intercept `emit` output to render progress bars, update UIs, or route to logging systems. Agents should prefer `emit` over `$echo` for all user-facing output — `$echo` is for shell-level side effects, `emit` is for communication.
+
 `agent.spawn {name: "auditor"}` also works as shorthand — the runtime resolves standard agent names to their bundled definitions.
+
+## Negotiation Protocol (Standard Pattern)
+
+Before committing to work, agents can negotiate scope, constraints, and cost. This uses existing Protocol syntax — no new primitives needed.
+
+```
+Protocol Offer = {task: Str  constraints: Rec  budget: Int}
+Protocol Accept = {commitment: Str  estimated_cost: Int}
+Protocol Reject = {reason: Str  counter_offer: Any}
+```
+
+The router and planner standard agents will adopt this pattern. An agent that supports negotiation responds to `Offer` messages with either `Accept` or `Reject`. The caller can recursive negotiate on `counter_offer`.
+
+Standard agents that support negotiation: router (can reject if catalog doesn't cover the prompt), planner (can reject if task exceeds budget, counter-offer with reduced scope), grader (can reject if rubric has too many categories for budget).
+
+## Handoff Integration
+
+Standard agents participate in structured handoff chains. The auditor, grader, and router all accept `Handoff` context in their request messages and can produce handoff records in their responses.
+
+When an auditor rejects work, it produces a handoff with `tried` (what checks failed), `recommendations` (what to fix), and `uncertainties` (borderline findings). This handoff feeds directly into the worker's revision cycle.
+
+The planner agent generates plans compatible with `std/plan` — step records with dependencies. The orchestrator executes them via `plan.run` with dynamic revision, so the planner's output is directly executable with mid-flight adjustments.
+
+## Dialogue in Standard Agents
+
+Standard agents support both single-shot `~>?` and multi-turn `agent.dialogue` modes. In dialogue mode, the agent maintains conversation context — useful for iterative grading where the grader explains its reasoning and the worker asks clarifying questions, or for router negotiation where the prompt is refined through conversation.
 
 ## Future Standard Agents
 

@@ -66,6 +66,9 @@ enum Expr {
     Assert { expr: Box<SExpr>, msg: Option<Box<SExpr>> },
 
     Dbg(Box<SExpr>),
+
+    Stream { agent: Box<SExpr>, msg: Box<SExpr> },
+    Checkpoint { name: String, body: Vec<Spanned<Stmt>> },
 }
 ```
 
@@ -267,6 +270,10 @@ enum UnaryOp { Neg, Not }
 `Pipe` is a separate node (not `Apply`) because the pipe threading logic (data-last insertion) is different from normal application. The interpreter handles `a | f` as `Apply(f, a)` but the AST preserves the distinction for diagnostics and formatting.
 
 `Dbg` is an AST node, not a function call, because it captures the source text of its argument at compile time for display.
+
+`Stream` is the AST node for `~>>?`. Distinct from `Binary` because streaming has different runtime semantics (returns a lazy iterator, not a single value).
+
+`Checkpoint` captures the checkpoint name (string literal) and block body. `rollback` is a built-in function that triggers a `BreakSignal`-like mechanism targeting the named checkpoint.
 
 ## Cross-References
 

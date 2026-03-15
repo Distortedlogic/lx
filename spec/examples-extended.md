@@ -188,3 +188,5 @@ use std/json
 ```
 
 Uses: `json.parse` for config loading, `merge` for layered config, `json.encode_pretty` for output.
+
+More agentic examples (streaming, checkpoint, blackboard, negotiation) are in [examples-agentic.md](examples-agentic.md).

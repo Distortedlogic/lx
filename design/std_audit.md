@@ -1,4 +1,4 @@
-# std/audit Design
+# std/audit Design — PLANNED, NOT IMPLEMENTED
 
 Structural response quality checks with configurable rubrics.
 

@@ -1,0 +1,101 @@
+-- 27_tasks.lx
+-- Tests: std/tasks module (task state machine + persistence)
+
+use std/tasks
+use std/fs
+
+-- === Store creation ===
+store = tasks.empty () ^
+
+-- === Task creation ===
+id = tasks.create store {title: "fix auth bug" tags: ["security"]} ^
+assert (len id > 0) "tasks.create returns id"
+
+-- === Get task ===
+task = tasks.get store id ^
+assert (task.title == "fix auth bug") "task title"
+assert (task.status == "todo") "task initial status"
+assert (task.tags == ["security"]) "task tags"
+assert (len task.created_at > 0) "task has created_at"
+assert (task.parent == "") "task default parent"
+
+-- === Hierarchical tasks ===
+sub_id = tasks.create store {title: "read token flow" parent: id} ^
+sub = tasks.get store sub_id ^
+assert (sub.parent == id) "subtask parent set"
+
+kids = tasks.children store id
+assert (len kids == 1) "children count"
+assert (kids.0.title == "read token flow") "child title"
+
+-- === State machine: todo -> in_progress ===
+tasks.start store id ^
+started = tasks.get store id ^
+assert (started.status == "in_progress") "start: todo -> in_progress"
+
+-- === Update without status change ===
+tasks.update store id {notes: "found issue in validate.rs"} ^
+updated = tasks.get store id ^
+assert (updated.notes == "found issue in validate.rs") "update notes"
+assert (updated.status == "in_progress") "update preserves status"
+
+-- === Invalid transition ===
+bad = tasks.start store id
+assert (err? bad == true) "start on in_progress returns Err"
+
+-- === submit ===
+tasks.submit store id {output: "patched validate.rs"} ^
+submitted = tasks.get store id ^
+assert (submitted.status == "submitted") "submit: in_progress -> submitted"
+assert (submitted.output == "patched validate.rs") "submit sets output"
+
+-- === audit ===
+tasks.audit store id ^
+audited = tasks.get store id ^
+assert (audited.status == "pending_audit") "audit: submitted -> pending_audit"
+
+-- === fail ===
+tasks.fail store id {feedback: "missed refresh path" failed_categories: ["completeness"]} ^
+failed = tasks.get store id ^
+assert (failed.status == "failed") "fail: pending_audit -> failed"
+assert (failed.feedback == "missed refresh path") "fail sets feedback"
+
+-- === revise -> resubmit -> re-audit -> pass ===
+tasks.revise store id ^
+revised = tasks.get store id ^
+assert (revised.status == "revision") "revise: failed -> revision"
+
+tasks.submit store id {output: "fixed refresh path too"} ^
+tasks.audit store id ^
+tasks.pass store id ^
+passed = tasks.get store id ^
+assert (passed.status == "passed") "pass: pending_audit -> passed"
+
+-- === complete ===
+tasks.complete store id {result: "fixed in commit abc123"} ^
+done = tasks.get store id ^
+assert (done.status == "complete") "complete: passed -> complete"
+assert (done.result == "fixed in commit abc123") "complete sets result"
+
+-- === List by status ===
+id2 = tasks.create store {title: "second task"} ^
+all = tasks.list store {}
+assert (len all == 3) "list all count"
+
+todos = tasks.list store {status: "todo"}
+assert (len todos == 2) "list by status"
+
+-- === Persistence: save + load ===
+tmp = "/tmp/lx_tasks_test.json"
+tasks.save store tmp ^
+loaded_store = tasks.load tmp ^
+loaded_task = tasks.get loaded_store id ^
+assert (loaded_task.title == "fix auth bug") "load preserves title"
+assert (loaded_task.status == "complete") "load preserves status"
+loaded_all = tasks.list loaded_store {}
+assert (len loaded_all == 3) "load preserves all tasks"
+
+-- cleanup
+fs.remove tmp ^
+
+log.info "27_tasks: all passed"

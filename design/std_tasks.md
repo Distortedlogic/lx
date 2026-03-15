@@ -1,4 +1,4 @@
-# std/tasks Design
+# std/tasks Design — PLANNED, NOT IMPLEMENTED
 
 In-process task state machine with hierarchical subtasks and JSON persistence.
 

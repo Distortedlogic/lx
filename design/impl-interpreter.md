@@ -136,6 +136,36 @@ When applying a function with arity N to a single tuple of size N, the tuple is 
 
 `par`, `sel`, `pmap`, `pmap_n`, `timeout` are implemented but **sequential**. `par` evaluates each statement in order and collects results into a tuple. Real async (tokio) is planned.
 
+### Checkpoint / Rollback
+
+`eval(Checkpoint { name, body })`:
+1. Snapshot all mutable bindings in scope
+2. Evaluate body statements sequentially
+3. If `rollback name` is called (via `RollbackSignal`), restore the snapshot and return `Err {rolled_back: name}`
+4. If body completes normally, discard snapshot and return the result
+
+`rollback` is a built-in function that emits a `RollbackSignal` (similar to `BreakSignal`). Only valid inside a matching `checkpoint` block.
+
+### Stream (`~>>?`)
+
+`eval(Stream { agent, msg })`:
+1. Evaluate `agent` and `msg`
+2. Send the message to the agent
+3. Return a lazy `Value::List` that reads incremental `yield` responses from the agent until the agent completes or errors
+4. Currently sequential (returns collected list). Real streaming depends on async runtime.
+
+### Emit
+
+`eval(Emit { value })`:
+1. Evaluate `value`
+2. If `emit_handler` is set, call it with the value. Handler signature: `Arc<dyn Fn(Value, Span) -> Result<(), LxError>>`
+3. If no handler: `println!` for `Value::Str`, `serde_json::to_string` for structured values
+4. Return `Value::Unit`
+
+Unlike `YieldHandler`, `EmitHandler` returns `Result<(), LxError>` (not `Result<Value, LxError>`) — emit is fire-and-forget, no response is expected.
+
+In subprocess agent mode, the default handler writes `{"type":"emit","value":...}` as a JSON-line to stdout, consistent with the agent JSON-line protocol.
+
 ## Division and Index Panics
 
 Division by zero (`/`, `//`, `%`) is a runtime panic. For safe alternatives: `math.safe_div` returns `Result`.

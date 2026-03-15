@@ -39,21 +39,19 @@ Each phase produces a working, testable increment. No phase depends on a later p
 - Interpreter: collection values, structural equality, `get`/`contains?`/`len`/`empty?`, pattern matching with destructuring
 - Value: implement `PartialEq` for structural equality
 
-**Test cases:** each collection type, spread merge, negative indexing, slicing, nested destructuring, guard conditions, exhaustiveness warnings, no truthiness (non-Bool in ternary is type error).
+**Test cases:** each collection type, spread merge, slicing, nested destructuring, guard conditions, no truthiness (non-Bool in ternary is type error).
 
 ## Phase 4: Iteration + Lazy Sequences
 
-**Goal:** `map`, `filter`, `fold`, ranges, lazy evaluation, `loop`/`break`, iterator protocol.
+**Goal:** `map`, `filter`, `fold`, ranges, `loop`/`break`.
 
 **Deliverables:**
 - Built-in HOFs: `map`, `filter`, `fold`, `flat_map`, `each`, `sort`, `sort_by`, `rev`, `take`, `drop`, `zip`, `enumerate`, `partition`, `group_by`, `chunks`, `windows`, `find`, `any?`, `all?`, `count`, `sum`, `product`, `uniq`, `flatten`, `intersperse`, `scan`, `take_while`, `drop_while`, `min`, `max`, `min_by`, `max_by`
-- Ranges: `1..10`, `1..=10`, lazy production
-- Lazy sequences: pipeline stages propagate laziness, forcing ops (`collect`, `sort`, `len`)
-- Iterator protocol: any record with `next: () -> Maybe a` is iterable
+- Ranges: `1..10`, `1..=10` (eager — produce lists)
 - `loop`/`break` with optional value
 - `nat`, `cycle` built-ins
 
-**Test cases:** each HOF, lazy evaluation (verify infinite range doesn't materialize), iterator protocol with custom generator, Fibonacci example, loop with break value.
+**Test cases:** each HOF, range materialization, loop with break value.
 
 ## Phase 5: Error Handling
 
@@ -72,183 +70,130 @@ Each phase produces a working, testable increment. No phase depends on a later p
 
 ## Phase 6: Shell Integration
 
-**Goal:** `$`, `$$`, `$^`, `${ }` — the core scripting use case.
+**Goal:** `$`, `$^`, `${ }` — the core scripting use case.
 
 **Deliverables:**
-- Lexer: shell mode after `$`/`$$`/`$^`/`${`, `{expr}` interpolation re-entry, shell mode until newline (or `}` for blocks)
+- Lexer: shell mode after `$`/`$^`/`${`, `{expr}` interpolation re-entry, shell mode until newline (or `}` for blocks)
 - Parser: shell expressions as AST nodes with interpolation holes
-- Interpreter: execute via `tokio::process::Command` through `/bin/sh -c`, capture stdout/stderr/exit code
-- `$cmd` returns `Result ShellResult ShellErr`
+- Interpreter: execute via `std::process::Command` through `/bin/sh -c`, capture stdout/stderr/exit code
+- `$cmd` returns `Result {out err code} ShellErr`
 - `$^cmd` returns `Str ^ ShellErr` (extract stdout on exit 0)
-- `$$cmd` — no interpolation
-- `${ }` — multi-line block, shared shell session
+- `${ }` — multi-line block
 - OS pipe vs language pipe disambiguation (parens to exit shell mode)
 
-**Test cases:** simple commands, interpolation, `$^` with pipe to `trim`, exit code handling, `$$` with literal braces, multi-line block, spawn failure returns Err.
+**Test cases:** simple commands, interpolation, `$^` with pipe to `trim`, exit code handling, multi-line block, spawn failure returns Err.
 
 ## Phase 7: Modules + Type Checker
 
 **Goal:** `use` imports, `+` exports, structural type checking.
 
-**Status:** Module system is **implemented**. Type checker is **not yet implemented** (type annotations are parse-and-skip).
+**Status:** DONE.
 
-**Implemented (Session 12):**
-- Module system: file = module, `use ./...`, `use ../...`, aliasing `: name`, selective `{name1 name2}`
+**Implemented:**
+- Module system: file = module, `use ./...`, `use ../...`, `use std/...`, aliasing `: name`, selective `{name1 name2}`
 - Export: `+` prefix at column 0 (both lowercase and uppercase bindings/types)
-- Circular import detection
-- Module caching (same file loaded once)
+- Circular import detection, module caching
 - Variant constructor scoping (tagged union constructors imported as bare names)
-- Test: `suite/11_modules/` (main.lx + lib_math.lx + lib_types.lx) — PASS
-
-**Not yet implemented:**
-- `use std/...` imports (needs stdlib infrastructure from Phase 9)
-- Import conflict detection (selective imports with same name)
-- Import shadowing warnings
 - Bidirectional type checker: annotation propagation, type synthesis, unification
-- Structural subtyping: record width subtyping, function types
-- Tagged union types: nominal, variant uniqueness within module
-- Generic types with instantiation
-- `^` in type signatures: `-> Str ^ IoErr`
 - `lx check` subcommand
+- Type annotations on params, return types, bindings: `(x: Int y: Str) -> Result Int Str { ... }`
+- `^` in type signatures: `-> Str ^ IoErr`
 
-**Test cases:** import resolution, circular import error, type mismatch errors, structural subtyping, generic instantiation, exhaustiveness checking on tagged unions, `^` type compatibility.
+**Test cases:** import resolution, circular import error, type annotations, `lx check` validation.
 
 ## Phase 8: Concurrency
 
 **Goal:** `par`, `sel`, `pmap` with structured concurrency.
 
-**Deliverables:**
-- `par { stmts }` — spawn each as tokio task, collect tuple, cancel on error
-- `sel { expr -> handler }` — race, cancel losers, bind `it`
-- `pmap f xs` — parallel map via JoinSet, preserve order
-- Cancellation: SIGTERM for shell, abort for HTTP, recursive cancel for nested par/sel
-- Mutable capture restriction: compile error for `:=` bindings captured in par/sel/pmap
-- `timeout n` built-in: completes after n seconds
+**Status:** Syntax implemented, execution is **sequential**. Real async (tokio) planned.
 
-**Test cases:** par collects results, par cancels on error, sel takes first, sel cancels others, pmap preserves order, pmap with error propagation, mutable capture error, timeout in sel.
+**Implemented:**
+- `par { stmts }` — evaluates sequentially, collects into tuple
+- `sel { expr -> handler }` — evaluates first arm only
+- `pmap f xs` / `pmap_n limit f xs` — sequential map
+- `timeout n` — sequential (just evaluates)
+
+**Not yet implemented:** actual concurrent execution, cancellation, mutable capture restriction.
 
 ## Phase 9: Standard Library
 
-**Goal:** Full stdlib as specified in stdlib.md and stdlib-modules.md.
+**Goal:** Core stdlib modules.
 
-**Deliverables:**
-- `std/fs` — fs ops via `tokio::fs` (read, write, walk, stat, mkdir, rm, copy, move, glob, read_lines, open/close)
-- `std/net/http` — reqwest wrapper (get, post, put, delete, request)
-- `std/json` — serde_json wrapper (parse, encode, encode_pretty)
-- `std/csv` — csv crate wrapper (parse, parse_with, encode)
-- `std/toml` — toml crate wrapper
-- `std/yaml` — serde_yaml wrapper
-- `std/time` — chrono/tokio::time (now, elapsed, sleep, sec, ms, min, format, parse, timeout)
-- `std/fmt` — formatting functions
-- `std/math` — numeric functions
-- `std/env` — env vars, args, exit
-- `std/io` — stdin/stdout (lazy stdin, read_line, print, println)
-- `std/bit` — bitwise ops
-- `std/crypto` — sha2/md5/hmac crates
-- `std/os` — process info
-- `std/rand` — rand crate wrapper
-- `std/re` — regex crate wrapper
+**Status:** DONE — 12 modules implemented.
 
-**Test cases:** per-module test files exercising each function.
+**Implemented:**
+- `std/json` — serde_json (parse, encode, encode_pretty)
+- `std/ctx` — immutable key-value context (load, save, get, set, merge)
+- `std/math` — numeric functions (abs, sqrt, pow, log, trig, clamp, safe_div)
+- `std/fs` — filesystem (read, write, exists, mkdir, rm, copy, move, glob, walk, read_lines)
+- `std/env` — environment (args, get, set, cwd)
+- `std/re` — regex (is_match, match, find_all, replace, replace_all, split)
+- `std/md` — markdown parsing (parse, extract sections/code/links, build, render)
+- `std/agent` — agent spawning/messaging (spawn, channel, list, stop)
+- `std/mcp` — MCP client (connect, list_tools, call, stdio/HTTP transports)
+- `std/http` — HTTP client (get, post, put, delete)
+- `std/time` — time (now, format, parse, sleep, sec, ms, min)
+- `std/cron` — scheduled execution (every, at, cancel)
 
 ## Phase 10: Toolchain Polish
 
-**Goal:** `lx fmt`, `lx test`, `lx repl`, `lx notebook`, `lx watch`, `lx init`, diagnostics polish.
+**Status:** PARTIALLY DONE.
+
+**Implemented:**
+- `lx test` — run tests/*.lx, collect assert failures, report counts
+- `lx check` — type checker subcommand
+- `lx agent` — agent mode (long-lived process for cron/channels)
+
+**Not yet implemented:**
+- `lx fmt` — see [impl-formatter.md](impl-formatter.md) for design
+- `lx repl` — interactive loop
+- `lx watch` — file watcher
+
+## Phase 11: `emit` Primitive
+
+**Goal:** Dedicated agent-to-human output primitive replacing `$echo` for user-facing output.
+
+**Status:** PLANNED.
 
 **Deliverables:**
-- `lx fmt` — AST pretty-printer with canonical rules (2-space indent, pipe-per-line when >2 stages, record inline when ≤3 fields)
-- `lx test` — run test/*.lx, collect assert failures, report counts
-- `lx repl` — rustyline loop, persistent bindings, print non-unit results
-- `lx notebook` — `---` separated blocks, shared env
-- `lx watch` — notify-based file watcher, re-run on change
-- `lx init` — create project skeleton (pkg.lx, src/, test/)
-- `lx run --json` — miette JSON reporter
-- `lx check --strict` — warnings as errors
-- Diagnostic polish: pipeline stage/element info, `^` trace formatting, parse error suggestions
+- Lexer: `emit` keyword → `TokenKind::Emit`
+- Parser: `emit expr` as prefix expression (same pattern as `yield`)
+- AST: `Emit { value: Box<SExpr> }` variant
+- Interpreter: `EmitHandler` callback (non-blocking, unlike `YieldHandler`). Default: `println!` for strings, JSON for structured values. Returns `()`.
+- Subprocess protocol: emits `{"type":"emit","value":...}` JSON-line to stdout
+- Works with `Protocol` validation: `emit StatusUpdate {type: "status" msg: "done"}`
 
-**Test cases:** formatter round-trips, test runner collects failures, REPL state persists, watch mode triggers on change.
+**Test cases:** emit string, emit record, emit with Protocol, emit in loop, emit default (no handler), emit in subprocess agent.
 
-## Phase 11: Data Ecosystem
+## Phase 12: Dialogue, Interceptors, Handoff
 
-**Goal:** `std/df`, `std/db`, `std/num`, `std/ml`, `std/plot` — the modules that make lx a Python replacement for data work.
+**Goal:** Multi-turn agent dialogue, message middleware, structured handoff — extensions to `std/agent`.
 
-**Deliverables:**
-- `std/df` — Polars wrapper: read_csv/parquet/json, filter/select/group_by/agg/join, lazy evaluation, section-to-column-expr translation, write_csv/parquet
-- `std/db` — rusqlite (SQLite) + duckdb: open/close, query/exec, prepared statements, transactions, SQL `{expr}` parameterization
-- `std/num` — ndarray wrapper: from_list, element-wise ops, dot/norm/normalize, statistics (mean/median/std_dev/percentile), rolling_mean, correlation, histogram
-- `std/ml` — candle-core or ort (ONNX Runtime): model loading, text embeddings, batch embedding, cosine similarity, classification, generation
-- `std/plot` — charming (SVG) + custom terminal renderer: bar/line/scatter/histogram/pie/heatmap, title/labels, render to terminal or SVG file
-
-**Phase 11 can be built incrementally:** `std/df` and `std/db` are highest value (cover 80% of data scripting). `std/num` and `std/plot` are medium. `std/ml` is most complex (model loading, tokenization). Each module is independent — implement in any order.
-
-**Test cases:** per-module test files. df: read CSV, filter/group/agg pipeline, join, write. db: CRUD, transactions, parameterized queries. num: vectorized ops, statistics, correlation. ml: embed + similarity. plot: chart construction, SVG output.
-
-## Phase 12: Agent Ecosystem
-
-**Goal:** `std/agent`, `std/mcp`, `std/ctx`, `std/md`, `std/cron` — the primitives that make lx an agentic workflow language. `lx agent` subcommand.
+**Status:** PLANNED.
 
 **Deliverables:**
-- `std/agent` — Agent spawning via subprocess (lx scripts or external), message passing (JSON over stdin/stdout), channels (mpsc local, Unix domain sockets cross-process), task submission and polling
-- `std/mcp` — MCP client (JSON-RPC 2.0 over stdio, HTTP streaming planned): connect, list tools/resources/prompts, invoke tools with structured args, read resources
-- `std/ctx` — Immutable key-value context backed by serde_json. load/save to JSON files, get/set/remove/merge operations
-- `std/md` — Markdown parsing (pulldown-cmark): parse to structured document, extract sections/code blocks/frontmatter/links, build documents from node list, render back to markdown string
-- `std/ai` — LLM integration via Claude Code CLI: `prompt` (simple text → text) and `prompt_with` (full options → result record with session_id/cost/turns). Uses `std::process::Command` to invoke `claude -p --output-format json`. No new dependencies.
-- `std/cron` — Recurring task scheduling: `every interval f`, `at cron_expr f`, cancel handles. Requires `lx agent` mode (long-lived process)
-- `lx agent script.lx` — CLI subcommand that runs scripts in agent mode (keeps process alive for cron/channels). `--daemon` flag for background execution
+- `agent.dialogue` / `agent.dialogue_turn` / `agent.dialogue_history` / `agent.dialogue_end` — session management with accumulated history
+- `agent.intercept` — middleware wrapping for `~>` and `~>?`, composable by nesting
+- `agent.handoff` / `agent.as_context` — structured context transfer between agents
+- `Handoff` Protocol — standard shape for context transfer records
+- JSON-line protocol extension: `dialogue_turn` / `dialogue_response` message types
+- All functions added to `stdlib/agent.rs`
 
-**Phase 12 can be built incrementally:** `std/ctx` and `std/md` are simplest (pure data processing). `std/mcp` is the highest-value agentic primitive. `std/agent` requires the most design work (process model, message format). `std/cron` requires `lx agent` mode.
+**Test cases:** dialogue open/turn/end, dialogue history accumulation, interceptor chain ordering, interceptor short-circuit, handoff with Protocol validation, as_context rendering.
 
-**Test cases:** per-module test files. ctx: load/save/get/set round-trips. md: parse/extract/render round-trips. mcp: tool listing and invocation (mock server). agent: spawn/ask/channel (integration tests). cron: scheduling fires at correct intervals.
+## Phase 13: Plan Revision, Introspection, Knowledge
 
-## Dependency Summary
+**Goal:** Dynamic plan execution, agent self-awareness, shared discovery cache — three new stdlib modules.
 
-```toml
-[dependencies]
-miette = { version = "7", features = ["fancy"] }
-num-bigint = "0.4"
-num-traits = "0.2"
-thiserror = "2"
-tokio = { version = "1", features = ["full"] }
-regex = "1"
-reqwest = { version = "0.13", features = ["json"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-toml = "0.8"
-serde_yaml = "0.9"
-csv = "1"
-sha2 = "0.10"
-md-5 = "0.10"
-hmac = "0.12"
-rand = "0.9"
-chrono = { version = "0.4", features = ["serde"] }
-rustyline = "15"
-notify = "8"
-```
+**Status:** PLANNED.
 
-Most already in the workspace or in reference/. New additions: `miette`, `num-bigint`, `num-traits`, `rustyline`, `notify`, `sha2`, `md-5`, `hmac`. Everything else is already used.
+**Deliverables:**
+- `std/plan` — `plan.run`, `plan.replan`, `plan.continue`, `plan.abort`, `plan.skip`, `plan.insert_after`. Topological step ordering, `on_step` callback, `PlanAction` tagged union.
+- `std/introspect` — `introspect.self`, `budget`, `elapsed`, `actions`, `is_stuck`, `strategy_shift`, `mark`. Interpreter-level action logging (bounded buffer).
+- `std/knowledge` — `knowledge.create`, `store`, `get`, `query`, `keys`, `remove`, `merge`, `expire`. File-backed JSON with provenance metadata and file-level locking.
 
-### Phase 11 Dependencies (Data Ecosystem)
+**Test cases:** plan execution with continue, plan replan mid-execution, plan insert_after, plan abort. Introspect actions list, budget tracking, is_stuck detection, strategy_shift reset. Knowledge create/store/get/query, provenance metadata, expire.
 
-```toml
-polars = { version = "0.46", features = ["lazy", "csv", "parquet", "json"] }
-rusqlite = { version = "0.32", features = ["bundled"] }
-duckdb = { version = "1.1", features = ["bundled"] }
-ndarray = "0.16"
-ndarray-stats = "0.6"
-charming = "0.4"
-candle-core = "0.8"
-candle-transformers = "0.8"
-candle-nn = "0.8"
-tokenizers = "0.21"
-```
+## Future Phases
 
-`polars` and `charming` are in reference/. `ndarray`, `rusqlite`, `duckdb`, `candle-*`, and `tokenizers` are new additions.
-
-### Phase 12 Dependencies (Agent Ecosystem)
-
-```toml
-pulldown-cmark = "0.12"
-tokio-cron-scheduler = "0.13"
-```
-
-`pulldown-cmark` for markdown parsing. `tokio-cron-scheduler` for recurring tasks (planned). `std/mcp` uses direct JSON-RPC 2.0 over stdio (no external crate). HTTP streaming transport will require `reqwest` + `tokio` when added. Agent spawning uses `std::process::Command`.
+For the stdlib buildout roadmap (std/ai, std/tasks, std/audit, standard agents, etc.), see [stdlib_roadmap.md](stdlib_roadmap.md) and `NEXT_PROMPT.md`.

@@ -158,40 +158,29 @@ memory = ctx.set "last_run" (time.now () | to_str) memory
 ctx.save "memory.json" memory ^
 ```
 
-## Workflow Patterns
+## Streaming (`~>>?`)
 
-### Retry with Escalation
-
-```
-analyze = (path) {
-  result = retry 3 () analyzer ~>? {path}
-  result ? {
-    Ok r  -> r
-    Err e -> senior ~>? {path error: e.msg} ^
-  }
-}
-```
-
-### Checkpoint and Resume
+`~>>?` sends a message and returns a lazy sequence of partial results. The agent yields incremental chunks; the caller iterates as they arrive.
 
 ```
-run_pipeline = (state_path) {
-  state = ctx.load state_path ?? %{}
-  step = ctx.get "step" state ?? "start"
+stream = agent ~>>? {task: "review" files: large_list}
+stream | each (chunk) display chunk
+```
 
-  step ? {
-    "start" -> {
-      data = fetch_data ()
-      ctx.save state_path (ctx.set "step" "process" (ctx.set "data" data %{})) ^
-      run_pipeline state_path
-    }
-    "process" -> {
-      data = ctx.get "data" state ^
-      result = process data
-      ctx.save state_path (ctx.set "step" "done" (ctx.set "result" result state)) ^
-    }
-    "done" -> ctx.get "result" state ^
-  }
+Composes with pipes and error handling:
+
+```
+agent ~>>? {task: "analyze"} | filter (.important) | each (r) log.info r.summary
+```
+
+The receiving agent uses `yield` to emit chunks. When the agent returns normally, the stream ends. If the agent errors, the stream produces `Err` on the next read.
+
+### Streaming in par/sel
+
+```
+sel {
+  agent ~>>? request | take 1 -> it
+  timeout 30                   -> Err "timeout"
 }
 ```
 
@@ -199,81 +188,65 @@ run_pipeline = (state_path) {
 
 Protocols define the expected shape of agent messages. They validate record structure at the boundary — missing fields, wrong types, and non-record values are caught immediately with clear diagnostics.
 
-### Defining Protocols
-
 ```
 Protocol ReviewRequest = {task: Str  path: Str  depth: Int = 3}
-Protocol CalcRequest = {op: Str  value: Int}
-```
-
-Fields have a name and a type. Optional fields have defaults (filled in when missing). Type checking uses runtime type names: `Str`, `Int`, `Float`, `Bool`, `List`, `Record`, `Map`, `Tuple`, `Any`.
-
-### Using Protocols
-
-Apply a Protocol to a record to validate it. Returns the validated record on success (with defaults filled in). Runtime error on failure.
-
-```
 msg = ReviewRequest {task: "audit" path: "src/"}
 -- msg == {task: "audit" path: "src/" depth: 3}
-
-CalcRequest {op: "double" value: 5}
--- returns {op: "double" value: 5}
-
-CalcRequest {op: "double" value: "five"}
--- RUNTIME ERROR: Protocol CalcRequest: field 'value' expected Int, got Str
-
-CalcRequest {op: "double"}
--- RUNTIME ERROR: Protocol CalcRequest: missing required field 'value'
-```
-
-### With Agent Communication
-
-Protocol validation happens before the message reaches the agent:
-
-```
-Protocol ReviewRequest = {task: Str  path: Str}
-reviewer = {handler: (msg) analyze msg.path msg.task}
 
 reviewer ~>? ReviewRequest {task: "audit" path: "src/"} ^
 -- validates, then sends {task: "audit" path: "src/"} to reviewer
 ```
 
-### Structural Subtyping
+See [agents-protocol.md](agents-protocol.md) for full details: structural subtyping, `Any` type, error messages, exports.
 
-Extra fields are allowed — Protocols check that required fields exist with correct types, but don't reject additional fields:
+## Multi-Turn Dialogue
 
-```
-Protocol Minimal = {id: Int}
-Minimal {id: 1 name: "extra" tags: [1 2]}
--- returns {id: 1 name: "extra" tags: [1 2]}
-```
-
-### `Any` Type
-
-Use `Any` for fields that accept any value:
+Single `~>?` calls are request-response. For sustained multi-turn conversation between agents (debugging together, iterative refinement, negotiation), use `agent.dialogue` sessions. See [agents-dialogue.md](agents-dialogue.md) for full spec.
 
 ```
-Protocol Flexible = {key: Str  value: Any}
-Flexible {key: "count" value: 42}       -- ok
-Flexible {key: "name" value: "alice"}    -- ok
-Flexible {key: "items" value: [1 2 3]}   -- ok
+session = agent.dialogue worker {role: "reviewer"} ^
+r1 = agent.dialogue_turn session "look at auth module" ^
+r2 = agent.dialogue_turn session "check payments too" ^
+agent.dialogue_end session
 ```
 
-### Exports
+## Structured Handoff
 
-Protocols can be exported with `+` and imported via `use`:
+When one agent finishes a phase and another takes over, `agent.handoff` transfers structured context — not just results, but what was tried, what assumptions were made, and recommendations. See [agents-handoff.md](agents-handoff.md) for full spec.
+
+## Message Interceptors
+
+`agent.intercept` wraps an agent with middleware for cross-cutting concerns: tracing, rate-limiting, context injection, policy enforcement. See [agents-intercept.md](agents-intercept.md) for full spec.
 
 ```
-+Protocol ReviewRequest = {task: Str  path: Str}
+traced = agent.intercept worker (msg next) {
+  log.debug "sending: {msg | to_str}"
+  next msg
+}
+traced ~>? {task: "review"} ^
 ```
+
+## Dynamic Plan Revision
+
+`std/plan` executes plan-as-data with runtime revision — steps can be added, removed, or replaced based on intermediate results. See [agents-plans.md](agents-plans.md) for full spec.
 
 ## Implementation Status
 
 - `~>` (send) and `~>?` (ask) — implemented as infix operators
+- `~>>?` (stream) — planned (depends on async runtime)
 - `Protocol` — implemented as keyword with runtime validation
 - `yield` — implemented as keyword with callback-based orchestrator protocol
+- `emit` — agent-to-human output primitive, callback-based, fire-and-forget (planned)
 - `MCP` declarations — implemented as keyword with typed tool contracts and validation
 - `with` / field update — implemented with scoped bindings and mutable record field assignment
+- `checkpoint`/`rollback` — planned
+- Capability attenuation on `agent.spawn` — planned
+- Multi-turn dialogue (`agent.dialogue`) — planned
+- Structured handoff (`agent.handoff`) — planned
+- Message interceptors (`agent.intercept`) — planned
+- Dynamic plan revision (`std/plan`) — planned
+- Agent introspection (`std/introspect`) — planned
+- Shared knowledge cache (`std/knowledge`) — planned
 - Sequential evaluation (like par/sel); real async is future work
 - Agents are records with handler functions; subprocess agents via `std/agent` (`__pid` records)
 - `agent.spawn` — implemented in `std/agent` (subprocess spawning, JSON-line protocol)
@@ -287,5 +260,12 @@ Protocols can be exported with `+` and imported via `use`:
 - Module details: [stdlib-agents.md](stdlib-agents.md)
 - Error handling in agents: [errors.md](errors.md) (^, ??)
 - Design rationale: [design.md](design.md) (agent communication syntax)
-- Advanced features: [agents-advanced.md](agents-advanced.md) (yield, MCP declarations, with/field update)
+- Protocol details: [agents-protocol.md](agents-protocol.md) (structural subtyping, Any, errors, exports)
+- Advanced features: [agents-advanced.md](agents-advanced.md) (emit, yield, MCP declarations, with/field update)
+- Multi-turn dialogue: [agents-dialogue.md](agents-dialogue.md)
+- Structured handoff: [agents-handoff.md](agents-handoff.md)
+- Message interceptors: [agents-intercept.md](agents-intercept.md)
+- Dynamic plan revision: [agents-plans.md](agents-plans.md)
+- Agent introspection: [stdlib-introspect.md](stdlib-introspect.md)
+- Shared knowledge cache: [stdlib-knowledge.md](stdlib-knowledge.md)
 - Test suite: [../tests/14_agents.lx](../tests/14_agents.lx)

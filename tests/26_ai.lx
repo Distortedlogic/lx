@@ -1,0 +1,33 @@
+-- 26_ai.lx
+-- Tests: std/ai module (LLM integration via Claude CLI)
+
+use std/ai
+use std/env
+
+assert (type_of ai.prompt == "Func") "ai.prompt is a function"
+assert (type_of ai.prompt_with == "Func") "ai.prompt_with is a function"
+
+-- Live tests only run when LX_TEST_AI env var is set
+run_live = env.get "LX_TEST_AI" ?? ""
+
+run_live != "" ? {
+  true -> {
+    response = ai.prompt "What is 2+2? Reply with ONLY the digit."
+    assert (ok? response == true) "ai.prompt returns Ok"
+    text = response ^
+    assert (len text > 0) "ai.prompt returns non-empty text"
+
+    full = ai.prompt_with {
+      prompt: "What is 3+5? Reply with ONLY the digit."
+      system: "You are a calculator. Output only the number, nothing else."
+      max_turns: 1
+    }
+    assert (ok? full == true) "ai.prompt_with returns Ok"
+    rec = full ^
+    assert (len rec.text > 0) "ai.prompt_with has text"
+    assert (len rec.session_id > 0) "ai.prompt_with has session_id"
+  }
+  false -> ()
+}
+
+log.info "26_ai: all passed"

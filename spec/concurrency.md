@@ -184,10 +184,31 @@ xs | pmap (x) {
 
 The `LX_THREADS` env var is reserved for future concurrent execution.
 
+## Event-Driven Concurrency
+
+For reactive patterns where agents respond to events rather than direct messages, use `std/events` (pub/sub). For shared mutable state across concurrent agents, use `std/blackboard`. See [stdlib-modules.md](stdlib-modules.md) for APIs.
+
+```
+use std/events
+use std/blackboard
+
+bus = events.create ()
+board = blackboard.create ()
+
+par {
+  events.subscribe bus "result" (evt) blackboard.write evt.key evt.val board
+  worker1 ~>? {task: "part1" bus} ^
+  worker2 ~>? {task: "part2" bus} ^
+}
+```
+
 ## Cross-References
 
 - Agent patterns built on par/sel/pmap: [agents.md](agents.md)
+- Agent streaming (`~>>?`): [agents.md](agents.md#streaming)
 - Agent stdlib (spawn, ask, channel): [stdlib-agents.md](stdlib-agents.md)
+- Shared workspace: [stdlib-modules.md](stdlib-modules.md#stdblackboard)
+- Pub/sub events: [stdlib-modules.md](stdlib-modules.md#stdevents)
 - Implementation: [impl-interpreter.md](../design/impl-interpreter.md) (par/sel/pmap evaluation), [impl-builtins.md](../design/impl-builtins.md) (pmap built-in)
 - Design decisions: [design.md](design.md) (structured concurrency, mutable capture restriction)
 - Test suite: [13_concurrency.lx](../tests/13_concurrency.lx)

@@ -15,7 +15,7 @@ Two crates. The library is the language engine — everything from source text t
 
 Parser generators (lalrpop, pest, chumsky) and lexer generators (logos) were evaluated. A hand-written approach wins for lx specifically:
 
-**Lexing has modal transitions.** `$` switches to shell mode (raw text until newline). `r/` switches to regex mode. `$$` and `$^` are single tokens. `"..."` has `{expr}` interpolation which re-enters expression mode mid-string. Logos can handle simple tokens but the mode switching requires a hand-written state machine anyway — at that point logos adds complexity without reducing code.
+**Lexing has modal transitions.** `$` switches to shell mode (raw text until newline). `r/` switches to regex mode. `$^` is a single token. `"..."` has `{expr}` interpolation which re-enters expression mode mid-string. Logos can handle simple tokens but the mode switching requires a hand-written state machine anyway — at that point logos adds complexity without reducing code.
 
 **Pratt parsing is the natural fit for lx's precedence table.** The 17-level precedence table with postfix `^`, sections `(* 2)`, and the three `?` modes maps directly to a Pratt parser. Each precedence level is a number. Adding/changing operators means changing a number. Parser generators require encoding precedence in grammar rules, which is indirect and harder to modify.
 
@@ -43,7 +43,7 @@ Already in the workspace. Powers `r/pattern/flags` at runtime. The lx regex lite
 
 ### Async Runtime: `tokio`
 
-Already the workspace standard. Powers `par`/`sel`/`pmap` via `tokio::task::JoinSet` (structured concurrency). Shell commands via `tokio::process::Command`. The lx interpreter runs on tokio and uses it for all concurrent and I/O operations.
+Not currently used at runtime. The interpreter is synchronous. Shell commands use `std::process::Command`. `par`/`sel`/`pmap` execute sequentially. Tokio is planned for real async concurrency.
 
 ### HTTP Client: `reqwest`
 
@@ -53,37 +53,12 @@ Already in the workspace. Powers `std/net/http`. The lx runtime wraps reqwest ca
 
 Standard ecosystem crates. lx values serialize to/from serde's data model. A lx map becomes a serde map, a lx list becomes a serde sequence.
 
-### REPL: `rustyline`
+### Agent Ecosystem (implemented)
 
-Line editing, history, and completion for `lx repl`. Lightweight, well-maintained. The alternative (reedline) is heavier but has more features — rustyline is sufficient for v1.
-
-### File Watching: `notify`
-
-Powers `lx watch`. Cross-platform filesystem event notifications. Already battle-tested.
-
-### Hashing: `sha2`, `md-5`, `hmac`
-
-Powers `std/crypto`. Standard RustCrypto crates.
-
-### Random: `rand`
-
-Already in reference/. Powers `std/rand`.
-
-### Data Ecosystem (Phase 11)
-
-- **polars** — already in reference/. Powers `std/df`. LazyFrame maps to lx's lazy evaluation model.
-- **rusqlite** + **duckdb** — powers `std/db`. SQLite for transactional, DuckDB for analytical queries.
-- **ndarray** — powers `std/num`. Contiguous typed arrays with SIMD-friendly operations.
-- **candle-core** / **ort** — powers `std/ml`. Local ML inference (embeddings, classification).
-- **charming** — already in reference/. Powers `std/plot`. SVG chart generation.
-
-### Agent Ecosystem (Phase 12)
-
-- **pulldown-cmark** — Markdown parser for `std/md`. Produces an AST that maps to lx `MdDoc` values.
-- **cron** (or `tokio-cron-scheduler`) — Powers `std/cron` recurring tasks (planned).
-- `std/mcp` — implemented via direct JSON-RPC 2.0 over subprocess stdin/stdout (no external crate). HTTP streaming transport planned (will need `reqwest` + `tokio`).
+- **pulldown-cmark** — Markdown parser for `std/md`.
+- `std/mcp` — JSON-RPC 2.0 over subprocess stdin/stdout + HTTP streaming transport via `reqwest`.
 - `std/agent` — subprocess spawning via `std::process::Command`, JSON-line protocol over stdin/stdout.
-- Agent channels use `tokio::sync::mpsc` for local communication (planned).
+- `std/cron` — cron expression scheduling (uses `chrono`).
 
 ### Not Needed (v1)
 
@@ -118,13 +93,9 @@ Env — scope chain (HashMap<String, Value> + parent pointer)
 
 ## Concurrency Implementation
 
-`par { a; b; c }` compiles to: spawn each expression as a tokio task via `JoinSet`, await all, cancel on first error.
+Currently **sequential**. `par { a; b; c }` evaluates each expression in order and collects results into a tuple. `sel` evaluates the first arm. `pmap f xs` maps sequentially. The syntax and semantics are in place — real async (tokio) is planned but not yet wired in.
 
-`sel { expr1 -> handler1; expr2 -> handler2 }` compiles to: spawn each expression, `tokio::select!` on the first to complete, cancel others, run the winning handler.
-
-`pmap f xs` compiles to: spawn `f(x)` for each element via `JoinSet`, collect results in order.
-
-The interpreter's `eval` function is `async fn eval(&mut self, expr: &Expr) -> Result<Value>`. Everything is async from the start — synchronous operations just `.await` immediately.
+The interpreter's `eval` function is `fn eval(&mut self, expr: &SExpr) -> Result<Value, LxError>`. Synchronous.
 
 ## Module Structure (Actual)
 

@@ -8,8 +8,13 @@ Complete stdlib for the three use cases: agent communication, workflow orchestra
 |---|---|
 | `std/json`, `std/md`, `std/re`, `std/math`, `std/time` | Data |
 | `std/fs`, `std/env`, `std/http` | System |
-| `std/agent`, `std/mcp` | Communication |
+| `std/agent`, `std/mcp`, `std/ai` | Communication |
 | `std/ctx`, `std/cron` | Orchestration |
+| — | — |
+| **Newly specified (not yet implemented):** | |
+| `std/blackboard` | Coordination |
+| `std/events` | Coordination |
+| `std/diag` | Visualization |
 
 ## Planned Modules (deterministic, Rust)
 
@@ -42,6 +47,36 @@ Trace collection for observability and fine-tuning. Records input/output/timing/
 ### std/circuit
 
 Circuit breakers for agentic loops. Turn counter (hard stop at N turns). Wall-clock timeout. Token budget tracking. Action repetition detection (last N actions compared for similarity). Returns structured reason when breaker fires. Not an agent — a mechanism that agents use.
+
+### std/diag
+
+Program visualization. Two entry points: `lx diagram` CLI subcommand (user-facing) and `std/diag` library (programmatic). Parses lx source, walks the AST to extract a workflow graph (agents as nodes, `~>`/`~>?`/`~>>?` as edges, `par`/`sel` as structural groups, pipes as sequential flow, match arms as decision points). Emits Mermaid flowchart text. No external dependencies — Mermaid text renders in GitHub, VS Code, any markdown viewer. Uses the existing lexer/parser internally. Spec: `spec/stdlib-diag.md`.
+
+### std/knowledge
+
+Shared discovery cache for cross-agent collaboration. File-backed JSON with provenance metadata (source, confidence, tags) and query support. Any agent with the path can read/write. Prevents duplicate tool calls when multiple agents work on the same problem. Functions: `create`, `store`, `get`, `query`, `keys`, `remove`, `merge`, `expire`. File-level locking for concurrent access.
+
+Spec: `spec/stdlib-knowledge.md`
+
+### std/introspect
+
+Agent self-awareness. Runtime metadata about identity, capabilities, budget consumption, action history, and stuck detection. Interpreter collects action log as side effect of evaluation (bounded to last 1000). Functions: `self`, `parent`, `capabilities`, `budget`, `elapsed`, `turn_count`, `actions`, `actions_since`, `mark`, `is_stuck`, `strategy_shift`, `similar_actions`.
+
+Spec: `spec/stdlib-introspect.md`
+
+### std/plan
+
+Dynamic plan execution with revision. Plans are lists of step records with dependencies. `plan.run` executes in topological order, calling `on_step` callback after each step. Callback returns `PlanAction`: `continue`, `replan` (replace remaining steps), `insert_after` (add steps), `skip`, `abort`. Complements `yield` (single-point pause) and `checkpoint`/`rollback` (undo).
+
+Spec: `spec/agents-plans.md`
+
+### std/blackboard
+
+Concurrent shared workspace for multi-agent collaboration within `par` blocks. Unlike `ctx` (single-owner, immutable), a blackboard supports concurrent reads and writes from multiple agents. Last-write-wins conflict resolution. Functions: `create`, `read`, `write`, `watch`, `unwatch`, `keys`, `snapshot`. Backed by a concurrent map (dashmap or similar).
+
+### std/events
+
+Topic-based pub/sub event bus. Decouples producers from consumers. Functions: `create`, `publish`, `subscribe`, `unsubscribe`, `topics`. Handlers invoked synchronously in subscription order. Enables reactive multi-agent systems where agents respond to environmental changes, not just direct messages.
 
 ## Planned Standard Agents (lx programs, LLM judgment)
 
@@ -108,7 +143,7 @@ The dependency chain determines build order:
 
 1. ~~Type annotations + type checker~~ (DONE — bidirectional inference, unification, `lx check`)
 2. ~~Regex literals~~ (DONE — `r/\d+/flags`, first-class Regex values)
-3. std/ai (foundational — all standard agents depend on this for LLM reasoning)
+3. ~~std/ai~~ (DONE — `ai.prompt` + `ai.prompt_with`, Claude CLI backend)
 4. std/tasks (no dependencies, enables grading loops)
 5. std/audit (no dependencies, enables auditor agent)
 6. std/agents/auditor (depends on std/audit, std/ai)
@@ -116,12 +151,20 @@ The dependency chain determines build order:
 8. std/agents/grader (depends on std/tasks, std/ai)
 9. std/agents/planner (depends on std/tasks, std/ai)
 10. std/circuit (no dependencies, enables monitor)
-11. std/memory (benefits from MCP Embeddings but works without)
-12. std/trace (no dependencies)
-13. std/agents/monitor (depends on std/circuit, std/trace)
-14. std/agents/reviewer (depends on std/memory, std/trace, std/ai)
-15. MCP Embeddings (external service, can be added anytime)
-16. MCP Workflow (external service, can be added anytime)
+11. std/introspect (no dependencies, enables adaptive agents and auto-populated handoffs)
+12. std/knowledge (no dependencies, enables cross-agent discovery sharing)
+13. std/plan (no dependencies, enables dynamic plan revision — enhances planner agent)
+14. std/blackboard (no dependencies, enables parallel agent coordination)
+15. std/events (no dependencies, enables reactive agent patterns)
+16. std/memory (benefits from MCP Embeddings but works without)
+17. std/trace (no dependencies)
+18. std/agents/monitor (depends on std/circuit, std/trace)
+19. std/agents/reviewer (depends on std/memory, std/trace, std/ai)
+20. MCP Embeddings (external service, can be added anytime)
+21. MCP Workflow (external service, can be added anytime)
+22. std/diag (no dependencies, uses existing lexer/parser, can be added anytime)
+
+Note: `agent.dialogue`, `agent.intercept`, and `agent.handoff` are extensions to `std/agent` (item 3 dependency chain), not separate modules. They're implemented as additional functions in `stdlib/agent.rs`.
 
 ## Mapping to Arch Diagram Flows
 
@@ -139,5 +182,10 @@ The dependency chain determines build order:
 | scenario_post_hoc_review | std/ai, std/agents/reviewer, std/memory, std/trace |
 | discovery_system | std/ai, std/tasks, std/trace, MCP Embeddings |
 | tool_generation | std/ai, std/tasks, std/agents/auditor |
-| defense_layers | std/agents/monitor, std/circuit, std/trace |
+| defense_layers | std/agents/monitor, std/circuit, std/trace, capability attenuation |
 | mcp_tool_audit | std/tasks, std/audit |
+| multi_agent_coordination | std/blackboard, std/events, `~>>?` streaming, std/knowledge, agent.dialogue |
+| safe_delegation | capability attenuation, checkpoint/rollback, agent.handoff |
+| (any flow) | std/diag (visualize any flow's structure as a diagram) |
+| (any multi-step flow) | std/plan (dynamic plan revision), std/introspect (adaptive strategy) |
+| (any multi-agent flow) | agent.intercept (tracing/rate-limiting), agent.handoff (context transfer) |

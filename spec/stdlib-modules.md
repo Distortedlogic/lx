@@ -139,3 +139,71 @@ find_all pattern s       -- [Str]: all match texts
 ```
 
 Patterns can be regex literals (`r/\d+/`) or strings (`"\\d+"`). Regex literals are preferred — no double-escaping. Flags: `r/pattern/i` (case insensitive), `m` (multiline), `s` (dotall), `x` (extended).
+
+## std/blackboard
+
+Concurrent shared workspace for multi-agent collaboration within `par` blocks. Unlike `ctx` (single-owner, immutable), a blackboard supports concurrent reads and writes from multiple agents.
+
+```
+create ()                 -- Board (empty blackboard)
+read key board            -- Maybe a (read a key)
+write key val board       -- () (write a key, last-write-wins)
+watch key callback board  -- WatchId (invoke callback on key change)
+unwatch id board          -- ()
+keys board                -- [Str] (all keys)
+snapshot board            -- %{Str: a} (atomic snapshot of all entries)
+```
+
+`Board` is an opaque type backed by a concurrent map. Thread-safe for use inside `par`/`pmap` blocks.
+
+### Patterns
+
+Cross-agent awareness during parallel review:
+```
+use std/blackboard
+
+board = blackboard.create ()
+par {
+  security_agent ~>? {task: "review" board} ^
+  perf_agent ~>? {task: "review" board} ^
+}
+findings = blackboard.snapshot board
+```
+
+Inside each agent, they read/write to the shared board:
+```
+blackboard.write "security_issues" issues board
+peer_findings = blackboard.read "perf_issues" board ?? []
+```
+
+## std/events
+
+Topic-based pub/sub event bus. Decouples event producers from consumers — publishers don't know who's listening.
+
+```
+create ()                      -- Bus (empty event bus)
+publish bus topic msg          -- () (broadcast to all subscribers of topic)
+subscribe bus topic handler    -- SubId (register handler for topic)
+unsubscribe bus id             -- ()
+topics bus                     -- [Str] (all active topics)
+```
+
+`Bus` is an opaque type. `SubId` is an opaque handle for unsubscribing. Handlers are `(msg) -> ()` functions invoked synchronously in subscription order.
+
+### Patterns
+
+Reactive multi-agent monitoring:
+```
+use std/events
+
+bus = events.create ()
+events.subscribe bus "file_changed" (evt) {
+  analyzer ~>? {path: evt.path action: "reanalyze"} ^
+}
+events.subscribe bus "test_failed" (evt) {
+  log.warn "test failed: {evt.name}"
+  notifier ~> {alert: evt.name}
+}
+
+fs_watcher ~>? {watch: "src/" bus}
+```

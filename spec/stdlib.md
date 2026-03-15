@@ -257,7 +257,13 @@ Regex literals are preferred — they avoid double-escaping. String patterns sti
 | `std/ctx` | Context: load, save, get, set, empty, merge |
 | `std/md` | Markdown: parse, sections, code_blocks, headings, render, doc, h1, h2, para, code, list |
 | `std/ai` | AI/LLM: prompt, prompt_with (CLI backend) |
-| `std/agent` | Agent: spawn, kill, subprocess communication |
+| `std/agent` | Agent: spawn, kill, capability attenuation, subprocess communication |
 | `std/mcp` | MCP: connect, list_tools, call, close (stdio + HTTP transports) |
+| `std/blackboard` | Shared workspace: create, read, write, watch, keys (concurrent multi-agent access) |
+| `std/events` | Pub/sub event bus: create, publish, subscribe, unsubscribe (topic-based broadcast) |
+| `std/diag` | Program visualization: `lx diagram` CLI + library. Extract workflow graph from lx source, emit Mermaid |
+| `std/knowledge` | Shared discovery cache: create, store, get, query, expire (file-backed, cross-agent, provenance metadata) |
+| `std/introspect` | Agent introspection: self, budget, actions, is_stuck, strategy_shift (runtime metadata) |
+| `std/plan` | Dynamic plan execution: run, replan, continue, abort, skip, insert_after (plan-as-data with revision) |
 
-Agent ecosystem modules (`std/ai`, `std/agent`, `std/mcp`, `std/ctx`, `std/md`) are in [stdlib-agents.md](stdlib-agents.md). Module API details are in [stdlib-modules.md](stdlib-modules.md).
+Agent ecosystem modules (`std/ai`, `std/agent`, `std/mcp`, `std/ctx`, `std/md`) are in [stdlib-agents.md](stdlib-agents.md). Data ecosystem modules (`std/plot`, `std/df`, etc.) are in [stdlib-data.md](stdlib-data.md). Program visualization (`std/diag`) is in [stdlib-diag.md](stdlib-diag.md). Shared discovery cache in [stdlib-knowledge.md](stdlib-knowledge.md). Agent introspection in [stdlib-introspect.md](stdlib-introspect.md). Dynamic plan revision in [agents-plans.md](agents-plans.md). Module API details are in [stdlib-modules.md](stdlib-modules.md).

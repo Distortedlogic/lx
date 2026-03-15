@@ -53,9 +53,19 @@ Functions are not comparable. `f == g` is a runtime error regardless of whether 
 **Exit codes** — `main` returning `()` exits 0. `main` returning `Err _` exits 1. `main` returning an `Int` exits with that code. `env.exit n` for explicit control anywhere.
 
 **Stdin/stdout/stderr**:
-- `$echo` goes to stdout (returns result with `.out`)
+- `emit` goes to stdout (agent-to-human output — strings print directly, records are JSON-encoded)
+- `$echo` goes to stdout via shell (returns result with `.out`)
 - `log` goes to stderr
 - Shell commands handle stdin/stdout interaction
+
+**Agent output** — `emit` is the primary mechanism for agent-to-human communication:
+
+```
+emit "processing {items | len} items..."
+emit {type: "progress" step: 3 total: 10}
+```
+
+`emit` sends a value to whoever invoked the agent. In standalone mode, strings go to stdout directly, structured values (records, lists) are JSON-encoded. In orchestrated mode, the host's `EmitHandler` callback intercepts the value. `emit` returns `()` and does not block. See [agents-advanced.md](agents-advanced.md) for full semantics.
 
 **Logging** — Built-in `log` namespace with four level functions:
 

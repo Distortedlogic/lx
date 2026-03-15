@@ -1,4 +1,7 @@
 pub(crate) mod agent;
+mod ai;
+mod audit;
+mod circuit;
 mod cron;
 mod ctx;
 mod env;
@@ -11,6 +14,7 @@ pub(crate) mod mcp;
 mod md;
 mod md_build;
 mod re;
+mod tasks;
 mod time;
 
 use crate::interpreter::ModuleExports;
@@ -32,6 +36,10 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
         "http" => http::build(),
         "time" => time::build(),
         "cron" => cron::build(),
+        "ai" => ai::build(),
+        "tasks" => tasks::build(),
+        "audit" => audit::build(),
+        "circuit" => circuit::build(),
         _ => return None,
     };
     Some(ModuleExports {
@@ -44,5 +52,5 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
     if path.len() < 2 || path[0] != "std" {
         return false;
     }
-    matches!(path[1].as_str(), "json" | "ctx" | "math" | "fs" | "env" | "re" | "md" | "agent" | "mcp" | "http" | "time" | "cron")
+    matches!(path[1].as_str(), "json" | "ctx" | "math" | "fs" | "env" | "re" | "md" | "agent" | "mcp" | "http" | "time" | "cron" | "ai" | "tasks" | "audit" | "circuit")
 }

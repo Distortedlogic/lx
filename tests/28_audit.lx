@@ -1,0 +1,100 @@
+-- 28_audit.lx
+-- Tests: std/audit module (structural quality checks)
+
+use std/audit
+use std/fs
+
+-- === Built-in checks ===
+
+-- is_empty
+assert (audit.is_empty "" == true) "is_empty: empty string"
+assert (audit.is_empty "  \n  " == true) "is_empty: whitespace"
+assert (audit.is_empty "hello" == false) "is_empty: non-empty"
+
+-- is_too_short
+assert (audit.is_too_short "hi" 10 == true) "is_too_short: under"
+assert (audit.is_too_short "hello world this is long enough" 10 == false) "is_too_short: over"
+
+-- is_repetitive
+assert (audit.is_repetitive "ok" == false) "is_repetitive: single"
+assert (audit.is_repetitive "Same thing. Same thing. Same thing. Different." == true) "is_repetitive: repeated"
+assert (audit.is_repetitive "First point. Second point. Third point." == false) "is_repetitive: unique"
+
+-- is_hedging
+assert (audit.is_hedging "I think this might work" == true) "is_hedging: detected"
+assert (audit.is_hedging "The fix patches validate.rs" == false) "is_hedging: clean"
+assert (audit.is_hedging "Maybe we should try" == true) "is_hedging: maybe"
+
+-- is_refusal
+assert (audit.is_refusal "I can't help with that" == true) "is_refusal: detected"
+assert (audit.is_refusal "Here is the implementation" == false) "is_refusal: clean"
+assert (audit.is_refusal "As an AI, I'm unable to" == true) "is_refusal: combined"
+
+-- references_task
+assert (audit.references_task "Fixed the auth token refresh bug" "fix auth token refresh" == true) "refs_task: match"
+assert (audit.references_task "Updated the README" "fix auth token refresh" == false) "refs_task: no match"
+
+-- files_exist
+fs.write "/tmp/lx_audit_test.txt" "test" ^
+assert (audit.files_exist ["/tmp/lx_audit_test.txt"] == true) "files_exist: exists"
+assert (audit.files_exist ["/tmp/lx_no_such_file_xyz"] == false) "files_exist: missing"
+assert (audit.files_exist [] == true) "files_exist: empty list"
+fs.remove "/tmp/lx_audit_test.txt" ^
+
+-- has_diff
+assert (audit.has_diff "diff --git a/file.rs b/file.rs" == true) "has_diff: git diff"
+assert (audit.has_diff "+++ a/file\n--- b/file\n@@ -1,3 +1,3 @@" == true) "has_diff: unified"
+assert (audit.has_diff "I changed some things" == false) "has_diff: no diff"
+
+-- === Rubric + evaluate ===
+
+rubric = audit.rubric [
+  {name: "not_empty" weight: 50 check: (r) not (audit.is_empty r.output)}
+  {name: "long_enough" weight: 50 check: (r) not (audit.is_too_short r.output 10)}
+]
+
+-- passing case
+good = audit.evaluate rubric {output: "This is a detailed response to the task."}
+assert (good.passed == true) "evaluate: good output passes"
+assert (good.score == 100) "evaluate: good output score 100"
+assert (len good.failed == 0) "evaluate: no failures"
+
+-- failing case
+bad = audit.evaluate rubric {output: ""}
+assert (bad.passed == false) "evaluate: empty output fails"
+assert (bad.score == 0) "evaluate: empty score 0"
+assert (len bad.failed == 2) "evaluate: both categories failed"
+
+-- partial failure
+short = audit.evaluate rubric {output: "hi"}
+assert (short.passed == false) "evaluate: short fails"
+assert (short.score == 50) "evaluate: one pass one fail = 50"
+assert (len short.failed == 1) "evaluate: one failure"
+assert (short.failed.0 == "long_enough") "evaluate: correct failure"
+
+-- custom threshold
+lenient = audit.evaluate rubric {output: "hi" threshold: 40}
+assert (lenient.passed == true) "evaluate: custom threshold"
+
+-- === quick_check ===
+
+qc_good = audit.quick_check {
+  output: "Fixed the auth token refresh bug in validate.rs by checking expiry."
+  min_length: 10
+  no_hedging: true
+  no_refusal: true
+  task: "fix auth token refresh"
+}
+assert (qc_good.passed == true) "quick_check: good passes"
+assert (len qc_good.reasons == 0) "quick_check: no reasons"
+
+qc_bad = audit.quick_check {
+  output: "I think maybe this could work"
+  min_length: 100
+  no_hedging: true
+  task: "fix auth token refresh"
+}
+assert (qc_bad.passed == false) "quick_check: bad fails"
+assert (len qc_bad.reasons > 0) "quick_check: has reasons"
+
+log.info "28_audit: all passed"

@@ -4,7 +4,7 @@ Session history + design decisions. For priorities and gap analysis, see `NEXT_P
 
 ## Implementation Status
 
-**25/25 PASS.** 12 stdlib modules. 14 flow programs. Type checker. Regex literals. `just diagnose` clean.
+**26/26 PASS.** 13 stdlib modules. 14 flow programs. Type checker. Regex literals. `just diagnose` clean.
 
 ## Key Design Decisions
 
@@ -35,6 +35,17 @@ Non-obvious choices that cause confusion if forgotten:
 - **Type annotations don't consume lowercase idents as type args**. `(x: Maybe a)` treats `a` as next param, not type var. Write `(x: (Maybe a))`. Avoids body-start ambiguity.
 - **`{` after type tokens is body, not record type**. `-> Int { body }` — `{` starts body. Record return types need parens: `-> ({x: Int})`.
 - **`lx check` is optional**. `lx run` ignores annotations. Checker uses bidirectional inference + unification.
+- **`~>>?` at concat precedence**. Same as `~>` and `~>?`. Returns lazy stream, not single value.
+- **`checkpoint`/`rollback` scoping**. `checkpoint` is a keyword. `rollback` is a built-in function only valid inside a `checkpoint` block. Shell/MCP not rolled back.
+- **Capability attenuation is runtime-enforced**. Not convention. `CapabilityDenied` error on violation.
+- **`std/blackboard` is last-write-wins**. No CRDTs. Agents are responsible for semantic merging.
+- **`std/events` handlers are synchronous**. Invoked in subscription order. No async dispatch yet.
+- **`agent.dialogue` is library, not keyword**. Session-based multi-turn. History accumulates via JSON-line protocol.
+- **`agent.intercept` returns new wrapped agent**. Original unchanged. Middleware takes `(msg next)`. Compose by wrapping.
+- **`agent.handoff` is explicit, not auto-populated**. Agent constructs `Handoff` record. `as_context` renders for LLM consumption.
+- **`std/plan` treats plans as data**. `plan.run` with `on_step` callback. `PlanAction` tagged union controls flow.
+- **`std/introspect` is separate from `std/agent`**. Cross-cutting runtime metadata. Bounded action log (1000 entries).
+- **`std/knowledge` is file-backed JSON**. Shared via path. Provenance metadata. File-level locking.
 
 ## Technical Debt
 
@@ -62,3 +73,6 @@ Non-obvious choices that cause confusion if forgotten:
 | 28 | 03-15 | Design review: types + regex back, full stdlib roadmap |
 | 29 | 03-15 | Type annotations + checker: AST, parser, bidirectional inference, `lx check` |
 | 30 | 03-15 | Regex literals: `r/\d+/flags`, Value::Regex, std/re accepts both, 25/25 tests |
+| 31 | 03-15 | Agentic features: `~>>?` streaming, checkpoint/rollback, capabilities, blackboard, events, negotiation |
+| 32 | 03-15 | Agentic layer completion: dialogue, interceptors, handoff, plan revision, introspection, knowledge cache |
+| 33 | 03-15 | std/ai: LLM integration via Claude CLI. `ai.prompt` + `ai.prompt_with`. 13 stdlib modules, 26/26 tests |

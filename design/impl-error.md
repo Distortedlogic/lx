@@ -36,6 +36,7 @@ pub enum LxError {
     DivisionByZero { span: SourceSpan },
 
     BreakSignal { value: Box<Value> },
+    RollbackSignal { name: String },
     PropagatedError { inner: Box<LxError>, span: SourceSpan },
 }
 ```

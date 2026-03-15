@@ -8,18 +8,54 @@ See [agents.md](agents.md) for patterns and design rationale. See [stdlib-module
 
 ```
 spawn config              -- Agent ^ AgentErr
-                          --   config: {command: Str  args: [Str]}
+                          --   config: {command: Str  args: [Str]  capabilities?: Capabilities}
 kill agent                -- () ^ AgentErr (terminate subprocess)
 ```
 
-Subprocess agents communicate via JSON-line protocol over stdin/stdout. Use `~>` (send, fire-and-forget) and `~>?` (ask, request-response) as infix operators on agents with a `__pid` field.
+Subprocess agents communicate via JSON-line protocol over stdin/stdout. Use `~>` (send, fire-and-forget), `~>?` (ask, request-response), and `~>>?` (stream) as infix operators on agents with a `__pid` field. Use `emit` for agent-to-human output — progress, status, results. In subprocess mode, `emit` writes `{"type":"emit","value":...}` JSON-lines that the parent can intercept.
 
 `Agent` is an opaque type.
 
 `AgentErr` variants:
 ```
-AgentErr = | SpawnFailed Str | Timeout | Disconnected
+AgentErr = | SpawnFailed Str | Timeout | Disconnected | CapabilityDenied Str
 ```
+
+### Capability Attenuation
+
+The `capabilities` field restricts what a subagent can do. Every subagent should run with least-privilege.
+
+```
+worker = agent.spawn {
+  command: "worker"
+  args: ["--task" "review"]
+  capabilities: {
+    tools: ["read_file" "grep"]
+    fs: {read: ["./src/**"] write: []}
+    network: false
+    budget: {tokens: 10000 wall_clock: time.min 5}
+  }
+} ^
+```
+
+Capability fields (all optional — omitted fields mean "unrestricted"):
+
+```
+Capabilities = {
+  tools: [Str]           -- MCP tools the agent may invoke (whitelist)
+  fs: {                  -- filesystem access restrictions
+    read: [Str]          -- glob patterns for allowed read paths
+    write: [Str]         -- glob patterns for allowed write paths
+  }
+  network: Bool          -- whether HTTP requests are allowed (default: true)
+  budget: {              -- resource limits
+    tokens: Int          -- max token spend (enforced via std/circuit)
+    wall_clock: Duration -- max wall-clock time before kill
+  }
+}
+```
+
+The runtime enforces capabilities — a subagent that tries to read outside its `fs.read` globs gets `Err (CapabilityDenied "fs.read: /etc/passwd not in allowed paths")`. MCP tool calls are filtered against `tools` before dispatch.
 
 ### Patterns
 
@@ -60,7 +96,7 @@ Tool discovery and invocation:
 ```
 client = mcp.connect {command: "server" args: []} ^
 tools = mcp.list_tools client ^
-tools | filter (t) contains? "file" t.name | each (t) $echo "{t.name}: {t.description}"
+tools | filter (t) contains? "file" t.name | each (t) emit "{t.name}: {t.description}"
 result = mcp.call client "read_file" {path: "src/main.rs"} ^
 ```
 
@@ -110,7 +146,7 @@ result = ai.prompt_with {
   prompt: "extract entities from: {text}"
   schema: {type: "object"  properties: {entities: {type: "array"  items: {type: "string"}}}}
 } ^
-result.result.entities | each (e) $echo "found: {e}"
+result.result.entities | each (e) emit "found: {e}"
 ```
 
 Agentic with tools and budget:
@@ -224,10 +260,40 @@ md.doc [
 ] | md.render | (out) fs.write "deploy-report.md" out ^
 ```
 
+## std/knowledge — Shared Discovery Cache
+
+Cross-agent shared knowledge base with provenance metadata and query support. File-backed, persistent across agent restarts within a session. See [stdlib-knowledge.md](stdlib-knowledge.md) for full API.
+
+```
+knowledge.create ".kb.json" ^
+  | (kb) knowledge.store "auth_structure" {entry: "mod.rs"} {source: "reviewer" confidence: 0.9 tags: ["arch"]} kb ^
+```
+
+## std/introspect — Agent Introspection
+
+Runtime metadata about the current agent's identity, budget, actions, and stuck detection. See [stdlib-introspect.md](stdlib-introspect.md) for full API.
+
+```
+budget = introspect.budget ()
+actions = introspect.actions ()
+introspect.is_stuck () ? true -> introspect.strategy_shift "trying alternative"
+```
+
+## std/plan — Dynamic Plan Revision
+
+Execute plans-as-data with runtime revision capability. See [agents-plans.md](agents-plans.md) for full spec.
+
 ## Cross-References
 
 - Agent patterns and design: [agents.md](agents.md)
+- Multi-turn dialogue: [agents-dialogue.md](agents-dialogue.md)
+- Structured handoff: [agents-handoff.md](agents-handoff.md)
+- Message interceptors: [agents-intercept.md](agents-intercept.md)
+- Dynamic plan revision: [agents-plans.md](agents-plans.md)
+- Shared knowledge: [stdlib-knowledge.md](stdlib-knowledge.md)
+- Agent introspection: [stdlib-introspect.md](stdlib-introspect.md)
 - Concurrency primitives: [concurrency.md](concurrency.md)
 - Core stdlib modules: [stdlib-modules.md](stdlib-modules.md)
+- Data ecosystem modules: [stdlib-data.md](stdlib-data.md) (std/diag, std/plot, std/df, etc.)
 - Built-in functions: [stdlib.md](stdlib.md)
 - Implementation: [implementation-phases.md](../design/implementation-phases.md) (Phase 12)

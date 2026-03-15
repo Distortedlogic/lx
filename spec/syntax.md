@@ -194,7 +194,7 @@ point = {
 }
 ```
 
-**Continuation operators** — a line starting with a binary operator (`|` `+` `-` `*` `/` `%` `//` `++` `&&` `||` `??` `==` `!=` `<` `>` `<=` `>=` `..` `..=` `~>` `~>?`) continues the previous statement:
+**Continuation operators** — a line starting with a binary operator (`|` `+` `-` `*` `/` `%` `//` `++` `&&` `||` `??` `==` `!=` `<` `>` `<=` `>=` `..` `..=` `~>` `~>?` `~>>?`) continues the previous statement:
 
 ```
 data
@@ -290,5 +290,7 @@ For literal construction, spread is preferred: `[..a ..b]`, `"prefix {middle} su
 `!` is prefix logical not. `not` is the function form for pipelines: `data | filter (x) !(empty? x)`.
 
 ## Cross-References
+
+**Agent output** — `emit expr` sends a value to the human/orchestrator. Fire-and-forget, returns `()`. See [agents-advanced.md](agents-advanced.md).
 
 Impl: [impl-lexer.md](../design/impl-lexer.md), [impl-parser.md](../design/impl-parser.md), [impl-ast.md](../design/impl-ast.md). Grammar: [grammar.md](grammar.md). Tests: suite/01–05.

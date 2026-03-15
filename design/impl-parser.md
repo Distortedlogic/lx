@@ -23,7 +23,7 @@ Each operator has a left and right binding power. Higher binding power means tig
 * / % //    → (27, 28)     multiplicative
 + -         → (25, 26)     additive
 .. ..=      → (23, 24)     range
-++ ~> ~>?   → (21, 22)     concat/agent comm
+++ ~> ~>? ~>>? → (21, 22)   concat/agent comm
 |           → (19, 20)     pipe
 == != < > <= >= → (17, 18) comparison
 &&          → (15, 16)     logical and
@@ -63,6 +63,7 @@ Prefix parsing dispatches on token kind:
 - `assert` → assert expression
 - `yield` → yield expression
 - `with` → scoped binding
+- `checkpoint` → checkpoint block (parses string name + block body)
 
 **Function body extent in pipe chains** — When `(params) body` appears as an argument to a HOF in a pipe chain, the body is parsed at binding power 0, consuming everything to the right including pipe operators. This means `map (x) x * 2 | sum` gives `map` a function whose body is `x * 2 | sum`. For inline functions with multi-expression bodies in pipe chains, use block delimiters: `map (x) { x * 2 } | sum`. Sections (`(* 2)`, `(> 0)`, `(.field)`) remain the primary mechanism for simple inline functions — they have no body extent ambiguity.
 

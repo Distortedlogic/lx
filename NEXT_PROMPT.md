@@ -25,7 +25,7 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 
 ## Current State
 
-`just diagnose` clean. `just test`: **25/25 PASS**. All language features complete.
+`just diagnose` clean. `just test`: **26/26 PASS**. All language features complete.
 
 ### What's implemented
 
@@ -42,9 +42,17 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 - Message contracts: `Protocol Name = {field: Type}` with runtime validation
 - `MCP` declarations: typed tool contracts, input/output validation, wrapper generation
 - `yield` coroutine: callback-based, JSON-line orchestrator protocol
+- `emit` agent-to-human output: fire-and-forget, callback-based, replaces `$echo` for user-facing output (planned)
 - `with` scoped bindings + record field update (`name.field <- value`)
-- 12 stdlib modules: `std/json`, `std/ctx`, `std/math`, `std/fs`, `std/env`, `std/re`, `std/md`, `std/agent`, `std/mcp`, `std/http`, `std/time`, `std/cron`
+- 13 stdlib modules: `std/json`, `std/ctx`, `std/math`, `std/fs`, `std/env`, `std/re`, `std/md`, `std/agent`, `std/mcp`, `std/http`, `std/time`, `std/cron`, `std/ai`
+- LLM integration: `ai.prompt` (text → text) + `ai.prompt_with` (full options: system, model, max_turns, resume, tools, append_system → result record with text, session_id, cost, turns, duration_ms, model). Backend: `claude -p --output-format json`
 - MCP HTTP streaming transport, `lx agent` and `lx check` subcommands
+- Multi-turn dialogue: `agent.dialogue` / `agent.dialogue_turn` — session-based accumulated context (planned)
+- Message interceptors: `agent.intercept` — middleware for `~>`/`~>?` (tracing, rate-limiting, transformation) (planned)
+- Structured handoff: `agent.handoff` / `agent.as_context` + `Handoff` Protocol (planned)
+- Dynamic plan revision: `std/plan` — plan-as-data execution with `replan`/`insert_after`/`skip`/`abort` (planned)
+- Agent introspection: `std/introspect` — identity, budget, actions, stuck detection (planned)
+- Shared knowledge: `std/knowledge` — cross-agent discovery cache with provenance and queries (planned)
 
 ### Syntax gotchas
 
@@ -55,6 +63,7 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 - `assert (expr) "msg"` — if `(expr)` is callable, parser consumes `"msg"` as arg. Use `assert (expr == true) "msg"`
 - Regex literals: `r/\d+/imsx` — `\/` escapes slash, `r` + `/` always starts regex (not an ident). `std/re` accepts both `r/pat/` and `"\\pat"` strings
 - `yield expr` pauses, sends to orchestrator, returns response. JSON-line protocol on stdin/stdout
+- `emit expr` sends to human/orchestrator, returns `()`, does not block. Strings to stdout, records JSON-encoded. Replaces `$echo` for user-facing output
 - `with name = expr { body }` scoped binding. `:=` or `mut` for mutable. Returns body's last value
 - `name.field <- value` updates mutable record field. Nested: `name.a.b <- value`. Requires `:=` binding
 - Type annotations: `(x: Int y: Str) -> Result Int Str { body }`. All optional. `lx check` validates, `lx run` ignores.
@@ -64,7 +73,7 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 
 ### Stdlib roadmap (full plan: `design/stdlib_roadmap.md`):
 
-1. **`std/ai`** — LLM integration. Generic interface, Claude Code CLI backend. `ai.prompt` (simple) + `ai.prompt_with` (full: system/model/tools/schema/budget/resume). Foundation for all standard agents — auditor/grader/router all depend on this.
+1. ~~**`std/ai`**~~ — DONE. `ai.prompt` (text → text) + `ai.prompt_with` (full options → result record). Backend: `claude -p --output-format json`.
 2. **`std/tasks`** — task state machine, subtasks, auto-persist. Design doc: `design/std_tasks.md`.
 3. **`std/audit`** — structural quality checks. Design doc: `design/std_audit.md`.
 4. **`std/agents/auditor`** — LLM quality gate. Uses std/audit as pre-filter, std/ai for judgment.
@@ -72,18 +81,24 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 6. **`std/agents/grader`** — rubric scoring, incremental re-grade. Uses std/ai.
 7. **`std/agents/planner`** — task decomposition into ordered subtasks. Uses std/ai.
 8. **`std/circuit`** — circuit breakers (turn/time/token limits, action repetition).
-9. **`std/memory`** — tiered L0-L3 memory with confidence, promotion/demotion.
-10. **`std/trace`** — trace collection, scoring, dataset export.
-11. **`std/agents/monitor`** — QC sampling of running subagents.
-12. **`std/agents/reviewer`** — post-hoc transcript review, learning extraction.
-13. **`MCP Embeddings`** — typed interface to embedding services (similarity, retrieval).
+9. **`std/introspect`** — agent self-awareness: identity, budget, actions, stuck detection. Spec: `spec/stdlib-introspect.md`.
+10. **`std/knowledge`** — shared cross-agent discovery cache with provenance and queries. Spec: `spec/stdlib-knowledge.md`.
+11. **`std/plan`** — dynamic plan-as-data execution with runtime revision. Spec: `spec/agents-plans.md`.
+12. **`std/memory`** — tiered L0-L3 memory with confidence, promotion/demotion.
+13. **`std/trace`** — trace collection, scoring, dataset export.
+14. **`std/agents/monitor`** — QC sampling of running subagents.
+15. **`std/agents/reviewer`** — post-hoc transcript review, learning extraction.
+16. **`MCP Embeddings`** — typed interface to embedding services (similarity, retrieval).
+17. **`std/diag`** — program visualization. `lx diagram` CLI subcommand + `std/diag` library. Extract workflow graph from lx source, emit Mermaid. Spec: `spec/stdlib-diag.md`.
+
+Also planned as extensions to `std/agent` (not separate modules): `agent.dialogue` (multi-turn sessions), `agent.intercept` (message middleware), `agent.handoff` / `agent.as_context` (structured context transfer). Specs: `spec/agents-dialogue.md`, `spec/agents-intercept.md`, `spec/agents-handoff.md`.
 
 Design docs: `design/standard_agents.md`, `design/stdlib_roadmap.md`
 
 ### Technical debt:
 
-14. **Currying removal** (deferred) — requires parser architecture change
-15. **Toolchain** — `lx fmt`, `lx repl`, `lx watch`
+18. **Currying removal** (deferred) — requires parser architecture change
+19. **Toolchain** — `lx fmt`, `lx repl`, `lx watch`
 
 ## Codebase Layout
 
@@ -94,12 +109,12 @@ crates/lx/src/
   checker/   mod.rs, synth.rs, types.rs
   interpreter/ mod.rs, agents.rs, apply.rs, collections.rs, eval.rs, modules.rs, patterns.rs, shell.rs
   builtins/  mod.rs, call.rs, str.rs, coll.rs, hof.rs, hof_extra.rs
-  stdlib/    mod.rs, json.rs, json_conv.rs, ctx.rs, math.rs, fs.rs, env.rs, re.rs, md.rs, md_build.rs, agent.rs, mcp.rs, mcp_rpc.rs, mcp_stdio.rs, mcp_http.rs, http.rs, time.rs, cron.rs
+  stdlib/    mod.rs, ai.rs, json.rs, json_conv.rs, ctx.rs, math.rs, fs.rs, env.rs, re.rs, md.rs, md_build.rs, agent.rs, mcp.rs, mcp_rpc.rs, mcp_stdio.rs, mcp_http.rs, http.rs, time.rs, cron.rs
   ast.rs, token.rs, value.rs, value_display.rs, env.rs, error.rs, span.rs, lib.rs
 crates/lx-cli/src/main.rs
-spec/          24 language spec files
+spec/          33 language spec files
 design/        11 impl design docs + DEVLOG + CURRENT_OPINION
-tests/         25 .lx test files
+tests/         26 .lx test files
   fixtures/    agent_echo.lx, mcp_test_server.py, yield_orchestrator.py, etc.
 flows/         14 .lx programs translating arch_diagrams
   specs/       14 target goal + scenario specs

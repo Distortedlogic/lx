@@ -1,4 +1,4 @@
-# Formatter Design
+# Formatter Design — PLANNED, NOT IMPLEMENTED
 
 `lx fmt` — one canonical format, zero configuration. Takes an AST and pretty-prints it to source text.
 

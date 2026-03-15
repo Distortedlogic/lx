@@ -4,13 +4,13 @@ EBNF grammar, operator precedence, and keyword list.
 
 ## Keywords
 
-Total: **11**
+Total: **13**
 
-`true` `false` `use` `loop` `break` `par` `sel` `assert` `yield` `with` `_`
+`true` `false` `use` `loop` `break` `par` `sel` `assert` `yield` `emit` `with` `checkpoint` `_`
 
 Additionally, `Protocol` and `MCP` are recognized as declaration keywords when they appear at statement level followed by a type name.
 
-Every other construct uses sigils (`$`, `^`, `?`, `+`, `??`, `<-`, `:=`) or function application. `dbg`, `tap`, `log`, `not`, `defer`, `require`, `identity`, `collect` are built-in functions, not keywords — they can technically be shadowed.
+Every other construct uses sigils (`$`, `^`, `?`, `+`, `??`, `<-`, `:=`) or function application. `dbg`, `tap`, `log`, `not`, `defer`, `require`, `identity`, `collect`, `rollback` are built-in functions, not keywords — they can technically be shadowed.
 
 ## Built-in Names
 
@@ -46,7 +46,7 @@ Macros, operator overloading, inheritance/class hierarchies, unstructured spawn/
  4.  * / % //    multiplicative
  5.  + -         additive
  6.  ..  ..=     range
- 7.  ++ ~> ~>?   concatenation / agent communication
+ 7.  ++ ~> ~>? ~>>?  concatenation / agent communication
  8.  |           pipe
  9.  == != < > <= >=   comparison
 10.  &&          logical and
@@ -152,15 +152,18 @@ expr        = literal | IDENT | TYPE | section
             | "loop" "{" (stmt SEP)* "}"
             | "break" expr?
             | "yield" expr
+            | "emit" expr
             | "with" IDENT "=" expr "{" (stmt SEP)* "}"
             | "with" IDENT ":=" expr "{" (stmt SEP)* "}"
             | expr "~>" expr
             | expr "~>?" expr
+            | expr "~>>?" expr
+            | "checkpoint" STR "{" (stmt SEP)* "}"
             | IDENT ("." IDENT)+ "<-" expr
             | "(" params ")" ("->" type)? expr
 
 binop       = "+" | "-" | "*" | "/" | "%" | "//"
-            | "++" | "~>" | "~>?"
+            | "++" | "~>" | "~>?" | "~>>?"
             | "==" | "!=" | "<" | ">" | "<=" | ">="
             | "&&" | "||"
             | "??" | ".." | "..="
@@ -230,8 +233,10 @@ map_entry   = expr ":" expr | ".." expr
 - Named arguments (`name: value`) at call sites are disambiguated from record fields by context: inside `{ }` they are record fields, in application position they are named arguments. Named args can only follow positional args.
 - `../` in module paths is a single token (parent directory reference), not separate `.` `.` `/` tokens.
 - `yield expr` suspends the current script and sends `expr` to the orchestrator. Execution resumes when the orchestrator provides a response.
+- `emit expr` sends `expr` to the human/orchestrator as fire-and-forget output. Returns `()`. Does not block. Strings print directly; records are JSON-encoded.
 - `with name = expr { body }` binds `name` to `expr` for the duration of `body` (immutable). `with name := expr { body }` is the mutable variant.
 - `Protocol TypeName = { ... }` defines a typed protocol (set of message/response pairs). `MCP TypeName = { ... }` defines an MCP tool declaration.
-- `~>` sends a message to an agent synchronously. `~>?` sends a message and returns `Ok result` or `Err error` instead of propagating failures.
+- `~>` sends a message to an agent synchronously. `~>?` sends a message and returns `Ok result` or `Err error` instead of propagating failures. `~>>?` sends a message and returns a lazy stream of partial results.
+- `checkpoint "name" { body }` snapshots mutable state. `rollback "name"` (built-in function) restores the snapshot and exits the block with `Err`.
 - Type annotations are optional on function parameters (`x: Int`), return types (`-> Int`), fallible returns (`-> Int ^ Str`), and bindings (`name: Int = 5`). The checker validates annotations; the interpreter ignores them.
 - In type application `TYPE type+`, only uppercase `TYPE` and delimited tokens (`[`, `(`, `%{`) are consumed as arguments. Lowercase identifiers are NOT consumed to avoid ambiguity with parameter names. Use parens for type variable arguments: `(x: (Maybe a))` not `(x: Maybe a)`.

@@ -44,6 +44,31 @@ All v0.1 design questions have been resolved. Decisions and rationale are in [de
 | MCP transport | Both stdio and HTTP+SSE are implemented |
 | Message serialization | JSON (serde_json) for inter-agent messages |
 
+## Resolved Post-v0.1 (Session 31)
+
+| Question | Decision |
+|---|---|
+| Agent permissions | Capability attenuation on `agent.spawn` — `capabilities` field restricts tools, fs, network, budget |
+| Shared state in par | `std/blackboard` — concurrent shared workspace with last-write-wins |
+| Agent streaming | `~>>?` operator — returns lazy stream of partial results from agent |
+| Transactional execution | `checkpoint`/`rollback` keywords — snapshot and restore mutable state |
+| Event-driven agents | `std/events` — topic-based pub/sub event bus |
+| Agent negotiation | Pattern using Protocol (Offer/Accept/Reject), not a primitive |
+
+## Resolved Post-v0.1 (Session 32)
+
+| Question | Decision |
+|---|---|
+| Multi-turn agent conversation | `agent.dialogue` / `agent.dialogue_turn` / `agent.dialogue_end` — library functions in `std/agent`, not keywords. Session accumulates history via JSON-line protocol. |
+| Message middleware | `agent.intercept agent middleware` — returns wrapped agent. Middleware takes `(msg next)`, composable by wrapping. |
+| Structured context transfer | `agent.handoff` + `Handoff` Protocol + `agent.as_context`. Agent constructs handoff explicitly, no auto-population. |
+| Dynamic plan revision | `std/plan` module. Plans are data (step records with deps). `plan.run` with `on_step` callback returns `PlanAction` (continue/replan/skip/abort/insert_after). |
+| Shared discovery cache | `std/knowledge` — file-backed JSON with provenance metadata (source, confidence, tags) and query support. Shared via path. |
+| Agent introspection | `std/introspect` — separate module. Identity, budget, actions, stuck detection. Interpreter collects action history. |
+| Dialogue history size | Bounded by `max_turns` in config. Default unlimited but capped at session lifetime. |
+| Interceptor ordering | Outside-in execution, inside-out response. Compose by wrapping: outer interceptor sees message first. |
+| Knowledge eviction | `knowledge.expire before_time kb` — explicit eviction by caller. No auto-TTL. |
+
 ## Agentic Design Questions (v1)
 
 These are open questions for the agentic layer — to be resolved during implementation:
@@ -53,10 +78,15 @@ These are open questions for the agentic layer — to be resolved during impleme
 | Agent process model | Are agents subprocesses (CLI invocations), API calls, or both? Should `agent.spawn` support both local and remote agents? |
 | Agent discovery | How do agents find each other? Registry, well-known names, URIs? |
 | Channel backpressure | What happens when a channel sender outpaces the receiver? Buffer, drop, block? |
-| Context conflict resolution | When two agents update the same context key, who wins? Last-write-wins, CRDTs, error? |
 | Agent lifecycle | What happens to subagents when the parent dies? Orphan cleanup? |
-| Workflow resumability | How to serialize workflow state for checkpoint/resume across process restarts? |
-| Agent permissions | Can an agent restrict what tools its subagents can use? Capability model? |
+| Dialogue persistence | Should dialogue sessions be serializable/resumable across process restarts? Currently session-scoped. |
+| Knowledge consistency | File-level locking for concurrent writes — sufficient for v1? May need advisory locks or WAL for high-contention. |
+| Introspection performance | Action logging adds overhead. Should it be opt-in via config, or always-on with bounded buffer? |
+| Interceptor + streaming | How do interceptors interact with `~>>?` streams? Intercept each chunk, or only the initial message? |
+| Plan step parallelism | Steps with no mutual dependencies could run in parallel. Should `plan.run` do this automatically? |
+| Checkpoint scope | Should `checkpoint` track shell commands via compensating actions? Current design: shell/MCP not rolled back. |
+| Blackboard consistency | Should `std/blackboard` support CRDTs or transactional multi-key updates beyond last-write-wins? |
+| Stream backpressure | When a `~>>?` consumer is slower than the producer, buffer or block? |
 
 ## Considerations for v2
 
@@ -70,7 +100,7 @@ These are not blockers for v1 implementation but worth revisiting after real-wor
 
 **~~Concurrency limits on `pmap`~~** — Resolved: `pmap_n limit f xs` added in v1. Rate-limited APIs are too common to defer. See [concurrency.md](concurrency.md).
 
-**Streaming/channel primitives** — `par`/`sel`/`pmap` cover request-response concurrency. Long-running producers/consumers (event streams, queue workers) may need channels. Defer until real use cases emerge.
+**~~Streaming/channel primitives~~** — Resolved: `~>>?` for agent streaming, `std/events` for pub/sub. Channels still deferred.
 
 **CLI argument parser** — `std/args` or `std/cli` for declarative argument parsing (flags, options, subcommands). v1 uses `env.args` with pattern matching, which handles simple cases. A structured parser would help for complex CLIs.
 

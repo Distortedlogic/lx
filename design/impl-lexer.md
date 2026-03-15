@@ -102,7 +102,9 @@ enum TokenKind {
     // Keywords
     Use, Loop, Break, Par, Sel, Assert, Underscore, Yield, With,
     TildeArrow, TildeArrowQ,   // ~> ~>?
+    TildeArrowArrowQ,          // ~>>?
     Protocol, Mcp,             // declaration keywords
+    Checkpoint,                // checkpoint keyword
 
     // Structure
     Export,                                       // + at column 0
@@ -115,7 +117,7 @@ enum TokenKind {
 
 Newlines become `Semi` tokens EXCEPT:
 1. Inside unmatched `(`, `[`, `{` — suppressed (track delimiter depth)
-2. When the next line starts with a continuation operator (`|`, `+`, `-`, `*`, `/`, `%`, `//`, `++`, `&&`, `||`, `??`, `==`, `!=`, `<`, `>`, `<=`, `>=`, `..`, `..=`, `~>`, `~>?`) — suppress the preceding newline
+2. When the next line starts with a continuation operator (`|`, `+`, `-`, `*`, `/`, `%`, `//`, `++`, `&&`, `||`, `??`, `==`, `!=`, `<`, `>`, `<=`, `>=`, `..`, `..=`, `~>`, `~>?`, `~>>?`) — suppress the preceding newline
 3. When the current line ends with a binary operator — suppress
 
 Implementation: the lexer tracks delimiter depth. On newline, if depth > 0, skip. Otherwise, peek at the next non-whitespace token. If it's a continuation operator, skip. Otherwise emit `Semi`.

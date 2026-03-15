@@ -2,7 +2,7 @@
 
 **Status: Not implemented.** These modules are planned for future phases. None of this code works today.
 
-Data processing, persistence, numerical computation, ML inference, and visualization modules. These are stdlib modules — no language changes required. All follow data-last conventions and compose naturally with pipes and sections.
+Data processing, persistence, numerical computation, ML inference, visualization, and program diagram modules. These are stdlib modules — no language changes required. All follow data-last conventions and compose naturally with pipes and sections.
 
 See [stdlib-modules.md](stdlib-modules.md) for core modules (fs, http, json, time, etc.).
 
@@ -270,8 +270,13 @@ plot.bar (by_day | map (.date)) (by_day | map (.requests))
 
 Backend: `charming` (in reference/) for SVG, custom terminal renderer for Unicode block output.
 
+## std/diag — Program Visualization
+
+See [stdlib-diag.md](stdlib-diag.md) for the full spec. `lx diagram` CLI subcommand + `std/diag` library. Emits Mermaid flowchart text from lx source.
+
 ## Cross-References
 
+- Program visualization: [stdlib-diag.md](stdlib-diag.md) (std/diag)
 - Agent ecosystem modules: [stdlib-agents.md](stdlib-agents.md) (std/agent, std/mcp, std/ctx, std/md)
 - Core stdlib modules: [stdlib-modules.md](stdlib-modules.md)
 - Built-in functions and conventions: [stdlib.md](stdlib.md)
