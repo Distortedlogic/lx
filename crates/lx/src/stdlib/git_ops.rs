@@ -83,9 +83,7 @@ pub fn bi_commit_with(
 
 fn get_head_hash() -> String {
     match run_git(&["rev-parse", "HEAD"]) {
-        Ok(out) if out.status.success() => {
-            String::from_utf8_lossy(&out.stdout).trim().to_string()
-        }
+        Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).trim().to_string(),
         _ => String::new(),
     }
 }

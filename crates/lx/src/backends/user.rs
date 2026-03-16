@@ -87,7 +87,9 @@ impl UserBackend for StdinStdoutUserBackend {
 
     fn progress(&self, current: usize, total: usize, message: &str) {
         eprint!("\r[{current}/{total}] {message}");
-        let _ = std::io::stderr().flush();
+        if let Err(e) = std::io::stderr().flush() {
+            eprintln!("progress: stderr flush failed: {e}");
+        }
         if current >= total {
             eprintln!();
         }
@@ -96,7 +98,9 @@ impl UserBackend for StdinStdoutUserBackend {
     fn progress_pct(&self, pct: f64, message: &str) {
         let pct_display = (pct * 100.0).min(100.0);
         eprint!("\r[{pct_display:.0}%] {message}");
-        let _ = std::io::stderr().flush();
+        if let Err(e) = std::io::stderr().flush() {
+            eprintln!("progress_pct: stderr flush failed: {e}");
+        }
         if pct >= 1.0 {
             eprintln!();
         }
@@ -146,7 +150,9 @@ impl UserBackend for StdinStdoutUserBackend {
         let pid = std::process::id();
         let path = format!(".lx/signals/{pid}.json");
         let content = std::fs::read_to_string(&path).ok()?;
-        let _ = std::fs::remove_file(&path);
+        if let Err(e) = std::fs::remove_file(&path) {
+            eprintln!("check_signal: failed to remove signal file {path}: {e}");
+        }
         let jv: serde_json::Value = serde_json::from_str(content.trim()).ok()?;
         Some(crate::stdlib::json_conv::json_to_lx(jv))
     }

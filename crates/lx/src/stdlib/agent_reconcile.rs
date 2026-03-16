@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use indexmap::IndexMap;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 
 use crate::backends::RuntimeCtx;
 use crate::builtins::{call_value, mk};
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::value::Value;
 
@@ -69,7 +69,7 @@ fn parse_config(cfg: &Value, span: Span) -> Result<ReconcileConfig, LxError> {
                 return Err(LxError::runtime(
                     format!("agent.reconcile: unknown strategy '{other}'"),
                     span,
-                ))
+                ));
             }
         },
         Value::Func(_) | Value::BuiltinFunc(_) => Strategy::Custom(strategy_val.clone()),
@@ -77,7 +77,7 @@ fn parse_config(cfg: &Value, span: Span) -> Result<ReconcileConfig, LxError> {
             return Err(LxError::type_err(
                 "agent.reconcile: strategy must be Str or Fn",
                 span,
-            ))
+            ));
         }
     };
     let quorum = match r.get("quorum") {
@@ -89,7 +89,7 @@ fn parse_config(cfg: &Value, span: Span) -> Result<ReconcileConfig, LxError> {
                 return Err(LxError::runtime(
                     format!("agent.reconcile: unknown quorum '{other}'"),
                     span,
-                ))
+                ));
             }
         },
         Some(Value::Record(qr)) => {
@@ -108,7 +108,7 @@ fn parse_config(cfg: &Value, span: Span) -> Result<ReconcileConfig, LxError> {
             return Err(LxError::type_err(
                 "agent.reconcile: quorum must be Str, {n: Int}, or Int",
                 span,
-            ))
+            ));
         }
     };
     Ok(ReconcileConfig {
@@ -141,26 +141,26 @@ pub(super) fn make_result(
     rounds: usize,
     dissenting: Vec<String>,
 ) -> Value {
-    let mut f = IndexMap::new();
-    f.insert("merged".into(), merged);
-    f.insert("sources".into(), Value::Int(BigInt::from(sources)));
-    f.insert("conflicts".into(), Value::List(Arc::new(conflicts)));
-    f.insert("dropped".into(), Value::List(Arc::new(dropped)));
-    f.insert("rounds".into(), Value::Int(BigInt::from(rounds)));
     let diss: Vec<Value> = dissenting
         .into_iter()
         .map(|s| Value::Str(Arc::from(s.as_str())))
         .collect();
-    f.insert("dissenting".into(), Value::List(Arc::new(diss)));
-    Value::Record(Arc::new(f))
+    record! {
+        "merged" => merged,
+        "sources" => Value::Int(BigInt::from(sources)),
+        "conflicts" => Value::List(Arc::new(conflicts)),
+        "dropped" => Value::List(Arc::new(dropped)),
+        "rounds" => Value::Int(BigInt::from(rounds)),
+        "dissenting" => Value::List(Arc::new(diss)),
+    }
 }
 
 pub(super) fn make_conflict_entry(key: Value, values: Vec<Value>, resolved: Value) -> Value {
-    let mut f = IndexMap::new();
-    f.insert("key".into(), key);
-    f.insert("values".into(), Value::List(Arc::new(values)));
-    f.insert("resolved".into(), resolved);
-    Value::Record(Arc::new(f))
+    record! {
+        "key" => key,
+        "values" => Value::List(Arc::new(values)),
+        "resolved" => resolved,
+    }
 }
 
 pub(super) fn call_key(
@@ -187,7 +187,7 @@ pub(super) fn flatten_results(
                     return Err(LxError::type_err(
                         format!("agent.reconcile: flatten field '{field}' must be a List"),
                         span,
-                    ))
+                    ));
                 }
                 None => {}
             },
@@ -195,7 +195,7 @@ pub(super) fn flatten_results(
                 return Err(LxError::type_err(
                     "agent.reconcile: flatten requires Record results",
                     span,
-                ))
+                ));
             }
         }
     }
@@ -218,11 +218,7 @@ pub(super) fn resolve_conflict(
     }
 }
 
-fn bi_reconcile(
-    args: &[Value],
-    span: Span,
-    ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+fn bi_reconcile(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let results = args[0]
         .as_list()
         .ok_or_else(|| LxError::type_err("agent.reconcile: first arg must be List", span))?;
@@ -236,7 +232,14 @@ fn bi_reconcile(
         Strategy::MergeFields => strat::do_merge_fields(results, &cfg, span, ctx),
         Strategy::Custom(f) => {
             let merged = call_value(&f, args[0].clone(), span, ctx)?;
-            Ok(make_result(merged, results.len(), vec![], vec![], 0, vec![]))
+            Ok(make_result(
+                merged,
+                results.len(),
+                vec![],
+                vec![],
+                0,
+                vec![],
+            ))
         }
     }
 }

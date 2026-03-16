@@ -6,6 +6,7 @@ use num_bigint::BigInt;
 use crate::backends::{AiOpts, RuntimeCtx};
 use crate::builtins::mk;
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::stdlib::ai;
 use crate::value::Value;
@@ -57,10 +58,19 @@ fn extract_fields(args: &[Value], span: Span) -> Result<ReviewFields, LxError> {
 }
 
 fn make_pattern(kind: &str, description: &str, confidence: f64) -> Value {
+    record! {
+        "kind" => Value::Str(Arc::from(kind)),
+        "description" => Value::Str(Arc::from(description)),
+        "confidence" => Value::Float(confidence),
+    }
+}
+
+fn make_tagged_record(kind: &str, fields: &[(&str, Value)]) -> Value {
     let mut f = IndexMap::new();
     f.insert("kind".into(), Value::Str(Arc::from(kind)));
-    f.insert("description".into(), Value::Str(Arc::from(description)));
-    f.insert("confidence".into(), Value::Float(confidence));
+    for (key, val) in fields {
+        f.insert((*key).into(), val.clone());
+    }
     Value::Record(Arc::new(f))
 }
 
@@ -72,20 +82,14 @@ fn build_result(
 ) -> Value {
     let pattern_count = patterns.len() as i64;
     let mistake_count = mistakes.len() as i64;
-    let mut r = IndexMap::new();
-    r.insert("patterns".into(), Value::List(Arc::new(patterns)));
-    r.insert("mistakes".into(), Value::List(Arc::new(mistakes)));
-    r.insert("facts".into(), Value::List(Arc::new(facts)));
-    r.insert("summary".into(), Value::Str(Arc::from(summary)));
-    r.insert(
-        "pattern_count".into(),
-        Value::Int(BigInt::from(pattern_count)),
-    );
-    r.insert(
-        "mistake_count".into(),
-        Value::Int(BigInt::from(mistake_count)),
-    );
-    Value::Record(Arc::new(r))
+    record! {
+        "patterns" => Value::List(Arc::new(patterns)),
+        "mistakes" => Value::List(Arc::new(mistakes)),
+        "facts" => Value::List(Arc::new(facts)),
+        "summary" => Value::Str(Arc::from(summary)),
+        "pattern_count" => Value::Int(BigInt::from(pattern_count)),
+        "mistake_count" => Value::Int(BigInt::from(mistake_count)),
+    }
 }
 
 fn build_system_prompt(focus: &[String]) -> String {
@@ -139,11 +143,13 @@ fn parse_llm_result(llm_response: &Value, span: Span) -> Result<Value, LxError> 
         for m in arr {
             let desc = m.get("description").and_then(|v| v.as_str()).unwrap_or("");
             let lesson = m.get("lesson").and_then(|v| v.as_str()).unwrap_or("");
-            let mut f = IndexMap::new();
-            f.insert("kind".into(), Value::Str(Arc::from("mistake")));
-            f.insert("description".into(), Value::Str(Arc::from(desc)));
-            f.insert("lesson".into(), Value::Str(Arc::from(lesson)));
-            mistakes.push(Value::Record(Arc::new(f)));
+            mistakes.push(make_tagged_record(
+                "mistake",
+                &[
+                    ("description", Value::Str(Arc::from(desc))),
+                    ("lesson", Value::Str(Arc::from(lesson))),
+                ],
+            ));
         }
     }
     if let Some(arr) = jv.get("facts").and_then(|v| v.as_array()) {
@@ -152,10 +158,10 @@ fn parse_llm_result(llm_response: &Value, span: Span) -> Result<Value, LxError> 
                 .get("description")
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
-            let mut f = IndexMap::new();
-            f.insert("kind".into(), Value::Str(Arc::from("fact")));
-            f.insert("description".into(), Value::Str(Arc::from(desc)));
-            facts.push(Value::Record(Arc::new(f)));
+            facts.push(make_tagged_record(
+                "fact",
+                &[("description", Value::Str(Arc::from(desc)))],
+            ));
         }
     }
     let summary = jv.get("summary").and_then(|v| v.as_str()).unwrap_or("");
@@ -170,8 +176,9 @@ fn bi_review(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value,
     let system = build_system_prompt(&fields.focus);
     let user = build_user_prompt(&fields);
     let opts = AiOpts {
-        system: Some(system),
+        append_system: Some(system),
         max_turns: Some(1),
+        tools: Some(vec![]),
         ..AiOpts::default()
     };
     let llm_result = ctx.ai.prompt(&user, &opts, span)?;
@@ -199,13 +206,13 @@ fn extract_structural(transcript: &str) -> (Vec<Value>, Vec<Value>, Vec<Value>) 
         patterns.push(make_pattern("persistence", "Used retry strategy", 0.5));
     }
     if has_error {
-        let mut f = IndexMap::new();
-        f.insert("kind".into(), Value::Str(Arc::from("observation")));
-        f.insert(
-            "description".into(),
-            Value::Str(Arc::from("Errors occurred during execution")),
-        );
-        facts.push(Value::Record(Arc::new(f)));
+        facts.push(make_tagged_record(
+            "observation",
+            &[(
+                "description",
+                Value::Str(Arc::from("Errors occurred during execution")),
+            )],
+        ));
     }
     let duplicate_lines: usize = {
         let mut seen = std::collections::HashSet::new();
@@ -215,17 +222,16 @@ fn extract_structural(transcript: &str) -> (Vec<Value>, Vec<Value>, Vec<Value>) 
             .count()
     };
     if duplicate_lines > 3 {
-        let mut f = IndexMap::new();
-        f.insert("kind".into(), Value::Str(Arc::from("mistake")));
-        f.insert(
-            "description".into(),
-            Value::Str(Arc::from("Excessive repeated actions")),
-        );
-        f.insert(
-            "lesson".into(),
-            Value::Str(Arc::from("Detect loops earlier")),
-        );
-        mistakes.push(Value::Record(Arc::new(f)));
+        mistakes.push(make_tagged_record(
+            "mistake",
+            &[
+                (
+                    "description",
+                    Value::Str(Arc::from("Excessive repeated actions")),
+                ),
+                ("lesson", Value::Str(Arc::from("Detect loops earlier"))),
+            ],
+        ));
     }
     (patterns, mistakes, facts)
 }

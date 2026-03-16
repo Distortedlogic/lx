@@ -5,6 +5,7 @@ use num_bigint::BigInt;
 
 use crate::backends::RuntimeCtx;
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::value::Value;
 
@@ -16,12 +17,7 @@ pub fn bi_log(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Valu
     let opts = match &args[0] {
         Value::Record(r) => r.as_ref().clone(),
         Value::Unit => IndexMap::new(),
-        _ => {
-            return Err(LxError::type_err(
-                "git.log expects Record opts or ()",
-                span,
-            ))
-        }
+        _ => return Err(LxError::type_err("git.log expects Record opts or ()", span)),
     };
     let n = get_int(&opts, "n").unwrap_or(10);
     let mut cmd_args = vec![
@@ -120,17 +116,17 @@ fn parse_commit_entry(entry: &str) -> Option<Value> {
         .filter(|s| !s.is_empty())
         .map(str_val)
         .collect();
-    let mut f = IndexMap::new();
-    f.insert("hash".into(), str_val(parts[0]));
-    f.insert("short".into(), str_val(parts[1]));
-    f.insert("author".into(), str_val(parts[2]));
-    f.insert("email".into(), str_val(parts[3]));
-    f.insert("date".into(), str_val(parts[4]));
-    f.insert("subject".into(), str_val(parts[5]));
-    f.insert("body".into(), str_val(parts[6].trim()));
-    f.insert("parents".into(), Value::List(Arc::new(parents)));
-    f.insert("diff".into(), Value::None);
-    Some(Value::Record(Arc::new(f)))
+    Some(record! {
+        "hash" => str_val(parts[0]),
+        "short" => str_val(parts[1]),
+        "author" => str_val(parts[2]),
+        "email" => str_val(parts[3]),
+        "date" => str_val(parts[4]),
+        "subject" => str_val(parts[5]),
+        "body" => str_val(parts[6].trim()),
+        "parents" => Value::List(Arc::new(parents)),
+        "diff" => Value::None,
+    })
 }
 
 pub fn bi_blame(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
@@ -193,13 +189,13 @@ fn parse_blame(raw: &str) -> Vec<Value> {
         } else if let Some(rest) = line.strip_prefix("author-time ") {
             current_date = rest.to_string();
         } else if let Some(content) = line.strip_prefix('\t') {
-            let mut f = IndexMap::new();
-            f.insert("hash".into(), str_val(&current_hash));
-            f.insert("author".into(), str_val(&current_author));
-            f.insert("date".into(), str_val(&current_date));
-            f.insert("line".into(), Value::Int(BigInt::from(current_line)));
-            f.insert("content".into(), str_val(content));
-            results.push(Value::Record(Arc::new(f)));
+            results.push(record! {
+                "hash" => str_val(&current_hash),
+                "author" => str_val(&current_author),
+                "date" => str_val(&current_date),
+                "line" => Value::Int(BigInt::from(current_line)),
+                "content" => str_val(content),
+            });
             in_header = true;
         }
     }

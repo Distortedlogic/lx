@@ -4,6 +4,17 @@ use crate::span::Span;
 use crate::token::{Token, TokenKind};
 
 impl<'src> Lexer<'src> {
+    fn flush_buf(
+        &mut self,
+        buf: &mut String,
+        chunk_start: usize,
+        make_kind: fn(String) -> TokenKind,
+    ) {
+        if !buf.is_empty() {
+            self.push(make_kind(std::mem::take(buf)), chunk_start, self.pos);
+        }
+    }
+
     pub(super) fn read_string(&mut self, start: usize) -> Result<(), LxError> {
         self.push(TokenKind::StrStart, start, start + 1);
         let mut buf = String::new();
@@ -46,13 +57,7 @@ impl<'src> Lexer<'src> {
                     }
                 }
                 Some('{') => {
-                    if !buf.is_empty() {
-                        self.push(
-                            TokenKind::StrChunk(std::mem::take(&mut buf)),
-                            chunk_start,
-                            self.pos,
-                        );
-                    }
+                    self.flush_buf(&mut buf, chunk_start, TokenKind::StrChunk);
                     self.advance();
                     self.lex_interpolation(start)?;
                     chunk_start = self.pos;
@@ -106,13 +111,7 @@ impl<'src> Lexer<'src> {
                 None | Some('\n') => break,
                 Some(')') if stop_at_rparen => break,
                 Some('{') if interpolate => {
-                    if !buf.is_empty() {
-                        self.push(
-                            TokenKind::ShellText(std::mem::take(&mut buf)),
-                            chunk_start,
-                            self.pos,
-                        );
-                    }
+                    self.flush_buf(&mut buf, chunk_start, TokenKind::ShellText);
                     self.advance();
                     self.lex_interpolation(self.pos)?;
                     chunk_start = self.pos;
@@ -142,13 +141,7 @@ impl<'src> Lexer<'src> {
                 None | Some('\n') | Some('|') | Some(';') => break,
                 Some(')') if stop_at_rparen => break,
                 Some('{') => {
-                    if !buf.is_empty() {
-                        self.push(
-                            TokenKind::ShellText(std::mem::take(&mut buf)),
-                            chunk_start,
-                            self.pos,
-                        );
-                    }
+                    self.flush_buf(&mut buf, chunk_start, TokenKind::ShellText);
                     self.advance();
                     self.lex_interpolation(self.pos)?;
                     chunk_start = self.pos;
@@ -191,13 +184,7 @@ impl<'src> Lexer<'src> {
                     return Ok(());
                 }
                 Some('{') => {
-                    if !buf.is_empty() {
-                        self.push(
-                            TokenKind::ShellText(std::mem::take(&mut buf)),
-                            chunk_start,
-                            self.pos,
-                        );
-                    }
+                    self.flush_buf(&mut buf, chunk_start, TokenKind::ShellText);
                     self.advance();
                     self.lex_interpolation(self.pos)?;
                     chunk_start = self.pos;

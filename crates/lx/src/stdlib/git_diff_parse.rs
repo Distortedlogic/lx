@@ -170,10 +170,7 @@ fn parse_hunk_header(line: &str) -> HunkState {
     let mut old_count = 1i64;
     let mut new_start = 1i64;
     let mut new_count = 1i64;
-    if let Some(rest) = line
-        .strip_prefix("@@ -")
-        .and_then(|r| r.split_once(" +"))
-    {
+    if let Some(rest) = line.strip_prefix("@@ -").and_then(|r| r.split_once(" +")) {
         parse_range(rest.0, &mut old_start, &mut old_count);
         if let Some((new_part, _)) = rest.1.split_once(" @@") {
             parse_range(new_part, &mut new_start, &mut new_count);

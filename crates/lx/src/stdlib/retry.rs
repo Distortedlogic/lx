@@ -14,7 +14,10 @@ use crate::value::Value;
 pub fn build() -> IndexMap<String, Value> {
     let mut m = IndexMap::new();
     m.insert("retry".into(), mk("retry.retry", 1, bi_retry));
-    m.insert("retry_with".into(), mk("retry.retry_with", 2, bi_retry_with));
+    m.insert(
+        "retry_with".into(),
+        mk("retry.retry_with", 2, bi_retry_with),
+    );
     m
 }
 
@@ -49,7 +52,7 @@ fn parse_opts(opts: &IndexMap<String, Value>, span: Span) -> Result<RetryOpts, L
                 return Err(LxError::runtime(
                     format!("retry: unknown backoff strategy :{other}"),
                     span,
-                ))
+                ));
             }
         },
         None => Backoff::Exponential,
@@ -144,18 +147,14 @@ fn run_retry_loop(
             Ok(Value::Ok(v)) => return Ok(Value::Ok(Box::new(*v))),
             Ok(Value::Err(e)) => {
                 last_err = *e;
-                if attempt + 1 < opts.max
-                    && !should_retry(&opts.retry_on, &last_err, span, ctx)?
-                {
+                if attempt + 1 < opts.max && !should_retry(&opts.retry_on, &last_err, span, ctx)? {
                     break;
                 }
             }
             Ok(other) => return Ok(Value::Ok(Box::new(other))),
             Err(LxError::Propagate { value, .. }) => {
                 last_err = *value;
-                if attempt + 1 < opts.max
-                    && !should_retry(&opts.retry_on, &last_err, span, ctx)?
-                {
+                if attempt + 1 < opts.max && !should_retry(&opts.retry_on, &last_err, span, ctx)? {
                     break;
                 }
             }
@@ -165,10 +164,7 @@ fn run_retry_loop(
 
     let elapsed_ms = start.elapsed().as_millis() as u64;
     let mut fields = IndexMap::new();
-    fields.insert(
-        "attempts".into(),
-        Value::Int(BigInt::from(opts.max)),
-    );
+    fields.insert("attempts".into(), Value::Int(BigInt::from(opts.max)));
     fields.insert("last_error".into(), last_err);
     fields.insert("elapsed_ms".into(), Value::Int(BigInt::from(elapsed_ms)));
     let exhausted = Value::Tagged {
@@ -193,7 +189,10 @@ fn bi_retry(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, 
 
 fn bi_retry_with(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let Value::Record(opts_rec) = &args[0] else {
-        return Err(LxError::type_err("retry_with: first arg must be Record", span));
+        return Err(LxError::type_err(
+            "retry_with: first arg must be Record",
+            span,
+        ));
     };
     let opts = parse_opts(opts_rec, span)?;
     let f = &args[1];

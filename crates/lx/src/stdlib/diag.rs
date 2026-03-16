@@ -5,6 +5,7 @@ use indexmap::IndexMap;
 use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::value::Value;
 
@@ -64,30 +65,30 @@ fn extract_graph(src: &str, span: Span) -> Result<Graph, LxError> {
 
 fn node_to_value(node: &DiagNode) -> Value {
     let children: Vec<Value> = node.children.iter().map(node_to_value).collect();
-    let mut fields = IndexMap::new();
-    fields.insert("id".into(), Value::Str(Arc::from(node.id.as_str())));
-    fields.insert("label".into(), Value::Str(Arc::from(node.label.as_str())));
-    fields.insert("kind".into(), Value::Str(Arc::from(node.kind.as_str())));
-    fields.insert("children".into(), Value::List(Arc::new(children)));
-    Value::Record(Arc::new(fields))
+    record! {
+        "id" => Value::Str(Arc::from(node.id.as_str())),
+        "label" => Value::Str(Arc::from(node.label.as_str())),
+        "kind" => Value::Str(Arc::from(node.kind.as_str())),
+        "children" => Value::List(Arc::new(children)),
+    }
 }
 
 fn edge_to_value(edge: &DiagEdge) -> Value {
-    let mut fields = IndexMap::new();
-    fields.insert("from".into(), Value::Str(Arc::from(edge.from.as_str())));
-    fields.insert("to".into(), Value::Str(Arc::from(edge.to.as_str())));
-    fields.insert("label".into(), Value::Str(Arc::from(edge.label.as_str())));
-    fields.insert("style".into(), Value::Str(Arc::from(edge.style.as_str())));
-    Value::Record(Arc::new(fields))
+    record! {
+        "from" => Value::Str(Arc::from(edge.from.as_str())),
+        "to" => Value::Str(Arc::from(edge.to.as_str())),
+        "label" => Value::Str(Arc::from(edge.label.as_str())),
+        "style" => Value::Str(Arc::from(edge.style.as_str())),
+    }
 }
 
 fn graph_to_value(graph: &Graph) -> Value {
     let nodes: Vec<Value> = graph.nodes.iter().map(node_to_value).collect();
     let edges: Vec<Value> = graph.edges.iter().map(edge_to_value).collect();
-    let mut fields = IndexMap::new();
-    fields.insert("nodes".into(), Value::List(Arc::new(nodes)));
-    fields.insert("edges".into(), Value::List(Arc::new(edges)));
-    Value::Record(Arc::new(fields))
+    record! {
+        "nodes" => Value::List(Arc::new(nodes)),
+        "edges" => Value::List(Arc::new(edges)),
+    }
 }
 
 fn value_to_graph(val: &Value, span: Span) -> Result<Graph, LxError> {

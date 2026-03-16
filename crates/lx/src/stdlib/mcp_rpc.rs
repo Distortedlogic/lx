@@ -2,11 +2,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock};
 
 use dashmap::DashMap;
-use indexmap::IndexMap;
 use num_bigint::BigInt;
 
 use crate::backends::RuntimeCtx;
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::value::Value;
 
@@ -169,9 +169,9 @@ pub(super) fn connect(
     init_handshake(&mut conn, span)?;
     let client_id = NEXT_CLIENT_ID.fetch_add(1, Ordering::Relaxed);
     REGISTRY.insert(client_id, conn);
-    let mut rec = IndexMap::new();
-    rec.insert("__mcp_id".into(), Value::Int(BigInt::from(client_id)));
-    Ok(Value::Ok(Box::new(Value::Record(Arc::new(rec)))))
+    Ok(Value::Ok(Box::new(record! {
+        "__mcp_id" => Value::Int(BigInt::from(client_id)),
+    })))
 }
 
 pub(super) fn close(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {

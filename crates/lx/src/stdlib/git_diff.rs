@@ -18,7 +18,12 @@ pub fn bi_diff(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Val
     let opts = match &args[0] {
         Value::Record(r) => r.as_ref().clone(),
         Value::Unit => IndexMap::new(),
-        _ => return Err(LxError::type_err("git.diff expects Record opts or ()", span)),
+        _ => {
+            return Err(LxError::type_err(
+                "git.diff expects Record opts or ()",
+                span,
+            ));
+        }
     };
     let context = get_int(&opts, "context").unwrap_or(3);
     let mut cmd_args = vec!["diff".to_string(), "--no-color".to_string()];
@@ -48,11 +53,7 @@ pub fn bi_diff(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Val
     }
 }
 
-pub fn bi_diff_stat(
-    args: &[Value],
-    span: Span,
-    _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+pub fn bi_diff_stat(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let opts = match &args[0] {
         Value::Record(r) => r.as_ref().clone(),
         Value::Unit => IndexMap::new(),
@@ -60,7 +61,7 @@ pub fn bi_diff_stat(
             return Err(LxError::type_err(
                 "git.diff_stat expects Record opts or ()",
                 span,
-            ))
+            ));
         }
     };
     let mut cmd_args = vec!["diff".to_string(), "--numstat".to_string()];
@@ -113,7 +114,12 @@ pub fn bi_grep(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Val
     let opts = match &args[1] {
         Value::Record(r) => r.as_ref().clone(),
         Value::Unit => IndexMap::new(),
-        _ => return Err(LxError::type_err("git.grep: opts must be Record or ()", span)),
+        _ => {
+            return Err(LxError::type_err(
+                "git.grep: opts must be Record or ()",
+                span,
+            ));
+        }
     };
     let mut cmd_args = vec!["grep".to_string(), "-n".to_string()];
     if get_bool(&opts, "ignore_case").unwrap_or(false) {
@@ -138,9 +144,7 @@ pub fn bi_grep(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Val
                 .collect();
             Ok(git_ok(Value::List(Arc::new(hits))))
         }
-        Ok(out) if out.status.code() == Some(1) => {
-            Ok(git_ok(Value::List(Arc::new(Vec::new()))))
-        }
+        Ok(out) if out.status.code() == Some(1) => Ok(git_ok(Value::List(Arc::new(Vec::new())))),
         Ok(out) => Ok(git_err_from(&out)),
         Err(e) => Ok(git_err(&format!("git: {e}"))),
     }

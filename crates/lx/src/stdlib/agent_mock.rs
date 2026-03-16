@@ -1,5 +1,5 @@
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use dashmap::DashMap;
 use indexmap::IndexMap;
@@ -38,14 +38,10 @@ pub fn mk_mock_assert_not_called() -> Value {
     mk("agent.mock_assert_not_called", 2, bi_mock_assert_not_called)
 }
 
-fn bi_mock(
-    args: &[Value],
-    span: Span,
-    _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
-    let rules = args[0].as_list().ok_or_else(|| {
-        LxError::type_err("agent.mock: first arg must be a List of rules", span)
-    })?;
+fn bi_mock(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+    let rules = args[0]
+        .as_list()
+        .ok_or_else(|| LxError::type_err("agent.mock: first arg must be a List of rules", span))?;
     let mock_id = NEXT_MOCK_ID.fetch_add(1, Ordering::Relaxed);
     MOCK_CALLS.insert(mock_id, Arc::new(Mutex::new(Vec::new())));
     let handler = Value::BuiltinFunc(BuiltinFunc {
@@ -63,18 +59,14 @@ fn bi_mock(
     Ok(Value::Record(Arc::new(rec)))
 }
 
-fn bi_mock_handler(
-    args: &[Value],
-    span: Span,
-    ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+fn bi_mock_handler(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let mock_id = args[0]
         .as_int()
         .and_then(|n| n.to_u64())
         .ok_or_else(|| LxError::runtime("agent.mock.handler: invalid mock_id", span))?;
-    let rules = args[1].as_list().ok_or_else(|| {
-        LxError::runtime("agent.mock.handler: invalid rules", span)
-    })?;
+    let rules = args[1]
+        .as_list()
+        .ok_or_else(|| LxError::runtime("agent.mock.handler: invalid rules", span))?;
     let msg = &args[2];
     let response = find_matching_response(rules, msg, span, ctx)?;
     if let Some(calls) = MOCK_CALLS.get(&mock_id) {
@@ -102,10 +94,7 @@ fn find_matching_response(
         }
     }
     let mut err = IndexMap::new();
-    err.insert(
-        "error".into(),
-        Value::Str(Arc::from("no matching rule")),
-    );
+    err.insert("error".into(), Value::Str(Arc::from("no matching rule")));
     Ok(Value::Record(Arc::new(err)))
 }
 
@@ -147,9 +136,7 @@ fn get_response(
         return Ok(Value::Unit);
     };
     match respond {
-        Value::Func(_) | Value::BuiltinFunc(_) => {
-            call_value(respond, msg.clone(), span, ctx)
-        }
+        Value::Func(_) | Value::BuiltinFunc(_) => call_value(respond, msg.clone(), span, ctx),
         _ => Ok(respond.clone()),
     }
 }
@@ -161,10 +148,7 @@ fn mock_id_from(val: &Value, span: Span) -> Result<u64, LxError> {
             .and_then(|v| v.as_int())
             .and_then(|n| n.to_u64())
             .ok_or_else(|| {
-                LxError::type_err(
-                    "agent.mock: expected mock agent with __mock_id",
-                    span,
-                )
+                LxError::type_err("agent.mock: expected mock agent with __mock_id", span)
             }),
         _ => Err(LxError::type_err(
             "agent.mock: expected mock agent Record",
@@ -173,15 +157,11 @@ fn mock_id_from(val: &Value, span: Span) -> Result<u64, LxError> {
     }
 }
 
-fn bi_mock_calls(
-    args: &[Value],
-    span: Span,
-    _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+fn bi_mock_calls(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let mock_id = mock_id_from(&args[0], span)?;
-    let calls = MOCK_CALLS.get(&mock_id).ok_or_else(|| {
-        LxError::runtime("agent.mock_calls: mock not found", span)
-    })?;
+    let calls = MOCK_CALLS
+        .get(&mock_id)
+        .ok_or_else(|| LxError::runtime("agent.mock_calls: mock not found", span))?;
     let records: Vec<Value> = calls
         .lock()
         .iter()
@@ -202,9 +182,9 @@ fn bi_mock_assert_called(
 ) -> Result<Value, LxError> {
     let mock_id = mock_id_from(&args[0], span)?;
     let pattern = &args[1];
-    let calls = MOCK_CALLS.get(&mock_id).ok_or_else(|| {
-        LxError::runtime("agent.mock_assert_called: mock not found", span)
-    })?;
+    let calls = MOCK_CALLS
+        .get(&mock_id)
+        .ok_or_else(|| LxError::runtime("agent.mock_assert_called: mock not found", span))?;
     let found = calls.lock().iter().any(|c| record_matches(&c.msg, pattern));
     if found {
         Ok(Value::Ok(Box::new(Value::Unit)))
@@ -222,9 +202,9 @@ fn bi_mock_assert_not_called(
 ) -> Result<Value, LxError> {
     let mock_id = mock_id_from(&args[0], span)?;
     let pattern = &args[1];
-    let calls = MOCK_CALLS.get(&mock_id).ok_or_else(|| {
-        LxError::runtime("agent.mock_assert_not_called: mock not found", span)
-    })?;
+    let calls = MOCK_CALLS
+        .get(&mock_id)
+        .ok_or_else(|| LxError::runtime("agent.mock_assert_not_called: mock not found", span))?;
     let found = calls.lock().iter().any(|c| record_matches(&c.msg, pattern));
     if found {
         Ok(Value::Err(Box::new(Value::Str(Arc::from(

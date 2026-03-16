@@ -1,5 +1,5 @@
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use dashmap::DashMap;
 use indexmap::IndexMap;
@@ -9,6 +9,7 @@ use num_traits::ToPrimitive;
 use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::value::Value;
 
@@ -73,17 +74,17 @@ fn build_turn_message(
 }
 
 fn history_entry_to_value(entry: &HistoryEntry) -> Value {
-    let mut rec = IndexMap::new();
-    rec.insert("role".into(), Value::Str(Arc::from(entry.role.as_str())));
-    rec.insert("content".into(), entry.content.clone());
-    rec.insert("time".into(), Value::Str(Arc::from(entry.time.as_str())));
-    Value::Record(Arc::new(rec))
+    record! {
+        "role" => Value::Str(Arc::from(entry.role.as_str())),
+        "content" => entry.content.clone(),
+        "time" => Value::Str(Arc::from(entry.time.as_str())),
+    }
 }
 
 fn make_session_record(session_id: u64) -> Value {
-    let mut rec = IndexMap::new();
-    rec.insert("__session_id".into(), Value::Int(BigInt::from(session_id)));
-    Value::Record(Arc::new(rec))
+    record! {
+        "__session_id" => Value::Int(BigInt::from(session_id)),
+    }
 }
 
 pub fn mk_dialogue() -> Value {
@@ -102,11 +103,7 @@ pub fn mk_dialogue_end() -> Value {
     mk("agent.dialogue_end", 1, bi_dialogue_end)
 }
 
-fn bi_dialogue(
-    args: &[Value],
-    span: Span,
-    _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+fn bi_dialogue(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let agent = &args[0];
     let config = &args[1];
     let cfg = parse_dialogue_config(config, span)?;
@@ -139,10 +136,7 @@ fn parse_dialogue_config(config: &Value, span: Span) -> Result<DialogueConfig, L
         }),
         Value::Record(r) => Ok(DialogueConfig {
             role: r.get("role").and_then(|v| v.as_str()).map(String::from),
-            context: r
-                .get("context")
-                .and_then(|v| v.as_str())
-                .map(String::from),
+            context: r.get("context").and_then(|v| v.as_str()).map(String::from),
             max_turns: r
                 .get("max_turns")
                 .and_then(|v| v.as_int())
@@ -181,11 +175,7 @@ fn ask_agent(
     Ok(result)
 }
 
-fn bi_dialogue_turn(
-    args: &[Value],
-    span: Span,
-    ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+fn bi_dialogue_turn(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let sid = session_id_from(&args[0], span)?;
     let msg = &args[1];
     let (agent, turn_msg) = {
@@ -195,17 +185,12 @@ fn bi_dialogue_turn(
         if let Some(max) = session.max_turns
             && session.history.len() / 2 >= max
         {
-            let mut r = IndexMap::new();
-            r.insert("exceeded".into(), Value::Str(Arc::from("max_turns")));
-            return Ok(Value::Err(Box::new(Value::Record(Arc::new(r)))));
+            return Ok(Value::Err(Box::new(record! {
+                "exceeded" => Value::Str(Arc::from("max_turns")),
+            })));
         }
-        let turn_msg = build_turn_message(
-            sid,
-            msg,
-            &session.history,
-            &session.role,
-            &session.context,
-        );
+        let turn_msg =
+            build_turn_message(sid, msg, &session.history, &session.role, &session.context);
         (session.agent.clone(), turn_msg)
     };
     let response = ask_agent(&agent, turn_msg, span, ctx)?;
@@ -217,9 +202,9 @@ fn bi_dialogue_turn(
         other => other.clone(),
     };
     let now = now_iso();
-    let mut session = SESSIONS.get_mut(&sid).ok_or_else(|| {
-        LxError::runtime("agent.dialogue_turn: session disappeared", span)
-    })?;
+    let mut session = SESSIONS
+        .get_mut(&sid)
+        .ok_or_else(|| LxError::runtime("agent.dialogue_turn: session disappeared", span))?;
     session.history.push(HistoryEntry {
         role: "user".into(),
         content: msg.clone(),
@@ -246,11 +231,7 @@ fn bi_dialogue_history(
     Ok(Value::List(Arc::new(entries)))
 }
 
-fn bi_dialogue_end(
-    args: &[Value],
-    span: Span,
-    _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+fn bi_dialogue_end(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let sid = session_id_from(&args[0], span)?;
     SESSIONS.remove(&sid);
     Ok(Value::Ok(Box::new(Value::Unit)))

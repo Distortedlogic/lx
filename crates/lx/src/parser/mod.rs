@@ -1,15 +1,23 @@
 mod func;
+mod helpers;
 mod infix;
 mod paren;
 mod pattern;
 mod prefix;
+mod prefix_coll;
+mod prefix_with;
 mod refine;
 mod statements;
+mod stmt_agent;
+mod stmt_mcp;
+mod stmt_protocol;
+mod stmt_use;
 mod type_ann;
 
+use helpers::{infix_bp, looks_like_record, postfix_bp};
 pub(crate) use infix::token_to_binop;
 
-use crate::ast::{BindTarget, Binding, Expr, FieldKind, Program, SExpr, SStmt, Stmt};
+use crate::ast::{Expr, Program, SExpr};
 use crate::error::LxError;
 use crate::span::Span;
 use crate::token::{Token, TokenKind};
@@ -42,106 +50,6 @@ impl Parser {
             self.skip_semis();
         }
         Ok(Program { stmts })
-    }
-
-    pub(crate) fn parse_stmt(&mut self) -> Result<SStmt, LxError> {
-        let start = self.tokens[self.pos].span.offset;
-        if *self.peek() == TokenKind::Use {
-            return self.parse_use_stmt(start);
-        }
-        let exported = if *self.peek() == TokenKind::Export {
-            self.advance();
-            true
-        } else {
-            false
-        };
-        if *self.peek() == TokenKind::Protocol {
-            return self.parse_protocol(exported, start);
-        }
-        if *self.peek() == TokenKind::Mcp {
-            return self.parse_mcp_decl(exported, start);
-        }
-        if *self.peek() == TokenKind::Trait {
-            return self.parse_trait_decl(exported, start);
-        }
-        if *self.peek() == TokenKind::AgentKw {
-            return self.parse_agent_decl(exported, start);
-        }
-        if let Some(type_def) = self.try_parse_type_def(exported, start)? {
-            return Ok(type_def);
-        }
-        if let Some(binding) = self.try_parse_binding(exported)? {
-            let end = binding.value.span.end();
-            return Ok(SStmt::new(
-                Stmt::Binding(binding),
-                Span::from_range(start, end),
-            ));
-        }
-        if exported {
-            let sp = self.tokens[self.pos].span;
-            return Err(LxError::parse("export must precede a binding", sp, None));
-        }
-        let expr = self.parse_expr(0)?;
-        if *self.peek() == TokenKind::Assign || *self.peek() == TokenKind::DeclMut {
-            let mutable = *self.peek() == TokenKind::DeclMut;
-            self.advance();
-            let pat = self.expr_to_pattern(&expr)?;
-            let value = self.parse_expr(0)?;
-            let end = value.span.end();
-            return Ok(SStmt::new(
-                Stmt::Binding(Binding {
-                    exported: false,
-                    mutable,
-                    target: BindTarget::Pattern(pat),
-                    type_ann: None,
-                    value,
-                }),
-                Span::from_range(start, end),
-            ));
-        }
-        if *self.peek() == TokenKind::Reassign {
-            self.advance();
-            let value = self.parse_expr(0)?;
-            let end = value.span.end();
-            let (name, fields) = Self::expr_to_field_chain(&expr)?;
-            return Ok(SStmt::new(
-                Stmt::FieldUpdate {
-                    name,
-                    fields,
-                    value,
-                },
-                Span::from_range(start, end),
-            ));
-        }
-        let end = expr.span.end();
-        Ok(SStmt::new(Stmt::Expr(expr), Span::from_range(start, end)))
-    }
-
-    fn expr_to_field_chain(expr: &SExpr) -> Result<(String, Vec<String>), LxError> {
-        let Expr::FieldAccess {
-            expr: inner,
-            field: FieldKind::Named(f),
-        } = &expr.node
-        else {
-            return Err(LxError::parse(
-                "'<-' requires name.field target",
-                expr.span,
-                None,
-            ));
-        };
-        match &inner.node {
-            Expr::Ident(name) => Ok((name.clone(), vec![f.clone()])),
-            Expr::FieldAccess { .. } => {
-                let (name, mut fields) = Self::expr_to_field_chain(inner)?;
-                fields.push(f.clone());
-                Ok((name, fields))
-            }
-            _ => Err(LxError::parse(
-                "invalid field update target",
-                expr.span,
-                None,
-            )),
-        }
     }
 
     pub(crate) fn parse_expr(&mut self, min_bp: u8) -> Result<SExpr, LxError> {
@@ -273,46 +181,6 @@ impl Parser {
         Ok(left)
     }
 
-    fn is_application_candidate(&self, left: &SExpr, min_bp: u8) -> bool {
-        if min_bp > 31 || self.no_juxtapose {
-            return false;
-        }
-        let callable = if self.collection_depth > 0 {
-            matches!(left.node, Expr::TypeConstructor(_))
-                && !matches!(self.peek(), TokenKind::TypeName(_))
-        } else {
-            matches!(
-                left.node,
-                Expr::Ident(_)
-                    | Expr::TypeConstructor(_)
-                    | Expr::Apply { .. }
-                    | Expr::FieldAccess { .. }
-                    | Expr::Section(_)
-                    | Expr::Func { .. }
-            )
-        };
-        if !callable {
-            return false;
-        }
-        matches!(
-            self.peek(),
-            TokenKind::Int(_)
-                | TokenKind::Float(_)
-                | TokenKind::StrStart
-                | TokenKind::RawStr(_)
-                | TokenKind::Regex(_)
-                | TokenKind::Ident(_)
-                | TokenKind::TypeName(_)
-                | TokenKind::LParen
-                | TokenKind::LBracket
-                | TokenKind::LBrace
-                | TokenKind::True
-                | TokenKind::False
-                | TokenKind::Unit
-                | TokenKind::PercentLBrace
-        )
-    }
-
     pub(crate) fn peek(&self) -> &TokenKind {
         self.tokens
             .get(self.pos)
@@ -346,66 +214,34 @@ impl Parser {
             self.advance();
         }
     }
-}
 
-fn looks_like_record(p: &Parser) -> bool {
-    let (cur, next) = (
-        p.tokens.get(p.pos).map(|t| &t.kind),
-        p.tokens.get(p.pos + 1).map(|t| &t.kind),
-    );
-    if matches!(
-        (cur, next),
-        (Some(TokenKind::Ident(_)), Some(TokenKind::Colon)) | (Some(TokenKind::DotDot), _)
-    ) {
-        return true;
-    }
-    if matches!(cur, Some(TokenKind::Ident(_))) {
-        let mut j = p.pos;
-        let mut ident_count = 0u32;
-        loop {
-            match p.tokens.get(j).map(|t| &t.kind) {
-                Some(TokenKind::Ident(_)) => {
-                    ident_count += 1;
-                    j += 1;
-                }
-                Some(TokenKind::Semi) => {
-                    j += 1;
-                }
-                Some(TokenKind::RBrace) => return ident_count >= 2,
-                _ => return false,
-            }
+    pub(crate) fn expect_ident(&mut self, context: &str) -> Result<String, LxError> {
+        let tok = &self.tokens[self.pos];
+        if let TokenKind::Ident(name) = &tok.kind {
+            let name = name.clone();
+            self.advance();
+            Ok(name)
+        } else {
+            Err(LxError::parse(
+                format!("expected identifier in {context}, found {:?}", tok.kind),
+                tok.span,
+                None,
+            ))
         }
     }
-    false
-}
-fn infix_bp(kind: &TokenKind) -> Option<(u8, u8)> {
-    match kind {
-        TokenKind::Question => Some((3, 4)),
-        TokenKind::Amp => Some((7, 8)),
-        TokenKind::QQ => Some((11, 12)),
-        TokenKind::Or => Some((13, 14)),
-        TokenKind::And => Some((15, 16)),
-        TokenKind::Eq
-        | TokenKind::NotEq
-        | TokenKind::Lt
-        | TokenKind::Gt
-        | TokenKind::LtEq
-        | TokenKind::GtEq => Some((17, 18)),
-        TokenKind::Pipe => Some((19, 20)),
-        TokenKind::PlusPlus | TokenKind::TildeArrow | TokenKind::TildeArrowQ => Some((21, 22)),
-        TokenKind::DotDot | TokenKind::DotDotEq => Some((23, 24)),
-        TokenKind::Plus | TokenKind::Minus => Some((25, 26)),
-        TokenKind::Star | TokenKind::Slash | TokenKind::Percent | TokenKind::IntDiv => {
-            Some((27, 28))
-        }
-        TokenKind::Dot => Some((33, 34)),
-        _ => None,
-    }
-}
 
-fn postfix_bp(kind: &TokenKind) -> Option<u8> {
-    match kind {
-        TokenKind::Caret => Some(10),
-        _ => None,
+    pub(crate) fn expect_type_name(&mut self, context: &str) -> Result<String, LxError> {
+        let tok = &self.tokens[self.pos];
+        if let TokenKind::TypeName(name) = &tok.kind {
+            let name = name.clone();
+            self.advance();
+            Ok(name)
+        } else {
+            Err(LxError::parse(
+                format!("expected type name in {context}, found {:?}", tok.kind),
+                tok.span,
+                None,
+            ))
+        }
     }
 }

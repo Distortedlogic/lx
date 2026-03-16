@@ -65,11 +65,7 @@ pub fn mk_advertise() -> Value {
     mk("agent.advertise", 2, bi_advertise)
 }
 
-fn bi_capabilities(
-    args: &[Value],
-    span: Span,
-    ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+fn bi_capabilities(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let agent = &args[0];
     let mut query = IndexMap::new();
     query.insert("type".into(), Value::Str(Arc::from("capabilities")));
@@ -84,9 +80,7 @@ fn bi_capabilities(
         let pid: u32 = pid_val
             .as_int()
             .and_then(|n| n.try_into().ok())
-            .ok_or_else(|| {
-                LxError::type_err("agent.capabilities: invalid __pid", span)
-            })?;
+            .ok_or_else(|| LxError::type_err("agent.capabilities: invalid __pid", span))?;
         return super::agent::ask_subprocess(pid, &query_val, span);
     }
     let handler = r.get("handler").ok_or_else(|| {
@@ -99,11 +93,7 @@ fn bi_capabilities(
     Ok(Value::Ok(Box::new(result)))
 }
 
-fn bi_advertise(
-    args: &[Value],
-    span: Span,
-    _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+fn bi_advertise(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let name = args[0]
         .as_str()
         .ok_or_else(|| {

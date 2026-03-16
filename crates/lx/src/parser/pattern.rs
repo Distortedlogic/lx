@@ -108,14 +108,7 @@ impl super::Parser {
                 }
                 break;
             }
-            let name_tok = self.advance().clone();
-            let TokenKind::Ident(name) = name_tok.kind else {
-                return Err(LxError::parse(
-                    "expected field name in record pattern",
-                    name_tok.span,
-                    None,
-                ));
-            };
+            let name = self.expect_ident("record pattern field")?;
             let pattern = if *self.peek() == TokenKind::Colon {
                 self.advance();
                 Some(self.parse_pattern()?)

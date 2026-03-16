@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use indexmap::IndexMap;
@@ -12,8 +12,8 @@ use crate::span::Span;
 use crate::value::Value;
 
 use super::agent_reconcile::{
-    call_key, flatten_results, make_conflict_entry, make_result, resolve_conflict, Quorum,
-    ReconcileConfig,
+    Quorum, ReconcileConfig, call_key, flatten_results, make_conflict_entry, make_result,
+    resolve_conflict,
 };
 
 pub(super) fn do_union(
@@ -88,11 +88,11 @@ pub(super) fn do_intersection(
                 other => vec![other.clone()],
             },
         };
-        let mut seen_in_result: HashMap<String, bool> = HashMap::new();
+        let mut seen_in_result: HashSet<String> = HashSet::new();
         for item in &items {
             let k = call_key(key_fn, item, span, ctx)?;
-            if !seen_in_result.contains_key(&k) {
-                seen_in_result.insert(k.clone(), true);
+            if !seen_in_result.contains(&k) {
+                seen_in_result.insert(k.clone());
                 *key_counts.entry(k.clone()).or_insert(0) += 1;
                 first_seen.entry(k).or_insert_with(|| item.clone());
             }
@@ -138,7 +138,10 @@ pub(super) fn do_vote(
         let w = match &cfg.weight {
             Some(wf) => {
                 let w_val = call_value(wf, Value::Int(BigInt::from(i)), span, ctx)?;
-                w_val.as_float().or_else(|| w_val.as_int().and_then(|n| n.to_f64())).unwrap_or(1.0)
+                w_val
+                    .as_float()
+                    .or_else(|| w_val.as_int().and_then(|n| n.to_f64()))
+                    .unwrap_or(1.0)
             }
             None => 1.0,
         };
@@ -148,13 +151,17 @@ pub(super) fn do_vote(
     }
     let (winner_key, winner_val, winner_weight) = tallies
         .iter()
-        .max_by(|a, b| a.1 .1.partial_cmp(&b.1 .1).unwrap_or(std::cmp::Ordering::Equal))
+        .max_by(|a, b| {
+            a.1.1
+                .partial_cmp(&b.1.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
         .map(|(k, (v, w))| (k.clone(), v.clone(), *w))
         .unwrap_or_else(|| (String::new(), Value::Unit, 0.0));
     let quorum_met = match &cfg.quorum {
         Quorum::Any => true,
         Quorum::Majority => winner_weight > total_weight / 2.0,
-        Quorum::Unanimous => (winner_weight - total_weight).abs() < f64::EPSILON && tallies.len() == 1,
+        Quorum::Unanimous => (winner_weight - total_weight).abs() < 1e-10 && tallies.len() == 1,
         Quorum::N(n) => winner_weight >= *n as f64,
     };
     let mut dissenting = Vec::new();
@@ -172,13 +179,17 @@ pub(super) fn do_vote(
         }
     }
     let merged = if quorum_met { winner_val } else { Value::None };
-    Ok(make_result(merged, results.len(), vec![], dropped, 0, dissenting))
+    Ok(make_result(
+        merged,
+        results.len(),
+        vec![],
+        dropped,
+        0,
+        dissenting,
+    ))
 }
 
-pub(super) fn do_highest_confidence(
-    results: &[Value],
-    span: Span,
-) -> Result<Value, LxError> {
+pub(super) fn do_highest_confidence(results: &[Value], span: Span) -> Result<Value, LxError> {
     let mut best: Option<(f64, &Value)> = None;
     for r in results {
         let conf = match r {
@@ -195,7 +206,7 @@ pub(super) fn do_highest_confidence(
                 return Err(LxError::type_err(
                     "agent.reconcile: highest_confidence requires Record results",
                     span,
-                ))
+                ));
             }
         };
         match best {
@@ -204,7 +215,14 @@ pub(super) fn do_highest_confidence(
         }
     }
     let merged = best.map(|(_, v)| v.clone()).unwrap_or(Value::Unit);
-    Ok(make_result(merged, results.len(), vec![], vec![], 0, vec![]))
+    Ok(make_result(
+        merged,
+        results.len(),
+        vec![],
+        vec![],
+        0,
+        vec![],
+    ))
 }
 
 pub(super) fn do_max_score(
@@ -234,7 +252,14 @@ pub(super) fn do_max_score(
         if let Some(threshold) = cfg.early_stop
             && s >= threshold
         {
-            return Ok(make_result(r.clone(), results.len(), vec![], vec![], 0, vec![]));
+            return Ok(make_result(
+                r.clone(),
+                results.len(),
+                vec![],
+                vec![],
+                0,
+                vec![],
+            ));
         }
         match best {
             Some((best_s, _)) if s <= best_s => {}
@@ -242,7 +267,14 @@ pub(super) fn do_max_score(
         }
     }
     let merged = best.map(|(_, v)| v).unwrap_or(Value::Unit);
-    Ok(make_result(merged, results.len(), vec![], vec![], 0, vec![]))
+    Ok(make_result(
+        merged,
+        results.len(),
+        vec![],
+        vec![],
+        0,
+        vec![],
+    ))
 }
 
 pub(super) fn do_merge_fields(
@@ -269,8 +301,7 @@ pub(super) fn do_merge_fields(
                         merged.insert(k.clone(), Value::List(Arc::new(combined)));
                     }
                     _ => {
-                        let resolved =
-                            resolve_conflict(&cfg.conflict, existing, v, span, ctx)?;
+                        let resolved = resolve_conflict(&cfg.conflict, existing, v, span, ctx)?;
                         conflicts.push(make_conflict_entry(
                             Value::Str(Arc::from(k.as_str())),
                             vec![existing.clone(), v.clone()],

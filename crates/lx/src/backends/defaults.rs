@@ -8,6 +8,7 @@ use reqwest::blocking::Client;
 use reqwest::header::CONTENT_TYPE;
 
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::stdlib::json_conv::{json_to_lx, lx_to_json};
 use crate::value::Value;
@@ -47,9 +48,9 @@ impl AiBackend for ClaudeCodeAiBackend {
         let mut child = match cmd.spawn() {
             Ok(c) => c,
             Err(e) => {
-                return Ok(Value::Err(Box::new(Value::Str(Arc::from(
-                    format!("ai: cannot run 'claude': {e}").as_str(),
-                )))));
+                return Ok(Value::Err(Box::new(Value::Str(Arc::from(format!(
+                    "ai: cannot run 'claude': {e}"
+                ))))));
             }
         };
         if let Some(mut stdin) = child.stdin.take() {
@@ -63,9 +64,10 @@ impl AiBackend for ClaudeCodeAiBackend {
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
         if !output.status.success() && stdout.trim().is_empty() {
-            return Ok(Value::Err(Box::new(Value::Str(Arc::from(
-                format!("ai: claude exited {}: {stderr}", output.status).as_str(),
-            )))));
+            return Ok(Value::Err(Box::new(Value::Str(Arc::from(format!(
+                "ai: claude exited {}: {stderr}",
+                output.status
+            ))))));
         }
         let jv: serde_json::Value = serde_json::from_str(stdout.trim()).map_err(|e| {
             LxError::runtime(
@@ -162,9 +164,7 @@ impl HttpBackend for ReqwestHttpBackend {
         }
         match builder.send() {
             Ok(resp) => response_to_value(resp, span),
-            Err(e) => Ok(Value::Err(Box::new(Value::Str(Arc::from(
-                e.to_string().as_str(),
-            ))))),
+            Err(e) => Ok(Value::Err(Box::new(Value::Str(Arc::from(e.to_string()))))),
         }
     }
 }
@@ -184,11 +184,11 @@ fn response_to_value(resp: reqwest::blocking::Response, span: Span) -> Result<Va
     } else {
         Value::Str(Arc::from(body_str.as_str()))
     };
-    let mut fields = IndexMap::new();
-    fields.insert("status".into(), Value::Int(BigInt::from(status)));
-    fields.insert("body".into(), body);
-    fields.insert("headers".into(), Value::Record(Arc::new(headers)));
-    Ok(Value::Ok(Box::new(Value::Record(Arc::new(fields)))))
+    Ok(Value::Ok(Box::new(record! {
+        "status" => Value::Int(BigInt::from(status)),
+        "body" => body,
+        "headers" => Value::Record(Arc::new(headers)),
+    })))
 }
 
 pub struct ProcessShellBackend;
@@ -200,18 +200,16 @@ impl ShellBackend for ProcessShellBackend {
                 let out = String::from_utf8_lossy(&output.stdout).into_owned();
                 let err = String::from_utf8_lossy(&output.stderr).into_owned();
                 let code = output.status.code().unwrap_or(-1);
-                let mut fields = IndexMap::new();
-                fields.insert("out".into(), Value::Str(Arc::from(out.as_str())));
-                fields.insert("err".into(), Value::Str(Arc::from(err.as_str())));
-                fields.insert("code".into(), Value::Int(code.into()));
-                Ok(Value::Ok(Box::new(Value::Record(Arc::new(fields)))))
+                Ok(Value::Ok(Box::new(record! {
+                    "out" => Value::Str(Arc::from(out.as_str())),
+                    "err" => Value::Str(Arc::from(err.as_str())),
+                    "code" => Value::Int(code.into()),
+                })))
             }
-            Err(e) => {
-                let mut fields = IndexMap::new();
-                fields.insert("cmd".into(), Value::Str(Arc::from(cmd)));
-                fields.insert("msg".into(), Value::Str(Arc::from(e.to_string().as_str())));
-                Ok(Value::Err(Box::new(Value::Record(Arc::new(fields)))))
-            }
+            Err(e) => Ok(Value::Err(Box::new(record! {
+                "cmd" => Value::Str(Arc::from(cmd)),
+                "msg" => Value::Str(Arc::from(e.to_string().as_str())),
+            }))),
         }
     }
 
@@ -224,18 +222,18 @@ impl ShellBackend for ProcessShellBackend {
                     Ok(Value::Str(Arc::from(out.as_str())))
                 } else {
                     let err = String::from_utf8_lossy(&output.stderr).into_owned();
-                    let mut fields = IndexMap::new();
-                    fields.insert("cmd".into(), Value::Str(Arc::from(cmd)));
-                    fields.insert("msg".into(), Value::Str(Arc::from(err.as_str())));
-                    let shell_err = Value::Err(Box::new(Value::Record(Arc::new(fields))));
+                    let shell_err = Value::Err(Box::new(record! {
+                        "cmd" => Value::Str(Arc::from(cmd)),
+                        "msg" => Value::Str(Arc::from(err.as_str())),
+                    }));
                     Err(LxError::propagate(shell_err, span))
                 }
             }
             Err(e) => {
-                let mut fields = IndexMap::new();
-                fields.insert("cmd".into(), Value::Str(Arc::from(cmd)));
-                fields.insert("msg".into(), Value::Str(Arc::from(e.to_string().as_str())));
-                let shell_err = Value::Err(Box::new(Value::Record(Arc::new(fields))));
+                let shell_err = Value::Err(Box::new(record! {
+                    "cmd" => Value::Str(Arc::from(cmd)),
+                    "msg" => Value::Str(Arc::from(e.to_string().as_str())),
+                }));
                 Err(LxError::propagate(shell_err, span))
             }
         }

@@ -9,6 +9,7 @@ use num_bigint::BigInt;
 use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::stdlib::json_conv;
 use crate::value::Value;
@@ -56,9 +57,9 @@ pub(crate) fn store_id(v: &Value, span: Span) -> Result<u64, LxError> {
 }
 
 fn make_handle(id: u64) -> Value {
-    let mut rec = IndexMap::new();
-    rec.insert("__trace_id".into(), Value::Int(BigInt::from(id)));
-    Value::Ok(Box::new(Value::Record(Arc::new(rec))))
+    Value::Ok(Box::new(record! {
+        "__trace_id" => Value::Int(BigInt::from(id)),
+    }))
 }
 
 pub(crate) fn now_str() -> String {
@@ -98,8 +99,7 @@ pub(crate) fn persist(store: &TraceStore, span: Span) -> Result<(), LxError> {
     let json = json_conv::lx_to_json(&list, span)?;
     let s = serde_json::to_string_pretty(&json)
         .map_err(|e| LxError::runtime(format!("trace: serialize: {e}"), span))?;
-    std::fs::write(&store.path, s)
-        .map_err(|e| LxError::runtime(format!("trace: write: {e}"), span))
+    std::fs::write(&store.path, s).map_err(|e| LxError::runtime(format!("trace: write: {e}"), span))
 }
 
 fn bi_create(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {

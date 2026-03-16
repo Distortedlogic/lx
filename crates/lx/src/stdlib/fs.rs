@@ -6,6 +6,7 @@ use num_bigint::BigInt;
 use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::value::Value;
 
@@ -142,17 +143,12 @@ fn bi_stat(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, 
         .as_str()
         .ok_or_else(|| LxError::type_err("fs.stat expects Str path", span))?;
     match std::fs::metadata(path) {
-        Ok(meta) => {
-            let mut fields = IndexMap::new();
-            fields.insert("size".into(), Value::Int(BigInt::from(meta.len())));
-            fields.insert("is_file".into(), Value::Bool(meta.is_file()));
-            fields.insert("is_dir".into(), Value::Bool(meta.is_dir()));
-            fields.insert(
-                "readonly".into(),
-                Value::Bool(meta.permissions().readonly()),
-            );
-            Ok(Value::Ok(Box::new(Value::Record(Arc::new(fields)))))
-        }
+        Ok(meta) => Ok(Value::Ok(Box::new(record! {
+            "size" => Value::Int(BigInt::from(meta.len())),
+            "is_file" => Value::Bool(meta.is_file()),
+            "is_dir" => Value::Bool(meta.is_dir()),
+            "readonly" => Value::Bool(meta.permissions().readonly()),
+        }))),
         Err(e) => Ok(Value::Err(Box::new(Value::Str(Arc::from(
             e.to_string().as_str(),
         ))))),

@@ -179,8 +179,9 @@ fn bi_audit(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, 
     let system = build_system_prompt(&fields.rubric);
     let user = build_user_prompt(&fields);
     let opts = AiOpts {
-        system: Some(system),
+        append_system: Some(system),
         max_turns: Some(1),
+        tools: Some(vec![]),
         ..AiOpts::default()
     };
     let llm_result = ctx.ai.prompt(&user, &opts, span)?;

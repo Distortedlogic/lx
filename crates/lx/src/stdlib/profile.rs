@@ -8,6 +8,7 @@ use num_bigint::BigInt;
 use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::value::Value;
 
@@ -53,15 +54,9 @@ pub fn build() -> IndexMap<String, Value> {
         "history".into(),
         mk("profile.history", 1, profile_io::bi_history),
     );
-    m.insert(
-        "merge".into(),
-        mk("profile.merge", 2, profile_io::bi_merge),
-    );
+    m.insert("merge".into(), mk("profile.merge", 2, profile_io::bi_merge));
     m.insert("age".into(), mk("profile.age", 2, profile_io::bi_age));
-    m.insert(
-        "decay".into(),
-        mk("profile.decay", 2, profile_io::bi_decay),
-    );
+    m.insert("decay".into(), mk("profile.decay", 2, profile_io::bi_decay));
     super::profile_strategy::register(&mut m);
     m
 }
@@ -78,10 +73,10 @@ pub(crate) fn profile_id(v: &Value, span: Span) -> Result<u64, LxError> {
 }
 
 fn make_handle(id: u64, name: &str) -> Value {
-    let mut rec = IndexMap::new();
-    rec.insert("__profile_id".into(), Value::Int(BigInt::from(id)));
-    rec.insert("name".into(), Value::Str(Arc::from(name)));
-    Value::Record(Arc::new(rec))
+    record! {
+        "__profile_id" => Value::Int(BigInt::from(id)),
+        "name" => Value::Str(Arc::from(name)),
+    }
 }
 
 pub(crate) fn now_str() -> String {
@@ -190,11 +185,7 @@ fn bi_recall(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
     }
 }
 
-fn bi_recall_prefix(
-    args: &[Value],
-    span: Span,
-    _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+fn bi_recall_prefix(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = profile_id(&args[0], span)?;
     let prefix = args[1]
         .as_str()
@@ -236,11 +227,7 @@ fn bi_preference(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<V
     Ok(Value::Unit)
 }
 
-fn bi_get_preference(
-    args: &[Value],
-    span: Span,
-    _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+fn bi_get_preference(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = profile_id(&args[0], span)?;
     let key = args[1]
         .as_str()

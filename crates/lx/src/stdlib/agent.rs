@@ -9,6 +9,7 @@ use num_bigint::BigInt;
 use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::stdlib::json_conv;
 use crate::value::Value;
@@ -31,7 +32,10 @@ pub fn build() -> IndexMap<String, Value> {
     m.insert("status".into(), mk("agent.status", 1, bi_status));
     m.insert("reconcile".into(), super::agent_reconcile::mk_reconcile());
     m.insert("intercept".into(), super::agent_intercept::mk_intercept());
-    m.insert("Handoff".into(), super::agent_handoff::mk_handoff_protocol());
+    m.insert(
+        "Handoff".into(),
+        super::agent_handoff::mk_handoff_protocol(),
+    );
     m.insert("as_context".into(), super::agent_handoff::mk_as_context());
     m.insert(
         "Capabilities".into(),
@@ -96,7 +100,10 @@ pub fn build() -> IndexMap<String, Value> {
     );
     m.insert("subscribers".into(), super::agent_pubsub::mk_subscribers());
     m.insert("topics".into(), super::agent_pubsub::mk_topics());
-    m.insert("implements".into(), mk("agent.implements", 2, bi_implements));
+    m.insert(
+        "implements".into(),
+        mk("agent.implements", 2, bi_implements),
+    );
     m
 }
 
@@ -113,9 +120,15 @@ fn get_pid(agent: &Value, span: Span) -> Result<u32, LxError> {
 
 fn bi_implements(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let Value::Record(agent) = &args[0] else {
-        return Err(LxError::type_err("implements?: expected agent record", span));
+        return Err(LxError::type_err(
+            "implements?: expected agent record",
+            span,
+        ));
     };
-    let Value::Trait { name: trait_name, .. } = &args[1] else {
+    let Value::Trait {
+        name: trait_name, ..
+    } = &args[1]
+    else {
         return Err(LxError::type_err("implements?: expected Trait value", span));
     };
     if let Some(Value::List(traits)) = agent.get("__traits") {
@@ -258,8 +271,12 @@ fn bi_kill(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, 
     let pid = get_pid(&args[0], span)?;
     match REGISTRY.remove(&pid) {
         Some((_, mut agent)) => {
-            let _ = agent._child.kill();
-            let _ = agent._child.wait();
+            if let Err(e) = agent._child.kill() {
+                eprintln!("agent.kill: kill failed for pid {pid}: {e}");
+            }
+            if let Err(e) = agent._child.wait() {
+                eprintln!("agent.kill: wait failed for pid {pid}: {e}");
+            }
             Ok(Value::Ok(Box::new(Value::Unit)))
         }
         None => Ok(Value::Err(Box::new(Value::Str(Arc::from(
@@ -285,8 +302,8 @@ fn bi_status(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
     } else {
         "stopped"
     };
-    let mut rec = IndexMap::new();
-    rec.insert("state".into(), Value::Str(Arc::from(state)));
-    rec.insert("pid".into(), Value::Int(BigInt::from(pid)));
-    Ok(Value::Record(Arc::new(rec)))
+    Ok(record! {
+        "state" => Value::Str(Arc::from(state)),
+        "pid" => Value::Int(BigInt::from(pid)),
+    })
 }

@@ -5,11 +5,12 @@ use num_bigint::BigInt;
 
 use crate::backends::RuntimeCtx;
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::stdlib::json_conv;
 use crate::value::Value;
 
-use super::profile::{profile_id, KnowledgeEntry, Profile, PROFILES};
+use super::profile::{KnowledgeEntry, PROFILES, Profile, profile_id};
 
 pub(crate) fn profile_path(name: &str) -> std::path::PathBuf {
     std::path::PathBuf::from(format!(".lx/profiles/{name}.json"))
@@ -110,13 +111,10 @@ pub fn bi_history(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<
     let items: Vec<Value> = entries
         .into_iter()
         .map(|(domain, learned_at)| {
-            let mut f = IndexMap::new();
-            f.insert("domain".into(), Value::Str(Arc::from(domain.as_str())));
-            f.insert(
-                "learned_at".into(),
-                Value::Str(Arc::from(learned_at.as_str())),
-            );
-            Value::Record(Arc::new(f))
+            record! {
+                "domain" => Value::Str(Arc::from(domain.as_str())),
+                "learned_at" => Value::Str(Arc::from(learned_at.as_str())),
+            }
         })
         .collect();
     Ok(Value::List(Arc::new(items)))

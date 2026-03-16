@@ -1,11 +1,15 @@
+#[path = "audit_score.rs"]
+mod audit_score;
+
 use std::sync::Arc;
 
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::{call_value, mk};
+use crate::builtins::mk;
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::value::Value;
 
@@ -38,21 +42,24 @@ pub fn build() -> IndexMap<String, Value> {
     );
     m.insert("has_diff".into(), mk("audit.has_diff", 1, bi_has_diff));
     m.insert("rubric".into(), mk("audit.rubric", 1, bi_rubric));
-    m.insert("evaluate".into(), mk("audit.evaluate", 2, bi_evaluate));
+    m.insert(
+        "evaluate".into(),
+        mk("audit.evaluate", 2, audit_score::bi_evaluate),
+    );
     m.insert(
         "quick_check".into(),
-        mk("audit.quick_check", 1, bi_quick_check),
+        mk("audit.quick_check", 1, audit_score::bi_quick_check),
     );
     m
 }
 
 pub(crate) fn make_eval_category(name: &str, score: i64, passed: bool, detail: &str) -> Value {
-    let mut cat = IndexMap::new();
-    cat.insert("name".into(), Value::Str(Arc::from(name)));
-    cat.insert("score".into(), Value::Int(BigInt::from(score)));
-    cat.insert("passed".into(), Value::Bool(passed));
-    cat.insert("feedback".into(), Value::Str(Arc::from(detail)));
-    Value::Record(Arc::new(cat))
+    record! {
+        "name" => Value::Str(Arc::from(name)),
+        "score" => Value::Int(BigInt::from(score)),
+        "passed" => Value::Bool(passed),
+        "feedback" => Value::Str(Arc::from(detail)),
+    }
 }
 
 pub(crate) fn build_eval_result(
@@ -62,13 +69,13 @@ pub(crate) fn build_eval_result(
     feedback: &str,
     failed: Vec<Value>,
 ) -> Value {
-    let mut r = IndexMap::new();
-    r.insert("score".into(), Value::Int(BigInt::from(score)));
-    r.insert("passed".into(), Value::Bool(passed));
-    r.insert("categories".into(), Value::List(Arc::new(categories)));
-    r.insert("feedback".into(), Value::Str(Arc::from(feedback)));
-    r.insert("failed".into(), Value::List(Arc::new(failed)));
-    Value::Record(Arc::new(r))
+    record! {
+        "score" => Value::Int(BigInt::from(score)),
+        "passed" => Value::Bool(passed),
+        "categories" => Value::List(Arc::new(categories)),
+        "feedback" => Value::Str(Arc::from(feedback)),
+        "failed" => Value::List(Arc::new(failed)),
+    }
 }
 
 pub(crate) fn keyword_overlap(
@@ -138,7 +145,7 @@ fn bi_is_repetitive(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Resul
     Ok(Value::Bool(dupes * 2 >= sentences.len()))
 }
 
-pub(crate) const HEDGING: &[&str] = &[
+pub(super) const HEDGING: &[&str] = &[
     "i think",
     "maybe",
     "possibly",
@@ -160,7 +167,7 @@ fn bi_is_hedging(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<V
     Ok(Value::Bool(check_hedging(s)))
 }
 
-pub(crate) const REFUSAL: &[&str] = &[
+pub(super) const REFUSAL: &[&str] = &[
     "i can't",
     "i'm unable",
     "as an ai",
@@ -189,7 +196,7 @@ fn bi_references_task(
     Ok(Value::Bool(check_references_task(output, task)))
 }
 
-pub(crate) fn check_references_task(output: &str, task: &str) -> bool {
+pub(super) fn check_references_task(output: &str, task: &str) -> bool {
     let (hits, total) = keyword_overlap(output, task, 3);
     if total == 0 {
         return true;
@@ -230,121 +237,4 @@ fn bi_rubric(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
         ));
     };
     Ok(args[0].clone())
-}
-
-fn bi_evaluate(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let Value::List(categories) = &args[0] else {
-        return Err(LxError::type_err(
-            "audit.evaluate: first arg must be rubric List",
-            span,
-        ));
-    };
-    let data = &args[1];
-    let threshold: i64 = match data {
-        Value::Record(r) => r
-            .get("threshold")
-            .and_then(|v| v.as_int())
-            .and_then(|n| n.try_into().ok())
-            .unwrap_or(95),
-        _ => 95,
-    };
-    let mut total_score: i64 = 0;
-    let mut total_weight: i64 = 0;
-    let mut cat_results = Vec::new();
-    let mut failed_names = Vec::new();
-    let mut feedback_parts = Vec::new();
-    for cat in categories.iter() {
-        let Value::Record(r) = cat else { continue };
-        let name = r.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
-        let weight: i64 = r
-            .get("weight")
-            .and_then(|v| v.as_int())
-            .and_then(|n| n.try_into().ok())
-            .unwrap_or(0);
-        let check_fn = r.get("check").ok_or_else(|| {
-            LxError::runtime(
-                format!("audit.evaluate: category '{name}' missing 'check' function"),
-                span,
-            )
-        })?;
-        let result = call_value(check_fn, data.clone(), span, ctx)?;
-        let passed = matches!(result, Value::Bool(true));
-        let score: i64 = if passed { 100 } else { 0 };
-        total_score += score * weight;
-        total_weight += weight;
-        let mut cr = IndexMap::new();
-        cr.insert("name".into(), Value::Str(Arc::from(name)));
-        cr.insert("score".into(), Value::Int(BigInt::from(score)));
-        cr.insert("passed".into(), Value::Bool(passed));
-        cat_results.push(Value::Record(Arc::new(cr)));
-        if !passed {
-            failed_names.push(Value::Str(Arc::from(name)));
-            feedback_parts.push(format!("{name}: failed"));
-        }
-    }
-    let final_score = if total_weight > 0 {
-        total_score / total_weight
-    } else {
-        0
-    };
-    let overall_passed = final_score >= threshold;
-    let feedback = feedback_parts.join("; ");
-    let mut result = IndexMap::new();
-    result.insert("score".into(), Value::Int(BigInt::from(final_score)));
-    result.insert("passed".into(), Value::Bool(overall_passed));
-    result.insert("categories".into(), Value::List(Arc::new(cat_results)));
-    result.insert("feedback".into(), Value::Str(Arc::from(feedback.as_str())));
-    result.insert("failed".into(), Value::List(Arc::new(failed_names)));
-    Ok(Value::Record(Arc::new(result)))
-}
-
-fn bi_quick_check(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let Value::Record(opts) = &args[0] else {
-        return Err(LxError::type_err("audit.quick_check expects Record", span));
-    };
-    let output = opts.get("output").and_then(|v| v.as_str()).unwrap_or("");
-    let mut reasons = Vec::new();
-    if output.trim().is_empty() {
-        reasons.push(Value::Str(Arc::from("output is empty")));
-    }
-    if let Some(min) = opts.get("min_length").and_then(|v| v.as_int()) {
-        let min: usize = min.try_into().unwrap_or(0);
-        if output.len() < min {
-            reasons.push(Value::Str(Arc::from(
-                format!("output too short ({} < {min})", output.len()).as_str(),
-            )));
-        }
-    }
-    if opts
-        .get("no_hedging")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false)
-    {
-        let lower = output.to_lowercase();
-        if HEDGING.iter().any(|h| lower.contains(h)) {
-            reasons.push(Value::Str(Arc::from("output contains hedging language")));
-        }
-    }
-    if opts
-        .get("no_refusal")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false)
-    {
-        let lower = output.to_lowercase();
-        if REFUSAL.iter().any(|r| lower.contains(r)) {
-            reasons.push(Value::Str(Arc::from("output contains refusal language")));
-        }
-    }
-    let references_task = opts
-        .get("task")
-        .and_then(|v| v.as_str())
-        .map(|t| check_references_task(output, t))
-        .unwrap_or(true);
-    if !references_task {
-        reasons.push(Value::Str(Arc::from("output doesn't reference task")));
-    }
-    let mut result = IndexMap::new();
-    result.insert("passed".into(), Value::Bool(reasons.is_empty()));
-    result.insert("reasons".into(), Value::List(Arc::new(reasons)));
-    Ok(Value::Record(Arc::new(result)))
 }

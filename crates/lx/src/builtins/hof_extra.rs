@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use indexmap::IndexMap;
+
 use crate::backends::RuntimeCtx;
 use crate::error::LxError;
 use crate::span::Span;
@@ -118,7 +120,7 @@ pub(super) fn bi_group_by(
     ctx: &Arc<RuntimeCtx>,
 ) -> Result<Value, LxError> {
     let items = get_list(&args[1], "group_by", sp)?;
-    let mut groups = indexmap::IndexMap::new();
+    let mut groups = IndexMap::new();
     for v in items.iter() {
         let key = call(&args[0], v.clone(), sp, ctx)?;
         groups
@@ -138,9 +140,12 @@ pub(super) fn bi_chunks(
     sp: Span,
     _ctx: &Arc<RuntimeCtx>,
 ) -> Result<Value, LxError> {
-    let n = args[0]
-        .as_int()
-        .ok_or_else(|| LxError::type_err(format!("chunks: size must be Int, got {}", args[0].type_name()), sp))?;
+    let n = args[0].as_int().ok_or_else(|| {
+        LxError::type_err(
+            format!("chunks: size must be Int, got {}", args[0].type_name()),
+            sp,
+        )
+    })?;
     let items = get_list(&args[1], "chunks", sp)?;
     let n = usize::try_from(n.clone()).map_err(|_| LxError::runtime("chunks: invalid size", sp))?;
     if n == 0 {
@@ -158,9 +163,12 @@ pub(super) fn bi_windows(
     sp: Span,
     _ctx: &Arc<RuntimeCtx>,
 ) -> Result<Value, LxError> {
-    let n = args[0]
-        .as_int()
-        .ok_or_else(|| LxError::type_err(format!("windows: size must be Int, got {}", args[0].type_name()), sp))?;
+    let n = args[0].as_int().ok_or_else(|| {
+        LxError::type_err(
+            format!("windows: size must be Int, got {}", args[0].type_name()),
+            sp,
+        )
+    })?;
     let items = get_list(&args[1], "windows", sp)?;
     let n =
         usize::try_from(n.clone()).map_err(|_| LxError::runtime("windows: invalid size", sp))?;

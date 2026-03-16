@@ -1,3 +1,6 @@
+#[path = "memory_store.rs"]
+mod memory_store;
+
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock};
@@ -9,27 +12,29 @@ use num_bigint::BigInt;
 use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
-use crate::stdlib::json_conv;
 use crate::value::Value;
 
-struct MemoryStore {
-    entries: IndexMap<String, MemEntry>,
-    path: PathBuf,
-    next_entry_id: u64,
+use memory_store::{entry_to_value, load_entries, persist};
+
+pub(super) struct MemoryStore {
+    pub entries: IndexMap<String, MemEntry>,
+    pub path: PathBuf,
+    pub next_entry_id: u64,
 }
 
-struct MemEntry {
-    content: String,
-    tier: i64,
-    confidence: f64,
-    tags: Vec<String>,
-    created_at: String,
-    confirmed: i64,
-    contradicted: i64,
+pub(super) struct MemEntry {
+    pub content: String,
+    pub tier: i64,
+    pub confidence: f64,
+    pub tags: Vec<String>,
+    pub created_at: String,
+    pub confirmed: i64,
+    pub contradicted: i64,
 }
 
-static STORES: LazyLock<DashMap<u64, MemoryStore>> = LazyLock::new(DashMap::new);
+pub(super) static STORES: LazyLock<DashMap<u64, MemoryStore>> = LazyLock::new(DashMap::new);
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
 pub fn build() -> IndexMap<String, Value> {
@@ -44,12 +49,12 @@ pub fn build() -> IndexMap<String, Value> {
         "consolidate".into(),
         mk("memory.consolidate", 1, bi_consolidate),
     );
-    m.insert("tier".into(), mk("memory.tier", 2, bi_tier));
-    m.insert("all".into(), mk("memory.all", 1, bi_all));
+    m.insert("tier".into(), mk("memory.tier", 2, memory_store::bi_tier));
+    m.insert("all".into(), mk("memory.all", 1, memory_store::bi_all));
     m
 }
 
-fn store_id(v: &Value, span: Span) -> Result<u64, LxError> {
+pub(super) fn store_id(v: &Value, span: Span) -> Result<u64, LxError> {
     match v {
         Value::Record(r) => r
             .get("__mem_id")
@@ -61,124 +66,13 @@ fn store_id(v: &Value, span: Span) -> Result<u64, LxError> {
 }
 
 fn make_handle(id: u64) -> Value {
-    let mut rec = IndexMap::new();
-    rec.insert("__mem_id".into(), Value::Int(BigInt::from(id)));
-    Value::Ok(Box::new(Value::Record(Arc::new(rec))))
+    Value::Ok(Box::new(record! {
+        "__mem_id" => Value::Int(BigInt::from(id)),
+    }))
 }
 
 fn now_str() -> String {
     chrono::Utc::now().to_rfc3339()
-}
-
-fn entry_to_value(id: &str, e: &MemEntry) -> Value {
-    let mut f = IndexMap::new();
-    f.insert("id".into(), Value::Str(Arc::from(id)));
-    f.insert("content".into(), Value::Str(Arc::from(e.content.as_str())));
-    f.insert("tier".into(), Value::Int(BigInt::from(e.tier)));
-    f.insert("confidence".into(), Value::Float(e.confidence));
-    let tags: Vec<Value> = e
-        .tags
-        .iter()
-        .map(|t| Value::Str(Arc::from(t.as_str())))
-        .collect();
-    f.insert("tags".into(), Value::List(Arc::new(tags)));
-    f.insert(
-        "created_at".into(),
-        Value::Str(Arc::from(e.created_at.as_str())),
-    );
-    f.insert("confirmed".into(), Value::Int(BigInt::from(e.confirmed)));
-    f.insert(
-        "contradicted".into(),
-        Value::Int(BigInt::from(e.contradicted)),
-    );
-    Value::Record(Arc::new(f))
-}
-
-fn persist(store: &MemoryStore, span: Span) -> Result<(), LxError> {
-    let items: Vec<Value> = store
-        .entries
-        .iter()
-        .map(|(id, e)| entry_to_value(id, e))
-        .collect();
-    let list = Value::List(Arc::new(items));
-    let json = json_conv::lx_to_json(&list, span)?;
-    let s = serde_json::to_string_pretty(&json)
-        .map_err(|e| LxError::runtime(format!("memory: serialize: {e}"), span))?;
-    std::fs::write(&store.path, s)
-        .map_err(|e| LxError::runtime(format!("memory: write: {e}"), span))
-}
-
-fn load_entries(path: &str, span: Span) -> Result<(IndexMap<String, MemEntry>, u64), LxError> {
-    let mut entries = IndexMap::new();
-    let mut max_id: u64 = 0;
-    if !std::path::Path::new(path).exists() {
-        return Ok((entries, 1));
-    }
-    let content = std::fs::read_to_string(path)
-        .map_err(|e| LxError::runtime(format!("memory: read: {e}"), span))?;
-    let jv: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| LxError::runtime(format!("memory: JSON: {e}"), span))?;
-    let Value::List(items) = json_conv::json_to_lx(jv) else {
-        return Err(LxError::runtime("memory: expected JSON array", span));
-    };
-    for item in items.iter() {
-        let Value::Record(r) = item else { continue };
-        let id = r
-            .get("id")
-            .and_then(|v| v.as_str())
-            .unwrap_or("0")
-            .to_string();
-        if let Ok(n) = id.parse::<u64>()
-            && n >= max_id
-        {
-            max_id = n + 1;
-        }
-        let tags = r
-            .get("tags")
-            .and_then(|v| v.as_list())
-            .map(|l| {
-                l.iter()
-                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                    .collect()
-            })
-            .unwrap_or_default();
-        entries.insert(
-            id,
-            MemEntry {
-                content: r
-                    .get("content")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string(),
-                tier: r
-                    .get("tier")
-                    .and_then(|v| v.as_int())
-                    .and_then(|n| n.try_into().ok())
-                    .unwrap_or(0),
-                confidence: r
-                    .get("confidence")
-                    .and_then(|v| v.as_float())
-                    .unwrap_or(0.0),
-                tags,
-                created_at: r
-                    .get("created_at")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string(),
-                confirmed: r
-                    .get("confirmed")
-                    .and_then(|v| v.as_int())
-                    .and_then(|n| n.try_into().ok())
-                    .unwrap_or(0),
-                contradicted: r
-                    .get("contradicted")
-                    .and_then(|v| v.as_int())
-                    .and_then(|n| n.try_into().ok())
-                    .unwrap_or(0),
-            },
-        );
-    }
-    Ok((entries, max_id))
 }
 
 fn bi_create(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
@@ -375,43 +269,9 @@ fn bi_consolidate(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<
         store.entries.shift_remove(id);
     }
     persist(&store, span)?;
-    let mut r = IndexMap::new();
-    r.insert("promoted".into(), Value::Int(BigInt::from(promoted)));
-    r.insert("demoted".into(), Value::Int(BigInt::from(demoted)));
-    r.insert(
-        "removed".into(),
-        Value::Int(BigInt::from(removed.len() as i64)),
-    );
-    Ok(Value::Record(Arc::new(r)))
-}
-
-fn bi_tier(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let level = args[0]
-        .as_int()
-        .and_then(|n| -> Option<i64> { n.try_into().ok() })
-        .ok_or_else(|| LxError::type_err("memory.tier: level must be Int", span))?;
-    let sid = store_id(&args[1], span)?;
-    let store = STORES
-        .get(&sid)
-        .ok_or_else(|| LxError::runtime("memory: store not found", span))?;
-    let results: Vec<Value> = store
-        .entries
-        .iter()
-        .filter(|(_, e)| e.tier == level)
-        .map(|(id, e)| entry_to_value(id, e))
-        .collect();
-    Ok(Value::List(Arc::new(results)))
-}
-
-fn bi_all(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let sid = store_id(&args[0], span)?;
-    let store = STORES
-        .get(&sid)
-        .ok_or_else(|| LxError::runtime("memory: store not found", span))?;
-    let results: Vec<Value> = store
-        .entries
-        .iter()
-        .map(|(id, e)| entry_to_value(id, e))
-        .collect();
-    Ok(Value::List(Arc::new(results)))
+    Ok(record! {
+        "promoted" => Value::Int(BigInt::from(promoted)),
+        "demoted" => Value::Int(BigInt::from(demoted)),
+        "removed" => Value::Int(BigInt::from(removed.len() as i64)),
+    })
 }

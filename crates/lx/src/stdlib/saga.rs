@@ -7,6 +7,7 @@ use indexmap::IndexMap;
 use crate::backends::RuntimeCtx;
 use crate::builtins::{call_value, mk};
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::value::Value;
 
@@ -120,23 +121,26 @@ fn compensate(
     for (id, result, undo_fn) in completed.iter().rev() {
         if let Some(ref on_comp) = opts.on_compensate {
             let id_val = Value::Str(Arc::from(id.as_str()));
-            let _ = call_value(on_comp, id_val, span, ctx)
-                .and_then(|partial| call_value(&partial, result.clone(), span, ctx));
+            if let Err(e) = call_value(on_comp, id_val, span, ctx)
+                .and_then(|partial| call_value(&partial, result.clone(), span, ctx))
+            {
+                eprintln!("saga: on_compensate callback failed for step '{id}': {e}");
+            }
         }
         let undo_result = call_value(undo_fn, result.clone(), span, ctx);
         match undo_result {
             Ok(Value::Err(e)) => {
-                let mut f = IndexMap::new();
-                f.insert("step".into(), Value::Str(Arc::from(id.as_str())));
-                f.insert("error".into(), *e);
-                comp_errors.push(Value::Record(Arc::new(f)));
+                comp_errors.push(record! {
+                    "step" => Value::Str(Arc::from(id.as_str())),
+                    "error" => *e,
+                });
             }
             Ok(_) => compensated.push(id.clone()),
             Err(e) => {
-                let mut f = IndexMap::new();
-                f.insert("step".into(), Value::Str(Arc::from(id.as_str())));
-                f.insert("error".into(), Value::Str(Arc::from(e.to_string())));
-                comp_errors.push(Value::Record(Arc::new(f)));
+                comp_errors.push(record! {
+                    "step" => Value::Str(Arc::from(id.as_str())),
+                    "error" => Value::Str(Arc::from(e.to_string())),
+                });
             }
         }
     }
@@ -243,10 +247,10 @@ fn bi_define(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
     let Value::List(_) = &args[0] else {
         return Err(LxError::type_err("saga.define expects List of steps", span));
     };
-    let mut fields = IndexMap::new();
-    fields.insert("__saga".into(), Value::Bool(true));
-    fields.insert("steps".into(), args[0].clone());
-    Ok(Value::Record(Arc::new(fields)))
+    Ok(record! {
+        "__saga" => Value::Bool(true),
+        "steps" => args[0].clone(),
+    })
 }
 
 fn bi_execute(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {

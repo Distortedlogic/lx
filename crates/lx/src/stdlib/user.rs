@@ -139,7 +139,7 @@ fn bi_progress_pct(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<
             return Err(LxError::type_err(
                 "user.progress_pct: expected Float pct",
                 span,
-            ))
+            ));
         }
     };
     let msg = args[1]

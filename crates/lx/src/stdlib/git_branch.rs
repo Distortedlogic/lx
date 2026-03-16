@@ -135,11 +135,7 @@ pub fn bi_stash(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<V
     }
 }
 
-pub fn bi_stash_with(
-    args: &[Value],
-    span: Span,
-    _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+pub fn bi_stash_with(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let msg = args[0]
         .as_str()
         .ok_or_else(|| LxError::type_err("git.stash_with expects Str message", span))?;
@@ -150,11 +146,7 @@ pub fn bi_stash_with(
     }
 }
 
-pub fn bi_stash_pop(
-    args: &[Value],
-    _span: Span,
-    _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+pub fn bi_stash_pop(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let _ = &args[0];
     match run_git(&["stash", "pop"]) {
         Ok(out) if out.status.success() => Ok(git_ok(Value::Unit)),
@@ -194,11 +186,7 @@ pub fn bi_stash_list(
     }
 }
 
-pub fn bi_stash_drop(
-    args: &[Value],
-    span: Span,
-    _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+pub fn bi_stash_drop(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let idx = args[0]
         .as_int()
         .ok_or_else(|| LxError::type_err("git.stash_drop expects Int index", span))?;
@@ -242,11 +230,7 @@ pub fn bi_push(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Va
     }
 }
 
-pub fn bi_push_with(
-    args: &[Value],
-    span: Span,
-    _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+pub fn bi_push_with(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let opts = match &args[0] {
         Value::Record(r) => r.as_ref(),
         _ => return Err(LxError::type_err("git.push_with expects Record", span)),

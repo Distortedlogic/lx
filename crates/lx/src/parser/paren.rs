@@ -75,9 +75,7 @@ impl super::Parser {
             && self.tokens.get(self.pos + 2).map(|t| &t.kind) == Some(&TokenKind::RParen)
         {
             self.advance();
-            let TokenKind::Ident(name) = self.advance().clone().kind else {
-                unreachable!()
-            };
+            let name = self.expect_ident("field section")?;
             let end = self.expect_kind(&TokenKind::RParen)?.span.end();
             return Ok(Some(SExpr::new(
                 Expr::Section(Section::Field(name)),

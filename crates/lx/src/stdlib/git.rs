@@ -53,11 +53,7 @@ pub fn build() -> IndexMap<String, Value> {
     );
     m.insert(
         "create_branch".into(),
-        mk(
-            "git.create_branch",
-            1,
-            super::git_branch::bi_create_branch,
-        ),
+        mk("git.create_branch", 1, super::git_branch::bi_create_branch),
     );
     m.insert(
         "create_branch_at".into(),
@@ -69,11 +65,7 @@ pub fn build() -> IndexMap<String, Value> {
     );
     m.insert(
         "delete_branch".into(),
-        mk(
-            "git.delete_branch",
-            1,
-            super::git_branch::bi_delete_branch,
-        ),
+        mk("git.delete_branch", 1, super::git_branch::bi_delete_branch),
     );
     m.insert(
         "checkout".into(),
@@ -115,14 +107,8 @@ pub fn build() -> IndexMap<String, Value> {
         "fetch".into(),
         mk("git.fetch", 1, super::git_branch::bi_fetch),
     );
-    m.insert(
-        "pull".into(),
-        mk("git.pull", 1, super::git_branch::bi_pull),
-    );
-    m.insert(
-        "push".into(),
-        mk("git.push", 1, super::git_branch::bi_push),
-    );
+    m.insert("pull".into(), mk("git.pull", 1, super::git_branch::bi_pull));
+    m.insert("push".into(), mk("git.push", 1, super::git_branch::bi_push));
     m.insert(
         "push_with".into(),
         mk("git.push_with", 1, super::git_branch::bi_push_with),
@@ -216,8 +202,7 @@ fn bi_is_repo(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Val
     let _ = &args[0];
     match run_git(&["rev-parse", "--is-inside-work-tree"]) {
         Ok(out) => Ok(Value::Bool(
-            out.status.success()
-                && String::from_utf8_lossy(&out.stdout).trim() == "true",
+            out.status.success() && String::from_utf8_lossy(&out.stdout).trim() == "true",
         )),
         Err(_) => Ok(Value::Bool(false)),
     }

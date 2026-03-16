@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 
 use crate::backends::RuntimeCtx;
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::value::Value;
 
@@ -34,18 +35,16 @@ pub(super) fn parse_status(raw: &str) -> Value {
         }
     }
 
-    let clean = staged.is_empty()
-        && unstaged.is_empty()
-        && untracked.is_empty()
-        && conflicts.is_empty();
-    let mut f = IndexMap::new();
-    f.insert("branch".into(), str_val(&branch));
-    f.insert("clean".into(), Value::Bool(clean));
-    f.insert("staged".into(), Value::List(Arc::new(staged)));
-    f.insert("unstaged".into(), Value::List(Arc::new(unstaged)));
-    f.insert("untracked".into(), Value::List(Arc::new(untracked)));
-    f.insert("conflicts".into(), Value::List(Arc::new(conflicts)));
-    Value::Record(Arc::new(f))
+    let clean =
+        staged.is_empty() && unstaged.is_empty() && untracked.is_empty() && conflicts.is_empty();
+    record! {
+        "branch" => str_val(&branch),
+        "clean" => Value::Bool(clean),
+        "staged" => Value::List(Arc::new(staged)),
+        "unstaged" => Value::List(Arc::new(unstaged)),
+        "untracked" => Value::List(Arc::new(untracked)),
+        "conflicts" => Value::List(Arc::new(conflicts)),
+    }
 }
 
 fn xy_to_action(c: char) -> &'static str {
@@ -61,10 +60,10 @@ fn xy_to_action(c: char) -> &'static str {
 }
 
 fn action_record(path: &str, action: &str) -> Value {
-    let mut f = IndexMap::new();
-    f.insert("path".into(), str_val(path));
-    f.insert("action".into(), str_val(action));
-    Value::Record(Arc::new(f))
+    record! {
+        "path" => str_val(path),
+        "action" => str_val(action),
+    }
 }
 
 fn parse_changed_entry(rest: &str, staged: &mut Vec<Value>, unstaged: &mut Vec<Value>) {
@@ -111,24 +110,14 @@ fn parse_conflict_entry(rest: &str, conflicts: &mut Vec<Value>) {
     let xy = parts[0];
     let path = parts[10];
     let chars: Vec<char> = xy.chars().collect();
-    let mut f = IndexMap::new();
-    f.insert("path".into(), str_val(path));
-    f.insert(
-        "ours".into(),
-        str_val(&chars.first().unwrap_or(&'?').to_string()),
-    );
-    f.insert(
-        "theirs".into(),
-        str_val(&chars.get(1).unwrap_or(&'?').to_string()),
-    );
-    conflicts.push(Value::Record(Arc::new(f)));
+    conflicts.push(record! {
+        "path" => str_val(path),
+        "ours" => str_val(&chars.first().unwrap_or(&'?').to_string()),
+        "theirs" => str_val(&chars.get(1).unwrap_or(&'?').to_string()),
+    });
 }
 
-pub fn bi_branches(
-    args: &[Value],
-    _span: Span,
-    _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+pub fn bi_branches(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let _ = &args[0];
     let fmt = "%(refname:short)\x1f%(HEAD)\x1f%(upstream:short)\x1f%(upstream:track,nobracket)";
     match run_git(&["for-each-ref", "--format", fmt, "refs/heads/"]) {
@@ -158,13 +147,13 @@ fn parse_branch_line(line: &str) -> Value {
         Value::Some(Box::new(str_val(remote_raw)))
     };
     let (ahead, behind) = parse_track(track);
-    let mut f = IndexMap::new();
-    f.insert("name".into(), str_val(name));
-    f.insert("current".into(), Value::Bool(current));
-    f.insert("remote".into(), remote);
-    f.insert("ahead".into(), int_val(ahead));
-    f.insert("behind".into(), int_val(behind));
-    Value::Record(Arc::new(f))
+    record! {
+        "name" => str_val(name),
+        "current" => Value::Bool(current),
+        "remote" => remote,
+        "ahead" => int_val(ahead),
+        "behind" => int_val(behind),
+    }
 }
 
 fn parse_track(track: &str) -> (i64, i64) {
@@ -181,11 +170,7 @@ fn parse_track(track: &str) -> (i64, i64) {
     (ahead, behind)
 }
 
-pub fn bi_remotes(
-    args: &[Value],
-    _span: Span,
-    _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+pub fn bi_remotes(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let _ = &args[0];
     match run_git(&["remote", "-v"]) {
         Ok(out) if out.status.success() => {
@@ -200,10 +185,10 @@ pub fn bi_remotes(
             let remotes: Vec<Value> = seen
                 .into_iter()
                 .map(|(name, url)| {
-                    let mut f = IndexMap::new();
-                    f.insert("name".into(), str_val(&name));
-                    f.insert("url".into(), str_val(&url));
-                    Value::Record(Arc::new(f))
+                    record! {
+                        "name" => str_val(&name),
+                        "url" => str_val(&url),
+                    }
                 })
                 .collect();
             Ok(git_ok(Value::List(Arc::new(remotes))))

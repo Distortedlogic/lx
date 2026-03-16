@@ -5,6 +5,7 @@ use indexmap::IndexMap;
 use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::value::Value;
 
@@ -62,13 +63,11 @@ fn bi_match(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value,
         .ok_or_else(|| LxError::type_err("re.match expects Str input", span))?;
     let re = to_regex(&pat, span)?;
     match re.find(input) {
-        Some(m) => {
-            let mut fields = IndexMap::new();
-            fields.insert("text".into(), Value::Str(Arc::from(m.as_str())));
-            fields.insert("start".into(), Value::Int(m.start().into()));
-            fields.insert("end".into(), Value::Int(m.end().into()));
-            Ok(Value::Some(Box::new(Value::Record(Arc::new(fields)))))
-        }
+        Some(m) => Ok(Value::Some(Box::new(record! {
+            "text" => Value::Str(Arc::from(m.as_str())),
+            "start" => Value::Int(m.start().into()),
+            "end" => Value::Int(m.end().into()),
+        }))),
         None => Ok(Value::None),
     }
 }

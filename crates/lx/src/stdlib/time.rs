@@ -7,6 +7,7 @@ use num_bigint::BigInt;
 use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::value::Value;
 
@@ -86,19 +87,13 @@ fn bi_parse(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value,
 }
 
 fn timestamp_to_record(dt: DateTime<Utc>) -> Value {
-    let mut fields = IndexMap::new();
-    fields.insert("epoch".into(), Value::Int(BigInt::from(dt.timestamp())));
-    fields.insert("ms".into(), Value::Int(BigInt::from(dt.timestamp_millis())));
-    fields.insert(
-        "iso".into(),
-        Value::Str(Arc::from(dt.to_rfc3339().as_str())),
-    );
     let local: DateTime<Local> = dt.with_timezone(&Local);
-    fields.insert(
-        "local".into(),
-        Value::Str(Arc::from(local.to_rfc3339().as_str())),
-    );
-    Value::Record(Arc::new(fields))
+    record! {
+        "epoch" => Value::Int(BigInt::from(dt.timestamp())),
+        "ms" => Value::Int(BigInt::from(dt.timestamp_millis())),
+        "iso" => Value::Str(Arc::from(dt.to_rfc3339().as_str())),
+        "local" => Value::Str(Arc::from(local.to_rfc3339().as_str())),
+    }
 }
 
 fn record_to_datetime(val: &Value, span: Span) -> Result<DateTime<Utc>, LxError> {

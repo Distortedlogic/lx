@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use num_traits::ToPrimitive;
+
 use crate::backends::RuntimeCtx;
 use crate::env::Env;
 use crate::error::LxError;
@@ -140,7 +142,15 @@ fn bi_filter(args: &[Value], sp: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, L
         match result.as_bool() {
             Some(true) => out.push(v.clone()),
             Some(false) => {}
-            _ => return Err(LxError::type_err(format!("filter predicate must return Bool, got {}", result.type_name()), sp)),
+            _ => {
+                return Err(LxError::type_err(
+                    format!(
+                        "filter predicate must return Bool, got {}",
+                        result.type_name()
+                    ),
+                    sp,
+                ));
+            }
         }
     }
     Ok(Value::List(Arc::new(out)))
@@ -179,10 +189,15 @@ fn bi_each(args: &[Value], sp: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxE
 }
 
 fn bi_take(args: &[Value], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let n = args[0]
-        .as_int()
-        .ok_or_else(|| LxError::type_err(format!("take: first arg must be Int, got {}", args[0].type_name()), sp))?;
-    let n = usize::try_from(n.clone()).unwrap_or(0);
+    let n = args[0].as_int().ok_or_else(|| {
+        LxError::type_err(
+            format!("take: first arg must be Int, got {}", args[0].type_name()),
+            sp,
+        )
+    })?;
+    let n = n
+        .to_usize()
+        .ok_or_else(|| LxError::runtime("take: count out of range", sp))?;
     let items = get_list(&args[1], "take", sp)?;
     Ok(Value::List(Arc::new(
         items.iter().take(n).cloned().collect(),
@@ -190,10 +205,15 @@ fn bi_take(args: &[Value], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, Lx
 }
 
 fn bi_drop(args: &[Value], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let n = args[0]
-        .as_int()
-        .ok_or_else(|| LxError::type_err(format!("drop: first arg must be Int, got {}", args[0].type_name()), sp))?;
-    let n = usize::try_from(n.clone()).unwrap_or(0);
+    let n = args[0].as_int().ok_or_else(|| {
+        LxError::type_err(
+            format!("drop: first arg must be Int, got {}", args[0].type_name()),
+            sp,
+        )
+    })?;
+    let n = n
+        .to_usize()
+        .ok_or_else(|| LxError::runtime("drop: count out of range", sp))?;
     let items = get_list(&args[1], "drop", sp)?;
     Ok(Value::List(Arc::new(
         items.iter().skip(n).cloned().collect(),

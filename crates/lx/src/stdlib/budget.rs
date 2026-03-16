@@ -1,3 +1,6 @@
+#[path = "budget_report.rs"]
+mod budget_report;
+
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock};
 use std::time::Instant;
@@ -5,24 +8,26 @@ use std::time::Instant;
 use dashmap::DashMap;
 use indexmap::IndexMap;
 use num_bigint::BigInt;
+use num_traits::ToPrimitive;
 
 use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::value::Value;
 
-struct BudgetState {
-    initial: IndexMap<String, f64>,
-    used: IndexMap<String, f64>,
-    steps: u64,
-    start: Instant,
-    tight_at: f64,
-    critical_at: f64,
-    parent_id: Option<u64>,
+pub(super) struct BudgetState {
+    pub initial: IndexMap<String, f64>,
+    pub used: IndexMap<String, f64>,
+    pub steps: u64,
+    pub start: Instant,
+    pub tight_at: f64,
+    pub critical_at: f64,
+    pub parent_id: Option<u64>,
 }
 
-static BUDGETS: LazyLock<DashMap<u64, BudgetState>> = LazyLock::new(DashMap::new);
+pub(super) static BUDGETS: LazyLock<DashMap<u64, BudgetState>> = LazyLock::new(DashMap::new);
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
 pub fn build() -> IndexMap<String, Value> {
@@ -32,13 +37,19 @@ pub fn build() -> IndexMap<String, Value> {
     m.insert("remaining".into(), mk("budget.remaining", 1, bi_remaining));
     m.insert("used".into(), mk("budget.used", 1, bi_used));
     m.insert("used_pct".into(), mk("budget.used_pct", 1, bi_used_pct));
-    m.insert("project".into(), mk("budget.project", 2, bi_project));
-    m.insert("status".into(), mk("budget.status", 1, bi_status));
+    m.insert(
+        "project".into(),
+        mk("budget.project", 2, budget_report::bi_project),
+    );
+    m.insert(
+        "status".into(),
+        mk("budget.status", 1, budget_report::bi_status),
+    );
     m.insert("slice".into(), mk("budget.slice", 2, bi_slice));
     m
 }
 
-fn budget_id(v: &Value, span: Span) -> Result<u64, LxError> {
+pub(super) fn budget_id(v: &Value, span: Span) -> Result<u64, LxError> {
     match v {
         Value::Record(r) => r
             .get("__budget_id")
@@ -50,9 +61,9 @@ fn budget_id(v: &Value, span: Span) -> Result<u64, LxError> {
 }
 
 fn make_handle(id: u64) -> Value {
-    let mut rec = IndexMap::new();
-    rec.insert("__budget_id".into(), Value::Int(BigInt::from(id)));
-    Value::Record(Arc::new(rec))
+    record! {
+        "__budget_id" => Value::Int(BigInt::from(id)),
+    }
 }
 
 fn record_to_dimensions(r: &IndexMap<String, Value>) -> IndexMap<String, f64> {
@@ -63,7 +74,7 @@ fn record_to_dimensions(r: &IndexMap<String, Value>) -> IndexMap<String, f64> {
         }
         let val = match v {
             Value::Float(f) => *f,
-            Value::Int(n) => n.to_string().parse::<f64>().unwrap_or(0.0),
+            Value::Int(n) => n.to_f64().unwrap_or(0.0),
             _ => continue,
         };
         dims.insert(k.clone(), val);
@@ -87,7 +98,7 @@ fn bi_create(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
         .get("tight_at")
         .and_then(|v| match v {
             Value::Float(f) => Some(*f),
-            Value::Int(n) => n.to_string().parse().ok(),
+            Value::Int(n) => n.to_f64(),
             _ => None,
         })
         .unwrap_or(50.0);
@@ -95,15 +106,12 @@ fn bi_create(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
         .get("critical_at")
         .and_then(|v| match v {
             Value::Float(f) => Some(*f),
-            Value::Int(n) => n.to_string().parse().ok(),
+            Value::Int(n) => n.to_f64(),
             _ => None,
         })
         .unwrap_or(80.0);
     let initial = record_to_dimensions(opts);
-    let used = initial
-        .keys()
-        .map(|k| (k.clone(), 0.0))
-        .collect();
+    let used = initial.keys().map(|k| (k.clone(), 0.0)).collect();
     let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
     BUDGETS.insert(
         id,
@@ -123,7 +131,10 @@ fn bi_create(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
 fn bi_spend(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = budget_id(&args[0], span)?;
     let Value::Record(amounts) = &args[1] else {
-        return Err(LxError::type_err("budget.spend expects Record amounts", span));
+        return Err(LxError::type_err(
+            "budget.spend expects Record amounts",
+            span,
+        ));
     };
     let spend = record_to_dimensions(amounts);
     let mut exceeded = Vec::new();
@@ -153,11 +164,9 @@ fn bi_spend(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value,
             .into_iter()
             .map(|s| Value::Str(Arc::from(s.as_str())))
             .collect();
-        Ok(Value::Err(Box::new(Value::Record(Arc::new({
-            let mut f = IndexMap::new();
-            f.insert("exceeded".into(), Value::List(Arc::new(names)));
-            f
-        })))))
+        Ok(Value::Err(Box::new(record! {
+            "exceeded" => Value::List(Arc::new(names)),
+        })))
     }
 }
 
@@ -233,97 +242,16 @@ fn bi_used_pct(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Val
     Ok(Value::Record(Arc::new(fields)))
 }
 
-fn bi_project(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let id = budget_id(&args[0], span)?;
-    let Value::Record(opts) = &args[1] else {
-        return Err(LxError::type_err("budget.project expects Record", span));
-    };
-    let remaining_steps: f64 = opts
-        .get("remaining_steps")
-        .and_then(|v| match v {
-            Value::Float(f) => Some(*f),
-            Value::Int(n) => n.to_string().parse().ok(),
-            _ => None,
-        })
-        .ok_or_else(|| {
-            LxError::type_err("budget.project: remaining_steps required", span)
-        })?;
-    let b = BUDGETS
-        .get(&id)
-        .ok_or_else(|| LxError::runtime("budget: not found", span))?;
-    let steps_done = b.steps.max(1) as f64;
-    let total_steps = steps_done + remaining_steps;
-    let mut projected_total = IndexMap::new();
-    let mut will_exceed = Vec::new();
-    let mut headroom = IndexMap::new();
-    for (k, limit) in &b.initial {
-        let spent = b.used.get(k).copied().unwrap_or(0.0);
-        let avg_per_step = spent / steps_done;
-        let projected = avg_per_step * total_steps;
-        projected_total.insert(k.clone(), Value::Float(projected));
-        let room = limit - projected;
-        headroom.insert(k.clone(), Value::Float(room));
-        if projected > *limit {
-            will_exceed.push(Value::Str(Arc::from(k.as_str())));
-        }
-    }
-    let mut fields = IndexMap::new();
-    fields.insert(
-        "projected_total".into(),
-        Value::Record(Arc::new(projected_total)),
-    );
-    fields.insert("will_exceed".into(), Value::List(Arc::new(will_exceed)));
-    fields.insert("headroom".into(), Value::Record(Arc::new(headroom)));
-    Ok(Value::Record(Arc::new(fields)))
-}
-
-fn bi_status(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let id = budget_id(&args[0], span)?;
-    let b = BUDGETS
-        .get(&id)
-        .ok_or_else(|| LxError::runtime("budget: not found", span))?;
-    let mut max_pct: f64 = 0.0;
-    let mut any_exceeded = false;
-    for (k, limit) in &b.initial {
-        if *limit == 0.0 {
-            any_exceeded = true;
-            continue;
-        }
-        let spent = if k == "wall_time" {
-            b.start.elapsed().as_secs_f64()
-        } else {
-            b.used.get(k).copied().unwrap_or(0.0)
-        };
-        if spent > *limit {
-            any_exceeded = true;
-        }
-        let pct = spent / limit * 100.0;
-        if pct > max_pct {
-            max_pct = pct;
-        }
-    }
-    let status = if any_exceeded {
-        "exceeded"
-    } else if max_pct >= b.critical_at {
-        "critical"
-    } else if max_pct >= b.tight_at {
-        "tight"
-    } else {
-        "comfortable"
-    };
-    Ok(Value::Str(Arc::from(status)))
-}
-
 fn bi_slice(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let parent_id = budget_id(&args[0], span)?;
     let Value::Record(limits) = &args[1] else {
-        return Err(LxError::type_err("budget.slice expects Record limits", span));
+        return Err(LxError::type_err(
+            "budget.slice expects Record limits",
+            span,
+        ));
     };
     let initial = record_to_dimensions(limits);
-    let used = initial
-        .keys()
-        .map(|k| (k.clone(), 0.0))
-        .collect();
+    let used = initial.keys().map(|k| (k.clone(), 0.0)).collect();
     let parent = BUDGETS
         .get(&parent_id)
         .ok_or_else(|| LxError::runtime("budget: parent not found", span))?;

@@ -6,8 +6,9 @@ use num_bigint::BigInt;
 use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
-use crate::stdlib::trace::{store_id, STORES};
+use crate::stdlib::trace::{STORES, store_id};
 use crate::value::Value;
 
 pub(crate) fn register(m: &mut IndexMap<String, Value>) {
@@ -62,22 +63,17 @@ fn bi_improvement_rate(
     let window: usize = args[0]
         .as_int()
         .and_then(|n| n.try_into().ok())
-        .ok_or_else(|| {
-            LxError::type_err("trace.improvement_rate: window must be Int", span)
-        })?;
+        .ok_or_else(|| LxError::type_err("trace.improvement_rate: window must be Int", span))?;
     let sid = store_id(&args[1], span)?;
     let scores = progress_scores(sid);
     let samples = scores.len().min(window);
     if samples < 2 {
-        let mut r = IndexMap::new();
-        r.insert("avg_delta".into(), Value::Float(0.0));
-        r.insert("recent_delta".into(), Value::Float(0.0));
-        r.insert("trend".into(), Value::Str(Arc::from("insufficient")));
-        r.insert(
-            "samples".into(),
-            Value::Int(BigInt::from(samples as i64)),
-        );
-        return Ok(Value::Record(Arc::new(r)));
+        return Ok(record! {
+            "avg_delta" => Value::Float(0.0),
+            "recent_delta" => Value::Float(0.0),
+            "trend" => Value::Str(Arc::from("insufficient")),
+            "samples" => Value::Int(BigInt::from(samples as i64)),
+        });
     }
     let start = scores.len().saturating_sub(window);
     let windowed = &scores[start..];
@@ -85,38 +81,30 @@ fn bi_improvement_rate(
     let avg_delta = deltas.iter().sum::<f64>() / deltas.len() as f64;
     let recent_delta = deltas.last().copied().unwrap_or(0.0);
     let trend = classify_trend(avg_delta, recent_delta);
-    let mut r = IndexMap::new();
-    r.insert("avg_delta".into(), Value::Float(avg_delta));
-    r.insert("recent_delta".into(), Value::Float(recent_delta));
-    r.insert("trend".into(), Value::Str(Arc::from(trend)));
-    r.insert(
-        "samples".into(),
-        Value::Int(BigInt::from(windowed.len() as i64)),
-    );
-    Ok(Value::Record(Arc::new(r)))
+    Ok(record! {
+        "avg_delta" => Value::Float(avg_delta),
+        "recent_delta" => Value::Float(recent_delta),
+        "trend" => Value::Str(Arc::from(trend)),
+        "samples" => Value::Int(BigInt::from(windowed.len() as i64)),
+    })
 }
 
-fn bi_should_stop(
-    args: &[Value],
-    span: Span,
-    _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+fn bi_should_stop(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let Value::Record(opts) = &args[0] else {
         return Err(LxError::type_err(
             "trace.should_stop: first arg must be Record",
             span,
         ));
     };
-    let min_delta = opts.get("min_delta").and_then(|v| v.as_float()).ok_or_else(
-        || LxError::type_err("trace.should_stop: min_delta required (Float)", span),
-    )?;
+    let min_delta = opts
+        .get("min_delta")
+        .and_then(|v| v.as_float())
+        .ok_or_else(|| LxError::type_err("trace.should_stop: min_delta required (Float)", span))?;
     let window: usize = opts
         .get("window")
         .and_then(|v| v.as_int())
         .and_then(|n| n.try_into().ok())
-        .ok_or_else(|| {
-            LxError::type_err("trace.should_stop: window required (Int)", span)
-        })?;
+        .ok_or_else(|| LxError::type_err("trace.should_stop: window required (Int)", span))?;
     let sid = store_id(&args[1], span)?;
     let scores = progress_scores(sid);
     if scores.len() < 2 {

@@ -46,11 +46,7 @@ pub fn mk_as_context() -> Value {
     mk("agent.as_context", 1, bi_as_context)
 }
 
-fn bi_as_context(
-    args: &[Value],
-    span: Span,
-    _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+fn bi_as_context(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let Value::Record(r) = &args[0] else {
         return Err(LxError::type_err(
             "agent.as_context: expected a Handoff Record",

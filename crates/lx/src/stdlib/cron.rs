@@ -13,6 +13,7 @@ use num_bigint::BigInt;
 use crate::backends::RuntimeCtx;
 use crate::builtins::{call_value, mk};
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::value::Value;
 
@@ -22,8 +23,7 @@ struct CronJob {
     cancel: Arc<AtomicBool>,
 }
 
-static JOBS: std::sync::LazyLock<DashMap<u64, CronJob>> =
-    std::sync::LazyLock::new(DashMap::new);
+static JOBS: std::sync::LazyLock<DashMap<u64, CronJob>> = std::sync::LazyLock::new(DashMap::new);
 
 pub fn build() -> IndexMap<String, Value> {
     let mut m = IndexMap::new();
@@ -72,14 +72,20 @@ fn positive_ms(val: &Value, name: &str, span: Span) -> Result<u64, LxError> {
             }
             Ok(*f as u64)
         }
-        _ => Err(LxError::type_err(format!("{name}: expected Int or Float ms"), span)),
+        _ => Err(LxError::type_err(
+            format!("{name}: expected Int or Float ms"),
+            span,
+        )),
     }
 }
 
 fn require_fn(val: &Value, name: &str, span: Span) -> Result<(), LxError> {
     match val {
         Value::Func(_) | Value::BuiltinFunc(_) => Ok(()),
-        _ => Err(LxError::type_err(format!("{name}: expected a function"), span)),
+        _ => Err(LxError::type_err(
+            format!("{name}: expected a function"),
+            span,
+        )),
     }
 }
 
@@ -105,7 +111,9 @@ fn spawn_oneshot(
     let flag = cancel.clone();
     JOBS.insert(id, CronJob { cancel });
     thread::spawn(move || {
-        if !sleep_cancellable(dur, &flag) && let Err(e) = call_value(&callback, Value::Unit, span, &ctx) {
+        if !sleep_cancellable(dur, &flag)
+            && let Err(e) = call_value(&callback, Value::Unit, span, &ctx)
+        {
             eprintln!("[cron] {label} error: {e}");
         }
         JOBS.remove(&id);
@@ -114,13 +122,13 @@ fn spawn_oneshot(
 }
 
 fn dt_to_record(dt: DateTime<Utc>) -> Value {
-    let mut f = IndexMap::new();
-    f.insert("epoch".into(), Value::Int(BigInt::from(dt.timestamp())));
-    f.insert("ms".into(), Value::Int(BigInt::from(dt.timestamp_millis())));
-    f.insert("iso".into(), Value::Str(Arc::from(dt.to_rfc3339().as_str())));
     let local: DateTime<Local> = dt.with_timezone(&Local);
-    f.insert("local".into(), Value::Str(Arc::from(local.to_rfc3339().as_str())));
-    Value::Record(Arc::new(f))
+    record! {
+        "epoch" => Value::Int(BigInt::from(dt.timestamp())),
+        "ms" => Value::Int(BigInt::from(dt.timestamp_millis())),
+        "iso" => Value::Str(Arc::from(dt.to_rfc3339().as_str())),
+        "local" => Value::Str(Arc::from(local.to_rfc3339().as_str())),
+    }
 }
 
 fn bi_schedule(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
@@ -203,7 +211,13 @@ fn bi_at(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxE
     }
     let wait = (target - now).to_std().unwrap_or(Duration::ZERO);
     require_fn(&args[1], "cron.at", span)?;
-    Ok(spawn_oneshot(wait, args[1].clone(), span, Arc::clone(ctx), "at"))
+    Ok(spawn_oneshot(
+        wait,
+        args[1].clone(),
+        span,
+        Arc::clone(ctx),
+        "at",
+    ))
 }
 
 fn bi_cancel(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
@@ -230,7 +244,11 @@ fn bi_next(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, 
         .ok_or_else(|| LxError::type_err("cron.next: expected Str expression", span))?;
     let schedule = match parse_schedule(expr, span) {
         Ok(s) => s,
-        Err(e) => return Ok(Value::Err(Box::new(Value::Str(Arc::from(e.to_string().as_str()))))),
+        Err(e) => {
+            return Ok(Value::Err(Box::new(Value::Str(Arc::from(
+                e.to_string().as_str(),
+            )))));
+        }
     };
     match schedule.upcoming(Utc).next() {
         Some(dt) => Ok(Value::Ok(Box::new(dt_to_record(dt)))),
@@ -247,18 +265,30 @@ fn bi_next_n(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
                 .try_into()
                 .map_err(|_| LxError::type_err("cron.next_n: count too large", span))?;
             if v <= 0 {
-                return Err(LxError::type_err("cron.next_n: count must be positive", span));
+                return Err(LxError::type_err(
+                    "cron.next_n: count must be positive",
+                    span,
+                ));
             }
             v as usize
         }
-        _ => return Err(LxError::type_err("cron.next_n: first arg must be Int", span)),
+        _ => {
+            return Err(LxError::type_err(
+                "cron.next_n: first arg must be Int",
+                span,
+            ));
+        }
     };
     let expr = args[1]
         .as_str()
         .ok_or_else(|| LxError::type_err("cron.next_n: second arg must be Str", span))?;
     let schedule = match parse_schedule(expr, span) {
         Ok(s) => s,
-        Err(e) => return Ok(Value::Err(Box::new(Value::Str(Arc::from(e.to_string().as_str()))))),
+        Err(e) => {
+            return Ok(Value::Err(Box::new(Value::Str(Arc::from(
+                e.to_string().as_str(),
+            )))));
+        }
     };
     let times: Vec<Value> = schedule.upcoming(Utc).take(n).map(dt_to_record).collect();
     Ok(Value::List(Arc::new(times)))

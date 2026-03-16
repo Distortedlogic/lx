@@ -6,6 +6,7 @@ use num_traits::ToPrimitive;
 use crate::backends::{AiOpts, RuntimeCtx};
 use crate::builtins::mk;
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::stdlib::json_conv;
 use crate::value::{ProtoFieldDef, Value};
@@ -43,15 +44,12 @@ fn bi_prompt_structured_with(
             span,
         ));
     };
-    let prompt = opts
-        .get("prompt")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| {
-            LxError::runtime(
-                "ai.prompt_structured_with: opts must have 'prompt' (Str)",
-                span,
-            )
-        })?;
+    let prompt = opts.get("prompt").and_then(|v| v.as_str()).ok_or_else(|| {
+        LxError::runtime(
+            "ai.prompt_structured_with: opts must have 'prompt' (Str)",
+            span,
+        )
+    })?;
     let max_retries = opts
         .get("max_retries")
         .and_then(|v| v.as_int())
@@ -62,10 +60,7 @@ fn bi_prompt_structured_with(
     run_structured(ctx, &augmented, &ai_opts, &fields, max_retries, span)
 }
 
-fn extract_protocol(
-    val: &Value,
-    span: Span,
-) -> Result<(String, Arc<Vec<ProtoFieldDef>>), LxError> {
+fn extract_protocol(val: &Value, span: Span) -> Result<(String, Arc<Vec<ProtoFieldDef>>), LxError> {
     match val {
         Value::Protocol { name, fields } => Ok((name.to_string(), Arc::clone(fields))),
         _ => Err(LxError::type_err(
@@ -86,9 +81,7 @@ fn augment_prompt(prompt: &str, _name: &str, fields: &[ProtoFieldDef]) -> String
         schema.push('\n');
     }
     schema.push('}');
-    format!(
-        "{prompt}\n\nRespond with a JSON object matching this exact schema:\n{schema}"
-    )
+    format!("{prompt}\n\nRespond with a JSON object matching this exact schema:\n{schema}")
 }
 
 fn type_to_schema(type_name: &str) -> String {
@@ -118,22 +111,12 @@ fn run_structured(
             Ok(record) => return Ok(Value::Ok(Box::new(record))),
             Err(reason) => {
                 if attempt == max_retries {
-                    let raw_text = super::ai::extract_llm_text(&response)
-                        .unwrap_or_else(|e| e);
-                    let mut err = IndexMap::new();
-                    err.insert(
-                        "reason".into(),
-                        Value::Str(Arc::from(reason.as_str())),
-                    );
-                    err.insert(
-                        "raw".into(),
-                        Value::Str(Arc::from(raw_text.as_str())),
-                    );
-                    err.insert(
-                        "attempts".into(),
-                        Value::Int((attempt + 1).into()),
-                    );
-                    return Ok(Value::Err(Box::new(Value::Record(Arc::new(err)))));
+                    let raw_text = super::ai::extract_llm_text(&response).unwrap_or_else(|e| e);
+                    return Ok(Value::Err(Box::new(record! {
+                        "reason" => Value::Str(Arc::from(reason.as_str())),
+                        "raw" => Value::Str(Arc::from(raw_text.as_str())),
+                        "attempts" => Value::Int((attempt + 1).into()),
+                    })));
                 }
                 current_prompt = format!(
                     "{prompt}\n\nYour previous response did not match the required schema.\nError: {reason}\nPlease respond again with a valid JSON object matching the schema."
@@ -151,8 +134,8 @@ fn try_parse_and_validate(
 ) -> Result<Value, String> {
     let text = super::ai::extract_llm_text(response)?;
     let stripped = super::ai::strip_json_fences(&text);
-    let jv: serde_json::Value = serde_json::from_str(stripped)
-        .map_err(|e| format!("invalid JSON: {e}"))?;
+    let jv: serde_json::Value =
+        serde_json::from_str(stripped).map_err(|e| format!("invalid JSON: {e}"))?;
     let lx_val = json_conv::json_to_lx(jv);
     let Value::Record(rec) = &lx_val else {
         return Err("response is not a JSON object".into());
@@ -162,7 +145,7 @@ fn try_parse_and_validate(
 }
 
 fn validate_fields(
-    rec: &indexmap::IndexMap<String, Value>,
+    rec: &IndexMap<String, Value>,
     fields: &[ProtoFieldDef],
     _span: Span,
 ) -> Result<(), String> {

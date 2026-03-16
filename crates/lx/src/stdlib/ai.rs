@@ -78,7 +78,7 @@ pub(crate) fn parse_llm_json(
     Ok(Ok(jv))
 }
 
-fn str_field(fields: &IndexMap<String, Value>, key: &str) -> Option<String> {
+fn opt_str(fields: &IndexMap<String, Value>, key: &str) -> Option<String> {
     fields
         .get(key)
         .and_then(|v| v.as_str())
@@ -87,19 +87,19 @@ fn str_field(fields: &IndexMap<String, Value>, key: &str) -> Option<String> {
 
 pub(crate) fn extract_opts(fields: &IndexMap<String, Value>) -> AiOpts {
     AiOpts {
-        system: str_field(fields, "system"),
-        model: str_field(fields, "model"),
+        system: opt_str(fields, "system"),
+        model: opt_str(fields, "model"),
         max_turns: fields
             .get("max_turns")
             .and_then(|v| v.as_int())
             .and_then(|n| n.try_into().ok()),
-        resume: str_field(fields, "resume"),
+        resume: opt_str(fields, "resume"),
         tools: fields.get("tools").and_then(|v| v.as_list()).map(|l| {
             l.iter()
                 .filter_map(|v| v.as_str().map(|s| s.to_string()))
                 .collect()
         }),
-        append_system: str_field(fields, "append_system"),
+        append_system: opt_str(fields, "append_system"),
     }
 }
 

@@ -62,15 +62,15 @@ impl HttpTransport {
         let Some(ref sid) = self.session_id else {
             return Ok(());
         };
-        let _ = self
-            .client
+        self.client
             .delete(&self.url)
             .header(
                 "Mcp-Session-Id",
                 HeaderValue::from_str(sid)
                     .map_err(|e| LxError::runtime(format!("mcp http: header: {e}"), span))?,
             )
-            .send();
+            .send()
+            .map_err(|e| LxError::runtime(format!("mcp http: shutdown: {e}"), span))?;
         Ok(())
     }
 

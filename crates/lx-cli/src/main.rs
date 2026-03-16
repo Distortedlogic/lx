@@ -1,3 +1,4 @@
+use std::io::{BufRead, Write};
 use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -266,7 +267,6 @@ fn run_agent(script_path: &str) -> ExitCode {
             return ExitCode::from(1);
         }
     };
-    use std::io::BufRead;
     let stdin = std::io::stdin();
     let reader = std::io::BufReader::new(stdin.lock());
     for line in reader.lines() {
@@ -296,8 +296,10 @@ fn run_agent(script_path: &str) -> ExitCode {
             }
             Err(e) => println!("{}", serde_json::json!({"__err": format!("{e}")})),
         }
-        use std::io::Write;
-        let _ = std::io::stdout().flush();
+        if let Err(e) = std::io::stdout().flush() {
+            eprintln!("agent: stdout flush failed: {e}");
+            return ExitCode::from(1);
+        }
     }
     ExitCode::SUCCESS
 }

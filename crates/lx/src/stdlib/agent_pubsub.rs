@@ -1,11 +1,11 @@
 use std::sync::{Arc, LazyLock};
 
 use dashmap::DashMap;
-use indexmap::IndexMap;
 
 use crate::backends::RuntimeCtx;
 use crate::builtins::{call_value, mk};
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::value::Value;
 
@@ -80,9 +80,10 @@ fn ask_agent(
     ctx: &Arc<RuntimeCtx>,
 ) -> Result<Value, LxError> {
     if let Value::Record(r) = agent {
-        if let Some(handler) = r.get("handler").filter(|h| {
-            matches!(h, Value::Func(_) | Value::BuiltinFunc(_))
-        }) {
+        if let Some(handler) = r
+            .get("handler")
+            .filter(|h| matches!(h, Value::Func(_) | Value::BuiltinFunc(_)))
+        {
             return call_value(handler, msg.clone(), span, ctx);
         }
         if let Some(pid) = r
@@ -101,11 +102,9 @@ fn ask_agent(
 
 fn bi_topic(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let name = topic_name(&args[0], span)?;
-    TOPICS
-        .entry(name.clone())
-        .or_insert_with(|| Topic {
-            subscribers: Vec::new(),
-        });
+    TOPICS.entry(name.clone()).or_insert_with(|| Topic {
+        subscribers: Vec::new(),
+    });
     Ok(Value::Str(Arc::from(name.as_str())))
 }
 
@@ -146,70 +145,74 @@ fn inject_topic(msg: &Value, topic: &str) -> Value {
         fields.insert("_topic".into(), Value::Str(Arc::from(topic)));
         Value::Record(Arc::new(fields))
     } else {
-        let mut fields = IndexMap::new();
-        fields.insert("_topic".into(), Value::Str(Arc::from(topic)));
-        fields.insert("_value".into(), msg.clone());
-        Value::Record(Arc::new(fields))
+        record! {
+            "_topic" => Value::Str(Arc::from(topic)),
+            "_value" => msg.clone(),
+        }
     }
+}
+
+fn publish_to_subscribers(
+    topic: &str,
+    msg: &Value,
+    span: Span,
+    ctx: &Arc<RuntimeCtx>,
+) -> Result<Vec<(String, Result<Value, LxError>)>, LxError> {
+    let enriched = inject_topic(msg, topic);
+    let mut results = Vec::new();
+    if let Some(t) = TOPICS.get(topic) {
+        for sub in &t.subscribers {
+            if let Some(ref filter) = sub.filter {
+                let pass = call_value(filter, msg.clone(), span, ctx)?;
+                if pass.as_bool() != Some(true) {
+                    continue;
+                }
+            }
+            let identity = agent_identity(&sub.agent);
+            let result = ask_agent(&sub.agent, &enriched, span, ctx);
+            results.push((identity, result));
+        }
+    }
+    Ok(results)
 }
 
 fn bi_publish(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let topic = topic_name(&args[0], span)?;
-    let msg = &args[1];
-    let enriched = inject_topic(msg, &topic);
-    if let Some(t) = TOPICS.get(&topic) {
-        for sub in &t.subscribers {
-            if let Some(ref filter) = sub.filter {
-                let pass = call_value(filter, msg.clone(), span, ctx)?;
-                if pass.as_bool() != Some(true) {
-                    continue;
-                }
-            }
-            let _ = ask_agent(&sub.agent, &enriched, span, ctx);
+    let deliveries = publish_to_subscribers(&topic, &args[1], span, ctx)?;
+    let mut errors: Vec<Value> = Vec::new();
+    for (identity, result) in deliveries {
+        if let Err(e) = result {
+            errors.push(record! {
+                "agent" => Value::Str(Arc::from(identity.as_str())),
+                "error" => Value::Str(Arc::from(e.to_string())),
+            });
         }
     }
-    Ok(Value::Ok(Box::new(Value::Unit)))
+    if errors.is_empty() {
+        Ok(Value::Ok(Box::new(Value::Unit)))
+    } else {
+        Ok(Value::Err(Box::new(Value::List(Arc::new(errors)))))
+    }
 }
 
-fn bi_publish_collect(
-    args: &[Value],
-    span: Span,
-    ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+fn bi_publish_collect(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let topic = topic_name(&args[0], span)?;
-    let msg = &args[1];
-    let enriched = inject_topic(msg, &topic);
+    let deliveries = publish_to_subscribers(&topic, &args[1], span, ctx)?;
     let mut results = Vec::new();
-    if let Some(t) = TOPICS.get(&topic) {
-        for sub in &t.subscribers {
-            if let Some(ref filter) = sub.filter {
-                let pass = call_value(filter, msg.clone(), span, ctx)?;
-                if pass.as_bool() != Some(true) {
-                    continue;
-                }
-            }
-            let result = ask_agent(&sub.agent, &enriched, span, ctx)?;
-            let result = match result {
-                Value::Ok(inner) => *inner,
-                other => other,
-            };
-            let mut rec = IndexMap::new();
-            rec.insert(
-                "agent".into(),
-                Value::Str(Arc::from(agent_identity(&sub.agent))),
-            );
-            rec.insert("result".into(), result);
-            results.push(Value::Record(Arc::new(rec)));
-        }
+    for (identity, result) in deliveries {
+        let val = match result? {
+            Value::Ok(inner) => *inner,
+            other => other,
+        };
+        results.push(record! {
+            "agent" => Value::Str(Arc::from(identity.as_str())),
+            "result" => val,
+        });
     }
     Ok(Value::Ok(Box::new(Value::List(Arc::new(results)))))
 }
 
-fn bi_unsubscribe(
-    args: &[Value],
-    span: Span,
-    _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+fn bi_unsubscribe(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let agent = &args[0];
     let topic = topic_name(&args[1], span)?;
     let agent_id = agent_identity(agent);
@@ -227,13 +230,10 @@ fn bi_subscribers(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<
             .subscribers
             .iter()
             .map(|s| {
-                let mut rec = IndexMap::new();
-                rec.insert(
-                    "agent".into(),
-                    Value::Str(Arc::from(agent_identity(&s.agent))),
-                );
-                rec.insert("filtered".into(), Value::Bool(s.filter.is_some()));
-                Value::Record(Arc::new(rec))
+                record! {
+                    "agent" => Value::Str(Arc::from(agent_identity(&s.agent))),
+                    "filtered" => Value::Bool(s.filter.is_some()),
+                }
             })
             .collect(),
         None => Vec::new(),

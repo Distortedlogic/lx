@@ -11,54 +11,39 @@ use crate::value::Value;
 
 use super::mk;
 
-fn bi_trim(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn str_transform(
+    args: &[Value],
+    span: Span,
+    name: &str,
+    f: fn(&str) -> String,
+) -> Result<Value, LxError> {
     match &args[0] {
-        Value::Str(s) => Ok(Value::Str(Arc::from(s.trim()))),
+        Value::Str(s) => Ok(Value::Str(Arc::from(f(s).as_str()))),
         other => Err(LxError::type_err(
-            format!("trim expects Str, got {}", other.type_name()),
+            format!("{name} expects Str, got {}", other.type_name()),
             span,
         )),
     }
+}
+
+fn bi_trim(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+    str_transform(args, span, "trim", |s| s.trim().to_string())
 }
 
 fn bi_trim_start(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    match &args[0] {
-        Value::Str(s) => Ok(Value::Str(Arc::from(s.trim_start()))),
-        other => Err(LxError::type_err(
-            format!("trim_start expects Str, got {}", other.type_name()),
-            span,
-        )),
-    }
+    str_transform(args, span, "trim_start", |s| s.trim_start().to_string())
 }
 
 fn bi_trim_end(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    match &args[0] {
-        Value::Str(s) => Ok(Value::Str(Arc::from(s.trim_end()))),
-        other => Err(LxError::type_err(
-            format!("trim_end expects Str, got {}", other.type_name()),
-            span,
-        )),
-    }
+    str_transform(args, span, "trim_end", |s| s.trim_end().to_string())
 }
 
 fn bi_upper(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    match &args[0] {
-        Value::Str(s) => Ok(Value::Str(Arc::from(s.to_uppercase().as_str()))),
-        other => Err(LxError::type_err(
-            format!("upper expects Str, got {}", other.type_name()),
-            span,
-        )),
-    }
+    str_transform(args, span, "upper", |s| s.to_uppercase())
 }
 
 fn bi_lower(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    match &args[0] {
-        Value::Str(s) => Ok(Value::Str(Arc::from(s.to_lowercase().as_str()))),
-        other => Err(LxError::type_err(
-            format!("lower expects Str, got {}", other.type_name()),
-            span,
-        )),
-    }
+    str_transform(args, span, "lower", |s| s.to_lowercase())
 }
 
 fn bi_lines(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
@@ -101,66 +86,127 @@ fn bi_byte_len(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Val
 }
 
 fn bi_split(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let sep = args[0]
-        .as_str()
-        .ok_or_else(|| LxError::type_err(format!("split: first arg must be Str, got {}", args[0].type_name()), span))?;
-    let s = args[1]
-        .as_str()
-        .ok_or_else(|| LxError::type_err(format!("split: second arg must be Str, got {}", args[1].type_name()), span))?;
+    let sep = args[0].as_str().ok_or_else(|| {
+        LxError::type_err(
+            format!("split: first arg must be Str, got {}", args[0].type_name()),
+            span,
+        )
+    })?;
+    let s = args[1].as_str().ok_or_else(|| {
+        LxError::type_err(
+            format!("split: second arg must be Str, got {}", args[1].type_name()),
+            span,
+        )
+    })?;
     let items: Vec<Value> = s.split(sep).map(|p| Value::Str(Arc::from(p))).collect();
     Ok(Value::List(Arc::new(items)))
 }
 
 fn bi_join(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let sep = args[0]
-        .as_str()
-        .ok_or_else(|| LxError::type_err(format!("join: first arg must be Str, got {}", args[0].type_name()), span))?;
-    let list = args[1]
-        .as_list()
-        .ok_or_else(|| LxError::type_err(format!("join: second arg must be List, got {}", args[1].type_name()), span))?;
+    let sep = args[0].as_str().ok_or_else(|| {
+        LxError::type_err(
+            format!("join: first arg must be Str, got {}", args[0].type_name()),
+            span,
+        )
+    })?;
+    let list = args[1].as_list().ok_or_else(|| {
+        LxError::type_err(
+            format!("join: second arg must be List, got {}", args[1].type_name()),
+            span,
+        )
+    })?;
     let parts: Result<Vec<&str>, LxError> = list
         .iter()
         .map(|v| {
-            v.as_str()
-                .ok_or_else(|| LxError::type_err(format!("join: list elements must be Str, got {}", v.type_name()), span))
+            v.as_str().ok_or_else(|| {
+                LxError::type_err(
+                    format!("join: list elements must be Str, got {}", v.type_name()),
+                    span,
+                )
+            })
         })
         .collect();
     Ok(Value::Str(Arc::from(parts?.join(sep).as_str())))
 }
 
 fn bi_replace(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let old = args[0]
-        .as_str()
-        .ok_or_else(|| LxError::type_err(format!("replace: first arg must be Str, got {}", args[0].type_name()), span))?;
-    let new = args[1]
-        .as_str()
-        .ok_or_else(|| LxError::type_err(format!("replace: second arg must be Str, got {}", args[1].type_name()), span))?;
-    let s = args[2]
-        .as_str()
-        .ok_or_else(|| LxError::type_err(format!("replace: third arg must be Str, got {}", args[2].type_name()), span))?;
+    let old = args[0].as_str().ok_or_else(|| {
+        LxError::type_err(
+            format!(
+                "replace: first arg must be Str, got {}",
+                args[0].type_name()
+            ),
+            span,
+        )
+    })?;
+    let new = args[1].as_str().ok_or_else(|| {
+        LxError::type_err(
+            format!(
+                "replace: second arg must be Str, got {}",
+                args[1].type_name()
+            ),
+            span,
+        )
+    })?;
+    let s = args[2].as_str().ok_or_else(|| {
+        LxError::type_err(
+            format!(
+                "replace: third arg must be Str, got {}",
+                args[2].type_name()
+            ),
+            span,
+        )
+    })?;
     Ok(Value::Str(Arc::from(s.replacen(old, new, 1).as_str())))
 }
 
 fn bi_replace_all(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let old = args[0]
-        .as_str()
-        .ok_or_else(|| LxError::type_err(format!("replace_all: first arg must be Str, got {}", args[0].type_name()), span))?;
-    let new = args[1]
-        .as_str()
-        .ok_or_else(|| LxError::type_err(format!("replace_all: second arg must be Str, got {}", args[1].type_name()), span))?;
-    let s = args[2]
-        .as_str()
-        .ok_or_else(|| LxError::type_err(format!("replace_all: third arg must be Str, got {}", args[2].type_name()), span))?;
+    let old = args[0].as_str().ok_or_else(|| {
+        LxError::type_err(
+            format!(
+                "replace_all: first arg must be Str, got {}",
+                args[0].type_name()
+            ),
+            span,
+        )
+    })?;
+    let new = args[1].as_str().ok_or_else(|| {
+        LxError::type_err(
+            format!(
+                "replace_all: second arg must be Str, got {}",
+                args[1].type_name()
+            ),
+            span,
+        )
+    })?;
+    let s = args[2].as_str().ok_or_else(|| {
+        LxError::type_err(
+            format!(
+                "replace_all: third arg must be Str, got {}",
+                args[2].type_name()
+            ),
+            span,
+        )
+    })?;
     Ok(Value::Str(Arc::from(s.replace(old, new).as_str())))
 }
 
 fn bi_repeat(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let n = args[0]
-        .as_int()
-        .ok_or_else(|| LxError::type_err(format!("repeat: first arg must be Int, got {}", args[0].type_name()), span))?;
-    let s = args[1]
-        .as_str()
-        .ok_or_else(|| LxError::type_err(format!("repeat: second arg must be Str, got {}", args[1].type_name()), span))?;
+    let n = args[0].as_int().ok_or_else(|| {
+        LxError::type_err(
+            format!("repeat: first arg must be Int, got {}", args[0].type_name()),
+            span,
+        )
+    })?;
+    let s = args[1].as_str().ok_or_else(|| {
+        LxError::type_err(
+            format!(
+                "repeat: second arg must be Str, got {}",
+                args[1].type_name()
+            ),
+            span,
+        )
+    })?;
     let count = n
         .to_usize()
         .ok_or_else(|| LxError::runtime("repeat: count out of range", span))?;
@@ -168,59 +214,83 @@ fn bi_repeat(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
 }
 
 fn bi_starts(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let prefix = args[0]
-        .as_str()
-        .ok_or_else(|| LxError::type_err(format!("starts?: first arg must be Str, got {}", args[0].type_name()), span))?;
-    let s = args[1]
-        .as_str()
-        .ok_or_else(|| LxError::type_err(format!("starts?: second arg must be Str, got {}", args[1].type_name()), span))?;
+    let prefix = args[0].as_str().ok_or_else(|| {
+        LxError::type_err(
+            format!(
+                "starts?: first arg must be Str, got {}",
+                args[0].type_name()
+            ),
+            span,
+        )
+    })?;
+    let s = args[1].as_str().ok_or_else(|| {
+        LxError::type_err(
+            format!(
+                "starts?: second arg must be Str, got {}",
+                args[1].type_name()
+            ),
+            span,
+        )
+    })?;
     Ok(Value::Bool(s.starts_with(prefix)))
 }
 
 fn bi_ends(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let suffix = args[0]
-        .as_str()
-        .ok_or_else(|| LxError::type_err(format!("ends?: first arg must be Str, got {}", args[0].type_name()), span))?;
-    let s = args[1]
-        .as_str()
-        .ok_or_else(|| LxError::type_err(format!("ends?: second arg must be Str, got {}", args[1].type_name()), span))?;
+    let suffix = args[0].as_str().ok_or_else(|| {
+        LxError::type_err(
+            format!("ends?: first arg must be Str, got {}", args[0].type_name()),
+            span,
+        )
+    })?;
+    let s = args[1].as_str().ok_or_else(|| {
+        LxError::type_err(
+            format!("ends?: second arg must be Str, got {}", args[1].type_name()),
+            span,
+        )
+    })?;
     Ok(Value::Bool(s.ends_with(suffix)))
 }
 
-fn bi_pad_left(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn pad(args: &[Value], span: Span, name: &str, left: bool) -> Result<Value, LxError> {
     let width = args[0]
         .as_int()
-        .ok_or_else(|| LxError::type_err(format!("pad_left: first arg must be Int, got {}", args[0].type_name()), span))?
+        .ok_or_else(|| {
+            LxError::type_err(
+                format!("{name}: first arg must be Int, got {}", args[0].type_name()),
+                span,
+            )
+        })?
         .to_usize()
-        .ok_or_else(|| LxError::runtime("pad_left: width out of range", span))?;
-    let s = args[1]
-        .as_str()
-        .ok_or_else(|| LxError::type_err(format!("pad_left: second arg must be Str, got {}", args[1].type_name()), span))?;
+        .ok_or_else(|| LxError::runtime(format!("{name}: width out of range"), span))?;
+    let s = args[1].as_str().ok_or_else(|| {
+        LxError::type_err(
+            format!(
+                "{name}: second arg must be Str, got {}",
+                args[1].type_name()
+            ),
+            span,
+        )
+    })?;
     let char_count = s.chars().count();
     if char_count >= width {
         Ok(Value::Str(Arc::from(s)))
     } else {
         let padding = " ".repeat(width - char_count);
-        Ok(Value::Str(Arc::from(format!("{padding}{s}").as_str())))
+        let result = if left {
+            format!("{padding}{s}")
+        } else {
+            format!("{s}{padding}")
+        };
+        Ok(Value::Str(Arc::from(result.as_str())))
     }
 }
 
+fn bi_pad_left(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+    pad(args, span, "pad_left", true)
+}
+
 fn bi_pad_right(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let width = args[0]
-        .as_int()
-        .ok_or_else(|| LxError::type_err(format!("pad_right: first arg must be Int, got {}", args[0].type_name()), span))?
-        .to_usize()
-        .ok_or_else(|| LxError::runtime("pad_right: width out of range", span))?;
-    let s = args[1]
-        .as_str()
-        .ok_or_else(|| LxError::type_err(format!("pad_right: second arg must be Str, got {}", args[1].type_name()), span))?;
-    let char_count = s.chars().count();
-    if char_count >= width {
-        Ok(Value::Str(Arc::from(s)))
-    } else {
-        let padding = " ".repeat(width - char_count);
-        Ok(Value::Str(Arc::from(format!("{s}{padding}").as_str())))
-    }
+    pad(args, span, "pad_right", false)
 }
 
 pub(super) fn register(env: &mut Env) {

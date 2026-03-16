@@ -10,11 +10,7 @@ pub fn mk_intercept() -> Value {
     mk("agent.intercept", 2, bi_intercept)
 }
 
-fn bi_intercept(
-    args: &[Value],
-    span: Span,
-    _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+fn bi_intercept(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let agent = &args[0];
     let middleware = &args[1];
     let Value::Record(original) = agent else {
@@ -61,11 +57,7 @@ fn bi_intercepted_handler(
     call_value(&partial, next_fn.clone(), span, ctx)
 }
 
-fn bi_next(
-    args: &[Value],
-    span: Span,
-    ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+fn bi_next(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let agent = &args[0];
     let msg = &args[1];
     let Value::Record(r) = agent else {
@@ -78,9 +70,7 @@ fn bi_next(
         let pid: u32 = pid_val
             .as_int()
             .and_then(|n| n.try_into().ok())
-            .ok_or_else(|| {
-                LxError::type_err("agent.intercept.next: invalid __pid", span)
-            })?;
+            .ok_or_else(|| LxError::type_err("agent.intercept.next: invalid __pid", span))?;
         return super::agent::ask_subprocess(pid, msg, span);
     }
     let handler = r.get("handler").ok_or_else(|| {

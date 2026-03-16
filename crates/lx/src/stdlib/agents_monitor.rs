@@ -6,6 +6,7 @@ use num_bigint::BigInt;
 use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::value::Value;
 
@@ -80,25 +81,22 @@ fn detect_issues(actions: &[Value]) -> Vec<(String, String, String)> {
 }
 
 fn make_issue(kind: &str, severity: &str, detail: &str) -> Value {
-    let mut f = IndexMap::new();
-    f.insert("kind".into(), Value::Str(Arc::from(kind)));
-    f.insert("severity".into(), Value::Str(Arc::from(severity)));
-    f.insert("detail".into(), Value::Str(Arc::from(detail)));
-    Value::Record(Arc::new(f))
+    record! {
+        "kind" => Value::Str(Arc::from(kind)),
+        "severity" => Value::Str(Arc::from(severity)),
+        "detail" => Value::Str(Arc::from(detail)),
+    }
 }
 
 fn build_result(issues: &[(String, String, String)]) -> Value {
     let issue_vals: Vec<Value> = issues.iter().map(|(k, s, d)| make_issue(k, s, d)).collect();
     let has_critical = issues.iter().any(|(_, s, _)| s == "critical");
-    let mut r = IndexMap::new();
-    r.insert("ok".into(), Value::Bool(issues.is_empty()));
-    r.insert("issues".into(), Value::List(Arc::new(issue_vals)));
-    r.insert(
-        "issue_count".into(),
-        Value::Int(BigInt::from(issues.len() as i64)),
-    );
-    r.insert("critical".into(), Value::Bool(has_critical));
-    Value::Record(Arc::new(r))
+    record! {
+        "ok" => Value::Bool(issues.is_empty()),
+        "issues" => Value::List(Arc::new(issue_vals)),
+        "issue_count" => Value::Int(BigInt::from(issues.len() as i64)),
+        "critical" => Value::Bool(has_critical),
+    }
 }
 
 fn bi_check(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {

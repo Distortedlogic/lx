@@ -6,10 +6,11 @@ use num_bigint::BigInt;
 use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::value::Value;
 
-use super::profile::{profile_id, PROFILES};
+use super::profile::{PROFILES, profile_id};
 
 pub fn register(m: &mut IndexMap<String, Value>) {
     m.insert(
@@ -33,11 +34,7 @@ struct StrategyStats {
     trend: String,
 }
 
-fn collect_strategies(
-    id: u64,
-    problem: &str,
-    span: Span,
-) -> Result<Vec<StrategyStats>, LxError> {
+fn collect_strategies(id: u64, problem: &str, span: Span) -> Result<Vec<StrategyStats>, LxError> {
     let p = PROFILES
         .get(&id)
         .ok_or_else(|| LxError::runtime("profile: handle not found", span))?;
@@ -66,7 +63,11 @@ fn collect_strategies(
             }
         })
         .collect();
-    stats.sort_by(|a, b| b.avg_score.partial_cmp(&a.avg_score).unwrap_or(std::cmp::Ordering::Equal));
+    stats.sort_by(|a, b| {
+        b.avg_score
+            .partial_cmp(&a.avg_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     Ok(stats)
 }
 
@@ -107,22 +108,15 @@ fn compute_trend(scores: &[f64]) -> String {
 }
 
 fn stats_to_value(s: &StrategyStats) -> Value {
-    let mut f = IndexMap::new();
-    f.insert(
-        "approach".into(),
-        Value::Str(Arc::from(s.approach.as_str())),
-    );
-    f.insert("avg_score".into(), Value::Float(s.avg_score));
-    f.insert("count".into(), Value::Int(BigInt::from(s.count)));
-    f.insert("trend".into(), Value::Str(Arc::from(s.trend.as_str())));
-    Value::Record(Arc::new(f))
+    record! {
+        "approach" => Value::Str(Arc::from(s.approach.as_str())),
+        "avg_score" => Value::Float(s.avg_score),
+        "count" => Value::Int(BigInt::from(s.count)),
+        "trend" => Value::Str(Arc::from(s.trend.as_str())),
+    }
 }
 
-fn bi_best_strategy(
-    args: &[Value],
-    span: Span,
-    _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+fn bi_best_strategy(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = profile_id(&args[0], span)?;
     let problem = args[1]
         .as_str()
@@ -144,19 +138,13 @@ fn bi_rank_strategies(
     let id = profile_id(&args[0], span)?;
     let problem = args[1]
         .as_str()
-        .ok_or_else(|| {
-            LxError::type_err("profile.rank_strategies: problem must be Str", span)
-        })?;
+        .ok_or_else(|| LxError::type_err("profile.rank_strategies: problem must be Str", span))?;
     let stats = collect_strategies(id, problem, span)?;
     let items: Vec<Value> = stats.iter().map(stats_to_value).collect();
     Ok(Value::List(Arc::new(items)))
 }
 
-fn bi_adapt_strategy(
-    args: &[Value],
-    span: Span,
-    _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+fn bi_adapt_strategy(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = profile_id(&args[0], span)?;
     let (problem, explore_rate) = match &args[1] {
         Value::Str(s) => (s.to_string(), 0.2),
@@ -178,15 +166,15 @@ fn bi_adapt_strategy(
             return Err(LxError::type_err(
                 "profile.adapt_strategy: expected Str or Record",
                 span,
-            ))
+            ));
         }
     };
     let stats = collect_strategies(id, &problem, span)?;
     if stats.is_empty() {
-        let mut f = IndexMap::new();
-        f.insert("approach".into(), Value::Str(Arc::from("none")));
-        f.insert("mode".into(), Value::Str(Arc::from("explore")));
-        return Ok(Value::Record(Arc::new(f)));
+        return Ok(record! {
+            "approach" => Value::Str(Arc::from("none")),
+            "mode" => Value::Str(Arc::from("explore")),
+        });
     }
     let roll: f64 = fastrand::f64();
     let (approach, mode) = if roll < explore_rate && stats.len() > 1 {
@@ -195,9 +183,8 @@ fn bi_adapt_strategy(
     } else {
         (&stats[0].approach, "exploit")
     };
-    let mut f = IndexMap::new();
-    f.insert("approach".into(), Value::Str(Arc::from(approach.as_str())));
-    f.insert("mode".into(), Value::Str(Arc::from(mode)));
-    Ok(Value::Record(Arc::new(f)))
+    Ok(record! {
+        "approach" => Value::Str(Arc::from(approach.as_str())),
+        "mode" => Value::Str(Arc::from(mode)),
+    })
 }
-

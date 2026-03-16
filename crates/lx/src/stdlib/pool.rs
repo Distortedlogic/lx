@@ -7,6 +7,7 @@ use num_bigint::BigInt;
 use crate::backends::RuntimeCtx;
 use crate::builtins::{call_value, mk};
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::value::Value;
 
@@ -74,10 +75,10 @@ fn bi_create(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
             }
             Value::Record(Arc::new(rec))
         } else {
-            let mut rec = IndexMap::new();
-            rec.insert("name".into(), Value::Str(Arc::from(format!("{name}-{i}"))));
-            rec.insert("handler".into(), Value::Unit);
-            Value::Record(Arc::new(rec))
+            record! {
+                "name" => Value::Str(Arc::from(format!("{name}-{i}"))),
+                "handler" => Value::Unit,
+            }
         };
         workers.push(worker);
     }
@@ -91,11 +92,11 @@ fn bi_create(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
             failed: 0,
         },
     );
-    let mut rec = IndexMap::new();
-    rec.insert("__pool_id".into(), Value::Int(BigInt::from(pool_id)));
-    rec.insert("name".into(), Value::Str(Arc::from(name)));
-    rec.insert("size".into(), Value::Int(BigInt::from(size)));
-    Ok(Value::Ok(Box::new(Value::Record(Arc::new(rec)))))
+    Ok(Value::Ok(Box::new(record! {
+        "__pool_id" => Value::Int(BigInt::from(pool_id)),
+        "name" => Value::Str(Arc::from(name)),
+        "size" => Value::Int(BigInt::from(size)),
+    })))
 }
 
 fn dispatch_to_worker(
@@ -116,7 +117,10 @@ fn dispatch_to_worker(
 fn bi_fan_out(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let pool_id = get_pool_id(&args[0], span)?;
     let Value::List(tasks) = &args[1] else {
-        return Err(LxError::type_err("pool.fan_out: tasks must be a List", span));
+        return Err(LxError::type_err(
+            "pool.fan_out: tasks must be a List",
+            span,
+        ));
     };
     let mut results = Vec::with_capacity(tasks.len());
     for task in tasks.iter() {
@@ -139,9 +143,7 @@ fn bi_fan_out(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value
                 if let Some(mut pool) = POOLS.get_mut(&pool_id) {
                     pool.failed += 1;
                 }
-                results.push(Value::Err(Box::new(Value::Str(Arc::from(
-                    format!("{e}"),
-                )))));
+                results.push(Value::Err(Box::new(Value::Str(Arc::from(format!("{e}"))))));
             }
         }
     }
@@ -176,9 +178,7 @@ fn bi_map(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, Lx
                 if let Some(mut pool) = POOLS.get_mut(&pool_id) {
                     pool.failed += 1;
                 }
-                results.push(Value::Err(Box::new(Value::Str(Arc::from(
-                    format!("{e}"),
-                )))));
+                results.push(Value::Err(Box::new(Value::Str(Arc::from(format!("{e}"))))));
             }
         }
     }
@@ -216,14 +216,11 @@ fn bi_status(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
     let pool = POOLS
         .get(&pool_id)
         .ok_or_else(|| LxError::runtime("pool not found", span))?;
-    let mut rec = IndexMap::new();
-    rec.insert(
-        "size".into(),
-        Value::Int(BigInt::from(pool.workers.len())),
-    );
-    rec.insert("completed".into(), Value::Int(BigInt::from(pool.completed)));
-    rec.insert("failed".into(), Value::Int(BigInt::from(pool.failed)));
-    Ok(Value::Record(Arc::new(rec)))
+    Ok(record! {
+        "size" => Value::Int(BigInt::from(pool.workers.len())),
+        "completed" => Value::Int(BigInt::from(pool.completed)),
+        "failed" => Value::Int(BigInt::from(pool.failed)),
+    })
 }
 
 fn bi_shutdown(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {

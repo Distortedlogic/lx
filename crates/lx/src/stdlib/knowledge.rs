@@ -9,6 +9,7 @@ use num_bigint::BigInt;
 use crate::backends::RuntimeCtx;
 use crate::builtins::{call_value, mk};
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::stdlib::json_conv;
 use crate::value::Value;
@@ -52,9 +53,9 @@ fn kb_id(v: &Value, span: Span) -> Result<u64, LxError> {
 }
 
 fn make_handle(id: u64) -> Value {
-    let mut rec = IndexMap::new();
-    rec.insert("__kb_id".into(), Value::Int(BigInt::from(id)));
-    Value::Ok(Box::new(Value::Record(Arc::new(rec))))
+    Value::Ok(Box::new(record! {
+        "__kb_id" => Value::Int(BigInt::from(id)),
+    }))
 }
 
 fn now_str() -> String {
@@ -62,15 +63,12 @@ fn now_str() -> String {
 }
 
 fn entry_to_value(key: &str, e: &KBEntry) -> Value {
-    let mut fields = IndexMap::new();
-    fields.insert("key".into(), Value::Str(Arc::from(key)));
-    fields.insert("val".into(), e.val.clone());
-    fields.insert("meta".into(), e.meta.clone());
-    fields.insert(
-        "stored_at".into(),
-        Value::Str(Arc::from(e.stored_at.as_str())),
-    );
-    Value::Record(Arc::new(fields))
+    record! {
+        "key" => Value::Str(Arc::from(key)),
+        "val" => e.val.clone(),
+        "meta" => e.meta.clone(),
+        "stored_at" => Value::Str(Arc::from(e.stored_at.as_str())),
+    }
 }
 
 fn persist(kb: &KnowledgeBase, span: Span) -> Result<(), LxError> {

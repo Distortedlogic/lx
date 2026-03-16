@@ -88,7 +88,6 @@ gather_context = (root) {
 investigate = (audit_content context) {
   emit "--- Phase 1-2: Investigation & Findings ---"
   p = prompt.create ()
-    | prompt.system "You are a code auditor. You analyze source code for violations of an audit checklist. Output findings directly. You are NOT an assistant — do not ask questions or request permission."
     | prompt.section "Audit Checklist" audit_content
     | prompt.section "Codebase Files" context
     | prompt.instruction "For each audit item, determine if the codebase violates it"
@@ -98,7 +97,12 @@ investigate = (audit_content context) {
     | prompt.constraint "Do not provide multiple options per finding"
   tokens = prompt.estimate p
   tokens > 50000 ? emit "  warning: investigation prompt ~{tokens} tokens"
-  out = ai.prompt (prompt.render p) ^
+  resp = ai.prompt_with {
+    prompt: (prompt.render p)
+    system: "You are a code auditor. Output a numbered list of findings. No conversation, no questions, no preamble, no asking for permission."
+    tools: []
+  } ^
+  out = resp.text
   emit "investigation complete ({out | lines | len} lines)"
   out
 }
@@ -106,7 +110,6 @@ investigate = (audit_content context) {
 compose = (audit_content rules_content findings context) {
   emit "\n--- Phase 3-4: Composition & Task List ---"
   p = prompt.create ()
-    | prompt.system "You are a document generator. You output markdown documents. You are NOT an assistant, NOT in a conversation, NOT asking for permission. Output the document directly."
     | prompt.section "Audit Checklist" audit_content
     | prompt.section "Process Rules" rules_content
     | prompt.section "Investigation Findings" findings
@@ -115,11 +118,16 @@ compose = (audit_content rules_content findings context) {
     | prompt.instruction "Required sections: # Goal, # Why, # What changes, # Files affected, # Task List, # CRITICAL REMINDERS, # Task Loading Instructions"
     | prompt.instruction "Each task must end with: just fmt, git add, git commit"
     | prompt.instruction "Final task must be verification: just test, just diagnose, just fmt"
-    | prompt.constraint "Output ONLY the raw markdown. No preamble, no commentary, no questions, no conversation"
-    | prompt.constraint "Start your output with '# Goal' — nothing before it"
+    | prompt.constraint "Output ONLY the raw markdown. No preamble, no commentary, no questions"
+    | prompt.constraint "Start output with '# Goal' — nothing before it"
   tokens = prompt.estimate p
   tokens > 50000 ? emit "  warning: composition prompt ~{tokens} tokens"
-  out = ai.prompt (prompt.render p) ^
+  resp = ai.prompt_with {
+    prompt: (prompt.render p)
+    system: "You are a markdown document generator. Output the document directly. Start with '# Goal'. No conversation, no questions, no preamble, no asking for permission."
+    tools: []
+  } ^
+  out = resp.text
   emit "composition complete ({out | lines | len} lines)"
   out
 }

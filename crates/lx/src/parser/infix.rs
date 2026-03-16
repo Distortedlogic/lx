@@ -38,49 +38,29 @@ impl super::Parser {
         self.skip_semis();
         match kind {
             TokenKind::Pipe => {
-                let right = self.parse_expr(rbp)?;
-                let span = Span::from_range(start, right.span.end());
-                Ok(SExpr::new(
-                    Expr::Pipe {
-                        left: Box::new(left),
-                        right: Box::new(right),
-                    },
-                    span,
-                ))
+                self.parse_binary_infix(left, rbp, |l, r| Expr::Pipe { left: l, right: r }, start)
             }
-            TokenKind::TildeArrow => {
-                let right = self.parse_expr(rbp)?;
-                let span = Span::from_range(start, right.span.end());
-                Ok(SExpr::new(
-                    Expr::AgentSend {
-                        target: Box::new(left),
-                        msg: Box::new(right),
-                    },
-                    span,
-                ))
-            }
-            TokenKind::TildeArrowQ => {
-                let right = self.parse_expr(rbp)?;
-                let span = Span::from_range(start, right.span.end());
-                Ok(SExpr::new(
-                    Expr::AgentAsk {
-                        target: Box::new(left),
-                        msg: Box::new(right),
-                    },
-                    span,
-                ))
-            }
-            TokenKind::QQ => {
-                let right = self.parse_expr(rbp)?;
-                let span = Span::from_range(start, right.span.end());
-                Ok(SExpr::new(
-                    Expr::Coalesce {
-                        expr: Box::new(left),
-                        default: Box::new(right),
-                    },
-                    span,
-                ))
-            }
+            TokenKind::TildeArrow => self.parse_binary_infix(
+                left,
+                rbp,
+                |l, r| Expr::AgentSend { target: l, msg: r },
+                start,
+            ),
+            TokenKind::TildeArrowQ => self.parse_binary_infix(
+                left,
+                rbp,
+                |l, r| Expr::AgentAsk { target: l, msg: r },
+                start,
+            ),
+            TokenKind::QQ => self.parse_binary_infix(
+                left,
+                rbp,
+                |l, r| Expr::Coalesce {
+                    expr: l,
+                    default: r,
+                },
+                start,
+            ),
             TokenKind::Dot => self.parse_dot(left, start),
             TokenKind::Question => self.parse_question(left, start),
             _ => {
@@ -105,6 +85,18 @@ impl super::Parser {
                 }
             }
         }
+    }
+
+    fn parse_binary_infix(
+        &mut self,
+        left: SExpr,
+        rbp: u8,
+        make: fn(Box<SExpr>, Box<SExpr>) -> Expr,
+        start: u32,
+    ) -> Result<SExpr, LxError> {
+        let right = self.parse_expr(rbp)?;
+        let span = Span::from_range(start, right.span.end());
+        Ok(SExpr::new(make(Box::new(left), Box::new(right)), span))
     }
 
     fn parse_dot(&mut self, left: SExpr, start: u32) -> Result<SExpr, LxError> {

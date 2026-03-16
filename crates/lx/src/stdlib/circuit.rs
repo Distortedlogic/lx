@@ -9,6 +9,7 @@ use num_bigint::BigInt;
 use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::value::Value;
 
@@ -53,26 +54,9 @@ fn breaker_id(v: &Value, span: Span) -> Result<u64, LxError> {
 }
 
 fn make_handle(id: u64) -> Value {
-    let mut rec = IndexMap::new();
-    rec.insert("__breaker_id".into(), Value::Int(BigInt::from(id)));
-    Value::Record(Arc::new(rec))
-}
-
-fn int_field(r: &IndexMap<String, Value>, key: &str, default: u64) -> u64 {
-    r.get(key)
-        .and_then(|v| v.as_int())
-        .and_then(|n| n.try_into().ok())
-        .unwrap_or(default)
-}
-
-fn float_field(r: &IndexMap<String, Value>, key: &str, default: f64) -> f64 {
-    r.get(key)
-        .and_then(|v| match v {
-            Value::Float(f) => Some(*f),
-            Value::Int(n) => n.to_string().parse().ok(),
-            _ => None,
-        })
-        .unwrap_or(default)
+    record! {
+        "__breaker_id" => Value::Int(BigInt::from(id)),
+    }
 }
 
 fn bi_create(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
@@ -80,12 +64,27 @@ fn bi_create(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
         return Err(LxError::type_err("circuit.create expects Record", span));
     };
     let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+    let int = |key, default: u64| -> u64 {
+        opts.get(key)
+            .and_then(|v| v.as_int())
+            .and_then(|n| n.try_into().ok())
+            .unwrap_or(default)
+    };
+    let float = |key, default: f64| -> f64 {
+        opts.get(key)
+            .and_then(|v| match v {
+                Value::Float(f) => Some(*f),
+                Value::Int(n) => n.to_string().parse().ok(),
+                _ => None,
+            })
+            .unwrap_or(default)
+    };
     let breaker = Breaker {
         turns: 0,
-        max_turns: int_field(opts, "max_turns", 100),
-        max_time_secs: float_field(opts, "max_time", 300.0),
-        max_actions: int_field(opts, "max_actions", 1000),
-        repetition_window: int_field(opts, "repetition_window", 5) as usize,
+        max_turns: int("max_turns", 100),
+        max_time_secs: float("max_time", 300.0),
+        max_actions: int("max_actions", 1000),
+        repetition_window: int("repetition_window", 5) as usize,
         actions: Vec::new(),
         start: Instant::now(),
         tripped: None,
@@ -156,11 +155,9 @@ fn bi_check(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value,
         .ok_or_else(|| LxError::runtime("circuit: breaker not found", span))?;
     trip_check(&mut b);
     match &b.tripped {
-        Some(reason) => {
-            let mut fields = IndexMap::new();
-            fields.insert("reason".into(), Value::Str(Arc::from(reason.as_str())));
-            Ok(Value::Err(Box::new(Value::Record(Arc::new(fields)))))
-        }
+        Some(reason) => Ok(Value::Err(Box::new(record! {
+            "reason" => Value::Str(Arc::from(reason.as_str())),
+        }))),
         None => Ok(Value::Ok(Box::new(Value::Unit))),
     }
 }

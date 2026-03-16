@@ -6,8 +6,9 @@ use num_bigint::BigInt;
 use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
-use crate::stdlib::trace::{span_to_value, store_id, STORES};
+use crate::stdlib::trace::{STORES, span_to_value, store_id};
 use crate::value::Value;
 
 pub(crate) fn register(m: &mut IndexMap<String, Value>) {
@@ -43,7 +44,7 @@ fn bi_export(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
     std::fs::write(export_path, lines.join("\n"))
         .map_err(|e| LxError::runtime(format!("trace: export write: {e}"), span))?;
     Ok(Value::Ok(Box::new(Value::Int(BigInt::from(
-        lines.len() as i64,
+        lines.len() as i64
     )))))
 }
 
@@ -65,18 +66,12 @@ fn bi_summary(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Valu
     } else {
         durations.iter().sum::<i64>() / durations.len() as i64
     };
-    let mut r = IndexMap::new();
-    r.insert("total".into(), Value::Int(BigInt::from(total)));
-    r.insert(
-        "scored".into(),
-        Value::Int(BigInt::from(scored.len() as i64)),
-    );
-    r.insert("avg_score".into(), Value::Float(avg_score));
-    r.insert(
-        "avg_duration_ms".into(),
-        Value::Int(BigInt::from(avg_duration)),
-    );
-    Ok(Value::Record(Arc::new(r)))
+    Ok(record! {
+        "total" => Value::Int(BigInt::from(total)),
+        "scored" => Value::Int(BigInt::from(scored.len() as i64)),
+        "avg_score" => Value::Float(avg_score),
+        "avg_duration_ms" => Value::Int(BigInt::from(avg_duration)),
+    })
 }
 
 fn bi_filter(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {

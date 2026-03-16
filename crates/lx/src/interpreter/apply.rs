@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use num_traits::ToPrimitive;
-
-use crate::ast::{Expr, FieldKind, Param, SExpr, Section, Spanned};
+use crate::ast::{Param, SExpr};
 use crate::error::LxError;
 use crate::span::Span;
 use crate::value::{LxFunc, Value};
@@ -26,10 +24,8 @@ impl Interpreter {
                     let fn_source_text = Arc::clone(&lf.source_text);
                     let fn_source_name = Arc::clone(&lf.source_name);
                     let saved = Arc::clone(&self.env);
-                    let saved_source = std::mem::replace(
-                        &mut self.source,
-                        lf.source_text.to_string(),
-                    );
+                    let saved_source =
+                        std::mem::replace(&mut self.source, lf.source_text.to_string());
                     self.env = Arc::clone(&lf.closure);
                     let result = self.eval(&lf.body);
                     self.env = saved;
@@ -58,10 +54,7 @@ impl Interpreter {
                 let fn_source_text = Arc::clone(&lf.source_text);
                 let fn_source_name = Arc::clone(&lf.source_name);
                 let saved = Arc::clone(&self.env);
-                let saved_source = std::mem::replace(
-                    &mut self.source,
-                    lf.source_text.to_string(),
-                );
+                let saved_source = std::mem::replace(&mut self.source, lf.source_text.to_string());
                 let mut call_env = lf.closure.child();
                 for (i, name) in lf.params.iter().enumerate() {
                     if i < lf.applied.len() {
@@ -129,10 +122,7 @@ impl Interpreter {
             {
                 let Value::Func(lf) = val else { unreachable!() };
                 let saved = Arc::clone(&self.env);
-                let saved_source = std::mem::replace(
-                    &mut self.source,
-                    lf.source_text.to_string(),
-                );
+                let saved_source = std::mem::replace(&mut self.source, lf.source_text.to_string());
                 let mut call_env = lf.closure.child();
                 for (i, name) in lf.params.iter().enumerate() {
                     if i < lf.applied.len() {
@@ -229,197 +219,5 @@ impl Interpreter {
             source_text: Arc::from(self.source.as_str()),
             source_name: Arc::from(source_name.as_str()),
         }))
-    }
-
-    fn make_section_func(&self, param: &str, body_expr: Expr, span: Span) -> Value {
-        let body = Spanned::new(body_expr, span);
-        Value::Func(LxFunc {
-            params: vec![param.into()],
-            defaults: vec![None],
-            body: Arc::new(body),
-            closure: Arc::clone(&self.env),
-            arity: 1,
-            applied: vec![],
-            source_text: Arc::from(self.source.as_str()),
-            source_name: Arc::from(""),
-        })
-    }
-
-    pub(super) fn eval_section(&mut self, sec: &Section, span: Span) -> Result<Value, LxError> {
-        match sec {
-            Section::Right { op, operand } => {
-                let body = Expr::Binary {
-                    op: *op,
-                    left: Box::new(Spanned::new(Expr::Ident("_x".into()), span)),
-                    right: Box::new((**operand).clone()),
-                };
-                Ok(self.make_section_func("_x", body, span))
-            }
-            Section::Left { operand, op } => {
-                let body = Expr::Binary {
-                    op: *op,
-                    left: Box::new((**operand).clone()),
-                    right: Box::new(Spanned::new(Expr::Ident("_x".into()), span)),
-                };
-                Ok(self.make_section_func("_x", body, span))
-            }
-            Section::Field(name) => {
-                let body = Expr::FieldAccess {
-                    expr: Box::new(Spanned::new(Expr::Ident("_x".into()), span)),
-                    field: FieldKind::Named(name.clone()),
-                };
-                Ok(self.make_section_func("_x", body, span))
-            }
-            Section::Index(idx) => {
-                let body = Expr::FieldAccess {
-                    expr: Box::new(Spanned::new(Expr::Ident("_x".into()), span)),
-                    field: FieldKind::Index(*idx),
-                };
-                Ok(self.make_section_func("_x", body, span))
-            }
-            Section::BinOp(op) => {
-                let body = Expr::Binary {
-                    op: *op,
-                    left: Box::new(Spanned::new(Expr::Ident("_a".into()), span)),
-                    right: Box::new(Spanned::new(Expr::Ident("_b".into()), span)),
-                };
-                Ok(self.make_section_func_2("_a", "_b", body, span))
-            }
-        }
-    }
-
-    fn make_section_func_2(&self, p1: &str, p2: &str, body_expr: Expr, span: Span) -> Value {
-        let body = Spanned::new(body_expr, span);
-        Value::Func(LxFunc {
-            params: vec![p1.into(), p2.into()],
-            defaults: vec![None, None],
-            body: Arc::new(body),
-            closure: Arc::clone(&self.env),
-            arity: 2,
-            applied: vec![],
-            source_text: Arc::from(self.source.as_str()),
-            source_name: Arc::from(""),
-        })
-    }
-
-    pub(super) fn eval_field_access(
-        &mut self,
-        expr: &SExpr,
-        field: &FieldKind,
-        span: Span,
-    ) -> Result<Value, LxError> {
-        let val = self.eval(expr)?;
-        match field {
-            FieldKind::Named(name) => match &val {
-                Value::Record(r) => r
-                    .get(name)
-                    .cloned()
-                    .ok_or_else(|| LxError::runtime(format!("field '{name}' not found"), span)),
-                Value::Agent {
-                    methods, init, ..
-                } => {
-                    if let Some(m) = methods.get(name) {
-                        Ok(m.clone())
-                    } else if name == "init" {
-                        match init {
-                            Some(v) => Ok(*v.clone()),
-                            None => Ok(Value::Unit),
-                        }
-                    } else {
-                        Err(LxError::runtime(
-                            format!("Agent method '{name}' not found"),
-                            span,
-                        ))
-                    }
-                }
-                other => Err(LxError::type_err(
-                    format!("field access on {}, not Record", other.type_name()),
-                    span,
-                )),
-            },
-            FieldKind::Index(idx) => match &val {
-                Value::Tuple(items) => {
-                    let i = if *idx < 0 {
-                        items.len() as i64 + idx
-                    } else {
-                        *idx
-                    } as usize;
-                    items.get(i).cloned().ok_or_else(|| {
-                        LxError::runtime(format!("tuple index {idx} out of bounds"), span)
-                    })
-                }
-                Value::List(items) => {
-                    let i = if *idx < 0 {
-                        items.len() as i64 + idx
-                    } else {
-                        *idx
-                    } as usize;
-                    items.get(i).cloned().ok_or_else(|| {
-                        LxError::runtime(format!("list index {idx} out of bounds"), span)
-                    })
-                }
-                other => Err(LxError::type_err(
-                    format!("index access on {}, not Tuple/List", other.type_name()),
-                    span,
-                )),
-            },
-            FieldKind::Computed(key_expr) => {
-                let key = self.eval(key_expr)?;
-                match (&val, &key) {
-                    (Value::Record(r), Value::Str(s)) => r
-                        .get(s.as_ref())
-                        .cloned()
-                        .ok_or_else(|| LxError::runtime(format!("field '{s}' not found"), span)),
-                    (Value::Map(m), Value::Str(s)) => {
-                        let vk = crate::value::ValueKey(Value::Str(s.clone()));
-                        m.get(&vk)
-                            .cloned()
-                            .ok_or_else(|| LxError::runtime(format!("key '{s}' not found"), span))
-                    }
-                    (Value::List(items), Value::Int(n)) => {
-                        let i = n
-                            .to_i64()
-                            .ok_or_else(|| LxError::runtime(format!("index {n} too large for i64"), span))?;
-                        let i = if i < 0 { items.len() as i64 + i } else { i } as usize;
-                        items
-                            .get(i)
-                            .cloned()
-                            .ok_or_else(|| LxError::runtime(
-                                format!("index {i} out of bounds (list length {})", items.len()),
-                                span,
-                            ))
-                    }
-                    _ => Err(LxError::type_err(
-                        format!(
-                            "computed field access: unsupported types {} / {}",
-                            val.type_name(),
-                            key.type_name()
-                        ),
-                        span,
-                    )),
-                }
-            }
-        }
-    }
-
-    pub(super) fn eval_ternary(
-        &mut self,
-        cond: &SExpr,
-        then_: &SExpr,
-        else_: &Option<Box<SExpr>>,
-        span: Span,
-    ) -> Result<Value, LxError> {
-        let cv = self.eval(cond)?;
-        match cv.as_bool() {
-            Some(true) => self.eval(then_),
-            Some(false) => match else_ {
-                Some(e) => self.eval(e),
-                None => Ok(Value::Unit),
-            },
-            _ => Err(LxError::type_err(
-                format!("ternary `?` condition must be Bool, got {} `{}`", cv.type_name(), cv.short_display()),
-                span,
-            )),
-        }
     }
 }

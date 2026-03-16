@@ -8,6 +8,7 @@ use parking_lot::Mutex;
 use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::value::Value;
 
@@ -73,20 +74,20 @@ fn now_str() -> String {
 }
 
 fn action_to_value(e: &ActionEntry) -> Value {
-    let mut f = IndexMap::new();
-    f.insert("type".into(), Value::Str(Arc::from(e.action_type.as_str())));
-    f.insert("target".into(), Value::Str(Arc::from(e.target.as_str())));
-    f.insert("time".into(), Value::Str(Arc::from(e.timestamp.as_str())));
-    Value::Record(Arc::new(f))
+    record! {
+        "type" => Value::Str(Arc::from(e.action_type.as_str())),
+        "target" => Value::Str(Arc::from(e.target.as_str())),
+        "time" => Value::Str(Arc::from(e.timestamp.as_str())),
+    }
 }
 
 fn bi_self(_args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let pid = std::process::id();
-    let mut f = IndexMap::new();
-    f.insert("name".into(), Value::Str(Arc::from("main")));
-    f.insert("role".into(), Value::Str(Arc::from("main")));
-    f.insert("pid".into(), Value::Int(BigInt::from(pid)));
-    Ok(Value::Record(Arc::new(f)))
+    Ok(record! {
+        "name" => Value::Str(Arc::from("main")),
+        "role" => Value::Str(Arc::from("main")),
+        "pid" => Value::Int(BigInt::from(pid)),
+    })
 }
 
 fn bi_elapsed(_args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
@@ -106,11 +107,11 @@ fn bi_tick_turn(_args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<
 }
 
 fn bi_budget(_args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let mut f = IndexMap::new();
-    f.insert("total".into(), Value::Int(BigInt::from(-1)));
-    f.insert("spent".into(), Value::Int(BigInt::from(0)));
-    f.insert("remaining".into(), Value::Int(BigInt::from(-1)));
-    Ok(Value::Record(Arc::new(f)))
+    Ok(record! {
+        "total" => Value::Int(BigInt::from(-1)),
+        "spent" => Value::Int(BigInt::from(0)),
+        "remaining" => Value::Int(BigInt::from(-1)),
+    })
 }
 
 fn bi_actions(_args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {

@@ -1,3 +1,6 @@
+#[path = "md_parse.rs"]
+mod md_parse;
+
 use std::sync::Arc;
 
 use indexmap::IndexMap;
@@ -13,14 +16,20 @@ use crate::value::Value;
 pub fn build() -> IndexMap<String, Value> {
     let mut m = IndexMap::new();
     m.insert("parse".into(), mk("md.parse", 1, bi_parse));
-    m.insert("sections".into(), mk("md.sections", 1, bi_sections));
+    m.insert(
+        "sections".into(),
+        mk("md.sections", 1, md_parse::bi_sections),
+    );
     m.insert(
         "code_blocks".into(),
-        mk("md.code_blocks", 1, bi_code_blocks),
+        mk("md.code_blocks", 1, md_parse::bi_code_blocks),
     );
-    m.insert("headings".into(), mk("md.headings", 1, bi_headings));
-    m.insert("links".into(), mk("md.links", 1, bi_links));
-    m.insert("to_text".into(), mk("md.to_text", 1, bi_to_text));
+    m.insert(
+        "headings".into(),
+        mk("md.headings", 1, md_parse::bi_headings),
+    );
+    m.insert("links".into(), mk("md.links", 1, md_parse::bi_links));
+    m.insert("to_text".into(), mk("md.to_text", 1, md_parse::bi_to_text));
     m.insert(
         "render".into(),
         mk("md.render", 1, super::md_build::bi_render),
@@ -174,66 +183,19 @@ fn bi_parse(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value,
     Ok(Value::List(Arc::new(parse_to_nodes(input))))
 }
 
-fn field_str(rec: &IndexMap<String, Value>, field: &str) -> Option<String> {
+pub(super) fn field_str(rec: &IndexMap<String, Value>, field: &str) -> Option<String> {
     rec.get(field)
         .and_then(|v| v.as_str())
         .map(|s| s.to_string())
 }
 
-fn get_nodes(val: &Value, span: Span) -> Result<&[Value], LxError> {
+pub(super) fn get_nodes(val: &Value, span: Span) -> Result<&[Value], LxError> {
     val.as_list()
         .map(|l| l.as_slice())
         .ok_or_else(|| LxError::type_err("md: expected List (parsed doc)", span))
 }
 
-fn bi_sections(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let nodes = get_nodes(&args[0], span)?;
-    let mut sections = Vec::new();
-    let mut cur: Option<(i64, String, String)> = None;
-    for node in nodes {
-        if let Value::Record(r) = node {
-            if field_str(r, "type").as_deref() == Some("heading") {
-                if let Some((lv, title, content)) = cur.take() {
-                    sections.push(node_rec(
-                        "section",
-                        vec![
-                            ("level", Value::Int(BigInt::from(lv))),
-                            ("title", Value::Str(Arc::from(title.as_str()))),
-                            ("content", Value::Str(Arc::from(content.trim()))),
-                        ],
-                    ));
-                }
-                let lv: i64 = r
-                    .get("level")
-                    .and_then(|v| v.as_int())
-                    .and_then(|n| n.try_into().ok())
-                    .unwrap_or(1);
-                let title = field_str(r, "text").unwrap_or_default();
-                cur = Some((lv, title, String::new()));
-            } else if let Some((_, _, ref mut content)) = cur
-                && let Some(t) = field_str(r, "text")
-            {
-                if !content.is_empty() {
-                    content.push_str("\n\n");
-                }
-                content.push_str(&t);
-            }
-        }
-    }
-    if let Some((lv, title, content)) = cur {
-        sections.push(node_rec(
-            "section",
-            vec![
-                ("level", Value::Int(BigInt::from(lv))),
-                ("title", Value::Str(Arc::from(title.as_str()))),
-                ("content", Value::Str(Arc::from(content.trim()))),
-            ],
-        ));
-    }
-    Ok(Value::List(Arc::new(sections)))
-}
-
-fn nodes_by_type(nodes: &[Value], type_name: &str) -> Vec<Value> {
+pub(super) fn nodes_by_type(nodes: &[Value], type_name: &str) -> Vec<Value> {
     nodes
         .iter()
         .filter(|n| {
@@ -245,70 +207,4 @@ fn nodes_by_type(nodes: &[Value], type_name: &str) -> Vec<Value> {
         })
         .cloned()
         .collect()
-}
-
-fn bi_code_blocks(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    Ok(Value::List(Arc::new(nodes_by_type(
-        get_nodes(&args[0], span)?,
-        "code",
-    ))))
-}
-
-fn bi_headings(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    Ok(Value::List(Arc::new(nodes_by_type(
-        get_nodes(&args[0], span)?,
-        "heading",
-    ))))
-}
-
-fn bi_links(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let input = args[0]
-        .as_str()
-        .ok_or_else(|| LxError::type_err("md.links expects Str (markdown source)", span))?;
-    let parser = Parser::new(input);
-    let mut links = Vec::new();
-    let mut in_link = false;
-    let mut link_url = String::new();
-    let mut link_text = String::new();
-    for event in parser {
-        match event {
-            Event::Start(Tag::Link { dest_url, .. }) => {
-                in_link = true;
-                link_url = dest_url.to_string();
-                link_text.clear();
-            }
-            Event::End(TagEnd::Link) => {
-                links.push(node_rec(
-                    "link",
-                    vec![
-                        ("text", Value::Str(Arc::from(link_text.as_str()))),
-                        ("url", Value::Str(Arc::from(link_url.as_str()))),
-                    ],
-                ));
-                in_link = false;
-            }
-            Event::Text(t) if in_link => link_text.push_str(&t),
-            _ => {}
-        }
-    }
-    Ok(Value::List(Arc::new(links)))
-}
-
-fn bi_to_text(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let input = args[0]
-        .as_str()
-        .ok_or_else(|| LxError::type_err("md.to_text expects Str (markdown source)", span))?;
-    let parser = Parser::new(input);
-    let mut out = String::new();
-    for event in parser {
-        match event {
-            Event::Text(t) => out.push_str(&t),
-            Event::Code(c) => out.push_str(&c),
-            Event::SoftBreak | Event::HardBreak => out.push('\n'),
-            Event::End(TagEnd::Paragraph | TagEnd::Heading(_)) => out.push('\n'),
-            Event::End(TagEnd::Item) => out.push('\n'),
-            _ => {}
-        }
-    }
-    Ok(Value::Str(Arc::from(out.trim())))
 }

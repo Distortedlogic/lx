@@ -173,6 +173,21 @@ fn collect_exports(program: &Program, interp: &Interpreter) -> ModuleExports {
                 exported: true,
                 name,
                 ..
+            }
+            | Stmt::McpDecl {
+                exported: true,
+                name,
+                ..
+            }
+            | Stmt::TraitDecl {
+                exported: true,
+                name,
+                ..
+            }
+            | Stmt::AgentDecl {
+                exported: true,
+                name,
+                ..
             } => {
                 if let Some(val) = interp.env.get(name) {
                     bindings.insert(name.clone(), val);
@@ -181,33 +196,6 @@ fn collect_exports(program: &Program, interp: &Interpreter) -> ModuleExports {
             Stmt::ProtocolUnion(def) if def.exported => {
                 if let Some(val) = interp.env.get(&def.name) {
                     bindings.insert(def.name.clone(), val);
-                }
-            }
-            Stmt::McpDecl {
-                exported: true,
-                name,
-                ..
-            } => {
-                if let Some(val) = interp.env.get(name) {
-                    bindings.insert(name.clone(), val);
-                }
-            }
-            Stmt::TraitDecl {
-                exported: true,
-                name,
-                ..
-            } => {
-                if let Some(val) = interp.env.get(name) {
-                    bindings.insert(name.clone(), val);
-                }
-            }
-            Stmt::AgentDecl {
-                exported: true,
-                name,
-                ..
-            } => {
-                if let Some(val) = interp.env.get(name) {
-                    bindings.insert(name.clone(), val);
                 }
             }
             _ => {}

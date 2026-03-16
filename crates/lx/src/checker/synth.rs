@@ -32,12 +32,12 @@ impl Checker {
                 ..
             } => Type::Bool,
             Expr::Pipe { left, right } => {
-                let _arg_t = self.synth(left);
+                let _ = self.synth(left);
                 self.synth(right)
             }
             Expr::Apply { func, arg } => {
                 let ft = self.synth(func);
-                let _at = self.synth(arg);
+                let _ = self.synth(arg);
                 match self.table.resolve(&ft) {
                     Type::Func { ret, .. } => *ret,
                     _ => Type::Unknown,
@@ -80,15 +80,17 @@ impl Checker {
                 }
             }
             Expr::Coalesce { expr: e, default } => {
-                let _et = self.synth(e);
+                let _ = self.synth(e);
                 self.synth(default)
             }
             Expr::Match { scrutinee, arms } => {
-                let _st = self.synth(scrutinee);
+                let _ = self.synth(scrutinee);
                 let result = self.fresh();
                 for arm in arms {
                     let body_t = self.synth(&arm.body);
-                    let _ = self.table.unify(&result, &body_t);
+                    if let Err(msg) = self.table.unify(&result, &body_t) {
+                        self.emit(format!("match arm type mismatch: {msg}"), arm.body.span);
+                    }
                 }
                 self.table.resolve(&result)
             }

@@ -6,6 +6,7 @@ use num_bigint::BigInt;
 use crate::backends::{AiOpts, RuntimeCtx};
 use crate::builtins::mk;
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::stdlib::ai;
 use crate::value::Value;
@@ -64,23 +65,23 @@ fn extract_fields(args: &[Value], span: Span) -> Result<PlanFields, LxError> {
 }
 
 fn make_step(id: i64, title: &str, description: &str, deps: Vec<Value>, complexity: &str) -> Value {
-    let mut s = IndexMap::new();
-    s.insert("id".into(), Value::Int(BigInt::from(id)));
-    s.insert("title".into(), Value::Str(Arc::from(title)));
-    s.insert("description".into(), Value::Str(Arc::from(description)));
-    s.insert("deps".into(), Value::List(Arc::new(deps)));
-    s.insert("complexity".into(), Value::Str(Arc::from(complexity)));
-    s.insert("status".into(), Value::Str(Arc::from("pending")));
-    Value::Record(Arc::new(s))
+    record! {
+        "id" => Value::Int(BigInt::from(id)),
+        "title" => Value::Str(Arc::from(title)),
+        "description" => Value::Str(Arc::from(description)),
+        "deps" => Value::List(Arc::new(deps)),
+        "complexity" => Value::Str(Arc::from(complexity)),
+        "status" => Value::Str(Arc::from("pending")),
+    }
 }
 
 fn build_result(steps: Vec<Value>, task: &str) -> Value {
-    let mut r = IndexMap::new();
     let count = steps.len() as i64;
-    r.insert("steps".into(), Value::List(Arc::new(steps)));
-    r.insert("task".into(), Value::Str(Arc::from(task)));
-    r.insert("step_count".into(), Value::Int(BigInt::from(count)));
-    Value::Record(Arc::new(r))
+    record! {
+        "steps" => Value::List(Arc::new(steps)),
+        "task" => Value::Str(Arc::from(task)),
+        "step_count" => Value::Int(BigInt::from(count)),
+    }
 }
 
 fn build_system_prompt(max_steps: i64, constraints: &[String]) -> String {
@@ -155,8 +156,9 @@ fn bi_plan(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, L
     let system = build_system_prompt(fields.max_steps, &fields.constraints);
     let user = build_user_prompt(&fields);
     let opts = AiOpts {
-        system: Some(system),
+        append_system: Some(system),
         max_turns: Some(1),
+        tools: Some(vec![]),
         ..AiOpts::default()
     };
     let llm_result = ctx.ai.prompt(&user, &opts, span)?;

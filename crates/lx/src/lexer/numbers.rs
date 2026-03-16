@@ -25,6 +25,13 @@ impl<'src> Lexer<'src> {
         self.source[pos..].chars().next().unwrap_or('\0')
     }
 
+    fn collect_digits(&self, start: usize) -> String {
+        self.source[start..self.pos]
+            .chars()
+            .filter(|c| *c != '_')
+            .collect()
+    }
+
     fn read_radix_int(
         &mut self,
         start: usize,
@@ -36,10 +43,7 @@ impl<'src> Lexer<'src> {
         while self.peek().is_some_and(|c| valid(c) || c == '_') {
             self.advance();
         }
-        let raw: String = self.source[digit_start..self.pos]
-            .chars()
-            .filter(|c| *c != '_')
-            .collect();
+        let raw = self.collect_digits(digit_start);
         if raw.is_empty() {
             let span = Span::from_range(start as u32, self.pos as u32);
             return Err(LxError::parse(
@@ -85,10 +89,7 @@ impl<'src> Lexer<'src> {
             }
         }
         let span = Span::from_range(start as u32, self.pos as u32);
-        let raw: String = self.source[start..self.pos]
-            .chars()
-            .filter(|c| *c != '_')
-            .collect();
+        let raw = self.collect_digits(start);
         if is_float {
             let val: f64 = raw
                 .parse()

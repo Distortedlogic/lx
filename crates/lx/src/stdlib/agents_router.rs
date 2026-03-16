@@ -5,6 +5,7 @@ use indexmap::IndexMap;
 use crate::backends::{AiOpts, RuntimeCtx};
 use crate::builtins::mk;
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::stdlib::ai;
 use crate::value::Value;
@@ -75,12 +76,12 @@ fn extract_fields(args: &[Value], span: Span) -> Result<RouteFields, LxError> {
 }
 
 fn build_result(domain: &str, agent: &str, confidence: f64, terminal: bool) -> Value {
-    let mut r = IndexMap::new();
-    r.insert("domain".into(), Value::Str(Arc::from(domain)));
-    r.insert("agent".into(), Value::Str(Arc::from(agent)));
-    r.insert("confidence".into(), Value::Float(confidence));
-    r.insert("terminal".into(), Value::Bool(terminal));
-    Value::Record(Arc::new(r))
+    record! {
+        "domain" => Value::Str(Arc::from(domain)),
+        "agent" => Value::Str(Arc::from(agent)),
+        "confidence" => Value::Float(confidence),
+        "terminal" => Value::Bool(terminal),
+    }
 }
 
 fn no_match() -> Value {
@@ -145,8 +146,9 @@ fn bi_route(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, 
     let system = build_system_prompt();
     let user = build_user_prompt(&fields);
     let opts = AiOpts {
-        system: Some(system),
+        append_system: Some(system),
         max_turns: Some(1),
+        tools: Some(vec![]),
         ..AiOpts::default()
     };
     let llm_result = ctx.ai.prompt(&user, &opts, span)?;

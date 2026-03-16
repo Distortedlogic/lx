@@ -1,3 +1,6 @@
+#[path = "tasks_query.rs"]
+mod tasks_query;
+
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock};
@@ -9,16 +12,17 @@ use num_bigint::BigInt;
 use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
+use crate::record;
 use crate::span::Span;
 use crate::stdlib::json_conv;
 use crate::value::Value;
 
-struct TaskStore {
-    tasks: IndexMap<String, Value>,
-    path: Option<PathBuf>,
+pub(super) struct TaskStore {
+    pub tasks: IndexMap<String, Value>,
+    pub path: Option<PathBuf>,
 }
 
-static STORES: LazyLock<DashMap<u64, TaskStore>> = LazyLock::new(DashMap::new);
+pub(super) static STORES: LazyLock<DashMap<u64, TaskStore>> = LazyLock::new(DashMap::new);
 static NEXT_STORE: AtomicU64 = AtomicU64::new(1);
 static NEXT_TASK: AtomicU64 = AtomicU64::new(1);
 
@@ -29,10 +33,16 @@ pub fn build() -> IndexMap<String, Value> {
     m.insert("save".into(), mk("tasks.save", 2, bi_save));
     m.insert("create".into(), mk("tasks.create", 2, bi_create));
     m.insert("get".into(), mk("tasks.get", 2, bi_get));
-    m.insert("children".into(), mk("tasks.children", 2, bi_children));
-    m.insert("list".into(), mk("tasks.list", 2, bi_list));
+    m.insert(
+        "children".into(),
+        mk("tasks.children", 2, tasks_query::bi_children),
+    );
+    m.insert("list".into(), mk("tasks.list", 2, tasks_query::bi_list));
     m.insert("start".into(), mk("tasks.start", 2, bi_start));
-    m.insert("update".into(), mk("tasks.update", 3, bi_update));
+    m.insert(
+        "update".into(),
+        mk("tasks.update", 3, tasks_query::bi_update),
+    );
     m.insert("submit".into(), mk("tasks.submit", 3, bi_submit));
     m.insert("audit".into(), mk("tasks.audit", 2, bi_audit));
     m.insert("pass".into(), mk("tasks.pass", 2, bi_pass));
@@ -42,7 +52,7 @@ pub fn build() -> IndexMap<String, Value> {
     m
 }
 
-fn store_id(v: &Value, span: Span) -> Result<u64, LxError> {
+pub(super) fn store_id(v: &Value, span: Span) -> Result<u64, LxError> {
     match v {
         Value::Record(r) => r
             .get("__store_id")
@@ -57,17 +67,17 @@ fn gen_id() -> String {
     format!("task_{}", NEXT_TASK.fetch_add(1, Ordering::Relaxed))
 }
 
-fn now() -> Arc<str> {
+pub(super) fn now() -> Arc<str> {
     Arc::from(chrono::Utc::now().to_rfc3339().as_str())
 }
 
 fn store_val(id: u64) -> Value {
-    let mut rec = IndexMap::new();
-    rec.insert("__store_id".into(), Value::Int(BigInt::from(id)));
-    Value::Ok(Box::new(Value::Record(Arc::new(rec))))
+    Value::Ok(Box::new(record! {
+        "__store_id" => Value::Int(BigInt::from(id)),
+    }))
 }
 
-fn persist(store: &TaskStore, span: Span) -> Result<(), LxError> {
+pub(super) fn persist(store: &TaskStore, span: Span) -> Result<(), LxError> {
     let Some(ref path) = store.path else {
         return Ok(());
     };
@@ -152,32 +162,23 @@ fn bi_create(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
         .ok_or_else(|| LxError::runtime("tasks.create: must have 'title' field", span))?;
     let id = gen_id();
     let ts = now();
-    let mut f = IndexMap::new();
-    f.insert("id".into(), Value::Str(Arc::from(id.as_str())));
-    f.insert("title".into(), Value::Str(Arc::from(title)));
-    f.insert("status".into(), Value::Str(Arc::from("todo")));
-    f.insert(
-        "parent".into(),
-        opts.get("parent")
-            .cloned()
-            .unwrap_or(Value::Str(Arc::from(""))),
-    );
-    f.insert(
-        "tags".into(),
-        opts.get("tags")
-            .cloned()
-            .unwrap_or(Value::List(Arc::new(vec![]))),
-    );
-    f.insert("notes".into(), Value::Str(Arc::from("")));
-    f.insert("output".into(), Value::Str(Arc::from("")));
-    f.insert("feedback".into(), Value::Str(Arc::from("")));
-    f.insert("result".into(), Value::Str(Arc::from("")));
-    f.insert("created_at".into(), Value::Str(ts.clone()));
-    f.insert("updated_at".into(), Value::Str(ts));
+    let task = record! {
+        "id" => Value::Str(Arc::from(id.as_str())),
+        "title" => Value::Str(Arc::from(title)),
+        "status" => Value::Str(Arc::from("todo")),
+        "parent" => opts.get("parent").cloned().unwrap_or(Value::Str(Arc::from(""))),
+        "tags" => opts.get("tags").cloned().unwrap_or(Value::List(Arc::new(vec![]))),
+        "notes" => Value::Str(Arc::from("")),
+        "output" => Value::Str(Arc::from("")),
+        "feedback" => Value::Str(Arc::from("")),
+        "result" => Value::Str(Arc::from("")),
+        "created_at" => Value::Str(ts.clone()),
+        "updated_at" => Value::Str(ts),
+    };
     let mut store = STORES
         .get_mut(&sid)
         .ok_or_else(|| LxError::runtime("tasks: store not found", span))?;
-    store.tasks.insert(id.clone(), Value::Record(Arc::new(f)));
+    store.tasks.insert(id.clone(), task);
     persist(&store, span)?;
     Ok(Value::Ok(Box::new(Value::Str(Arc::from(id.as_str())))))
 }
@@ -196,51 +197,6 @@ fn bi_get(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, L
             format!("task '{tid}' not found").as_str(),
         ))))),
     }
-}
-
-fn bi_children(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let sid = store_id(&args[0], span)?;
-    let parent = args[1]
-        .as_str()
-        .ok_or_else(|| LxError::type_err("tasks.children: id must be Str", span))?;
-    let store = STORES
-        .get(&sid)
-        .ok_or_else(|| LxError::runtime("tasks: store not found", span))?;
-    let kids: Vec<Value> = store
-        .tasks
-        .values()
-        .filter(|t| {
-            matches!(t, Value::Record(r) if
-            r.get("parent").and_then(|v| v.as_str()) == Some(parent))
-        })
-        .cloned()
-        .collect();
-    Ok(Value::List(Arc::new(kids)))
-}
-
-fn bi_list(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let sid = store_id(&args[0], span)?;
-    let store = STORES
-        .get(&sid)
-        .ok_or_else(|| LxError::runtime("tasks: store not found", span))?;
-    let status_filter = match &args[1] {
-        Value::Record(r) => r
-            .get("status")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string()),
-        _ => None,
-    };
-    let items: Vec<Value> = store
-        .tasks
-        .values()
-        .filter(|t| match &status_filter {
-            Some(s) => matches!(t, Value::Record(r) if
-                r.get("status").and_then(|v| v.as_str()) == Some(s)),
-            None => true,
-        })
-        .cloned()
-        .collect();
-    Ok(Value::List(Arc::new(items)))
 }
 
 fn transition(
@@ -291,39 +247,6 @@ fn transition(
 
 fn bi_start(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     transition(&args[0], &args[1], None, &["todo"], "in_progress", span)
-}
-
-fn bi_update(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let sid = store_id(&args[0], span)?;
-    let tid = args[1]
-        .as_str()
-        .ok_or_else(|| LxError::type_err("tasks.update: id must be Str", span))?;
-    let Value::Record(extra) = &args[2] else {
-        return Err(LxError::type_err("tasks.update: opts must be Record", span));
-    };
-    let mut store = STORES
-        .get_mut(&sid)
-        .ok_or_else(|| LxError::runtime("tasks: store not found", span))?;
-    let task = store
-        .tasks
-        .get(tid)
-        .ok_or_else(|| LxError::runtime(format!("tasks: task '{tid}' not found"), span))?
-        .clone();
-    let Value::Record(r) = task else {
-        return Err(LxError::runtime("tasks: corrupt task record", span));
-    };
-    let mut fields = (*r).clone();
-    for (k, v) in extra.iter() {
-        if k != "id" && k != "status" && k != "created_at" {
-            fields.insert(k.clone(), v.clone());
-        }
-    }
-    fields.insert("updated_at".into(), Value::Str(now()));
-    store
-        .tasks
-        .insert(tid.to_string(), Value::Record(Arc::new(fields)));
-    persist(&store, span)?;
-    Ok(Value::Ok(Box::new(Value::Unit)))
 }
 
 fn bi_submit(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
