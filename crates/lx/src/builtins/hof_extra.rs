@@ -140,7 +140,7 @@ pub(super) fn bi_chunks(
 ) -> Result<Value, LxError> {
     let n = args[0]
         .as_int()
-        .ok_or_else(|| LxError::type_err("chunks: size must be Int", sp))?;
+        .ok_or_else(|| LxError::type_err(format!("chunks: size must be Int, got {}", args[0].type_name()), sp))?;
     let items = get_list(&args[1], "chunks", sp)?;
     let n = usize::try_from(n.clone()).map_err(|_| LxError::runtime("chunks: invalid size", sp))?;
     if n == 0 {
@@ -160,7 +160,7 @@ pub(super) fn bi_windows(
 ) -> Result<Value, LxError> {
     let n = args[0]
         .as_int()
-        .ok_or_else(|| LxError::type_err("windows: size must be Int", sp))?;
+        .ok_or_else(|| LxError::type_err(format!("windows: size must be Int, got {}", args[0].type_name()), sp))?;
     let items = get_list(&args[1], "windows", sp)?;
     let n =
         usize::try_from(n.clone()).map_err(|_| LxError::runtime("windows: invalid size", sp))?;

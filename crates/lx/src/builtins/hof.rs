@@ -116,8 +116,8 @@ pub(super) fn get_list<'a>(v: &'a Value, name: &str, sp: Span) -> Result<ListRef
             end,
             inclusive,
         } => Ok(ListRef::Owned(range_to_list(*start, *end, *inclusive))),
-        _ => Err(LxError::type_err(
-            format!("{name} expects List or Range"),
+        other => Err(LxError::type_err(
+            format!("{name} expects List or Range, got {}", other.type_name()),
             sp,
         )),
     }
@@ -140,7 +140,7 @@ fn bi_filter(args: &[Value], sp: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, L
         match result.as_bool() {
             Some(true) => out.push(v.clone()),
             Some(false) => {}
-            _ => return Err(LxError::type_err("filter predicate must return Bool", sp)),
+            other => return Err(LxError::type_err(format!("filter predicate must return Bool, got {}", other.type_name()), sp)),
         }
     }
     Ok(Value::List(Arc::new(out)))
@@ -181,7 +181,7 @@ fn bi_each(args: &[Value], sp: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxE
 fn bi_take(args: &[Value], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let n = args[0]
         .as_int()
-        .ok_or_else(|| LxError::type_err("take: first arg must be Int", sp))?;
+        .ok_or_else(|| LxError::type_err(format!("take: first arg must be Int, got {}", args[0].type_name()), sp))?;
     let n = usize::try_from(n.clone()).unwrap_or(0);
     let items = get_list(&args[1], "take", sp)?;
     Ok(Value::List(Arc::new(
@@ -192,7 +192,7 @@ fn bi_take(args: &[Value], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, Lx
 fn bi_drop(args: &[Value], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let n = args[0]
         .as_int()
-        .ok_or_else(|| LxError::type_err("drop: first arg must be Int", sp))?;
+        .ok_or_else(|| LxError::type_err(format!("drop: first arg must be Int, got {}", args[0].type_name()), sp))?;
     let n = usize::try_from(n.clone()).unwrap_or(0);
     let items = get_list(&args[1], "drop", sp)?;
     Ok(Value::List(Arc::new(

@@ -36,7 +36,7 @@ fn bi_first(args: &[Value], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, L
     Ok(maybe(
         args[0]
             .as_list()
-            .ok_or_else(|| LxError::type_err("first expects List", sp))?
+            .ok_or_else(|| LxError::type_err(format!("first expects List, got {}", args[0].type_name()), sp))?
             .first(),
     ))
 }
@@ -44,7 +44,7 @@ fn bi_last(args: &[Value], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, Lx
     Ok(maybe(
         args[0]
             .as_list()
-            .ok_or_else(|| LxError::type_err("last expects List", sp))?
+            .ok_or_else(|| LxError::type_err(format!("last expects List, got {}", args[0].type_name()), sp))?
             .last(),
     ))
 }
@@ -52,7 +52,7 @@ fn bi_contains(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Val
     match &args[1] {
         Value::Str(s) => {
             let needle = args[0].as_str().ok_or_else(|| {
-                LxError::type_err("contains?: needle must be Str for Str haystack", span)
+                LxError::type_err(format!("contains?: needle must be Str for Str haystack, got {}", args[0].type_name()), span)
             })?;
             Ok(Value::Bool(s.contains(needle)))
         }
@@ -68,7 +68,7 @@ fn bi_get(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, L
         Value::List(l) => {
             let n = args[0]
                 .as_int()
-                .ok_or_else(|| LxError::type_err("get: index must be Int for List", span))?;
+                .ok_or_else(|| LxError::type_err(format!("get: index must be Int for List, got {}", args[0].type_name()), span))?;
             let idx = n
                 .to_i64()
                 .ok_or_else(|| LxError::runtime("get: index out of range", span))?;
@@ -81,7 +81,7 @@ fn bi_get(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, L
         Value::Record(r) => {
             let key = args[0]
                 .as_str()
-                .ok_or_else(|| LxError::type_err("get: key must be Str for Record", span))?;
+                .ok_or_else(|| LxError::type_err(format!("get: key must be Str for Record, got {}", args[0].type_name()), span))?;
             Ok(maybe(r.get(key)))
         }
         Value::Map(m) => Ok(maybe(m.get(&ValueKey(args[0].clone())))),
@@ -94,7 +94,7 @@ fn bi_get(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, L
 fn bi_sort(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let l = args[0]
         .as_list()
-        .ok_or_else(|| LxError::type_err("sort expects List", span))?;
+        .ok_or_else(|| LxError::type_err(format!("sort expects List, got {}", args[0].type_name()), span))?;
     let mut items = l.as_ref().clone();
     items.sort_by(cmp_values);
     Ok(Value::List(Arc::new(items)))
@@ -102,7 +102,7 @@ fn bi_sort(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, 
 fn bi_sorted_q(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let l = args[0]
         .as_list()
-        .ok_or_else(|| LxError::type_err("sorted? expects List", span))?;
+        .ok_or_else(|| LxError::type_err(format!("sorted? expects List, got {}", args[0].type_name()), span))?;
     Ok(Value::Bool(
         l.windows(2).all(|w| cmp_values(&w[0], &w[1]).is_le()),
     ))
@@ -110,7 +110,7 @@ fn bi_sorted_q(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Val
 fn bi_rev(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let l = args[0]
         .as_list()
-        .ok_or_else(|| LxError::type_err("rev expects List", span))?;
+        .ok_or_else(|| LxError::type_err(format!("rev expects List, got {}", args[0].type_name()), span))?;
     let mut items = l.as_ref().clone();
     items.reverse();
     Ok(Value::List(Arc::new(items)))
@@ -162,7 +162,7 @@ fn num_fold(
 fn bi_sum(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let l = args[0]
         .as_list()
-        .ok_or_else(|| LxError::type_err("sum expects List", span))?;
+        .ok_or_else(|| LxError::type_err(format!("sum expects List, got {}", args[0].type_name()), span))?;
     num_fold(
         "sum",
         l,
@@ -176,7 +176,7 @@ fn bi_sum(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, L
 fn bi_product(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let l = args[0]
         .as_list()
-        .ok_or_else(|| LxError::type_err("product expects List", span))?;
+        .ok_or_else(|| LxError::type_err(format!("product expects List, got {}", args[0].type_name()), span))?;
     num_fold(
         "product",
         l,
@@ -190,7 +190,7 @@ fn bi_product(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Valu
 fn bi_min(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let l = args[0]
         .as_list()
-        .ok_or_else(|| LxError::type_err("min expects List", span))?;
+        .ok_or_else(|| LxError::type_err(format!("min expects List, got {}", args[0].type_name()), span))?;
     l.iter()
         .min_by(|a, b| cmp_values(a, b))
         .cloned()
@@ -199,7 +199,7 @@ fn bi_min(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, L
 fn bi_max(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let l = args[0]
         .as_list()
-        .ok_or_else(|| LxError::type_err("max expects List", span))?;
+        .ok_or_else(|| LxError::type_err(format!("max expects List, got {}", args[0].type_name()), span))?;
     l.iter()
         .max_by(|a, b| cmp_values(a, b))
         .cloned()
@@ -208,7 +208,7 @@ fn bi_max(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, L
 fn bi_uniq(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let l = args[0]
         .as_list()
-        .ok_or_else(|| LxError::type_err("uniq expects List", span))?;
+        .ok_or_else(|| LxError::type_err(format!("uniq expects List, got {}", args[0].type_name()), span))?;
     let mut out: Vec<Value> = Vec::with_capacity(l.len());
     for v in l.iter() {
         if out.last() != Some(v) {
@@ -220,7 +220,7 @@ fn bi_uniq(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, 
 fn bi_flatten(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let l = args[0]
         .as_list()
-        .ok_or_else(|| LxError::type_err("flatten expects List", span))?;
+        .ok_or_else(|| LxError::type_err(format!("flatten expects List, got {}", args[0].type_name()), span))?;
     let mut out = Vec::new();
     for v in l.iter() {
         match v {
@@ -290,7 +290,7 @@ fn bi_to_record(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Va
     for (k, v) in m.iter() {
         let key =
             k.0.as_str()
-                .ok_or_else(|| LxError::type_err("to_record: map key must be Str", span))?;
+                .ok_or_else(|| LxError::type_err(format!("to_record: map key must be Str, got {}", k.0.type_name()), span))?;
         r.insert(key.to_string(), v.clone());
     }
     Ok(Value::Record(Arc::new(r)))
@@ -345,7 +345,7 @@ fn bi_has_key(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Valu
         Value::Record(r) => {
             let key = args[0]
                 .as_str()
-                .ok_or_else(|| LxError::type_err("has_key?: key must be Str for Record", span))?;
+                .ok_or_else(|| LxError::type_err(format!("has_key?: key must be Str for Record, got {}", args[0].type_name()), span))?;
             Ok(Value::Bool(r.contains_key(key)))
         }
         other => Err(LxError::type_err(
@@ -377,7 +377,7 @@ fn bi_merge(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value,
             }
             Ok(Value::Map(Arc::new(merged)))
         }
-        _ => Err(LxError::type_err("merge expects two Maps", span)),
+        _ => Err(LxError::type_err(format!("merge expects two Maps, got {} and {}", args[0].type_name(), args[1].type_name()), span)),
     }
 }
 pub(super) fn register(env: &mut Env) {

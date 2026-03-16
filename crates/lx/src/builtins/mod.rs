@@ -29,28 +29,28 @@ fn make_log_builtin(level: &'static str) -> Value {
     fn log_info(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
         let s = args[0]
             .as_str()
-            .ok_or_else(|| LxError::type_err("log.info expects Str", span))?;
+            .ok_or_else(|| LxError::type_err(format!("log.info expects Str, got {}", args[0].type_name()), span))?;
         ctx.log.log(LogLevel::Info, s);
         Ok(Value::Unit)
     }
     fn log_warn(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
         let s = args[0]
             .as_str()
-            .ok_or_else(|| LxError::type_err("log.warn expects Str", span))?;
+            .ok_or_else(|| LxError::type_err(format!("log.warn expects Str, got {}", args[0].type_name()), span))?;
         ctx.log.log(LogLevel::Warn, s);
         Ok(Value::Unit)
     }
     fn log_err(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
         let s = args[0]
             .as_str()
-            .ok_or_else(|| LxError::type_err("log.err expects Str", span))?;
+            .ok_or_else(|| LxError::type_err(format!("log.err expects Str, got {}", args[0].type_name()), span))?;
         ctx.log.log(LogLevel::Err, s);
         Ok(Value::Unit)
     }
     fn log_debug(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
         let s = args[0]
             .as_str()
-            .ok_or_else(|| LxError::type_err("log.debug expects Str", span))?;
+            .ok_or_else(|| LxError::type_err(format!("log.debug expects Str, got {}", args[0].type_name()), span))?;
         ctx.log.log(LogLevel::Debug, s);
         Ok(Value::Unit)
     }
@@ -177,7 +177,7 @@ fn bi_collect(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Val
 fn bi_step(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let step = args[0]
         .as_int()
-        .ok_or_else(|| LxError::type_err("step: first arg must be Int", span))?;
+        .ok_or_else(|| LxError::type_err(format!("step: first arg must be Int, got {}", args[0].type_name()), span))?;
     let step = step
         .to_i64()
         .ok_or_else(|| LxError::runtime("step: value too large", span))?;
