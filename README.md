@@ -66,34 +66,42 @@ flows/           -- lx programs translating real agentic architectures
 editors/         -- editor support (VS Code)
 ```
 
-## Specification — `spec/`
+## Reference — `doc/`
+
+Quick-reference docs for all implemented language features.
 
 | Document | Contents |
 |---|---|
-| [design.md](spec/design.md) | Key design decisions with rationale for every non-obvious choice |
-| [syntax.md](spec/syntax.md) | Literals, bindings, functions, sections, pipes, closures, recursion, multiline |
-| [collections.md](spec/collections.md) | Lists, records, maps, tuples, spread, slicing, conversions |
-| [pattern-matching.md](spec/pattern-matching.md) | `?` operator (three modes), destructuring, guards, exhaustiveness, disambiguation |
-| [iteration.md](spec/iteration.md) | HOFs, ranges, loop/break, eager map/filter/take on lists |
-| [types.md](spec/types.md) | Tagged unions, structural subtyping (no type annotations) |
-| [errors.md](spec/errors.md) | `Result`/`Maybe`, `^` propagation, `??` coalescing, explicit Ok/Err |
-| [shell.md](spec/shell.md) | `$`, `$^`, `${}`, shell result types, OS pipes vs language pipes |
-| [modules.md](spec/modules.md) | `use`, `+` exports, import conflicts, re-exports |
-| [agents.md](spec/agents.md) | `~>` send, `~>?` ask, Protocol, MCP tools, context, workflows |
-| [agents-advanced.md](spec/agents-advanced.md) | yield, MCP declarations, with/field update |
-| [concurrency.md](spec/concurrency.md) | `par`, `sel`, `pmap`, structured concurrency |
-| [runtime.md](spec/runtime.md) | Numbers, strings, equality, closures, tail calls, assert |
-| [grammar.md](spec/grammar.md) | EBNF formal grammar, operator precedence, keyword lists |
-| [stdlib.md](spec/stdlib.md) | Built-in functions, conventions |
-| [stdlib-modules.md](spec/stdlib-modules.md) | Module APIs (fs, http, json, time, math, env, re) |
-| [stdlib-agents.md](spec/stdlib-agents.md) | Agent modules (agent, mcp, ctx, md) |
+| [syntax.md](doc/syntax.md) | Literals, bindings, functions, sections, pipes, closures |
+| [grammar.md](doc/grammar.md) | EBNF grammar, operator precedence, keywords |
+| [collections.md](doc/collections.md) | Lists, records, maps, tuples, spread, slicing |
+| [pattern-matching.md](doc/pattern-matching.md) | `?` operator, destructuring, guards |
+| [iteration.md](doc/iteration.md) | HOFs, ranges, loop/break |
+| [types.md](doc/types.md) | Tagged unions, structural subtyping |
+| [errors.md](doc/errors.md) | `Result`/`Maybe`, `^`, `??` |
+| [shell.md](doc/shell.md) | `$`, `$^`, `${}` |
+| [modules.md](doc/modules.md) | `use`, `+` exports, imports |
+| [agents.md](doc/agents.md) | `~>`, `~>?`, Protocol, MCP, workflows |
+| [concurrency.md](doc/concurrency.md) | `par`, `sel`, `pmap` |
+| [runtime.md](doc/runtime.md) | Numbers, strings, equality, closures |
+| [stdlib.md](doc/stdlib.md) | Built-in functions, conventions |
+
+## Specification — `spec/`
+
+Specs for planned/unimplemented features. See [stdlib-modules.md](spec/stdlib-modules.md), [stdlib-agents.md](spec/stdlib-agents.md), and individual agent extension specs.
+
+## Agent Context — `agent/`
+
+| Document | Contents |
+|---|---|
+| [NEXT_PROMPT.md](agent/NEXT_PROMPT.md) | Cold-start document: current state, what's next, codebase layout |
+| [DEVLOG.md](agent/DEVLOG.md) | Session history, design decisions, what's next |
+| [CURRENT_OPINION.md](agent/CURRENT_OPINION.md) | Self-critique and gap analysis |
 
 ## Design — `design/`
 
 | Document | Contents |
 |---|---|
-| [DEVLOG.md](design/DEVLOG.md) | Session history, design decisions, what's next |
-| [CURRENT_OPINION.md](design/CURRENT_OPINION.md) | Self-critique and gap analysis |
 | [implementation.md](design/implementation.md) | Architecture, crate choices, module structure |
 | [implementation-phases.md](design/implementation-phases.md) | 10-phase build plan |
 

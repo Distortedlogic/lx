@@ -2,7 +2,7 @@
 -- grade_draft: run refine cycle on an existing draft with a live worker agent.
 -- run: full cycle -- spawn agent, get draft, grade, kill agent, return result.
 -- Wraps std/agents/grader + refine expression into single-call patterns.
--- Used by: flow_full_pipeline (run_list + run_single).
+-- defaults: threshold 95, max_rounds 5 -- override via opts record.
 
 use std/agent
 use std/agents/grader

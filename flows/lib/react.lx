@@ -1,9 +1,8 @@
--- Composable ReAct engine: Thought -> Action -> Observation -> loop or terminate.
+-- ReAct loop engine: Thought -> Action -> Observation -> loop or terminate.
 -- Circuit breaker via std/circuit: max turns, max time, max repeated actions.
 -- Stuck detection via std/introspect: automatic strategy shift hints when stuck.
 -- Verification gate: failed observations trigger verify step, can abort loop.
 -- Returns Ok(thought) on done, Err(reason) on circuit break or verification failure.
--- Source: mcp-toolbelt/arch_diagrams/agentic_loop
 
 use std/agent
 use std/circuit

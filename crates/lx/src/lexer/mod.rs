@@ -326,6 +326,7 @@ impl<'src> Lexer<'src> {
             "par" => TokenKind::Par,
             "sel" => TokenKind::Sel,
             "assert" => TokenKind::Assert,
+            "emit" => TokenKind::Emit,
             "yield" => TokenKind::Yield,
             "with" => TokenKind::With,
             "refine" => TokenKind::Refine,

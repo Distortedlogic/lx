@@ -158,7 +158,7 @@ Two Protocol definitions added to `std/agent` in `stdlib/agent.rs`. No functions
 ## Cross-References
 
 - Plan execution: [agents-plans.md](agents-plans.md) (goals decompose into plans)
-- Planner agent: stdlib_roadmap (`std/agents/planner` — LLM-based decomposition)
+- Planner agent: ROADMAP (`std/agents/planner` — LLM-based decomposition)
 - Capability discovery: [agents-capability.md](agents-capability.md) (can this agent handle my goal?)
 - Refinement: [agents-refine.md](agents-refine.md) (acceptance verification uses refine)
 - Handoff: [agents-handoff.md](agents-handoff.md) (goal forwarding uses handoff conventions)

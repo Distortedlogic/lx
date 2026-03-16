@@ -178,6 +178,11 @@ fn collect_exports(program: &Program, interp: &Interpreter) -> ModuleExports {
                     bindings.insert(name.clone(), val);
                 }
             }
+            Stmt::ProtocolUnion(def) if def.exported => {
+                if let Some(val) = interp.env.get(&def.name) {
+                    bindings.insert(def.name.clone(), val);
+                }
+            }
             Stmt::McpDecl {
                 exported: true,
                 name,

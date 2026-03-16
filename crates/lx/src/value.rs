@@ -53,6 +53,10 @@ pub enum Value {
         name: Arc<str>,
         fields: Arc<Vec<ProtoFieldDef>>,
     },
+    ProtocolUnion {
+        name: Arc<str>,
+        variants: Arc<Vec<Arc<str>>>,
+    },
     McpDecl {
         name: Arc<str>,
         tools: Arc<Vec<McpToolDef>>,
@@ -134,6 +138,9 @@ impl Value {
                 },
             ) => s1 == s2 && e1 == e2 && i1 == i2,
             (Value::Protocol { name: n1, .. }, Value::Protocol { name: n2, .. }) => n1 == n2,
+            (Value::ProtocolUnion { name: n1, .. }, Value::ProtocolUnion { name: n2, .. }) => {
+                n1 == n2
+            }
             (Value::McpDecl { name: n1, .. }, Value::McpDecl { name: n2, .. }) => n1 == n2,
             (Value::Func(_), _) | (_, Value::Func(_)) => false,
             (Value::BuiltinFunc(_), _) | (_, Value::BuiltinFunc(_)) => false,
@@ -190,6 +197,7 @@ impl Value {
                 inclusive.hash(state);
             }
             Value::Protocol { name, .. } => name.hash(state),
+            Value::ProtocolUnion { name, .. } => name.hash(state),
             Value::McpDecl { name, .. } => name.hash(state),
             Value::Func(_) | Value::BuiltinFunc(_) | Value::TaggedCtor { .. } => {}
         }
@@ -265,6 +273,7 @@ pub struct ProtoFieldDef {
     pub name: String,
     pub type_name: String,
     pub default: Option<Value>,
+    pub constraint: Option<Arc<crate::ast::SExpr>>,
 }
 
 #[derive(Debug, Clone)]

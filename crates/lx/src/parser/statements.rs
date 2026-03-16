@@ -1,5 +1,6 @@
 use crate::ast::{
-    BindTarget, Binding, McpOutputType, McpToolDecl, ProtocolField, SStmt, Stmt, UseKind, UseStmt,
+    BindTarget, Binding, McpOutputType, McpToolDecl, ProtocolEntry, ProtocolField,
+    ProtocolUnionDef, SStmt, Stmt, UseKind, UseStmt,
 };
 use crate::error::LxError;
 use crate::span::Span;
@@ -175,59 +176,144 @@ impl super::Parser {
             }
         };
         self.expect_kind(&TokenKind::Assign)?;
+        if matches!(self.peek(), TokenKind::TypeName(_)) {
+            return self.parse_protocol_union(name, exported, start);
+        }
         self.expect_kind(&TokenKind::LBrace)?;
-        let mut fields = Vec::new();
-        self.skip_semis();
-        while *self.peek() != TokenKind::RBrace {
-            let field_name = match self.peek().clone() {
-                TokenKind::Ident(n) => {
-                    self.advance();
-                    n
-                }
-                _ => {
-                    return Err(LxError::parse(
-                        "expected field name in Protocol",
-                        self.tokens[self.pos].span,
-                        None,
-                    ));
-                }
-            };
-            self.expect_kind(&TokenKind::Colon)?;
-            let type_name = match self.peek().clone() {
+        let entries = self.parse_protocol_entries()?;
+        let end = self.expect_kind(&TokenKind::RBrace)?.span.end();
+        Ok(SStmt::new(
+            Stmt::Protocol {
+                name,
+                entries,
+                exported,
+            },
+            Span::from_range(start, end),
+        ))
+    }
+
+    fn parse_protocol_union(
+        &mut self,
+        name: String,
+        exported: bool,
+        start: u32,
+    ) -> Result<SStmt, LxError> {
+        let mut variants = Vec::new();
+        let first = match self.peek().clone() {
+            TokenKind::TypeName(n) => {
+                self.advance();
+                n
+            }
+            _ => unreachable!(),
+        };
+        variants.push(first);
+        while *self.peek() == TokenKind::Pipe {
+            self.advance();
+            let variant = match self.peek().clone() {
                 TokenKind::TypeName(n) => {
                     self.advance();
                     n
                 }
                 _ => {
                     return Err(LxError::parse(
-                        "expected type name after ':'",
+                        "expected type name after '|' in Protocol union",
                         self.tokens[self.pos].span,
                         None,
                     ));
                 }
             };
-            let default = if *self.peek() == TokenKind::Assign {
+            variants.push(variant);
+        }
+        let end = self.tokens[self.pos.saturating_sub(1)].span.end();
+        Ok(SStmt::new(
+            Stmt::ProtocolUnion(ProtocolUnionDef {
+                name,
+                variants,
+                exported,
+            }),
+            Span::from_range(start, end),
+        ))
+    }
+
+    fn parse_protocol_entries(&mut self) -> Result<Vec<ProtocolEntry>, LxError> {
+        let mut entries = Vec::new();
+        self.skip_semis();
+        while *self.peek() != TokenKind::RBrace {
+            if *self.peek() == TokenKind::DotDot {
+                self.advance();
+                let base = match self.peek().clone() {
+                    TokenKind::TypeName(n) => {
+                        self.advance();
+                        n
+                    }
+                    _ => {
+                        return Err(LxError::parse(
+                            "expected Protocol name after '..'",
+                            self.tokens[self.pos].span,
+                            None,
+                        ));
+                    }
+                };
+                entries.push(ProtocolEntry::Spread(base));
+                self.skip_semis();
+                continue;
+            }
+            let field = self.parse_protocol_field()?;
+            entries.push(ProtocolEntry::Field(field));
+            self.skip_semis();
+        }
+        Ok(entries)
+    }
+
+    fn parse_protocol_field(&mut self) -> Result<ProtocolField, LxError> {
+        let field_name = match self.peek().clone() {
+            TokenKind::Ident(n) => {
+                self.advance();
+                n
+            }
+            _ => {
+                return Err(LxError::parse(
+                    "expected field name in Protocol",
+                    self.tokens[self.pos].span,
+                    None,
+                ));
+            }
+        };
+        self.expect_kind(&TokenKind::Colon)?;
+        let type_name = match self.peek().clone() {
+            TokenKind::TypeName(n) => {
+                self.advance();
+                n
+            }
+            _ => {
+                return Err(LxError::parse(
+                    "expected type name after ':'",
+                    self.tokens[self.pos].span,
+                    None,
+                ));
+            }
+        };
+        let default = if *self.peek() == TokenKind::Assign {
+            self.advance();
+            Some(self.parse_expr(0)?)
+        } else {
+            None
+        };
+        let constraint =
+            if let TokenKind::Ident(kw) = self.peek().clone()
+                && kw == "where"
+            {
                 self.advance();
                 Some(self.parse_expr(0)?)
             } else {
                 None
             };
-            fields.push(ProtocolField {
-                name: field_name,
-                type_name,
-                default,
-            });
-            self.skip_semis();
-        }
-        let end = self.expect_kind(&TokenKind::RBrace)?.span.end();
-        Ok(SStmt::new(
-            Stmt::Protocol {
-                name,
-                fields,
-                exported,
-            },
-            Span::from_range(start, end),
-        ))
+        Ok(ProtocolField {
+            name: field_name,
+            type_name,
+            default,
+            constraint,
+        })
     }
 
     pub(super) fn parse_mcp_decl(&mut self, exported: bool, start: u32) -> Result<SStmt, LxError> {
@@ -305,6 +391,7 @@ impl super::Parser {
                     name: field_name,
                     type_name,
                     default,
+                    constraint: None,
                 });
                 self.skip_semis();
             }
@@ -372,6 +459,7 @@ impl super::Parser {
                     name: field_name,
                     type_name,
                     default: None,
+                    constraint: None,
                 });
                 self.skip_semis();
             }

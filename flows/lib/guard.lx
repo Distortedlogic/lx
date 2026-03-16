@@ -1,18 +1,18 @@
--- Security toolkit: injection scanning, stuck loop detection, resource monitoring.
--- scan: regex-based injection pattern detection, returns Finding records.
--- detect_loops: flag agents with excessive tool calls as stuck.
--- check_resources: flag transcripts that are too large.
--- full_scan: run all detection passes on a list of trace entries.
--- check: fast pass/fail gate for a single input.
+-- Security toolkit -- injection scanning, loop detection, resource monitoring.
+-- Configurable injection patterns with sensible defaults.
+-- scan: test text against pattern list, return Finding list.
+-- detect_loops: flag excessive tool calls.
+-- check_resources: flag oversized transcripts.
+-- full_scan: run all passes on trace entries (patterns, thresholds via opts).
+-- check: fast pass/fail gate for single input using default patterns.
 -- run_parallel/run_blocking: composable guard wrappers for agent execution.
 
 use std/re
 
 Protocol +GuardResult = {pass: Bool  reason: Str}
-
 Protocol +Finding = {severity: Str  type: Str  evidence: Str  source: Str  agent_id: Str = ""}
 
-+patterns = [
++default_patterns = [
   "ignore previous instructions"
   "you are now"
   "system prompt override"
@@ -22,7 +22,7 @@ Protocol +Finding = {severity: Str  type: Str  evidence: Str  source: Str  agent
   "disregard your instructions"
 ]
 
-+scan = (text) {
++scan = (text patterns) {
   lowered = lower text
   patterns | flat_map (p) {
     re.is_match (lower p) lowered ? {
@@ -32,14 +32,13 @@ Protocol +Finding = {severity: Str  type: Str  evidence: Str  source: Str  agent
   }
 }
 
-+scan_entries = (entries) {
++scan_entries = (entries patterns) {
   entries | flat_map (e) {
-    scan (to_str e.input) | map (f) {..f  agent_id: e.name ?? ""}
+    scan (to_str e.input) patterns | map (f) {..f  agent_id: e.name ?? ""}
   }
 }
 
-+detect_loops = (entries opts) {
-  threshold = opts.threshold ?? 20
++detect_loops = (entries threshold) {
   calls = entries | filter (e) e.type == "tool_use"
   calls | len > threshold ? {
     true -> [Finding {severity: "high"  type: "stuck_loop"  evidence: "{calls | len} tool calls (threshold: {threshold})"  source: "guard"}]
@@ -47,8 +46,7 @@ Protocol +Finding = {severity: Str  type: Str  evidence: Str  source: Str  agent
   }
 }
 
-+check_resources = (entries opts) {
-  threshold = opts.threshold ?? 500
++check_resources = (entries threshold) {
   size = entries | len
   size > threshold ? {
     true -> [Finding {severity: "high"  type: "resource_excessive"  evidence: "{size} entries (threshold: {threshold})"  source: "guard"}]
@@ -57,19 +55,19 @@ Protocol +Finding = {severity: Str  type: Str  evidence: Str  source: Str  agent
 }
 
 +full_scan = (entries opts) {
+  pats = opts.patterns ?? default_patterns
+  loop_threshold = opts.loop_threshold ?? 20
+  resource_threshold = opts.resource_threshold ?? 500
   [
-    ..scan_entries entries
-    ..detect_loops entries opts
-    ..check_resources entries opts
+    ..scan_entries entries pats
+    ..detect_loops entries loop_threshold
+    ..check_resources entries resource_threshold
   ]
 }
 
 +check = (input) {
-  text = input ? {
-    {content: c ..} -> c
-    _ -> to_str input
-  }
-  findings = scan text
+  text = input ? { {content: c ..} -> c; _ -> to_str input }
+  findings = scan text default_patterns
   findings | empty? ? {
     true -> GuardResult {pass: true  reason: "ok"}
     false -> GuardResult {pass: false  reason: "injection pattern: {findings.0.evidence}"}
@@ -77,13 +75,10 @@ Protocol +Finding = {severity: Str  type: Str  evidence: Str  source: Str  agent
 }
 
 +run_parallel = (input agent_fn) {
-  (guard_result, agent_result) = par {
-    check input
-    agent_fn input
-  }
+  (guard_result, agent_result) = par { check input; agent_fn input }
   guard_result.pass ? {
     true -> agent_result
-    false -> Err "blocked by guardrail: {guard_result.reason}"
+    false -> Err "blocked: {guard_result.reason}"
   }
 }
 
@@ -91,6 +86,6 @@ Protocol +Finding = {severity: Str  type: Str  evidence: Str  source: Str  agent
   result = check input
   result.pass ? {
     true -> agent_fn input
-    false -> Err "blocked by guardrail: {result.reason}"
+    false -> Err "blocked: {result.reason}"
   }
 }

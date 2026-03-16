@@ -139,8 +139,8 @@ result = refine draft {
 
 ## Cross-References
 
-- Circuit breakers: stdlib_roadmap (`std/circuit`) — hard limits vs gradient budgets
+- Circuit breakers: ROADMAP (`std/circuit`) — hard limits vs gradient budgets
 - Ambient context: [agents-ambient.md](agents-ambient.md) (budget propagation)
-- AI module: stdlib_roadmap (`std/ai`) — `prompt_with` returns usage info
+- AI module: ROADMAP (`std/ai`) — `prompt_with` returns usage info
 - Reconcile: [agents-reconcile.md](agents-reconcile.md) (cost tracking across `:max_score` branches)
 - Refinement: [agents-refine.md](agents-refine.md) (budget-aware revision)

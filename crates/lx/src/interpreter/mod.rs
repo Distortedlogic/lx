@@ -178,6 +178,11 @@ impl Interpreter {
             Expr::Sel(arms) => self.eval_sel(arms, span),
             Expr::AgentSend { target, msg } => self.eval_agent_send(target, msg, span),
             Expr::AgentAsk { target, msg } => self.eval_agent_ask(target, msg, span),
+            Expr::Emit { value } => {
+                let v = self.eval(value)?;
+                self.ctx.emit.emit(&v, span)?;
+                Ok(Value::Unit)
+            }
             Expr::Yield { value } => {
                 let v = self.eval(value)?;
                 self.ctx.yield_.yield_value(v, span)
@@ -300,7 +305,12 @@ impl Interpreter {
                 self.env = env.into_arc();
                 Ok(Value::Unit)
             }
-            Stmt::Protocol { name, fields, .. } => self.eval_protocol_def(name, fields, stmt.span),
+            Stmt::Protocol {
+                name, entries, ..
+            } => self.eval_protocol_def(name, entries, stmt.span),
+            Stmt::ProtocolUnion(def) => {
+                self.eval_protocol_union(&def.name, &def.variants, stmt.span)
+            }
             Stmt::McpDecl { name, tools, .. } => self.eval_mcp_decl(name, tools, stmt.span),
             Stmt::FieldUpdate {
                 name,

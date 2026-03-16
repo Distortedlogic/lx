@@ -132,6 +132,6 @@ Built as a convenience layer on top of `std/blackboard`, not a separate `DashMap
 ## Cross-References
 
 - Parallel execution: [concurrency.md](concurrency.md) (`par` blocks where peers exist)
-- Blackboard: stdlib_roadmap (underlying primitive — peers is a convenience layer on top)
-- Events: stdlib_roadmap (explicit pub/sub — peers is automatic)
+- Blackboard: ROADMAP (underlying primitive — peers is a convenience layer on top)
+- Events: ROADMAP (explicit pub/sub — peers is automatic)
 - Introspection: [stdlib-introspect.md](stdlib-introspect.md) (self-awareness; peers is sibling-awareness)

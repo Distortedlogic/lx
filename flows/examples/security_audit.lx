@@ -1,0 +1,68 @@
+-- Security audit of running subagents -- detect stuck loops, injection, resource abuse.
+-- Data source: Claude CLI transcripts (~/.claude/projects/<project>/*.jsonl).
+-- Uses lib/guard.full_scan for all detection passes per transcript:
+--   Stuck loops (>20 tool calls), prompt injection (regex), resource abuse (>500 entries).
+-- Dedup via agent.reconcile (union, keyed by agent_id:type).
+-- Severity-sorted output with critical/high classification and markdown report.
+-- Demonstrates: workflow.run, guard composition, reconciliation, transcript ingestion.
+-- Source: mcp-toolbelt/arch_diagrams/scenario_security_audit
+
+use std/agent
+use ../lib/guard
+use ../lib/transcript
+use ../lib/report
+use ../lib/workflow
+
++main = () {
+  project_dir = "{$^echo $HOME | trim}/.claude/projects"
+  audit project_dir {}
+}
+
++audit = (project_dir opts) {
+  workflow.run "security-audit" project_dir (_) {
+    paths = transcript.read_recent project_dir 60
+
+    paths | empty? ? {
+      true -> {
+        emit "no recent transcripts to audit"
+        Ok {findings: 0  critical: 0  high: 0}
+      }
+      false -> {
+        all_findings = paths | flat_map (path) {
+          entries = transcript.parse path
+          guard.full_scan entries opts | map (f) {..f  agent_id: path}
+        }
+
+        merged = agent.reconcile all_findings {
+          strategy: "union"
+          key: (f) "{f.agent_id}:{f.type}"
+        }
+
+        findings = merged.merged | sort_by (.severity) | rev
+        critical = findings | filter (f) f.severity == "critical"
+        high = findings | filter (f) f.severity == "high"
+
+        critical | each (f) emit "CRITICAL [{f.type}] agent={f.agent_id}: {f.evidence}"
+        high | each (f) emit "HIGH [{f.type}] agent={f.agent_id}: {f.evidence}"
+
+        report.write "security_audit.md" "Security Audit" [
+          ..report.text "{paths | len} transcripts scanned, {findings | len} findings"
+          ..report.section "Summary" [
+            ..report.bullets [
+              "Critical: {critical | len}"
+              "High: {high | len}"
+              "Total: {findings | len}"
+            ]
+          ]
+          ..report.conditional (findings | len > 0) "Findings" [
+            ..report.table ["Severity" "Type" "Agent" "Evidence"]
+              (findings | map (f) [f.severity f.type f.agent_id f.evidence])
+          ]
+        ]
+
+        emit "\naudit: {findings | len} findings ({critical | len} critical, {high | len} high)"
+        Ok {findings: (findings | len)  critical: (critical | len)  high: (high | len)}
+      }
+    }
+  }
+}

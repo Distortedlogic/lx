@@ -91,6 +91,16 @@ impl super::Parser {
                     Span::from_range(tok.span.offset, end),
                 ))
             }
+            TokenKind::Emit => {
+                let value = self.parse_expr(0)?;
+                let end = value.span.end();
+                Ok(SExpr::new(
+                    Expr::Emit {
+                        value: Box::new(value),
+                    },
+                    Span::from_range(tok.span.offset, end),
+                ))
+            }
             TokenKind::Yield => {
                 let value = self.parse_expr(0)?;
                 let end = value.span.end();
@@ -382,6 +392,7 @@ impl super::Parser {
                 | TokenKind::Par
                 | TokenKind::Sel
                 | TokenKind::PercentLBrace
+                | TokenKind::Emit
                 | TokenKind::Yield
                 | TokenKind::With
                 | TokenKind::Refine

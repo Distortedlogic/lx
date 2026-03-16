@@ -35,26 +35,25 @@ tiers = [
   kb = knowledge.create {name: "discoveries"}
 
   candidates = axes | flat_map (axis) {
-    axis.queries | flat_map (q) search_github q
+    axis.queries | flat_map search_github
   }
 
   scored = candidates | map (c) {
-    ..c
-    total: score_candidate c
-    tier: scoring.tier tiers (score_candidate c)
+    total = score_candidate c
+    {..c  total  tier: (scoring.tier tiers total)}
   }
 
   auto = scored | filter (c) c.tier == "auto"
   review = scored | filter (c) c.tier == "review"
 
   auto | each (c) {
-    $echo "[AUTO] {c.name} ({c.total}): {c.description}"
+    emit "[AUTO] {c.name} ({c.total}): {c.description}"
     integrate c
     knowledge.store kb c.name (json.encode c) "discovery" {score: c.total}
   }
 
   review | each (c) {
-    $echo "[REVIEW] {c.name} ({c.total}): {c.url}"
+    emit "[REVIEW] {c.name} ({c.total}): {c.url}"
     knowledge.store kb c.name (json.encode c) "review" {score: c.total}
   }
 
@@ -74,7 +73,7 @@ tiers = [
     ]
   ]
 
-  $echo "\n{scored | len} candidates, {auto | len} auto-integrated, {review | len} for review"
+  emit "\n{scored | len} candidates, {auto | len} auto-integrated, {review | len} for review"
 }
 
 search_github = (query) {
@@ -92,15 +91,7 @@ search_github = (query) {
 score_candidate = (c) {
   lang_fit = c.lang ? { "Rust" -> 10.0; "TypeScript" -> 6.0; "Python" -> 4.0; _ -> 2.0 }
   community = scoring.scale_stars c.stars
-  scoring.composite %{
-    "lang": 0.10
-    "community": 0.10
-    "baseline": 0.80
-  } %{
-    "lang": lang_fit
-    "community": community
-    "baseline": 5.0
-  }
+  scoring.composite %{"lang": 0.10  "community": 0.10  "baseline": 0.80} %{"lang": lang_fit  "community": community  "baseline": 5.0}
 }
 
 integrate = (candidate) {

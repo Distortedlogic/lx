@@ -129,12 +129,15 @@ impl Checker {
                 }
                 Type::Unit
             }
-            Stmt::Protocol { fields, .. } => {
-                for f in fields {
-                    let _ = named_to_type(&f.type_name);
+            Stmt::Protocol { entries, .. } => {
+                for entry in entries {
+                    if let crate::ast::ProtocolEntry::Field(f) = entry {
+                        let _ = named_to_type(&f.type_name);
+                    }
                 }
                 Type::Unit
             }
+            Stmt::ProtocolUnion(_) => Type::Unit,
             Stmt::McpDecl { tools, .. } => {
                 for tool in tools {
                     for f in &tool.input {

@@ -1,0 +1,43 @@
+-- Transcript ingestion -- read Claude CLI JSONL transcripts into TraceEntry records.
+-- read_recent: find .jsonl files modified within a time window (minutes).
+-- parse: JSONL lines into normalized TraceEntry records.
+-- Filters: tool_calls, tool_results, successes, failures.
+
+use std/fs
+use std/json
+
+Protocol +TraceEntry = {type: Str  name: Str  input: Any  output: Any  success: Bool}
+
++read_recent = (dir mins) {
+  $^find {dir} -name "*.jsonl" -mmin -{mins}
+    | lines
+    | filter (!= "")
+}
+
++parse = (path) {
+  content = fs.read path ?? ""
+  content | lines | filter (!= "") | flat_map (line) {
+    json.parse line ? {
+      Ok entry -> [normalize entry]
+      Err _ -> []
+    }
+  }
+}
+
+normalize = (entry) {
+  TraceEntry {
+    type: get "type" entry ?? "unknown"
+    name: get "name" entry ?? ""
+    input: get "input" entry ?? %{}
+    output: get "output" entry ?? %{}
+    success: get "success" entry ?? true
+  }
+}
+
++tool_calls = (entries) entries | filter (e) e.type == "tool_use"
+
++tool_results = (entries) entries | filter (e) e.type == "tool_result"
+
++successes = (entries) entries | filter (.success)
+
++failures = (entries) entries | filter (e) !e.success

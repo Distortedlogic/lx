@@ -148,8 +148,8 @@ EWMA with configurable alpha (derived from `decay_half_life`). History is bounde
 
 ## Cross-References
 
-- Router agent: stdlib_roadmap (`std/agents/router`) — fallback when reputation insufficient
-- Reviewer agent: stdlib_roadmap (`std/agents/reviewer`) — outcomes feed reputation
-- Auditor agent: stdlib_roadmap (`std/agents/auditor`) — grade results feed reputation
+- Router agent: ROADMAP (`std/agents/router`) — fallback when reputation insufficient
+- Reviewer agent: ROADMAP (`std/agents/reviewer`) — outcomes feed reputation
+- Auditor agent: ROADMAP (`std/agents/auditor`) — grade results feed reputation
 - Knowledge base: [stdlib-knowledge.md](stdlib-knowledge.md) — same file-backed pattern
 - Reconcile: [agents-reconcile.md](agents-reconcile.md) — reputation-informed agent selection for voting

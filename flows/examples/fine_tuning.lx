@@ -1,0 +1,129 @@
+-- Fine-tuning pipeline for specialist subagents.
+-- 4 candidates: audit-verifier, classifier, grader, db-query (each needs >=5K scored traces).
+-- Harvest: Langfuse MCP -> list_traces -> filter scored -> filter score >= 0.7.
+-- Teacher enhancement: frontier model rewrites low-scored traces (< 0.5) as ideal responses.
+--   Parallel enhancement via pmap_n 3 through dispatch.run_one to agents/teacher.lx.
+-- Training output: ChatML JSONL (system + user + assistant) per candidate.
+-- Target model: Qwen2.5-Coder-32B + QLoRA SFT (r=64, alpha=128, bf16).
+-- Demonstrates: workflow.run, MCP trace harvesting, teacher enhancement, JSONL output.
+-- Source: mcp-toolbelt/arch_diagrams/subagent_fine_tuning
+
+use std/mcp
+use std/json
+use std/fs
+use ../lib/dispatch
+use ../lib/report
+use ../lib/workflow
+
+Protocol TraceData = {input: Str  output: Str  model: Str  score: Float}
+
+fine_tune_candidates = [
+  {name: "audit-verifier"  min_traces: 5000}
+  {name: "classifier"      min_traces: 5000}
+  {name: "grader"          min_traces: 5000}
+  {name: "db-query"        min_traces: 5000}
+]
+
++main = () {
+  langfuse = mcp.connect {command: "langfuse-mcp" args: []} ^
+
+  result = workflow.run "fine-tuning" "pipeline" (session) {
+    results = fine_tune_candidates | map (candidate) {
+      emit "\n=== {candidate.name} ==="
+      traces = harvest_traces langfuse candidate.name candidate.min_traces
+      traces ? {
+        Err e -> {
+          emit "  not ready: {e}"
+          {name: candidate.name  status: "skipped"  reason: e}
+        }
+        Ok data -> {
+          emit "  harvested {data | len} traces"
+          enhanced = teacher_enhance data
+          path = write_training candidate.name enhanced
+          emit "  training file: {path} ({enhanced | len} examples)"
+          {name: candidate.name  status: "ready"  path  count: (enhanced | len)}
+        }
+      }
+    }
+
+    ready = results | filter (r) r.status == "ready"
+    skipped = results | filter (r) r.status == "skipped"
+
+    report.write "fine_tuning_report.md" "Fine-Tuning Pipeline" [
+      ..report.text "{results | len} candidates, {ready | len} ready, {skipped | len} skipped"
+      ..report.conditional (ready | len > 0) "Ready for Training" [
+        ..report.table ["Candidate" "Examples" "Output"]
+          (ready | map (r) [r.name (to_str r.count) r.path])
+      ]
+      ..report.conditional (skipped | len > 0) "Skipped (Insufficient Data)" [
+        ..report.bullets (skipped | map (r) "{r.name}: {r.reason}")
+      ]
+      ..report.section "Training Config" [
+        ..report.bullets [
+          "Base model: Qwen2.5-Coder-32B"
+          "Method: QLoRA SFT (r=64, alpha=128, bf16)"
+          "Format: ChatML JSONL"
+        ]
+      ]
+    ]
+
+    emit "\n{ready | len}/{results | len} candidates ready for training"
+    Ok results
+  }
+
+  mcp.close langfuse
+  result
+}
+
+harvest_traces = (langfuse agent_name min_count) {
+  raw = mcp.call langfuse "list_traces" {name: agent_name  limit: 10000} ^
+  scored = raw | filter (t) (get "score" t) ? { Some _ -> true; None -> false }
+
+  scored | len < min_count ? {
+    true -> Err "only {scored | len}/{min_count} scored traces"
+    false -> Ok (scored
+      | filter (t) t.score >= 0.7
+      | map (t) TraceData {
+        input: t.input
+        output: t.output
+        model: t.model ?? "unknown"
+        score: t.score
+      })
+  }
+}
+
+teacher_enhance = (traces) {
+  low = traces | filter (t) t.score < 0.5
+  high = traces | filter (t) t.score >= 0.7
+
+  enhanced = low | pmap_n 3 (t) {
+    result = dispatch.run_one "agents/teacher.lx" {
+      action: "enhance"
+      input: t.input
+      bad_output: t.output
+      examples: (high | take 3)
+    }
+    {..t  output: result.ideal_output  score: 0.9  source: "teacher"}
+  }
+
+  [..high ..enhanced]
+}
+
+write_training = (agent_name data) {
+  system_prompt = fs.read "agents/{agent_name}/system_prompt.md" ?? ""
+
+  lines = data | map (d) {
+    json.encode %{
+      "messages": [
+        %{"role": "system"    "content": system_prompt}
+        %{"role": "user"      "content": d.input}
+        %{"role": "assistant" "content": d.output}
+      ]
+    }
+  }
+
+  path = "training/{agent_name}_train.jsonl"
+  $^mkdir -p training
+  fs.write path (lines | join "\n") ^
+  path
+}

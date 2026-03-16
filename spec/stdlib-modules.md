@@ -284,6 +284,23 @@ prune store opts               -- () ({older_than: days} or {min_count below_sco
 export store / import store data -- Record / ()
 ```
 
+## std/pool
+
+Agent worker pools. Identity-less groups of interchangeable agents with load balancing and lifecycle management.
+
+```
+create opts                    -- Pool ^ PoolErr ({agent size trait? overflow?})
+fan_out pool tasks             -- [Result] ^ PoolErr (distribute, collect in order)
+map pool items fn              -- [Result] ^ PoolErr (transform items via pool workers)
+submit pool task               -- () ^ PoolErr (fire-and-forget, uses overflow policy)
+drain pool                     -- () (wait for queued work, stop accepting)
+shutdown pool                  -- () (kill all workers immediately)
+status pool                    -- {size busy idle queued completed failed}
+resize pool n                  -- () ^ PoolErr (adjust worker count)
+```
+
+`Pool` is an opaque type. Workers are spawned eagerly via `agent.spawn`. If `trait` is specified in options, all workers are validated at spawn time. Failed workers are auto-restarted (uses `agent.supervise` internally). Spec: `spec/agents-pool.md`.
+
 ## Eliminated Modules (merged into existing features)
 
 - **std/decide** → Decision metadata stored as trace spans with structured metadata fields. Query via `trace.query {type: "decision"}`.

@@ -18,31 +18,37 @@ pub fn mk_capabilities_protocol() -> Value {
             name: "protocols".into(),
             type_name: "List".into(),
             default: None,
+            constraint: None,
         },
         ProtoFieldDef {
             name: "tools".into(),
             type_name: "List".into(),
             default: None,
+            constraint: None,
         },
         ProtoFieldDef {
             name: "domains".into(),
             type_name: "List".into(),
             default: None,
+            constraint: None,
         },
         ProtoFieldDef {
             name: "budget_remaining".into(),
             type_name: "Int".into(),
             default: Some(Value::Int((-1).into())),
+            constraint: None,
         },
         ProtoFieldDef {
             name: "accepts".into(),
             type_name: "List".into(),
             default: Some(Value::List(Arc::new(vec![]))),
+            constraint: None,
         },
         ProtoFieldDef {
             name: "status".into(),
             type_name: "Str".into(),
             default: Some(Value::Str(Arc::from("ready"))),
+            constraint: None,
         },
     ];
     Value::Protocol {

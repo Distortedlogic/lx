@@ -1,0 +1,66 @@
+-- Multi-source research with parallel specialists and synthesis.
+-- Fan-out to 3 specialists via dispatch.run_one, parallel via par:
+--   researcher: web search for external patterns and best practices.
+--   context-engine: codebase retrieval for current approach and gaps.
+--   github-search: code search for OSS implementations and libraries.
+-- Merge via agent.reconcile (merge_fields) to unify results.
+-- Synthesis: recommend best OSS match or suggest implementation from external patterns.
+-- Demonstrates: workflow.run, parallel fan-out, agent reconciliation, synthesis logic.
+-- Source: mcp-toolbelt/arch_diagrams/scenario_research
+
+use std/agent
+use ../lib/dispatch
+use ../lib/report
+use ../lib/workflow
+
+Protocol ResearchRequest = {topic: Str  compare_to: Str  find_oss: Bool}
+
++main = () {
+  request = ResearchRequest {
+    topic: "rate limiting patterns"
+    compare_to: "src/"
+    find_oss: true
+  }
+
+  research request
+}
+
++research = (request) {
+  workflow.run "research" request.topic (_) {
+    (external, internal, oss) = par {
+      dispatch.run_one "agents/researcher.lx" {action: "search"  topic: request.topic}
+      dispatch.run_one "agents/context_engine.lx" {action: "search"  path: request.compare_to  topic: request.topic}
+      dispatch.run_one "agents/github_search.lx" {action: "search"  query: request.topic  lang: "rust"}
+    }
+
+    merged = agent.reconcile [external internal oss] {strategy: "merge_fields"}
+    recommendation = synthesize external oss
+
+    report.write "research_report.md" "Research: {request.topic}" [
+      ..report.section "External Findings" [
+        ..report.bullets (external.findings | map (.summary))
+      ]
+      ..report.section "Our Codebase" [
+        ..report.text "Current approach: {internal.summary}"
+        ..report.bullets (internal.gaps | map (g) "GAP: {g}")
+      ]
+      ..report.section "OSS Libraries" [
+        ..report.table
+          ["Name" "Stars" "License" "Fit"]
+          (oss.repos | map (r) [r.name (to_str r.stars) r.license r.fit])
+      ]
+      ..report.section "Recommendation" [..report.text recommendation]
+    ]
+
+    emit "research report written"
+    Ok {merged  recommendation}
+  }
+}
+
+synthesize = (external oss) {
+  best = oss.repos | filter (r) r.fit == "high" | first
+  best ? {
+    Some lib -> "Use {lib.name} ({lib.license}). Covers {external.findings | len} patterns we're missing."
+    None -> "No strong OSS match. Implement based on external patterns: {external.findings.0.summary}"
+  }
+}

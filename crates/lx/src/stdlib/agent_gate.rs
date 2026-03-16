@@ -14,21 +14,25 @@ pub fn mk_gate_result_protocol() -> Value {
             name: "approved".into(),
             type_name: "Bool".into(),
             default: None,
+            constraint: None,
         },
         ProtoFieldDef {
             name: "approver".into(),
             type_name: "Str".into(),
             default: None,
+            constraint: None,
         },
         ProtoFieldDef {
             name: "reason".into(),
             type_name: "Str".into(),
             default: Some(Value::Str(Arc::from(""))),
+            constraint: None,
         },
         ProtoFieldDef {
             name: "timestamp".into(),
             type_name: "Str".into(),
             default: None,
+            constraint: None,
         },
     ];
     Value::Protocol {

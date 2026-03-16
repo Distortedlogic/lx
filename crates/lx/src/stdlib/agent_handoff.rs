@@ -12,6 +12,7 @@ pub fn mk_handoff_protocol() -> Value {
             name: "result".into(),
             type_name: "Any".into(),
             default: None,
+            constraint: None,
         },
         proto_list_field("tried"),
         proto_list_field("assumptions"),
@@ -23,6 +24,7 @@ pub fn mk_handoff_protocol() -> Value {
             name: "duration_ms".into(),
             type_name: "Int".into(),
             default: Some(Value::Int(0.into())),
+            constraint: None,
         },
     ];
     Value::Protocol {
@@ -36,6 +38,7 @@ fn proto_list_field(name: &str) -> ProtoFieldDef {
         name: name.into(),
         type_name: "List".into(),
         default: Some(Value::List(Arc::new(vec![]))),
+        constraint: None,
     }
 }
 

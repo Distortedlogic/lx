@@ -126,4 +126,4 @@ For subprocess agents, the ambient context is serialized as a JSON-line `{"type"
 - Scoped bindings: [agents-advanced.md](agents-advanced.md) (`with`)
 - Agent spawning: [agents.md](agents.md)
 - Introspection budget: [stdlib-introspect.md](stdlib-introspect.md) (`introspect.budget`)
-- Circuit breakers: stdlib_roadmap (`std/circuit`)
+- Circuit breakers: ROADMAP (`std/circuit`)

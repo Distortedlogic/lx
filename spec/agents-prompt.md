@@ -231,4 +231,4 @@ Rendering concatenates sections with headers. `render_within` estimates tokens p
 - LLM integration: stdlib (`std/ai`) — `prompt.render` feeds `ai.prompt`
 - Structured output: [agents-structured-output.md](agents-structured-output.md) — validates output side
 - Context capacity: [agents-context-capacity.md](agents-context-capacity.md) — budget-aware rendering
-- Standard agents: stdlib_roadmap (`std/agents/*`) — all build prompts internally
+- Standard agents: ROADMAP (`std/agents/*`) — all build prompts internally

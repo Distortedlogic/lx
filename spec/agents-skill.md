@@ -211,6 +211,6 @@ New stdlib module following standard pattern. Functions: `registry`, `list`, `ma
 - Protocol declarations: [agents-protocol.md](agents-protocol.md) (message validation)
 - MCP declarations: [agents-advanced.md](agents-advanced.md) (external tool contracts)
 - Structured output: [agents-structured-output.md](agents-structured-output.md) (skills use structured output)
-- Router agent: stdlib_roadmap (`std/agents/router`) — skill matching as alternative to LLM routing
-- Planner agent: stdlib_roadmap (`std/agents/planner`) — plans over available skills
+- Router agent: ROADMAP (`std/agents/router`) — skill matching as alternative to LLM routing
+- Planner agent: ROADMAP (`std/agents/planner`) — plans over available skills
 - Reputation: [agents-reputation.md](agents-reputation.md) — skill execution outcomes feed reputation

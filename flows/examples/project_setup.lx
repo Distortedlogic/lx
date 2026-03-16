@@ -1,0 +1,104 @@
+-- New service scaffolding with compensating rollback on failure.
+-- Multi-step setup as a saga (std/saga) -- automatic undo if any step fails:
+--   Step 1: Scaffold project files via scaffolder agent.
+--   Step 2: Create Forgejo git repo via MCP.
+--   Step 3: Create database via PostgreSQL MCP (conditional on config.db).
+--   Step 4: Add health monitor via Uptime Kuma MCP (conditional on config.monitoring).
+-- Each step has a compensate function for automatic cleanup on failure.
+-- Conditional steps use list spreading: ..flag ? {true -> [step]; false -> []}.
+-- Demonstrates: workflow.run, saga pattern, MCP orchestration, conditional composition.
+-- Source: mcp-toolbelt/arch_diagrams/scenario_project_setup
+
+use std/saga
+use std/mcp
+use ../lib/dispatch
+use ../lib/report
+use ../lib/workflow
+
+Protocol SetupConfig = {name: Str  lang: Str  db: Bool  monitoring: Bool}
+
++main = () {
+  config = SetupConfig {
+    name: "billing-service"
+    lang: "rust"
+    db: true
+    monitoring: true
+  }
+
+  setup config
+}
+
++setup = (config) {
+  forgejo = mcp.connect {command: "forgejo-mcp" args: []} ^
+  pg = mcp.connect {command: "postgresql-mcp" args: []} ^
+  db_name = config.name | replace "-" "_"
+
+  result = workflow.run "project-setup" config.name (_) {
+    steps = [
+      {
+        name: "scaffold"
+        action: () dispatch.run_one "agents/scaffolder.lx" {
+          action: "scaffold"  name: config.name  lang: config.lang  template: "service"
+        }
+        compensate: (result) $^rm -rf {result.path}
+      }
+      {
+        name: "repo"
+        action: () mcp.call forgejo "create_repo" {
+          name: config.name  description: "{config.name} service"  private: true
+        } ^
+        compensate: () mcp.call forgejo "delete_repo" {name: config.name} ^
+      }
+      ..config.db ? {
+        true -> [{
+          name: "database"
+          action: () mcp.call pg "execute" {query: "CREATE DATABASE {db_name}"} ^
+          compensate: () mcp.call pg "execute" {query: "DROP DATABASE IF EXISTS {db_name}"} ^
+        }]
+        false -> []
+      }
+      ..config.monitoring ? {
+        true -> [{
+          name: "monitoring"
+          action: () {
+            mon = mcp.connect {command: "uptime-kuma-mcp" args: []} ^
+            result = mcp.call mon "add_monitor" {
+              name: config.name  url: "http://{config.name}:8080/health"  interval: 60
+            } ^
+            mcp.close mon
+            result
+          }
+          compensate: () ()
+        }]
+        false -> []
+      }
+    ]
+
+    saga_result = saga.run steps
+    saga_result ? {
+      Ok outcomes -> {
+        step_names = outcomes | map (.name) | join ", "
+        emit "setup complete: {step_names}"
+
+        report.write "setup_{config.name}.md" "Project Setup: {config.name}" [
+          ..report.text "Language: {config.lang}"
+          ..report.section "Steps Completed" [..report.bullets (outcomes | map (.name))]
+          ..report.conditional config.db "Database" [..report.text "Database: {db_name}"]
+          ..report.conditional config.monitoring "Monitoring" [
+            ..report.text "Health check: http://{config.name}:8080/health (60s interval)"
+          ]
+        ]
+
+        Ok outcomes
+      }
+      Err e -> {
+        emit "setup failed at step '{e.step}': {e.error}"
+        Err e
+      }
+    }
+  }
+
+  mcp.close forgejo
+  mcp.close pg
+  result
+}

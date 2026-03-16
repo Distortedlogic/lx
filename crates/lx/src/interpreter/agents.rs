@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::ast::{McpOutputType, McpToolDecl, ProtocolField, SExpr};
+use crate::ast::{McpOutputType, McpToolDecl, ProtocolEntry, ProtocolField, SExpr};
 use crate::error::LxError;
 use crate::span::Span;
 use crate::value::{McpOutputDef, McpToolDef, ProtoFieldDef, Value};
@@ -75,20 +75,49 @@ impl Interpreter {
     pub(super) fn eval_protocol_def(
         &mut self,
         name: &str,
-        fields: &[ProtocolField],
+        entries: &[ProtocolEntry],
         span: Span,
     ) -> Result<Value, LxError> {
         let mut proto_fields = Vec::new();
-        for f in fields {
-            let default = match &f.default {
-                Some(e) => Some(self.eval(e)?),
-                None => None,
-            };
-            proto_fields.push(ProtoFieldDef {
-                name: f.name.clone(),
-                type_name: f.type_name.clone(),
-                default,
-            });
+        for entry in entries {
+            match entry {
+                ProtocolEntry::Spread(base_name) => {
+                    let base = self.env.get(base_name).ok_or_else(|| {
+                        LxError::runtime(
+                            format!("Protocol {name}: spread base '{base_name}' not found"),
+                            span,
+                        )
+                    })?;
+                    let Value::Protocol { fields, .. } = &base else {
+                        return Err(LxError::runtime(
+                            format!(
+                                "Protocol {name}: '{base_name}' is not a Protocol, got {}",
+                                base.type_name()
+                            ),
+                            span,
+                        ));
+                    };
+                    for f in fields.iter() {
+                        if let Some(pos) =
+                            proto_fields.iter().position(|pf: &ProtoFieldDef| pf.name == f.name)
+                        {
+                            proto_fields[pos] = f.clone();
+                        } else {
+                            proto_fields.push(f.clone());
+                        }
+                    }
+                }
+                ProtocolEntry::Field(f) => {
+                    let def = self.eval_proto_field(f)?;
+                    if let Some(pos) =
+                        proto_fields.iter().position(|pf: &ProtoFieldDef| pf.name == def.name)
+                    {
+                        proto_fields[pos] = def;
+                    } else {
+                        proto_fields.push(def);
+                    }
+                }
+            }
         }
         let val = Value::Protocol {
             name: Arc::from(name),
@@ -97,7 +126,54 @@ impl Interpreter {
         let mut env = self.env.child();
         env.bind(name.to_string(), val);
         self.env = env.into_arc();
-        let _ = span;
+        Ok(Value::Unit)
+    }
+
+    fn eval_proto_field(&mut self, f: &ProtocolField) -> Result<ProtoFieldDef, LxError> {
+        let default = match &f.default {
+            Some(e) => Some(self.eval(e)?),
+            None => None,
+        };
+        let constraint = f.constraint.as_ref().map(|e| Arc::new(e.clone()));
+        Ok(ProtoFieldDef {
+            name: f.name.clone(),
+            type_name: f.type_name.clone(),
+            default,
+            constraint,
+        })
+    }
+
+    pub(super) fn eval_protocol_union(
+        &mut self,
+        name: &str,
+        variants: &[String],
+        span: Span,
+    ) -> Result<Value, LxError> {
+        for v in variants {
+            let val = self.env.get(v).ok_or_else(|| {
+                LxError::runtime(
+                    format!("Protocol union {name}: variant '{v}' not found"),
+                    span,
+                )
+            })?;
+            if !matches!(val, Value::Protocol { .. }) {
+                return Err(LxError::runtime(
+                    format!(
+                        "Protocol union {name}: variant '{v}' is not a Protocol, got {}",
+                        val.type_name()
+                    ),
+                    span,
+                ));
+            }
+        }
+        let variant_arcs: Vec<Arc<str>> = variants.iter().map(|v| Arc::from(v.as_str())).collect();
+        let val = Value::ProtocolUnion {
+            name: Arc::from(name),
+            variants: Arc::new(variant_arcs),
+        };
+        let mut env = self.env.child();
+        env.bind(name.to_string(), val);
+        self.env = env.into_arc();
         Ok(Value::Unit)
     }
 
@@ -119,6 +195,7 @@ impl Interpreter {
                     name: f.name.clone(),
                     type_name: f.type_name.clone(),
                     default,
+                    constraint: None,
                 });
             }
             let output = self.resolve_mcp_output(&t.output);
@@ -157,6 +234,7 @@ impl Interpreter {
                         name: f.name.clone(),
                         type_name: f.type_name.clone(),
                         default: None,
+                        constraint: None,
                     })
                     .collect();
                 McpOutputDef::Record(defs)
@@ -205,7 +283,109 @@ impl Interpreter {
                 }
             }
         }
+        for field in fields.iter() {
+            if let Some(ref constraint_expr) = field.constraint {
+                let val = result.get(&field.name).cloned().unwrap_or(Value::Unit);
+                let saved = Arc::clone(&self.env);
+                let mut scope = self.env.child();
+                scope.bind(field.name.clone(), val);
+                self.env = scope.into_arc();
+                let ok = self.eval(constraint_expr)?;
+                self.env = saved;
+                match ok.as_bool() {
+                    Some(true) => {}
+                    _ => {
+                        return Err(LxError::runtime(
+                            format!(
+                                "Protocol {name}: field '{}' constraint violated",
+                                field.name
+                            ),
+                            span,
+                        ));
+                    }
+                }
+            }
+        }
         Ok(Value::Record(Arc::new(result)))
+    }
+
+    pub(super) fn apply_protocol_union(
+        &mut self,
+        name: &str,
+        variants: &Arc<Vec<Arc<str>>>,
+        arg: &Value,
+        span: Span,
+    ) -> Result<Value, LxError> {
+        let Value::Record(rec) = arg else {
+            return Err(LxError::runtime(
+                format!("Protocol union {name}: expected Record, got {}", arg.type_name()),
+                span,
+            ));
+        };
+        for variant_name in variants.iter() {
+            let proto = self.env.get(variant_name.as_ref()).ok_or_else(|| {
+                LxError::runtime(
+                    format!("Protocol union {name}: variant '{variant_name}' not in scope"),
+                    span,
+                )
+            })?;
+            let Value::Protocol {
+                fields: ref proto_fields,
+                ..
+            } = proto
+            else {
+                continue;
+            };
+            if self
+                .try_match_variant(proto_fields, rec, span)
+                .is_ok()
+            {
+                let mut result = rec.as_ref().clone();
+                result.insert(
+                    "_variant".to_string(),
+                    Value::Str(Arc::from(variant_name.as_ref())),
+                );
+                for field in proto_fields.iter() {
+                    if !rec.contains_key(&field.name)
+                        && let Some(ref default) = field.default
+                    {
+                        result.insert(field.name.clone(), default.clone());
+                    }
+                }
+                return Ok(Value::Record(Arc::new(result)));
+            }
+        }
+        let variant_names: Vec<&str> = variants.iter().map(|v| v.as_ref()).collect();
+        Err(LxError::runtime(
+            format!(
+                "Protocol union {name}: no variant matched. Tried: {}",
+                variant_names.join(", ")
+            ),
+            span,
+        ))
+    }
+
+    fn try_match_variant(
+        &mut self,
+        fields: &Arc<Vec<ProtoFieldDef>>,
+        rec: &Arc<indexmap::IndexMap<String, Value>>,
+        span: Span,
+    ) -> Result<(), LxError> {
+        for field in fields.iter() {
+            match rec.get(&field.name) {
+                Some(val) => {
+                    if field.type_name != "Any" && val.type_name() != field.type_name {
+                        return Err(LxError::runtime("type mismatch", span));
+                    }
+                }
+                None => {
+                    if field.default.is_none() {
+                        return Err(LxError::runtime("missing field", span));
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     pub(super) fn apply_mcp_decl(

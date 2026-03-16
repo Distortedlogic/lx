@@ -1,49 +1,37 @@
 -- ReAct agent loop with session tracing and knowledge persistence.
--- Delegates to lib/react for the core Thought -> Action -> Observation loop.
--- Traces session outcome for post-hoc analysis via std/trace.
+-- Delegates to lib/react for the core Thought -> Action -> Observation engine.
 -- Persists successful results to std/knowledge for cross-session compounding.
--- Demonstrates: react engine composition, trace recording, knowledge storage.
+-- Generates markdown report on success.
+-- Demonstrates: workflow.run, react engine composition, knowledge storage.
 -- Source: mcp-toolbelt/arch_diagrams/agentic_loop
 
-use std/trace
 use std/knowledge
 use ../lib/react
 use ../lib/report
+use ../lib/workflow
 
 +main = () {
-  task = "fix the failing test in src/parser.rs"
-  run task {}
+  run "fix the failing test in src/parser.rs" {}
 }
 
 +run = (task opts) {
-  session = trace.create {name: "react-session"  source: task}
+  workflow.run "react-session" task (session) {
+    r = react.run {
+      script: opts.script ?? "agents/react_worker.lx"
+      task: task
+      max_turns: opts.max_turns ?? 25
+      max_time_ms: opts.max_time_ms ?? 300000
+    } ^
 
-  result = react.run {
-    script: opts.script ?? "agents/react_worker.lx"
-    task: task
-    max_turns: opts.max_turns ?? 25
-    max_time_ms: opts.max_time_ms ?? 300000
-  }
+    kb = knowledge.create {name: "react-results"}
+    knowledge.store kb task (to_str r) "react" {confidence: 0.8}
 
-  result ? {
-    Ok r -> {
-      trace.record session {name: "complete"  input: task  output: r  success: true}
+    report.write "react_report.md" "ReAct Session" [
+      ..report.text "Task: {task}"
+      ..report.section "Result" [..report.text r.reasoning]
+    ]
 
-      kb = knowledge.create {name: "react-results"}
-      knowledge.store kb task (to_str r) "react" {confidence: 0.8}
-
-      report.write "react_report.md" "ReAct Session" [
-        ..report.text "Task: {task}"
-        ..report.section "Result" [..report.text r.reasoning]
-      ]
-
-      $echo "completed: {r.reasoning}"
-      r
-    }
-    Err e -> {
-      trace.record session {name: "failed"  input: task  output: e  success: false}
-      $echo "FAILED: {e}"
-      Err e
-    }
+    emit "completed: {r.reasoning}"
+    Ok r
   }
 }

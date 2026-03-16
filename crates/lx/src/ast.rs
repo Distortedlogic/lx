@@ -35,9 +35,10 @@ pub enum Stmt {
     },
     Protocol {
         name: String,
-        fields: Vec<ProtocolField>,
+        entries: Vec<ProtocolEntry>,
         exported: bool,
     },
+    ProtocolUnion(ProtocolUnionDef),
     McpDecl {
         name: String,
         tools: Vec<McpToolDecl>,
@@ -156,6 +157,9 @@ pub enum Expr {
         msg: Box<SExpr>,
     },
 
+    Emit {
+        value: Box<SExpr>,
+    },
     Yield {
         value: Box<SExpr>,
     },
@@ -294,10 +298,24 @@ pub enum Pattern {
 }
 
 #[derive(Debug, Clone)]
+pub enum ProtocolEntry {
+    Field(ProtocolField),
+    Spread(String),
+}
+
+#[derive(Debug, Clone)]
 pub struct ProtocolField {
     pub name: String,
     pub type_name: String,
     pub default: Option<SExpr>,
+    pub constraint: Option<SExpr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ProtocolUnionDef {
+    pub name: String,
+    pub variants: Vec<String>,
+    pub exported: bool,
 }
 
 #[derive(Debug, Clone)]

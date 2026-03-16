@@ -85,6 +85,7 @@ pub enum TokenKind {
     TildeArrowQ,
     Protocol,
     Mcp,
+    Emit,
     Yield,
     With,
     Refine,

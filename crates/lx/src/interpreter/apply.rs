@@ -87,6 +87,9 @@ impl Interpreter {
                 }
             }
             Value::Protocol { name, fields } => self.apply_protocol(&name, &fields, &arg, span),
+            Value::ProtocolUnion { name, variants } => {
+                self.apply_protocol_union(&name, &variants, &arg, span)
+            }
             Value::McpDecl { name, tools } => self.apply_mcp_decl(&name, &tools, &arg, span),
             other => Err(LxError::type_err(
                 format!("cannot call {}, not a function", other.type_name()),

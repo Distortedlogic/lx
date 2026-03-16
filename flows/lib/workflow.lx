@@ -1,0 +1,17 @@
+-- Traced workflow runner -- session tracing and outcome recording.
+-- run: create trace session, execute work function, record final outcome.
+-- work_fn receives the session handle (for intermediate span recording)
+-- and must return Ok result or Err reason.
+-- Returns the work function's Result unchanged after recording outcome.
+
+use std/trace
+
++run = (name source work_fn) {
+  session = trace.create {name  source}
+  result = work_fn session
+  result ? {
+    Ok r -> trace.record session {name: "complete"  input: source  output: r  success: true}
+    Err e -> trace.record session {name: "failed"  input: source  output: e  success: false}
+  }
+  result
+}

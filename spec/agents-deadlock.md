@@ -133,4 +133,4 @@ Since `par` is currently sequential, true concurrent deadlocks can't occur yet. 
 - Structured clarification: [agents-clarify.md](agents-clarify.md) (`caller` creates bidirectional flows)
 - Supervision: [agents-supervision.md](agents-supervision.md) (supervisor can restart deadlocked agents)
 - Ambient context: [agents-ambient.md](agents-ambient.md) (deadline timeout is the fallback if detection misses)
-- Circuit breakers: stdlib_roadmap (`std/circuit` — timeout is a coarser deadlock escape)
+- Circuit breakers: ROADMAP (`std/circuit` — timeout is a coarser deadlock escape)

@@ -1,0 +1,53 @@
+-- Performance analysis via 5 parallel domain specialists.
+-- Fan-out to: db, memory, compute, threading, network analysis agents.
+-- Each specialist returns findings with severity, location, and fix recommendation.
+-- Aggregation via agent.reconcile (union): dedup by location, keep higher severity.
+-- Conflict detection: same location, different fixes from different domains.
+-- Demonstrates: workflow.run, parallel pmap dispatch, reconciliation, conflict handling.
+-- Source: mcp-toolbelt/arch_diagrams/scenario_perf_analysis
+
+use std/agent
+use ../lib/dispatch
+use ../lib/report
+use ../lib/workflow
+
+Protocol PerfFinding = {domain: Str  severity: Str  location: Str  issue: Str  fix: Str}
+
+domains = ["db" "memory" "compute" "threading" "network"]
+
++main = () {
+  analyze "src/" "high latency on API endpoints"
+}
+
++analyze = (path concern) {
+  workflow.run "perf-analysis" concern (_) {
+    results = domains | pmap (d) {
+      dispatch.run_one "agents/perf_{d}.lx" {path  concern  domain: d}
+    }
+
+    merged = agent.reconcile results {
+      strategy: "union"
+      key: (r) r.location ?? "global"
+      flatten: "findings"
+      conflict: (a b) a.severity < b.severity ? b : a
+    }
+
+    findings = merged.merged | sort_by (.severity) | rev
+    conflicts = merged.conflicts
+    conflict_notes = conflicts | map (c) "CONFLICT at {c.key}: {c.values | map (.fix) | join " vs "}"
+
+    report.write "perf_report.md" "Performance Analysis: {concern}" [
+      ..report.text "Path: {path} | {findings | len} findings across {domains | len} domains"
+      ..report.section "Findings" [
+        ..report.table ["Severity" "Domain" "Location" "Issue" "Fix"]
+          (findings | map (f) [f.severity f.domain f.location f.issue f.fix])
+      ]
+      ..report.conditional (conflicts | len > 0) "Conflicts" [..report.bullets conflict_notes]
+    ]
+
+    findings | each (f) emit "[{f.severity}] {f.domain}: {f.location} -- {f.issue}"
+    emit "\n{findings | len} findings, {conflicts | len} conflicts"
+
+    Ok {findings  conflicts}
+  }
+}
