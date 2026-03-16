@@ -1,5 +1,0 @@
-1. No .unwrap() calls — use ? operator, .map_err(), or match for all Result/Option handling
-2. No panic!() in library code — return Result with descriptive error instead
-3. No mutable statics — use OnceLock, LazyLock, or pass state through function parameters
-4. All public functions must return Result when they can fail
-5. Error messages must include context about what operation failed and why

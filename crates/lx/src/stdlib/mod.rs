@@ -57,6 +57,7 @@ mod time;
 mod trace;
 mod trace_progress;
 mod trace_query;
+mod user;
 
 use crate::interpreter::ModuleExports;
 
@@ -105,6 +106,7 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
             "saga" => saga::build(),
             "introspect" => introspect::build(),
             "trace" => trace::build(),
+            "user" => user::build(),
             _ => return None,
         }
     };
@@ -155,5 +157,6 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
             | "saga"
             | "introspect"
             | "trace"
+            | "user"
     )
 }

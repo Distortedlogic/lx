@@ -1,5 +1,5 @@
 -- Satisfaction spec for workgen.
--- Each scenario is a real codebase with planted violations + an answer key
+-- Each scenario is a fixture with planted violations + an answer key
 -- of expected findings. The grader checks that workgen's output catches them.
 
 use std/audit
@@ -18,12 +18,12 @@ use std/md
   parsed = md.parse output
   headings = md.headings parsed
 
-  has_goal = headings | any? (h) contains? "Goal" h
-  has_why = headings | any? (h) contains? "Why" h
-  has_changes = headings | any? (h) contains? "changes" h
-  has_files = headings | any? (h) contains? "Files" h
-  has_tasks = headings | any? (h) contains? "Task" h
-  has_reminders = headings | any? (h) contains? "CRITICAL REMINDERS" h
+  has_goal = headings | any? (h) contains? "Goal" h.text
+  has_why = headings | any? (h) contains? "Why" h.text
+  has_changes = headings | any? (h) contains? "changes" h.text
+  has_files = headings | any? (h) contains? "Files" h.text
+  has_tasks = headings | any? (h) contains? "Task" h.text
+  has_reminders = headings | any? (h) contains? "CRITICAL REMINDERS" h.text
   section_hits = [has_goal has_why has_changes has_files has_tasks has_reminders] | filter identity | len
   structure_score = section_hits / 6.0
 
@@ -34,7 +34,7 @@ use std/md
   has_fmt = contains? "just fmt" output
   has_commit = contains? "git commit" output || contains? "git add" output
   has_verify = contains? "just test" output || contains? "just diagnose" output
-  has_loading = headings | any? (h) contains? "Loading" h
+  has_loading = headings | any? (h) contains? "Loading" h.text
   compliance_hits = [has_fmt has_commit has_verify has_loading] | filter identity | len
   compliance_score = compliance_hits / 4.0
 
@@ -54,42 +54,58 @@ use std/md
 
 +scenarios = [
   {
-    name: "unwrap audit"
-    root: "workgen/tests/fixtures/unwrap_audit"
+    name: "rust-audit: inline imports"
+    root: "workgen/tests/fixtures/rust_audit"
     expected_findings: [
-      "unwrap"
-      "panic"
-      "mutable static"
-      "Result"
-      "error"
-    ]
-    tags: ["smoke"]
-  }
-  {
-    name: "error handling audit"
-    root: "workgen/tests/fixtures/error_handling_audit"
-    expected_findings: [
-      "swallow"
-      "unwrap_or_default"
-      "String"
-      "silent"
-      "context"
-      ".ok()"
-    ]
-    tags: ["full"]
-  }
-  {
-    name: "style audit"
-    root: "workgen/tests/fixtures/style_audit"
-    expected_findings: [
-      "wildcard"
-      "TODO"
-      "FIXME"
       "inline import"
-      "duplicate"
-      "method"
-      "do_the_thing"
+      "self-assignment"
+      "#[allow"
+      "&String"
+      "&Vec"
+      "swallow"
+      "intermediate collect"
+      "string literal"
     ]
-    tags: ["full"]
+    tags: ["rust" "smoke"]
+  }
+  {
+    name: "python-audit: quality"
+    root: "workgen/tests/fixtures/python_audit"
+    expected_findings: [
+      "string literal"
+      "free function"
+      "mutable default"
+      "swallow"
+      "intermediate list"
+      "dict"
+      "StrEnum"
+    ]
+    tags: ["python"]
+  }
+  {
+    name: "performance-audit: anti-patterns"
+    root: "workgen/tests/fixtures/perf_audit"
+    expected_findings: [
+      "intermediate collect"
+      "clone"
+      "lock per"
+      "string concat"
+      "full sort"
+      "repeated HashMap lookup"
+      "with_capacity"
+    ]
+    tags: ["perf"]
+  }
+  {
+    name: "topology-audit: simplification"
+    root: "workgen/tests/fixtures/topology_audit"
+    expected_findings: [
+      "proxy"
+      "shuttle"
+      "call chain"
+      "repeated lock"
+      "parameter threading"
+    ]
+    tags: ["topology"]
   }
 ]

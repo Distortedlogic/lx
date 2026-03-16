@@ -1,6 +1,8 @@
 mod defaults;
+mod user;
 
 pub use defaults::*;
+pub use user::*;
 
 use std::sync::Arc;
 
@@ -17,6 +19,7 @@ pub struct RuntimeCtx {
     pub shell: Arc<dyn ShellBackend>,
     pub yield_: Arc<dyn YieldBackend>,
     pub log: Arc<dyn LogBackend>,
+    pub user: Arc<dyn UserBackend>,
 }
 
 impl Default for RuntimeCtx {
@@ -28,6 +31,7 @@ impl Default for RuntimeCtx {
             shell: Arc::new(ProcessShellBackend),
             yield_: Arc::new(StdinStdoutYieldBackend),
             log: Arc::new(StderrLogBackend),
+            user: Arc::new(NoopUserBackend),
         }
     }
 }
@@ -86,4 +90,15 @@ pub enum LogLevel {
 
 pub trait LogBackend: Send + Sync {
     fn log(&self, level: LogLevel, msg: &str);
+}
+
+pub trait UserBackend: Send + Sync {
+    fn confirm(&self, message: &str) -> Result<bool, String>;
+    fn choose(&self, message: &str, options: &[String]) -> Result<usize, String>;
+    fn ask(&self, message: &str, default: Option<&str>) -> Result<String, String>;
+    fn progress(&self, current: usize, total: usize, message: &str);
+    fn progress_pct(&self, pct: f64, message: &str);
+    fn status(&self, level: &str, message: &str);
+    fn table(&self, headers: &[String], rows: &[Vec<String>]);
+    fn check_signal(&self) -> Option<Value>;
 }

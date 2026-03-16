@@ -13,6 +13,8 @@ Future features only. For what's already implemented, see `agent/INVENTORY.md`.
 | `std/flow`          | `spec/flow-composition.md`              | Flows as first-class values: load, run, pipe, par, branch     | Tier 2   |
 | `std/workspace`     | `spec/agents-workspace.md`             | Concurrent multi-agent editing with region claiming/conflicts  | Tier 3   |
 | `std/registry`      | `spec/agents-discovery.md`              | Cross-process agent discovery, health, load-balanced dispatch  | Tier 3   |
+| `std/taskgraph`     | `spec/agents-task-graph.md`             | DAG-aware subtask decomposition, dependency-ordered execution  | Tier 2   |
+| `std/deadline`      | `spec/agents-deadline.md`               | Time budget propagation across agent boundaries                | Tier 2   |
 | `AgentErr`          | `spec/agents-errors.md`                 | Structured agent failure taxonomy for pattern-matched recovery | Tier 2   |
 | `trait.methods/match` | `spec/agents-trait.md`               | Trait-based discovery (replaces `std/skill`)                   | Tier 2   |
 | `std/durable`       | `spec/agents-durable.md`                | Workflow persistence, cross-process resumption                 | Tier 4   |
@@ -23,7 +25,12 @@ Future features only. For what's already implemented, see `agent/INVENTORY.md`.
 | ----------------------------------- | --------------------------------------- | ---------------------------------------------------- | -------- |
 | `agent.pipeline`                    | `spec/agents-pipeline.md`               | Consumer-driven flow control with backpressure       | Tier 2   |
 | `~>>?` streaming ask                | `spec/agents-streaming.md`              | Stream partial results from long-running agents      | Tier 2   |
+| `agent.route`/`agent.register`      | `spec/agents-capability-routing.md`     | Declarative capability-based routing with load awareness | Tier 2 |
+| `introspect.system`/`agents`        | `spec/agents-introspect-live.md`        | Live system-wide agent state observation             | Tier 2   |
 | `std/trace` provenance + reputation | `spec/agents-provenance.md` (folded)    | Message flow tracking + agent scoring as trace extensions | Tier 3 |
+| `agent.dialogue_fork`/`compare`     | `spec/agents-dialogue-branch.md`        | Fork dialogues for parallel exploration, compare, merge | Tier 3 |
+| `agent.adapter`/`negotiate_format`  | `spec/agents-format-negotiate.md`       | Runtime Protocol format negotiation between agents   | Tier 3   |
+| `agent.reload`/`agent.evolve`       | `spec/agents-hot-reload.md`             | Hot-swap agent handlers without restart              | Tier 3   |
 | `agent.dialogue_save/load`          | `spec/agents-dialogue-persist.md`       | Persist dialogue sessions across process restarts    | Tier 3   |
 | `agent.on` lifecycle hooks          | `spec/agents-lifecycle.md`              | Dynamic lifecycle hooks including `:signal` event    | Tier 4   |
 | Causal spans in `std/trace`         | —                                       | Parent-child span trees, `trace.chain`               | Tier 4   |

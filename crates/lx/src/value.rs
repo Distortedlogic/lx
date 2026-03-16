@@ -272,6 +272,8 @@ pub struct LxFunc {
     pub closure: Arc<Env>,
     pub arity: usize,
     pub applied: Vec<Value>,
+    pub source_text: Arc<str>,
+    pub source_name: Arc<str>,
 }
 
 pub type BuiltinFn =

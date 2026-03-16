@@ -46,10 +46,10 @@ install:
 audit:
   #!/usr/bin/env bash
   shopt -s nullglob
-  files=(rules/*audit* rules/*-audit*)
+  files=(workgen/rules/*audit* workgen/rules/*-audit*)
   unique=($(printf '%s\n' "${files[@]}" | sort -u))
   if [[ ${#unique[@]} -eq 0 ]]; then
-    echo "No audit files found in rules/"
+    echo "No audit files found in workgen/rules/"
     exit 1
   fi
   if command -v fzf &>/dev/null; then

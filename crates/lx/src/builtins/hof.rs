@@ -140,7 +140,7 @@ fn bi_filter(args: &[Value], sp: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, L
         match result.as_bool() {
             Some(true) => out.push(v.clone()),
             Some(false) => {}
-            other => return Err(LxError::type_err(format!("filter predicate must return Bool, got {}", other.type_name()), sp)),
+            _ => return Err(LxError::type_err(format!("filter predicate must return Bool, got {}", result.type_name()), sp)),
         }
     }
     Ok(Value::List(Arc::new(out)))

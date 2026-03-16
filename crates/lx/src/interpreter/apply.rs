@@ -22,12 +22,23 @@ impl Interpreter {
                     && lf.arity == 0
                     && lf.applied.is_empty()
                 {
+                    let is_cross_module = self.source != lf.source_text.as_ref();
+                    let fn_source_text = Arc::clone(&lf.source_text);
+                    let fn_source_name = Arc::clone(&lf.source_name);
                     let saved = Arc::clone(&self.env);
+                    let saved_source = std::mem::replace(
+                        &mut self.source,
+                        lf.source_text.to_string(),
+                    );
                     self.env = Arc::clone(&lf.closure);
                     let result = self.eval(&lf.body);
                     self.env = saved;
+                    self.source = saved_source;
                     return match result {
                         Err(LxError::Propagate { value, .. }) => Ok(*value),
+                        Err(e) if is_cross_module => {
+                            Err(e.with_source(fn_source_name.to_string(), fn_source_text))
+                        }
                         other => other,
                     };
                 }
@@ -43,7 +54,14 @@ impl Interpreter {
                 if lf.applied.len() < lf.arity {
                     return Ok(Value::Func(lf));
                 }
+                let is_cross_module = self.source != lf.source_text.as_ref();
+                let fn_source_text = Arc::clone(&lf.source_text);
+                let fn_source_name = Arc::clone(&lf.source_name);
                 let saved = Arc::clone(&self.env);
+                let saved_source = std::mem::replace(
+                    &mut self.source,
+                    lf.source_text.to_string(),
+                );
                 let mut call_env = lf.closure.child();
                 for (i, name) in lf.params.iter().enumerate() {
                     if i < lf.applied.len() {
@@ -55,8 +73,12 @@ impl Interpreter {
                 self.env = call_env.into_arc();
                 let result = self.eval(&lf.body);
                 self.env = saved;
+                self.source = saved_source;
                 match result {
                     Err(LxError::Propagate { value, .. }) => Ok(*value),
+                    Err(e) if is_cross_module => {
+                        Err(e.with_source(fn_source_name.to_string(), fn_source_text))
+                    }
                     other => other,
                 }
             }
@@ -107,6 +129,10 @@ impl Interpreter {
             {
                 let Value::Func(lf) = val else { unreachable!() };
                 let saved = Arc::clone(&self.env);
+                let saved_source = std::mem::replace(
+                    &mut self.source,
+                    lf.source_text.to_string(),
+                );
                 let mut call_env = lf.closure.child();
                 for (i, name) in lf.params.iter().enumerate() {
                     if i < lf.applied.len() {
@@ -118,6 +144,7 @@ impl Interpreter {
                 self.env = call_env.into_arc();
                 let result = self.eval(&lf.body);
                 self.env = saved;
+                self.source = saved_source;
                 match result {
                     Err(LxError::Propagate { value, .. }) => Ok(*value),
                     other => other,
@@ -187,6 +214,11 @@ impl Interpreter {
             })
             .collect::<Result<_, _>>()?;
         let arity = params.len();
+        let source_name = self
+            .source_dir
+            .as_ref()
+            .map(|d| d.display().to_string())
+            .unwrap_or_default();
         Ok(Value::Func(LxFunc {
             params: param_names,
             defaults,
@@ -194,6 +226,8 @@ impl Interpreter {
             closure: Arc::clone(&self.env),
             arity,
             applied: vec![],
+            source_text: Arc::from(self.source.as_str()),
+            source_name: Arc::from(source_name.as_str()),
         }))
     }
 
@@ -206,6 +240,8 @@ impl Interpreter {
             closure: Arc::clone(&self.env),
             arity: 1,
             applied: vec![],
+            source_text: Arc::from(self.source.as_str()),
+            source_name: Arc::from(""),
         })
     }
 
@@ -261,6 +297,8 @@ impl Interpreter {
             closure: Arc::clone(&self.env),
             arity: 2,
             applied: vec![],
+            source_text: Arc::from(self.source.as_str()),
+            source_name: Arc::from(""),
         })
     }
 

@@ -52,6 +52,13 @@ pub enum LxError {
         #[label("error propagated here")]
         span: SourceSpan,
     },
+
+    #[error("{inner}")]
+    Sourced {
+        source_name: String,
+        source_text: std::sync::Arc<str>,
+        inner: Box<LxError>,
+    },
 }
 
 impl LxError {
@@ -99,6 +106,14 @@ impl LxError {
         Self::Propagate {
             value: Box::new(value),
             span: span.into(),
+        }
+    }
+
+    pub fn with_source(self, name: String, text: std::sync::Arc<str>) -> Self {
+        Self::Sourced {
+            source_name: name,
+            source_text: text,
+            inner: Box::new(self),
         }
     }
 }

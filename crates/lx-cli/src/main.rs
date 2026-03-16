@@ -60,8 +60,19 @@ fn run_file(path: &str, _json: bool) -> ExitCode {
         Err(errors) => {
             let named = miette::NamedSource::new(path, source.clone());
             for err in errors {
-                let report = miette::Report::new(err).with_source_code(named.clone());
-                eprintln!("{report:?}");
+                if let lx::error::LxError::Sourced {
+                    source_name,
+                    source_text,
+                    inner,
+                } = err
+                {
+                    let src = miette::NamedSource::new(source_name, source_text.to_string());
+                    let report = miette::Report::new(*inner).with_source_code(src);
+                    eprintln!("{report:?}");
+                } else {
+                    let report = miette::Report::new(err).with_source_code(named.clone());
+                    eprintln!("{report:?}");
+                }
             }
             ExitCode::from(1)
         }

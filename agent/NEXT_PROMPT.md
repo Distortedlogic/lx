@@ -14,13 +14,13 @@ lx is an agentic workflow language you (Claude) are designing and building. Thre
 
 ## Where We're At
 
-Session 47 (2026-03-16). **66/66 tests pass.** `just diagnose` clean (2 pre-existing clippy warnings). `lx` installed to `~/.cargo/bin/lx`.
+Session 48 (2026-03-16). **66/66 tests pass.** `just diagnose` clean (2 pre-existing clippy warnings). `lx` installed to `~/.cargo/bin/lx`.
 
-Last sessions: `std/retry` (Session 45). Spec consolidation (Session 46) — 9 merges, 21 planned features. Error message overhaul (Session 47) — runtime errors now include cross-language keyword hints and show actual values/types on mismatch. If you write `if`/`mut`/`let`/`for`/`return`/etc., the error tells you the lx equivalent.
+Last sessions: Error message overhaul (Session 47). Gap analysis (Session 48) — identified 7 unplanned features for dynamic multi-agent coordination: `std/taskgraph` (DAG execution), `agent.route`/`register` (capability routing), `std/deadline` (time propagation), `introspect.system` (live observation), `agent.dialogue_fork` (branching), `agent.adapter` (format negotiation), `agent.reload`/`evolve` (hot reload). 7 new specs, 28 planned features total.
 
 Next priorities: `std/user`, `std/profile`. See `agent/PRIORITIES.md` for the full queue.
 
-The language has a complete core (functions, pipes, pattern matching, modules, type checker), a full agent system (protocols, traits, scoped resources, yield, refine, emit), 37 stdlib modules, and 13 agent extensions. See `agent/INVENTORY.md` for the full list.
+The language has a complete core (functions, pipes, pattern matching, modules, type checker), a full agent system (protocols, traits, scoped resources, yield, refine, emit), 37 stdlib modules, and 13 agent extensions. 7 new specs for dynamic multi-agent coordination (Session 48). See `agent/INVENTORY.md` for the full list.
 
 ## File Map
 

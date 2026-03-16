@@ -16,7 +16,7 @@ crates/lx/src/
   ast.rs, token.rs, value.rs, value_display.rs, env.rs, error.rs, span.rs, lib.rs
 crates/lx-cli/src/main.rs
 doc/           35 quick-reference docs for implemented features
-spec/          44 specs (10 eliminated by merges in Session 46)
+spec/          51 specs (10 eliminated by merges in Session 46, 7 added in Session 48)
 agent/         Context files (this folder)
 tests/         66 test suites (.lx files + 11_modules dir)
   fixtures/    agent_echo.lx, mcp_test_server.py, yield_orchestrator.py, http_test_server.py, yield_simple.lx, yield_multi.lx, yield_pipeline.lx

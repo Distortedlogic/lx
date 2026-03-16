@@ -1,6 +1,6 @@
 # Design Opinion
 
-Written by the language designer (Claude). Updated after Session 47 (2026-03-16).
+Written by the language designer (Claude). Updated after Session 48 (2026-03-16).
 
 ## What Works
 
@@ -50,13 +50,28 @@ Tech debt (currying, unicode, 300-line files, fake concurrency) tracked in `agen
 
 **Yield protocol is untyped** — All yields are opaque JSON blobs. Spec: `spec/agents-yield-typed.md`.
 
+**No DAG-aware task decomposition** — `std/plan` is linear, `std/pool` is homogeneous fan-out, `agent.reconcile` is post-hoc. "Task C depends on A and B" requires manual `~>?` sequencing and result threading. Every non-trivial multi-agent flow reinvents DAG scheduling. Spec: `spec/agents-task-graph.md`.
+
+**No capability-based routing** — `agent.capabilities`/`advertise` exist, `agent.dispatch` routes by message shape, but there's no "send to whatever handles Trait X with lowest load." Every flow hardcodes agent references. Spec: `spec/agents-capability-routing.md`.
+
+**Dialogue sessions can't branch** — `agent.dialogue` is linear. Tree-of-thought / best-of-N requires manually creating separate sessions, duplicating context, then reconciling. No fork/compare/merge at the dialogue level. Spec: `spec/agents-dialogue-branch.md`.
+
+**No time budget propagation** — `std/budget` tracks cost, `timeout` wraps expressions, but spawned sub-agents don't know the parent's remaining time. Agents start expensive work that gets killed by parent timeout. Spec: `spec/agents-deadline.md`.
+
+**No live system-wide agent observation** — `std/introspect` is self-only, `std/trace` is historical. No "what are all agents doing right now?" — no structured view of agent states, in-flight messages, bottlenecks across the whole system. Spec: `spec/agents-introspect-live.md`.
+
+**Agents can't update their own behavior** — Handler is fixed at spawn. Learning via `refine`/`std/profile` stores knowledge but can't change the handler function. Kill-and-respawn loses all in-process state. Spec: `spec/agents-hot-reload.md`.
+
+**No Protocol format negotiation** — Agents with structurally-compatible but differently-named Protocols can't interoperate without manual interceptor boilerplate. Spec: `spec/agents-format-negotiate.md`.
+
 ## Bottom Line
 
 The core agent architecture is solid — Traits, pools, scoped resources, Protocols, reconciliation, supervision, negotiation, pub/sub, retry all work. Cost tracking (budget), prompt composition (prompt), and context management (context) are all in place.
 
-After aggressive spec consolidation (Session 46: 9 merges, 4 modules eliminated, 2 keywords eliminated), the remaining work is leaner:
+After aggressive spec consolidation (Session 46: 9 merges, 4 modules eliminated, 2 keywords eliminated) plus Session 48 gap analysis (7 new features for dynamic multi-agent coordination), the remaining work is:
 
 1. **Daily-use stdlib gaps** — `std/user` (with `user.check` for interrupt polling), `std/profile` (with strategy helpers). (`std/git` done Session 43, `std/retry` done Session 45.)
 2. **Agent identity & contracts** — `Agent` declarations with first-class identity, enforced `Trait` methods with typed signatures (absorbing Skills). These give agents real structure instead of ad-hoc records and boilerplate dispatch.
-3. **Ecosystem infrastructure** — `AgentErr`, `lx.toml`, `std/test`, `std/flow`, `std/pipeline` checkpoint/resume, `agent.pipeline` backpressure, `~>>?` streaming. Foundation for robust multi-agent systems.
-4. **Adaptive intelligence + distribution** — `std/trace` extensions (provenance + reputation), `std/registry`, dialogue persistence, `with context` ambient propagation (with cross-spawn constraint inheritance), `meta` block, typed yields.
+3. **Dynamic multi-agent coordination** — `std/taskgraph` (DAG execution), `agent.route`/`register` (capability routing), `std/deadline` (time propagation), `introspect.system` (live observation). These eliminate the manual wiring boilerplate that every non-trivial multi-agent flow reinvents.
+4. **Ecosystem infrastructure** — `AgentErr`, `lx.toml`, `std/test`, `std/flow`, `std/pipeline` checkpoint/resume, `agent.pipeline` backpressure, `~>>?` streaming. Foundation for robust multi-agent systems.
+5. **Adaptive intelligence + distribution** — `agent.reload`/`evolve` (hot handler swap), `agent.dialogue_fork`/`compare` (branching exploration), `agent.adapter`/`negotiate_format` (Protocol interop), `std/trace` extensions (provenance + reputation), `std/registry`, dialogue persistence, `with context` ambient propagation, `meta` block, typed yields.

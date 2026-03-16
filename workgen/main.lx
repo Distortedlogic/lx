@@ -39,7 +39,7 @@ required_sections = ["Goal" "Why" "What changes" "Files affected" "Task List" "C
       Err "AUDIT_FILE not set"
     }
     false -> {
-      rules_path = env.get "RULES_FILE" ?? "rules/work-item.md"
+      rules_path = env.get "RULES_FILE" ?? "workgen/rules/work-item.md"
       run audit_path rules_path
     }
   }
@@ -129,7 +129,7 @@ write_draft = (name content) {
 check_sections = (draft) {
   headings = md.parse draft | md.headings
   missing = required_sections | filter (req) {
-    headings | any? (h) contains? req h | not
+    headings | any? (h) contains? req h.text | not
   }
   missing | empty? ? {
     true -> {
