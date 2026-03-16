@@ -1,0 +1,101 @@
+-- 63_agent_pubsub.lx
+-- Tests: agent.topic / agent.subscribe / agent.publish (pub/sub)
+
+use std/agent
+
+-- === Create topics ===
+build_topic = agent.topic "build_status"
+assert (build_topic == "build_status") "topic returns name"
+
+-- === Duplicate topic returns same name ===
+same = agent.topic "build_status"
+assert (same == build_topic) "same topic"
+
+-- === Subscribe and publish ===
+received := []
+listener = agent.mock [
+  {match: "any" respond: (msg) {
+    received <- received ++ [msg._topic]
+    {ack: true}
+  }}
+]
+
+agent.subscribe listener build_topic ^
+agent.publish build_topic {status: "compiling" file: "main.rs"} ^
+
+assert (len received == 1) "listener received 1 message"
+assert (received.[0] == "build_status") "topic injected"
+
+-- === Multiple subscribers ===
+count_a := 0
+count_b := 0
+agent_a = agent.mock [{match: "any" respond: (msg) {count_a <- count_a + 1; {ok: true}}}]
+agent_b = agent.mock [{match: "any" respond: (msg) {count_b <- count_b + 1; {ok: true}}}]
+
+test_topic = agent.topic "test_events"
+agent.subscribe agent_a test_topic ^
+agent.subscribe agent_b test_topic ^
+
+agent.publish test_topic {suite: "unit"} ^
+assert (count_a == 1) "agent_a received"
+assert (count_b == 1) "agent_b received"
+
+agent.publish test_topic {suite: "integration"} ^
+assert (count_a == 2) "agent_a received again"
+assert (count_b == 2) "agent_b received again"
+
+-- === Filtered subscription ===
+critical_count := 0
+crit_agent = agent.mock [{match: "any" respond: (msg) {
+  critical_count <- critical_count + 1
+  {processed: true}
+}}]
+
+alert_topic = agent.topic "alerts"
+agent.subscribe_filtered crit_agent alert_topic (msg) {msg.severity == "critical"} ^
+
+agent.publish alert_topic {severity: "info" msg: "all good"} ^
+assert (critical_count == 0) "info filtered out"
+
+agent.publish alert_topic {severity: "critical" msg: "disk full"} ^
+assert (critical_count == 1) "critical passed through"
+
+-- === Publish collect ===
+responder_1 = agent.mock [{match: "any" respond: {result: "analysis_1"}}]
+responder_2 = agent.mock [{match: "any" respond: {result: "analysis_2"}}]
+
+collect_topic = agent.topic "collect_test"
+agent.subscribe responder_1 collect_topic ^
+agent.subscribe responder_2 collect_topic ^
+
+results = agent.publish_collect collect_topic {task: "analyze"} ^
+assert (len results == 2) "collected 2 results"
+assert (results.[0].result.result == "analysis_1") "first result"
+assert (results.[1].result.result == "analysis_2") "second result"
+
+-- === Unsubscribe ===
+unsub_count := 0
+unsub_agent = agent.mock [{match: "any" respond: (msg) {unsub_count <- unsub_count + 1; {ok: true}}}]
+
+unsub_topic = agent.topic "unsub_test"
+agent.subscribe unsub_agent unsub_topic ^
+agent.publish unsub_topic {x: 1} ^
+assert (unsub_count == 1) "received before unsub"
+
+agent.unsubscribe unsub_agent unsub_topic ^
+agent.publish unsub_topic {x: 2} ^
+assert (unsub_count == 1) "not received after unsub"
+
+-- === Subscribers listing ===
+list_topic = agent.topic "list_test"
+l_agent = agent.mock [{match: "any" respond: {ok: true}}]
+agent.subscribe l_agent list_topic ^
+subs = agent.subscribers list_topic
+assert (len subs == 1) "1 subscriber"
+assert (subs.[0].filtered == false) "not filtered"
+
+-- === Topics listing ===
+all_topics = agent.topics ()
+assert (len all_topics > 0) "has topics"
+
+log.info "63_agent_pubsub: all passed"

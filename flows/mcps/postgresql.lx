@@ -1,0 +1,16 @@
+-- PostgreSQL MCP -- database operations.
+-- Server: postgresql-mcp (stdio)
+
+use std/mcp
+
++MCP PostgreSQL = {
+  execute: {query: Str} -> Str
+  query: {sql: Str} -> List
+}
+
++connect = () {
+  raw = mcp.connect {command: "postgresql-mcp" args: []} ^
+  PostgreSQL raw
+}
+
++close = (server) { mcp.close server }

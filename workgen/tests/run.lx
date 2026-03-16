@@ -1,0 +1,92 @@
+-- Satisfaction test runner for workgen.
+-- Runs workgen against each scenario's real codebase, grades the output
+-- against expected findings (the answer key), reports satisfaction scores.
+--
+-- Usage: lx run workgen/tests/run.lx
+-- Filter: TEST_TAG=smoke lx run workgen/tests/run.lx
+
+use std/fs
+use std/env
+use std/trace
+use std/audit
+use ./spec
+use ../main : workgen
+
+run_scenario = (scenario) {
+  emit "\n  --- {scenario.name} ---"
+
+  audit_path = "{scenario.root}/rules/audit"
+  rules_path = "{scenario.root}/rules/work-item.md"
+
+  result = workgen.run audit_path rules_path
+
+  result ? {
+    Ok r -> {
+      output = fs.read r.path ?? ""
+
+      dimensions = spec.grader output scenario
+      w_structure = dimensions.structure * spec.weights.structure
+      w_coverage = dimensions.coverage * spec.weights.coverage
+      w_compliance = dimensions.compliance * spec.weights.compliance
+      w_safety = dimensions.safety * spec.weights.safety
+      total_weight = spec.weights.structure + spec.weights.coverage + spec.weights.compliance + spec.weights.safety
+      weighted = (w_structure + w_coverage + w_compliance + w_safety) / total_weight
+      passed = weighted >= spec.threshold
+
+      emit "    structure:   {dimensions.structure}"
+      emit "    coverage:    {dimensions.coverage}"
+      emit "    compliance:  {dimensions.compliance}"
+      emit "    safety:      {dimensions.safety}"
+      emit "    weighted:    {weighted}"
+
+      found = scenario.expected_findings | filter (f) contains? f output
+      missed = scenario.expected_findings | filter (f) {
+        contains? f output | not
+      }
+      emit "    findings: {found | len}/{scenario.expected_findings | len}"
+      missed | empty? ? () : emit "    missed: {missed | join ", "}"
+
+      {name: scenario.name  passed  score: weighted}
+    }
+    Err e -> {
+      emit "    ERROR: {e}"
+      {name: scenario.name  passed: false  score: 0.0}
+    }
+  }
+}
+
++main = () {
+  session = trace.create "/tmp/lx_workgen_test_trace.json" ^
+  tag_filter = env.get "TEST_TAG" ?? ""
+
+  scenarios = tag_filter == "" ? {
+    true -> spec.scenarios
+    false -> spec.scenarios | filter (s) s.tags | contains? tag_filter
+  }
+
+  emit "=== workgen satisfaction tests ==="
+  emit "scenarios: {scenarios | len}"
+  emit "threshold: {spec.threshold}"
+
+  results = scenarios | map run_scenario
+
+  results | each (r) {
+    trace.record {name: r.name  output: (to_str r.score)  score: r.score} session ^
+  }
+
+  passed_count = results | filter (.passed) | len
+  total = results | len
+  scores = results | map (.score)
+  overall = scores | fold 0.0 (+) | (s) s / total
+
+  emit "\n=== {spec.name} ==="
+  results | each (r) {
+    status = r.passed ? "PASS" : "FAIL"
+    emit "  {r.name}: {r.score} {status}"
+  }
+  emit "\nOverall: {overall} — {passed_count}/{total} passed (threshold: {spec.threshold})"
+
+  passed_count == total ? (Ok results) : (Err "some scenarios failed")
+}
+
+main ()

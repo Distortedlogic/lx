@@ -20,6 +20,7 @@ pub fn parse(tokens: Vec<Token>) -> Result<Program, LxError> {
         pos: 0,
         no_juxtapose: false,
         collection_depth: 0,
+        stop_ident: None,
     }
     .parse_program()
 }
@@ -29,6 +30,7 @@ pub(crate) struct Parser {
     pub(crate) pos: usize,
     pub(crate) no_juxtapose: bool,
     pub(crate) collection_depth: u32,
+    pub(crate) stop_ident: Option<String>,
 }
 
 impl Parser {
@@ -58,6 +60,9 @@ impl Parser {
         }
         if *self.peek() == TokenKind::Mcp {
             return self.parse_mcp_decl(exported, start);
+        }
+        if *self.peek() == TokenKind::Trait {
+            return self.parse_trait_decl(exported, start);
         }
         if let Some(type_def) = self.try_parse_type_def(exported, start)? {
             return Ok(type_def);
@@ -139,6 +144,11 @@ impl Parser {
     pub(crate) fn parse_expr(&mut self, min_bp: u8) -> Result<SExpr, LxError> {
         let mut left = self.parse_prefix()?;
         loop {
+            if let Some(ref stop) = self.stop_ident
+                && *self.peek() == TokenKind::Ident(stop.clone())
+            {
+                break;
+            }
             let kind = self.peek().clone();
             if matches!(
                 kind,

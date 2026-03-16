@@ -57,8 +57,7 @@ Agents currently orchestrate workflows through natural language (imprecise, not 
 crates/          -- Rust implementation
   lx/            -- core library (lexer, parser, interpreter, stdlib)
   lx-cli/        -- the `lx` binary
-spec/            -- language specification (what lx IS)
-design/          -- design docs (how it was PLANNED)
+spec/            -- specs for planned/unimplemented features
 tests/           -- .lx test suite (proof spec and impl agree)
   fixtures/      -- test helper scripts
 flows/           -- lx programs translating real agentic architectures
@@ -94,44 +93,52 @@ Specs for planned/unimplemented features. See [stdlib-modules.md](spec/stdlib-mo
 
 | Document | Contents |
 |---|---|
-| [NEXT_PROMPT.md](agent/NEXT_PROMPT.md) | Cold-start document: current state, what's next, codebase layout |
-| [DEVLOG.md](agent/DEVLOG.md) | Session history, design decisions, what's next |
-| [CURRENT_OPINION.md](agent/CURRENT_OPINION.md) | Self-critique and gap analysis |
-
-## Design — `design/`
-
-| Document | Contents |
-|---|---|
-| [implementation.md](design/implementation.md) | Architecture, crate choices, module structure |
-| [implementation-phases.md](design/implementation-phases.md) | 10-phase build plan |
+| [NEXT_PROMPT.md](agent/NEXT_PROMPT.md) | Cold-start bootstrap: identity, current status, file map |
+| [PRIORITIES.md](agent/PRIORITIES.md) | Ordered work queue with rationale |
+| [INVENTORY.md](agent/INVENTORY.md) | Full list of implemented features |
+| [OPINION.md](agent/OPINION.md) | Design self-critique: what works, what's wrong |
+| [ROADMAP.md](agent/ROADMAP.md) | All planned future features |
+| [DEVLOG.md](agent/DEVLOG.md) | Design decisions, tech debt, session history |
+| [REFERENCE.md](agent/REFERENCE.md) | Codebase layout, how-to guides |
 
 ## Test Suite — `tests/`
 
-23 `.lx` programs testing every language feature. Run with `just test`.
+65 test suites (64 `.lx` files + 11_modules dir) testing every language feature. Run with `just test`.
 
 | File | Tests |
 |---|---|
-| [01_literals.lx](tests/01_literals.lx) – [05_pipes.lx](tests/05_pipes.lx) | Core: literals, bindings, arithmetic, functions, pipes |
-| [06_collections.lx](tests/06_collections.lx) – [09_errors.lx](tests/09_errors.lx) | Data: collections, patterns, iteration, errors |
-| [10_shell.lx](tests/10_shell.lx) – [13_concurrency.lx](tests/13_concurrency.lx) | System: shell, modules, types, concurrency |
-| [14_agents.lx](tests/14_agents.lx) – [19_mcp_typed.lx](tests/19_mcp_typed.lx) | Agent: communication, Protocol, stdlib, MCP, yield |
-| [20_http.lx](tests/20_http.lx) – [23_cron.lx](tests/23_cron.lx) | Stdlib: http, time, with/field update, cron |
+| 01–05 | Core: literals, bindings, arithmetic, functions, pipes |
+| 06–09 | Data: collections, patterns, iteration, errors |
+| 10–13 | System: shell, modules, types, concurrency |
+| 14–19 | Agent: communication, Protocol, stdlib, MCP, yield |
+| 20–25 | Stdlib: http, time, with, cron, type annotations, regex |
+| 26–32 | AI, tasks, audit, circuit, knowledge, plan, introspect |
+| 33–40 | Standard agents, memory, trace, monitor, reviewer, diag, saga |
+| 41–45 | Refine, reconcile, trace_progress, dialogue, intercept |
+| 46–54 | Handoff, capability, gate, supervise, ai_structured, mock, dispatch |
+| 55–57 | Emit, protocol extensions, with_resource, trait |
+| 58–63 | Pool, budget, prompt, context, agent_negotiate, agent_pubsub |
+| 64 | Git: structured git access |
 
 ## Flows — `flows/`
 
-14 lx programs translating real agentic architectures from `mcp-toolbelt/arch_diagrams`. Each has a matching spec in `flows/specs/` with target goals and scenarios.
+13 lx programs translating real agentic architectures from `mcp-toolbelt/arch_diagrams`. Each has a matching spec in `flows/specs/` with target goals and scenarios. 10 reusable library modules in `flows/lib/`.
 
 | Flow | What it expresses |
 |---|---|
-| [agentic_loop.lx](flows/agentic_loop.lx) | ReAct loop with doom detection and circuit breakers |
-| [agent_lifecycle.lx](flows/agent_lifecycle.lx) | Tiered memory (L0-L3), seeding, review loops |
-| [subagent_lifecycle.lx](flows/subagent_lifecycle.lx) | Router-mediated spawning, terminal vs non-terminal |
-| [flow_full_pipeline.lx](flows/flow_full_pipeline.lx) | Audit + manual pipeline with grading loop |
-| [scenario_security_audit.lx](flows/scenario_security_audit.lx) | 3-specialist parallel audit |
-| [scenario_research.lx](flows/scenario_research.lx) | Multi-source research synthesis |
-| [discovery_system.lx](flows/discovery_system.lx) | Automated repo/tool discovery |
-| [tool_generation.lx](flows/tool_generation.lx) | 7-phase MCP generation pipeline |
+| agentic_loop | ReAct loop with doom detection and circuit breakers |
+| agent_lifecycle | Tiered memory (L0-L3), seeding, review loops |
+| full_pipeline | Audit + manual pipeline with grading loop |
+| research | Multi-source research synthesis |
+| perf_analysis | Performance analysis with specialist routing |
+| project_setup | Task-based project scaffolding |
+| discovery_system | Automated repo/tool discovery |
+| tool_generation | 7-phase MCP generation pipeline |
+| post_hoc_review | Post-hoc output review with memory |
+| mcp_tool_audit | MCP tool audit with scoring |
+| fine_tuning | Fine-tuning workflow with embeddings |
+| software_diffusion | Software diffusion pipeline |
 
 ## Status
 
-v0.1 — All language features complete. `just diagnose` clean. `just test`: **23/23 PASS**. 12 stdlib modules. The language name is **lx**, file extension `.lx`.
+v0.1 — **65/65 tests pass.** `just diagnose` clean (2 pre-existing clippy warnings). 36 stdlib modules, 13 agent extensions, 6 standard agents. Complete core language, full agent system, structured git access. The language name is **lx**, file extension `.lx`.

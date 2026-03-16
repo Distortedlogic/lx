@@ -1,0 +1,7 @@
+1. No wildcard imports (use foo::*) — import specific items by name
+2. No TODO/FIXME comments in committed code — create work items instead
+3. No inline imports inside function bodies — all use statements at file top
+4. No redundant variable bindings — don't bind to a variable just to return it on the next line
+5. No duplicate struct fields across types — if Config and DbConfig share host/port/name, embed DbConfig in Config
+6. Functions that take a struct as first parameter should be methods on that struct, not free functions
+7. No vague function names — do_the_thing, helper_process, etc. must describe what they actually do

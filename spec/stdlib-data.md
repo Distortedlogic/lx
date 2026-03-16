@@ -280,7 +280,5 @@ See [stdlib-diag.md](stdlib-diag.md) for the full spec. `lx diagram` CLI subcomm
 - Agent ecosystem modules: [stdlib-agents.md](stdlib-agents.md) (std/agent, std/mcp, std/ctx, std/md)
 - Core stdlib modules: [stdlib-modules.md](stdlib-modules.md)
 - Built-in functions and conventions: [stdlib.md](stdlib.md)
-- Stdlib loader design: [impl-stdlib.md](../design/impl-stdlib.md)
-- Implementation phases: [implementation-phases.md](../design/implementation-phases.md) (Phase 11)
 - Polars reference: `reference/polars/`
 - Charming reference: `reference/charming/`

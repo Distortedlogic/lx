@@ -1,0 +1,23 @@
+-- Context engine agent -- delegates to ContextEngine MCP for code search.
+-- Thin agent wrapper: receives messages, forwards to MCP, returns results.
+
+use std/agent
+use ../mcps/context_engine
+
++search = (msg) {
+  engine = context_engine.connect ^
+  result = engine.search {topic: msg.topic  path: msg.path ?? "."} ^
+  context_engine.close engine
+  result
+}
+
++retrieve = (msg) {
+  engine = context_engine.connect ^
+  result = engine.retrieve {query: msg.query} ^
+  context_engine.close engine
+  result
+}
+
++handlers = %{"search": search  "retrieve": retrieve}
+
++main = () { agent.dispatch handlers }

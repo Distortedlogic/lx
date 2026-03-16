@@ -44,6 +44,13 @@ pub enum Stmt {
         tools: Vec<McpToolDecl>,
         exported: bool,
     },
+    TraitDecl {
+        name: String,
+        handles: Vec<String>,
+        provides: Vec<String>,
+        requires: Vec<String>,
+        exported: bool,
+    },
     FieldUpdate {
         name: String,
         fields: Vec<String>,
@@ -168,6 +175,10 @@ pub enum Expr {
         value: Box<SExpr>,
         body: Vec<SStmt>,
         mutable: bool,
+    },
+    WithResource {
+        resources: Vec<(SExpr, String)>,
+        body: Vec<SStmt>,
     },
     Refine {
         initial: Box<SExpr>,

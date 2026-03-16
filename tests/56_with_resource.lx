@@ -1,0 +1,71 @@
+-- with ... as: scoped resource blocks with auto-cleanup
+
+-- basic: cleanup runs on normal exit
+log := []
+make_resource = (name) {
+  {
+    name: name
+    value: "data-{name}"
+    close: () { log <- log ++ [name] }
+  }
+}
+
+result = with make_resource "a" as r {
+  r.value
+}
+assert (result == "data-a") "body returns value"
+assert (log == ["a"]) "close ran on normal exit"
+
+-- cleanup runs on error
+log <- []
+err_result = with make_resource "b" as r {
+  r.value
+  Err "boom"
+} ?? "caught"
+assert (err_result == "caught") "error propagated"
+assert (log == ["b"]) "close ran on error exit"
+
+-- multiple resources close in reverse order
+log <- []
+result = with make_resource "x" as r1, make_resource "y" as r2 {
+  r1.value ++ " " ++ r2.value
+}
+assert (result == "data-x data-y") "both resources accessible in body"
+assert (log == ["y" "x"]) "close in reverse order (LIFO)"
+
+-- resource without close field: no error, no cleanup
+plain = with {value: 42} as r {
+  r.value + 1
+}
+assert (plain == 43) "non-closeable resource works fine"
+
+-- nested with-resource
+log <- []
+result = with make_resource "outer" as o {
+  inner = with make_resource "inner" as i {
+    i.value
+  }
+  o.value ++ " " ++ inner
+}
+assert (result == "data-outer data-inner") "nested resources"
+assert (log == ["inner" "outer"]) "nested close order"
+
+-- cleanup still runs when body returns Err (value-level)
+log <- []
+result = with make_resource "c" as r {
+  Err "fail"
+} ?? "handled"
+assert (result == "handled") "Err value coalesced through with-resource"
+assert (log == ["c"]) "close ran for Err body"
+
+-- cleanup runs on ^ propagation (runtime-level error)
+log <- []
+fail_fn = () Err "boom"
+wrapper = () {
+  with make_resource "d" as r {
+    fail_fn () ^
+    "unreachable"
+  }
+}
+result = wrapper () ?? "caught"
+assert (log == ["d"]) "close ran despite ^ propagation"

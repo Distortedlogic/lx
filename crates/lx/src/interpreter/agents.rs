@@ -375,12 +375,21 @@ impl Interpreter {
             match rec.get(&field.name) {
                 Some(val) => {
                     if field.type_name != "Any" && val.type_name() != field.type_name {
-                        return Err(LxError::runtime("type mismatch", span));
+                        return Err(LxError::runtime(
+                            format!(
+                                "field '{}': expected {}, got {} `{val}`",
+                                field.name, field.type_name, val.type_name()
+                            ),
+                            span,
+                        ));
                     }
                 }
                 None => {
                     if field.default.is_none() {
-                        return Err(LxError::runtime("missing field", span));
+                        return Err(LxError::runtime(
+                            format!("missing required field '{}'", field.name),
+                            span,
+                        ));
                     }
                 }
             }

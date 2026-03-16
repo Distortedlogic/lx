@@ -10,8 +10,10 @@
 -- Source: mcp-toolbelt/arch_diagrams/scenario_project_setup
 
 use std/saga
-use std/mcp
-use ../lib/dispatch
+use ../agents/scaffolder
+use ../mcps/forgejo
+use ../mcps/postgresql
+use ../mcps/uptime_kuma
 use ../lib/report
 use ../lib/workflow
 
@@ -29,31 +31,31 @@ Protocol SetupConfig = {name: Str  lang: Str  db: Bool  monitoring: Bool}
 }
 
 +setup = (config) {
-  forgejo = mcp.connect {command: "forgejo-mcp" args: []} ^
-  pg = mcp.connect {command: "postgresql-mcp" args: []} ^
+  forge = forgejo.connect ^
+  pg = postgresql.connect ^
   db_name = config.name | replace "-" "_"
 
   result = workflow.run "project-setup" config.name (_) {
     steps = [
       {
         name: "scaffold"
-        action: () dispatch.run_one "agents/scaffolder.lx" {
-          action: "scaffold"  name: config.name  lang: config.lang  template: "service"
+        action: () scaffolder.scaffold {
+          name: config.name  lang: config.lang  template: "service"
         }
         compensate: (result) $^rm -rf {result.path}
       }
       {
         name: "repo"
-        action: () mcp.call forgejo "create_repo" {
+        action: () forge.create_repo {
           name: config.name  description: "{config.name} service"  private: true
         } ^
-        compensate: () mcp.call forgejo "delete_repo" {name: config.name} ^
+        compensate: () forge.delete_repo {name: config.name} ^
       }
       ..config.db ? {
         true -> [{
           name: "database"
-          action: () mcp.call pg "execute" {query: "CREATE DATABASE {db_name}"} ^
-          compensate: () mcp.call pg "execute" {query: "DROP DATABASE IF EXISTS {db_name}"} ^
+          action: () pg.execute {query: "CREATE DATABASE {db_name}"} ^
+          compensate: () pg.execute {query: "DROP DATABASE IF EXISTS {db_name}"} ^
         }]
         false -> []
       }
@@ -61,11 +63,11 @@ Protocol SetupConfig = {name: Str  lang: Str  db: Bool  monitoring: Bool}
         true -> [{
           name: "monitoring"
           action: () {
-            mon = mcp.connect {command: "uptime-kuma-mcp" args: []} ^
-            result = mcp.call mon "add_monitor" {
+            mon = uptime_kuma.connect ^
+            result = mon.add_monitor {
               name: config.name  url: "http://{config.name}:8080/health"  interval: 60
             } ^
-            mcp.close mon
+            uptime_kuma.close mon
             result
           }
           compensate: () ()
@@ -98,7 +100,7 @@ Protocol SetupConfig = {name: Str  lang: Str  db: Bool  monitoring: Bool}
     }
   }
 
-  mcp.close forgejo
-  mcp.close pg
+  forgejo.close forge
+  postgresql.close pg
   result
 }

@@ -1,0 +1,17 @@
+-- Agent security auditor -- examines agent behavior for safety issues.
+-- Import and call directly, or spawn as subprocess via main.
+
+use std/ai
+use std/agent
+
++audit = (msg) {
+  ai.prompt "Audit this agent's behavior for security issues:\n{to_str msg}" ^
+}
+
++verify = (msg) {
+  ai.prompt "Verify this security finding:\n{to_str msg.finding}" ^
+}
+
++handlers = %{"audit": audit  "verify": verify}
+
++main = () { agent.dispatch handlers }

@@ -79,6 +79,7 @@ agent.on me :idle 30 () {
 | `:error` | `(err msg)` | Unhandled error in handler. `err` is the error, `msg` is the message that caused it |
 | `:idle` | `()` | No messages received for N seconds (N specified after `:idle`) |
 | `:message` | `(msg)` | Before every incoming message (pre-handler hook) |
+| `:signal` | `(signal)` | User-initiated interrupt signal received (see `std/user` `user.check`) |
 
 ### Idle Duration
 
@@ -113,6 +114,34 @@ agent.on me :shutdown (reason) { flush_state () }
 agent.on me :shutdown (reason) { notify_peers () }
 // flush_state runs first, then notify_peers
 ```
+
+### Signal Event (User Interruption)
+
+Absorbs the reactive interrupt handler from `spec/agents-interrupt.md`. `:signal` fires when a user sends a signal via `lx signal {pid} '{...}'`. This is the reactive counterpart to `user.check` (cooperative).
+
+```
+agent.on me :signal (s) {
+  s.action ? {
+    "redirect" -> current_task <- s.task
+    "stop" -> should_stop <- true
+    "pause" -> yield {kind: "paused" state: current_state}
+    _ -> emit "unknown signal: {s.action}"
+  }
+}
+```
+
+For Agent declarations, use the `on:` field:
+
+```
+Agent Worker: Taskable = {
+  on: {
+    signal: (s) { s.action == "stop" ? should_stop <- true }
+  }
+  run = (msg) { ... }
+}
+```
+
+Signal delivery uses the same mechanism as `user.check`: `.lx/signals/{pid}.json` files polled by the runtime. The `:signal` handler fires between statements in loops and between pipeline stages.
 
 ### Removing Hooks
 

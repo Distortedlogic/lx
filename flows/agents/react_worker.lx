@@ -1,0 +1,38 @@
+-- ReAct loop worker -- handles think/execute/verify/hint actions.
+-- Spawned by lib/react.lx for the multi-turn Thought-Action-Observation loop.
+-- This agent is typically spawned (not imported) because react needs multi-turn messaging.
+
+use std/ai
+use std/agent
+
++think = (msg) {
+  prompt = "Task: {msg.task}\nHistory: {msg.history | len} turns\nThink step by step. What action should we take next? If done, set action to 'done'."
+  ai.prompt_structured {action: Str  args: Any  reasoning: Str} prompt ^
+}
+
++execute = (msg) {
+  result = msg.tool ? {
+    "read_file" -> $^cat {msg.args.path}
+    "search"    -> $^rg --type rust {msg.args.pattern} {msg.args.path ?? "."}
+    "edit"      -> $^sed -i {msg.args.sed} {msg.args.path}
+    "run_test"  -> $just test
+    "diagnose"  -> $just diagnose
+    _           -> Err "unknown tool: {msg.tool}"
+  }
+  success = result ? { Ok _ -> true; Err _ -> false }
+  output = result ? { Ok r -> r.out ?? (to_str r); Err e -> to_str e }
+  {success  output}
+}
+
++verify = (msg) {
+  {should_continue: msg.observation.success  reason: msg.observation.output}
+}
+
++hint = (msg) {
+  emit "strategy hint: {msg.msg}"
+  {acknowledged: true}
+}
+
++handlers = %{"think": think  "execute": execute  "verify": verify  "hint": hint}
+
++main = () { agent.dispatch handlers }

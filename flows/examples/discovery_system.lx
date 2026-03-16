@@ -7,40 +7,23 @@
 -- Demonstrates: HTTP API integration, composite scoring, state management, reporting.
 -- Source: mcp-toolbelt/arch_diagrams/discovery_system
 
-use std/http
-use std/json
 use std/ctx
 use std/knowledge
+use std/json
+use ../lib/github
 use ../lib/report
 use ../lib/scoring
-
-Protocol Candidate = {name: Str  url: Str  description: Str  stars: Int  lang: Str}
-
-axes = [
-  {name: "agent-harness"  queries: ["agent framework rust" "tool dispatch" "agent executor"]}
-  {name: "context-mgmt"   queries: ["context window" "memory management llm" "conversation compaction"]}
-  {name: "observability"   queries: ["llm observability" "agent tracing" "eval harness"]}
-  {name: "multi-agent"     queries: ["multi agent orchestration" "agent coordination rust"]}
-  {name: "mcp-tooling"     queries: ["mcp server rust" "model context protocol"]}
-]
-
-tiers = [
-  {name: "auto"    min: 8.0}
-  {name: "review"  min: 6.0}
-  {name: "skip"    min: 0.0}
-]
+use ../prompts/discovery
 
 +main = () {
   state = ctx.load ".discovery-state.json" ?? (ctx.empty ())
   kb = knowledge.create {name: "discoveries"}
 
-  candidates = axes | flat_map (axis) {
-    axis.queries | flat_map search_github
-  }
+  candidates = github.search_axes discovery.axes
 
   scored = candidates | map (c) {
     total = score_candidate c
-    {..c  total  tier: (scoring.tier tiers total)}
+    {..c  total  tier: (scoring.tier discovery.tiers total)}
   }
 
   auto = scored | filter (c) c.tier == "auto"
@@ -62,7 +45,7 @@ tiers = [
     | (s) ctx.save ".discovery-state.json" s ^
 
   report.write "discovery_report.md" "Discovery Run" [
-    ..report.text "{scored | len} candidates across {axes | len} axes"
+    ..report.text "{scored | len} candidates across {discovery.axes | len} axes"
     ..report.section "Auto-Integrated ({auto | len})" [
       ..report.table ["Name" "Score" "Language" "Stars"]
         (auto | map (c) [c.name (to_str c.total) c.lang (to_str c.stars)])
@@ -74,18 +57,6 @@ tiers = [
   ]
 
   emit "\n{scored | len} candidates, {auto | len} auto-integrated, {review | len} for review"
-}
-
-search_github = (query) {
-  resp = http.get "https://api.github.com/search/repositories?q={query}&sort=stars&per_page=10" ^
-  items = resp.body | json.parse ^ | (.items) ?? []
-  items | map (item) Candidate {
-    name: item."full_name" ?? "unknown"
-    url: item."html_url" ?? ""
-    description: item."description" ?? ""
-    stars: item."stargazers_count" ?? 0
-    lang: item."language" ?? "unknown"
-  }
 }
 
 score_candidate = (c) {

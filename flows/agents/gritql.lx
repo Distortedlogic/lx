@@ -1,0 +1,23 @@
+-- GritQL AST search specialist -- structural code search via MCP.
+-- Import and call directly, or spawn as subprocess via main.
+
+use std/agent
+use ../mcps/gritql
+
++search = (msg) {
+  grit = gritql.connect ^
+  results = grit.search {pattern: msg.pattern  path: msg.path ?? "."} ^
+  gritql.close grit
+  results
+}
+
++check = (msg) {
+  grit = gritql.connect ^
+  results = grit.check {} ^
+  gritql.close grit
+  results
+}
+
++handlers = %{"search": search  "check": check}
+
++main = () { agent.dispatch handlers }

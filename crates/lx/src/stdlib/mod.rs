@@ -6,6 +6,8 @@ mod agent_gate;
 mod agent_handoff;
 mod agent_intercept;
 mod agent_mock;
+mod agent_negotiate;
+mod agent_pubsub;
 mod agent_supervise;
 mod agent_reconcile;
 mod agent_reconcile_strat;
@@ -18,13 +20,22 @@ mod agents_router;
 mod ai;
 mod ai_structured;
 mod audit;
+mod budget;
 mod circuit;
+mod context;
 mod cron;
 mod ctx;
 pub mod diag;
 mod diag_walk;
 mod env;
 mod fs;
+mod git;
+mod git_branch;
+mod git_diff;
+mod git_diff_parse;
+mod git_log;
+mod git_ops;
+mod git_status;
 mod http;
 mod introspect;
 mod json;
@@ -36,7 +47,10 @@ mod md;
 mod md_build;
 mod memory;
 mod plan;
+mod pool;
+mod prompt;
 mod re;
+mod retry;
 mod saga;
 mod tasks;
 mod time;
@@ -66,6 +80,7 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
             "ctx" => ctx::build(),
             "math" => math::build(),
             "fs" => fs::build(),
+            "git" => git::build(),
             "env" => env::build(),
             "re" => re::build(),
             "md" => md::build(),
@@ -77,11 +92,16 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
             "ai" => ai::build(),
             "tasks" => tasks::build(),
             "audit" => audit::build(),
+            "budget" => budget::build(),
             "circuit" => circuit::build(),
+            "context" => context::build(),
             "diag" => diag::build(),
             "knowledge" => knowledge::build(),
             "memory" => memory::build(),
             "plan" => plan::build(),
+            "pool" => pool::build(),
+            "prompt" => prompt::build(),
+            "retry" => retry::build(),
             "saga" => saga::build(),
             "introspect" => introspect::build(),
             "trace" => trace::build(),
@@ -110,6 +130,7 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
             | "ctx"
             | "math"
             | "fs"
+            | "git"
             | "env"
             | "re"
             | "md"
@@ -121,11 +142,16 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
             | "ai"
             | "tasks"
             | "audit"
+            | "budget"
             | "circuit"
+            | "context"
             | "diag"
             | "knowledge"
             | "memory"
             | "plan"
+            | "pool"
+            | "prompt"
+            | "retry"
             | "saga"
             | "introspect"
             | "trace"

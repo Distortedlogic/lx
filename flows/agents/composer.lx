@@ -1,0 +1,17 @@
+-- Content composer -- drafts and revises structured content.
+-- Spawned for grading loops (multi-turn), importable for single calls.
+
+use std/ai
+use std/agent
+
++compose = (msg) {
+  ai.prompt "Compose a solution based on:\nTasks: {to_str msg.tasks}\nResearch: {to_str msg.research}" ^
+}
+
++revise = (msg) {
+  ai.prompt "Revise:\n{msg.work}\nFeedback: {msg.feedback}" ^
+}
+
++handlers = %{"compose": compose  "revise": revise}
+
++main = () { agent.dispatch handlers }

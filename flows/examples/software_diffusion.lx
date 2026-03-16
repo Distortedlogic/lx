@@ -1,0 +1,182 @@
+-- Software diffusion: progressively denoising code from natural language.
+-- Maps image diffusion concepts to software development:
+--   text prompt ↔ user idea, noise ↔ unstructured intent, U-Net ↔ LLM agent,
+--   guidance ↔ user feedback + compiler, neg prompt ↔ constraints.md.
+-- Five stages, each reducing entropy:
+--   Stage 0 ELICIT (t=T → 0.8T): user prompt → structured specs (convergence loop)
+--   Stage 1 SCAFFOLD (0.8T → 0.6T): specs → repo skeleton + per-module SPEC.md
+--   Stage 2 TYPE STUB (0.6T → 0.3T): SPEC.md → types, traits, fn sigs, todo!() bodies
+--   Stage 3 TYPE REFINE (0.3T → 0.15T): cargo check loop → verified skeleton
+--   Stage 4 IMPLEMENT (0.15T → 0): fill todo!() → cargo test loop → working software
+-- Guidance signals (user, compiler, agent self-check) gate each stage boundary.
+-- Demonstrates: workflow.run, convergence loops, pmap fan-out, guidance gates, reporting.
+-- Source: mcp-toolbelt/arch_diagrams/software_diffusion
+
+use std/agent
+use ../lib/dispatch
+use ../lib/guidance
+use ../lib/report
+use ../lib/workflow
+
++main = () {
+  prompt = "I want a collaborative task manager with real-time updates"
+
+  workflow.run "software-diffusion" prompt (_) {
+    emit "t=T  high entropy: raw user intent"
+
+    specs = stage_elicit prompt ^
+    emit "t=0.8T  specs converged: {specs.requirements | len} requirements"
+
+    (skeleton, module_specs) = stage_scaffold specs ^
+    emit "t=0.6T  skeleton: {skeleton.modules | len} modules"
+
+    stubs = stage_stub module_specs ^
+    emit "t=0.3T  stubs: {stubs | flat_map (.types) | len} types defined"
+
+    verified = stage_refine stubs skeleton ^
+    emit "t=0.15T  verified: compiles clean"
+
+    result = stage_implement verified module_specs ^
+    emit "t=0  working software: {result.completed | len} functions"
+
+    report.write "diffusion_report.md" "Software Diffusion" [
+      ..report.section "Input" [..report.text prompt]
+      ..report.section "Specs (t=0.8T)" [
+        ..report.bullets specs.requirements
+        ..report.subsection "Constraints" [..report.bullets specs.constraints]
+        ..report.subsection "Decisions" [..report.bullets specs.decisions]
+      ]
+      ..report.section "Architecture (t=0.6T)" [
+        ..report.table
+          ["Module" "Responsibility" "Dependencies"]
+          (skeleton.modules | map (m) [m.name m.responsibility (m.deps | join ", ")])
+        ..report.subsection "Tech Stack" [..report.bullets skeleton.tech_stack]
+      ]
+      ..report.section "Type System (t=0.3T)" [
+        ..report.bullets (stubs | flat_map (.types))
+        ..report.subsection "Traits" [..report.bullets (stubs | flat_map (.traits))]
+      ]
+      ..report.section "Result (t=0)" [
+        ..report.text "Functions implemented: {result.completed | len}"
+        ..report.text "Tests passing: {result.tests_passed}"
+      ]
+    ]
+
+    Ok result
+  }
+}
+
++stage_elicit = (prompt) {
+  elicitor = agent.spawn {command: "lx" args: ["run" "subagents/elicitor.lx"]} ^
+  specs := elicitor ~>? {action: "elicit" prompt} ^
+
+  result := loop {
+    specs.converged ? break (Ok specs)
+
+    answers = specs.questions | map (q) {
+      elicitor ~>? {action: "clarify" specs question: q} ^
+    }
+
+    user_signal = guidance.ask_user {stage: "elicit"  specs  questions: specs.questions}
+    !user_signal.proceed ? {
+      true -> specs <- {..specs  constraints: [..specs.constraints user_signal.feedback]}
+      false -> ()
+    }
+
+    specs <- elicitor ~>? {
+      action: "elicit"
+      prompt: "{prompt}\nClarifications:\n{answers | join "\n"}"
+    } ^
+  }
+
+  agent.kill elicitor ^
+  result
+}
+
++stage_scaffold = (specs) {
+  structurer = agent.spawn {command: "lx" args: ["run" "subagents/structurer.lx"]} ^
+
+  skeleton = structurer ~>? {action: "scaffold" specs} ^
+  module_specs = skeleton.modules | map (m) {
+    structurer ~>? {action: "spec" module: m constraints: specs.constraints} ^
+  }
+
+  self_signal = guidance.check_self
+    (specs.requirements | map to_str)
+    (module_specs | map (.responsibility))
+
+  !self_signal.proceed ? {
+    true -> emit "scaffold gap: {self_signal.feedback}"
+    false -> ()
+  }
+
+  agent.kill structurer ^
+  Ok (skeleton, module_specs)
+}
+
++stage_stub = (module_specs) {
+  stubs = module_specs | pmap (spec) {
+    dispatch.run_one "subagents/typer.lx" {action: "stub" module: spec.responsibility spec}
+  }
+  Ok stubs
+}
+
++stage_refine = (stubs skeleton) {
+  code := stubs | map (.code) | join "\n"
+  max_attempts = 10
+  attempt := 0
+
+  loop {
+    attempt <- attempt + 1
+    attempt > max_attempts ? break (Err "exceeded {max_attempts} compilation attempts")
+
+    signal = guidance.check_build "."
+    signal.proceed ? break (Ok {code  verified: true})
+
+    fix = dispatch.run_one "subagents/type_fixer.lx" {action: "fix" errors: signal.feedback code}
+    code <- fix.code
+    emit "refine attempt {attempt}: {fix.fixes_applied | len} fixes"
+  }
+}
+
++stage_implement = (verified module_specs) {
+  implementer = agent.spawn {command: "lx" args: ["run" "subagents/implementer.lx"]} ^
+  completed := []
+
+  module_specs | each (spec) {
+    functions = spec.public_api ?? []
+    functions | each (f) {
+      impl = implementer ~>? {
+        action: "implement"
+        spec
+        function: f.name
+        context: verified.code
+      } ^
+      completed <- [..completed {module: spec.responsibility  function: f.name  code: impl.code}]
+    }
+  }
+
+  tests_passed := false
+  max_attempts = 10
+  attempt := 0
+
+  loop {
+    attempt <- attempt + 1
+    attempt > max_attempts ? break ()
+
+    signal = guidance.check_tests "."
+    signal.proceed ? {
+      true -> {
+        tests_passed <- true
+        break ()
+      }
+      false -> {
+        implementer ~>? {action: "fix_test" error: signal.feedback code: verified.code} ^
+        emit "test fix attempt {attempt}"
+      }
+    }
+  }
+
+  agent.kill implementer ^
+  Ok {completed  tests_passed}
+}

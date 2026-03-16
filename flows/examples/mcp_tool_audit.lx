@@ -1,7 +1,4 @@
 -- Audit MCP servers against 10 weighted engineering scenarios.
--- Scenarios: writing-code (10), debugging (10), testing (8), code-review (9),
---   deploying (7), incidents (8), refactoring (6), new-service (5),
---   investigation (7), secret-rotation (4).
 -- Per server: connect -> list tools -> assess (empty? no read tools? no write tools?).
 -- Classify: pass (0 issues), partial (1-3 issues), fail (>3 or connection error).
 -- Dead weight: tools on failed servers that serve no scenario.
@@ -13,29 +10,15 @@ use std/json
 use std/fs
 use std/re
 use ../lib/report
+use ../prompts/audit
 
 Protocol ServerStatus = {name: Str  status: Str  tool_count: Int  issues: List}
-
-scenarios = [
-  {name: "writing-code"    weight: 10}
-  {name: "debugging"       weight: 10}
-  {name: "testing"         weight: 8}
-  {name: "code-review"     weight: 9}
-  {name: "deploying"       weight: 7}
-  {name: "incidents"       weight: 8}
-  {name: "refactoring"     weight: 6}
-  {name: "new-service"     weight: 5}
-  {name: "investigation"   weight: 7}
-  {name: "secret-rotation" weight: 4}
-]
-
-total_weight = scenarios | map (.weight) | sum
 
 +main = () {
   mcp_config = fs.read ".mcp.json" ^ | json.parse ^
   server_names = mcp_config | keys
 
-  emit "auditing {server_names | len} MCP servers against {scenarios | len} scenarios\n"
+  emit "auditing {server_names | len} MCP servers against {audit.scenarios | len} scenarios\n"
 
   results = server_names | map (name) audit_server name (mcp_config | get name ^)
 
@@ -66,7 +49,7 @@ total_weight = scenarios | map (.weight) | sum
     ]
     ..report.section "Scenario Coverage" [
       ..report.table ["Scenario" "Weight" "% of Total"]
-        (scenarios | map (s) [s.name (to_str s.weight) (to_str (s.weight * 100 / total_weight))])
+        (audit.scenarios | map (s) [s.name (to_str s.weight) (to_str (s.weight * 100 / audit.total_weight))])
     ]
   ]
 

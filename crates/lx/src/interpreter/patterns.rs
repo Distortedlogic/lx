@@ -31,7 +31,10 @@ impl super::Interpreter {
                         Some(true) => {}
                         _ => {
                             self.env = saved;
-                            return Err(LxError::type_err("match guard must be Bool", span));
+                            return Err(LxError::type_err(
+                                format!("match guard must be Bool, got {} `{gv}`", gv.type_name()),
+                                span,
+                            ));
                         }
                     }
                 }
@@ -40,7 +43,10 @@ impl super::Interpreter {
                 return result;
             }
         }
-        Err(LxError::runtime("no matching pattern", span))
+        Err(LxError::runtime(
+            format!("no matching pattern for {} `{val}`", val.type_name()),
+            span,
+        ))
     }
 
     pub(super) fn try_match_pattern(

@@ -1,0 +1,18 @@
+-- GritQL MCP -- AST-aware code search, structural rewriting, and lint.
+-- Server: grit-mcp (stdio)
+
+use std/mcp
+
++MCP GritQL = {
+  search: {pattern: Str  path: Str = "."} -> Str
+  check: {} -> {findings: List}
+  fix: {} -> Str
+  rewrite: {pattern: Str  path: Str = "."} -> Str
+}
+
++connect = () {
+  raw = mcp.connect {command: "grit-mcp" args: []} ^
+  GritQL raw
+}
+
++close = (server) { mcp.close server }

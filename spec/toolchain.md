@@ -18,12 +18,28 @@ lx agent script.lx             -- run as MCP agent (streamable HTTP transport)
 ```
 lx fmt                         -- format all .lx files in project
 lx fmt --check                 -- exit nonzero if unformatted (CI mode)
-lx test                        -- run test/ scripts, collect assert failures
+lx test                        -- run tests (assert + satisfaction-based)
 lx build                       -- AOT compile to binary
-lx init                        -- create new project
+lx init [name]                 -- create new project with lx.toml
+lx install                     -- resolve and lock dependencies
+lx update                      -- update deps within semver constraints
 lx repl                        -- interactive session
 lx watch script.lx             -- re-run on file changes
+lx registry                    -- start cross-process agent registry
+lx signal PID JSON             -- send interrupt signal to running agent
 ```
+
+### `lx signal` — User-Initiated Interruption
+
+Sends a signal to a running lx process. The signal is written to `.lx/signals/{pid}.json` and picked up by the runtime at the next `user.check` call or `:signal` lifecycle hook check.
+
+```bash
+lx signal 12345 '{"action": "redirect", "task": "fix the auth bug instead"}'
+lx signal 12345 '{"action": "stop"}'
+lx signal 12345 '{"action": "pause", "reason": "waiting for review"}'
+```
+
+The signal file is single-slot: latest signal wins if multiple arrive between checks. The runtime polls every 100ms at natural yield points (loop iterations, between pipeline stages).
 
 ## Agent Mode
 
@@ -67,7 +83,11 @@ Rules:
 
 **Status: Not implemented.** Tests are currently run via `just test` which uses `cargo run -p lx-cli` to execute suite files.
 
-`lx test` runs all `.lx` files in `test/`. Tests use `assert`:
+`lx test` supports two testing modes:
+
+### Assert-based (deterministic)
+
+For testing language features and deterministic logic. Files with `assert` statements:
 
 ```
 -- test/math_test.lx
@@ -78,7 +98,35 @@ assert (add 0 0 == 0)
 assert (double 5 == 10) "double should multiply by 2"
 ```
 
-`assert expr` fails the test if `expr` is `false`. `assert expr msg` includes the message in the failure output. All assertions in a file are run (no short-circuit on first failure). Results collected and reported.
+`assert expr` fails the test if `expr` is `false`. All assertions in a file are run (no short-circuit). Results collected and reported.
+
+### Satisfaction-based (agentic)
+
+For testing non-deterministic agentic flows. Full spec: [testing-satisfaction.md](testing-satisfaction.md).
+
+Files using `std/test` with `test.spec` / `test.scenario` calls run satisfaction scoring. Each scenario is executed multiple times, scored by a grader function across weighted dimensions, and compared against a threshold:
+
+```
+-- test/review_test.lx
+use std/test
+
+spec = test.spec "code review" {
+  flow: "./src/review.lx"
+  grader: (output scenario) {
+    relevance: audit.references_task output scenario.task
+    quality: audit.rubric output scenario.rubric
+  }
+  threshold: 0.75
+}
+
+test.scenario spec "bug fix" {
+  input: {task: "fix null check"}
+  rubric: ["identifies the null" "proposes a fix"]
+  runs: 3
+}
+```
+
+Configuration defaults come from `lx.toml`'s `[test]` section.
 
 ## Type Checker
 
@@ -172,37 +220,69 @@ Each block executes with all previous bindings in scope. Results are printed aft
 
 ## Project Initialization
 
-**Status: Not implemented.**
+**Status: Not implemented.** Full spec: [package-manifest.md](package-manifest.md).
 
-`lx init` creates a project skeleton:
+`lx init` creates a project with an `lx.toml` manifest:
 
 ```
-my-project/
-  pkg.lx
-  src/
-    main.lx
-  test/
-    main_test.lx
+$ lx init my-flow
+Created my-flow/
+  lx.toml
+  src/main.lx
+  test/main_test.lx
 ```
 
-`pkg.lx` contains the project name and an empty deps record. `src/main.lx` contains a minimal `+main`. `test/main_test.lx` contains a passing placeholder assertion.
+`lx.toml` declares package identity, dependencies, backend configuration, and test settings:
+
+```toml
+[package]
+name = "my-flow"
+version = "0.1.0"
+entry = "src/main.lx"
+
+[deps]
+
+[test]
+threshold = 0.75
+runs = 1
+```
+
+`lx init --flow` creates a flow-oriented project with `src/agents/` and `test/scenarios/` directories.
+
+All `lx` subcommands (`run`, `test`, `check`) walk up from cwd to find `lx.toml` as the project root.
 
 ## Test Runner Output
 
-`lx test` output:
+`lx test` output shows both modes:
 
 ```
+-- assert-based --
 test/math_test.lx ............. ok (12 assertions)
 test/string_test.lx ......F... FAIL
   test/string_test.lx:15: assert (trim "  " == "")
     left:  " "
     right: ""
-test/io_test.lx .............. ok (14 assertions)
 
-2 passed, 1 failed (26/27 assertions)
+-- satisfaction-based --
+test/review_test.lx
+  code review
+    bug fix .................. 0.82 PASS (3 runs, mean 0.82, min 0.71, max 0.91)
+    refactor ................. 0.69 FAIL (3 runs, mean 0.69, min 0.55, max 0.80)
+
+Assert: 1 passed, 1 failed (26/27 assertions)
+Satisfaction: 1/2 scenarios passed (threshold: 0.75)
 ```
 
-`lx test --json` outputs one JSON object per assertion result for programmatic consumption.
+CLI flags for satisfaction tests:
+
+```
+lx test --tag smoke              -- run scenarios tagged "smoke"
+lx test --scenario "bug fix"     -- run specific scenario
+lx test --threshold 0.90         -- override threshold
+lx test --runs 10                -- override run count
+```
+
+`lx test --json` outputs structured results for programmatic consumption.
 
 ## Environment Variables
 
@@ -214,6 +294,9 @@ test/io_test.lx .............. ok (14 assertions)
 
 ## Cross-References
 
-- Implementation: [implementation.md](../design/implementation.md) (architecture, crate choices), [implementation-phases.md](../design/implementation-phases.md) (phase 10: toolchain)
-- Formatter design: [impl-formatter.md](../design/impl-formatter.md)
-- Diagnostics: [diagnostics.md](diagnostics.md), [impl-error.md](../design/impl-error.md)
+- Formatter spec: [formatter.md](formatter.md)
+- Diagnostics: [diagnostics.md](diagnostics.md)
+- Package manifest: [package-manifest.md](package-manifest.md)
+- Satisfaction testing: [testing-satisfaction.md](testing-satisfaction.md)
+- Flow composition: [flow-composition.md](flow-composition.md)
+- Agent discovery: [agents-discovery.md](agents-discovery.md)

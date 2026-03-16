@@ -1,39 +1,96 @@
 # Agent Traits
 
-Behavioral contracts for agents. A Trait declares what Protocol messages an agent handles and what Skills it provides. Agents declare conformance; the runtime validates.
+Behavioral contracts with typed method signatures. A Trait declares what an agent must do — typed methods, resource requirements, and optional metadata for LLM discovery. Agents declare conformance; the runtime validates at definition time.
+
+Supersedes the `Skill` declaration. Skills and Traits covered the same ground — self-describing typed capabilities — but Skills were per-function while Traits were unenforceable name lists. This spec merges them: Trait methods ARE skills, with the rigor of interface enforcement.
 
 ## Problem
 
-`agent.capabilities` (#27) is runtime discovery — "what CAN you do right now?" That's dynamic and useful for load-aware routing. But there's no way to express static contracts — "agents of this kind MUST handle these message types." Without contracts:
+The current Trait system (`handles: [Protocol]  provides: [skill_name]`) is toothless:
 
-- Routers guess via LLM or ad-hoc domain tags
-- Mock agents for testing might not match the real agent's interface
-- Agent pools can't guarantee all workers are interchangeable
-- No compile-time or spawn-time validation that an agent handles the messages it'll receive
+- `provides` is a list of strings — no signatures, no enforcement
+- `agent.implements` checks `__traits` string tags, not actual capability
+- An agent can claim `__traits: ["Reviewer"]` without handling any review messages
+- Skills (`spec/agents-skill.md`) added typed I/O and metadata but as a separate system
+- Two overlapping concepts (Traits for contracts, Skills for capabilities) that should be one
 
 ## `Trait` Declaration
 
 ```
-Protocol ReviewRequest = {task: Str  path: Str}
-Protocol AuditRequest = {severity: Str  scope: Str}
-
-Trait Reviewer = {
-  handles: [ReviewRequest AuditRequest]
-  provides: [summarize_findings]
+Trait Searchable = {
+  search: {topic: Str  path: Str = "."} -> {summary: Str  gaps: List}
+  retrieve: {query: Str} -> Str
+  requires: [:ai]
 }
 ```
 
-### Fields
+Methods use the same signature syntax as MCP tool declarations: `{input fields} -> output_type`. This is the contract — any agent implementing `Searchable` must provide `search` and `retrieve` with these exact signatures.
+
+### Method Signatures
+
+Short form — just the type contract:
+
+```
+Trait Reviewable = {
+  review: {task: Str  path: Str} -> {findings: List  score: Float}
+  summarize: {findings: List} -> Str
+}
+```
+
+Long form — signature plus metadata for LLM discovery:
+
+```
+Trait Reviewable = {
+  review: {
+    description: "Review code at the given path"
+    input: {task: Str  path: Str}
+    output: {findings: List  score: Float}
+    examples: [{input: {task: "security" path: "src/"} output: {findings: [] score: 1.0}}]
+  }
+  summarize: {findings: List} -> Str
+}
+```
+
+The two forms are unambiguous: if the value contains `->`, it's short form. If it's a record with `input` and `output` fields, it's long form.
+
+### Reserved Fields
+
+These names are trait metadata, not methods:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `handles` | [Protocol] | Yes | Protocol messages this agent must accept |
-| `provides` | [Skill] | No | Skills this agent must expose |
-| `requires` | [Symbol] | No | Capabilities needed: `:ai`, `:fs`, `:network` |
+| `description` | Str | No | Natural-language description for LLM discovery |
+| `requires` | [Symbol] | No | Resource capabilities needed: `:ai`, `:fs`, `:network`, `:shell` |
+| `tags` | [Str] | No | Categorization tags for filtering and matching |
 
-`handles` is a list of Protocol names (resolved at evaluation time). `provides` is a list of Skill names. Both are validated when an agent declares conformance.
+Everything else in the trait body is a method declaration.
 
-## Agent Conformance
+### Protocol Inputs
+
+Method inputs can reference named Protocols instead of inline record types:
+
+```
+Protocol ReviewRequest = {task: Str  path: Str}
+
+Trait Reviewable = {
+  review: ReviewRequest -> {findings: List  score: Float}
+}
+```
+
+This enables automatic message routing: when an agent receives a `ReviewRequest` via `~>?`, the runtime can match it to the `review` method.
+
+## Conformance Checking
+
+### At Agent Definition
+
+When an Agent declaration lists trait conformance (see `agents-declaration.md`), the runtime validates:
+
+1. The agent provides a method for every method in the Trait
+2. Each method's input type is compatible with the Trait's declared input
+3. Each method's output type is compatible with the Trait's declared output
+4. All `requires` resources are available in the agent's runtime context
+
+Validation happens at definition time — not deferred to first call.
 
 ### At Spawn Time
 
@@ -41,52 +98,62 @@ Trait Reviewer = {
 reviewer = agent.spawn {
   command: "lx"
   args: ["run" "agents/reviewer.lx"]
-  implements: [Reviewer]
+  implements: [Reviewable]
 } ^
 ```
 
-The `implements` field is a list of Trait values. At spawn time, the runtime sends a capabilities probe to the agent. The agent's response must include all Protocols listed in `handles` and all Skills listed in `provides`. If validation fails, `agent.spawn` returns `Err`.
+The `implements` field triggers spawn-time validation. The runtime sends a capabilities probe. The agent's response must include method signatures matching all declared Traits. Mismatch returns `Err` with diagnostics listing missing or incompatible methods.
 
-### In Handler Definitions
+### `agent.implements?`
 
-For in-process agents (record-based handlers), validation is structural:
-
-```
-reviewer = {
-  implements: [Reviewer]
-  handler: (msg) {
-    msg._variant ? {
-      "ReviewRequest" -> do_review msg
-      "AuditRequest"  -> do_audit msg
-    }
-  }
-}
-```
-
-The runtime checks that the handler can receive all Protocol messages listed in the Trait's `handles` field. For record-based agents, this is a best-effort check at definition time.
+Runtime check: `agent.implements? agent trait -> Bool`. Returns `true` only if the agent's methods match the Trait's signatures. Replaces the current `__traits` string-tag check.
 
 ## Trait Composition
 
-Traits compose via list concatenation:
+Agents implement multiple Traits by listing them:
 
 ```
-Trait Auditable = {handles: [AuditRequest]  provides: [audit_report]}
-Trait Reviewable = {handles: [ReviewRequest]  provides: [summarize]}
-
--- Agent implements both
-analyzer = agent.spawn {
-  command: "lx" args: ["run" "agents/analyzer.lx"]
-  implements: [Auditable Reviewable]
-} ^
+Agent Analyzer: [Reviewable Searchable] = { ... }
 ```
 
-The agent must satisfy all Traits. Overlapping Protocols are deduplicated.
+The agent must satisfy all Traits. Overlapping methods with identical signatures are deduplicated. Conflicting signatures (same method name, different types) are a definition-time error.
+
+## Discovery
+
+Traits absorb the `std/skill` discovery functionality. Since Trait methods are typed and optionally annotated with descriptions, they serve as the catalog for LLM-driven routing and planning.
+
+### Listing Methods
+
+```
+methods = trait.methods Reviewable
+-- [{name: "review"  input: {task: Str  path: Str}  output: {findings: List  score: Float}}
+--  {name: "summarize"  input: {findings: List}  output: Str}]
+```
+
+Returns method metadata only (no handler functions). Safe to send to an LLM for selection.
+
+### Matching
+
+```
+best = trait.match Reviewable "I need to find security issues in auth code" ^
+-- {method: "review"  score: 0.85}
+```
+
+Keyword matching against method names, descriptions, and tags. With `:ai` available, `trait.match_semantic` uses LLM for semantic matching.
+
+### Unified Capability View
+
+```
+internal = trait.methods Reviewable
+external = mcp.tools grit_server
+all_capabilities = internal ++ external
+```
+
+Both return records with `name`, `input`, `output`. A planner doesn't need to distinguish internal methods from external MCP tools.
 
 ## Trait-Based Routing
 
 ```
-use std/agent
-
 route_by_trait = (task agents trait) {
   capable = agents | filter (a) agent.implements? a trait
   capable | empty? ? {
@@ -96,17 +163,34 @@ route_by_trait = (task agents trait) {
 }
 ```
 
-`agent.implements?` checks if an agent's declared traits include the given Trait. This replaces ad-hoc domain-tag matching in the router.
+### Message Routing via Protocol Matching
+
+When a method's input type is a named Protocol, the runtime can auto-route incoming messages:
+
+```
+reviewer ~>? ReviewRequest {task: "audit" path: "src/"}
+```
+
+The runtime checks which method accepts `ReviewRequest` and dispatches to it. If multiple methods accept the same Protocol, the first match wins.
+
+### Direct Method Calls
+
+When an agent is imported as a module, methods are callable directly:
+
+```
+use ./agents/reviewer
+reviewer.review {task: "audit" path: "src/"} ^
+```
+
+No message passing — direct function call with input validation against the Trait signature.
 
 ## Trait-Based Pools
-
-Traits combine naturally with Agent Pools (see [agents-pool.md](agents-pool.md)):
 
 ```
 pool = pool.create {
   agent: "agents/reviewer.lx"
   size: 3
-  trait: Reviewer
+  trait: Reviewable
 }
 ```
 
@@ -116,40 +200,48 @@ All pool workers must implement the declared Trait. Workers that fail the Trait 
 
 ### Parser
 
-`Trait` is a new keyword (like `Protocol`, `MCP`, `Skill`). Parsed as: `Trait Name = { handles: [...] provides: [...] requires: [...] }`. Returns `Stmt::Trait { name, fields, exported }`.
+`Trait` keyword already exists. Parser changes: method entries use `{input} -> output` or `{description, input, output}` syntax (same as MCP tool declarations). Reserved field names (`description`, `requires`, `tags`) parsed as metadata.
 
 ### AST Node
 
 ```
-Stmt::Trait {
+TraitDecl {
     name: String,
-    handles: Vec<String>,
-    provides: Vec<String>,
-    requires: Vec<String>,
+    methods: Vec<TraitMethod>,
+    requires: Vec<Expr>,
+    description: Option<Expr>,
+    tags: Option<Vec<Expr>>,
     exported: bool,
+}
+
+TraitMethod {
+    name: String,
+    input: McpInputDef,
+    output: McpOutputDef,
+    description: Option<String>,
+    examples: Option<Vec<Expr>>,
 }
 ```
 
+Reuses `McpInputDef` and `McpOutputDef` from MCP declarations — same type representation.
+
 ### Runtime Value
 
-`Value::Trait { name, handles, provides, requires }`. Evaluated at definition time — Protocol/Skill names are resolved in the current environment.
+`Value::Trait { name, methods, requires, description, tags }`. Methods carry their typed signatures. `trait.methods` extracts them as records.
 
 ### Validation
 
-`agent.spawn` with `implements` field triggers trait validation:
-1. Send `{type: "capabilities"}` to the agent
-2. Check response's `protocols` list includes all `handles` Protocols
-3. Check response's skills include all `provides` Skills
-4. Return `Err` on mismatch with diagnostic listing missing capabilities
+`agent.implements?` performs structural checking: for each Trait method, the agent must have a corresponding method with compatible input/output types. Type compatibility uses the existing subtyping rules from the type checker.
 
-### `agent.implements?`
+### Migration from Current Traits
 
-New builtin in `std/agent`: `agent.implements? agent trait -> Bool`. Checks the agent's stored Trait list (from `implements` at spawn time).
+Current `handles`/`provides` syntax continues to parse but is deprecated. The `handles` list is derivable from methods with Protocol-typed inputs. The `provides` name list is replaced by actual method declarations.
 
 ## Cross-References
 
-- Protocol system: [agents-protocol.md](agents-protocol.md)
-- Protocol unions (Traits reference union Protocols): [agents-protocol-ext.md](agents-protocol-ext.md)
-- Capability discovery (runtime complement): [agents-capability.md](agents-capability.md)
-- Skill declarations: [agents-skill.md](agents-skill.md)
-- Agent pools: [agents-pool.md](agents-pool.md)
+- Agent declarations: [agents-declaration.md](agents-declaration.md) — Traits are enforced on Agent definitions
+- MCP declarations: [agents-advanced.md](agents-advanced.md) — method syntax mirrors MCP tool syntax
+- Protocol system: [agents-protocol.md](agents-protocol.md) — Protocol-typed inputs enable message routing
+- Agent pools: [agents-pool.md](agents-pool.md) — Trait-constrained worker pools
+- Cross-process discovery: [agents-discovery.md](agents-discovery.md) — registry queries by Trait
+- Eliminated: [agents-skill.md](agents-skill.md) — Skill functionality merged into Traits

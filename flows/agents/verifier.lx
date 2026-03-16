@@ -1,0 +1,14 @@
+-- Finding verifier -- confirms or rejects automated findings.
+-- Import and call directly, or spawn as subprocess via main.
+
+use std/ai
+use std/agent
+
++verify = (msg) {
+  analysis = ai.prompt "Verify this finding:\n{to_str msg.finding}\nIs this a real issue? Respond with confirmed (bool) and reason." ^
+  {confirmed: analysis.confirmed ?? false  reason: analysis.reason ?? "unverified"}
+}
+
++handlers = %{"verify": verify}
+
++main = () { agent.dispatch handlers }

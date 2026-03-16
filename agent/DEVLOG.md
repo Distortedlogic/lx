@@ -1,10 +1,6 @@
 # lx Development Log
 
-Session history + design decisions. For priorities and gap analysis, see `agent/NEXT_PROMPT.md`. For self-critique, see `agent/CURRENT_OPINION.md`.
-
-## Implementation Status
-
-**56/56 PASS.** 29 stdlib modules (12 base + 8 orchestration/intelligence + 6 standard agents + 2 infrastructure + 1 visualization). 14 flow programs. Type checker. Regex literals. `lx diagram` CLI. `refine` expression. `agent.reconcile` (6 strategies). `trace.improvement_rate` / `trace.should_stop`. `agent.dialogue` (multi-turn sessions). `agent.intercept` (message middleware). `Handoff` Protocol + `agent.as_context`. `Capabilities` Protocol + `agent.capabilities` + `agent.advertise`. `GateResult` Protocol + `agent.gate`. `agent.supervise` + `agent.child` + `agent.supervise_stop` (Erlang-style supervision). `ai.prompt_structured` + `ai.prompt_structured_with` (Protocol-validated LLM output). `agent.mock` + call tracking. `agent.dispatch` + `agent.dispatch_multi` (pattern-based routing). Protocol composition, unions, field constraints. `just diagnose` clean.
+Design decisions, technical debt, and session history. Read `NEXT_PROMPT.md` first for orientation.
 
 ## Key Design Decisions
 
@@ -28,18 +24,22 @@ Non-obvious choices that cause confusion if forgotten:
 - **`{x: (f 42)}`** — parens for function calls in record field values.
 - **is_func_def ambiguity**: `(a b c) (expr)` with all bare Ident params NOT a func def. Defaults/underscores/type annotations override.
 - **`~>`/`~>?` at concat precedence**. `agent ~>? msg ^ | process` = `((agent ~>? msg) ^) | process`.
-- **`yield` is callback-based**. No handler → runtime error. Will be subsumed by `RuntimeCtx.yield_` backend.
-- **`RuntimeCtx` for backend pluggability**. All I/O builtins receive `&Arc<RuntimeCtx>`. Traits: `AiBackend`, `EmitBackend`, `HttpBackend`, `ShellBackend`, `YieldBackend`, `LogBackend`. Standard defaults in `crates/lx/src/backends/defaults.rs`. Spec: `spec/runtime-backends.md`.
+- **`yield` is callback-based**. No handler → runtime error. Subsumed by `RuntimeCtx.yield_` backend.
+- **`RuntimeCtx` for backend pluggability**. All I/O builtins receive `&Arc<RuntimeCtx>`. Traits: `AiBackend`, `EmitBackend`, `HttpBackend`, `ShellBackend`, `YieldBackend`, `LogBackend`. Standard defaults in `crates/lx/src/backends/defaults.rs`.
 - **`with` is scoped binding**. Lexical scope, not dynamic. Supports `:=` mutable.
+- **`with ... as` uses `stop_ident` parser flag**. Expression parsing stops at `Ident("as")` to prevent it being consumed as application argument. Multi-resource separated by `,` (Semi token). Cleanup via `Closeable` convention (record with `.close` field).
 - **Record field update via `<-`**. Requires `:=` binding. Adding new fields allowed.
 - **`MCP` declarations are typed tool contracts**. Callable → record of wrapper functions.
 - **Type annotations don't consume lowercase idents as type args**. `(x: Maybe a)` treats `a` as next param, not type var. Write `(x: (Maybe a))`.
 - **`{` after type tokens is body, not record type**. `-> Int { body }` — `{` starts body. Record return types need parens: `-> ({x: Int})`.
 - **`lx check` is optional**. `lx run` ignores annotations. Checker uses bidirectional inference + unification.
-- **Protocol failures are runtime errors**, not lx-level `Err` values. Type mismatch, missing field, and constraint violations all panic. Not catchable with `??`.
-- **Protocol `where` constraints bind the field name**. `score: Float where score >= 0.0` — `score` is available as a variable in the constraint expression.
-- **Protocol union `_variant` injection**. `AgentMessage {task: "review" path: "src/"}` tries each variant in declaration order, first match injects `_variant: "ReviewRequest"`.
-- **Protocol spread overrides**: later fields override same-named spread fields. `{..Base severity: Str = "critical"}` overrides Base's severity.
+- **Protocol failures are runtime errors**, not lx-level `Err` values. Not catchable with `??`.
+- **Protocol `where` constraints bind the field name**. `score: Float where score >= 0.0`.
+- **Protocol union `_variant` injection**. First matching variant in declaration order injects `_variant` field.
+- **Protocol spread overrides**: later fields override same-named spread fields.
+- **`Trait` is a keyword**. Lexed like `Protocol`/`MCP` (uppercase → TypeName, but special-cased). Produces `Stmt::TraitDecl` and `Value::Trait`. Trait names stored in agent `__traits` list field.
+- **`agent.implements` not `agent.implements?`**. The `?` suffix parses as ternary operator. Use bare name.
+- **`std/pool` is sequential**. Like `par`/`pmap`, pools distribute work sequentially. Abstraction value is organizational — round-robin dispatch, status tracking.
 - **`std/plan` treats plans as data**. `plan.run` with `on_step` callback. `PlanAction` tagged union controls flow.
 - **`std/introspect` is separate from `std/agent`**. Cross-cutting runtime metadata. Bounded action log (1000 entries).
 - **`std/knowledge` is file-backed JSON**. Shared via path. Provenance metadata. File-level locking.
@@ -47,7 +47,7 @@ Non-obvious choices that cause confusion if forgotten:
 
 ## Technical Debt
 
-- `par`/`sel`/`pmap` are sequential; real async needs `tokio`
+- `par`/`sel`/`pmap`/`std/pool` are sequential; real async needs `tokio`
 - Named-arg parser consumes ternary `:` separator (workaround: parens)
 - Assert parsing greedy — `assert (expr) "msg"` consumes msg when `(expr)` is callable
 - Currying removal deferred — requires parser architecture change
@@ -55,6 +55,7 @@ Non-obvious choices that cause confusion if forgotten:
 - Shell line is single-line only — forces `${ }` for complex commands
 - Named args + default params + currying interaction
 - Unicode chars in lexer cause panics (byte vs char indexing in comments)
+- 19+ files over 300-line limit (parser: 3, interpreter: 4, builtins: 2, stdlib: 5+, lexer: 1, core: 1)
 
 ## Session History
 
@@ -77,8 +78,14 @@ Non-obvious choices that cause confusion if forgotten:
 | 33 | 03-15 | std/ai + std/tasks + std/audit + std/circuit + std/knowledge + std/plan + std/introspect. 19 stdlib modules, 32/32 tests |
 | 34 | 03-15 | Agent self-assessment: 10 missing features identified. 8 new spec files + updates to 10 existing files |
 | 35 | 03-15 | Standard agents (auditor/router/grader/planner/monitor/reviewer) + std/memory + std/trace. 40/40 tests |
-| 36 | 03-15 | std/diag: program visualization. AST walker extracts workflow graph, emits Mermaid. `lx diagram` CLI. 41/41 tests |
+| 36 | 03-15 | std/diag: program visualization. AST walker, Mermaid output. `lx diagram` CLI. 41/41 tests |
 | 37 | 03-15 | RuntimeCtx design + implementation. Backend traits. Refine expression. agent.reconcile. 44/44 tests |
-| 38 | 03-15 | trace.improvement_rate + trace.should_stop: diminishing returns detection. trace.rs split into trace/trace_query/trace_progress. 45/45 tests |
-| 39 | 03-15 | Agent communication layer: dialogue, intercept, handoff, capabilities, gate, supervise, mock, dispatch, ai.prompt_structured. 9 features, 10 new Rust files, 9 new tests. 54/54 tests |
-| 40 | 03-15 | Protocol extensions: composition (`{..Base}`), unions (`A | B | C` with `_variant`), field constraints (`where`). Parser + interpreter + AST changes. 56/56 tests |
+| 38 | 03-15 | trace.improvement_rate + trace.should_stop: diminishing returns detection. 45/45 tests |
+| 39 | 03-15 | Agent communication layer: dialogue, intercept, handoff, capabilities, gate, supervise, mock, dispatch, ai.prompt_structured. 54/54 tests |
+| 40 | 03-15 | Protocol extensions: composition, unions, field constraints. 56/56 tests |
+| 41 | 03-16 | `with ... as` scoped resources, `Trait` declarations + `agent.implements`, `std/pool`. 59/59 tests |
+| 42 | 03-16 | Tier 1 stdlib (`std/budget`, `std/prompt`, `std/context`) + Tier 2 agent extensions (`agent.negotiate`, `agent.topic`/`subscribe`/`publish` pub/sub). 64/64 tests |
+| 43 | 03-16 | `std/git`: structured git access — 36 functions (status, log, diff, blame, grep, add, commit, branch, stash, remote). 7 Rust files, unified diff parser. 65/65 tests |
+| 44 | 03-16 | Gap analysis: 7 new specs for unplanned features (profile, interrupt, constraint propagation, provenance, workspace, teaching, pipeline checkpoint). Priority queue restructured. `std/blackboard`/`std/events` eliminated |
+| 45 | 03-16 | `std/retry`: retry-with-backoff (2 functions, `fastrand` dep for jitter). Improved binding pattern-match error messages. 66/66 tests |
+| 46 | 03-16 | Spec consolidation: 9 merges applied. Eliminated `std/strategy` (→ `std/profile`), `std/reputation` (→ `std/trace`), `checkpoint`/`on_interrupt` keywords (→ `user.check` + `:signal` lifecycle hook), `plan.run_incremental` (→ `std/pipeline`), `agent.teach` (→ dialogue convention), `workflow.peers` (→ topic convention), constraint propagation spec (→ `with context` ambient), provenance spec (→ `std/trace`), `Goal`/`Task` (→ docs). Agent/Trait declaration specs from Session 45b integrated. Net: 21 planned features (down from ~33) |

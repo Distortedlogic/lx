@@ -1,0 +1,17 @@
+-- Uptime Kuma MCP -- health monitoring.
+-- Server: uptime-kuma-mcp (stdio)
+
+use std/mcp
+
++MCP UptimeKuma = {
+  add_monitor: {name: Str  url: Str  interval: Int = 60} -> Str
+  remove_monitor: {name: Str} -> Str
+  list_monitors: {} -> List
+}
+
++connect = () {
+  raw = mcp.connect {command: "uptime-kuma-mcp" args: []} ^
+  UptimeKuma raw
+}
+
++close = (server) { mcp.close server }

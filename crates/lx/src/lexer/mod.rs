@@ -344,6 +344,7 @@ impl<'src> Lexer<'src> {
         let kind = match text {
             "Protocol" => TokenKind::Protocol,
             "MCP" => TokenKind::Mcp,
+            "Trait" => TokenKind::Trait,
             _ => TokenKind::TypeName(text.to_string()),
         };
         Ok(Token::new(kind, span))

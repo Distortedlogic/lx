@@ -1,0 +1,25 @@
+-- Implementation agent -- fills todo!() bodies and fixes failing tests.
+-- Used by software_diffusion stage 4 for final code generation.
+
+use std/ai
+use std/agent
+
++main = () {
+  agent.dispatch %{
+    "implement": (msg) {
+      ai.prompt_structured "Implement the body for function '{msg.function}'.\nSpec: {to_str msg.spec}\nContext: {msg.context}" {
+        code: Str
+        tests: Str
+      } ^
+    }
+    "fix_test": (msg) {
+      ai.prompt_structured "Fix this failing test.\nError: {msg.error}\nCode: {msg.code}" {
+        code: Str
+        explanation: Str
+      } ^
+    }
+    "revise": (msg) {
+      ai.prompt "Revise this implementation based on feedback.\nWork: {msg.work}\nFeedback: {msg.feedback}" ^
+    }
+  }
+}

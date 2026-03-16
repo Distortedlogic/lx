@@ -1,13 +1,13 @@
 -- Performance analysis via 5 parallel domain specialists.
--- Fan-out to: db, memory, compute, threading, network analysis agents.
--- Each specialist returns findings with severity, location, and fix recommendation.
+-- Fan-out to: db, memory, compute, threading, network analysis via perf_specialist.
+-- Each call returns findings with severity, location, and fix recommendation.
 -- Aggregation via agent.reconcile (union): dedup by location, keep higher severity.
 -- Conflict detection: same location, different fixes from different domains.
--- Demonstrates: workflow.run, parallel pmap dispatch, reconciliation, conflict handling.
+-- Demonstrates: workflow.run, parallel pmap, reconciliation, conflict handling.
 -- Source: mcp-toolbelt/arch_diagrams/scenario_perf_analysis
 
 use std/agent
-use ../lib/dispatch
+use ../agents/perf_specialist
 use ../lib/report
 use ../lib/workflow
 
@@ -22,7 +22,7 @@ domains = ["db" "memory" "compute" "threading" "network"]
 +analyze = (path concern) {
   workflow.run "perf-analysis" concern (_) {
     results = domains | pmap (d) {
-      dispatch.run_one "agents/perf_{d}.lx" {path  concern  domain: d}
+      perf_specialist.analyze {path  concern  domain: d}
     }
 
     merged = agent.reconcile results {

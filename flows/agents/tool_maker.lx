@@ -1,0 +1,31 @@
+-- MCP tool builder -- handles all phases of tool generation.
+-- Import and call phase functions directly, or spawn as subprocess via main.
+
+use std/ai
+use std/agent
+
++analyze = (msg) {
+  ai.prompt "Analyze the need for MCP tool '{msg.target}'. What capabilities should it expose?" ^
+}
+
++design = (msg) {
+  ai.prompt "Design MCP tool based on analysis:\n{to_str msg.analysis}\nReturn a manifest with tools, types, and endpoints." ^
+}
+
++scaffold = (msg) {
+  path = "tools/{msg.manifest.name ?? "tool"}"
+  $^mkdir -p {path}/src
+  {path}
+}
+
++codegen = (msg) {
+  ai.prompt "Generate Rust MCP server code for:\n{to_str msg.manifest}\nWorkspace: {msg.workspace}" ^
+}
+
++fix_compile = (msg) {
+  ai.prompt "Fix these compilation errors in {msg.workspace}:\n{to_str msg.errors}" ^
+}
+
++handlers = %{"analyze": analyze  "design": design  "scaffold": scaffold  "codegen": codegen  "fix_compile": fix_compile}
+
++main = () { agent.dispatch handlers }

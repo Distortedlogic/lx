@@ -1,5 +1,5 @@
 -- Full work-item pipeline with two entry points and refine-based grading.
--- Entry 1 (audit): GritQL MCP auto-fix -> check -> parallel verification subagents.
+-- Entry 1 (audit): GritQL MCP auto-fix -> check -> parallel verification.
 -- Entry 2 (manual): router classification -> run_list (parallel) or run_single (sequential).
 -- Grading via lib/grading: wraps refine + std/agents/grader into single calls.
 -- run_list: pmap over classified items, each gets spawn + grade + kill cycle.
@@ -8,9 +8,9 @@
 -- Source: mcp-toolbelt/arch_diagrams/flow_full_pipeline
 
 use std/agent
-use std/mcp
 use std/agents/router
-use ../lib/dispatch
+use ../agents/verifier
+use ../mcps/gritql
 use ../lib/grading
 use ../lib/report
 use ../lib/workflow
@@ -32,13 +32,13 @@ grade_opts = {threshold: 95  max_rounds: 5}
 }
 
 +run_audit = (audit_type) {
-  grit = mcp.connect {command: "grit-mcp" args: []} ^
+  grit = gritql.connect ^
 
   emit "T0: auto-fix..."
-  mcp.call grit "fix" {} ^
+  grit.fix {} ^
 
   emit "T1-T3: running checks..."
-  checks = mcp.call grit "check" {} ^
+  checks = grit.check {} ^
   findings = checks.findings ?? []
 
   result = findings | empty? ? {
@@ -47,9 +47,9 @@ grade_opts = {threshold: 95  max_rounds: 5}
       Ok {findings: 0  confirmed: 0}
     }
     false -> {
-      emit "{findings | len} findings, spawning verification..."
+      emit "{findings | len} findings, verifying..."
       results = findings | pmap (f) {
-        dispatch.run_one "agents/verifier.lx" {finding: f  action: "verify"}
+        verifier.verify {finding: f}
       }
       confirmed = results | filter (.confirmed)
       emit "{confirmed | len}/{findings | len} confirmed"
@@ -57,7 +57,7 @@ grade_opts = {threshold: 95  max_rounds: 5}
     }
   }
 
-  mcp.close grit
+  gritql.close grit
   result
 }
 

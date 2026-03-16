@@ -1,0 +1,18 @@
+-- Typing agent -- generates type stubs with todo!() bodies from module specs.
+-- Used by software_diffusion stage 2 to define the type system.
+
+use std/ai
+use std/agent
+
++main = () {
+  agent.dispatch %{
+    "stub": (msg) {
+      ai.prompt_structured "Generate Rust type stubs for module '{msg.module}'.\nSpec: {to_str msg.spec}\n\nDefine types, traits, fn signatures with todo!() bodies." {
+        code: Str
+        types: [Str]
+        traits: [Str]
+        functions: [{name: Str  signature: Str}]
+      } ^
+    }
+  }
+}

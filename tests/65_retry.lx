@@ -1,0 +1,102 @@
+-- 65_retry.lx
+-- Tests: std/retry module (retry-with-backoff for transient failures)
+
+use std/retry
+
+-- === retry succeeds on first try ===
+always_ok = () Ok 42
+r1 = retry.retry always_ok
+assert (ok? r1 == true) "retry returns Ok on immediate success"
+assert ((r1 ?? 0) == 42) "retry preserves success value"
+
+-- === retry retries on Err and eventually succeeds ===
+count := 0
+f2 = () {
+  count <- count + 1
+  count < 3 ? Err "transient" : Ok "recovered"
+}
+r2 = retry.retry f2
+assert (ok? r2 == true) "retry succeeds after transient errors"
+assert ((r2 ?? "") == "recovered") "retry returns recovered value"
+assert (count == 3) "retry called function 3 times"
+
+-- === retry exhausts attempts ===
+calls := 0
+f3 = () {
+  calls <- calls + 1
+  Err "always fails"
+}
+r3 = retry.retry f3
+assert (err? r3 == true) "retry returns Err after exhaustion"
+assert (calls == 3) "default max is 3 attempts"
+
+-- === retry_with custom max ===
+c4 := 0
+f4 = () {
+  c4 <- c4 + 1
+  Err "fail"
+}
+r4 = retry.retry_with {max: 5 base_ms: 0 jitter: false} f4
+assert (err? r4 == true) "exhausted after 5 attempts"
+assert (c4 == 5) "custom max respected"
+
+-- === retry_with constant backoff ===
+c5 := 0
+f5 = () {
+  c5 <- c5 + 1
+  c5 == 2 ? Ok "ok" : Err "nope"
+}
+r5 = retry.retry_with {max: 2 backoff: "constant" base_ms: 0 jitter: false} f5
+assert (ok? r5 == true) "constant backoff retry succeeds"
+
+-- === retry_with linear backoff ===
+c6 := 0
+f6 = () {
+  c6 <- c6 + 1
+  c6 == 3 ? Ok "done" : Err "retry"
+}
+r6 = retry.retry_with {max: 3 backoff: "linear" base_ms: 0 jitter: false} f6
+assert (ok? r6 == true) "linear backoff retry succeeds"
+
+-- === retry_with retry_on predicate ===
+c7 := 0
+f7 = () {
+  c7 <- c7 + 1
+  c7 == 1 ? Err "retryable" : Err "fatal"
+}
+r7 = retry.retry_with {max: 5 base_ms: 0 jitter: false retry_on: (e) e == "retryable"} f7
+assert (err? r7 == true) "stops retrying on non-matching error"
+assert (c7 == 2) "retry_on stopped after non-matching error"
+
+-- === retry_on allows selective retry ===
+c8 := 0
+f8 = () {
+  c8 <- c8 + 1
+  c8 < 4 ? Err "retryable" : Ok "success"
+}
+r8 = retry.retry_with {max: 5 base_ms: 0 jitter: false retry_on: (e) e == "retryable"} f8
+assert (ok? r8 == true) "selective retry eventually succeeds"
+assert (c8 == 4) "retried correct number of times"
+
+-- === retry returns non-Result values as Ok ===
+plain_val = () 99
+r9 = retry.retry plain_val
+assert (ok? r9 == true) "plain value wrapped in Ok"
+assert ((r9 ?? 0) == 99) "plain value preserved"
+
+-- === retry_with max: 1 means single attempt ===
+c10 := 0
+f10 = () {
+  c10 <- c10 + 1
+  Err "once"
+}
+r10 = retry.retry_with {max: 1 base_ms: 0 jitter: false} f10
+assert (err? r10 == true) "single attempt exhausted"
+assert (c10 == 1) "max: 1 means exactly one try"
+
+-- === exhaustion error contains metadata ===
+always_err = () Err "boom"
+r11 = retry.retry_with {max: 2 base_ms: 0 jitter: false} always_err
+assert (err? r11 == true) "exhausted is Err"
+
+log.info "65_retry: all passed"

@@ -161,7 +161,7 @@ impl Walker {
                 self.context = saved;
             }
             Expr::Loop(stmts) | Expr::Block(stmts) => self.walk_stmts(stmts),
-            Expr::With { body, .. } => self.walk_stmts(body),
+            Expr::With { body, .. } | Expr::WithResource { body, .. } => self.walk_stmts(body),
             Expr::Refine {
                 initial,
                 grade,

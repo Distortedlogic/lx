@@ -115,6 +115,62 @@ with context team: "backend" env: "staging" {
 
 Custom fields propagate to subagents as part of the ambient context record.
 
+## Cross-Process Propagation (Constraint Inheritance)
+
+Absorbs `spec/agents-constraint-propagation.md`. When `agent.spawn` is called inside a `with context` block, the ambient context propagates automatically to the child process. This eliminates manual `inherit` config — the context IS the inheritance mechanism.
+
+### Spawn-Time Behavior
+
+```
+with context deadline: 30 budget: 500 trace_id: "abc" {
+  worker = agent.spawn {command: "lx" args: ["run" "worker.lx"]} ^
+  -- worker automatically receives: deadline: (remaining), budget: 500, trace_id: "abc"
+}
+```
+
+Each standard field has specific propagation rules:
+
+| Field | Propagation Rule |
+|-------|-----------------|
+| `deadline` | Remaining time (original minus elapsed). Child can't extend. |
+| `budget` | Creates a sub-budget via `budget.slice`. Child spending reports back to parent. |
+| `trace_id` | Passed as-is. Child spans are parented under parent's current span. |
+| `request_id` | Passed as-is. |
+| Custom fields | Passed as-is in the init message. |
+
+### Wire Protocol
+
+Ambient context is serialized as a JSON-line init message on spawn:
+
+```json
+{"_context": {
+  "deadline": {"remaining_ms": 20000},
+  "budget": {"remaining": 450, "parent_id": "budget-abc"},
+  "trace_id": "trace-xyz",
+  "request_id": "req-123",
+  "team": "backend"
+}}
+```
+
+The child runtime's `RuntimeCtx` initialization reads `_context` and populates its ambient context.
+
+### Opt-Out
+
+To spawn a child WITHOUT inheriting context:
+
+```
+with context deadline: 30 budget: 500 {
+  with context {} {
+    -- empty context override clears ambient
+    untrusted = agent.spawn {command: "lx" args: ["run" "sandbox.lx"]} ^
+  }
+}
+```
+
+### Budget Propagation Details
+
+When budget is inherited, the child receives a sub-budget (equivalent to `budget.slice`). Spending in the child is reported back via the agent messaging channel. If the parent's budget is exhausted, the child receives a budget-exhausted error on its next operation.
+
 ## Implementation Notes
 
 Ambient context is stored in the interpreter's `Env` as a special binding (`__ambient_context`). `with context` creates a child scope with the merged context. Agent operations (`~>`, `~>?`, `agent.spawn`, `mcp.call`) read from the ambient context in the current scope.
@@ -127,3 +183,4 @@ For subprocess agents, the ambient context is serialized as a JSON-line `{"type"
 - Agent spawning: [agents.md](agents.md)
 - Introspection budget: [stdlib-introspect.md](stdlib-introspect.md) (`introspect.budget`)
 - Circuit breakers: ROADMAP (`std/circuit`)
+- Eliminated: `spec/agents-constraint-propagation.md` (folded into this spec as cross-process propagation)

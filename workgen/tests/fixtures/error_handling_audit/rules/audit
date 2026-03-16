@@ -1,0 +1,6 @@
+1. No swallowed errors — never use .ok(), let _ =, .unwrap_or_default() to silently ignore failures. Handle explicitly or propagate.
+2. No string-typed errors — use typed error enums with thiserror or manual Display+Error impls, not String or &str
+3. All I/O operations must propagate errors — file reads, network calls, database ops must return Result, not silently default
+4. Error messages must include context — what file, what operation, what input caused the failure
+5. No silent fallback to empty collections — if loading data fails, the caller must know, not receive an empty HashMap/Vec
+6. Failed operations in loops must not be silently skipped — log or collect errors, don't .ok() them away

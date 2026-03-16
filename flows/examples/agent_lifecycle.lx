@@ -10,32 +10,13 @@
 
 use std/cron
 use std/trace
-use ../lib/dispatch
-use ../lib/catalog {Specialist}
 use ../lib/catalog
+use ../lib/dispatch
 use ../lib/memory
 use ../lib/report
+use ../lib/specialists
 
 Protocol AgentDef = {name: Str  purpose: Str  domain: Str}
-
-my_catalog = catalog.create [
-  Specialist {name: "researcher"       domain: "research"     script: "agents/researcher.lx"       terminal: true}
-  Specialist {name: "context-engine"   domain: "codebase"     script: "agents/context_engine.lx"   terminal: true}
-  Specialist {name: "gritql"           domain: "ast-search"   script: "agents/gritql.lx"           terminal: true}
-  Specialist {name: "agent-auditor"    domain: "security"     script: "agents/agent_auditor.lx"    terminal: false}
-  Specialist {name: "perf-analyzer"    domain: "performance"  script: "agents/perf_analyzer.lx"    terminal: false}
-  Specialist {name: "project-setup"    domain: "scaffolding"  script: "agents/project_setup.lx"    terminal: false}
-  Specialist {name: "tool-maker"       domain: "tool-gen"     script: "agents/tool_maker.lx"       terminal: false}
-  Specialist {name: "seeder"           domain: "seeding"      script: "agents/seeder.lx"           terminal: true}
-  Specialist {name: "teacher"          domain: "training"     script: "agents/teacher.lx"          terminal: false}
-] %{
-  "research": ["research" "compare" "investigate" "how do others"]
-  "codebase": ["our code" "codebase" "find where" "grep" "search"]
-  "security": ["audit" "injection" "stuck" "suspicious"]
-  "performance": ["slow" "latency" "perf" "benchmark" "rate limit"]
-  "scaffolding": ["new service" "setup" "scaffold" "create project"]
-  "tool-gen": ["tool gap" "missing tool" "generate tool" "build mcp"]
-}
 
 +main = () {
   def = AgentDef {name: "code-reviewer"  purpose: "review PRs"  domain: "code-quality"}
@@ -52,7 +33,7 @@ my_catalog = catalog.create [
   mem = memory.create def.name
   session = trace.create {name: "seed-{def.name}"  source: "lifecycle"}
 
-  seeder = catalog.by_name "seeder" my_catalog
+  seeder = catalog.by_name "seeder" specialists.default
   entries = seeder ? {
     Some s -> dispatch.run_one s.script {
       action: "seed"
@@ -100,7 +81,7 @@ my_catalog = catalog.create [
 }
 
 +route_and_dispatch = (prompt) {
-  route = catalog.route prompt my_catalog
+  route = catalog.route prompt specialists.default
   emit "routed to: {route.domain} (confidence: {route.confidence})"
 
   route.specialist ? {

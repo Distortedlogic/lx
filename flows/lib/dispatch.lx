@@ -22,3 +22,9 @@ use std/agent
   agent.kill a ^
   result
 }
+
++run_handler = (handlers msg) {
+  action = msg.action ?? Err "no action in message" ^
+  handler = get action handlers ?? Err "unknown action: {action}" ^
+  handler msg
+}

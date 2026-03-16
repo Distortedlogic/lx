@@ -324,12 +324,15 @@ impl Interpreter {
                     (Value::List(items), Value::Int(n)) => {
                         let i = n
                             .to_i64()
-                            .ok_or_else(|| LxError::runtime("index too large", span))?;
+                            .ok_or_else(|| LxError::runtime(format!("index {n} too large for i64"), span))?;
                         let i = if i < 0 { items.len() as i64 + i } else { i } as usize;
                         items
                             .get(i)
                             .cloned()
-                            .ok_or_else(|| LxError::runtime("index out of bounds", span))
+                            .ok_or_else(|| LxError::runtime(
+                                format!("index {i} out of bounds (list length {})", items.len()),
+                                span,
+                            ))
                     }
                     _ => Err(LxError::type_err(
                         format!(
@@ -358,7 +361,10 @@ impl Interpreter {
                 Some(e) => self.eval(e),
                 None => Ok(Value::Unit),
             },
-            _ => Err(LxError::type_err("ternary condition must be Bool", span)),
+            _ => Err(LxError::type_err(
+                format!("ternary `?` condition must be Bool, got {} `{cv}`", cv.type_name()),
+                span,
+            )),
         }
     }
 }

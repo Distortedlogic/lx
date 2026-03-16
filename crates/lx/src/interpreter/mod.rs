@@ -209,6 +209,7 @@ impl Interpreter {
                 self.env = saved;
                 Ok(result)
             }
+            Expr::WithResource { resources, body } => self.eval_with_resource(resources, body, span),
             Expr::Refine {
                 initial,
                 grade,
@@ -260,7 +261,12 @@ impl Interpreter {
                     BindTarget::Pattern(pat) => {
                         let bindings =
                             self.try_match_pattern(&pat.node, &val).ok_or_else(|| {
-                                LxError::runtime("pattern match failed in binding", stmt.span)
+                                LxError::runtime(
+                                    format!(
+                                        "pattern match failed in binding: value `{val}` does not match pattern `{pat:?}`"
+                                    ),
+                                    stmt.span,
+                                )
                             })?;
                         let mut env = self.env.child();
                         for (name, v) in bindings {
@@ -312,6 +318,25 @@ impl Interpreter {
                 self.eval_protocol_union(&def.name, &def.variants, stmt.span)
             }
             Stmt::McpDecl { name, tools, .. } => self.eval_mcp_decl(name, tools, stmt.span),
+            Stmt::TraitDecl {
+                name,
+                handles,
+                provides,
+                requires,
+                exported,
+            } => {
+                let val = Value::Trait {
+                    name: Arc::from(name.as_str()),
+                    handles: Arc::new(handles.iter().map(|s| Arc::from(s.as_str())).collect()),
+                    provides: Arc::new(provides.iter().map(|s| Arc::from(s.as_str())).collect()),
+                    requires: Arc::new(requires.iter().map(|s| Arc::from(s.as_str())).collect()),
+                };
+                let _ = exported;
+                let mut env = self.env.child();
+                env.bind(name.clone(), val);
+                self.env = env.into_arc();
+                Ok(Value::Unit)
+            }
             Stmt::FieldUpdate {
                 name,
                 fields,

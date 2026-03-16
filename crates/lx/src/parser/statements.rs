@@ -479,6 +479,99 @@ impl super::Parser {
         }
     }
 
+    pub(super) fn parse_trait_decl(
+        &mut self,
+        exported: bool,
+        start: u32,
+    ) -> Result<SStmt, LxError> {
+        self.advance();
+        let name = match self.peek().clone() {
+            TokenKind::TypeName(n) => {
+                self.advance();
+                n
+            }
+            _ => {
+                return Err(LxError::parse(
+                    "expected type name after 'Trait'",
+                    self.tokens[self.pos].span,
+                    None,
+                ));
+            }
+        };
+        self.expect_kind(&TokenKind::Assign)?;
+        self.expect_kind(&TokenKind::LBrace)?;
+        let mut handles = Vec::new();
+        let mut provides = Vec::new();
+        let mut requires = Vec::new();
+        self.skip_semis();
+        while *self.peek() != TokenKind::RBrace {
+            let field = match self.peek().clone() {
+                TokenKind::Ident(n) => {
+                    self.advance();
+                    n
+                }
+                _ => {
+                    return Err(LxError::parse(
+                        "expected field name in Trait",
+                        self.tokens[self.pos].span,
+                        None,
+                    ));
+                }
+            };
+            self.expect_kind(&TokenKind::Colon)?;
+            self.expect_kind(&TokenKind::LBracket)?;
+            let mut names = Vec::new();
+            while *self.peek() != TokenKind::RBracket {
+                match self.peek().clone() {
+                    TokenKind::TypeName(n) | TokenKind::Ident(n) => {
+                        self.advance();
+                        names.push(n);
+                    }
+                    TokenKind::Colon => {
+                        self.advance();
+                        if let TokenKind::Ident(sym) = self.peek().clone() {
+                            self.advance();
+                            names.push(format!(":{sym}"));
+                        }
+                    }
+                    _ => {
+                        return Err(LxError::parse(
+                            "expected name in Trait field list",
+                            self.tokens[self.pos].span,
+                            None,
+                        ));
+                    }
+                }
+                self.skip_semis();
+            }
+            self.expect_kind(&TokenKind::RBracket)?;
+            match field.as_str() {
+                "handles" => handles = names,
+                "provides" => provides = names,
+                "requires" => requires = names,
+                _ => {
+                    return Err(LxError::parse(
+                        format!("unknown Trait field '{field}'"),
+                        self.tokens[self.pos].span,
+                        None,
+                    ));
+                }
+            }
+            self.skip_semis();
+        }
+        let end = self.expect_kind(&TokenKind::RBrace)?.span.end();
+        Ok(SStmt::new(
+            Stmt::TraitDecl {
+                name,
+                handles,
+                provides,
+                requires,
+                exported,
+            },
+            Span::from_range(start, end),
+        ))
+    }
+
     pub(super) fn parse_use_stmt(&mut self, start: u32) -> Result<SStmt, LxError> {
         self.advance();
         let mut path = Vec::new();

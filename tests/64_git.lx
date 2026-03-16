@@ -1,0 +1,77 @@
+-- 64_git.lx
+-- Tests: std/git module (structured git access)
+-- Runs inside a git repo so most read-only operations work
+
+use std/git
+
+-- === is_repo ===
+assert (git.is_repo () == true) "is_repo in git repo"
+
+-- === root ===
+r = git.root () ^
+assert (r | len > 0) "root returns non-empty path"
+
+-- === branch ===
+b = git.branch () ^
+assert (b | len > 0) "branch returns name"
+
+-- === status ===
+s = git.status () ^
+assert (s.branch | len > 0) "status has branch"
+assert (type_of s.staged == "List") "status.staged is list"
+assert (type_of s.unstaged == "List") "status.unstaged is list"
+assert (type_of s.untracked == "List") "status.untracked is list"
+assert (type_of s.conflicts == "List") "status.conflicts is list"
+
+-- === log ===
+commits = git.log {} ^
+assert (commits | len > 0) "log returns commits"
+c = commits.[0]
+assert (c.hash | len > 0) "commit has hash"
+assert (c.short | len > 0) "commit has short hash"
+assert (c.subject | len > 0) "commit has subject"
+assert (c.author | len > 0) "commit has author"
+assert (c.email | len > 0) "commit has email"
+assert (c.date | len > 0) "commit has date"
+assert (type_of c.parents == "List") "commit has parents list"
+
+-- === log with n limit ===
+commits2 = git.log {n: 2} ^
+assert (commits2 | len <= 2) "log respects n limit"
+
+-- === log with unit arg ===
+commits3 = git.log () ^
+assert (commits3 | len > 0) "log with () works"
+
+-- === show ===
+first_hash = (git.log {n: 1} ^).[0].hash
+shown = git.show first_hash ^
+assert (shown.hash == first_hash) "show returns correct commit"
+assert (shown.subject | len > 0) "show has subject"
+
+-- === diff_stat ===
+stats = git.diff_stat {} ^
+assert (type_of stats == "List") "diff_stat returns list"
+
+-- === diff ===
+diffs = git.diff {} ^
+assert (type_of diffs == "List") "diff returns list"
+
+-- === branches ===
+brs = git.branches () ^
+assert (brs | len > 0) "branches returns at least one"
+br = brs.[0]
+assert (br.name | len > 0) "branch has name"
+assert (type_of br.current == "Bool") "branch has current flag"
+assert (type_of br.ahead == "Int") "branch has ahead count"
+assert (type_of br.behind == "Int") "branch has behind count"
+
+-- === remotes ===
+rems = git.remotes () ^
+assert (type_of rems == "List") "remotes returns list"
+
+-- === stash_list ===
+stashes = git.stash_list () ^
+assert (type_of stashes == "List") "stash_list returns list"
+
+log.info "64_git: all passed"

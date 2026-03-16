@@ -1,0 +1,139 @@
+-- 61_context.lx
+-- Tests: std/context module (context window capacity management)
+
+use std/context
+
+-- === Create window ===
+win = context.create {capacity: 1000}
+usage = context.usage win
+assert (usage.capacity == 1000) "capacity set"
+assert (usage.used == 0) "initial used 0"
+assert (usage.available == 1000) "initial available"
+assert (usage.pct == 0.0) "initial pct 0"
+assert (context.pressure win == "low") "initial pressure low"
+
+-- === Add items ===
+context.add win {key: "system" content: "You are a helpful assistant" tokens: 100} ^
+context.add win {key: "turn_1" content: "Hello world" tokens: 200} ^
+usage2 = context.usage win
+assert (usage2.used == 300) "used after add"
+assert (usage2.available == 700) "available after add"
+
+-- === Estimate tokens ===
+est = context.estimate "hello world this is a test string for estimation"
+assert (est > 0) "estimate positive"
+
+-- === Items listing ===
+items = context.items win
+assert (len items == 2) "2 items"
+assert (items.[0].key == "system") "first item is system"
+assert (items.[1].key == "turn_1") "second item is turn_1"
+
+-- === Get item ===
+got = context.get win "system" ?? {key: "none"}
+assert (got.key == "system") "get finds item"
+assert (got.tokens == 100) "get has tokens"
+assert (got.pinned == false) "not pinned initially"
+
+missing = context.get win "nonexistent"
+assert (missing == None) "get returns None for missing"
+
+-- === Pin / Unpin ===
+context.pin win "system" ^
+got2 = context.get win "system" ?? {pinned: false}
+assert (got2.pinned == true) "pinned after pin"
+
+context.unpin win "system" ^
+got3 = context.get win "system" ?? {pinned: true}
+assert (got3.pinned == false) "unpinned after unpin"
+
+-- === Remove ===
+context.remove win "turn_1" ^
+items2 = context.items win
+assert (len items2 == 1) "1 item after remove"
+assert (items2.[0].key == "system") "system remains"
+
+-- === Clear (preserves pinned) ===
+context.add win {key: "a" content: "aaa" tokens: 50} ^
+context.add win {key: "b" content: "bbb" tokens: 50} ^
+context.pin win "system" ^
+context.clear win ^
+items3 = context.items win
+assert (len items3 == 1) "clear keeps pinned"
+assert (items3.[0].key == "system") "pinned system kept"
+
+-- === Pressure levels ===
+big_win = context.create {capacity: 100}
+assert (context.pressure big_win == "low") "0% is low"
+
+context.add big_win {key: "a" tokens: 55} ^
+assert (context.pressure big_win == "moderate") "55% is moderate"
+
+context.add big_win {key: "b" tokens: 25} ^
+assert (context.pressure big_win == "high") "80% is high"
+
+context.add big_win {key: "c" tokens: 15} ^
+assert (context.pressure big_win == "critical") "95% is critical"
+
+-- === Evict oldest ===
+ev_win = context.create {capacity: 1000}
+context.add ev_win {key: "old" content: "old" tokens: 100} ^
+context.add ev_win {key: "mid" content: "mid" tokens: 100} ^
+context.add ev_win {key: "new" content: "new" tokens: 100} ^
+context.evict ev_win "oldest" ^
+ev_items = context.items ev_win
+assert (len ev_items == 2) "one evicted"
+assert (ev_items.[0].key == "mid") "oldest removed"
+
+-- === Evict lowest priority ===
+pr_win = context.create {capacity: 1000}
+context.add pr_win {key: "hi" content: "hi" tokens: 100 priority: "high"} ^
+context.add pr_win {key: "lo" content: "lo" tokens: 100 priority: "low"} ^
+context.add pr_win {key: "norm" content: "norm" tokens: 100 priority: "normal"} ^
+context.evict pr_win "lowest_priority" ^
+pr_items = context.items pr_win
+assert (len pr_items == 2) "one evicted"
+first_keys = pr_items | map (.key)
+assert (first_keys.[0] == "hi") "low priority removed first"
+
+-- === Evict largest ===
+lg_win = context.create {capacity: 1000}
+context.add lg_win {key: "small" content: "s" tokens: 50} ^
+context.add lg_win {key: "big" content: "b" tokens: 500} ^
+context.add lg_win {key: "med" content: "m" tokens: 200} ^
+context.evict lg_win "largest" ^
+lg_items = context.items lg_win
+assert (len lg_items == 2) "one evicted"
+lg_keys = lg_items | map (.key)
+assert (lg_keys.[0] == "small") "largest removed"
+
+-- === Evict respects pinned ===
+pin_win = context.create {capacity: 1000}
+context.add pin_win {key: "pinned_old" tokens: 100} ^
+context.add pin_win {key: "unpinned" tokens: 100} ^
+context.pin pin_win "pinned_old" ^
+context.evict pin_win "oldest" ^
+pin_items = context.items pin_win
+assert (len pin_items == 1) "one evicted"
+assert (pin_items.[0].key == "pinned_old") "pinned item survives eviction"
+
+-- === Evict until ===
+eu_win = context.create {capacity: 100}
+context.add eu_win {key: "a" tokens: 30} ^
+context.add eu_win {key: "b" tokens: 30} ^
+context.add eu_win {key: "c" tokens: 30} ^
+assert (context.usage eu_win | (.pct) == 90.0) "90% before evict_until"
+context.evict_until eu_win "oldest" {target_pct: 50.0} ^
+eu_usage = context.usage eu_win
+assert (eu_usage.pct <= 50.0) "under 50% after evict_until"
+
+-- === Replace item by key ===
+rep_win = context.create {capacity: 1000}
+context.add rep_win {key: "x" content: "old" tokens: 100} ^
+context.add rep_win {key: "x" content: "new" tokens: 200} ^
+rep_items = context.items rep_win
+assert (len rep_items == 1) "replaced item, not duplicated"
+rep_got = context.get rep_win "x" ?? {tokens: 0}
+assert (rep_got.tokens == 200) "replacement has new tokens"
+
+log.info "61_context: all passed"

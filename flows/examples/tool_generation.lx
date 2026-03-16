@@ -12,7 +12,7 @@ use std/mcp
 use std/json
 use std/fs
 use std/re
-use ../lib/dispatch
+use ../agents/tool_maker
 use ../lib/report
 use ../lib/workflow
 
@@ -49,14 +49,12 @@ Protocol ToolGap = {signal: Str  tool: Str  context: Str}
 }
 
 +generate = (gap) {
-  maker = "agents/tool_maker.lx"
-
   workflow.run "tool-generation" gap.tool (session) {
     steps = [
-      {id: "analyze"   deps: []            run: (ctx) dispatch.run_one maker {phase: "analyze"  target: gap.tool}}
-      {id: "design"    deps: ["analyze"]   run: (ctx) dispatch.run_one maker {phase: "design"  analysis: ctx.analyze}}
-      {id: "scaffold"  deps: ["design"]    run: (ctx) dispatch.run_one maker {phase: "scaffold"  manifest: ctx.design}}
-      {id: "codegen"   deps: ["scaffold"]  run: (ctx) dispatch.run_one maker {phase: "codegen"  workspace: ctx.scaffold.path  manifest: ctx.design}}
+      {id: "analyze"   deps: []            run: (ctx) tool_maker.analyze {target: gap.tool}}
+      {id: "design"    deps: ["analyze"]   run: (ctx) tool_maker.design {analysis: ctx.analyze}}
+      {id: "scaffold"  deps: ["design"]    run: (ctx) tool_maker.scaffold {manifest: ctx.design}}
+      {id: "codegen"   deps: ["scaffold"]  run: (ctx) tool_maker.codegen {workspace: ctx.scaffold.path  manifest: ctx.design}}
       {id: "compile"   deps: ["codegen"]   run: (ctx) compile_gate ctx.scaffold.path}
       {id: "register"  deps: ["compile"]   run: (ctx) register gap.tool ctx.scaffold.path}
       {id: "test"      deps: ["register"]  run: (ctx) smoke_test gap.tool ctx.scaffold.path}
@@ -73,7 +71,7 @@ compile_gate = (workspace) {
   check ? {
     Ok {code: 0 ..} -> ()
     _ -> {
-      dispatch.run_one "agents/tool_maker.lx" {phase: "fix_compile"  workspace  errors: check}
+      tool_maker.fix_compile {workspace  errors: check}
       recheck = $cargo check --manifest-path {workspace}/Cargo.toml 2>&1
       recheck ? {
         Ok {code: 0 ..} -> ()

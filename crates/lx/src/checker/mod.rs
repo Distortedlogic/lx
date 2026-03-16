@@ -147,6 +147,7 @@ impl Checker {
                 }
                 Type::Unit
             }
+            Stmt::TraitDecl { .. } => Type::Unit,
             Stmt::FieldUpdate { value, .. } => {
                 self.synth(value);
                 Type::Unit

@@ -81,6 +81,22 @@ pub fn build() -> IndexMap<String, Value> {
         "dialogue_end".into(),
         super::agent_dialogue::mk_dialogue_end(),
     );
+    m.insert("negotiate".into(), super::agent_negotiate::mk_negotiate());
+    m.insert("topic".into(), super::agent_pubsub::mk_topic());
+    m.insert("subscribe".into(), super::agent_pubsub::mk_subscribe());
+    m.insert(
+        "subscribe_filtered".into(),
+        super::agent_pubsub::mk_subscribe_filtered(),
+    );
+    m.insert("unsubscribe".into(), super::agent_pubsub::mk_unsubscribe());
+    m.insert("publish".into(), super::agent_pubsub::mk_publish());
+    m.insert(
+        "publish_collect".into(),
+        super::agent_pubsub::mk_publish_collect(),
+    );
+    m.insert("subscribers".into(), super::agent_pubsub::mk_subscribers());
+    m.insert("topics".into(), super::agent_pubsub::mk_topics());
+    m.insert("implements".into(), mk("agent.implements", 2, bi_implements));
     m
 }
 
@@ -92,6 +108,27 @@ fn get_pid(agent: &Value, span: Span) -> Result<u32, LxError> {
             .and_then(|n| n.try_into().ok())
             .ok_or_else(|| LxError::type_err("agent: expected agent record with __pid", span)),
         _ => Err(LxError::type_err("agent: expected agent Record", span)),
+    }
+}
+
+fn bi_implements(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+    let Value::Record(agent) = &args[0] else {
+        return Err(LxError::type_err("implements?: expected agent record", span));
+    };
+    let Value::Trait { name: trait_name, .. } = &args[1] else {
+        return Err(LxError::type_err("implements?: expected Trait value", span));
+    };
+    if let Some(Value::List(traits)) = agent.get("__traits") {
+        let found = traits.iter().any(|t| {
+            if let Value::Str(s) = t {
+                s.as_ref() == trait_name.as_ref()
+            } else {
+                false
+            }
+        });
+        Ok(Value::Bool(found))
+    } else {
+        Ok(Value::Bool(false))
     }
 }
 
@@ -144,6 +181,19 @@ fn bi_spawn(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value,
     let mut rec = IndexMap::new();
     rec.insert("__pid".into(), Value::Int(BigInt::from(pid)));
     rec.insert("name".into(), Value::Str(Arc::from(name.as_str())));
+    if let Some(Value::List(traits)) = config.get("implements") {
+        let trait_names: Vec<Value> = traits
+            .iter()
+            .filter_map(|t| {
+                if let Value::Trait { name, .. } = t {
+                    Some(Value::Str(Arc::clone(name)))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        rec.insert("__traits".into(), Value::List(Arc::new(trait_names)));
+    }
     Ok(Value::Ok(Box::new(Value::Record(Arc::new(rec)))))
 }
 

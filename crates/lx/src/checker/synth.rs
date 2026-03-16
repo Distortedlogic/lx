@@ -119,6 +119,16 @@ impl Checker {
                 self.pop_scope();
                 result
             }
+            Expr::WithResource { resources, body } => {
+                self.push_scope();
+                for (expr, name) in resources {
+                    let vt = self.synth(expr);
+                    self.bind(name.clone(), vt);
+                }
+                let result = self.check_stmts(body);
+                self.pop_scope();
+                result
+            }
             Expr::Refine { .. } => Type::Unknown,
             _ => Type::Unknown,
         }

@@ -45,8 +45,8 @@ use ../lib/workflow
       }
     }
 
-    patterns = extract_patterns good
-    mistakes = extract_mistakes bad
+    patterns = transcript.extract_patterns good
+    mistakes = transcript.extract_mistakes bad
 
     review_result = reviewer.review {
       transcript: path
@@ -76,17 +76,4 @@ use ../lib/workflow
     emit "distilled {patterns | len} patterns, {mistakes | len} mistakes"
     Ok {patterns  mistakes  review: review_result}
   }
-}
-
-extract_patterns = (good) {
-  good
-    | map (e) {tool: e.name  description: "successful {e.name}"}
-    | group_by (.tool)
-    | entries
-    | filter (tool, uses) uses | len >= 2
-    | map (tool, uses) {tool  count: (uses | len)  description: "{tool}: {uses | len} successes"}
-}
-
-extract_mistakes = (bad) {
-  bad | map (e) {what: "failed {e.name}"  lesson: (to_str e.output)}
 }

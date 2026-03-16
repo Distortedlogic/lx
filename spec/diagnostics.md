@@ -202,9 +202,90 @@ error[type]: src/types.lx:5
   fix:      rename variant or move to separate module
 ```
 
+## Lint Warnings (Planned)
+
+Ambiguous syntax patterns that should produce warnings in `lx check` (or a future `lx lint`). These are parser-legal constructs that are almost always mistakes.
+
+### Tuple vs Application
+
+`(a b)` is application (call `a` with `b`). Tuples need commas: `(a, b)`. When a binding uses `(a b)` where a tuple is likely intended, warn:
+
+```
+warning[lint]: src/main.lx:5:10
+  |
+ 5|   (x y) = get_pair ()
+  |   ^^^^^
+  `(x y)` is function application, not a tuple destructure
+  fix:      use commas for a tuple: `(x, y)`
+```
+
+### Record Field Function Call
+
+`{x: f 42}` parses `f` as the field value and `42` as a second field (or error). Function calls in record field values need parens:
+
+```
+warning[lint]: src/main.lx:8:7
+  |
+ 8|   {x: f 42}
+  |       ^
+  bare function call in record field value
+  fix:      wrap in parens: `{x: (f 42)}`
+```
+
+### Assert Argument Consumption
+
+`assert (expr) "msg"` — if `(expr)` evaluates to a callable, the parser consumes `"msg"` as its argument instead of as the assert message:
+
+```
+warning[lint]: src/main.lx:10:1
+  |
+10|   assert (is_valid) "should be valid"
+  |          ^^^^^^^^^^
+  `(is_valid)` is callable — "should be valid" will be passed as its argument
+  fix:      force boolean: `assert (is_valid == true) "should be valid"`
+```
+
+### Empty Braces in Block Position
+
+`{}` in expression position is an empty block returning `()`, not an empty record:
+
+```
+warning[lint]: src/main.lx:12:25
+  |
+12|   agent.dialogue peer {}
+  |                       ^^
+  `{}` is an empty block (returns unit), not an empty record
+  fix:      use `()` for unit: `agent.dialogue peer ()`
+```
+
+### Type Argument Consumption
+
+`(x: Maybe a)` treats `a` as the next parameter, not a type variable. Type application with lowercase type vars needs parens:
+
+```
+warning[lint]: src/main.lx:3:5
+  |
+ 3|   f = (x: Maybe a) x
+  |                  ^
+  `a` parsed as next parameter, not type argument to `Maybe`
+  fix:      use parens: `(x: (Maybe a))`
+```
+
+### Uppercase Field Access
+
+`.Uppercase` after a dot is ambiguous with Protocol names. Protocols need selective import:
+
+```
+warning[lint]: src/main.lx:6:8
+  |
+ 6|   agent.Handoff
+  |         ^^^^^^^
+  uppercase after `.` — Protocol names require selective import
+  fix:      `use std/agent {Handoff}` then use `Handoff` directly
+```
+
 ## Cross-References
 
-- Implementation: [impl-error.md](../design/impl-error.md) (error types, diagnostic generation)
 - Error handling spec: [errors.md](errors.md)
 - Toolchain JSON output: [toolchain.md](toolchain.md)
 - Test suite: diagnostics are tested implicitly across all suite files.

@@ -1,0 +1,16 @@
+-- Context Engine MCP -- codebase search and context retrieval.
+-- Server: context-engine-mcp (stdio)
+
+use std/mcp
+
++MCP ContextEngine = {
+  search: {topic: Str  path: Str = "."} -> {summary: Str  gaps: List}
+  retrieve: {query: Str} -> Str
+}
+
++connect = () {
+  raw = mcp.connect {command: "context-engine-mcp" args: []} ^
+  ContextEngine raw
+}
+
++close = (server) { mcp.close server }

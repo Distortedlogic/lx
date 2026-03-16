@@ -1,0 +1,16 @@
+-- Discovery pipeline configuration -- research axes and quality tiers.
+-- Separates search parameters from orchestration logic.
+
++axes = [
+  {name: "agent-harness"  queries: ["agent framework rust" "tool dispatch" "agent executor"]}
+  {name: "context-mgmt"   queries: ["context window" "memory management llm" "conversation compaction"]}
+  {name: "observability"   queries: ["llm observability" "agent tracing" "eval harness"]}
+  {name: "multi-agent"     queries: ["multi agent orchestration" "agent coordination rust"]}
+  {name: "mcp-tooling"     queries: ["mcp server rust" "model context protocol"]}
+]
+
++tiers = [
+  {name: "auto"    min: 8.0}
+  {name: "review"  min: 6.0}
+  {name: "skip"    min: 0.0}
+]

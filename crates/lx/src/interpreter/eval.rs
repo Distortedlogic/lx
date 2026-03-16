@@ -79,7 +79,10 @@ impl Interpreter {
                     let r = self.eval(right)?;
                     self.force_defaults(r, span)
                 }
-                _ => Err(LxError::type_err("&& requires Bool operands", span)),
+                _ => Err(LxError::type_err(
+                    format!("&& requires Bool operands, got {}", l.type_name()),
+                    span,
+                )),
             };
         }
         if *op == BinOp::Or {
@@ -91,7 +94,10 @@ impl Interpreter {
                     let r = self.eval(right)?;
                     self.force_defaults(r, span)
                 }
-                _ => Err(LxError::type_err("|| requires Bool operands", span)),
+                _ => Err(LxError::type_err(
+                    format!("|| requires Bool operands, got {}", l.type_name()),
+                    span,
+                )),
             };
         }
         let lv = self.eval(left)?;
@@ -335,7 +341,10 @@ impl Interpreter {
                 let v = self.eval(e)?;
                 v.as_int()
                     .and_then(|n| n.try_into().ok())
-                    .ok_or_else(|| LxError::type_err("slice index must be Int", span))?
+                    .ok_or_else(|| LxError::type_err(
+                        format!("slice start index must be Int, got {} `{v}`", v.type_name()),
+                        span,
+                    ))?
             }
             None => 0usize,
         };
@@ -344,7 +353,10 @@ impl Interpreter {
                 let v = self.eval(e)?;
                 v.as_int()
                     .and_then(|n| n.try_into().ok())
-                    .ok_or_else(|| LxError::type_err("slice index must be Int", span))?
+                    .ok_or_else(|| LxError::type_err(
+                        format!("slice end index must be Int, got {} `{v}`", v.type_name()),
+                        span,
+                    ))?
             }
             None => len,
         };
@@ -379,6 +391,54 @@ impl Interpreter {
         result
     }
 
+    pub(super) fn eval_with_resource(
+        &mut self,
+        resources: &[(SExpr, String)],
+        body: &[SStmt],
+        span: Span,
+    ) -> Result<Value, LxError> {
+        let mut acquired: Vec<(String, Value)> = Vec::new();
+        let setup_result = (|| -> Result<(), LxError> {
+            for (expr, name) in resources {
+                let val = self.eval(expr)?;
+                acquired.push((name.clone(), val));
+            }
+            Ok(())
+        })();
+        if let Err(e) = setup_result {
+            for (_, val) in acquired.iter().rev() {
+                self.close_resource(val, span);
+            }
+            return Err(e);
+        }
+        let saved = Arc::clone(&self.env);
+        let mut child = self.env.child();
+        for (name, val) in &acquired {
+            child.bind(name.clone(), val.clone());
+        }
+        self.env = child.into_arc();
+        let body_result = (|| -> Result<Value, LxError> {
+            let mut result = Value::Unit;
+            for stmt in body {
+                result = self.eval_stmt(stmt)?;
+            }
+            Ok(result)
+        })();
+        self.env = saved;
+        for (_, val) in acquired.iter().rev() {
+            self.close_resource(val, span);
+        }
+        body_result
+    }
+
+    fn close_resource(&mut self, val: &Value, span: Span) {
+        if let Value::Record(fields) = val {
+            if let Some(close_fn) = fields.get("close") {
+                let _ = crate::builtins::call_value(close_fn, Value::Unit, span, &self.ctx);
+            }
+        }
+    }
+
     pub(super) fn eval_assert(
         &mut self,
         expr: &SExpr,
@@ -403,7 +463,10 @@ impl Interpreter {
                     span,
                 ))
             }
-            _ => Err(LxError::type_err("assert requires Bool", span)),
+            _ => Err(LxError::type_err(
+                format!("assert requires Bool, got {} `{val}`", val.type_name()),
+                span,
+            )),
         }
     }
 }

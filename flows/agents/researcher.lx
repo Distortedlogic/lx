@@ -1,0 +1,22 @@
+-- Research specialist -- web search and analysis.
+-- Import and call functions directly, or spawn as subprocess via main.
+
+use std/ai
+use std/agent
+
++search = (msg) {
+  results = ai.prompt "Search the web for: {msg.topic}\nSummarize findings as a list of {summary, source, relevance}." ^
+  {findings: results  summary: "Searched: {msg.topic}"}
+}
+
++research = (msg) {
+  ai.prompt "Research: {msg.topic}\nProvide comprehensive analysis with findings and gaps." ^
+}
+
++breakdown = (msg) {
+  ai.prompt "Break down the following research into actionable tasks:\n{msg.research}" ^
+}
+
++handlers = %{"search": search  "research": research  "breakdown": breakdown}
+
++main = () { agent.dispatch handlers }

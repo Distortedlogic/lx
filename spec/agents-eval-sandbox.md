@@ -152,4 +152,3 @@ New function in the agent module: `agent.eval_sandbox`. Extension file: `stdlib/
 - Agent capabilities: [agents-capability.md](agents-capability.md)
 - Skill declarations (static version): [agents-skill.md](agents-skill.md)
 - Tool generation flow: `flows/tool_generation.lx`
-- RuntimeCtx backends: `design/impl-stdlib.md`

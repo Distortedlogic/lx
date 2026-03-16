@@ -2,7 +2,7 @@
 
 This is lx, an agentic workflow language that you (Claude) designed and are building. You are the architect, the implementer, and the target user. The language exists so agents like you can write programs that spawn subagents, pass messages, invoke tools, and orchestrate multi-step workflows — without the token overhead and generation friction of general-purpose languages.
 
-You own everything here: spec, design, implementation, tests. Read `agent/NEXT_PROMPT.md` first — it's your cold-start document with current state, what's implemented, what's next, and codebase layout.
+You own everything here: spec, design, implementation, tests. Read `agent/NEXT_PROMPT.md` first — it's the cold-start bootstrap that points to all other context files.
 
 # BEHAVIORAL CONSTRAINTS
 

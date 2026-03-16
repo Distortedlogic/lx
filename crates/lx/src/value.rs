@@ -61,6 +61,12 @@ pub enum Value {
         name: Arc<str>,
         tools: Arc<Vec<McpToolDef>>,
     },
+    Trait {
+        name: Arc<str>,
+        handles: Arc<Vec<Arc<str>>>,
+        provides: Arc<Vec<Arc<str>>>,
+        requires: Arc<Vec<Arc<str>>>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -142,6 +148,7 @@ impl Value {
                 n1 == n2
             }
             (Value::McpDecl { name: n1, .. }, Value::McpDecl { name: n2, .. }) => n1 == n2,
+            (Value::Trait { name: n1, .. }, Value::Trait { name: n2, .. }) => n1 == n2,
             (Value::Func(_), _) | (_, Value::Func(_)) => false,
             (Value::BuiltinFunc(_), _) | (_, Value::BuiltinFunc(_)) => false,
             _ => false,
@@ -199,6 +206,7 @@ impl Value {
             Value::Protocol { name, .. } => name.hash(state),
             Value::ProtocolUnion { name, .. } => name.hash(state),
             Value::McpDecl { name, .. } => name.hash(state),
+            Value::Trait { name, .. } => name.hash(state),
             Value::Func(_) | Value::BuiltinFunc(_) | Value::TaggedCtor { .. } => {}
         }
     }

@@ -1,0 +1,80 @@
+# Implemented Feature Inventory
+
+What lx can do right now. For project health/status, see the "Where We're At" section of `NEXT_PROMPT.md`.
+
+## Core Language
+
+- Arithmetic, bindings, strings, interpolation, regex literals (`r/\d+/flags`), collections (lists, records, maps, tuples), pattern matching
+- Functions, closures, currying, default params, pipes, sections, slicing, named args
+- Type definitions with tagged values and pattern matching
+- Type annotations: `(x: Int y: Str) -> Result Int Str { ... }` on params, return types, bindings
+- Type checker: `lx check` — bidirectional inference, unification, structural subtyping
+- Concurrency: `par`, `sel`, `pmap`, `pmap_n`, `timeout` (sequential impl — real async needs tokio)
+- Shell: `$cmd`, `$^cmd`, `${...}` with interpolation
+- Error handling: `^` propagation, `??` coalescing, `(?? default)` sections
+- Modules: `use ./path`, aliasing, selective imports, `+` exports
+
+## Agent System
+
+- `~>` send, `~>?` ask — infix operators, subprocess-transparent
+- `Protocol Name = {field: Type}` — message contracts with runtime validation
+- Protocol composition (`{..Base extra: Str}`), unions (`A | B | C` with `_variant`), field constraints (`where`)
+- `Trait Name = { handles: [...] provides: [...] requires: [...] }` — agent behavioral contracts
+- `agent.implements` — runtime trait checking for routing/filtering
+- `MCP` declarations — typed tool contracts, input/output validation, wrapper generation
+- `with expr as name { body }` — scoped resources with auto-cleanup (LIFO close, cleanup on error)
+- `yield` — callback-based coroutine, JSON-line orchestrator protocol
+- `refine` — first-class feedback loop: try/grade/revise with threshold + max_rounds
+- `emit` — agent-to-human fire-and-forget output via EmitBackend
+- `with name = expr { body }` — scoped bindings + record field update (`name.field <- value`)
+
+## Stdlib (37 modules)
+
+- Data: `std/json`, `std/md`, `std/re`, `std/math`, `std/time`
+- System: `std/fs`, `std/env`, `std/http`, `std/git`
+- Resilience: `std/retry` — `retry` (default 3 attempts, exponential backoff), `retry_with` (configurable max, backoff strategy, base_ms, max_delay_ms, jitter, retry_on predicate). Returns `Ok value` on success, `Err Exhausted {attempts last_error elapsed_ms}` on exhaustion
+- Git: `std/git` — `status`, `branch`, `root`, `is_repo`, `branches`, `remotes`, `log`, `show`, `blame`, `blame_range`, `diff`, `diff_stat`, `grep`, `add`, `commit`, `commit_with`, `tag`, `tag_with`, `create_branch`, `create_branch_at`, `delete_branch`, `checkout`, `checkout_create`, `merge`, `stash`/`stash_with`/`stash_pop`/`stash_list`/`stash_drop`, `fetch`, `pull`, `push`, `push_with`
+- Communication: `std/agent`, `std/mcp`, `std/ai`
+- Scheduling: `std/cron`
+- Orchestration: `std/ctx`, `std/tasks`, `std/audit`, `std/circuit`, `std/plan`, `std/saga`
+- Concurrency: `std/pool` — worker pools: `create`, `fan_out`, `map`, `submit`, `status`, `shutdown`
+- Cost management: `std/budget` — `create`, `spend`, `remaining`, `used`, `used_pct`, `project`, `status`, `slice` (sub-budgets)
+- Prompt assembly: `std/prompt` — `create`, `system`, `section`, `constraint`, `instruction`, `example`, `compose`, `render`, `render_within`, `estimate`, `sections`, `without`
+- Context windows: `std/context` — `create`, `add`, `usage`, `pressure`, `estimate`, `pin`/`unpin`, `evict`, `evict_until`, `items`, `get`, `remove`, `clear`
+- Intelligence: `std/knowledge`, `std/introspect`
+- Standard agents: `std/agents/auditor`, `std/agents/router`, `std/agents/grader`, `std/agents/planner`, `std/agents/monitor`, `std/agents/reviewer`
+- Infrastructure: `std/memory`, `std/trace`
+- Visualization: `std/diag`
+
+## Agent Extensions (13 sub-modules of `std/agent`)
+
+- `agent.reconcile` — 6 merge strategies (union, intersection, vote, highest_confidence, max_score, merge_fields) + custom Fn
+- `agent.dialogue` — multi-turn stateful sessions with config `{role? context? max_turns?}`
+- `agent.intercept` — composable message middleware with short-circuit
+- `Handoff` Protocol + `agent.as_context` — structured context transfer for LLM consumption
+- `Capabilities` Protocol + `agent.capabilities` + `agent.advertise` — runtime capability discovery
+- `GateResult` Protocol + `agent.gate` — human-in-the-loop approval gates via yield
+- `agent.supervise` — Erlang-style supervision: one_for_one/one_for_all/rest_for_one
+- `agent.mock` — mock agents with call tracking for testing
+- `agent.dispatch` — pattern-based message routing without LLM
+- `agent.negotiate` — N-party iterative consensus with converge function
+- `agent.topic` / `agent.subscribe` / `agent.publish` — in-process pub/sub with filtered subscriptions
+
+## Other Extensions
+
+- `ai.prompt_structured` — Protocol-validated LLM output with auto-retry
+- `trace.improvement_rate` + `trace.should_stop` — diminishing returns detection
+
+## Runtime
+
+- All I/O builtins receive `&Arc<RuntimeCtx>` — backend traits: `AiBackend`, `EmitBackend`, `HttpBackend`, `ShellBackend`, `YieldBackend`, `LogBackend`
+- Standard defaults: `ClaudeCodeAiBackend`, `ReqwestHttpBackend`, `ProcessShellBackend`, `StdoutEmitBackend`, `StdinStdoutYieldBackend`, `StderrLogBackend`
+- Embedders construct custom `RuntimeCtx` to swap backends for testing, server deployment, or sandboxing
+
+## CLI
+
+`lx run`, `lx test`, `lx check`, `lx agent`, `lx diagram`
+
+## Test Coverage
+
+66 test suites (65 .lx files + 11_modules dir) in `tests/`. Fixtures in `tests/fixtures/`.
