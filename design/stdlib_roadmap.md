@@ -23,6 +23,9 @@ Complete stdlib for the three use cases: agent communication, workflow orchestra
 |---|---|---|
 | `std/blackboard` | Coordination | — |
 | `std/events` | Coordination | — |
+| `std/context` | Intelligence | `spec/agents-context-capacity.md` |
+| `std/prompt` | Intelligence | `spec/agents-prompt.md` |
+| `std/strategy` | Intelligence | `spec/agents-strategy.md` |
 
 ## Module Descriptions (Implemented)
 
@@ -125,6 +128,18 @@ Runtime registry and discovery for Skill declarations. Functions: `registry`, `l
 
 Workflow persistence management. Functions: `status`, `resume`, `cancel`, `list`, `cleanup`. Spec: `spec/agents-durable.md`.
 
+### std/context
+
+Context capacity management. Track working memory usage, pressure levels, eviction policies, pinning, compaction (summarization). Addresses the fundamental LLM constraint: finite context windows with silent overflow. Distinct from `std/ctx` (persistent storage) and `std/memory` (tiered facts). Spec: `spec/agents-context-capacity.md`.
+
+### std/prompt
+
+Typed composable prompt assembly. Named sections, few-shot examples, constraints, instructions. `compose` merges prompts. `render_within` trims to fit a token budget (drop examples first, then constraints). Replaces ad-hoc string concatenation for LLM input construction. Spec: `spec/agents-prompt.md`.
+
+### std/strategy
+
+Strategy memory. Records which approaches work for which problem types. Accumulates outcome data per (problem, approach) pair. `best_for` returns highest-scoring approach. `adapt` does epsilon-greedy explore/exploit. File-backed, cross-session. Distinct from `std/memory` (facts) and `std/reputation` (agent quality). Spec: `spec/agents-strategy.md`.
+
 ## Planned Extensions to Existing Modules
 
 | Extension | Target | Spec |
@@ -146,6 +161,9 @@ Workflow persistence management. Functions: `status`, `resume`, `cancel`, `list`
 | `RuntimeCtx` backends | interpreter + all stdlib | DONE |
 | `ai.prompt_structured` / `ai.prompt_structured_with` | std/ai | `spec/agents-structured-output.md` |
 | `plan.run_incremental` | std/plan | `spec/agents-incremental.md` |
+| `agent.topic` / `agent.subscribe` | std/agent | `spec/agents-pubsub.md` |
+| `agent.pipeline` | std/agent | `spec/agents-pipeline.md` |
+| `agent.on` (lifecycle hooks) | std/agent | `spec/agents-lifecycle.md` |
 
 ## Eliminated by Merges (Session 37)
 

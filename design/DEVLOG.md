@@ -4,7 +4,7 @@ Session history + design decisions. For priorities and gap analysis, see `NEXT_P
 
 ## Implementation Status
 
-**43/43 PASS.** 29 stdlib modules (12 base + 8 orchestration/intelligence + 6 standard agents + 2 infrastructure + 1 visualization). 14 flow programs. Type checker. Regex literals. `lx diagram` CLI. `refine` expression. `just diagnose` clean.
+**44/44 PASS.** 29 stdlib modules (12 base + 8 orchestration/intelligence + 6 standard agents + 2 infrastructure + 1 visualization). 14 flow programs. Type checker. Regex literals. `lx diagram` CLI. `refine` expression. `agent.reconcile` (6 strategies). `just diagnose` clean.
 
 ## Key Design Decisions
 

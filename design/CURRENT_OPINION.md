@@ -49,7 +49,7 @@ Reviewed `mcp-toolbelt/packages/arch_diagrams` — 14 agentic flow architectures
 | Feature | Spec | Why I Want It |
 |---|---|---|
 | Feedback loops (`refine`) | DONE | First-class `refine` expression implemented. |
-| Result reconciliation + voting + best-of-N | `spec/agents-reconcile.md` | Single `agent.reconcile` with strategies: `:vote` (quorum/deliberation), `:max_score` (early_stop), `:union`, `:intersection`. Subsumes former consensus and speculate keywords. |
+| Result reconciliation + voting + best-of-N | DONE | `agent.reconcile` with 6 strategies: union, intersection, vote, highest_confidence, max_score, merge_fields. |
 | Diminishing returns | `spec/agents-progress.md` | `trace.improvement_rate`/`trace.should_stop` — gradient progress via scored trace spans. |
 | Workflow status broadcasting | `spec/agents-broadcast.md` | Convenience layer over `std/blackboard`. |
 | Goal vs task communication | `spec/agents-goals.md` | `Goal`/`Task` Protocol definitions — convention, no wrapper functions. |
@@ -59,6 +59,9 @@ Reviewed `mcp-toolbelt/packages/arch_diagrams` — 14 agentic flow architectures
 | Multi-turn dialogue | `spec/agents-dialogue.md` | Session-based context accumulation. Subsumes negotiation pattern. |
 | Message middleware | `spec/agents-intercept.md` | Composable wrappers for tracing, rate-limiting, transformation. |
 | Handoff convention | `spec/agents-handoff.md` | `Handoff` Protocol + `agent.as_context` helper (not a function). |
+| Agent pub/sub | `spec/agents-pubsub.md` | Multi-agent broadcast without manual routing loops. Distinct from in-process `std/events`. |
+| Agent lifecycle hooks | `spec/agents-lifecycle.md` | Internal lifecycle management (idle, shutdown, error) without wrapping every handler. |
+| Agent pipeline backpressure | `spec/agents-pipeline.md` | Consumer-driven flow control in multi-agent pipelines. |
 
 **What's specified but not built (intelligence layer):**
 
@@ -69,6 +72,9 @@ Reviewed `mcp-toolbelt/packages/arch_diagrams` — 14 agentic flow architectures
 | Cost budgeting (`std/budget`) | `spec/agents-budget.md` | Gradient resource tracking. Absorbs `std/circuit` on implementation. |
 | Agent reputation (`std/reputation`) | `spec/agents-reputation.md` | Cross-interaction quality tracking, learning router feedback. |
 | Incremental plans (`plan.run_incremental`) | `spec/agents-incremental.md` | Memoized execution with input-hash cache invalidation. |
+| Context capacity (`std/context`) | `spec/agents-context-capacity.md` | Working memory management — pressure tracking, eviction, compaction. The fundamental LLM constraint. |
+| Prompt composition (`std/prompt`) | `spec/agents-prompt.md` | Typed prompt assembly from sections, examples, constraints. Replaces ad-hoc string concatenation. |
+| Strategy memory (`std/strategy`) | `spec/agents-strategy.md` | Approach learning across sessions — stop rediscovering optimal strategies. |
 
 **What's specified but not built (operational layer):**
 
@@ -83,14 +89,14 @@ Reviewed `mcp-toolbelt/packages/arch_diagrams` — 14 agentic flow architectures
 
 ## Bottom Line
 
-29 stdlib modules (incl. 6 standard agents + visualization + saga). Communication/orchestration layer is solid. Type checker working. Standard agents working. Program visualization working. RuntimeCtx backend abstraction in place.
+29 stdlib modules (incl. 6 standard agents + visualization + saga + reconcile). Communication/orchestration layer is solid. Type checker working. Standard agents working. Program visualization working. RuntimeCtx backend abstraction in place.
 
 The core language and stdlib are feature-complete for the three use cases. What remains:
 
-1. **Efficiency layer** — `reconcile` (subsumes consensus + speculate + best-of-N), diminishing returns, peer visibility, deadlock detection.
+1. **Efficiency layer** — diminishing returns, peer visibility, deadlock detection, agent pub/sub, lifecycle hooks, pipeline backpressure.
 
-2. **Intelligence layer** — structured AI output, skills, reputation, budgets (absorbing circuit), incremental plans.
+2. **Intelligence layer** — structured AI output, skills, reputation, budgets (absorbing circuit), incremental plans, context capacity management, prompt composition, strategy memory.
 
 3. **Operational layer** — durable execution (biggest architectural gap), content-addressed dispatch, mock agents for testing, causal chain queries in trace.
 
-Next implementation: `Skill` + `ai.prompt_structured` (highest daily impact). Then `durable` (biggest gap) and `agent.reconcile` + `agent.dispatch` (most common hand-rolled patterns).
+Next implementation: `std/context` + `std/prompt` (highest daily impact — every agent conversation hits context limits and builds prompts). Then `Skill` + `ai.prompt_structured` (self-describing capabilities + validated output). Then `durable` (biggest gap) and `agent.dispatch` (most common hand-rolled pattern).

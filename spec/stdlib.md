@@ -265,5 +265,8 @@ Regex literals are preferred — they avoid double-escaping. String patterns sti
 | `std/knowledge` | Shared discovery cache: create, store, get, query, expire (file-backed, cross-agent, provenance metadata) |
 | `std/introspect` | Agent introspection: self, budget, actions, is_stuck, strategy_shift (runtime metadata) |
 | `std/plan` | Dynamic plan execution: run, replan, continue, abort, skip, insert_after (plan-as-data with revision) |
+| `std/context` | Context capacity: create, add, usage, pressure, evict, compact, pin (working memory management) |
+| `std/prompt` | Prompt assembly: create, system, section, example, compose, render, render_within (typed LLM input) |
+| `std/strategy` | Strategy memory: create, record, best_for, rank, suggest, adapt (approach learning across sessions) |
 
 Agent ecosystem modules (`std/ai`, `std/agent`, `std/mcp`, `std/ctx`, `std/md`) are in [stdlib-agents.md](stdlib-agents.md). Data ecosystem modules (`std/plot`, `std/df`, etc.) are in [stdlib-data.md](stdlib-data.md). Program visualization (`std/diag`) is in [stdlib-diag.md](stdlib-diag.md). Shared discovery cache in [stdlib-knowledge.md](stdlib-knowledge.md). Agent introspection in [stdlib-introspect.md](stdlib-introspect.md). Dynamic plan revision in [agents-plans.md](agents-plans.md). Module API details are in [stdlib-modules.md](stdlib-modules.md).

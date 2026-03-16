@@ -25,7 +25,7 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 
 ## Current State
 
-`just diagnose` clean. `just test`: **43/43 PASS**. All core language features and stdlib modules implemented. `RuntimeCtx` backend refactor complete. `refine` expression implemented.
+`just diagnose` clean. `just test`: **44/44 PASS**. All core language features and stdlib modules implemented. `RuntimeCtx` backend refactor complete. `refine` expression implemented. `agent.reconcile` implemented.
 
 ### What's implemented
 
@@ -49,7 +49,7 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 **29 stdlib modules:**
 - Data: `std/json`, `std/md`, `std/re`, `std/math`, `std/time`
 - System: `std/fs`, `std/env`, `std/http`
-- Communication: `std/agent`, `std/mcp`, `std/ai`
+- Communication: `std/agent` (incl. `agent.reconcile`), `std/mcp`, `std/ai`
 - Orchestration: `std/ctx`, `std/cron`, `std/tasks`, `std/audit`, `std/circuit`, `std/plan`, `std/saga`
 - Intelligence: `std/knowledge`, `std/introspect`
 - Standard agents: `std/agents/auditor`, `std/agents/router`, `std/agents/grader`, `std/agents/planner`, `std/agents/monitor`, `std/agents/reviewer`
@@ -67,6 +67,7 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 - Agent introspection (`std/introspect`): identity, elapsed, turn count, action log, markers, stuck detection, strategy shift
 - Multi-agent transactions (`std/saga`): `saga.run` executes steps in order with compensating undo on failure. `saga.run_with` adds options (timeout, max_retries, on_compensate callback). `saga.define`/`saga.execute` for reusable saga definitions with initial context. Supports dependency ordering.
 - Program visualization (`std/diag`): AST walker extracts workflow graph (agents, messages, control flow), emits Mermaid flowchart. `lx diagram file.lx` CLI subcommand + `diag.extract`/`diag.to_mermaid` library API
+- Result reconciliation (`agent.reconcile`): structured merging of parallel results — 6 strategies (union, intersection, vote, highest_confidence, max_score, merge_fields) + custom Fn. Vote supports quorum (unanimous/majority/any/N), weighted voting. Union/intersection use key fn + conflict resolution. Returns `{merged sources conflicts dropped rounds dissenting}`
 
 **Runtime backends (`RuntimeCtx`):**
 - All I/O-touching builtins receive `&Arc<RuntimeCtx>` — backend traits for AI, HTTP, shell, emit, yield, logging
@@ -92,7 +93,7 @@ These have specs in `spec/` but no Rust implementation yet:
 - `agent.gate` — structured human-in-the-loop with timeout policies
 - `agent.capabilities` — runtime capability discovery via `Capabilities` protocol
 - `_priority` field on messages — binary (`:critical` or default), not 4-level
-- `agent.reconcile` — structured merge of parallel results: union, vote (with quorum/deliberation), max_score (with early_stop), merge_fields. Subsumes consensus and speculate patterns
+- `agent.reconcile` deliberation — re-ask agents when quorum not met (requires agent refs in results)
 - `trace.improvement_rate` / `trace.should_stop` — gradient progress tracking via trace spans
 - `workflow.peers` / `workflow.share` — passive sibling visibility in `par` (convenience over blackboard)
 - `Goal`/`Task` standard Protocols — convention, no wrapper functions
@@ -106,6 +107,12 @@ These have specs in `spec/` but no Rust implementation yet:
 - `agent.mock` + `agent.mock_calls` + `agent.mock_assert_called` — mock agents with call tracking for testing
 - `agent.dispatch` / `agent.dispatch_multi` — content-addressed pattern-based message routing
 - Causal chain queries in `std/trace` — parent-child span trees, `trace.chain` for failure chain extraction
+- `std/context` — context capacity management: tracking working memory, pressure callbacks, eviction, pinning, compaction
+- `std/prompt` — typed composable prompt assembly: named sections, few-shot examples, constraints, budget-aware rendering
+- `agent.topic` / `agent.subscribe` — agent-level pub/sub for multi-agent broadcast (distinct from in-process `std/events`)
+- `agent.pipeline` — consumer-driven flow control in agent pipelines with backpressure and overflow policies
+- `agent.on` — internal agent lifecycle hooks: startup, shutdown, error, idle, pre-message
+- `std/strategy` — strategy memory: recording approach outcomes per problem type, adaptive selection, cross-session learning
 
 ### Syntax gotchas
 
@@ -126,12 +133,11 @@ These have specs in `spec/` but no Rust implementation yet:
 
 Full plan: `design/stdlib_roadmap.md`. Specs for all planned features are in `spec/`.
 
-### Completed stdlib roadmap items (1-20):
+### Completed stdlib roadmap items (1-21):
 
-All 18 stdlib items + RuntimeCtx backend refactor + `refine` expression done: std/ai, std/tasks, std/audit, std/circuit, std/knowledge, std/plan, std/introspect, std/agents/auditor, std/agents/router, std/agents/grader, std/agents/planner, std/memory, std/trace, std/agents/monitor, std/agents/reviewer, MCP Embeddings (typed decl), std/diag, std/saga, RuntimeCtx backends, `refine`.
+All 18 stdlib items + RuntimeCtx backend refactor + `refine` expression + `agent.reconcile` done: std/ai, std/tasks, std/audit, std/circuit, std/knowledge, std/plan, std/introspect, std/agents/auditor, std/agents/router, std/agents/grader, std/agents/planner, std/memory, std/trace, std/agents/monitor, std/agents/reviewer, MCP Embeddings (typed decl), std/diag, std/saga, RuntimeCtx backends, `refine`, `agent.reconcile`.
 
 ### Next priorities (pick from these):
-21. **`agent.reconcile`** — Extension to `std/agent`. Structured merging of parallel results: union, vote (quorum/deliberation), max_score (early_stop), merge_fields. Subsumes consensus and speculate patterns. Spec: `spec/agents-reconcile.md`.
 22. **`trace.improvement_rate` / `trace.should_stop`** — Extension to `std/trace`. Gradient progress tracking via scored trace spans. Spec: `spec/agents-progress.md`.
 23. **`agent.dialogue`** — Extension to `std/agent`. Multi-turn sessions. Subsumes negotiation pattern. Spec: `spec/agents-dialogue.md`.
 24. **`agent.intercept`** — Extension to `std/agent`. Message middleware. Spec: `spec/agents-intercept.md`.
@@ -152,12 +158,18 @@ All 18 stdlib items + RuntimeCtx backend refactor + `refine` expression done: st
 39. **`agent.mock` + call tracking** — Extension to `std/agent`. Mock agents for testing. Spec: `spec/agents-test-harness.md`.
 40. **`agent.dispatch`** — Extension to `std/agent`. Content-addressed pattern-based message routing, dynamic tables, multi-dispatch. Spec: `spec/agents-dispatch.md`.
 41. **Causal spans in `std/trace`** — Extension to `std/trace`. Parent-child span trees, `trace.chain` for failure chain extraction. Mermaid sequence diagrams.
+42. **`std/context`** — New stdlib module. Context capacity management: tracking working memory, summarization triggers, eviction policies, pressure callbacks, pinning. Spec: `spec/agents-context-capacity.md`.
+43. **`std/prompt`** — New stdlib module. Typed composable prompt assembly: sections, few-shot examples, constraints, budget-aware rendering. Spec: `spec/agents-prompt.md`.
+44. **`agent.topic` / `agent.subscribe`** — Extension to `std/agent`. Agent-level pub/sub for multi-agent broadcast. Spec: `spec/agents-pubsub.md`.
+45. **`agent.pipeline`** — Extension to `std/agent`. Consumer-driven flow control with backpressure, buffering, pressure callbacks. Spec: `spec/agents-pipeline.md`.
+46. **`agent.on`** — Extension to `std/agent`. Internal lifecycle hooks: startup, shutdown, error, idle, pre-message. Spec: `spec/agents-lifecycle.md`.
+47. **`std/strategy`** — New stdlib module. Strategy memory: recording approach outcomes, learning across sessions, adaptive selection. Spec: `spec/agents-strategy.md`.
 
 ### Technical debt:
 
-42. **Currying removal** (deferred) — requires parser architecture change
-43. **Toolchain** — `lx fmt`, `lx repl`, `lx watch`
-44. **Unicode in lexer** — `→` and other multi-byte chars in comments cause panics (byte vs char indexing)
+48. **Currying removal** (deferred) — requires parser architecture change
+49. **Toolchain** — `lx fmt`, `lx repl`, `lx watch`
+50. **Unicode in lexer** — `→` and other multi-byte chars in comments cause panics (byte vs char indexing)
 
 ## Codebase Layout
 
@@ -169,12 +181,12 @@ crates/lx/src/
   checker/   mod.rs, synth.rs, types.rs
   interpreter/ mod.rs, agents.rs, apply.rs, collections.rs, eval.rs, modules.rs, patterns.rs, refine.rs, shell.rs
   builtins/  mod.rs, call.rs, str.rs, coll.rs, hof.rs, hof_extra.rs
-  stdlib/    mod.rs, agents_auditor.rs, agents_grader.rs, agents_monitor.rs, agents_planner.rs, agents_reviewer.rs, agents_router.rs, ai.rs, audit.rs, circuit.rs, diag.rs, diag_walk.rs, introspect.rs, knowledge.rs, memory.rs, plan.rs, saga.rs, tasks.rs, trace.rs, json.rs, json_conv.rs, ctx.rs, math.rs, fs.rs, env.rs, re.rs, md.rs, md_build.rs, agent.rs, mcp.rs, mcp_rpc.rs, mcp_stdio.rs, mcp_http.rs, http.rs, time.rs, cron.rs
+  stdlib/    mod.rs, agent.rs, agent_reconcile.rs, agent_reconcile_strat.rs, agents_auditor.rs, agents_grader.rs, agents_monitor.rs, agents_planner.rs, agents_reviewer.rs, agents_router.rs, ai.rs, audit.rs, circuit.rs, diag.rs, diag_walk.rs, introspect.rs, knowledge.rs, memory.rs, plan.rs, saga.rs, tasks.rs, trace.rs, json.rs, json_conv.rs, ctx.rs, math.rs, fs.rs, env.rs, re.rs, md.rs, md_build.rs, mcp.rs, mcp_rpc.rs, mcp_stdio.rs, mcp_http.rs, http.rs, time.rs, cron.rs
   ast.rs, token.rs, value.rs, value_display.rs, env.rs, error.rs, span.rs, lib.rs
 crates/lx-cli/src/main.rs
-spec/          55 language spec files
+spec/          62 language spec files
 design/        11 impl design docs + DEVLOG + CURRENT_OPINION
-tests/         43 .lx test files
+tests/         44 .lx test files
   fixtures/    agent_echo.lx, mcp_test_server.py, yield_orchestrator.py, etc.
 flows/         14 .lx programs translating arch_diagrams
   specs/       14 target goal + scenario specs

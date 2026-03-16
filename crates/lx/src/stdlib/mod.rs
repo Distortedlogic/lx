@@ -1,4 +1,6 @@
 pub(crate) mod agent;
+mod agent_reconcile;
+mod agent_reconcile_strat;
 mod agents_auditor;
 mod agents_grader;
 mod agents_monitor;

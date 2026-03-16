@@ -29,6 +29,7 @@ pub fn build() -> IndexMap<String, Value> {
     m.insert("kill".into(), mk("agent.kill", 1, bi_kill));
     m.insert("name".into(), mk("agent.name", 1, bi_name));
     m.insert("status".into(), mk("agent.status", 1, bi_status));
+    m.insert("reconcile".into(), super::agent_reconcile::mk_reconcile());
     m
 }
 

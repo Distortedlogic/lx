@@ -1,0 +1,195 @@
+use std/agent
+
+-- === Union: dedup by key, keep first ===
+
+search_results = [
+  [{id: "a" file: "main.rs" severity: 3}  {id: "b" file: "lib.rs" severity: 1}]
+  [{id: "a" file: "main.rs" severity: 5}  {id: "c" file: "util.rs" severity: 2}]
+]
+
+union_result = agent.reconcile search_results {
+  strategy: "union"
+  key: (item) item.id
+}
+
+assert (len union_result.merged == 3) "union: 3 unique items"
+assert (union_result.sources == 2) "union: 2 sources"
+assert (len union_result.conflicts == 1) "union: 1 conflict on id=a"
+assert (union_result.merged.0.severity == 3) "union: default keeps first"
+
+-- === Union: custom conflict ===
+
+union_conflict = agent.reconcile search_results {
+  strategy: "union"
+  key: (item) item.id
+  conflict: (a b) b
+}
+
+assert (union_conflict.merged.0.severity == 5) "union conflict: custom keeps second"
+
+-- === Union: flatten ===
+
+wrapped = [
+  {findings: [{id: "x" s: 1} {id: "y" s: 2}]}
+  {findings: [{id: "x" s: 3} {id: "z" s: 4}]}
+]
+
+flat_result = agent.reconcile wrapped {
+  strategy: "union"
+  flatten: "findings"
+  key: (item) item.id
+}
+
+assert (len flat_result.merged == 3) "union flatten: 3 unique"
+
+-- === Intersection ===
+
+inter_results = [
+  [{id: "a"} {id: "b"} {id: "c"}]
+  [{id: "a"} {id: "c"} {id: "d"}]
+  [{id: "a"} {id: "c"} {id: "e"}]
+]
+
+inter = agent.reconcile inter_results {
+  strategy: "intersection"
+  key: (item) item.id
+}
+
+assert (len inter.merged == 2) "intersection: a and c in all"
+assert (len inter.dropped == 3) "intersection: b, d, e dropped"
+
+-- === Vote: majority ===
+
+votes = [
+  {approved: true reason: "looks good"}
+  {approved: true reason: "lgtm"}
+  {approved: false reason: "needs work"}
+]
+
+vote_result = agent.reconcile votes {
+  strategy: "vote"
+  vote_field: "approved"
+  quorum: "majority"
+}
+
+assert (vote_result.merged == true) "vote majority: true wins"
+assert (vote_result.sources == 3) "vote: 3 sources"
+assert (len vote_result.dissenting == 1) "vote: 1 dissenter"
+
+-- === Vote: unanimous (not met) ===
+
+vote_unan = agent.reconcile votes {
+  strategy: "vote"
+  vote_field: "approved"
+  quorum: "unanimous"
+}
+
+unan_merged = vote_unan.merged
+assert (unan_merged == None) "vote unanimous: not met returns None"
+
+-- === Vote: quorum N ===
+
+vote_n = agent.reconcile votes {
+  strategy: "vote"
+  vote_field: "approved"
+  quorum: {n: 2}
+}
+
+assert (vote_n.merged == true) "vote quorum n=2: true has 2 votes"
+
+-- === Vote: custom field ===
+
+classifiers = [
+  {classification: "security"}
+  {classification: "security"}
+  {classification: "performance"}
+]
+
+class_result = agent.reconcile classifiers {
+  strategy: "vote"
+  vote_field: "classification"
+  quorum: "majority"
+}
+
+assert (class_result.merged == "security") "vote custom field: security wins"
+
+-- === Vote: weighted ===
+
+weighted_votes = [
+  {approved: true}
+  {approved: false}
+  {approved: false}
+]
+
+weighted_result = agent.reconcile weighted_votes {
+  strategy: "vote"
+  vote_field: "approved"
+  quorum: "majority"
+  weight: (idx) idx == 0 ? {true -> 3 false -> 1}
+}
+
+assert (weighted_result.merged == true) "vote weighted: senior overrides"
+
+-- === Highest confidence ===
+
+conf_results = [
+  {answer: "A" confidence: 0.7}
+  {answer: "B" confidence: 0.95}
+  {answer: "C" confidence: 0.8}
+]
+
+best = agent.reconcile conf_results {
+  strategy: "highest_confidence"
+}
+
+assert (best.merged.answer == "B") "highest_confidence: B wins"
+
+-- === Max score ===
+
+approaches = [
+  {code: "v1" quality: 60}
+  {code: "v2" quality: 85}
+  {code: "v3" quality: 72}
+]
+
+scored = agent.reconcile approaches {
+  strategy: "max_score"
+  score: (r) r.quality
+}
+
+assert (scored.merged.code == "v2") "max_score: v2 wins"
+
+-- === Max score: early stop ===
+
+early = agent.reconcile approaches {
+  strategy: "max_score"
+  score: (r) r.quality
+  early_stop: 80.0
+}
+
+assert (early.merged.code == "v2") "max_score early_stop: v2 exceeds 80"
+
+-- === Merge fields ===
+
+partial_a = {name: "report" tags: ["security"] score: 7}
+partial_b = {name: "report" tags: ["perf"] extra: "data"}
+
+merge_result = agent.reconcile [partial_a partial_b] {
+  strategy: "merge_fields"
+}
+
+assert (merge_result.merged.name == "report") "merge_fields: name kept"
+assert (merge_result.merged.tags == ["security" "perf"]) "merge_fields: lists concat"
+assert (merge_result.merged.extra == "data") "merge_fields: new field added"
+assert (len merge_result.conflicts == 1) "merge_fields: name conflicted"
+
+-- === Custom strategy ===
+
+custom = agent.reconcile [1 2 3] {
+  strategy: (results) results | fold 0 (acc x) acc + x
+}
+
+assert (custom.merged == 6) "custom strategy: sum"
+assert (custom.sources == 3) "custom: 3 sources"
+
+log.info "44_agent_reconcile: all passed"

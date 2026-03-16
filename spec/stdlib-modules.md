@@ -156,26 +156,6 @@ snapshot board            -- %{Str: a} (atomic snapshot of all entries)
 
 `Board` is an opaque type backed by a concurrent map. Thread-safe for use inside `par`/`pmap` blocks.
 
-### Patterns
-
-Cross-agent awareness during parallel review:
-```
-use std/blackboard
-
-board = blackboard.create ()
-par {
-  security_agent ~>? {task: "review" board} ^
-  perf_agent ~>? {task: "review" board} ^
-}
-findings = blackboard.snapshot board
-```
-
-Inside each agent, they read/write to the shared board:
-```
-blackboard.write "security_issues" issues board
-peer_findings = blackboard.read "perf_issues" board ?? []
-```
-
 ## std/events
 
 Topic-based pub/sub event bus. Decouples event producers from consumers — publishers don't know who's listening.
@@ -224,7 +204,7 @@ project b opts                 -- {projected_total  will_exceed  headroom}
 slice b limits                 -- Budget (sub-budget drawing from parent)
 ```
 
-`Budget` is a mutable, thread-safe type. `spend` returns `Err "budget_exceeded"` if any dimension goes negative. `status` returns a symbol based on used percentage. `slice` creates child budgets that share parent counters. Spec: `spec/agents-budget.md`.
+`Budget` is a mutable, thread-safe type. `slice` creates child budgets sharing parent counters. Spec: `spec/agents-budget.md`.
 
 ## std/reputation
 
@@ -239,11 +219,11 @@ best_for rep task_type opts    -- with {min_history: 5}
 rank rep task_type             -- [{agent score}] (sorted best-first)
 ```
 
-`Rep` is an opaque file-backed type. Scores are EWMA (exponentially-weighted moving average) per (agent, task_type) pair. `trend` is `:improving`, `:stable`, or `:declining`. Configurable `decay_half_life` (default 100). Spec: `spec/agents-reputation.md`.
+`Rep` is an opaque file-backed type. EWMA per (agent, task_type) pair. Configurable `decay_half_life`. Spec: `spec/agents-reputation.md`.
 
 ## std/trace extensions (planned)
 
-Causal chain queries via parent-child span trees. `trace.span` gains optional `parent` field. `trace.chain` walks from failed span to root cause. `trace.improvement_rate` and `trace.should_stop` query scored progress spans. These extend the existing `std/trace` module — no separate `std/causal` module.
+Causal chain queries via parent-child span trees. `trace.chain` walks from failure to root cause. `trace.improvement_rate`/`trace.should_stop` query scored progress spans.
 
 ## std/skill
 
@@ -259,11 +239,66 @@ run registry name input        -- Result output SkillErr (validated execution)
 compose registry names         -- Fn (chained pipeline, output->input type-checked)
 ```
 
-`Registry` is an opaque type holding Skill values. `list` returns metadata safe for LLM consumption (no handler functions). `run` validates input against schema, calls handler, validates output. `compose` chains skills into a pipeline. Spec: `spec/agents-skill.md`.
+`Registry` is an opaque type holding Skill values. `list` returns metadata only (LLM-safe). `compose` chains skills into a pipeline. Spec: `spec/agents-skill.md`.
 
 ## std/durable
 
 Workflow persistence management. Functions: `status`, `resume`, `cancel`, `list`, `cleanup`. Manages workflows created by `durable` expression. Storage via `DurableBackend` trait on RuntimeCtx. Default: filesystem JSON. Spec: `spec/agents-durable.md`.
+
+## std/context
+
+Context capacity management. Tracks working memory, pressure, eviction, compaction. Distinct from `std/ctx` (persistent storage) and `std/memory` (tiered facts). Spec: `spec/agents-context-capacity.md`.
+
+```
+create opts                    -- Window (e.g. {capacity: 200000})
+add win item                   -- () (item: {key content tokens priority?})
+usage win                      -- {used capacity available pct}
+pressure win                   -- :low | :moderate | :high | :critical
+estimate content               -- Int (approximate token count)
+on_pressure win level callback -- () (fire callback when pressure >= level)
+pin win key / unpin win key    -- ()
+evict win strategy             -- () (:oldest | :lowest_priority | :largest)
+evict_until win strategy opts  -- () (repeat until {target_pct} reached)
+compact win strategy           -- () (:summarize | :drop_examples | :truncate)
+items win                      -- [{key tokens priority pinned added_at}]
+get win key                    -- Maybe {key content tokens priority pinned}
+remove win key / clear win     -- ()
+```
+
+## std/prompt
+
+Typed composable prompt assembly. Immutable builder — all functions return new Prompt. Spec: `spec/agents-prompt.md`.
+
+```
+create ()                      -- Prompt (empty builder)
+system text p                  -- Prompt (set system section)
+section name content p         -- Prompt (add named section)
+constraint text p              -- Prompt (add constraint)
+instruction text p             -- Prompt (add instruction)
+example pair p                 -- Prompt (add {input output} few-shot example)
+compose [p1 p2 ...]           -- Prompt (merge prompts, sections concatenate)
+render p                       -- Str (render to final string)
+render_within p budget         -- Str (trim to fit token budget)
+estimate p                     -- Int (approximate token count)
+sections p                     -- [Symbol] (list section names)
+without p name                 -- Prompt (remove section)
+```
+
+## std/strategy
+
+Strategy memory — approach outcomes per problem type, cross-session learning. File-backed. Spec: `spec/agents-strategy.md`.
+
+```
+create path                    -- Store ^ IoErr (file-backed JSON)
+record store entry             -- () ^ IoErr ({problem approach score context?})
+best_for store problem         -- {approach avg_score count trend} ^ StratErr
+rank store problem             -- [{approach avg_score count trend}]
+suggest store query            -- {approach confidence reason} ({problem context})
+history store problem approach -- [{score context timestamp}]
+adapt store problem            -- {approach mode} (:exploit or :explore)
+prune store opts               -- () ({older_than: days} or {min_count below_score})
+export store / import store data -- Record / ()
+```
 
 ## Eliminated Modules (merged into existing features)
 
