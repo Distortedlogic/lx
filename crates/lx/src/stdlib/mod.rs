@@ -4,6 +4,7 @@ mod agent_dialogue;
 mod agent_gate;
 mod agent_handoff;
 mod agent_intercept;
+mod agent_mock;
 mod agent_supervise;
 mod agent_reconcile;
 mod agent_reconcile_strat;
