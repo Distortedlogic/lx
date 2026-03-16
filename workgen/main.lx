@@ -48,8 +48,8 @@ required_sections = ["Goal" "Why" "What changes" "Files affected" "Task List" "C
 +run = (audit_path rules_path) {
   audit_content = fs.read audit_path ^
   rules_content = fs.read rules_path ^
-  raw_name = audit_path | split "/" | last
-  base = raw_name | split "." | first
+  raw_name = audit_path | split "/" | last ^
+  base = raw_name | split "." | first ^
   name = base | replace "-" "_" | upper
   context = gather_context ()
 

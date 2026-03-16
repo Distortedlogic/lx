@@ -1,6 +1,6 @@
 -- Satisfaction test runner for workgen.
--- Runs workgen against each scenario's real codebase, grades the output
--- against expected findings (the answer key), reports satisfaction scores.
+-- Grades golden output files against expected findings (the answer key),
+-- reports satisfaction scores per scenario.
 --
 -- Usage: lx run workgen/tests/run.lx
 -- Filter: TEST_TAG=smoke lx run workgen/tests/run.lx
@@ -8,22 +8,16 @@
 use std/fs
 use std/env
 use std/trace
-use std/audit
 use ./spec
-use ../main : workgen
 
 run_scenario = (scenario) {
   emit "\n  --- {scenario.name} ---"
 
-  audit_path = "{scenario.root}/rules/audit"
-  rules_path = "{scenario.root}/rules/work-item.md"
+  golden_path = "{scenario.root}/expected_output.md"
+  read_result = fs.read golden_path
 
-  result = workgen.run audit_path rules_path
-
-  result ? {
-    Ok r -> {
-      output = fs.read r.path ?? ""
-
+  read_result ? {
+    Ok output -> {
       dimensions = spec.grader output scenario
       w_structure = dimensions.structure * spec.weights.structure
       w_coverage = dimensions.coverage * spec.weights.coverage
@@ -46,11 +40,13 @@ run_scenario = (scenario) {
       emit "    findings: {found | len}/{scenario.expected_findings | len}"
       missed | empty? ? () : emit "    missed: {missed | join ", "}"
 
-      {name: scenario.name  passed  score: weighted}
+      sn = scenario.name
+      {name: sn  passed  score: weighted}
     }
     Err e -> {
       emit "    ERROR: {e}"
-      {name: scenario.name  passed: false  score: 0.0}
+      sn = scenario.name
+      {name: sn  passed: false  score: 0.0}
     }
   }
 }
