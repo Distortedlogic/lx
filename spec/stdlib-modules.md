@@ -207,3 +207,66 @@ events.subscribe bus "test_failed" (evt) {
 
 fs_watcher ~>? {watch: "src/" bus}
 ```
+
+## std/budget
+
+Cumulative resource/cost accounting with projection and adaptive strategy.
+
+```
+create limits                  -- Budget (e.g. {tokens: 50000 api_calls: 20})
+create limits opts             -- Budget with custom thresholds ({tight_at: 60 critical_at: 90})
+spend b costs                  -- () ^ BudgetErr (deduct from budget)
+remaining b                    -- {tokens: Int  api_calls: Int  ...}
+used b                         -- {tokens: Int  api_calls: Int  ...}
+used_pct b                     -- {tokens: Float  api_calls: Float  ...}
+status b                       -- :comfortable | :tight | :critical | :exceeded
+project b opts                 -- {projected_total  will_exceed  headroom}
+slice b limits                 -- Budget (sub-budget drawing from parent)
+```
+
+`Budget` is a mutable, thread-safe type. `spend` returns `Err "budget_exceeded"` if any dimension goes negative. `status` returns a symbol based on used percentage. `slice` creates child budgets that share parent counters. Spec: `spec/agents-budget.md`.
+
+## std/reputation
+
+Cross-interaction agent quality tracking with EWMA scoring.
+
+```
+load path                      -- Rep ^ IoErr (load or create reputation store)
+record rep entry               -- () ^ IoErr (record outcome: {agent task_type passed score})
+score rep agent task_type      -- {score ewma total recent trend} ^ RepErr
+best_for rep task_type         -- {agent score} ^ RepErr
+best_for rep task_type opts    -- with {min_history: 5}
+rank rep task_type             -- [{agent score}] (sorted best-first)
+```
+
+`Rep` is an opaque file-backed type. Scores are EWMA (exponentially-weighted moving average) per (agent, task_type) pair. `trend` is `:improving`, `:stable`, or `:declining`. Configurable `decay_half_life` (default 100). Spec: `spec/agents-reputation.md`.
+
+## std/trace extensions (planned)
+
+Causal chain queries via parent-child span trees. `trace.span` gains optional `parent` field. `trace.chain` walks from failed span to root cause. `trace.improvement_rate` and `trace.should_stop` query scored progress spans. These extend the existing `std/trace` module — no separate `std/causal` module.
+
+## std/skill
+
+Runtime registry and discovery for `Skill` declarations.
+
+```
+registry skills                -- Registry (from list of Skill values)
+list registry                  -- [{name description input output tags}] (metadata only)
+get registry name              -- {name description input output requires tags} ^ SkillErr
+match registry prompt          -- {name score reason} ^ SkillErr (keyword matching)
+match_semantic registry prompt -- {name score reason} ^ SkillErr (LLM-based matching)
+run registry name input        -- Result output SkillErr (validated execution)
+compose registry names         -- Fn (chained pipeline, output->input type-checked)
+```
+
+`Registry` is an opaque type holding Skill values. `list` returns metadata safe for LLM consumption (no handler functions). `run` validates input against schema, calls handler, validates output. `compose` chains skills into a pipeline. Spec: `spec/agents-skill.md`.
+
+## std/durable
+
+Workflow persistence management. Functions: `status`, `resume`, `cancel`, `list`, `cleanup`. Manages workflows created by `durable` expression. Storage via `DurableBackend` trait on RuntimeCtx. Default: filesystem JSON. Spec: `spec/agents-durable.md`.
+
+## Eliminated Modules (merged into existing features)
+
+- **std/decide** → Decision metadata stored as trace spans with structured metadata fields. Query via `trace.query {type: "decision"}`.
+- **std/causal** → Parent-child span trees in `std/trace`. `trace.chain` walks from failure to root cause.
+- **std/agent_test** → `agent.mock` + `agent.mock_calls` + `agent.mock_assert_called` helpers in `std/agent`. Test scenarios are regular lx code.

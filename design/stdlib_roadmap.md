@@ -28,7 +28,7 @@ Complete stdlib for the three use cases: agent communication, workflow orchestra
 
 ### std/ai (DONE)
 
-LLM integration. `prompt` (text -> text) and `prompt_with` (full options -> result record with session_id, cost, turns). Standard backend: Claude Code CLI (`claude -p --output-format json`) — handles auth, model routing, tool permissions, sessions, cost tracking. Will be behind `AiBackend` trait after `RuntimeCtx` refactor. Shared utilities: `ai::parse_llm_json`, `ai::extract_llm_text`, `ai::strip_json_fences`.
+LLM integration. `prompt` (text -> text) and `prompt_with` (full options -> result record with session_id, cost, turns). Standard backend: Claude Code CLI. Shared utilities: `ai::parse_llm_json`, `ai::extract_llm_text`, `ai::strip_json_fences`.
 
 ### std/tasks (DONE)
 
@@ -36,11 +36,11 @@ Task state machine with hierarchical subtasks and auto-persist. Status lifecycle
 
 ### std/audit (DONE)
 
-Structural quality checks. Fast pre-filter for auditor agent. Checks: is_empty, is_hedging, is_refusal, references_task, has_diff. Shared utilities: `build_eval_result`, `make_eval_category`, `keyword_overlap`.
+Structural quality checks. Fast pre-filter for auditor agent. Shared utilities: `build_eval_result`, `make_eval_category`, `keyword_overlap`.
 
-### std/circuit (DONE)
+### std/circuit (DONE — will be absorbed by std/budget)
 
-Circuit breakers. Turn counter, wall-clock timeout, action repetition detection. Returns structured reason when breaker fires.
+Circuit breakers. Turn counter, wall-clock timeout, action repetition detection. Returns structured reason when breaker fires. When `std/budget` is implemented, circuit's functionality folds into budget (multi-dimension limits with gradient status instead of binary tripped/not-tripped). Repetition detection stays in introspect.
 
 ### std/knowledge (DONE)
 
@@ -60,29 +60,15 @@ Tiered memory (L0-L3). Promotion on confirmation, demotion on contradiction. Con
 
 ### std/trace (DONE)
 
-Trace collection. Input/output/timing/score per interaction. JSONL export.
+Trace collection. Input/output/timing/score per interaction. JSONL export. Will be extended with parent-child spans (causal chains) and progress query utilities.
 
 ### std/diag (DONE)
 
-Program visualization. AST walker extracts workflow graph (agents as nodes, `~>`/`~>?` as edges, `par`/`sel` as structural groups, match as decision points). Emits Mermaid flowchart. `lx diagram` CLI subcommand + `diag.extract`/`diag.to_mermaid` library API. Graph IR is plain lx records.
+Program visualization. AST walker extracts workflow graph. Mermaid flowchart. `lx diagram` CLI subcommand + `diag.extract`/`diag.to_mermaid` library API.
 
 ### std/saga (DONE)
 
-Multi-agent transactional operations with compensating actions. `saga.run` executes steps in order; on failure, undo functions run in reverse. `saga.run_with` adds options (timeout, max_retries, on_compensate). `saga.define`/`saga.execute` for reusable definitions with initial context. Supports dependency ordering.
-
-## Module Descriptions (Not Yet Implemented)
-
-### std/blackboard
-
-Concurrent shared workspace for multi-agent collaboration within `par` blocks. Last-write-wins. Functions: `create`, `read`, `write`, `watch`, `unwatch`, `keys`, `snapshot`.
-
-### std/events
-
-Topic-based pub/sub event bus. Functions: `create`, `publish`, `subscribe`, `unsubscribe`, `topics`. Synchronous handlers.
-
-### std/saga
-
-Multi-agent transactional operations with compensating actions. `saga.run` executes steps in order; on failure, undo functions run in reverse. Spec: `spec/agents-saga.md`.
+Multi-agent transactional operations with compensating actions. `saga.run`, `saga.run_with`, `saga.define`/`saga.execute`. Supports dependency ordering.
 
 ## Standard Agents (All DONE)
 
@@ -97,14 +83,6 @@ Multi-agent transactional operations with compensating actions. `saga.run` execu
 
 ## Planned Language Features (Not Yet Implemented)
 
-### `refine` expression (new keyword)
-
-First-class feedback loop: try -> grade -> revise -> re-grade with threshold and max_rounds. Spec: `spec/agents-refine.md`.
-
-### `consensus` expression (new keyword)
-
-Multi-agent voting with quorum policies (`:unanimous`, `:majority`, `:any`, `(n K)`). Optional deliberation. Spec: `spec/agents-consensus.md`.
-
 ### `|>>` streaming pipe (new operator)
 
 Reactive dataflow. Items flow downstream as they complete. Lazy until `collect`/`each`. Spec: `spec/concurrency-reactive.md`.
@@ -117,28 +95,72 @@ Extends `with`. Deadline, budget, trace ID propagate automatically. Spec: `spec/
 
 Handler-scoped. Agents ask back without going through orchestrator. Spec: `spec/agents-clarify.md`.
 
-### `_priority` message field
+### `_priority` message field (binary)
 
-4 levels: `:critical`/`:high`/`:normal`/`:low`. Stripped before handler delivery. Spec: `spec/agents-priority.md`.
+`:critical` or default. Stripped before handler delivery. `agent.check_critical` polls for pending critical messages. Spec: `spec/agents-priority.md`.
+
+### `Skill` declarations (new keyword)
+
+Self-describing, discoverable capability units with typed I/O. Completes the trinity: Protocol (messages), MCP (external tools), Skill (internal capabilities). `std/skill` provides registry, discovery, matching, composition. Spec: `spec/agents-skill.md`.
+
+### `durable` expression (new keyword)
+
+Automatic workflow state persistence at suspension points. Cross-process resumption via `lx resume <id>`. `DurableBackend` trait on RuntimeCtx. Default: filesystem JSON. Spec: `spec/agents-durable.md`.
+
+## Planned New Modules (Not Yet Implemented)
+
+### std/budget
+
+Cumulative cost/resource accounting. Track spend across token, API call, and wall-time dimensions. Gradient status (comfortable/tight/critical/exceeded). Sub-budgets. Absorbs `std/circuit` functionality (hard limits are just exceeded budget status). Spec: `spec/agents-budget.md`.
+
+### std/reputation
+
+Cross-interaction agent quality tracking. EWMA scoring per (agent, task_type) pair. Spec: `spec/agents-reputation.md`.
+
+### std/skill
+
+Runtime registry and discovery for Skill declarations. Functions: `registry`, `list`, `match`, `match_semantic`, `run`, `get`, `compose`. Spec: `spec/agents-skill.md`.
+
+### std/durable
+
+Workflow persistence management. Functions: `status`, `resume`, `cancel`, `list`, `cleanup`. Spec: `spec/agents-durable.md`.
 
 ## Planned Extensions to Existing Modules
 
 | Extension | Target | Spec |
 |---|---|---|
-| `introspect.progress` / `improvement_rate` / `should_stop` | std/introspect | `spec/agents-progress.md` |
-| `agent.reconcile` | std/agent | `spec/agents-reconcile.md` |
+| `trace.improvement_rate` / `trace.should_stop` | std/trace | `spec/agents-progress.md` |
+| Parent-child spans + `trace.chain` | std/trace | (causal chain queries) |
+| `agent.reconcile` (vote/quorum/deliberation/max_score/early_stop) | std/agent | `spec/agents-reconcile.md` |
 | `agent.dialogue` / `agent.dialogue_turn` | std/agent | `spec/agents-dialogue.md` |
 | `agent.intercept` | std/agent | `spec/agents-intercept.md` |
-| `agent.handoff` / `agent.as_context` | std/agent | `spec/agents-handoff.md` |
+| `Handoff` Protocol + `agent.as_context` | std/agent | `spec/agents-handoff.md` |
 | `agent.supervise` | std/agent | `spec/agents-supervision.md` |
 | `agent.gate` | std/agent | `spec/agents-gates.md` |
 | `agent.capabilities` | std/agent | `spec/agents-capability.md` |
 | `workflow.peers` / `workflow.share` | std/agent | `spec/agents-broadcast.md` |
-| Goal/Task protocols + `agent.send_goal`/`agent.send_task` | std/agent | `spec/agents-goals.md` |
+| `Goal`/`Task` Protocols | std/agent | `spec/agents-goals.md` |
+| `agent.mock` + call tracking | std/agent | `spec/agents-test-harness.md` |
+| `agent.dispatch` / `agent.dispatch_multi` | std/agent | `spec/agents-dispatch.md` |
 | Deadlock detection | interpreter | `spec/agents-deadlock.md` |
-| `RuntimeCtx` backends | interpreter + all stdlib | `spec/runtime-backends.md` | DONE |
-| Enhanced `retry_with` | built-in | stdlib roadmap |
-| `ai.summarize` | std/ai | stdlib roadmap |
+| `RuntimeCtx` backends | interpreter + all stdlib | DONE |
+| `ai.prompt_structured` / `ai.prompt_structured_with` | std/ai | `spec/agents-structured-output.md` |
+| `plan.run_incremental` | std/plan | `spec/agents-incremental.md` |
+
+## Eliminated by Merges (Session 37)
+
+| Former Feature | Absorbed Into | Rationale |
+|---|---|---|
+| `consensus` keyword | `agent.reconcile` `:vote` strategy | Voting is a reconciliation strategy, not a separate keyword |
+| `speculate` keyword | `agent.reconcile` `:max_score` strategy | Best-of-N is a reconciliation strategy |
+| `agent.escalate` | Fold + handoff pattern | Expressible as composition, not a primitive |
+| `agent.negotiate` | `agent.dialogue` with Protocols | Negotiation is multi-turn dialogue with Proposal/Counter/Contract protocols |
+| `std/decide` module | Decision metadata on trace spans | Decisions are trace spans with structured metadata |
+| `std/causal` module | Parent-child spans in `std/trace` | Causal spans are trace spans with `parent_id` |
+| `agent.handoff` function | `Handoff` Protocol + `~>?` | Just a Protocol convention, not a function |
+| `agent.send_goal`/`agent.send_task` | `Goal`/`Task` Protocols + `~>?` | Just Protocol definitions, not wrapper functions |
+| 4-level priority | Binary `:critical`/default | Only critical (stop signals) needs priority |
+| `std/agent_test` module | `agent.mock` helpers in `std/agent` | Scenarios are regular test code; only mock_agent needs stdlib support |
 
 ## Mapping to Arch Diagram Flows
 

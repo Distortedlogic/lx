@@ -57,10 +57,7 @@ fn rpc(
             .get("message")
             .and_then(|v| v.as_str())
             .unwrap_or("unknown");
-        return Err(LxError::runtime(
-            format!("mcp: server error: {msg}"),
-            span,
-        ));
+        return Err(LxError::runtime(format!("mcp: server error: {msg}"), span));
     }
     resp.get("result")
         .cloned()
@@ -136,7 +133,10 @@ fn http_url(val: &Value, span: Span) -> Result<String, LxError> {
             .and_then(|v| v.as_str())
             .map(String::from)
             .ok_or_else(|| LxError::runtime("mcp.connect: needs 'url' field", span)),
-        _ => Err(LxError::type_err("mcp.connect: expects URI or Record", span)),
+        _ => Err(LxError::type_err(
+            "mcp.connect: expects URI or Record",
+            span,
+        )),
     }
 }
 
@@ -150,7 +150,11 @@ fn init_handshake(conn: &mut McpConnection, span: Span) -> Result<(), LxError> {
     notify(conn, "notifications/initialized", span)
 }
 
-pub(super) fn connect(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+pub(super) fn connect(
+    args: &[Value],
+    span: Span,
+    _ctx: &Arc<RuntimeCtx>,
+) -> Result<Value, LxError> {
     let transport = if is_http(&args[0]) {
         let url = http_url(&args[0], span)?;
         McpTransport::Http(HttpTransport::new(url, span)?)

@@ -34,7 +34,8 @@ pub fn build() -> IndexMap<String, Value> {
 
 fn get_pid(agent: &Value, span: Span) -> Result<u32, LxError> {
     match agent {
-        Value::Record(r) => r.get("__pid")
+        Value::Record(r) => r
+            .get("__pid")
             .and_then(|v| v.as_int())
             .and_then(|n| n.try_into().ok())
             .ok_or_else(|| LxError::type_err("agent: expected agent record with __pid", span)),
@@ -46,10 +47,14 @@ fn bi_spawn(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value,
     let Value::Record(config) = &args[0] else {
         return Err(LxError::type_err("agent.spawn expects Record config", span));
     };
-    let script = config.get("script")
+    let script = config
+        .get("script")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| LxError::runtime("agent.spawn: config must have 'script' field (Str)", span))?;
-    let name = config.get("name")
+        .ok_or_else(|| {
+            LxError::runtime("agent.spawn: config must have 'script' field (Str)", span)
+        })?;
+    let name = config
+        .get("name")
         .and_then(|v| v.as_str())
         .unwrap_or("unnamed")
         .to_string();
@@ -63,12 +68,27 @@ fn bi_spawn(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value,
         .stderr(Stdio::inherit())
         .spawn()
         .map_err(|e| LxError::runtime(format!("agent.spawn: failed: {e}"), span))?;
-    let stdin = BufWriter::new(child.stdin.take()
-        .ok_or_else(|| LxError::runtime("agent.spawn: no stdin pipe", span))?);
-    let stdout = BufReader::new(child.stdout.take()
-        .ok_or_else(|| LxError::runtime("agent.spawn: no stdout pipe", span))?);
+    let stdin = BufWriter::new(
+        child
+            .stdin
+            .take()
+            .ok_or_else(|| LxError::runtime("agent.spawn: no stdin pipe", span))?,
+    );
+    let stdout = BufReader::new(
+        child
+            .stdout
+            .take()
+            .ok_or_else(|| LxError::runtime("agent.spawn: no stdout pipe", span))?,
+    );
     let pid = child.id();
-    REGISTRY.insert(pid, AgentProcess { _child: child, stdin, stdout });
+    REGISTRY.insert(
+        pid,
+        AgentProcess {
+            _child: child,
+            stdin,
+            stdout,
+        },
+    );
     let mut rec = IndexMap::new();
     rec.insert("__pid".into(), Value::Int(BigInt::from(pid)));
     rec.insert("name".into(), Value::Str(Arc::from(name.as_str())));
@@ -79,17 +99,24 @@ pub fn ask_subprocess(pid: u32, msg: &Value, span: Span) -> Result<Value, LxErro
     let json = json_conv::lx_to_json(msg, span)?;
     let json_str = serde_json::to_string(&json)
         .map_err(|e| LxError::runtime(format!("agent.ask: JSON encode: {e}"), span))?;
-    let mut agent = REGISTRY.get_mut(&pid)
+    let mut agent = REGISTRY
+        .get_mut(&pid)
         .ok_or_else(|| LxError::runtime(format!("agent.ask: agent {pid} not found"), span))?;
     writeln!(agent.stdin, "{json_str}")
         .map_err(|e| LxError::runtime(format!("agent.ask: write error: {e}"), span))?;
-    agent.stdin.flush()
+    agent
+        .stdin
+        .flush()
         .map_err(|e| LxError::runtime(format!("agent.ask: flush error: {e}"), span))?;
     let mut response = String::new();
-    agent.stdout.read_line(&mut response)
+    agent
+        .stdout
+        .read_line(&mut response)
         .map_err(|e| LxError::runtime(format!("agent.ask: read error: {e}"), span))?;
     if response.is_empty() {
-        return Ok(Value::Err(Box::new(Value::Str(Arc::from("agent disconnected")))));
+        return Ok(Value::Err(Box::new(Value::Str(Arc::from(
+            "agent disconnected",
+        )))));
     }
     let jv: serde_json::Value = serde_json::from_str(response.trim())
         .map_err(|e| LxError::runtime(format!("agent.ask: JSON decode: {e}"), span))?;
@@ -103,11 +130,14 @@ pub fn send_subprocess(pid: u32, msg: &Value, span: Span) -> Result<Value, LxErr
     let json = json_conv::lx_to_json(msg, span)?;
     let json_str = serde_json::to_string(&json)
         .map_err(|e| LxError::runtime(format!("agent.send: JSON encode: {e}"), span))?;
-    let mut agent = REGISTRY.get_mut(&pid)
+    let mut agent = REGISTRY
+        .get_mut(&pid)
         .ok_or_else(|| LxError::runtime(format!("agent.send: agent {pid} not found"), span))?;
     writeln!(agent.stdin, "{json_str}")
         .map_err(|e| LxError::runtime(format!("agent.send: write: {e}"), span))?;
-    agent.stdin.flush()
+    agent
+        .stdin
+        .flush()
         .map_err(|e| LxError::runtime(format!("agent.send: flush: {e}"), span))?;
     Ok(Value::Ok(Box::new(Value::Unit)))
 }
@@ -130,13 +160,16 @@ fn bi_kill(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, 
             let _ = agent._child.wait();
             Ok(Value::Ok(Box::new(Value::Unit)))
         }
-        None => Ok(Value::Err(Box::new(Value::Str(Arc::from("agent not found"))))),
+        None => Ok(Value::Err(Box::new(Value::Str(Arc::from(
+            "agent not found",
+        ))))),
     }
 }
 
 fn bi_name(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     match &args[0] {
-        Value::Record(r) => Ok(r.get("name")
+        Value::Record(r) => Ok(r
+            .get("name")
             .cloned()
             .unwrap_or(Value::Str(Arc::from("unnamed")))),
         _ => Err(LxError::type_err("agent.name expects agent Record", span)),
@@ -145,7 +178,11 @@ fn bi_name(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, 
 
 fn bi_status(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let pid = get_pid(&args[0], span)?;
-    let state = if REGISTRY.contains_key(&pid) { "running" } else { "stopped" };
+    let state = if REGISTRY.contains_key(&pid) {
+        "running"
+    } else {
+        "stopped"
+    };
     let mut rec = IndexMap::new();
     rec.insert("state".into(), Value::Str(Arc::from(state)));
     rec.insert("pid".into(), Value::Int(BigInt::from(pid)));

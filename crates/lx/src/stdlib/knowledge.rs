@@ -42,7 +42,8 @@ pub fn build() -> IndexMap<String, Value> {
 
 fn kb_id(v: &Value, span: Span) -> Result<u64, LxError> {
     match v {
-        Value::Record(r) => r.get("__kb_id")
+        Value::Record(r) => r
+            .get("__kb_id")
             .and_then(|v| v.as_int())
             .and_then(|n| n.try_into().ok())
             .ok_or_else(|| LxError::type_err("knowledge: expected KB record", span)),
@@ -65,12 +66,17 @@ fn entry_to_value(key: &str, e: &KBEntry) -> Value {
     fields.insert("key".into(), Value::Str(Arc::from(key)));
     fields.insert("val".into(), e.val.clone());
     fields.insert("meta".into(), e.meta.clone());
-    fields.insert("stored_at".into(), Value::Str(Arc::from(e.stored_at.as_str())));
+    fields.insert(
+        "stored_at".into(),
+        Value::Str(Arc::from(e.stored_at.as_str())),
+    );
     Value::Record(Arc::new(fields))
 }
 
 fn persist(kb: &KnowledgeBase, span: Span) -> Result<(), LxError> {
-    let items: Vec<Value> = kb.entries.iter()
+    let items: Vec<Value> = kb
+        .entries
+        .iter()
         .map(|(k, e)| entry_to_value(k, e))
         .collect();
     let list = Value::List(Arc::new(items));
@@ -95,48 +101,79 @@ fn load_entries(path: &str, span: Span) -> Result<IndexMap<String, KBEntry>, LxE
     };
     for item in items.iter() {
         if let Value::Record(r) = item {
-            let key = r.get("key").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let key = r
+                .get("key")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
             let val = r.get("val").cloned().unwrap_or(Value::Unit);
-            let meta = r.get("meta").cloned().unwrap_or(Value::Record(Arc::new(IndexMap::new())));
-            let stored_at = r.get("stored_at").and_then(|v| v.as_str())
-                .unwrap_or("").to_string();
-            entries.insert(key, KBEntry { val, meta, stored_at });
+            let meta = r
+                .get("meta")
+                .cloned()
+                .unwrap_or(Value::Record(Arc::new(IndexMap::new())));
+            let stored_at = r
+                .get("stored_at")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            entries.insert(
+                key,
+                KBEntry {
+                    val,
+                    meta,
+                    stored_at,
+                },
+            );
         }
     }
     Ok(entries)
 }
 
 fn bi_create(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let path = args[0].as_str()
+    let path = args[0]
+        .as_str()
         .ok_or_else(|| LxError::type_err("knowledge.create expects Str path", span))?;
     let entries = load_entries(path, span)?;
     let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
-    KBS.insert(id, KnowledgeBase { entries, path: PathBuf::from(path) });
+    KBS.insert(
+        id,
+        KnowledgeBase {
+            entries,
+            path: PathBuf::from(path),
+        },
+    );
     Ok(make_handle(id))
 }
 
 fn bi_store(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let key = args[0].as_str()
+    let key = args[0]
+        .as_str()
         .ok_or_else(|| LxError::type_err("knowledge.store: key must be Str", span))?;
     let val = args[1].clone();
     let meta = args[2].clone();
     let id = kb_id(&args[3], span)?;
-    let mut kb = KBS.get_mut(&id)
+    let mut kb = KBS
+        .get_mut(&id)
         .ok_or_else(|| LxError::runtime("knowledge: KB not found", span))?;
-    kb.entries.insert(key.to_string(), KBEntry {
-        val,
-        meta,
-        stored_at: now_str(),
-    });
+    kb.entries.insert(
+        key.to_string(),
+        KBEntry {
+            val,
+            meta,
+            stored_at: now_str(),
+        },
+    );
     persist(&kb, span)?;
     Ok(make_handle(id))
 }
 
 fn bi_get(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let key = args[0].as_str()
+    let key = args[0]
+        .as_str()
         .ok_or_else(|| LxError::type_err("knowledge.get: key must be Str", span))?;
     let id = kb_id(&args[1], span)?;
-    let kb = KBS.get(&id)
+    let kb = KBS
+        .get(&id)
         .ok_or_else(|| LxError::runtime("knowledge: KB not found", span))?;
     match kb.entries.get(key) {
         Some(e) => Ok(Value::Some(Box::new(entry_to_value(key, e)))),
@@ -147,7 +184,8 @@ fn bi_get(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, L
 fn bi_query(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let filter_fn = &args[0];
     let id = kb_id(&args[1], span)?;
-    let kb = KBS.get(&id)
+    let kb = KBS
+        .get(&id)
         .ok_or_else(|| LxError::runtime("knowledge: KB not found", span))?;
     let mut results = Vec::new();
     for (key, entry) in kb.entries.iter() {
@@ -162,19 +200,24 @@ fn bi_query(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, 
 
 fn bi_keys(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = kb_id(&args[0], span)?;
-    let kb = KBS.get(&id)
+    let kb = KBS
+        .get(&id)
         .ok_or_else(|| LxError::runtime("knowledge: KB not found", span))?;
-    let keys: Vec<Value> = kb.entries.keys()
+    let keys: Vec<Value> = kb
+        .entries
+        .keys()
         .map(|k| Value::Str(Arc::from(k.as_str())))
         .collect();
     Ok(Value::List(Arc::new(keys)))
 }
 
 fn bi_remove(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let key = args[0].as_str()
+    let key = args[0]
+        .as_str()
         .ok_or_else(|| LxError::type_err("knowledge.remove: key must be Str", span))?;
     let id = kb_id(&args[1], span)?;
-    let mut kb = KBS.get_mut(&id)
+    let mut kb = KBS
+        .get_mut(&id)
         .ok_or_else(|| LxError::runtime("knowledge: KB not found", span))?;
     kb.entries.shift_remove(key);
     persist(&kb, span)?;
@@ -185,15 +228,25 @@ fn bi_merge(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value,
     let id1 = kb_id(&args[0], span)?;
     let id2 = kb_id(&args[1], span)?;
     let other_entries: IndexMap<String, KBEntry> = {
-        let kb2 = KBS.get(&id2)
+        let kb2 = KBS
+            .get(&id2)
             .ok_or_else(|| LxError::runtime("knowledge: KB2 not found", span))?;
-        kb2.entries.iter().map(|(k, e)| (k.clone(), KBEntry {
-            val: e.val.clone(),
-            meta: e.meta.clone(),
-            stored_at: e.stored_at.clone(),
-        })).collect()
+        kb2.entries
+            .iter()
+            .map(|(k, e)| {
+                (
+                    k.clone(),
+                    KBEntry {
+                        val: e.val.clone(),
+                        meta: e.meta.clone(),
+                        stored_at: e.stored_at.clone(),
+                    },
+                )
+            })
+            .collect()
     };
-    let mut kb1 = KBS.get_mut(&id1)
+    let mut kb1 = KBS
+        .get_mut(&id1)
         .ok_or_else(|| LxError::runtime("knowledge: KB1 not found", span))?;
     for (k, e) in other_entries {
         kb1.entries.insert(k, e);
@@ -203,10 +256,12 @@ fn bi_merge(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value,
 }
 
 fn bi_expire(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let before = args[0].as_str()
+    let before = args[0]
+        .as_str()
         .ok_or_else(|| LxError::type_err("knowledge.expire: timestamp must be Str", span))?;
     let id = kb_id(&args[1], span)?;
-    let mut kb = KBS.get_mut(&id)
+    let mut kb = KBS
+        .get_mut(&id)
         .ok_or_else(|| LxError::runtime("knowledge: KB not found", span))?;
     kb.entries.retain(|_, e| e.stored_at.as_str() >= before);
     persist(&kb, span)?;

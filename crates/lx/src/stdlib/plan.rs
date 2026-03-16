@@ -14,7 +14,10 @@ pub fn build() -> IndexMap<String, Value> {
     m.insert("run".into(), mk("plan.run", 3, bi_run));
     m.insert("replan".into(), mk("plan.replan", 1, bi_replan));
     m.insert("abort".into(), mk("plan.abort", 1, bi_abort));
-    m.insert("insert_after".into(), mk("plan.insert_after", 2, bi_insert_after));
+    m.insert(
+        "insert_after".into(),
+        mk("plan.insert_after", 2, bi_insert_after),
+    );
     m.insert("continue".into(), make_action("continue"));
     m.insert("skip".into(), make_action("skip"));
     m
@@ -37,7 +40,8 @@ fn bi_replan(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
 }
 
 fn bi_abort(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let reason = args[0].as_str()
+    let reason = args[0]
+        .as_str()
         .ok_or_else(|| LxError::type_err("plan.abort expects Str reason", span))?;
     let mut fields = IndexMap::new();
     fields.insert("__action".into(), Value::Str(Arc::from("abort")));
@@ -46,10 +50,14 @@ fn bi_abort(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value,
 }
 
 fn bi_insert_after(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let after_id = args[0].as_str()
+    let after_id = args[0]
+        .as_str()
         .ok_or_else(|| LxError::type_err("plan.insert_after: first arg must be Str", span))?;
     let Value::List(_) = &args[1] else {
-        return Err(LxError::type_err("plan.insert_after: second arg must be List", span));
+        return Err(LxError::type_err(
+            "plan.insert_after: second arg must be List",
+            span,
+        ));
     };
     let mut fields = IndexMap::new();
     fields.insert("__action".into(), Value::Str(Arc::from("insert_after")));
@@ -58,12 +66,25 @@ fn bi_insert_after(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result
     Ok(Value::Record(Arc::new(fields)))
 }
 
-fn call2(f: &Value, a: Value, b: Value, span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn call2(
+    f: &Value,
+    a: Value,
+    b: Value,
+    span: Span,
+    ctx: &Arc<RuntimeCtx>,
+) -> Result<Value, LxError> {
     let partial = call_value(f, a, span, ctx)?;
     call_value(&partial, b, span, ctx)
 }
 
-fn call3(f: &Value, a: Value, b: Value, c: Value, span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn call3(
+    f: &Value,
+    a: Value,
+    b: Value,
+    c: Value,
+    span: Span,
+    ctx: &Arc<RuntimeCtx>,
+) -> Result<Value, LxError> {
     let p1 = call_value(f, a, span, ctx)?;
     let p2 = call_value(&p1, b, span, ctx)?;
     call_value(&p2, c, span, ctx)
@@ -78,27 +99,35 @@ fn step_id(step: &Value) -> Option<&str> {
 
 fn step_deps(step: &Value) -> Vec<String> {
     match step {
-        Value::Record(r) => r.get("depends")
+        Value::Record(r) => r
+            .get("depends")
             .and_then(|v| v.as_list())
-            .map(|l| l.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+            .map(|l| {
+                l.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
             .unwrap_or_default(),
         _ => vec![],
     }
 }
 
 fn next_ready(remaining: &[Value], completed: &HashSet<String>) -> Option<usize> {
-    remaining.iter().position(|step| {
-        step_deps(step).iter().all(|d| completed.contains(d))
-    })
+    remaining
+        .iter()
+        .position(|step| step_deps(step).iter().all(|d| completed.contains(d)))
 }
 
 fn build_context(completed_results: &[(String, Value)]) -> Value {
-    let items: Vec<Value> = completed_results.iter().map(|(id, result)| {
-        let mut fields = IndexMap::new();
-        fields.insert("id".into(), Value::Str(Arc::from(id.as_str())));
-        fields.insert("result".into(), result.clone());
-        Value::Record(Arc::new(fields))
-    }).collect();
+    let items: Vec<Value> = completed_results
+        .iter()
+        .map(|(id, result)| {
+            let mut fields = IndexMap::new();
+            fields.insert("id".into(), Value::Str(Arc::from(id.as_str())));
+            fields.insert("result".into(), result.clone());
+            Value::Record(Arc::new(fields))
+        })
+        .collect();
     let mut ctx = IndexMap::new();
     ctx.insert("completed".into(), Value::List(Arc::new(items)));
     Value::Record(Arc::new(ctx))
@@ -109,15 +138,21 @@ fn build_plan_state(
     remaining: &[Value],
     current: &Value,
 ) -> Value {
-    let completed: Vec<Value> = completed_results.iter().map(|(id, result)| {
-        let mut f = IndexMap::new();
-        f.insert("id".into(), Value::Str(Arc::from(id.as_str())));
-        f.insert("result".into(), result.clone());
-        Value::Record(Arc::new(f))
-    }).collect();
+    let completed: Vec<Value> = completed_results
+        .iter()
+        .map(|(id, result)| {
+            let mut f = IndexMap::new();
+            f.insert("id".into(), Value::Str(Arc::from(id.as_str())));
+            f.insert("result".into(), result.clone());
+            Value::Record(Arc::new(f))
+        })
+        .collect();
     let mut state = IndexMap::new();
     state.insert("completed".into(), Value::List(Arc::new(completed)));
-    state.insert("remaining".into(), Value::List(Arc::new(remaining.to_vec())));
+    state.insert(
+        "remaining".into(),
+        Value::List(Arc::new(remaining.to_vec())),
+    );
     state.insert("current".into(), current.clone());
     Value::Record(Arc::new(state))
 }
@@ -131,7 +166,10 @@ fn get_action(v: &Value) -> Option<&str> {
 
 fn bi_run(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let Value::List(initial_steps) = &args[0] else {
-        return Err(LxError::type_err("plan.run: first arg must be List of steps", span));
+        return Err(LxError::type_err(
+            "plan.run: first arg must be List of steps",
+            span,
+        ));
     };
     let executor = &args[1];
     let on_step = &args[2];
@@ -144,7 +182,7 @@ fn bi_run(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, Lx
         }
         let Some(idx) = next_ready(&remaining, &completed_ids) else {
             return Ok(Value::Err(Box::new(Value::Str(Arc::from(
-                "plan: cycle or unmet dependencies in remaining steps"
+                "plan: cycle or unmet dependencies in remaining steps",
             )))));
         };
         let step = remaining.remove(idx);
@@ -159,13 +197,12 @@ fn bi_run(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, Lx
             Some("continue") | None => {}
             Some("skip") => {
                 let to_skip = find_successors(&sid, &remaining);
-                remaining.retain(|s| {
-                    step_id(s).is_none_or(|id| !to_skip.contains(id))
-                });
+                remaining.retain(|s| step_id(s).is_none_or(|id| !to_skip.contains(id)));
             }
             Some("abort") => {
                 let reason = match &action {
-                    Value::Record(r) => r.get("reason")
+                    Value::Record(r) => r
+                        .get("reason")
                         .and_then(|v| v.as_str())
                         .unwrap_or("aborted"),
                     _ => "aborted",
@@ -190,17 +227,21 @@ fn bi_run(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, Lx
             }
             Some(other) => {
                 return Err(LxError::runtime(
-                    format!("plan: unknown action '{other}'"), span,
+                    format!("plan: unknown action '{other}'"),
+                    span,
                 ));
             }
         }
     }
-    let results: Vec<Value> = completed_results.iter().map(|(id, result)| {
-        let mut f = IndexMap::new();
-        f.insert("id".into(), Value::Str(Arc::from(id.as_str())));
-        f.insert("result".into(), result.clone());
-        Value::Record(Arc::new(f))
-    }).collect();
+    let results: Vec<Value> = completed_results
+        .iter()
+        .map(|(id, result)| {
+            let mut f = IndexMap::new();
+            f.insert("id".into(), Value::Str(Arc::from(id.as_str())));
+            f.insert("result".into(), result.clone());
+            Value::Record(Arc::new(f))
+        })
+        .collect();
     Ok(Value::Ok(Box::new(Value::List(Arc::new(results)))))
 }
 

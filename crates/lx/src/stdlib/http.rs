@@ -24,7 +24,8 @@ fn extract_opts(val: &Value, span: Span) -> Result<HttpOpts, LxError> {
     };
     let headers = fields.get("headers").and_then(|v| {
         if let Value::Record(hdr_fields) = v {
-            let map: IndexMap<String, String> = hdr_fields.iter()
+            let map: IndexMap<String, String> = hdr_fields
+                .iter()
                 .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
                 .collect();
             if map.is_empty() { None } else { Some(map) }
@@ -34,7 +35,8 @@ fn extract_opts(val: &Value, span: Span) -> Result<HttpOpts, LxError> {
     });
     let query = fields.get("query").and_then(|v| {
         if let Value::Record(q_fields) = v {
-            let map: IndexMap<String, String> = q_fields.iter()
+            let map: IndexMap<String, String> = q_fields
+                .iter()
                 .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
                 .collect();
             if map.is_empty() { None } else { Some(map) }
@@ -42,50 +44,68 @@ fn extract_opts(val: &Value, span: Span) -> Result<HttpOpts, LxError> {
             None
         }
     });
-    let body = fields.get("body")
+    let body = fields
+        .get("body")
         .map(|v| lx_to_json(v, span))
         .transpose()?;
-    Ok(HttpOpts { headers, query, body })
+    Ok(HttpOpts {
+        headers,
+        query,
+        body,
+    })
 }
 
 fn bi_get(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let (url, opts) = match &args[0] {
         Value::Str(s) => (s.to_string(), HttpOpts::default()),
         Value::Record(fields) => {
-            let url = fields.get("url")
+            let url = fields
+                .get("url")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| LxError::type_err(
-                    "http.get: record must have Str 'url' field", span,
-                ))?
+                .ok_or_else(|| {
+                    LxError::type_err("http.get: record must have Str 'url' field", span)
+                })?
                 .to_string();
             let opts = extract_opts(&args[0], span)?;
             (url, opts)
         }
-        _ => return Err(LxError::type_err(
-            "http.get expects Str url or Record {url headers query}", span,
-        )),
+        _ => {
+            return Err(LxError::type_err(
+                "http.get expects Str url or Record {url headers query}",
+                span,
+            ));
+        }
     };
     ctx.http.request("GET", &url, &opts, span)
 }
 
 fn bi_post(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let url = args[0].as_str()
+    let url = args[0]
+        .as_str()
         .ok_or_else(|| LxError::type_err("http.post expects Str url as first arg", span))?;
     let body = lx_to_json(&args[1], span)?;
-    let opts = HttpOpts { body: Some(body), ..Default::default() };
+    let opts = HttpOpts {
+        body: Some(body),
+        ..Default::default()
+    };
     ctx.http.request("POST", url, &opts, span)
 }
 
 fn bi_put(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let url = args[0].as_str()
+    let url = args[0]
+        .as_str()
         .ok_or_else(|| LxError::type_err("http.put expects Str url as first arg", span))?;
     let body = lx_to_json(&args[1], span)?;
-    let opts = HttpOpts { body: Some(body), ..Default::default() };
+    let opts = HttpOpts {
+        body: Some(body),
+        ..Default::default()
+    };
     ctx.http.request("PUT", url, &opts, span)
 }
 
 fn bi_delete(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let url = args[0].as_str()
+    let url = args[0]
+        .as_str()
         .ok_or_else(|| LxError::type_err("http.delete expects Str url", span))?;
     ctx.http.request("DELETE", url, &HttpOpts::default(), span)
 }

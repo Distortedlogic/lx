@@ -19,7 +19,8 @@ pub fn build() -> IndexMap<String, Value> {
 }
 
 fn bi_get(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let key = args[0].as_str()
+    let key = args[0]
+        .as_str()
         .ok_or_else(|| LxError::type_err("env.get expects Str", span))?;
     match std::env::var(key) {
         Ok(val) => Ok(Value::Some(Box::new(Value::Str(Arc::from(val.as_str()))))),

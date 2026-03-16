@@ -17,16 +17,16 @@ mod fs;
 mod http;
 mod introspect;
 mod json;
-mod knowledge;
-mod memory;
 pub mod json_conv;
+mod knowledge;
 mod math;
 pub(crate) mod mcp;
 mod md;
-mod plan;
 mod md_build;
-mod saga;
+mod memory;
+mod plan;
 mod re;
+mod saga;
 mod tasks;
 mod time;
 mod trace;
@@ -86,7 +86,35 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
         return false;
     }
     if path[1] == "agents" && path.len() >= 3 {
-        return matches!(path[2].as_str(), "auditor" | "grader" | "monitor" | "planner" | "reviewer" | "router");
+        return matches!(
+            path[2].as_str(),
+            "auditor" | "grader" | "monitor" | "planner" | "reviewer" | "router"
+        );
     }
-    matches!(path[1].as_str(), "json" | "ctx" | "math" | "fs" | "env" | "re" | "md" | "agent" | "mcp" | "http" | "time" | "cron" | "ai" | "tasks" | "audit" | "circuit" | "diag" | "knowledge" | "memory" | "plan" | "saga" | "introspect" | "trace")
+    matches!(
+        path[1].as_str(),
+        "json"
+            | "ctx"
+            | "math"
+            | "fs"
+            | "env"
+            | "re"
+            | "md"
+            | "agent"
+            | "mcp"
+            | "http"
+            | "time"
+            | "cron"
+            | "ai"
+            | "tasks"
+            | "audit"
+            | "circuit"
+            | "diag"
+            | "knowledge"
+            | "memory"
+            | "plan"
+            | "saga"
+            | "introspect"
+            | "trace"
+    )
 }

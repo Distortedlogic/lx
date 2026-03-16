@@ -1,6 +1,6 @@
 # Goal-Level vs Task-Level Communication
 
-Standard protocols for distinguishing between goals (intent — agent decides how) and tasks (instructions — agent executes directly). Enables agents to autonomously decompose goals while faithfully executing tasks.
+Standard Protocol definitions for distinguishing between goals (intent — agent decides how) and tasks (instructions — agent executes directly). These are conventions enforced by the type system, not separate API functions.
 
 ## Problem
 
@@ -9,8 +9,8 @@ Currently all agent messages are structural — `Protocol` validates shape but d
 ```
 handler = (msg) {
   msg.type ? {
-    "search"  -> do_search msg.query    // task: explicit instruction
-    "analyze" -> {                       // goal: requires decomposition
+    "search"  -> do_search msg.query
+    "analyze" -> {
       plan = figure_out_how msg
       execute plan
     }
@@ -18,11 +18,11 @@ handler = (msg) {
 }
 ```
 
-This means every agent hand-rolls goal detection. There's no standard way for a sender to signal "I'm telling you WHAT to achieve, not HOW to do it" vs "I'm telling you exactly what to do."
+Every agent hand-rolls goal detection.
 
 ## Standard Protocols
 
-Two new protocols in `std/agent`, establishing a convention:
+Two Protocol definitions in `std/agent`, establishing a convention:
 
 ```
 Protocol Goal = {
@@ -56,29 +56,25 @@ Protocol Task = {
 | `action` | Specific action to perform. |
 | `params` | Parameters for the action. |
 
-## `agent.send_goal` / `agent.send_task`
+## Usage
 
-Convenience functions that validate against the protocol and set the `type` field:
+Send goals and tasks using normal `~>?` with Protocol validation:
 
 ```
-use std/agent
-
-// Send a goal — agent decides how
-result = agent.send_goal worker {
+result = worker ~>? Goal {
   intent: "find and fix all SQL injection vulnerabilities"
   constraints: {scope: "src/api/" exclude: ["test files"]}
   budget: 500
   acceptance: {min_score: 90 rubric: security_rubric}
 } ^
 
-// Send a task — agent executes directly
-result = agent.send_task worker {
+result = worker ~>? Task {
   action: "grep"
   params: {pattern: "execute\\(" path: "src/api/"}
 } ^
 ```
 
-These are thin wrappers around `~>?` that add Protocol validation.
+No wrapper functions needed — `~>?` with a Protocol value provides validation.
 
 ## Handler Pattern
 
@@ -98,11 +94,11 @@ handler = (msg) -> msg.type ? {
 }
 ```
 
-The key insight: goal handlers use `std/plan` for decomposition, task handlers execute directly. This integrates naturally with the existing planning infrastructure.
+Goal handlers use `std/plan` for decomposition, task handlers execute directly.
 
 ## Goal Decomposition
 
-When an agent receives a Goal, it decomposes using `std/agents/planner` (or its own logic):
+When an agent receives a Goal, it decomposes using `std/agents/planner`:
 
 ```
 use std/agents/planner
@@ -120,25 +116,6 @@ handler = (msg) -> msg.type ? {
 }
 ```
 
-### Goal Forwarding
-
-An agent that can't handle a goal can forward it:
-
-```
-handler = (msg) -> msg.type ? {
-  "goal" -> {
-    can_handle = assess_capability msg.intent
-    can_handle ? {
-      true  -> decompose_and_execute msg
-      false -> {
-        better = find_capable_agent msg.intent ^
-        agent.send_goal better msg ^
-      }
-    }
-  }
-}
-```
-
 ### Sub-Goals
 
 Goal decomposition can produce sub-goals, not just tasks:
@@ -153,8 +130,6 @@ decompose = (intent constraints) {
   ]
 }
 ```
-
-This creates a tree: top-level goal → mix of sub-goals and tasks → leaf tasks.
 
 ## Acceptance Verification
 
@@ -178,7 +153,7 @@ execute_goal = (goal) {
 
 ## Implementation
 
-Two new Protocol definitions added to `std/agent` in `stdlib/agent.rs`. `agent.send_goal` and `agent.send_task` are thin wrappers around `~>?` with Protocol validation. No new syntax — these are conventions enforced by the type system.
+Two Protocol definitions added to `std/agent` in `stdlib/agent.rs`. No functions — just protocol shapes. The Goal/Task distinction is a convention enforced by Protocol validation on `~>?`.
 
 ## Cross-References
 
@@ -186,4 +161,4 @@ Two new Protocol definitions added to `std/agent` in `stdlib/agent.rs`. `agent.s
 - Planner agent: stdlib_roadmap (`std/agents/planner` — LLM-based decomposition)
 - Capability discovery: [agents-capability.md](agents-capability.md) (can this agent handle my goal?)
 - Refinement: [agents-refine.md](agents-refine.md) (acceptance verification uses refine)
-- Handoff: [agents-handoff.md](agents-handoff.md) (goal forwarding is a form of handoff)
+- Handoff: [agents-handoff.md](agents-handoff.md) (goal forwarding uses handoff conventions)

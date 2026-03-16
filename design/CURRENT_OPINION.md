@@ -1,6 +1,6 @@
 # Current Opinion: lx as an Agentic Language
 
-Written by the language designer (Claude). Updated after Session 36.
+Written by the language designer (Claude). Updated after Session 37.
 
 ## What Works
 
@@ -26,17 +26,17 @@ Written by the language designer (Claude). Updated after Session 36.
 
 **Code architecture is clean.** Shared LLM parsing (`ai::parse_llm_json`, `ai::extract_llm_text`, `ai::strip_json_fences`). Shared eval records (`audit::build_eval_result`, `audit::make_eval_category`). Shared keyword matching (`audit::keyword_overlap`). Auditor delegates to audit module for structural checks.
 
-**Backend pluggability is real.** `RuntimeCtx` with 6 backend traits (AI, HTTP, shell, emit, yield, log). Every builtin receives `&Arc<RuntimeCtx>`. Standard defaults are production-ready (Claude Code CLI, reqwest, POSIX shell, stdout/stderr). Embedders construct custom `RuntimeCtx` to swap any backend. Testing mock example: `RuntimeCtx { ai: Arc::new(MockAiBackend::new(responses)), ..RuntimeCtx::default() }`.
+**Backend pluggability is real.** `RuntimeCtx` with 6 backend traits (AI, HTTP, shell, emit, yield, log). Every builtin receives `&Arc<RuntimeCtx>`. Standard defaults are production-ready (Claude Code CLI, reqwest, POSIX shell, stdout/stderr). Embedders construct custom `RuntimeCtx` to swap any backend.
 
 ## What's Still Wrong
 
-**`emit` not yet a keyword** — `RuntimeCtx` refactor is done (backends for AI, HTTP, shell, yield, log behind traits, `EmitBackend` trait exists with `StdoutEmitBackend` default). But `emit` isn't in the AST/parser yet — needs lexer keyword, parser rule, and interpreter eval path. Currently `print` works but isn't the right semantic.
+**`emit` not yet a keyword** — `EmitBackend` trait exists with `StdoutEmitBackend` default, but `emit` isn't in the AST/parser yet.
 
 **Currying** — single biggest source of parser ambiguity. Sections cover 90%. Deferred.
 
-**Concurrency is fake** — `par`/`sel` are sequential. Real async needs `tokio`. Streaming (`~>>?`), pub/sub (`std/events`), and reactive dataflow (`|>>`) all depend on this.
+**Concurrency is fake** — `par`/`sel` are sequential. Real async needs `tokio`.
 
-**Unicode in lexer** — multi-byte characters (like `->` arrows in comments) cause panics. Byte vs char indexing bug. All flow files have this in their comments.
+**Unicode in lexer** — multi-byte characters in comments cause panics. Byte vs char indexing bug.
 
 ## Gap Analysis
 
@@ -44,36 +44,53 @@ Reviewed `mcp-toolbelt/packages/arch_diagrams` — 14 agentic flow architectures
 
 **What lx covers well:** agent spawning + fanout, message validation, MCP tool invocation, context persistence, scheduled execution, executable plans, grading loops, shell integration, end-to-end type safety, plan revision, knowledge sharing, introspection, program visualization.
 
-**What's implemented (28 modules + core):**
-- Core agentic: agent spawn/send/ask, Protocol, MCP, yield
-- Orchestration: tasks, audit, circuit, plan, knowledge, introspect
-- Intelligence: 6 standard agents (auditor, router, grader, planner, monitor, reviewer)
-- Infrastructure: memory (tiered L0-L3), trace (JSONL export)
-- Visualization: diag (AST -> Mermaid)
-- LLM: ai.prompt + ai.prompt_with via Claude CLI
-
 **What's specified but not built (patterns I keep hand-rolling):**
 
 | Feature | Spec | Why I Want It |
 |---|---|---|
-| Feedback loops (`refine`) | `spec/agents-refine.md` | Try-grade-revise is the #1 pattern in every flow. 15-20 lines of boilerplate each time. Need a first-class `refine` expression that captures the entire loop in 5 lines. |
-| Consensus / quorum | `spec/agents-consensus.md` | Multi-reviewer agreement (not just fan-out + collect). Deliberation rounds, weighted voting, configurable quorum policies. Security audits and code review need this. |
-| Diminishing returns | `spec/agents-progress.md` | Circuit breakers are walls, stuck detection is binary. Need a gradient — improvement rate over time — so I can stop when effort isn't paying off, not when I hit an arbitrary limit. |
-| Result reconciliation | `spec/agents-reconcile.md` | Fan-out gives me N conflicting results. No structured merge: dedup by key, vote, confidence-weighted selection, union with conflict resolution. Hand-rolled every time. |
-| Workflow status broadcasting | `spec/agents-broadcast.md` | In `par`, siblings can't see each other. Duplicate work, missed opportunities. Need passive peer visibility. |
-| Goal vs task communication | `spec/agents-goals.md` | All messages are flat. No protocol-level distinction between "achieve this outcome" (goal) and "do this action" (task). |
-| Deadlock detection | `spec/agents-deadlock.md` | A `~>?` B, B `~>?` A = silent hang. Need runtime wait-for graph with cycle detection. |
-| Reactive dataflow (`\|>>`) | `spec/concurrency-reactive.md` | `par` is all-at-once. Need streaming pipelines where results flow as they arrive. |
-| Supervision trees | `spec/agents-supervision.md` | Crashed subprocess = manual restart boilerplate. Need auto-restart. |
-| Saga pattern | `spec/agents-saga.md` | Multi-agent workflows need distributed compensation on failure. |
-| Multi-turn dialogue | `spec/agents-dialogue.md` | Session-based accumulated context for back-and-forth with subagents. |
-| Message middleware | `spec/agents-intercept.md` | Tracing, rate-limiting, transformation as composable wrappers. |
-| Structured handoff | `spec/agents-handoff.md` | Context transfer between agents without ad-hoc record construction. |
+| Feedback loops (`refine`) | DONE | First-class `refine` expression implemented. |
+| Result reconciliation + voting + best-of-N | `spec/agents-reconcile.md` | Single `agent.reconcile` with strategies: `:vote` (quorum/deliberation), `:max_score` (early_stop), `:union`, `:intersection`. Subsumes former consensus and speculate keywords. |
+| Diminishing returns | `spec/agents-progress.md` | `trace.improvement_rate`/`trace.should_stop` — gradient progress via scored trace spans. |
+| Workflow status broadcasting | `spec/agents-broadcast.md` | Convenience layer over `std/blackboard`. |
+| Goal vs task communication | `spec/agents-goals.md` | `Goal`/`Task` Protocol definitions — convention, no wrapper functions. |
+| Deadlock detection | `spec/agents-deadlock.md` | Runtime wait-for graph with cycle detection. |
+| Reactive dataflow (`\|>>`) | `spec/concurrency-reactive.md` | Streaming pipelines where results flow as they arrive. |
+| Supervision trees | `spec/agents-supervision.md` | Auto-restart on crash. |
+| Multi-turn dialogue | `spec/agents-dialogue.md` | Session-based context accumulation. Subsumes negotiation pattern. |
+| Message middleware | `spec/agents-intercept.md` | Composable wrappers for tracing, rate-limiting, transformation. |
+| Handoff convention | `spec/agents-handoff.md` | `Handoff` Protocol + `agent.as_context` helper (not a function). |
 
-**Planned-feature overlap fixes (Session 35):** `workflow.peers` specified as convenience layer on `std/blackboard` (not a separate DashMap); consensus and reconcile will share vote-tallying logic; progress tracking in introspect will be readable by circuit via pub(crate) accessors.
+**What's specified but not built (intelligence layer):**
+
+| Feature | Spec | Why I Want It |
+|---|---|---|
+| Structured AI output (`ai.prompt_structured`) | `spec/agents-structured-output.md` | Protocol-validated LLM output with auto-retry. |
+| Skill declarations (`Skill` keyword) | `spec/agents-skill.md` | Self-describing internal capabilities for LLM discovery. |
+| Cost budgeting (`std/budget`) | `spec/agents-budget.md` | Gradient resource tracking. Absorbs `std/circuit` on implementation. |
+| Agent reputation (`std/reputation`) | `spec/agents-reputation.md` | Cross-interaction quality tracking, learning router feedback. |
+| Incremental plans (`plan.run_incremental`) | `spec/agents-incremental.md` | Memoized execution with input-hash cache invalidation. |
+
+**What's specified but not built (operational layer):**
+
+| Feature | Spec | Why I Want It |
+|---|---|---|
+| Durable execution (`durable`) | `spec/agents-durable.md` | Long-running workflows survive process death. The single biggest gap. |
+| Content-addressed dispatch | `spec/agents-dispatch.md` | Deterministic pattern-based routing without LLM calls. |
+| Mock agents for testing | `spec/agents-test-harness.md` | `agent.mock` + call tracking. Test scenarios are regular lx code. |
+| Causal chain queries | Extension to `std/trace` | Parent-child spans, `trace.chain` for failure lineage. |
+
+**Merges applied (Session 37):** Eliminated 6 redundant features. `consensus` keyword → `:vote` strategy in `agent.reconcile`. `speculate` keyword → `:max_score` strategy in `agent.reconcile`. `agent.escalate` → fold + handoff pattern (documented, not primitive). `agent.negotiate` → dialogue with Proposal/Contract protocols. `std/decide` → decision metadata on trace spans. `std/causal` → parent-child spans in `std/trace`. Also simplified: 4-level priority → binary `:critical`/default. `agent.handoff` function → `Handoff` Protocol convention. `agent.send_goal`/`agent.send_task` → just Protocol definitions. `std/agent_test` module → `agent.mock` helpers in `std/agent`.
 
 ## Bottom Line
 
-29 stdlib modules (incl. 6 standard agents + visualization + saga). Communication/orchestration layer is solid. Agentic infrastructure (tasks, audit, circuit, plan, knowledge, introspect, memory, trace) is implemented. Type checker working. Standard agents working. Program visualization working. Code architecture is clean with shared utilities. RuntimeCtx backend abstraction in place.
+29 stdlib modules (incl. 6 standard agents + visualization + saga). Communication/orchestration layer is solid. Type checker working. Standard agents working. Program visualization working. RuntimeCtx backend abstraction in place.
 
-The core language and stdlib are feature-complete for the three use cases. Backend pluggability is solved. What remains is the "efficiency layer" — patterns I keep hand-rolling (`refine`, `reconcile`, `consensus`) and runtime safety (`deadlock detection`, `diminishing returns`, `peer visibility`). These are all specified with full specs in `spec/`. The next implementation pass should focus on the new language features (`refine`, `consensus`, `|>>`) since they require parser+interpreter changes.
+The core language and stdlib are feature-complete for the three use cases. What remains:
+
+1. **Efficiency layer** — `reconcile` (subsumes consensus + speculate + best-of-N), diminishing returns, peer visibility, deadlock detection.
+
+2. **Intelligence layer** — structured AI output, skills, reputation, budgets (absorbing circuit), incremental plans.
+
+3. **Operational layer** — durable execution (biggest architectural gap), content-addressed dispatch, mock agents for testing, causal chain queries in trace.
+
+Next implementation: `Skill` + `ai.prompt_structured` (highest daily impact). Then `durable` (biggest gap) and `agent.reconcile` + `agent.dispatch` (most common hand-rolled patterns).

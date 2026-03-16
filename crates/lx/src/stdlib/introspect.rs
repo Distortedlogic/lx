@@ -25,12 +25,14 @@ struct ActionEntry {
     is_marker: bool,
 }
 
-static STATE: LazyLock<Mutex<State>> = LazyLock::new(|| Mutex::new(State {
-    start: Instant::now(),
-    actions: Vec::new(),
-    markers: IndexMap::new(),
-    turns: 0,
-}));
+static STATE: LazyLock<Mutex<State>> = LazyLock::new(|| {
+    Mutex::new(State {
+        start: Instant::now(),
+        actions: Vec::new(),
+        markers: IndexMap::new(),
+        turns: 0,
+    })
+});
 
 const MAX_ACTIONS: usize = 1000;
 
@@ -38,16 +40,31 @@ pub fn build() -> IndexMap<String, Value> {
     let mut m = IndexMap::new();
     m.insert("self".into(), mk("introspect.self", 1, bi_self));
     m.insert("elapsed".into(), mk("introspect.elapsed", 1, bi_elapsed));
-    m.insert("turn_count".into(), mk("introspect.turn_count", 1, bi_turn_count));
-    m.insert("tick_turn".into(), mk("introspect.tick_turn", 1, bi_tick_turn));
+    m.insert(
+        "turn_count".into(),
+        mk("introspect.turn_count", 1, bi_turn_count),
+    );
+    m.insert(
+        "tick_turn".into(),
+        mk("introspect.tick_turn", 1, bi_tick_turn),
+    );
     m.insert("budget".into(), mk("introspect.budget", 1, bi_budget));
     m.insert("actions".into(), mk("introspect.actions", 1, bi_actions));
-    m.insert("actions_since".into(), mk("introspect.actions_since", 1, bi_actions_since));
+    m.insert(
+        "actions_since".into(),
+        mk("introspect.actions_since", 1, bi_actions_since),
+    );
     m.insert("mark".into(), mk("introspect.mark", 1, bi_mark));
     m.insert("record".into(), mk("introspect.record", 1, bi_record));
     m.insert("is_stuck".into(), mk("introspect.is_stuck", 1, bi_is_stuck));
-    m.insert("strategy_shift".into(), mk("introspect.strategy_shift", 1, bi_strategy_shift));
-    m.insert("similar_actions".into(), mk("introspect.similar_actions", 1, bi_similar));
+    m.insert(
+        "strategy_shift".into(),
+        mk("introspect.strategy_shift", 1, bi_strategy_shift),
+    );
+    m.insert(
+        "similar_actions".into(),
+        mk("introspect.similar_actions", 1, bi_similar),
+    );
     m
 }
 
@@ -98,7 +115,9 @@ fn bi_budget(_args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Val
 
 fn bi_actions(_args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let state = STATE.lock();
-    let items: Vec<Value> = state.actions.iter()
+    let items: Vec<Value> = state
+        .actions
+        .iter()
         .filter(|a| !a.is_marker)
         .map(action_to_value)
         .collect();
@@ -106,11 +125,13 @@ fn bi_actions(_args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Va
 }
 
 fn bi_actions_since(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let marker = args[0].as_str()
+    let marker = args[0]
+        .as_str()
         .ok_or_else(|| LxError::type_err("introspect.actions_since: expects Str marker", span))?;
     let state = STATE.lock();
     let start_idx = state.markers.get(marker).copied().unwrap_or(0);
-    let items: Vec<Value> = state.actions[start_idx..].iter()
+    let items: Vec<Value> = state.actions[start_idx..]
+        .iter()
         .filter(|a| !a.is_marker)
         .map(action_to_value)
         .collect();
@@ -118,7 +139,8 @@ fn bi_actions_since(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Resul
 }
 
 fn bi_mark(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let name = args[0].as_str()
+    let name = args[0]
+        .as_str()
         .ok_or_else(|| LxError::type_err("introspect.mark: expects Str name", span))?;
     let mut state = STATE.lock();
     let idx = state.actions.len();
@@ -137,8 +159,16 @@ fn bi_record(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
     let Value::Record(r) = &args[0] else {
         return Err(LxError::type_err("introspect.record expects Record", span));
     };
-    let action_type = r.get("type").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
-    let target = r.get("target").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let action_type = r
+        .get("type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+    let target = r
+        .get("target")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
     let mut state = STATE.lock();
     state.actions.push(ActionEntry {
         action_type,
@@ -152,20 +182,21 @@ fn bi_record(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
 
 fn bi_is_stuck(_args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let state = STATE.lock();
-    let real_actions: Vec<&ActionEntry> = state.actions.iter()
-        .filter(|a| !a.is_marker)
-        .collect();
+    let real_actions: Vec<&ActionEntry> = state.actions.iter().filter(|a| !a.is_marker).collect();
     if real_actions.len() < 5 {
         return Ok(Value::Bool(false));
     }
     let last5 = &real_actions[real_actions.len() - 5..];
     let first = &last5[0];
-    let stuck = last5.iter().all(|a| a.action_type == first.action_type && a.target == first.target);
+    let stuck = last5
+        .iter()
+        .all(|a| a.action_type == first.action_type && a.target == first.target);
     Ok(Value::Bool(stuck))
 }
 
 fn bi_strategy_shift(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let reason = args[0].as_str()
+    let reason = args[0]
+        .as_str()
         .ok_or_else(|| LxError::type_err("introspect.strategy_shift: expects Str", span))?;
     let mut state = STATE.lock();
     state.actions.push(ActionEntry {
@@ -179,22 +210,26 @@ fn bi_strategy_shift(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Resu
 }
 
 fn bi_similar(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let n: usize = args[0].as_int()
+    let n: usize = args[0]
+        .as_int()
         .ok_or_else(|| LxError::type_err("introspect.similar_actions: expects Int", span))?
         .try_into()
         .map_err(|_| LxError::runtime("introspect.similar_actions: n too large", span))?;
     let state = STATE.lock();
-    let real: Vec<&ActionEntry> = state.actions.iter()
-        .filter(|a| !a.is_marker)
-        .collect();
+    let real: Vec<&ActionEntry> = state.actions.iter().filter(|a| !a.is_marker).collect();
     if real.is_empty() {
         return Ok(Value::Int(BigInt::from(0)));
     }
-    let window = if n > real.len() { &real[..] } else { &real[real.len() - n..] };
+    let window = if n > real.len() {
+        &real[..]
+    } else {
+        &real[real.len() - n..]
+    };
     let Some(last) = window.last() else {
         return Ok(Value::Int(BigInt::from(0)));
     };
-    let count = window.iter()
+    let count = window
+        .iter()
         .filter(|a| a.action_type == last.action_type && a.target == last.target)
         .count();
     Ok(Value::Int(BigInt::from(count)))
@@ -205,8 +240,12 @@ fn trim_actions(state: &mut State) {
         let excess = state.actions.len() - MAX_ACTIONS;
         state.actions.drain(..excess);
         state.markers.retain(|_, idx| {
-            if *idx >= excess { *idx -= excess; true } else { false }
+            if *idx >= excess {
+                *idx -= excess;
+                true
+            } else {
+                false
+            }
         });
     }
 }
-

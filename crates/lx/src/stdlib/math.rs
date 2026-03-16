@@ -29,18 +29,30 @@ pub fn build() -> IndexMap<String, Value> {
 fn to_f64(v: &Value, span: Span) -> Result<f64, LxError> {
     match v {
         Value::Float(f) => Ok(*f),
-        Value::Int(n) => n.to_f64().ok_or_else(|| LxError::runtime("math: Int too large for float", span)),
-        other => Err(LxError::type_err(format!("math: expected number, got {}", other.type_name()), span)),
+        Value::Int(n) => n
+            .to_f64()
+            .ok_or_else(|| LxError::runtime("math: Int too large for float", span)),
+        other => Err(LxError::type_err(
+            format!("math: expected number, got {}", other.type_name()),
+            span,
+        )),
     }
 }
 
 fn bi_abs(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     match &args[0] {
         Value::Int(n) => {
-            if n.sign() == num_bigint::Sign::Minus { Ok(Value::Int(-n)) } else { Ok(Value::Int(n.clone())) }
-        },
+            if n.sign() == num_bigint::Sign::Minus {
+                Ok(Value::Int(-n))
+            } else {
+                Ok(Value::Int(n.clone()))
+            }
+        }
         Value::Float(f) => Ok(Value::Float(f.abs())),
-        other => Err(LxError::type_err(format!("math.abs expects number, got {}", other.type_name()), span)),
+        other => Err(LxError::type_err(
+            format!("math.abs expects number, got {}", other.type_name()),
+            span,
+        )),
     }
 }
 
@@ -62,14 +74,16 @@ fn bi_round(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value,
 fn bi_pow(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     match (&args[0], &args[1]) {
         (Value::Int(base), Value::Int(exp)) => {
-            let e: u32 = exp.try_into().map_err(|_| LxError::runtime("math.pow: exponent too large or negative", span))?;
+            let e: u32 = exp
+                .try_into()
+                .map_err(|_| LxError::runtime("math.pow: exponent too large or negative", span))?;
             Ok(Value::Int(base.pow(e)))
-        },
+        }
         _ => {
             let b = to_f64(&args[0], span)?;
             let e = to_f64(&args[1], span)?;
             Ok(Value::Float(b.powf(e)))
-        },
+        }
     }
 }
 
@@ -86,7 +100,7 @@ fn bi_min(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, L
             let a = to_f64(&args[0], span)?;
             let b = to_f64(&args[1], span)?;
             Ok(Value::Float(a.min(b)))
-        },
+        }
     }
 }
 
@@ -98,6 +112,6 @@ fn bi_max(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, L
             let a = to_f64(&args[0], span)?;
             let b = to_f64(&args[1], span)?;
             Ok(Value::Float(a.max(b)))
-        },
+        }
     }
 }

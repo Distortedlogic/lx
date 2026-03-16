@@ -107,6 +107,22 @@ These are open questions for the agentic layer — to be resolved during impleme
 | Priority preemption | No mid-handler interruption. Critical messages queued and processed next. Long handlers can poll with `agent.check_critical`. |
 | Ambient context custom fields | Pass through as-is, no runtime enforcement. Available via `context.current ()`. |
 | `\|>>` ordering | Completion order by default (fastest first). Caller uses `sort_by` for input order if needed. |
+| Skill keyword vs stdlib | `Skill` as keyword (like Protocol/MCP) enables parse-time validation, but it's structurally just a record with a function. Decided: keyword — completes Protocol/MCP/Skill trinity. |
+| Structured output retry strategy | `ai.prompt_structured` continues the session on schema failure (LLM sees its mistake). Alternative: restart fresh. Decided: continue — cheaper and the LLM has context. |
+| Reconcile early stop | `:max_score` strategy's `early_stop` requires cancellation of in-flight par branches. Before real async: all branches run to completion, early_stop is a no-op. After tokio: true cancellation. |
+| Budget per-agent vs per-workflow | Sub-budgets (`budget.slice`) can allocate to agents, but should agents auto-report spend? Decided: explicit `budget.spend` — no magic. Agents don't know about budgets unless passed one. |
+| Reputation decay model | EWMA with configurable half-life. Alternative: sliding window. EWMA is simpler and handles irregular intervals better. |
+| Reputation cold start | New agents have no history. `min_history` parameter prevents premature routing. Fall back to LLM routing when insufficient data. |
+| Causal span propagation | Parent-child spans in `std/trace`. Manual before `with context` is implemented. Automatic after. Both modes should work. |
+| Incremental cache hash stability | Uses `serde_json::to_string` for deterministic serialization. Requires `preserve_order` feature (already enabled). Float NaN/Inf edge cases TBD. |
+| Incremental cache location | Single file vs directory of files. Single file simpler for small plans. May need sharding for 100+ step plans. Start with single file. |
+| Skill + MCP unified view | `skill.list` and `mcp.tools` both return description+schema records. Unification is concat. Should there be a `capabilities.all` that merges both? Defer until usage patterns emerge. |
+| Durable + closures | Functions/closures can't be serialized. On resume, source is re-parsed and definitions re-evaluated. What if the source changed between persist and resume? Decided: re-parse current source — workflow code should be stable during execution. Document this as a contract. |
+| Durable step granularity | Persist at every suspension point, or only at explicit `durable.checkpoint` calls? Decided: every suspension point — the overhead is acceptable and maximizes safety. Explicit checkpoints are an optimization for later. |
+| Durable + par | When a `par` block has 3 branches and 2 complete before crash, resume should replay the 2 cached results and only re-execute the 3rd. Need per-branch step tracking within durable. |
+| Dispatch + intercept ordering | When a dispatcher's target has an interceptor, message flows: dispatch match → interceptor → handler. Is this always the right order? Yes — dispatch is routing, intercept is per-agent middleware. |
+| Reconcile deliberation protocol | How do agents receive deliberation messages? Via `~>?` with `{type: "deliberate" votes round}`. Agent must handle this message type to participate in deliberation. |
+| Mock agent + subprocess | `agent.mock` creates in-process handlers. Should it support subprocess mocking? Defer — in-process covers most test cases. |
 
 ## Considerations for v2
 

@@ -1,9 +1,9 @@
+#[path = "mcp_http.rs"]
+mod mcp_http;
 #[path = "mcp_rpc.rs"]
 pub(super) mod mcp_rpc;
 #[path = "mcp_stdio.rs"]
 mod mcp_stdio;
-#[path = "mcp_http.rs"]
-mod mcp_http;
 
 use std::sync::{Arc, LazyLock};
 
@@ -31,9 +31,7 @@ fn get_tool_def(mcp_id: u64, name: &str, span: Span) -> Result<McpToolDef, LxErr
         .iter()
         .find(|t| t.name == name)
         .cloned()
-        .ok_or_else(|| {
-            LxError::runtime(format!("mcp typed call: no def for tool '{name}'"), span)
-        })
+        .ok_or_else(|| LxError::runtime(format!("mcp typed call: no def for tool '{name}'"), span))
 }
 
 pub fn build() -> IndexMap<String, Value> {
@@ -54,10 +52,7 @@ pub fn build() -> IndexMap<String, Value> {
         "list_prompts".into(),
         mk("mcp.list_prompts", 1, bi_list_prompts),
     );
-    m.insert(
-        "get_prompt".into(),
-        mk("mcp.get_prompt", 3, bi_get_prompt),
-    );
+    m.insert("get_prompt".into(), mk("mcp.get_prompt", 3, bi_get_prompt));
     m
 }
 
@@ -147,7 +142,11 @@ fn bi_get_prompt(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<V
     Ok(Value::Ok(Box::new(json_conv::json_to_lx(result))))
 }
 
-pub(crate) fn typed_call(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+pub(crate) fn typed_call(
+    args: &[Value],
+    span: Span,
+    _ctx: &Arc<RuntimeCtx>,
+) -> Result<Value, LxError> {
     let tool_name = args[1]
         .as_str()
         .ok_or_else(|| LxError::runtime("mcp typed call: invalid tool name", span))?;
@@ -157,7 +156,12 @@ pub(crate) fn typed_call(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> 
             .and_then(|v| v.as_int())
             .and_then(|n| n.try_into().ok())
             .ok_or_else(|| LxError::runtime("mcp typed call: invalid client", span))?,
-        _ => return Err(LxError::runtime("mcp typed call: expected client record", span)),
+        _ => {
+            return Err(LxError::runtime(
+                "mcp typed call: expected client record",
+                span,
+            ));
+        }
     };
     let tool_def = get_tool_def(mcp_id, tool_name, span)?;
     let validated = match validate_input(&args[2], &tool_def.input, tool_name) {
@@ -204,7 +208,9 @@ fn validate_input(
                 if field.type_name != "Any" && val.type_name() != field.type_name {
                     return Err(format!(
                         "MCP tool '{tool_name}': field '{}' expected {}, got {}",
-                        field.name, field.type_name, val.type_name()
+                        field.name,
+                        field.type_name,
+                        val.type_name()
                     ));
                 }
             }
@@ -266,7 +272,9 @@ fn validate_output(
                         if field.type_name != "Any" && fv.type_name() != field.type_name {
                             return Err(format!(
                                 "MCP tool '{tool_name}': output field '{}' expected {}, got {}",
-                                field.name, field.type_name, fv.type_name()
+                                field.name,
+                                field.type_name,
+                                fv.type_name()
                             ));
                         }
                     }

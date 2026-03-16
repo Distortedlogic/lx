@@ -15,20 +15,25 @@ use super::diag_walk::{DiagEdge, DiagNode, Graph, Walker};
 pub fn build() -> IndexMap<String, Value> {
     let mut m = IndexMap::new();
     m.insert("extract".into(), mk("diag.extract", 1, bi_extract));
-    m.insert("extract_file".into(), mk("diag.extract_file", 1, bi_extract_file));
+    m.insert(
+        "extract_file".into(),
+        mk("diag.extract_file", 1, bi_extract_file),
+    );
     m.insert("to_mermaid".into(), mk("diag.to_mermaid", 1, bi_to_mermaid));
     m
 }
 
 fn bi_extract(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let src = args[0].as_str()
+    let src = args[0]
+        .as_str()
         .ok_or_else(|| LxError::type_err("diag.extract expects Str", span))?;
     let graph = extract_graph(src, span)?;
     Ok(graph_to_value(&graph))
 }
 
 fn bi_extract_file(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let path = args[0].as_str()
+    let path = args[0]
+        .as_str()
         .ok_or_else(|| LxError::type_err("diag.extract_file expects Str", span))?;
     let src = std::fs::read_to_string(path)
         .map_err(|e| LxError::runtime(format!("diag.extract_file: {e}"), span))?;
@@ -87,18 +92,29 @@ fn graph_to_value(graph: &Graph) -> Value {
 
 fn value_to_graph(val: &Value, span: Span) -> Result<Graph, LxError> {
     let Value::Record(rec) = val else {
-        return Err(LxError::type_err("diag.to_mermaid expects Graph record", span));
+        return Err(LxError::type_err(
+            "diag.to_mermaid expects Graph record",
+            span,
+        ));
     };
-    let nodes_val = rec.get("nodes")
+    let nodes_val = rec
+        .get("nodes")
         .ok_or_else(|| LxError::type_err("graph missing 'nodes'", span))?;
-    let edges_val = rec.get("edges")
+    let edges_val = rec
+        .get("edges")
         .ok_or_else(|| LxError::type_err("graph missing 'edges'", span))?;
     let nodes = match nodes_val {
-        Value::List(l) => l.iter().map(|v| value_to_node(v, span)).collect::<Result<_, _>>()?,
+        Value::List(l) => l
+            .iter()
+            .map(|v| value_to_node(v, span))
+            .collect::<Result<_, _>>()?,
         _ => return Err(LxError::type_err("graph.nodes must be List", span)),
     };
     let edges = match edges_val {
-        Value::List(l) => l.iter().map(|v| value_to_edge(v, span)).collect::<Result<_, _>>()?,
+        Value::List(l) => l
+            .iter()
+            .map(|v| value_to_edge(v, span))
+            .collect::<Result<_, _>>()?,
         _ => return Err(LxError::type_err("graph.edges must be List", span)),
     };
     Ok(Graph { nodes, edges })
@@ -115,7 +131,10 @@ fn value_to_node(val: &Value, span: Span) -> Result<DiagNode, LxError> {
             .ok_or_else(|| LxError::type_err(format!("node missing '{k}'"), span))
     };
     let children = match rec.get("children") {
-        Some(Value::List(l)) => l.iter().map(|v| value_to_node(v, span)).collect::<Result<_, _>>()?,
+        Some(Value::List(l)) => l
+            .iter()
+            .map(|v| value_to_node(v, span))
+            .collect::<Result<_, _>>()?,
         _ => vec![],
     };
     Ok(DiagNode {
@@ -166,7 +185,10 @@ fn to_mermaid(graph: &Graph) -> String {
         if edge.label.is_empty() {
             out.push_str(&format!("    {} {} {}\n", edge.from, arrow, edge.to));
         } else {
-            out.push_str(&format!("    {} {}|\"{}\"| {}\n", edge.from, arrow, edge.label, edge.to));
+            out.push_str(&format!(
+                "    {} {}|\"{}\"| {}\n",
+                edge.from, arrow, edge.label, edge.to
+            ));
         }
     }
     out.push_str("    classDef agent fill:#e1f5fe,stroke:#0288d1\n");

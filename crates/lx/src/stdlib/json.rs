@@ -14,16 +14,22 @@ pub fn build() -> IndexMap<String, Value> {
     let mut m = IndexMap::new();
     m.insert("parse".into(), mk("json.parse", 1, bi_parse));
     m.insert("encode".into(), mk("json.encode", 1, bi_encode));
-    m.insert("encode_pretty".into(), mk("json.encode_pretty", 1, bi_encode_pretty));
+    m.insert(
+        "encode_pretty".into(),
+        mk("json.encode_pretty", 1, bi_encode_pretty),
+    );
     m
 }
 
 fn bi_parse(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let s = args[0].as_str()
+    let s = args[0]
+        .as_str()
         .ok_or_else(|| LxError::type_err("json.parse expects Str", span))?;
     match serde_json::from_str::<serde_json::Value>(s) {
         Ok(jv) => Ok(Value::Ok(Box::new(json_to_lx(jv)))),
-        Err(e) => Ok(Value::Err(Box::new(Value::Str(Arc::from(e.to_string().as_str()))))),
+        Err(e) => Ok(Value::Err(Box::new(Value::Str(Arc::from(
+            e.to_string().as_str(),
+        ))))),
     }
 }
 

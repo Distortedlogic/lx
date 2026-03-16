@@ -1,8 +1,8 @@
 # Structured Handoff with Context Transfer
 
-When agent A finishes a phase and agent B takes over, there's a context transfer problem. Manually extracting A's results and passing them to B loses metadata: what A tried, what worked, what it was uncertain about. Structured handoff formalizes this pattern.
+When agent A finishes a phase and agent B takes over, there's a context transfer problem. Manually extracting A's results and passing them to B loses metadata: what A tried, what worked, what it was uncertain about. Structured handoff is a Protocol convention (not a function) that standardizes this.
 
-## Why a Primitive
+## Why a Convention
 
 Without structured handoff, context transfer looks like:
 
@@ -13,7 +13,7 @@ agent_b ~>? {task: "implement fix" context: result_a.summary} ^
 
 This loses: what agent A tried and rejected, what assumptions it made, what it was uncertain about, what files it read, what it recommends the next agent start with. The receiving agent gets a summary blob, not structured knowledge about the preceding work.
 
-## Handoff Record
+## Handoff Protocol
 
 A handoff is a record with a known structure:
 
@@ -30,15 +30,18 @@ Protocol Handoff = {
 }
 ```
 
-Agents construct handoff records explicitly — the runtime doesn't auto-populate them (that would require introspection of all agent activity, which is `std/introspect`'s job). The structure ensures a consistent shape that receiving agents can query.
-
-## API
+Agents construct handoff records explicitly — the runtime doesn't auto-populate them. The structure ensures a consistent shape that receiving agents can query. Send a handoff using normal `~>?`:
 
 ```
-agent.handoff from to handoff_record   -- a ^ AgentErr
+fixer ~>? Handoff {
+  result: review_result
+  tried: ["checked token refresh" "checked session management"]
+  assumptions: ["auth module is the only entry point"]
+  uncertainties: ["rate limiting may also be affected"]
+  recommendations: ["start with src/auth/token.rs:45"]
+  files_read: ["src/auth/token.rs" "src/auth/session.rs"]
+} ^
 ```
-
-`agent.handoff` sends the handoff record to the receiving agent as a structured context message. The receiving agent gets a message with `{type: "handoff" ...handoff_record}` and can access any field.
 
 ## `as_context` Helper
 
@@ -78,7 +81,7 @@ handoff = Handoff {
   files_read: ["src/auth/token.rs" "src/auth/session.rs"]
 }
 
-fix_result = agent.handoff reviewer fixer handoff ^
+fix_result = fixer ~>? handoff ^
 ```
 
 ### With Dialogue
@@ -123,13 +126,28 @@ run_pipeline = (stages) {
 }
 ```
 
+### Escalation Pattern
+
+When an agent fails, escalation is a fold over a chain with handoff context:
+
+```
+escalation_chain = [junior_reviewer senior_reviewer lead_reviewer]
+
+result = escalation_chain | fold_until (Err {}) (agent, prev) {
+  attempt = agent ~>? {task prev_attempts: prev.attempts ?? []} ^
+  attempt ? {
+    Ok v -> Break v
+    Err e -> Continue {attempts: (prev.attempts ?? []) ++ [{agent: agent error: e}]}
+  }
+}
+```
+
 ## Implementation Status
 
-Planned. `Handoff` Protocol and `agent.handoff` / `agent.as_context` functions in `std/agent`.
+Planned. `Handoff` Protocol defined in `std/agent`. `agent.as_context` is a formatting helper in `stdlib/agent.rs`. No `agent.handoff` function — handoff is just a Protocol applied to normal `~>?`.
 
 ## Cross-References
 
 - Agent communication: [agents.md](agents.md)
 - Multi-turn dialogue: [agents-dialogue.md](agents-dialogue.md)
 - Introspection (auto-populating handoff): [stdlib-introspect.md](stdlib-introspect.md)
-- Planner agent (handoff between plan steps): [standard_agents.md](../design/standard_agents.md)

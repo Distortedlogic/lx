@@ -1,5 +1,5 @@
 use reqwest::blocking::Client;
-use reqwest::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
+use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderValue};
 
 use crate::error::LxError;
 use crate::span::Span;
@@ -67,9 +67,8 @@ impl HttpTransport {
             .delete(&self.url)
             .header(
                 "Mcp-Session-Id",
-                HeaderValue::from_str(sid).map_err(|e| {
-                    LxError::runtime(format!("mcp http: header: {e}"), span)
-                })?,
+                HeaderValue::from_str(sid)
+                    .map_err(|e| LxError::runtime(format!("mcp http: header: {e}"), span))?,
             )
             .send();
         Ok(())
@@ -89,9 +88,8 @@ impl HttpTransport {
         if let Some(ref sid) = self.session_id {
             builder = builder.header(
                 "Mcp-Session-Id",
-                HeaderValue::from_str(sid).map_err(|e| {
-                    LxError::runtime(format!("mcp http: header: {e}"), span)
-                })?,
+                HeaderValue::from_str(sid)
+                    .map_err(|e| LxError::runtime(format!("mcp http: header: {e}"), span))?,
             );
         }
         builder

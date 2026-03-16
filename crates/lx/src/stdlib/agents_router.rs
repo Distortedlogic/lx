@@ -12,7 +12,10 @@ use crate::value::Value;
 pub fn build() -> IndexMap<String, Value> {
     let mut m = IndexMap::new();
     m.insert("route".into(), mk("router.route", 1, bi_route));
-    m.insert("quick_route".into(), mk("router.quick_route", 1, bi_quick_route));
+    m.insert(
+        "quick_route".into(),
+        mk("router.quick_route", 1, bi_quick_route),
+    );
     m
 }
 
@@ -32,23 +35,39 @@ fn extract_fields(args: &[Value], span: Span) -> Result<RouteFields, LxError> {
     let Value::Record(fields) = &args[0] else {
         return Err(LxError::type_err("router expects Record", span));
     };
-    let prompt = fields.get("prompt")
+    let prompt = fields
+        .get("prompt")
         .and_then(|v| v.as_str())
         .ok_or_else(|| LxError::runtime("router: missing 'prompt' (Str)", span))?
         .to_string();
-    let catalog_list = fields.get("catalog")
+    let catalog_list = fields
+        .get("catalog")
         .and_then(|v| v.as_list())
         .ok_or_else(|| LxError::runtime("router: missing 'catalog' (List)", span))?;
     let mut catalog = Vec::new();
     for entry in catalog_list.iter() {
         let Value::Record(r) = entry else {
-            return Err(LxError::type_err("router: catalog entry must be Record", span));
+            return Err(LxError::type_err(
+                "router: catalog entry must be Record",
+                span,
+            ));
         };
         catalog.push(CatalogEntry {
-            name: r.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-            domain: r.get("domain").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-            description: r.get("description").and_then(|v| v.as_str())
-                .unwrap_or("").to_string(),
+            name: r
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+            domain: r
+                .get("domain")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+            description: r
+                .get("description")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
             terminal: r.get("terminal").and_then(|v| v.as_bool()).unwrap_or(false),
         });
     }
@@ -84,7 +103,10 @@ fn build_catalog_text(catalog: &[CatalogEntry]) -> String {
     for (i, entry) in catalog.iter().enumerate() {
         text.push_str(&format!(
             "{}. name={} domain={} description={}\n",
-            i + 1, entry.name, entry.domain, entry.description,
+            i + 1,
+            entry.name,
+            entry.domain,
+            entry.description,
         ));
     }
     text
@@ -96,16 +118,19 @@ fn build_user_prompt(fields: &RouteFields) -> String {
     p
 }
 
-fn parse_llm_result(llm_response: &Value, catalog: &[CatalogEntry], span: Span)
-    -> Result<Value, LxError>
-{
+fn parse_llm_result(
+    llm_response: &Value,
+    catalog: &[CatalogEntry],
+    span: Span,
+) -> Result<Value, LxError> {
     let Ok(jv) = ai::parse_llm_json(llm_response, "router", span)? else {
         return Ok(no_match());
     };
     let domain = jv.get("domain").and_then(|v| v.as_str()).unwrap_or("none");
     let agent = jv.get("agent").and_then(|v| v.as_str()).unwrap_or("");
     let confidence = jv.get("confidence").and_then(|v| v.as_f64()).unwrap_or(0.0);
-    let terminal = catalog.iter()
+    let terminal = catalog
+        .iter()
         .find(|e| e.name == agent || e.domain == domain)
         .map(|e| e.terminal)
         .unwrap_or(false);
@@ -149,7 +174,10 @@ fn keyword_score(prompt: &str, entry: &CatalogEntry) -> f64 {
     if words.is_empty() {
         return 0.0;
     }
-    let hits = words.iter().filter(|w| prompt_lower.contains(w.as_str())).count();
+    let hits = words
+        .iter()
+        .filter(|w| prompt_lower.contains(w.as_str()))
+        .count();
     hits as f64 / words.len() as f64
 }
 
@@ -171,5 +199,10 @@ fn bi_quick_route(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<
         return Ok(no_match());
     }
     let entry = &fields.catalog[best_idx];
-    Ok(build_result(&entry.domain, &entry.name, best_score, entry.terminal))
+    Ok(build_result(
+        &entry.domain,
+        &entry.name,
+        best_score,
+        entry.terminal,
+    ))
 }

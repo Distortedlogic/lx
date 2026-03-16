@@ -13,7 +13,10 @@ use crate::value::Value;
 pub fn build() -> IndexMap<String, Value> {
     let mut m = IndexMap::new();
     m.insert("review".into(), mk("reviewer.review", 1, bi_review));
-    m.insert("quick_review".into(), mk("reviewer.quick_review", 1, bi_quick_review));
+    m.insert(
+        "quick_review".into(),
+        mk("reviewer.quick_review", 1, bi_quick_review),
+    );
     m
 }
 
@@ -27,19 +30,30 @@ fn extract_fields(args: &[Value], span: Span) -> Result<ReviewFields, LxError> {
     let Value::Record(fields) = &args[0] else {
         return Err(LxError::type_err("reviewer expects Record", span));
     };
-    let transcript = fields.get("transcript")
+    let transcript = fields
+        .get("transcript")
         .and_then(|v| v.as_str())
         .ok_or_else(|| LxError::runtime("reviewer: missing 'transcript' (Str)", span))?
         .to_string();
-    let task = fields.get("task")
+    let task = fields
+        .get("task")
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();
-    let focus = fields.get("focus")
+    let focus = fields
+        .get("focus")
         .and_then(|v| v.as_list())
-        .map(|l| l.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+        .map(|l| {
+            l.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        })
         .unwrap_or_default();
-    Ok(ReviewFields { transcript, task, focus })
+    Ok(ReviewFields {
+        transcript,
+        task,
+        focus,
+    })
 }
 
 fn make_pattern(kind: &str, description: &str, confidence: f64) -> Value {
@@ -63,8 +77,14 @@ fn build_result(
     r.insert("mistakes".into(), Value::List(Arc::new(mistakes)));
     r.insert("facts".into(), Value::List(Arc::new(facts)));
     r.insert("summary".into(), Value::Str(Arc::from(summary)));
-    r.insert("pattern_count".into(), Value::Int(BigInt::from(pattern_count)));
-    r.insert("mistake_count".into(), Value::Int(BigInt::from(mistake_count)));
+    r.insert(
+        "pattern_count".into(),
+        Value::Int(BigInt::from(pattern_count)),
+    );
+    r.insert(
+        "mistake_count".into(),
+        Value::Int(BigInt::from(mistake_count)),
+    );
     Value::Record(Arc::new(r))
 }
 
@@ -128,7 +148,10 @@ fn parse_llm_result(llm_response: &Value, span: Span) -> Result<Value, LxError> 
     }
     if let Some(arr) = jv.get("facts").and_then(|v| v.as_array()) {
         for fact in arr {
-            let desc = fact.get("description").and_then(|v| v.as_str()).unwrap_or("");
+            let desc = fact
+                .get("description")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             let mut f = IndexMap::new();
             f.insert("kind".into(), Value::Str(Arc::from("fact")));
             f.insert("description".into(), Value::Str(Arc::from(desc)));
@@ -178,18 +201,30 @@ fn extract_structural(transcript: &str) -> (Vec<Value>, Vec<Value>, Vec<Value>) 
     if has_error {
         let mut f = IndexMap::new();
         f.insert("kind".into(), Value::Str(Arc::from("observation")));
-        f.insert("description".into(), Value::Str(Arc::from("Errors occurred during execution")));
+        f.insert(
+            "description".into(),
+            Value::Str(Arc::from("Errors occurred during execution")),
+        );
         facts.push(Value::Record(Arc::new(f)));
     }
     let duplicate_lines: usize = {
         let mut seen = std::collections::HashSet::new();
-        lines.iter().filter(|l| l.len() > 10 && !seen.insert(**l)).count()
+        lines
+            .iter()
+            .filter(|l| l.len() > 10 && !seen.insert(**l))
+            .count()
     };
     if duplicate_lines > 3 {
         let mut f = IndexMap::new();
         f.insert("kind".into(), Value::Str(Arc::from("mistake")));
-        f.insert("description".into(), Value::Str(Arc::from("Excessive repeated actions")));
-        f.insert("lesson".into(), Value::Str(Arc::from("Detect loops earlier")));
+        f.insert(
+            "description".into(),
+            Value::Str(Arc::from("Excessive repeated actions")),
+        );
+        f.insert(
+            "lesson".into(),
+            Value::Str(Arc::from("Detect loops earlier")),
+        );
         mistakes.push(Value::Record(Arc::new(f)));
     }
     (patterns, mistakes, facts)
@@ -203,7 +238,9 @@ fn bi_quick_review(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result
     let (patterns, mistakes, facts) = extract_structural(&fields.transcript);
     let summary = format!(
         "{} patterns, {} mistakes, {} facts extracted structurally",
-        patterns.len(), mistakes.len(), facts.len(),
+        patterns.len(),
+        mistakes.len(),
+        facts.len(),
     );
     Ok(build_result(patterns, mistakes, facts, &summary))
 }

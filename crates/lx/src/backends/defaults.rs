@@ -13,8 +13,8 @@ use crate::stdlib::json_conv::{json_to_lx, lx_to_json};
 use crate::value::Value;
 
 use super::{
-    AiBackend, AiOpts, EmitBackend, HttpBackend, HttpOpts, LogBackend, LogLevel,
-    ShellBackend, YieldBackend,
+    AiBackend, AiOpts, EmitBackend, HttpBackend, HttpOpts, LogBackend, LogLevel, ShellBackend,
+    YieldBackend,
 };
 
 pub struct ClaudeCodeAiBackend;
@@ -41,36 +41,47 @@ impl AiBackend for ClaudeCodeAiBackend {
         if let Some(ref s) = opts.append_system {
             cmd.arg("--append-system-prompt").arg(s);
         }
-        cmd.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+        cmd.stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
         let mut child = match cmd.spawn() {
             Ok(c) => c,
-            Err(e) => return Ok(Value::Err(Box::new(Value::Str(
-                Arc::from(format!("ai: cannot run 'claude': {e}").as_str()),
-            )))),
+            Err(e) => {
+                return Ok(Value::Err(Box::new(Value::Str(Arc::from(
+                    format!("ai: cannot run 'claude': {e}").as_str(),
+                )))));
+            }
         };
         if let Some(mut stdin) = child.stdin.take() {
-            stdin.write_all(text.as_bytes())
+            stdin
+                .write_all(text.as_bytes())
                 .map_err(|e| LxError::runtime(format!("ai: stdin write: {e}"), span))?;
         }
-        let output = child.wait_with_output()
+        let output = child
+            .wait_with_output()
             .map_err(|e| LxError::runtime(format!("ai: wait: {e}"), span))?;
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
         if !output.status.success() && stdout.trim().is_empty() {
-            return Ok(Value::Err(Box::new(Value::Str(
-                Arc::from(format!("ai: claude exited {}: {stderr}", output.status).as_str()),
-            ))));
+            return Ok(Value::Err(Box::new(Value::Str(Arc::from(
+                format!("ai: claude exited {}: {stderr}", output.status).as_str(),
+            )))));
         }
-        let jv: serde_json::Value = serde_json::from_str(stdout.trim())
-            .map_err(|e| LxError::runtime(
-                format!("ai: JSON parse: {e}\nstdout: {stdout}\nstderr: {stderr}"), span,
-            ))?;
+        let jv: serde_json::Value = serde_json::from_str(stdout.trim()).map_err(|e| {
+            LxError::runtime(
+                format!("ai: JSON parse: {e}\nstdout: {stdout}\nstderr: {stderr}"),
+                span,
+            )
+        })?;
         parse_ai_response(&jv)
     }
 }
 
 fn parse_ai_response(jv: &serde_json::Value) -> Result<Value, LxError> {
-    let is_error = jv.get("is_error").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_error = jv
+        .get("is_error")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     let result_text = jv.get("result").and_then(|v| v.as_str()).unwrap_or("");
     if is_error {
         let mut fields = IndexMap::new();
@@ -119,14 +130,20 @@ impl HttpBackend for ReqwestHttpBackend {
         opts: &HttpOpts,
         span: Span,
     ) -> Result<Value, LxError> {
-        let c = Client::builder().build()
+        let c = Client::builder()
+            .build()
             .map_err(|e| LxError::runtime(format!("http: client: {e}"), span))?;
         let mut builder = match method {
             "GET" => c.get(url),
             "POST" => c.post(url),
             "PUT" => c.put(url),
             "DELETE" => c.delete(url),
-            _ => return Err(LxError::runtime(format!("http: unknown method '{method}'"), span)),
+            _ => {
+                return Err(LxError::runtime(
+                    format!("http: unknown method '{method}'"),
+                    span,
+                ));
+            }
         };
         if let Some(ref hdrs) = opts.headers {
             for (k, v) in hdrs {
@@ -134,7 +151,8 @@ impl HttpBackend for ReqwestHttpBackend {
             }
         }
         if let Some(ref query) = opts.query {
-            let pairs: Vec<(&str, &str)> = query.iter()
+            let pairs: Vec<(&str, &str)> = query
+                .iter()
                 .map(|(k, v)| (k.as_str(), v.as_str()))
                 .collect();
             builder = builder.query(&pairs);
@@ -144,9 +162,9 @@ impl HttpBackend for ReqwestHttpBackend {
         }
         match builder.send() {
             Ok(resp) => response_to_value(resp, span),
-            Err(e) => Ok(Value::Err(Box::new(Value::Str(
-                Arc::from(e.to_string().as_str()),
-            )))),
+            Err(e) => Ok(Value::Err(Box::new(Value::Str(Arc::from(
+                e.to_string().as_str(),
+            ))))),
         }
     }
 }
@@ -158,7 +176,8 @@ fn response_to_value(resp: reqwest::blocking::Response, span: Span) -> Result<Va
         let v = value.to_str().unwrap_or("").to_string();
         headers.insert(name.to_string(), Value::Str(Arc::from(v.as_str())));
     }
-    let body_str = resp.text()
+    let body_str = resp
+        .text()
         .map_err(|e| LxError::runtime(format!("http: body: {e}"), span))?;
     let body = if let Ok(jv) = serde_json::from_str::<serde_json::Value>(&body_str) {
         json_to_lx(jv)
@@ -228,14 +247,17 @@ pub struct StdinStdoutYieldBackend;
 impl YieldBackend for StdinStdoutYieldBackend {
     fn yield_value(&self, value: Value, span: Span) -> Result<Value, LxError> {
         use std::io::BufRead;
-        let json = lx_to_json(&value, span)
-            .map_err(|e| LxError::runtime(format!("yield: {e}"), span))?;
+        let json =
+            lx_to_json(&value, span).map_err(|e| LxError::runtime(format!("yield: {e}"), span))?;
         let msg = serde_json::json!({"__yield": json});
         println!("{msg}");
-        std::io::stdout().flush()
+        std::io::stdout()
+            .flush()
             .map_err(|e| LxError::runtime(format!("yield: stdout: {e}"), span))?;
         let mut line = String::new();
-        std::io::stdin().lock().read_line(&mut line)
+        std::io::stdin()
+            .lock()
+            .read_line(&mut line)
             .map_err(|e| LxError::runtime(format!("yield: stdin: {e}"), span))?;
         if line.trim().is_empty() {
             return Err(LxError::runtime("yield: orchestrator closed stdin", span));

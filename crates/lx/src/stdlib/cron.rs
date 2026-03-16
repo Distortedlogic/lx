@@ -1,5 +1,5 @@
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::thread;
 use std::time::Duration;
 
@@ -20,8 +20,7 @@ struct CronJob {
     handle: thread::JoinHandle<()>,
 }
 
-static JOBS: std::sync::LazyLock<DashMap<u64, CronJob>> =
-    std::sync::LazyLock::new(DashMap::new);
+static JOBS: std::sync::LazyLock<DashMap<u64, CronJob>> = std::sync::LazyLock::new(DashMap::new);
 
 pub fn build() -> IndexMap<String, Value> {
     let mut m = IndexMap::new();
@@ -35,26 +34,43 @@ pub fn build() -> IndexMap<String, Value> {
 fn bi_every(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let interval_ms = match &args[0] {
         Value::Int(n) => {
-            let v: i64 = n.try_into()
+            let v: i64 = n
+                .try_into()
                 .map_err(|_| LxError::type_err("cron.every: interval too large", span))?;
             if v <= 0 {
-                return Err(LxError::type_err("cron.every: interval must be positive", span));
+                return Err(LxError::type_err(
+                    "cron.every: interval must be positive",
+                    span,
+                ));
             }
             v as u64
         }
         Value::Float(f) => {
             if *f <= 0.0 {
-                return Err(LxError::type_err("cron.every: interval must be positive", span));
+                return Err(LxError::type_err(
+                    "cron.every: interval must be positive",
+                    span,
+                ));
             }
             *f as u64
         }
-        _ => return Err(LxError::type_err("cron.every: first arg must be Int ms", span)),
+        _ => {
+            return Err(LxError::type_err(
+                "cron.every: first arg must be Int ms",
+                span,
+            ));
+        }
     };
 
     let callback = args[1].clone();
     match &callback {
         Value::Func(_) | Value::BuiltinFunc(_) => {}
-        _ => return Err(LxError::type_err("cron.every: second arg must be a function", span)),
+        _ => {
+            return Err(LxError::type_err(
+                "cron.every: second arg must be a function",
+                span,
+            ));
+        }
     }
 
     let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
@@ -79,9 +95,11 @@ fn bi_every(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, 
 }
 
 fn bi_cancel(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let id = args[0].as_int()
+    let id = args[0]
+        .as_int()
         .ok_or_else(|| LxError::type_err("cron.cancel expects Int handle", span))?;
-    let id: u64 = id.try_into()
+    let id: u64 = id
+        .try_into()
         .map_err(|_| LxError::type_err("cron.cancel: invalid handle", span))?;
 
     match JOBS.remove(&id) {
@@ -90,9 +108,9 @@ fn bi_cancel(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
             let _ = job.handle.join();
             Ok(Value::Unit)
         }
-        None => Ok(Value::Err(Box::new(Value::Str(
-            Arc::from(format!("cron.cancel: no job with id {id}").as_str()),
-        )))),
+        None => Ok(Value::Err(Box::new(Value::Str(Arc::from(
+            format!("cron.cancel: no job with id {id}").as_str(),
+        ))))),
     }
 }
 

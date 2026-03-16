@@ -13,7 +13,10 @@ use crate::value::Value;
 pub fn build() -> IndexMap<String, Value> {
     let mut m = IndexMap::new();
     m.insert("plan".into(), mk("planner.plan", 1, bi_plan));
-    m.insert("quick_plan".into(), mk("planner.quick_plan", 1, bi_quick_plan));
+    m.insert(
+        "quick_plan".into(),
+        mk("planner.quick_plan", 1, bi_quick_plan),
+    );
     m
 }
 
@@ -28,32 +31,39 @@ fn extract_fields(args: &[Value], span: Span) -> Result<PlanFields, LxError> {
     let Value::Record(fields) = &args[0] else {
         return Err(LxError::type_err("planner expects Record", span));
     };
-    let task = fields.get("task")
+    let task = fields
+        .get("task")
         .and_then(|v| v.as_str())
         .ok_or_else(|| LxError::runtime("planner: missing 'task' (Str)", span))?
         .to_string();
-    let context = fields.get("context")
+    let context = fields
+        .get("context")
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();
-    let max_steps = fields.get("max_steps")
+    let max_steps = fields
+        .get("max_steps")
         .and_then(|v| v.as_int())
         .and_then(|n| n.try_into().ok())
         .unwrap_or(10);
-    let constraints = fields.get("constraints")
+    let constraints = fields
+        .get("constraints")
         .and_then(|v| v.as_list())
-        .map(|l| l.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+        .map(|l| {
+            l.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        })
         .unwrap_or_default();
-    Ok(PlanFields { task, context, max_steps, constraints })
+    Ok(PlanFields {
+        task,
+        context,
+        max_steps,
+        constraints,
+    })
 }
 
-fn make_step(
-    id: i64,
-    title: &str,
-    description: &str,
-    deps: Vec<Value>,
-    complexity: &str,
-) -> Value {
+fn make_step(id: i64, title: &str, description: &str, deps: Vec<Value>, complexity: &str) -> Value {
     let mut s = IndexMap::new();
     s.insert("id".into(), Value::Int(BigInt::from(id)));
     s.insert("title".into(), Value::Str(Arc::from(title)));
@@ -101,24 +111,35 @@ fn build_user_prompt(fields: &PlanFields) -> String {
     p
 }
 
-fn parse_llm_result(llm_response: &Value, task: &str, span: Span)
-    -> Result<Value, LxError>
-{
+fn parse_llm_result(llm_response: &Value, task: &str, span: Span) -> Result<Value, LxError> {
     let Ok(jv) = ai::parse_llm_json(llm_response, "planner", span)? else {
         return Ok(build_result(vec![], task));
     };
     let mut steps = Vec::new();
     if let Some(arr) = jv.get("steps").and_then(|v| v.as_array()) {
         for step in arr {
-            let id = step.get("id").and_then(|v| v.as_i64()).unwrap_or(steps.len() as i64);
+            let id = step
+                .get("id")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(steps.len() as i64);
             let title = step.get("title").and_then(|v| v.as_str()).unwrap_or("");
-            let desc = step.get("description").and_then(|v| v.as_str()).unwrap_or("");
-            let complexity = step.get("complexity").and_then(|v| v.as_str())
+            let desc = step
+                .get("description")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let complexity = step
+                .get("complexity")
+                .and_then(|v| v.as_str())
                 .unwrap_or("medium");
-            let deps: Vec<Value> = step.get("deps")
+            let deps: Vec<Value> = step
+                .get("deps")
                 .and_then(|v| v.as_array())
-                .map(|a| a.iter().filter_map(|v| v.as_i64())
-                    .map(|n| Value::Int(BigInt::from(n))).collect())
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|v| v.as_i64())
+                        .map(|n| Value::Int(BigInt::from(n)))
+                        .collect()
+                })
                 .unwrap_or_default();
             steps.push(make_step(id, title, desc, deps, complexity));
         }

@@ -11,35 +11,38 @@ Real agent work has phases:
 2. Diminishing returns (good draft → slightly better draft)
 3. Plateau (changes don't measurably improve quality)
 
-Agents need to detect phase transitions and adapt: stop refining, switch strategy, or ask for help.
+## Trace-Based Progress Tracking
 
-## `introspect.progress` — Progress Tracker
-
-Extension to `std/introspect`. Tracks scored checkpoints over time.
+Progress checkpoints are recorded as trace spans with score metadata. This integrates with `std/trace` rather than requiring a separate storage mechanism.
 
 ```
-use std/introspect
+use std/trace
 
-introspect.record_progress {score: 72 label: "initial draft"}
+trace.span "progress" {score: 72 label: "initial draft"}
 
 // ... do some work ...
 
-introspect.record_progress {score: 85 label: "after revision 1"}
-introspect.record_progress {score: 87 label: "after revision 2"}
-introspect.record_progress {score: 87.5 label: "after revision 3"}
-
-rate = introspect.improvement_rate 3
-// rate = {avg_delta: 0.83  trend: :diminishing  recent_delta: 0.5  samples: 3}
+trace.span "progress" {score: 85 label: "after revision 1"}
+trace.span "progress" {score: 87 label: "after revision 2"}
+trace.span "progress" {score: 87.5 label: "after revision 3"}
 ```
 
-### Functions
+### Query Functions
+
+Utility functions in `std/trace` that operate on progress spans:
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
-| `introspect.record_progress` | `{score: Float label: Str} -> ()` | Record a scored checkpoint. |
-| `introspect.improvement_rate` | `Int -> ProgressRate` | Compute improvement rate over last N checkpoints. |
-| `introspect.progress_history` | `() -> [{score label timestamp}]` | Full history of scored checkpoints. |
-| `introspect.should_stop` | `{min_delta: Float window: Int} -> Bool` | True if improvement over window is below min_delta. |
+| `trace.improvement_rate` | `Int -> ProgressRate` | Compute improvement rate over last N progress spans. |
+| `trace.should_stop` | `{min_delta: Float window: Int} -> Bool` | True if improvement over window is below min_delta. |
+
+```
+rate = trace.improvement_rate 3
+// rate = {avg_delta: 0.83  trend: :diminishing  recent_delta: 0.5  samples: 3}
+
+trace.should_stop {min_delta: 1.0 window: 3}
+// => true (last 3 deltas are all below 1.0)
+```
 
 ### ProgressRate Record
 
@@ -56,7 +59,7 @@ Protocol ProgressRate = {
 |-------|-------------|
 | `avg_delta` | Mean score change per checkpoint over the window. |
 | `recent_delta` | Most recent score change (last two checkpoints). |
-| `trend` | `:improving` (accelerating), `:steady` (consistent gains), `:diminishing` (decelerating), `:plateau` (< 0.5 delta), `:regressing` (negative delta). |
+| `trend` | `:improving` (accelerating), `:steady` (consistent gains), `:diminishing` (decelerating), `:plateau` (< min_delta), `:regressing` (negative delta). |
 | `samples` | Number of checkpoints in the window. |
 
 ### Trend Classification
@@ -69,8 +72,6 @@ plateau      = recent_delta <= min_delta
 regressing   = recent_delta < 0
 ```
 
-Thresholds are configurable via `introspect.configure_progress {min_delta: 0.5}`.
-
 ## Usage Patterns
 
 ### Adaptive stopping
@@ -79,9 +80,9 @@ Thresholds are configurable via `introspect.configure_progress {min_delta: 0.5}`
 loop {
   result = improve current_work ^
   grade = evaluate result ^
-  introspect.record_progress {score: grade.score label: "round {round}"}
+  trace.span "progress" {score: grade.score label: "round {round}"}
 
-  introspect.should_stop {min_delta: 1.0 window: 3} ? {
+  trace.should_stop {min_delta: 1.0 window: 3} ? {
     true  -> break result
     false -> current_work = result
   }
@@ -91,7 +92,7 @@ loop {
 ### Strategy shift on plateau
 
 ```
-rate = introspect.improvement_rate 3
+rate = trace.improvement_rate 3
 rate.trend ? {
   :diminishing -> switch_to_different_approach ()
   :plateau     -> finalize_and_return ()
@@ -106,14 +107,14 @@ rate.trend ? {
 result = refine draft {
   grade: (work) {
     g = evaluate work
-    introspect.record_progress {score: g.score label: "refine"}
+    trace.span "progress" {score: g.score label: "refine"}
     g
   }
   revise: improve
   threshold: 90
   max_rounds: 10
   on_round: (round work score) {
-    introspect.should_stop {min_delta: 1.0 window: 3} ? {
+    trace.should_stop {min_delta: 1.0 window: 3} ? {
       true  -> emit "stopping early: diminishing returns"
       false -> ()
     }
@@ -123,11 +124,12 @@ result = refine draft {
 
 ## Implementation
 
-Extension to `std/introspect` in `stdlib/introspect.rs`. Progress checkpoints stored as a `Vec<ProgressEntry>` in the interpreter's introspection state alongside the existing action log. Bounded to last 1000 entries like actions. Progress data is exposed via `pub(crate)` accessors so `std/circuit` can incorporate progress trend into trip decisions — e.g., trip when score has plateaued AND turn limit is near. This is part of the broader architecture where introspect is the single source of truth for agent state and circuit reads from it.
+Extension to `std/trace` in `stdlib/trace.rs`. `trace.improvement_rate` and `trace.should_stop` query the existing trace span storage, filtering for spans named "progress" that have a `score` field. No separate storage — progress data lives alongside all other trace spans.
 
 ## Cross-References
 
+- Trace spans: stdlib (`std/trace` — progress checkpoints are trace spans)
 - Stuck detection: [stdlib-introspect.md](stdlib-introspect.md) (`is_stuck` is binary; this is gradient)
-- Circuit breakers: stdlib_roadmap (`std/circuit` — hard limits; reads from introspect for action/progress data)
+- Circuit breakers: stdlib_roadmap (`std/circuit` / `std/budget` — hard limits)
 - Refinement loops: [agents-refine.md](agents-refine.md) (`on_round` callback)
 - Strategy shift: [stdlib-introspect.md](stdlib-introspect.md) (`strategy_shift`)

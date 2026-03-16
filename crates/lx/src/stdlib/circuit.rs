@@ -32,7 +32,10 @@ pub fn build() -> IndexMap<String, Value> {
     m.insert("tick".into(), mk("circuit.tick", 1, bi_tick));
     m.insert("record".into(), mk("circuit.record", 2, bi_record));
     m.insert("check".into(), mk("circuit.check", 1, bi_check));
-    m.insert("is_tripped".into(), mk("circuit.is_tripped", 1, bi_is_tripped));
+    m.insert(
+        "is_tripped".into(),
+        mk("circuit.is_tripped", 1, bi_is_tripped),
+    );
     m.insert("reset".into(), mk("circuit.reset", 1, bi_reset));
     m.insert("status".into(), mk("circuit.status", 1, bi_status));
     m
@@ -40,7 +43,8 @@ pub fn build() -> IndexMap<String, Value> {
 
 fn breaker_id(v: &Value, span: Span) -> Result<u64, LxError> {
     match v {
-        Value::Record(r) => r.get("__breaker_id")
+        Value::Record(r) => r
+            .get("__breaker_id")
             .and_then(|v| v.as_int())
             .and_then(|n| n.try_into().ok())
             .ok_or_else(|| LxError::type_err("circuit: expected breaker record", span)),
@@ -104,20 +108,28 @@ fn trip_check(b: &mut Breaker) {
         return;
     }
     if b.actions.len() as u64 >= b.max_actions {
-        b.tripped = Some(format!("max_actions: {} >= {}", b.actions.len(), b.max_actions));
+        b.tripped = Some(format!(
+            "max_actions: {} >= {}",
+            b.actions.len(),
+            b.max_actions
+        ));
         return;
     }
     if b.repetition_window > 0 && b.actions.len() >= b.repetition_window {
         let window = &b.actions[b.actions.len() - b.repetition_window..];
         if window.iter().all(|a| a == &window[0]) {
-            b.tripped = Some(format!("repetition: last {} actions identical", b.repetition_window));
+            b.tripped = Some(format!(
+                "repetition: last {} actions identical",
+                b.repetition_window
+            ));
         }
     }
 }
 
 fn bi_tick(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = breaker_id(&args[0], span)?;
-    let mut b = BREAKERS.get_mut(&id)
+    let mut b = BREAKERS
+        .get_mut(&id)
         .ok_or_else(|| LxError::runtime("circuit: breaker not found", span))?;
     b.turns += 1;
     trip_check(&mut b);
@@ -126,9 +138,11 @@ fn bi_tick(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, 
 
 fn bi_record(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = breaker_id(&args[0], span)?;
-    let action = args[1].as_str()
+    let action = args[1]
+        .as_str()
         .ok_or_else(|| LxError::type_err("circuit.record: action must be Str", span))?;
-    let mut b = BREAKERS.get_mut(&id)
+    let mut b = BREAKERS
+        .get_mut(&id)
         .ok_or_else(|| LxError::runtime("circuit: breaker not found", span))?;
     b.actions.push(action.to_string());
     trip_check(&mut b);
@@ -137,7 +151,8 @@ fn bi_record(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
 
 fn bi_check(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = breaker_id(&args[0], span)?;
-    let mut b = BREAKERS.get_mut(&id)
+    let mut b = BREAKERS
+        .get_mut(&id)
         .ok_or_else(|| LxError::runtime("circuit: breaker not found", span))?;
     trip_check(&mut b);
     match &b.tripped {
@@ -152,14 +167,16 @@ fn bi_check(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value,
 
 fn bi_is_tripped(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = breaker_id(&args[0], span)?;
-    let b = BREAKERS.get(&id)
+    let b = BREAKERS
+        .get(&id)
         .ok_or_else(|| LxError::runtime("circuit: breaker not found", span))?;
     Ok(Value::Bool(b.tripped.is_some()))
 }
 
 fn bi_reset(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = breaker_id(&args[0], span)?;
-    let mut b = BREAKERS.get_mut(&id)
+    let mut b = BREAKERS
+        .get_mut(&id)
         .ok_or_else(|| LxError::runtime("circuit: breaker not found", span))?;
     b.turns = 0;
     b.actions.clear();
@@ -170,16 +187,22 @@ fn bi_reset(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value,
 
 fn bi_status(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = breaker_id(&args[0], span)?;
-    let b = BREAKERS.get(&id)
+    let b = BREAKERS
+        .get(&id)
         .ok_or_else(|| LxError::runtime("circuit: breaker not found", span))?;
     let elapsed = b.start.elapsed().as_secs_f64();
-    let actions: Vec<Value> = b.actions.iter()
+    let actions: Vec<Value> = b
+        .actions
+        .iter()
         .map(|a| Value::Str(Arc::from(a.as_str())))
         .collect();
     let mut fields = IndexMap::new();
     fields.insert("turns".into(), Value::Int(BigInt::from(b.turns)));
     fields.insert("elapsed".into(), Value::Float(elapsed));
-    fields.insert("action_count".into(), Value::Int(BigInt::from(b.actions.len())));
+    fields.insert(
+        "action_count".into(),
+        Value::Int(BigInt::from(b.actions.len())),
+    );
     fields.insert("actions".into(), Value::List(Arc::new(actions)));
     fields.insert("tripped".into(), Value::Bool(b.tripped.is_some()));
     if let Some(ref reason) = b.tripped {

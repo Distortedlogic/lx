@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::{
-    BindTarget, Expr, FieldKind, Literal, Program, SExpr, SStmt, Stmt, StrPart,
-};
+use crate::ast::{BindTarget, Expr, FieldKind, Literal, Program, SExpr, SStmt, Stmt, StrPart};
 
 pub(crate) struct DiagNode {
     pub id: String,
@@ -34,7 +32,12 @@ pub(crate) struct Walker {
 
 impl Walker {
     pub fn new() -> Self {
-        let main = DiagNode { id: "main".into(), label: "main".into(), kind: "agent".into(), children: vec![] };
+        let main = DiagNode {
+            id: "main".into(),
+            label: "main".into(),
+            kind: "agent".into(),
+            children: vec![],
+        };
         Self {
             nodes: vec![main],
             edges: vec![],
@@ -48,22 +51,34 @@ impl Walker {
     fn add_node(&mut self, prefix: &str, label: String, kind: &str) -> String {
         let id = format!("{prefix}_{}", self.next_id);
         self.next_id += 1;
-        self.nodes.push(DiagNode { id: id.clone(), label, kind: kind.into(), children: vec![] });
+        self.nodes.push(DiagNode {
+            id: id.clone(),
+            label,
+            kind: kind.into(),
+            children: vec![],
+        });
         id
     }
 
     fn add_edge(&mut self, from: &str, to: &str, label: String, style: &str) {
         self.edges.push(DiagEdge {
-            from: from.into(), to: to.into(), label, style: style.into(),
+            from: from.into(),
+            to: to.into(),
+            label,
+            style: style.into(),
         });
     }
 
     pub fn walk_program(&mut self, program: &Program) {
-        for stmt in &program.stmts { self.walk_stmt(&stmt.node); }
+        for stmt in &program.stmts {
+            self.walk_stmt(&stmt.node);
+        }
     }
 
     fn walk_stmts(&mut self, stmts: &[SStmt]) {
-        for stmt in stmts { self.walk_stmt(&stmt.node); }
+        for stmt in stmts {
+            self.walk_stmt(&stmt.node);
+        }
     }
 
     fn walk_stmt(&mut self, stmt: &Stmt) {
@@ -100,11 +115,21 @@ impl Walker {
         match expr {
             Expr::AgentSend { target, msg } => {
                 let to = self.resolve_target(&target.node);
-                self.add_edge(&self.context.clone(), &to, extract_msg_label(&msg.node), "dashed");
+                self.add_edge(
+                    &self.context.clone(),
+                    &to,
+                    extract_msg_label(&msg.node),
+                    "dashed",
+                );
             }
             Expr::AgentAsk { target, msg } => {
                 let to = self.resolve_target(&target.node);
-                self.add_edge(&self.context.clone(), &to, extract_msg_label(&msg.node), "solid");
+                self.add_edge(
+                    &self.context.clone(),
+                    &to,
+                    extract_msg_label(&msg.node),
+                    "solid",
+                );
             }
             Expr::Par(stmts) => {
                 let fork_id = self.add_node("fork", "par".into(), "fork");
@@ -119,7 +144,9 @@ impl Walker {
                 self.add_edge(&self.context.clone(), &dec_id, String::new(), "solid");
                 let saved = self.context.clone();
                 self.context = dec_id;
-                for arm in arms { self.walk_expr(&arm.handler.node); }
+                for arm in arms {
+                    self.walk_expr(&arm.handler.node);
+                }
                 self.context = saved;
             }
             Expr::Match { scrutinee, arms } => {
@@ -128,11 +155,23 @@ impl Walker {
                 self.add_edge(&self.context.clone(), &dec_id, String::new(), "solid");
                 let saved = self.context.clone();
                 self.context = dec_id;
-                for arm in arms { self.walk_expr(&arm.body.node); }
+                for arm in arms {
+                    self.walk_expr(&arm.body.node);
+                }
                 self.context = saved;
             }
             Expr::Loop(stmts) | Expr::Block(stmts) => self.walk_stmts(stmts),
             Expr::With { body, .. } => self.walk_stmts(body),
+            Expr::Refine {
+                initial,
+                grade,
+                revise,
+                ..
+            } => {
+                self.walk_expr(&initial.node);
+                self.walk_expr(&grade.node);
+                self.walk_expr(&revise.node);
+            }
             Expr::Pipe { left, right } => {
                 self.walk_expr(&left.node);
                 self.walk_expr(&right.node);
@@ -140,7 +179,12 @@ impl Walker {
             Expr::Propagate(inner) => self.walk_expr(&inner.node),
             Expr::Apply { func, arg } => {
                 if let Some(target_id) = self.extract_mcp_call(expr) {
-                    self.add_edge(&self.context.clone(), &target_id, "mcp.call".into(), "solid");
+                    self.add_edge(
+                        &self.context.clone(),
+                        &target_id,
+                        "mcp.call".into(),
+                        "solid",
+                    );
                     return;
                 }
                 self.walk_expr(&func.node);
@@ -148,7 +192,9 @@ impl Walker {
             }
             Expr::Ternary { then_, else_, .. } => {
                 self.walk_expr(&then_.node);
-                if let Some(e) = else_ { self.walk_expr(&e.node); }
+                if let Some(e) = else_ {
+                    self.walk_expr(&e.node);
+                }
             }
             Expr::Func { body, .. } => self.walk_expr(&body.node),
             Expr::Coalesce { expr, default } => {
@@ -161,38 +207,67 @@ impl Walker {
 
     fn resolve_target(&self, expr: &Expr) -> String {
         if let Expr::Ident(name) = expr {
-            if let Some(id) = self.agent_vars.get(name) { return id.clone(); }
-            if let Some(id) = self.mcp_vars.get(name) { return id.clone(); }
+            if let Some(id) = self.agent_vars.get(name) {
+                return id.clone();
+            }
+            if let Some(id) = self.mcp_vars.get(name) {
+                return id.clone();
+            }
             return name.clone();
         }
         "unknown".into()
     }
 
     fn extract_mcp_call(&self, expr: &Expr) -> Option<String> {
-        let Expr::Apply { func, .. } = expr else { return None };
-        let Expr::Apply { func: f2, .. } = &func.node else { return None };
-        let Expr::Apply { func: f3, arg: conn } = &f2.node else { return None };
-        if !is_field_call(&f3.node, "mcp", "call") { return None; }
-        let Expr::Ident(var) = &conn.node else { return None };
+        let Expr::Apply { func, .. } = expr else {
+            return None;
+        };
+        let Expr::Apply { func: f2, .. } = &func.node else {
+            return None;
+        };
+        let Expr::Apply {
+            func: f3,
+            arg: conn,
+        } = &f2.node
+        else {
+            return None;
+        };
+        if !is_field_call(&f3.node, "mcp", "call") {
+            return None;
+        }
+        let Expr::Ident(var) = &conn.node else {
+            return None;
+        };
         self.mcp_vars.get(var).cloned()
     }
 
     pub fn into_graph(self) -> Graph {
-        Graph { nodes: self.nodes, edges: self.edges }
+        Graph {
+            nodes: self.nodes,
+            edges: self.edges,
+        }
     }
 }
 
 fn extract_agent_spawn(sexpr: &SExpr) -> Option<String> {
     let expr = unwrap_propagate(&sexpr.node);
-    let Expr::Apply { func, arg } = expr else { return None };
-    if !is_field_call(&func.node, "agent", "spawn") { return None; }
+    let Expr::Apply { func, arg } = expr else {
+        return None;
+    };
+    if !is_field_call(&func.node, "agent", "spawn") {
+        return None;
+    }
     Some(extract_spawn_label(&arg.node))
 }
 
 fn extract_mcp_connect(sexpr: &SExpr) -> Option<String> {
     let expr = unwrap_propagate(&sexpr.node);
-    let Expr::Apply { func, arg } = expr else { return None };
-    if !is_field_call(&func.node, "mcp", "connect") { return None; }
+    let Expr::Apply { func, arg } = expr else {
+        return None;
+    };
+    if !is_field_call(&func.node, "mcp", "connect") {
+        return None;
+    }
     Some(extract_spawn_label(&arg.node))
 }
 
@@ -204,8 +279,16 @@ fn unwrap_propagate(expr: &Expr) -> &Expr {
 }
 
 fn is_field_call(expr: &Expr, obj: &str, field: &str) -> bool {
-    let Expr::FieldAccess { expr: e, field: FieldKind::Named(f) } = expr else { return false };
-    let Expr::Ident(name) = &e.node else { return false };
+    let Expr::FieldAccess {
+        expr: e,
+        field: FieldKind::Named(f),
+    } = expr
+    else {
+        return false;
+    };
+    let Expr::Ident(name) = &e.node else {
+        return false;
+    };
     name == obj && f == field
 }
 
@@ -232,20 +315,33 @@ fn extract_msg_label(expr: &Expr) -> String {
 }
 
 fn extract_str_literal(expr: &Expr) -> Option<String> {
-    let Expr::Literal(Literal::Str(parts)) = expr else { return None };
-    if parts.len() != 1 { return None; }
-    let StrPart::Text(t) = &parts[0] else { return None };
+    let Expr::Literal(Literal::Str(parts)) = expr else {
+        return None;
+    };
+    if parts.len() != 1 {
+        return None;
+    }
+    let StrPart::Text(t) = &parts[0] else {
+        return None;
+    };
     Some(t.clone())
 }
 
 fn expr_label(expr: &Expr) -> String {
     match expr {
         Expr::Ident(name) => name.clone(),
-        Expr::FieldAccess { expr: e, field: FieldKind::Named(f) } => {
+        Expr::FieldAccess {
+            expr: e,
+            field: FieldKind::Named(f),
+        } => {
             format!("{}.{f}", expr_label(&e.node))
         }
         Expr::Binary { op, left, right } => {
-            format!("{} {op} {}", expr_label(&left.node), expr_label(&right.node))
+            format!(
+                "{} {op} {}",
+                expr_label(&left.node),
+                expr_label(&right.node)
+            )
         }
         Expr::Literal(Literal::Int(n)) => n.to_string(),
         Expr::Literal(Literal::Bool(b)) => b.to_string(),

@@ -32,8 +32,12 @@ fn parse_opts(v: &Value, span: Span) -> Result<SagaOpts, LxError> {
     };
     Ok(SagaOpts {
         on_compensate: r.get("on_compensate").cloned(),
-        timeout_secs: r.get("timeout").and_then(|v| v.as_int()).and_then(|n| n.try_into().ok()),
-        max_retries: r.get("max_retries")
+        timeout_secs: r
+            .get("timeout")
+            .and_then(|v| v.as_int())
+            .and_then(|n| n.try_into().ok()),
+        max_retries: r
+            .get("max_retries")
             .and_then(|v| v.as_int())
             .and_then(|n| n.try_into().ok())
             .unwrap_or(0),
@@ -49,18 +53,23 @@ fn step_id(step: &Value) -> Option<&str> {
 
 fn step_deps(step: &Value) -> Vec<String> {
     match step {
-        Value::Record(r) => r.get("depends")
+        Value::Record(r) => r
+            .get("depends")
             .and_then(|v| v.as_list())
-            .map(|l| l.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+            .map(|l| {
+                l.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
             .unwrap_or_default(),
         _ => vec![],
     }
 }
 
 fn next_ready(remaining: &[Value], completed: &HashSet<String>) -> Option<usize> {
-    remaining.iter().position(|step| {
-        step_deps(step).iter().all(|d| completed.contains(d))
-    })
+    remaining
+        .iter()
+        .position(|step| step_deps(step).iter().all(|d| completed.contains(d)))
 }
 
 fn build_prev(completed: &[(String, Value)]) -> Value {
@@ -78,7 +87,13 @@ fn step_fn(step: &Value, field: &str) -> Option<Value> {
     }
 }
 
-fn try_step(do_fn: &Value, prev: &Value, retries: usize, span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, Value> {
+fn try_step(
+    do_fn: &Value,
+    prev: &Value,
+    retries: usize,
+    span: Span,
+    ctx: &Arc<RuntimeCtx>,
+) -> Result<Value, Value> {
     for attempt in 0..=retries {
         let last = attempt == retries;
         match call_value(do_fn, prev.clone(), span, ctx) {
@@ -128,15 +143,25 @@ fn compensate(
     (compensated, comp_errors)
 }
 
-fn make_err(failed_step: &str, error: Value, compensated: &[String], comp_errors: Vec<Value>) -> Value {
+fn make_err(
+    failed_step: &str,
+    error: Value,
+    compensated: &[String],
+    comp_errors: Vec<Value>,
+) -> Value {
     let mut f = IndexMap::new();
     f.insert("failed_step".into(), Value::Str(Arc::from(failed_step)));
     f.insert("error".into(), error);
-    let comp_vals: Vec<Value> = compensated.iter()
-        .map(|s| Value::Str(Arc::from(s.as_str()))).collect();
+    let comp_vals: Vec<Value> = compensated
+        .iter()
+        .map(|s| Value::Str(Arc::from(s.as_str())))
+        .collect();
     f.insert("compensated".into(), Value::List(Arc::new(comp_vals)));
     if !comp_errors.is_empty() {
-        f.insert("compensation_errors".into(), Value::List(Arc::new(comp_errors)));
+        f.insert(
+            "compensation_errors".into(),
+            Value::List(Arc::new(comp_errors)),
+        );
     }
     Value::Err(Box::new(Value::Record(Arc::new(f))))
 }
@@ -158,19 +183,28 @@ fn run_saga(
         if remaining.is_empty() {
             break;
         }
-        if let Some(timeout) = opts.timeout_secs && start.elapsed().as_secs() >= timeout {
+        if let Some(timeout) = opts.timeout_secs
+            && start.elapsed().as_secs() >= timeout
+        {
             let (comp, comp_err) = compensate(&completed, opts, span, ctx);
-            return Ok(make_err("__timeout", Value::Str(Arc::from("saga timeout exceeded")), &comp, comp_err));
+            return Ok(make_err(
+                "__timeout",
+                Value::Str(Arc::from("saga timeout exceeded")),
+                &comp,
+                comp_err,
+            ));
         }
         let Some(idx) = next_ready(&remaining, &completed_ids) else {
             return Err(LxError::runtime("saga: cycle or unmet dependencies", span));
         };
         let step = remaining.remove(idx);
         let sid = step_id(&step).unwrap_or("unknown").to_string();
-        let do_fn = step_fn(&step, "do")
-            .ok_or_else(|| LxError::type_err(format!("saga step '{sid}' missing 'do' function"), span))?;
-        let undo_fn = step_fn(&step, "undo")
-            .ok_or_else(|| LxError::type_err(format!("saga step '{sid}' missing 'undo' function"), span))?;
+        let do_fn = step_fn(&step, "do").ok_or_else(|| {
+            LxError::type_err(format!("saga step '{sid}' missing 'do' function"), span)
+        })?;
+        let undo_fn = step_fn(&step, "undo").ok_or_else(|| {
+            LxError::type_err(format!("saga step '{sid}' missing 'undo' function"), span)
+        })?;
         let prev = build_prev(&results);
 
         match try_step(&do_fn, &prev, opts.max_retries, span, ctx) {
@@ -191,13 +225,15 @@ fn run_saga(
 }
 
 fn bi_run(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let steps = args[0].as_list()
+    let steps = args[0]
+        .as_list()
         .ok_or_else(|| LxError::type_err("saga.run expects List of steps", span))?;
     run_saga(steps, Vec::new(), &SagaOpts::default(), span, ctx)
 }
 
 fn bi_run_with(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let steps = args[0].as_list()
+    let steps = args[0]
+        .as_list()
         .ok_or_else(|| LxError::type_err("saga.run_with: first arg must be List of steps", span))?;
     let opts = parse_opts(&args[1], span)?;
     run_saga(steps, Vec::new(), &opts, span, ctx)
@@ -215,9 +251,13 @@ fn bi_define(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
 
 fn bi_execute(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let Value::Record(def) = &args[0] else {
-        return Err(LxError::type_err("saga.execute: first arg must be a saga definition", span));
+        return Err(LxError::type_err(
+            "saga.execute: first arg must be a saga definition",
+            span,
+        ));
     };
-    let steps = def.get("steps")
+    let steps = def
+        .get("steps")
         .and_then(|v| v.as_list())
         .ok_or_else(|| LxError::type_err("saga.execute: invalid saga definition", span))?;
     let initial = match &args[1] {

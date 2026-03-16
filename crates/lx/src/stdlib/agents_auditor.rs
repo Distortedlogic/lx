@@ -13,7 +13,10 @@ use crate::value::Value;
 pub fn build() -> IndexMap<String, Value> {
     let mut m = IndexMap::new();
     m.insert("audit".into(), mk("auditor.audit", 1, bi_audit));
-    m.insert("quick_audit".into(), mk("auditor.quick_audit", 1, bi_quick_audit));
+    m.insert(
+        "quick_audit".into(),
+        mk("auditor.quick_audit", 1, bi_quick_audit),
+    );
     m
 }
 
@@ -28,23 +31,36 @@ fn extract_fields(args: &[Value], span: Span) -> Result<AuditFields, LxError> {
     let Value::Record(fields) = &args[0] else {
         return Err(LxError::type_err("auditor expects Record", span));
     };
-    let output = fields.get("output")
+    let output = fields
+        .get("output")
         .and_then(|v| v.as_str())
         .ok_or_else(|| LxError::runtime("auditor: missing 'output' (Str)", span))?
         .to_string();
-    let task = fields.get("task")
+    let task = fields
+        .get("task")
         .and_then(|v| v.as_str())
         .ok_or_else(|| LxError::runtime("auditor: missing 'task' (Str)", span))?
         .to_string();
-    let context = fields.get("context")
+    let context = fields
+        .get("context")
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();
-    let rubric = fields.get("rubric")
+    let rubric = fields
+        .get("rubric")
         .and_then(|v| v.as_list())
-        .map(|l| l.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+        .map(|l| {
+            l.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        })
         .unwrap_or_default();
-    Ok(AuditFields { output, task, context, rubric })
+    Ok(AuditFields {
+        output,
+        task,
+        context,
+        rubric,
+    })
 }
 
 fn check_structural(fields: &AuditFields) -> Vec<(String, String)> {
@@ -56,7 +72,10 @@ fn check_structural(fields: &AuditFields) -> Vec<(String, String)> {
         failures.push(("refusal".into(), "Output contains refusal language".into()));
     }
     let lower = fields.output.to_lowercase();
-    let hedge_count = audit::HEDGING.iter().filter(|h| lower.contains(**h)).count();
+    let hedge_count = audit::HEDGING
+        .iter()
+        .filter(|h| lower.contains(**h))
+        .count();
     if hedge_count >= 3 {
         failures.push((
             "excessive_hedging".into(),
@@ -73,13 +92,16 @@ fn check_structural(fields: &AuditFields) -> Vec<(String, String)> {
 }
 
 fn structural_result(failures: &[(String, String)]) -> Value {
-    let categories: Vec<Value> = failures.iter()
+    let categories: Vec<Value> = failures
+        .iter()
         .map(|(name, reason)| audit::make_eval_category(name, 0, false, reason))
         .collect();
-    let failed: Vec<Value> = failures.iter()
+    let failed: Vec<Value> = failures
+        .iter()
         .map(|(name, _)| Value::Str(Arc::from(name.as_str())))
         .collect();
-    let feedback = failures.iter()
+    let feedback = failures
+        .iter()
         .map(|(_, reason)| reason.as_str())
         .collect::<Vec<_>>()
         .join("; ");
@@ -129,7 +151,10 @@ fn extract_audit_from_json(jv: &serde_json::Value) -> Result<Value, LxError> {
     let mut failed = Vec::new();
     if let Some(cats) = jv.get("categories").and_then(|v| v.as_array()) {
         for cat in cats {
-            let name = cat.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
+            let name = cat
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown");
             let passed = cat.get("passed").and_then(|v| v.as_bool()).unwrap_or(false);
             let reason = cat.get("reason").and_then(|v| v.as_str()).unwrap_or("");
             let cat_score = if passed { 100 } else { 0 };
@@ -140,7 +165,9 @@ fn extract_audit_from_json(jv: &serde_json::Value) -> Result<Value, LxError> {
         }
     }
     let passed = score >= 70 && failed.is_empty();
-    Ok(audit::build_eval_result(score, passed, categories, feedback, failed))
+    Ok(audit::build_eval_result(
+        score, passed, categories, feedback, failed,
+    ))
 }
 
 fn bi_audit(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
@@ -164,9 +191,18 @@ fn bi_quick_audit(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<
     let fields = extract_fields(args, span)?;
     let structural = check_structural(&fields);
     if structural.is_empty() {
-        Ok(audit::build_eval_result(100, true, vec![
-            audit::make_eval_category("structure", 100, true, "All structural checks passed"),
-        ], "Structural checks passed", vec![]))
+        Ok(audit::build_eval_result(
+            100,
+            true,
+            vec![audit::make_eval_category(
+                "structure",
+                100,
+                true,
+                "All structural checks passed",
+            )],
+            "Structural checks passed",
+            vec![],
+        ))
     } else {
         Ok(structural_result(&structural))
     }

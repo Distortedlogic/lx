@@ -23,27 +23,36 @@ pub fn build() -> IndexMap<String, Value> {
 }
 
 fn bi_read(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let path = args[0].as_str()
+    let path = args[0]
+        .as_str()
         .ok_or_else(|| LxError::type_err("fs.read expects Str path", span))?;
     match std::fs::read_to_string(path) {
-        Ok(contents) => Ok(Value::Ok(Box::new(Value::Str(Arc::from(contents.as_str()))))),
-        Err(e) => Ok(Value::Err(Box::new(Value::Str(Arc::from(e.to_string().as_str()))))),
+        Ok(contents) => Ok(Value::Ok(Box::new(Value::Str(Arc::from(
+            contents.as_str(),
+        ))))),
+        Err(e) => Ok(Value::Err(Box::new(Value::Str(Arc::from(
+            e.to_string().as_str(),
+        ))))),
     }
 }
 
 fn bi_write(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let path = args[0].as_str()
+    let path = args[0]
+        .as_str()
         .ok_or_else(|| LxError::type_err("fs.write expects Str path", span))?;
     let content = format!("{}", args[1]);
     match std::fs::write(path, content) {
         Ok(()) => Ok(Value::Ok(Box::new(Value::Unit))),
-        Err(e) => Ok(Value::Err(Box::new(Value::Str(Arc::from(e.to_string().as_str()))))),
+        Err(e) => Ok(Value::Err(Box::new(Value::Str(Arc::from(
+            e.to_string().as_str(),
+        ))))),
     }
 }
 
 fn bi_append(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     use std::io::Write;
-    let path = args[0].as_str()
+    let path = args[0]
+        .as_str()
         .ok_or_else(|| LxError::type_err("fs.append expects Str path", span))?;
     let content = format!("{}", args[1]);
     let result = std::fs::OpenOptions::new()
@@ -53,18 +62,22 @@ fn bi_append(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
         .and_then(|mut f| f.write_all(content.as_bytes()));
     match result {
         Ok(()) => Ok(Value::Ok(Box::new(Value::Unit))),
-        Err(e) => Ok(Value::Err(Box::new(Value::Str(Arc::from(e.to_string().as_str()))))),
+        Err(e) => Ok(Value::Err(Box::new(Value::Str(Arc::from(
+            e.to_string().as_str(),
+        ))))),
     }
 }
 
 fn bi_exists(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let path = args[0].as_str()
+    let path = args[0]
+        .as_str()
         .ok_or_else(|| LxError::type_err("fs.exists expects Str path", span))?;
     Ok(Value::Bool(std::path::Path::new(path).exists()))
 }
 
 fn bi_remove(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let path_str = args[0].as_str()
+    let path_str = args[0]
+        .as_str()
         .ok_or_else(|| LxError::type_err("fs.remove expects Str path", span))?;
     let path = std::path::Path::new(path_str);
     let result = if path.is_dir() {
@@ -74,21 +87,27 @@ fn bi_remove(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
     };
     match result {
         Ok(()) => Ok(Value::Ok(Box::new(Value::Unit))),
-        Err(e) => Ok(Value::Err(Box::new(Value::Str(Arc::from(e.to_string().as_str()))))),
+        Err(e) => Ok(Value::Err(Box::new(Value::Str(Arc::from(
+            e.to_string().as_str(),
+        ))))),
     }
 }
 
 fn bi_mkdir(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let path = args[0].as_str()
+    let path = args[0]
+        .as_str()
         .ok_or_else(|| LxError::type_err("fs.mkdir expects Str path", span))?;
     match std::fs::create_dir_all(path) {
         Ok(()) => Ok(Value::Ok(Box::new(Value::Unit))),
-        Err(e) => Ok(Value::Err(Box::new(Value::Str(Arc::from(e.to_string().as_str()))))),
+        Err(e) => Ok(Value::Err(Box::new(Value::Str(Arc::from(
+            e.to_string().as_str(),
+        ))))),
     }
 }
 
 fn bi_ls(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let path = args[0].as_str()
+    let path = args[0]
+        .as_str()
         .ok_or_else(|| LxError::type_err("fs.ls expects Str path", span))?;
     match std::fs::read_dir(path) {
         Ok(entries) => {
@@ -98,9 +117,11 @@ fn bi_ls(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, Lx
                     Ok(e) => items.push(Value::Str(Arc::from(
                         e.file_name().to_string_lossy().as_ref(),
                     ))),
-                    Err(e) => return Ok(Value::Err(Box::new(Value::Str(
-                        Arc::from(e.to_string().as_str()),
-                    )))),
+                    Err(e) => {
+                        return Ok(Value::Err(Box::new(Value::Str(Arc::from(
+                            e.to_string().as_str(),
+                        )))));
+                    }
                 }
             }
             items.sort_by(|a, b| {
@@ -109,13 +130,16 @@ fn bi_ls(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, Lx
                 a_str.cmp(b_str)
             });
             Ok(Value::Ok(Box::new(Value::List(Arc::new(items)))))
-        },
-        Err(e) => Ok(Value::Err(Box::new(Value::Str(Arc::from(e.to_string().as_str()))))),
+        }
+        Err(e) => Ok(Value::Err(Box::new(Value::Str(Arc::from(
+            e.to_string().as_str(),
+        ))))),
     }
 }
 
 fn bi_stat(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let path = args[0].as_str()
+    let path = args[0]
+        .as_str()
         .ok_or_else(|| LxError::type_err("fs.stat expects Str path", span))?;
     match std::fs::metadata(path) {
         Ok(meta) => {
@@ -123,9 +147,14 @@ fn bi_stat(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, 
             fields.insert("size".into(), Value::Int(BigInt::from(meta.len())));
             fields.insert("is_file".into(), Value::Bool(meta.is_file()));
             fields.insert("is_dir".into(), Value::Bool(meta.is_dir()));
-            fields.insert("readonly".into(), Value::Bool(meta.permissions().readonly()));
+            fields.insert(
+                "readonly".into(),
+                Value::Bool(meta.permissions().readonly()),
+            );
             Ok(Value::Ok(Box::new(Value::Record(Arc::new(fields)))))
-        },
-        Err(e) => Ok(Value::Err(Box::new(Value::Str(Arc::from(e.to_string().as_str()))))),
+        }
+        Err(e) => Ok(Value::Err(Box::new(Value::Str(Arc::from(
+            e.to_string().as_str(),
+        ))))),
     }
 }
