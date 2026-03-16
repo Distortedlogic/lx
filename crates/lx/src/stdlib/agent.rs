@@ -47,6 +47,11 @@ pub fn build() -> IndexMap<String, Value> {
         super::agent_gate::mk_gate_result_protocol(),
     );
     m.insert("gate".into(), super::agent_gate::mk_gate());
+    m.insert("dispatch".into(), super::agent_dispatch::mk_dispatch());
+    m.insert(
+        "dispatch_multi".into(),
+        super::agent_dispatch::mk_dispatch_multi(),
+    );
     m.insert("mock".into(), super::agent_mock::mk_mock());
     m.insert("mock_calls".into(), super::agent_mock::mk_mock_calls());
     m.insert(

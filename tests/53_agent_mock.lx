@@ -1,0 +1,66 @@
+-- 53_agent_mock.lx
+-- Tests: spec/agents-test-harness.md (agent.mock, agent.mock_calls, agent.mock_assert_called)
+-- Phase: Mock agents with call tracking
+
+use std/agent
+
+-- basic mock with record pattern matching
+mock = agent.mock [
+  {match: {task: "review"} respond: {approved: true  score: 0.9}}
+  {match: {task: "audit"} respond: {passed: false  issues: 3}}
+  {match: "any" respond: {error: "unexpected"}}
+]
+
+-- mock responds to matching messages
+r1 = mock ~>? {task: "review" code: "diff"}
+assert (r1.approved == true) "mock matches review"
+assert (r1.score == 0.9) "mock returns score"
+
+r2 = mock ~>? {task: "audit" path: "src/"}
+assert (r2.passed == false) "mock matches audit"
+assert (r2.issues == 3) "mock returns issues"
+
+-- fallback to :any
+r3 = mock ~>? {task: "unknown"}
+assert (r3.error == "unexpected") "mock falls back to any"
+
+-- call tracking
+calls = agent.mock_calls mock
+assert (calls | len == 3) "mock recorded 3 calls"
+assert (calls.0.msg.task == "review") "first call was review"
+assert (calls.1.msg.task == "audit") "second call was audit"
+assert (calls.2.msg.task == "unknown") "third call was unknown"
+
+-- assert_called / assert_not_called
+agent.mock_assert_called mock {task: "review"} ^
+agent.mock_assert_called mock {task: "audit"} ^
+agent.mock_assert_not_called mock {task: "delete"} ^
+
+-- assert_called with non-existent pattern returns Err
+result = agent.mock_assert_called mock {task: "deploy"}
+assert (result == Err "expected call not found") "assert_called returns Err when not found"
+
+-- mock with function matcher
+fn_mock = agent.mock [
+  {match: (msg) msg.value > 10 respond: "big"}
+  {match: "any" respond: "small"}
+]
+assert (fn_mock ~>? {value: 20} == "big") "function matcher matches"
+assert (fn_mock ~>? {value: 3} == "small") "function matcher rejects"
+
+-- mock with dynamic response function
+dynamic_mock = agent.mock [
+  {match: "any" respond: (msg) {echoed: msg.text  upper: true}}
+]
+r = dynamic_mock ~>? {text: "hello"}
+assert (r.echoed == "hello") "dynamic response echoes"
+assert (r.upper == true) "dynamic response includes extra"
+
+-- mock with intercept composition
+traced_mock = agent.intercept mock (msg next) {
+  result = next msg
+  {..result  traced: true}
+}
+r4 = traced_mock ~>? {task: "review"}
+assert (r4.approved == true) "intercepted mock responds"
+assert (r4.traced == true) "intercepted mock traced"

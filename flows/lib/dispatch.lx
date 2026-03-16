@@ -1,6 +1,7 @@
--- One-shot agent execution: spawn -> ask -> kill as a single call.
+-- Agent execution patterns: spawn -> ask -> kill as single calls.
 -- Eliminates the 3-line spawn/ask/kill ceremony repeated across every flow.
--- run_one: single agent, single message. run_many: parallel batch.
+-- run_one: single agent script, single message. run_many: parallel batch.
+-- run_with: custom spawn config (for non-lx agents or special args).
 
 use std/agent
 
@@ -11,6 +12,13 @@ use std/agent
   result
 }
 
-+run_many = (scripts_and_msgs) {
-  scripts_and_msgs | pmap (script, msg) run_one script msg
++run_many = (pairs) {
+  pairs | pmap (script, msg) run_one script msg
+}
+
++run_with = (config msg) {
+  a = agent.spawn config ^
+  result = a ~>? msg ^
+  agent.kill a ^
+  result
 }

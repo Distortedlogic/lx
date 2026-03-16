@@ -1,15 +1,16 @@
--- Prompt injection detection + composable guard wrappers.
--- check: fast pass/fail regex scan against known injection patterns.
--- scan: detailed Finding records for each match.
--- run_parallel: concurrent guard + agent execution, block on failure.
--- run_blocking: guard first, agent only if passed.
--- Used by: defense_layers, scenario_security_audit.
+-- Security toolkit: injection scanning, stuck loop detection, resource monitoring.
+-- scan: regex-based injection pattern detection, returns Finding records.
+-- detect_loops: flag agents with excessive tool calls as stuck.
+-- check_resources: flag transcripts that are too large.
+-- full_scan: run all detection passes on a list of trace entries.
+-- check: fast pass/fail gate for a single input.
+-- run_parallel/run_blocking: composable guard wrappers for agent execution.
 
 use std/re
 
 Protocol +GuardResult = {pass: Bool  reason: Str}
 
-Protocol +Finding = {severity: Str  type: Str  evidence: Str  source: Str}
+Protocol +Finding = {severity: Str  type: Str  evidence: Str  source: Str  agent_id: Str = ""}
 
 +patterns = [
   "ignore previous instructions"
@@ -29,6 +30,38 @@ Protocol +Finding = {severity: Str  type: Str  evidence: Str  source: Str}
       false -> []
     }
   }
+}
+
++scan_entries = (entries) {
+  entries | flat_map (e) {
+    scan (to_str e.input) | map (f) {..f  agent_id: e.name ?? ""}
+  }
+}
+
++detect_loops = (entries opts) {
+  threshold = opts.threshold ?? 20
+  calls = entries | filter (e) e.type == "tool_use"
+  calls | len > threshold ? {
+    true -> [Finding {severity: "high"  type: "stuck_loop"  evidence: "{calls | len} tool calls (threshold: {threshold})"  source: "guard"}]
+    false -> []
+  }
+}
+
++check_resources = (entries opts) {
+  threshold = opts.threshold ?? 500
+  size = entries | len
+  size > threshold ? {
+    true -> [Finding {severity: "high"  type: "resource_excessive"  evidence: "{size} entries (threshold: {threshold})"  source: "guard"}]
+    false -> []
+  }
+}
+
++full_scan = (entries opts) {
+  [
+    ..scan_entries entries
+    ..detect_loops entries opts
+    ..check_resources entries opts
+  ]
 }
 
 +check = (input) {

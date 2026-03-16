@@ -1,7 +1,7 @@
--- Report generation -- build structured markdown and write to file.
--- Composes std/md into high-level operations: section, bullets, table.
--- write: render full document to disk, return path.
--- Used by: discovery_system, mcp_tool_audit, research, perf_analysis, post_hoc_review.
+-- Markdown report generation -- build structured documents and write to file.
+-- Composes std/md into high-level operations: section, bullets, table, quote.
+-- write: render full document to disk, return path for downstream reference.
+-- All builder functions return lists of md nodes for spread into write's sections.
 
 use std/md
 use std/fs
@@ -14,8 +14,18 @@ use std/fs
 
 +section = (heading blocks) [md.h2 heading ..blocks]
 
++subsection = (heading blocks) [md.h3 heading ..blocks]
+
 +text = (content) [md.para content]
 
 +bullets = (items) [md.list items]
 
 +table = (headers rows) [md.table headers rows]
+
++quote = (content) [md.blockquote content]
+
++divider = () [md.hr]
+
++conditional = (show heading blocks) {
+  show ? { true -> section heading blocks; false -> [] }
+}

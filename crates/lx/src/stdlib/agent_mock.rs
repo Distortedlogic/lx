@@ -54,7 +54,7 @@ fn bi_mock(
         func: bi_mock_handler,
         applied: vec![
             Value::Int(BigInt::from(mock_id)),
-            Value::List(Arc::clone(&rules)),
+            Value::List(Arc::clone(rules)),
         ],
     });
     let mut rec = IndexMap::new();

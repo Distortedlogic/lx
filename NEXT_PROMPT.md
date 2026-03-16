@@ -25,7 +25,7 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 
 ## Current State
 
-`just diagnose` clean. `just test`: **52/52 PASS**. All core language features and stdlib modules implemented. `RuntimeCtx` backend refactor complete. `refine` expression implemented. `agent.reconcile` implemented. `trace.improvement_rate` / `trace.should_stop` implemented. `agent.dialogue` / `agent.dialogue_turn` / `agent.dialogue_history` / `agent.dialogue_end` implemented. `agent.intercept` implemented. `Handoff` Protocol + `agent.as_context` implemented. `agent.supervise` + `agent.gate` + `agent.capabilities` implemented. `ai.prompt_structured` + `ai.prompt_structured_with` implemented.
+`just diagnose` clean. `just test`: **54/54 PASS**. All core language features and stdlib modules implemented. `RuntimeCtx` backend refactor complete. `refine` expression implemented. `agent.reconcile` implemented. `trace.improvement_rate` / `trace.should_stop` implemented. `agent.dialogue` / `agent.dialogue_turn` / `agent.dialogue_history` / `agent.dialogue_end` implemented. `agent.intercept` implemented. `Handoff` Protocol + `agent.as_context` implemented. `agent.supervise` + `agent.gate` + `agent.capabilities` implemented. `ai.prompt_structured` + `ai.prompt_structured_with` implemented. `agent.mock` + call tracking implemented. `agent.dispatch` + `agent.dispatch_multi` implemented.
 
 ### What's implemented
 
@@ -49,7 +49,7 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 **29 stdlib modules:**
 - Data: `std/json`, `std/md`, `std/re`, `std/math`, `std/time`
 - System: `std/fs`, `std/env`, `std/http`
-- Communication: `std/agent` (incl. `agent.reconcile`, `agent.dialogue`, `agent.intercept`, `Handoff` Protocol, `agent.as_context`, `agent.capabilities`, `agent.gate`, `agent.supervise`), `std/mcp`, `std/ai`
+- Communication: `std/agent` (incl. `agent.reconcile`, `agent.dialogue`, `agent.intercept`, `Handoff`/`Capabilities`/`GateResult` Protocols, `agent.as_context`, `agent.gate`, `agent.supervise`, `agent.mock`, `agent.dispatch`), `std/mcp`, `std/ai` (incl. `ai.prompt_structured`)
 - Scheduling: `std/cron` (cron expressions, intervals, one-shot timers, fire-time queries)
 - Orchestration: `std/ctx`, `std/tasks`, `std/audit`, `std/circuit`, `std/plan`, `std/saga`
 - Intelligence: `std/knowledge`, `std/introspect`
@@ -75,6 +75,9 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 - Capability discovery (`Capabilities` Protocol + `agent.capabilities` + `agent.advertise`): `agent.capabilities agent` sends `{type: "capabilities"}` query. `Capabilities` Protocol with protocols, tools, domains, budget_remaining, accepts, status fields. `agent.advertise name caps` registers capabilities
 - Approval gates (`GateResult` Protocol + `agent.gate`): `agent.gate name config` blocks on yield backend for approval. Config: `{show? timeout? on_timeout?}`. Returns `Ok GateResult` (approved) or `Err` (rejected/timeout). Timeout policies: abort, approve, reject, escalate
 - Supervision (`agent.supervise` + `agent.child` + `agent.supervise_stop`): Erlang-style supervision with lazy restart. Strategies: one_for_one, one_for_all, rest_for_one. Restart types: permanent, transient, temporary. `agent.child sup id` checks liveness and restarts if needed. Max restart intensity tracking
+- Structured LLM output (`ai.prompt_structured`): `ai.prompt_structured Protocol prompt` augments prompt with schema, calls AI, parses JSON, validates against Protocol, retries on failure. `ai.prompt_structured_with Protocol opts` with full options. Returns `Ok record` or `Err {reason raw attempts}`
+- Mock agents (`agent.mock`): `agent.mock rules_list` creates agent with scripted responses and call tracking. Rules: `{match: pattern respond: value}`. Match types: Record pattern, function predicate, `"any"`. `agent.mock_calls`, `agent.mock_assert_called`, `agent.mock_assert_not_called`
+- Pattern dispatch (`agent.dispatch`): `agent.dispatch rules_list` returns agent that routes by message content. `{match: pattern to: agent}`. First match wins. `agent.dispatch_multi` fans out to all matches. Supports `transform` on rules. No LLM needed
 
 **Runtime backends (`RuntimeCtx`):**
 - All I/O-touching builtins receive `&Arc<RuntimeCtx>` — backend traits for AI, HTTP, shell, emit, yield, logging
@@ -103,8 +106,6 @@ These have specs in `spec/` but no Rust implementation yet:
 - `std/reputation` — cross-interaction agent quality tracking, learning router feedback
 - `plan.run_incremental` — memoized plan execution, input-hash cache invalidation
 - `durable` expression + `std/durable` — automatic workflow state persistence at suspension points, cross-process resumption
-- `agent.mock` + `agent.mock_calls` + `agent.mock_assert_called` — mock agents with call tracking for testing
-- `agent.dispatch` / `agent.dispatch_multi` — content-addressed pattern-based message routing
 - Causal chain queries in `std/trace` — parent-child span trees, `trace.chain` for failure chain extraction
 - `std/context` — context capacity management: tracking working memory, pressure callbacks, eviction, pinning, compaction
 - `std/prompt` — typed composable prompt assembly: named sections, few-shot examples, constraints, budget-aware rendering
@@ -132,9 +133,9 @@ These have specs in `spec/` but no Rust implementation yet:
 
 Full plan: `design/stdlib_roadmap.md`. Specs for all planned features are in `spec/`.
 
-### Completed stdlib roadmap items (1-27, 34):
+### Completed stdlib roadmap items (1-27, 34, 39, 40):
 
-All 18 stdlib items + RuntimeCtx backend refactor + `refine` expression + `agent.reconcile` + `trace.improvement_rate`/`trace.should_stop` + `agent.dialogue` + `agent.intercept` + `Handoff` Protocol + `agent.as_context` + `agent.supervise` + `agent.gate` + `agent.capabilities` + `ai.prompt_structured` done.
+All 18 stdlib items + RuntimeCtx backend refactor + `refine` expression + `agent.reconcile` + `trace.improvement_rate`/`trace.should_stop` + `agent.dialogue` + `agent.intercept` + `Handoff` Protocol + `agent.as_context` + `agent.supervise` + `agent.gate` + `agent.capabilities` + `ai.prompt_structured` + `agent.mock` + `agent.dispatch` done.
 
 ### Next priorities (pick from these):
 26. **`|>>` streaming pipe** — New operator. Reactive dataflow. Spec: `spec/concurrency-reactive.md`. Requires parser + interpreter changes.
@@ -144,13 +145,10 @@ All 18 stdlib items + RuntimeCtx backend refactor + `refine` expression + `agent
 31. **`Goal`/`Task` Protocols** — Convention only, no wrapper functions. Spec: `spec/agents-goals.md`.
 32. **Deadlock detection** — Runtime wait-for graph. Spec: `spec/agents-deadlock.md`.
 33. **`Skill` declarations + `std/skill`** — New keyword. Self-describing capability units with typed I/O, registry, discovery, matching, composition. Spec: `spec/agents-skill.md`. Requires parser + interpreter + new stdlib module.
-34. **`ai.prompt_structured`** — Extension to `std/ai`. Protocol-validated LLM output with auto-retry. Spec: `spec/agents-structured-output.md`.
 35. **`std/budget`** — New stdlib module. Cumulative cost tracking, projection, sub-budgets, adaptive strategy. Absorbs `std/circuit` functionality. Spec: `spec/agents-budget.md`.
 36. **`std/reputation`** — New stdlib module. EWMA quality scores, cross-interaction tracking, learning router. Spec: `spec/agents-reputation.md`.
 37. **`plan.run_incremental`** — Extension to `std/plan`. Memoized execution with input-hash invalidation. Spec: `spec/agents-incremental.md`.
 38. **`durable` expression + `std/durable`** — New keyword. Automatic workflow persistence at suspension points, cross-process resumption, `lx resume`. Spec: `spec/agents-durable.md`. Requires parser + interpreter + new stdlib module + RuntimeCtx `DurableBackend`.
-39. **`agent.mock` + call tracking** — Extension to `std/agent`. Mock agents for testing. Spec: `spec/agents-test-harness.md`.
-40. **`agent.dispatch`** — Extension to `std/agent`. Content-addressed pattern-based message routing, dynamic tables, multi-dispatch. Spec: `spec/agents-dispatch.md`.
 41. **Causal spans in `std/trace`** — Extension to `std/trace`. Parent-child span trees, `trace.chain` for failure chain extraction. Mermaid sequence diagrams.
 42. **`std/context`** — New stdlib module. Context capacity management: tracking working memory, summarization triggers, eviction policies, pressure callbacks, pinning. Spec: `spec/agents-context-capacity.md`.
 43. **`std/prompt`** — New stdlib module. Typed composable prompt assembly: sections, few-shot examples, constraints, budget-aware rendering. Spec: `spec/agents-prompt.md`.
@@ -175,7 +173,7 @@ crates/lx/src/
   checker/   mod.rs, synth.rs, types.rs
   interpreter/ mod.rs, agents.rs, apply.rs, collections.rs, eval.rs, modules.rs, patterns.rs, refine.rs, shell.rs
   builtins/  mod.rs, call.rs, str.rs, coll.rs, hof.rs, hof_extra.rs
-  stdlib/    mod.rs, agent.rs, agent_capability.rs, agent_dialogue.rs, agent_gate.rs, agent_handoff.rs, agent_intercept.rs, agent_reconcile.rs, agent_reconcile_strat.rs, agent_supervise.rs, agents_auditor.rs, agents_grader.rs, agents_monitor.rs, agents_planner.rs, agents_reviewer.rs, agents_router.rs, ai.rs, audit.rs, circuit.rs, diag.rs, diag_walk.rs, introspect.rs, knowledge.rs, memory.rs, plan.rs, saga.rs, tasks.rs, trace.rs, trace_progress.rs, trace_query.rs, json.rs, json_conv.rs, ctx.rs, math.rs, fs.rs, env.rs, re.rs, md.rs, md_build.rs, mcp.rs, mcp_rpc.rs, mcp_stdio.rs, mcp_http.rs, http.rs, time.rs, cron.rs
+  stdlib/    mod.rs, agent.rs, agent_capability.rs, agent_dialogue.rs, agent_dispatch.rs, agent_gate.rs, agent_handoff.rs, agent_intercept.rs, agent_mock.rs, agent_reconcile.rs, agent_reconcile_strat.rs, agent_supervise.rs, ai_structured.rs, agents_auditor.rs, agents_grader.rs, agents_monitor.rs, agents_planner.rs, agents_reviewer.rs, agents_router.rs, ai.rs, audit.rs, circuit.rs, diag.rs, diag_walk.rs, introspect.rs, knowledge.rs, memory.rs, plan.rs, saga.rs, tasks.rs, trace.rs, trace_progress.rs, trace_query.rs, json.rs, json_conv.rs, ctx.rs, math.rs, fs.rs, env.rs, re.rs, md.rs, md_build.rs, mcp.rs, mcp_rpc.rs, mcp_stdio.rs, mcp_http.rs, http.rs, time.rs, cron.rs
   ast.rs, token.rs, value.rs, value_display.rs, env.rs, error.rs, span.rs, lib.rs
 crates/lx-cli/src/main.rs
 spec/          62 language spec files

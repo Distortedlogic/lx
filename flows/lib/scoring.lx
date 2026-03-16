@@ -1,0 +1,28 @@
+-- Composite scoring and tiering -- weighted multi-factor evaluation.
+-- composite: weighted sum of named scores against a record of values.
+-- tier: classify a numeric value into named tiers by threshold.
+-- normalize: scale a value to 0.0-1.0 range.
+-- Used by: discovery_system (repo scoring), mcp_tool_audit (scenario weighting).
+
++composite = (weights values) {
+  weights | entries | fold 0.0 (total, name, weight) {
+    val = get name values ?? 0.0
+    total + val * weight
+  }
+}
+
++tier = (thresholds value) {
+  match = thresholds | sort_by (.min) | rev | find (t) value >= t.min
+  match ? {
+    Some t -> t.name
+    None -> "unranked"
+  }
+}
+
++normalize = (min max value) {
+  max == min ? 0.0 : ((value - min) / (max - min))
+}
+
++scale_stars = (stars) {
+  stars > 1000 ? 10.0 : (stars > 100 ? 7.0 : (stars > 10 ? 4.0 : 1.0))
+}
