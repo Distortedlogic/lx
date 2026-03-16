@@ -58,15 +58,12 @@ assert (r8 == ()) "table returns unit"
 sig = user.check ()
 assert (sig == None) "check returns None with noop backend"
 
--- === confirm is a function ===
-assert (func? user.confirm) "confirm is a function"
-assert (func? user.choose) "choose is a function"
-assert (func? user.ask) "ask is a function"
-assert (func? user.ask_with) "ask_with is a function"
-assert (func? user.progress) "progress is a function"
-assert (func? user.progress_pct) "progress_pct is a function"
-assert (func? user.status) "status is a function"
-assert (func? user.table) "table is a function"
-assert (func? user.check) "check is a function"
+-- === table with empty rows ===
+r9 = user.table ["A" "B"] []
+assert (r9 == ()) "table with empty rows returns unit"
+
+-- === choose returns value, not index ===
+picked = user.choose "Color?" ["red" "green" "blue"]
+assert (picked == "red") "choose returns the value not an index"
 
 log.info "66_user: all passed"

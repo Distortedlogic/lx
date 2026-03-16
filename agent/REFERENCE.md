@@ -6,7 +6,7 @@ Stable how-to guides and codebase layout. Changes infrequently.
 
 ```
 crates/lx/src/
-  backends/    mod.rs (traits + RuntimeCtx), defaults.rs (standard impls)
+  backends/    mod.rs (traits + RuntimeCtx), defaults.rs (standard impls), user.rs (UserBackend impls)
   lexer/       mod.rs, numbers.rs, strings.rs
   parser/      mod.rs, func.rs, infix.rs, paren.rs, pattern.rs, prefix.rs, refine.rs, statements.rs, type_ann.rs
   checker/     mod.rs, synth.rs, types.rs

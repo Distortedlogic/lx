@@ -54,6 +54,9 @@ mod retry;
 mod saga;
 mod tasks;
 mod time;
+mod profile;
+mod profile_io;
+mod profile_strategy;
 mod trace;
 mod trace_progress;
 mod trace_query;
@@ -105,6 +108,7 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
             "retry" => retry::build(),
             "saga" => saga::build(),
             "introspect" => introspect::build(),
+            "profile" => profile::build(),
             "trace" => trace::build(),
             "user" => user::build(),
             _ => return None,
@@ -156,6 +160,7 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
             | "retry"
             | "saga"
             | "introspect"
+            | "profile"
             | "trace"
             | "user"
     )

@@ -4,11 +4,7 @@ Ordered work queue. Top item = next thing to implement. Each entry explains WHY 
 
 ## Tier 1 — Highest leverage remaining
 
-No parser changes needed. Pure stdlib modules that fill gaps agents hit constantly. `std/retry` completed (Session 44).
-
-1. **`std/user`** (`spec/stdlib-user.md`) — Structured agent-to-user interaction: `confirm`, `choose`, `ask`, `progress`, `status`, `table`, `check` (non-blocking signal poll). Fills the gap between `emit` (fire-and-forget text) and `yield` (heavy orchestrator round-trip). New `UserBackend` trait on `RuntimeCtx` — terminal, yield-bridge, and noop backends. `user.check` absorbs cooperative interrupt checking (no `checkpoint` keyword needed).
-
-2. **`std/profile`** (`spec/agents-profile.md`) — Persistent agent identity across sessions. Agents accumulate knowledge, preferences, and relationship history. File-backed profiles at `.lx/profiles/`. Now also absorbs `std/strategy` — strategy outcomes stored as `strategy:` prefixed domains with `profile.best_strategy`/`rank_strategies`/`adapt_strategy` helpers. One module for all cross-session agent state.
+No parser changes needed. Pure stdlib modules that fill gaps agents hit constantly. `std/retry` completed (Session 44). `std/user` + `std/profile` completed (Session 49). Agents accumulate knowledge, preferences, and relationship history. File-backed profiles at `.lx/profiles/`. Now also absorbs `std/strategy` — strategy outcomes stored as `strategy:` prefixed domains with `profile.best_strategy`/`rank_strategies`/`adapt_strategy` helpers. One module for all cross-session agent state.
 
 ## Tier 2 — Agent identity, communication, testing, packaging
 

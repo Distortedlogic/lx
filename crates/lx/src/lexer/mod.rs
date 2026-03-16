@@ -345,6 +345,7 @@ impl<'src> Lexer<'src> {
             "Protocol" => TokenKind::Protocol,
             "MCP" => TokenKind::Mcp,
             "Trait" => TokenKind::Trait,
+            "Agent" => TokenKind::AgentKw,
             _ => TokenKind::TypeName(text.to_string()),
         };
         Ok(Token::new(kind, span))

@@ -161,6 +161,7 @@ impl fmt::Display for Value {
             Value::ProtocolUnion { name, .. } => write!(f, "<Protocol {name}>"),
             Value::McpDecl { name, .. } => write!(f, "<MCP {name}>"),
             Value::Trait { name, .. } => write!(f, "<Trait {name}>"),
+            Value::Agent { name, .. } => write!(f, "<Agent {name}>"),
         }
     }
 }

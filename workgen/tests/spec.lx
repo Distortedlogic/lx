@@ -108,4 +108,109 @@ use std/md
     ]
     tags: ["topology"]
   }
+  {
+    name: "diagram-audit: graphviz"
+    root: "workgen/tests/fixtures/diagram_audit"
+    expected_findings: [
+      "vertical bloat"
+      "invisible edge"
+      "spaghetti"
+      "dummy"
+      "pause/resume"
+    ]
+    tags: ["diagram"]
+  }
+  {
+    name: "diesel-audit: queries"
+    root: "workgen/tests/fixtures/diesel_audit"
+    expected_findings: [
+      "sequential quer"
+      "raw SQL"
+      "loop"
+      "upsert"
+      "filter after load"
+      "transaction"
+      "DbEnum"
+    ]
+    tags: ["diesel"]
+  }
+  {
+    name: "perf-libs-audit: polars+rayon"
+    root: "workgen/tests/fixtures/perf_libs_audit"
+    expected_findings: [
+      "premature"
+      "collect"
+      "element-wise"
+      "round-trip"
+      "eager read"
+      "lock per"
+      "nested"
+    ]
+    tags: ["perf-libs"]
+  }
+  {
+    name: "dioxus-audit: framework"
+    root: "workgen/tests/fixtures/dioxus_audit"
+    expected_findings: [
+      "#[server]"
+      "use_resource"
+      "use_effect"
+      "use_action"
+      "wrapper component"
+      "interpolation"
+      "Store"
+    ]
+    tags: ["dioxus"]
+  }
+  {
+    name: "tailwind-audit: css"
+    root: "workgen/tests/fixtures/tailwind_audit"
+    expected_findings: [
+      "@tailwind"
+      "@utility"
+      "raw palette"
+      "dark:"
+      "outline-none"
+      "ring"
+      "border"
+      "focus:"
+    ]
+    tags: ["tailwind"]
+  }
+  {
+    name: "bevy-audit: ecs"
+    root: "workgen/tests/fixtures/bevy_audit"
+    expected_findings: [
+      "monolithic plugin"
+      "chain"
+      "run condition"
+      "reflect"
+      "init_resource"
+      "Deref"
+      "schedule"
+    ]
+    tags: ["bevy"]
+  }
+  {
+    name: "bevy-ecosystem-audit: plugins"
+    root: "workgen/tests/fixtures/bevy_eco_audit"
+    expected_findings: [
+      "bevy_rand"
+      "volume"
+      "Rapier"
+      "egui"
+    ]
+    tags: ["bevy-eco"]
+  }
+  {
+    name: "primitives-audit: dioxus"
+    root: "workgen/tests/fixtures/primitives_audit"
+    expected_findings: [
+      "AlertDialog"
+      "Tooltip"
+      "Select"
+      "Tabs"
+    ]
+    tags: ["primitives"]
+  }
 ]

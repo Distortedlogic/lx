@@ -51,6 +51,15 @@ pub enum Stmt {
         requires: Vec<String>,
         exported: bool,
     },
+    AgentDecl {
+        name: String,
+        traits: Vec<String>,
+        uses: Vec<(String, String)>,
+        init: Option<SExpr>,
+        on: Option<SExpr>,
+        methods: Vec<AgentMethod>,
+        exported: bool,
+    },
     FieldUpdate {
         name: String,
         fields: Vec<String>,
@@ -411,6 +420,12 @@ pub enum McpOutputType {
     Named(String),
     List(Box<McpOutputType>),
     Record(Vec<ProtocolField>),
+}
+
+#[derive(Debug, Clone)]
+pub struct AgentMethod {
+    pub name: String,
+    pub handler: SExpr,
 }
 
 #[derive(Debug, Clone)]

@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@utility btn-accent {
+  @apply bg-blue-500 text-white rounded-lg px-4 py-2 font-medium shadow-sm hover:bg-blue-600;
+}
+
+@utility text-info {
+  @apply text-blue-400;
+}
+
+.custom-card {
+  background: #1a1a2e;
+  border-radius: 8px;
+  padding: 16px;
+}

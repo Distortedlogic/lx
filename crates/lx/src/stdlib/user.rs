@@ -46,7 +46,7 @@ fn bi_choose(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value,
             span,
         ));
     };
-    let labels: Vec<String> = items.iter().map(|v| option_label(v)).collect();
+    let labels: Vec<String> = items.iter().map(option_label).collect();
     let idx = ctx
         .user
         .choose(msg, &labels)
@@ -98,7 +98,7 @@ fn bi_ask_with(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Valu
     loop {
         let result = ctx
             .user
-            .ask(msg, default.as_deref())
+            .ask(msg, default)
             .map_err(|e| LxError::runtime(format!("user.ask_with: {e}"), span))?;
         if let Some(pred) = validate {
             let val = Value::Str(Arc::from(result.as_str()));

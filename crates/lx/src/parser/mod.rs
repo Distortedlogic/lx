@@ -64,6 +64,9 @@ impl Parser {
         if *self.peek() == TokenKind::Trait {
             return self.parse_trait_decl(exported, start);
         }
+        if *self.peek() == TokenKind::AgentKw {
+            return self.parse_agent_decl(exported, start);
+        }
         if let Some(type_def) = self.try_parse_type_def(exported, start)? {
             return Ok(type_def);
         }

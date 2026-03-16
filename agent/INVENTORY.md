@@ -28,7 +28,7 @@ What lx can do right now. For project health/status, see the "Where We're At" se
 - `emit` — agent-to-human fire-and-forget output via EmitBackend
 - `with name = expr { body }` — scoped bindings + record field update (`name.field <- value`)
 
-## Stdlib (37 modules)
+## Stdlib (39 modules)
 
 - Data: `std/json`, `std/md`, `std/re`, `std/math`, `std/time`
 - System: `std/fs`, `std/env`, `std/http`, `std/git`
@@ -44,6 +44,8 @@ What lx can do right now. For project health/status, see the "Where We're At" se
 - Intelligence: `std/knowledge`, `std/introspect`
 - Standard agents: `std/agents/auditor`, `std/agents/router`, `std/agents/grader`, `std/agents/planner`, `std/agents/monitor`, `std/agents/reviewer`
 - Infrastructure: `std/memory`, `std/trace`
+- Interaction: `std/user` — `confirm`, `choose`, `ask`, `ask_with`, `progress`, `progress_pct`, `status`, `table`, `check` (signal poll). `UserBackend` trait on `RuntimeCtx` — `NoopUserBackend` (default/test), `StdinStdoutUserBackend` (terminal)
+- Identity: `std/profile` — persistent agent profiles: `load`, `save`, `learn`, `recall`, `recall_prefix`, `forget`, `preference`, `get_preference`, `history`, `merge`, `age`, `decay`. Strategy helpers: `best_strategy`, `rank_strategies`, `adapt_strategy`. File-backed at `.lx/profiles/{name}.json`
 - Visualization: `std/diag`
 
 ## Agent Extensions (13 sub-modules of `std/agent`)
@@ -67,8 +69,8 @@ What lx can do right now. For project health/status, see the "Where We're At" se
 
 ## Runtime
 
-- All I/O builtins receive `&Arc<RuntimeCtx>` — backend traits: `AiBackend`, `EmitBackend`, `HttpBackend`, `ShellBackend`, `YieldBackend`, `LogBackend`
-- Standard defaults: `ClaudeCodeAiBackend`, `ReqwestHttpBackend`, `ProcessShellBackend`, `StdoutEmitBackend`, `StdinStdoutYieldBackend`, `StderrLogBackend`
+- All I/O builtins receive `&Arc<RuntimeCtx>` — backend traits: `AiBackend`, `EmitBackend`, `HttpBackend`, `ShellBackend`, `YieldBackend`, `LogBackend`, `UserBackend`
+- Standard defaults: `ClaudeCodeAiBackend`, `ReqwestHttpBackend`, `ProcessShellBackend`, `StdoutEmitBackend`, `StdinStdoutYieldBackend`, `StderrLogBackend`, `NoopUserBackend`
 - Embedders construct custom `RuntimeCtx` to swap backends for testing, server deployment, or sandboxing
 
 ## CLI
@@ -77,4 +79,4 @@ What lx can do right now. For project health/status, see the "Where We're At" se
 
 ## Test Coverage
 
-66 test suites (65 .lx files + 11_modules dir) in `tests/`. Fixtures in `tests/fixtures/`.
+68 test suites (67 .lx files + 11_modules dir) in `tests/`. Fixtures in `tests/fixtures/`.

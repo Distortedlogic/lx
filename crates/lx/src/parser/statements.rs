@@ -1,5 +1,5 @@
 use crate::ast::{
-    BindTarget, Binding, McpOutputType, McpToolDecl, ProtocolEntry, ProtocolField,
+    AgentMethod, BindTarget, Binding, McpOutputType, McpToolDecl, ProtocolEntry, ProtocolField,
     ProtocolUnionDef, SStmt, Stmt, UseKind, UseStmt,
 };
 use crate::error::LxError;
@@ -570,6 +570,168 @@ impl super::Parser {
             },
             Span::from_range(start, end),
         ))
+    }
+
+    pub(super) fn parse_agent_decl(
+        &mut self,
+        exported: bool,
+        start: u32,
+    ) -> Result<SStmt, LxError> {
+        self.advance();
+        let name = match self.peek().clone() {
+            TokenKind::TypeName(n) => {
+                self.advance();
+                n
+            }
+            _ => {
+                return Err(LxError::parse(
+                    "expected type name after 'Agent'",
+                    self.tokens[self.pos].span,
+                    None,
+                ));
+            }
+        };
+        let traits = if *self.peek() == TokenKind::Colon {
+            self.advance();
+            self.parse_agent_trait_list()?
+        } else {
+            Vec::new()
+        };
+        self.expect_kind(&TokenKind::Assign)?;
+        self.expect_kind(&TokenKind::LBrace)?;
+        let mut uses = Vec::new();
+        let mut init = None;
+        let mut on = None;
+        let mut methods = Vec::new();
+        self.skip_semis();
+        while *self.peek() != TokenKind::RBrace {
+            let field_name = match self.peek().clone() {
+                TokenKind::Ident(n) => n,
+                _ => {
+                    return Err(LxError::parse(
+                        "expected field name in Agent body",
+                        self.tokens[self.pos].span,
+                        None,
+                    ));
+                }
+            };
+            match field_name.as_str() {
+                "uses" => {
+                    self.advance();
+                    self.expect_kind(&TokenKind::Colon)?;
+                    uses = self.parse_agent_uses()?;
+                }
+                "init" => {
+                    self.advance();
+                    self.expect_kind(&TokenKind::Colon)?;
+                    init = Some(self.parse_expr(0)?);
+                }
+                "on" => {
+                    self.advance();
+                    self.expect_kind(&TokenKind::Colon)?;
+                    on = Some(self.parse_expr(0)?);
+                }
+                _ => {
+                    self.advance();
+                    self.expect_kind(&TokenKind::Assign)?;
+                    let handler = self.parse_expr(0)?;
+                    methods.push(AgentMethod {
+                        name: field_name,
+                        handler,
+                    });
+                }
+            }
+            self.skip_semis();
+        }
+        let end = self.expect_kind(&TokenKind::RBrace)?.span.end();
+        Ok(SStmt::new(
+            Stmt::AgentDecl {
+                name,
+                traits,
+                uses,
+                init,
+                on,
+                methods,
+                exported,
+            },
+            Span::from_range(start, end),
+        ))
+    }
+
+    fn parse_agent_trait_list(&mut self) -> Result<Vec<String>, LxError> {
+        if *self.peek() == TokenKind::LBracket {
+            self.advance();
+            let mut traits = Vec::new();
+            while *self.peek() != TokenKind::RBracket {
+                match self.peek().clone() {
+                    TokenKind::TypeName(n) | TokenKind::Ident(n) => {
+                        self.advance();
+                        traits.push(n);
+                    }
+                    _ => {
+                        return Err(LxError::parse(
+                            "expected trait name",
+                            self.tokens[self.pos].span,
+                            None,
+                        ));
+                    }
+                }
+                self.skip_semis();
+            }
+            self.expect_kind(&TokenKind::RBracket)?;
+            Ok(traits)
+        } else {
+            match self.peek().clone() {
+                TokenKind::TypeName(n) | TokenKind::Ident(n) => {
+                    self.advance();
+                    Ok(vec![n])
+                }
+                _ => Err(LxError::parse(
+                    "expected trait name after ':'",
+                    self.tokens[self.pos].span,
+                    None,
+                )),
+            }
+        }
+    }
+
+    fn parse_agent_uses(&mut self) -> Result<Vec<(String, String)>, LxError> {
+        self.expect_kind(&TokenKind::LBrace)?;
+        let mut uses = Vec::new();
+        self.skip_semis();
+        while *self.peek() != TokenKind::RBrace {
+            let binding = match self.peek().clone() {
+                TokenKind::Ident(n) => {
+                    self.advance();
+                    n
+                }
+                _ => {
+                    return Err(LxError::parse(
+                        "expected binding name in uses",
+                        self.tokens[self.pos].span,
+                        None,
+                    ));
+                }
+            };
+            self.expect_kind(&TokenKind::Colon)?;
+            let module = match self.peek().clone() {
+                TokenKind::Ident(n) | TokenKind::TypeName(n) => {
+                    self.advance();
+                    n
+                }
+                _ => {
+                    return Err(LxError::parse(
+                        "expected module name in uses",
+                        self.tokens[self.pos].span,
+                        None,
+                    ));
+                }
+            };
+            uses.push((binding, module));
+            self.skip_semis();
+        }
+        self.expect_kind(&TokenKind::RBrace)?;
+        Ok(uses)
     }
 
     pub(super) fn parse_use_stmt(&mut self, start: u32) -> Result<SStmt, LxError> {
