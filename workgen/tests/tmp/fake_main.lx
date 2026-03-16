@@ -1,0 +1,4 @@
++run = (audit_path rules_path) {
+  raw_name = audit_path | split "/" | last
+  Err "ai not available"
+}

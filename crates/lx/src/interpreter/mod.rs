@@ -27,6 +27,62 @@ pub(crate) struct ModuleExports {
     pub(crate) variant_ctors: Vec<String>,
 }
 
+fn keyword_hint(name: &str) -> Option<&'static str> {
+    match name {
+        "if" | "else" | "then" | "elif" | "elsif" => {
+            Some("lx uses `cond ? then_expr : else_expr` for conditionals")
+        }
+        "mut" => Some("lx uses `:=` for mutable bindings: `x := 0`"),
+        "let" | "var" | "const" => Some("lx bindings use `name = value` (or `name := value` for mutable)"),
+        "return" => Some("lx uses implicit returns — last expression in a block is its value"),
+        "fn" | "def" | "func" | "function" => {
+            Some("lx functions use `name = (params) body` or `name = (params) { body }`")
+        }
+        "import" | "from" | "require" | "include" => {
+            Some("lx uses `use std/module` or `use ./relative/path`")
+        }
+        "for" | "while" | "loop" => {
+            Some("lx uses `each`, `map`, `filter` for iteration, or recursion")
+        }
+        "match" | "switch" | "case" => {
+            Some("lx uses `value ? { pattern -> body }` for pattern matching")
+        }
+        "print" | "println" | "console" | "echo" | "printf" => {
+            Some("lx uses `emit` for output or `log.info`/`log.warn`/`log.err` for logging")
+        }
+        "try" | "catch" | "throw" | "raise" | "except" => {
+            Some("lx uses `^` to propagate errors and `??` to coalesce: `expr ^ | process` or `expr ?? default`")
+        }
+        "null" | "nil" | "undefined" | "void" => {
+            Some("lx uses `None` for absence and `()` for unit")
+        }
+        "class" | "struct" | "new" | "interface" => {
+            Some("lx uses Records `{field: value}` for data, `Protocol` for contracts, `Trait` for behavior")
+        }
+        "async" | "await" => Some("lx uses `par`, `sel`, `pmap` for concurrency"),
+        "self" | "this" => Some("lx has no `self` — use record fields or closures"),
+        "break" | "continue" => Some("lx uses recursion or higher-order functions for control flow"),
+        "lambda" => Some("lx lambdas use `(params) body` or `(params) { body }`"),
+        "not" => Some("lx uses `!` for negation: `!expr`"),
+        "and" => Some("lx uses `&&` for logical and"),
+        "or" => Some("lx uses `||` for logical or"),
+        "in" => Some("lx uses `contains?` for membership"),
+        _ => None,
+    }
+}
+
+fn binding_pattern_hint(pat_str: &str) -> Option<&'static str> {
+    let first_word = pat_str.split_whitespace().next().unwrap_or("");
+    let trimmed = first_word.trim_matches(|c| c == '(' || c == ')' || c == ',');
+    match trimmed {
+        "mut" => Some("lx uses `:=` for mutable bindings: `x := 0`"),
+        "let" | "var" | "const" => {
+            Some("lx bindings use `name = value` (or `name := value` for mutable)")
+        }
+        _ => None,
+    }
+}
+
 pub struct Interpreter {
     env: Arc<Env>,
     source: String,
@@ -100,7 +156,14 @@ impl Interpreter {
             Expr::Ident(name) => self
                 .env
                 .get(name)
-                .ok_or_else(|| LxError::runtime(format!("undefined variable '{name}'"), span)),
+                .ok_or_else(|| {
+                    let hint = keyword_hint(name);
+                    let msg = match hint {
+                        Some(h) => format!("undefined variable '{name}' — {h}"),
+                        None => format!("undefined variable '{name}'"),
+                    };
+                    LxError::runtime(msg, span)
+                }),
             Expr::TypeConstructor(name) => self
                 .env
                 .get(name)
@@ -261,12 +324,19 @@ impl Interpreter {
                     BindTarget::Pattern(pat) => {
                         let bindings =
                             self.try_match_pattern(&pat.node, &val).ok_or_else(|| {
-                                LxError::runtime(
-                                    format!(
-                                        "pattern match failed in binding: value `{val}` does not match pattern `{pat:?}`"
+                                let pat_str = format!("{}", pat.node);
+                                let hint = binding_pattern_hint(&pat_str);
+                                let msg = match hint {
+                                    Some(h) => format!(
+                                        "cannot bind {} `{}` to pattern `{pat_str}` — {h}",
+                                        val.type_name(), val.short_display(),
                                     ),
-                                    stmt.span,
-                                )
+                                    None => format!(
+                                        "cannot bind {} `{}` to pattern `{pat_str}`",
+                                        val.type_name(), val.short_display(),
+                                    ),
+                                };
+                                LxError::runtime(msg, stmt.span)
                             })?;
                         let mut env = self.env.child();
                         for (name, v) in bindings {

@@ -2,6 +2,19 @@
 
 Read this first when picking up workgen work in a fresh agent.
 
+## Tooling
+
+`lx` is installed as a release binary at `/home/entropybender/.cargo/bin/lx`. Use it directly — do NOT use `cargo run -p lx-cli --`. Examples:
+
+```
+lx run workgen/tests/run.lx          # run tests
+lx run workgen/run.lx                # run workgen
+lx check some_file.lx                # type check
+lx test tests/                        # run lx test suite
+```
+
+The justfile recipes still use `cargo run` for consistency with the rest of the repo, but for ad-hoc execution during development, use `lx` directly — it's the release build and faster.
+
 ## What This Is
 
 workgen is an lx program that automates work-item generation from audit checklists. The user currently does this manually in Claude Code: "read ./rules/rust-audit then go through all phases in ./rules/work-item.md to produce a work-item doc." workgen automates that entire multi-phase process.

@@ -464,7 +464,7 @@ impl Interpreter {
                 ))
             }
             _ => Err(LxError::type_err(
-                format!("assert requires Bool, got {} `{val}`", val.type_name()),
+                format!("assert requires Bool, got {} `{}`", val.type_name(), val.short_display()),
                 span,
             )),
         }

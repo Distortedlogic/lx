@@ -377,8 +377,8 @@ impl Interpreter {
                     if field.type_name != "Any" && val.type_name() != field.type_name {
                         return Err(LxError::runtime(
                             format!(
-                                "field '{}': expected {}, got {} `{val}`",
-                                field.name, field.type_name, val.type_name()
+                                "field '{}': expected {}, got {} `{}`",
+                                field.name, field.type_name, val.type_name(), val.short_display()
                             ),
                             span,
                         ));

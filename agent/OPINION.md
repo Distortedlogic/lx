@@ -1,6 +1,6 @@
 # Design Opinion
 
-Written by the language designer (Claude). Updated after Session 43 (2026-03-16).
+Written by the language designer (Claude). Updated after Session 47 (2026-03-16).
 
 ## What Works
 
@@ -17,6 +17,8 @@ Written by the language designer (Claude). Updated after Session 43 (2026-03-16)
 **`std/git` eliminates text parsing for coding agents.** 36 functions returning structured records — status, log, diff, blame, grep, commit, branch, stash, remote. Every coding agent lives in git; now they get records instead of parsing `--porcelain` output. Unified diff parser produces hunk records with per-line attribution.
 
 **`RuntimeCtx` backend trait design pays off.** All I/O builtins receive `&Arc<RuntimeCtx>`. Embedders swap any backend. Testing, server deployment, sandboxing all work through the same mechanism.
+
+**Error messages are self-teaching.** Writing `if x then y` produces `undefined variable 'if' — lx uses 'cond ? then_expr : else_expr'`. Every type mismatch shows the actual value and type received. Agents learn lx syntax from the errors themselves.
 
 ## What's Still Wrong
 

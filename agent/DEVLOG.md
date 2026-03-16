@@ -47,6 +47,7 @@ Non-obvious choices that cause confusion if forgotten:
 
 ## Technical Debt
 
+- Builtins (str.rs, coll.rs, hof.rs) still use "X expects Y" without showing actual type — interpreter errors are fixed, stdlib next
 - `par`/`sel`/`pmap`/`std/pool` are sequential; real async needs `tokio`
 - Named-arg parser consumes ternary `:` separator (workaround: parens)
 - Assert parsing greedy — `assert (expr) "msg"` consumes msg when `(expr)` is callable
@@ -89,3 +90,4 @@ Non-obvious choices that cause confusion if forgotten:
 | 44 | 03-16 | Gap analysis: 7 new specs for unplanned features (profile, interrupt, constraint propagation, provenance, workspace, teaching, pipeline checkpoint). Priority queue restructured. `std/blackboard`/`std/events` eliminated |
 | 45 | 03-16 | `std/retry`: retry-with-backoff (2 functions, `fastrand` dep for jitter). Improved binding pattern-match error messages. 66/66 tests |
 | 46 | 03-16 | Spec consolidation: 9 merges applied. Eliminated `std/strategy` (→ `std/profile`), `std/reputation` (→ `std/trace`), `checkpoint`/`on_interrupt` keywords (→ `user.check` + `:signal` lifecycle hook), `plan.run_incremental` (→ `std/pipeline`), `agent.teach` (→ dialogue convention), `workflow.peers` (→ topic convention), constraint propagation spec (→ `with context` ambient), provenance spec (→ `std/trace`), `Goal`/`Task` (→ docs). Agent/Trait declaration specs from Session 45b integrated. Net: 21 planned features (down from ~33) |
+| 47 | 03-16 | Error message overhaul: cross-language keyword hints (30+ keywords), value/type in all mismatch errors, Pattern Display impl, Value::short_display(). `cargo install` to host. Quick syntax reference in NEXT_PROMPT for cold-start agents. 66/66 tests |

@@ -253,6 +253,15 @@ impl Value {
     pub fn type_name(&self) -> &'static str {
         self.into()
     }
+
+    pub fn short_display(&self) -> String {
+        let s = format!("{self}");
+        if s.len() > 80 {
+            format!("{}...", &s[..77])
+        } else {
+            s
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

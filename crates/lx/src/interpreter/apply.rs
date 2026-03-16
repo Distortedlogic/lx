@@ -362,7 +362,7 @@ impl Interpreter {
                 None => Ok(Value::Unit),
             },
             _ => Err(LxError::type_err(
-                format!("ternary `?` condition must be Bool, got {} `{cv}`", cv.type_name()),
+                format!("ternary `?` condition must be Bool, got {} `{}`", cv.type_name(), cv.short_display()),
                 span,
             )),
         }

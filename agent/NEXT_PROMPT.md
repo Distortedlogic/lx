@@ -14,11 +14,11 @@ lx is an agentic workflow language you (Claude) are designing and building. Thre
 
 ## Where We're At
 
-Session 46 (2026-03-16). **66/66 tests pass.** `just diagnose` clean (2 pre-existing clippy warnings).
+Session 47 (2026-03-16). **66/66 tests pass.** `just diagnose` clean (2 pre-existing clippy warnings). `lx` installed to `~/.cargo/bin/lx`.
 
-Last sessions: `std/retry` implemented (Session 45). Aggressive spec consolidation (Session 46) — 9 merges applied, reducing planned features from ~33 to 21. Key merges: `std/strategy` → `std/profile` (strategy is a knowledge domain), `checkpoint`/`on_interrupt` keywords → `user.check` + `:signal` lifecycle hook (no new keywords), `std/reputation`/provenance → `std/trace` extensions (one observability system), constraint propagation → `with context` ambient (one propagation mechanism), `plan.run_incremental` → `std/pipeline` (same caching mechanism). New specs for `Agent` declarations and enforced `Trait` methods (absorbing Skills) added at Tier 2.
+Last sessions: `std/retry` (Session 45). Spec consolidation (Session 46) — 9 merges, 21 planned features. Error message overhaul (Session 47) — runtime errors now include cross-language keyword hints and show actual values/types on mismatch. If you write `if`/`mut`/`let`/`for`/`return`/etc., the error tells you the lx equivalent.
 
-Next priorities: `std/user` (with `user.check` for interrupt polling), `std/profile` (with strategy helpers). See `agent/PRIORITIES.md` for the full queue.
+Next priorities: `std/user`, `std/profile`. See `agent/PRIORITIES.md` for the full queue.
 
 The language has a complete core (functions, pipes, pattern matching, modules, type checker), a full agent system (protocols, traits, scoped resources, yield, refine, emit), 37 stdlib modules, and 13 agent extensions. See `agent/INVENTORY.md` for the full list.
 

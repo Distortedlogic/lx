@@ -1,0 +1,14 @@
+use ../../main : workgen
+
+scenario = {name: "test"  root: "workgen/tests/fixtures/unwrap_audit"  tags: []}
+result = workgen.run "{scenario.root}/rules/audit" "{scenario.root}/rules/work-item.md"
+result ? {
+  Ok r -> {
+    emit "ok: {r}"
+    {name: scenario.name  passed: true  score: 1.0}
+  }
+  Err e -> {
+    emit "ERROR: {e}"
+    {name: scenario.name  passed: false  score: 0.0}
+  }
+}

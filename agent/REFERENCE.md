@@ -55,6 +55,16 @@ For new keywords like `Trait`, `Protocol`, `with ... as`:
 8. **Module exports**: add export case in `interpreter/modules.rs`
 9. **Value** (if runtime representation needed): add variant to `value.rs`, update `structural_eq`, `hash_value`, `value_display.rs`
 
+## Error Messages
+
+When adding errors, follow these rules:
+
+- Show actual value and type: `format!("expected Bool, got {} `{}`", val.type_name(), val.short_display())`
+- Use `val.short_display()` (80 char cap), never raw `{val}` in errors
+- Undefined variable hints: `keyword_hint()` in `interpreter/mod.rs` maps 30+ cross-language keywords to lx equivalents
+- Binding pattern hints: `binding_pattern_hint()` detects `mut`/`let`/`var` and suggests `:=`
+- Pattern display: `Pattern` impl Display in `ast.rs` for readable error output
+
 ## Running Flows
 
 `flows/examples/*.lx` are lx translations of real agentic architectures from `~/repos/mcp-toolbelt/packages/arch_diagrams/`. Each has a matching spec in `flows/specs/`. `flows/lib/*.lx` are reusable library modules imported by the examples. Run with `just run flows/examples/research.lx`. Most require actual agent subprocesses or MCP servers — they're structural demonstrations, not standalone tests.

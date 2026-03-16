@@ -1,0 +1,5 @@
+use ../main : workgen
+
+emit "before run"
+result = workgen.run "workgen/tests/fixtures/unwrap_audit/rules/audit" "workgen/tests/fixtures/unwrap_audit/rules/work-item.md"
+emit "after run"
