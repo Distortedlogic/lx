@@ -106,6 +106,10 @@ impl Walker {
                 let id = self.add_node("tool", name.clone(), "tool");
                 self.mcp_vars.insert(name.clone(), id);
             }
+            Stmt::AgentDecl { name, .. } => {
+                let id = self.add_node("agent", name.clone(), "agent");
+                self.agent_vars.insert(name.clone(), id);
+            }
             Stmt::Expr(sexpr) => self.walk_expr(&sexpr.node),
             _ => {}
         }

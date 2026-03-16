@@ -315,6 +315,23 @@ impl Interpreter {
                     .get(name)
                     .cloned()
                     .ok_or_else(|| LxError::runtime(format!("field '{name}' not found"), span)),
+                Value::Agent {
+                    methods, init, ..
+                } => {
+                    if let Some(m) = methods.get(name) {
+                        Ok(m.clone())
+                    } else if name == "init" {
+                        match init {
+                            Some(v) => Ok(*v.clone()),
+                            None => Ok(Value::Unit),
+                        }
+                    } else {
+                        Err(LxError::runtime(
+                            format!("Agent method '{name}' not found"),
+                            span,
+                        ))
+                    }
+                }
                 other => Err(LxError::type_err(
                     format!("field access on {}, not Record", other.type_name()),
                     span,

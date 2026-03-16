@@ -40,18 +40,19 @@ required_sections = ["Goal" "Why" "What changes" "Files affected" "Task List" "C
     }
     false -> {
       rules_path = env.get "RULES_FILE" ?? "workgen/rules/work-item.md"
-      run audit_path rules_path
+      root = env.get "ROOT" ?? "."
+      run audit_path rules_path root
     }
   }
 }
 
-+run = (audit_path rules_path) {
++run = (audit_path rules_path root) {
   audit_content = fs.read audit_path ^
   rules_content = fs.read rules_path ^
   raw_name = audit_path | split "/" | last ^
   base = raw_name | split "." | first ^
   name = base | replace "-" "_" | upper
-  context = gather_context ()
+  context = gather_context root
 
   session = trace.create "/tmp/lx_workgen_trace.json" ^
 
@@ -66,25 +67,28 @@ required_sections = ["Goal" "Why" "What changes" "Files affected" "Task List" "C
   trace.record {name: "compose"  input: "findings"  output: draft} session ^
 
   out_path = write_draft name draft
-
-  final = verify_and_revise session out_path draft name
   trace.record {name: "complete"  input: name  output: out_path} session ^
 
   emit "\n=== complete: {out_path} ==="
   Ok {path: out_path  name}
 }
 
-gather_context = () {
-  tree = ($^rg --files --type rust --type toml 2>/dev/null) ?? ""
-  tree_trimmed = tree | lines | take 200 | join "\n"
-  git_status = ($^git status --short) ?? ""
-  "{tree_trimmed}\n\nGit status:\n{git_status}"
+gather_context = (root) {
+  tree = ($^find {root} -name "*.rs" -o -name "*.py" -o -name "*.css" -o -name "*.toml" 2>/dev/null) ?? ""
+  files = tree | lines | take 200
+  file_list = files | join "\n"
+  sources = files | take 30 | map (f) {
+    content = fs.read f ?? ""
+    trimmed = content | lines | take 50 | join "\n"
+    "--- {f} ---\n{trimmed}"
+  } | join "\n\n"
+  "{file_list}\n\n{sources}"
 }
 
 investigate = (audit_content context) {
   emit "--- Phase 1-2: Investigation & Findings ---"
   p = prompt.create ()
-    | prompt.system "You are investigating a codebase for violations of an audit checklist. Search exhaustively."
+    | prompt.system "You are a code auditor. You analyze source code for violations of an audit checklist. Output findings directly. You are NOT an assistant — do not ask questions or request permission."
     | prompt.section "Audit Checklist" audit_content
     | prompt.section "Codebase Files" context
     | prompt.instruction "For each audit item, determine if the codebase violates it"
@@ -102,15 +106,17 @@ investigate = (audit_content context) {
 compose = (audit_content rules_content findings context) {
   emit "\n--- Phase 3-4: Composition & Task List ---"
   p = prompt.create ()
-    | prompt.system "You are composing a work item document from investigation findings."
+    | prompt.system "You are a document generator. You output markdown documents. You are NOT an assistant, NOT in a conversation, NOT asking for permission. Output the document directly."
     | prompt.section "Audit Checklist" audit_content
     | prompt.section "Process Rules" rules_content
     | prompt.section "Investigation Findings" findings
     | prompt.section "Codebase Files" context
-    | prompt.instruction "Produce a single markdown document with ALL sections from the process rules"
-    | prompt.instruction "Goal, Why, What Changes, How It Works, Files Affected, Task List, CRITICAL REMINDERS, Task Loading Instructions"
-    | prompt.instruction "Task list MUST include format+commit after each implementation task and final verification section"
-    | prompt.constraint "Output ONLY the markdown document, no preamble"
+    | prompt.instruction "Produce a single markdown work item document"
+    | prompt.instruction "Required sections: # Goal, # Why, # What changes, # Files affected, # Task List, # CRITICAL REMINDERS, # Task Loading Instructions"
+    | prompt.instruction "Each task must end with: just fmt, git add, git commit"
+    | prompt.instruction "Final task must be verification: just test, just diagnose, just fmt"
+    | prompt.constraint "Output ONLY the raw markdown. No preamble, no commentary, no questions, no conversation"
+    | prompt.constraint "Start your output with '# Goal' — nothing before it"
   tokens = prompt.estimate p
   tokens > 50000 ? emit "  warning: composition prompt ~{tokens} tokens"
   out = ai.prompt (prompt.render p) ^

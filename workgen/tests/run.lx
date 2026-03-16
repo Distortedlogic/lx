@@ -1,6 +1,7 @@
 -- Satisfaction test runner for workgen.
--- Grades golden output files against expected findings (the answer key),
--- reports satisfaction scores per scenario.
+-- Runs workgen for real against each scenario's fixture codebase,
+-- uses std/agents/grader for AI-backed scoring of the output.
+-- Scenarios run in parallel via pmap_n with per-scenario timeouts.
 --
 -- Usage: lx run workgen/tests/run.lx
 -- Filter: TEST_TAG=smoke lx run workgen/tests/run.lx
@@ -8,40 +9,32 @@
 use std/fs
 use std/env
 use std/trace
+use std/agents/grader
+use std/audit
+use ../main : workgen
 use ./spec
 
 run_scenario = (scenario) {
   emit "\n  --- {scenario.name} ---"
 
-  golden_path = "{scenario.root}/expected_output.md"
-  read_result = fs.read golden_path
+  result = workgen.run scenario.audit "workgen/rules/work-item.md" scenario.root
 
-  read_result ? {
-    Ok output -> {
-      dimensions = spec.grader output scenario
-      w_structure = dimensions.structure * spec.weights.structure
-      w_coverage = dimensions.coverage * spec.weights.coverage
-      w_compliance = dimensions.compliance * spec.weights.compliance
-      w_safety = dimensions.safety * spec.weights.safety
-      total_weight = spec.weights.structure + spec.weights.coverage + spec.weights.compliance + spec.weights.safety
-      weighted = (w_structure + w_coverage + w_compliance + w_safety) / total_weight
-      passed = weighted >= spec.threshold
+  result ? {
+    Ok r -> {
+      output = fs.read r.path ?? ""
 
-      emit "    structure:   {dimensions.structure}"
-      emit "    coverage:    {dimensions.coverage}"
-      emit "    compliance:  {dimensions.compliance}"
-      emit "    safety:      {dimensions.safety}"
-      emit "    weighted:    {weighted}"
-
-      found = scenario.expected_findings | filter (f) contains? f output
-      missed = scenario.expected_findings | filter (f) {
-        contains? f output | not
+      grade_result = grader.grade {
+        work: output
+        task: "work item for {scenario.name} covering: {scenario.expected_findings | join ", "}"
+        rubric: spec.rubric
+        threshold: spec.threshold_pct
       }
-      emit "    findings: {found | len}/{scenario.expected_findings | len}"
-      missed | empty? ? () : emit "    missed: {missed | join ", "}"
+
+      emit "    score: {grade_result.score}  passed: {grade_result.passed}"
+      grade_result.passed | not ? emit "    feedback: {grade_result.feedback}"
 
       sn = scenario.name
-      {name: sn  passed  score: weighted}
+      {name: sn  passed: grade_result.passed  score: grade_result.score}
     }
     Err e -> {
       emit "    ERROR: {e}"
@@ -64,7 +57,7 @@ run_scenario = (scenario) {
   emit "scenarios: {scenarios | len}"
   emit "threshold: {spec.threshold}"
 
-  results = scenarios | map run_scenario
+  results = scenarios | pmap_n 4 run_scenario
 
   results | each (r) {
     trace.record {name: r.name  output: (to_str r.score)  score: r.score} session ^

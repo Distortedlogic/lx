@@ -6,8 +6,6 @@ Future features only. For what's already implemented, see `agent/INVENTORY.md`.
 
 | Module              | Spec                                    | Purpose                                                       | Priority |
 | ------------------- | --------------------------------------- | ------------------------------------------------------------- | -------- |
-| `std/user`          | `spec/stdlib-user.md`                   | Structured agent-to-user interaction + `user.check` signal poll | Tier 1 |
-| `std/profile`       | `spec/agents-profile.md`               | Persistent agent identity + strategy memory (absorbs `std/strategy`) | Tier 1 |
 | `std/pipeline`      | `spec/agents-pipeline-checkpoint.md`    | Stage-boundary checkpoint/resume (absorbs `plan.run_incremental`) | Tier 2 |
 | `std/test`          | `spec/testing-satisfaction.md`          | Satisfaction-based agentic testing: spec/scenarios/grading     | Tier 2   |
 | `std/flow`          | `spec/flow-composition.md`              | Flows as first-class values: load, run, pipe, par, branch     | Tier 2   |
@@ -48,7 +46,6 @@ Future features only. For what's already implemented, see `agent/INVENTORY.md`.
 
 | Feature                      | Spec                              | Purpose                                         | Priority |
 | ---------------------------- | --------------------------------- | ----------------------------------------------- | -------- |
-| `Agent` declarations         | `spec/agents-declaration.md`      | First-class agent definitions with trait enforcement | Tier 2 |
 | Enforced `Trait` methods     | `spec/agents-trait.md`            | Typed method signatures, definition-time validation | Tier 2 |
 | `meta` block                 | `spec/agents-meta.md`             | Strategy-level iteration                        | Tier 3   |
 | Typed yield variants         | `spec/agents-yield-typed.md`      | Structured orchestrator communication           | Tier 3   |
@@ -65,6 +62,9 @@ Future features only. For what's already implemented, see `agent/INVENTORY.md`.
 | ---------------- | ------- | -------------------------------------------------------- |
 | `std/git`        | 43      | 36 functions, 7 Rust files, structured records for all git ops |
 | `std/retry`      | 45      | 2 functions, exponential backoff with jitter             |
+| `std/user`       | 49      | 9 functions, `UserBackend` trait, signal poll via `.lx/signals/` |
+| `std/profile`    | 49      | 15 functions, persistent identity + strategy helpers, file-backed |
+| `Agent` declarations | 49  | `Agent Name: TraitList = { body }`, `Value::Agent`, trait conformance |
 
 ## Eliminated by Merges
 

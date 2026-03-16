@@ -1,60 +1,24 @@
 -- Satisfaction spec for workgen.
--- Each scenario is a fixture with planted violations + an answer key
--- of expected findings. The grader checks that workgen's output catches them.
+-- Each scenario runs workgen for real against a fixture codebase
+-- with planted violations. The AI-backed grader.grade evaluates output.
 
 use std/audit
-use std/md
 
 +name = "workgen"
 +threshold = 0.75
-+weights = {
-  structure: 0.25
-  coverage: 0.30
-  compliance: 0.25
-  safety: 0.20
-}
++threshold_pct = 75
 
-+grader = (output scenario) {
-  parsed = md.parse output
-  headings = md.headings parsed
-
-  has_goal = headings | any? (h) contains? "Goal" h.text
-  has_why = headings | any? (h) contains? "Why" h.text
-  has_changes = headings | any? (h) contains? "changes" h.text
-  has_files = headings | any? (h) contains? "Files" h.text
-  has_tasks = headings | any? (h) contains? "Task" h.text
-  has_reminders = headings | any? (h) contains? "CRITICAL REMINDERS" h.text
-  section_hits = [has_goal has_why has_changes has_files has_tasks has_reminders] | filter identity | len
-  structure_score = section_hits / 6.0
-
-  expected = scenario.expected_findings
-  found = expected | filter (finding) contains? finding output
-  coverage_score = expected | empty? ? 1.0 : ((found | len) / (expected | len))
-
-  has_fmt = contains? "just fmt" output
-  has_commit = contains? "git commit" output || contains? "git add" output
-  has_verify = contains? "just test" output || contains? "just diagnose" output
-  has_loading = headings | any? (h) contains? "Loading" h.text
-  compliance_hits = [has_fmt has_commit has_verify has_loading] | filter identity | len
-  compliance_score = compliance_hits / 4.0
-
-  not_empty = audit.is_empty output | not
-  not_hedging = audit.is_hedging output | not
-  not_refusal = audit.is_refusal output | not
-  safety_hits = [not_empty not_hedging not_refusal] | filter identity | len
-  safety_score = safety_hits / 3.0
-
-  {
-    structure: structure_score
-    coverage: coverage_score
-    compliance: compliance_score
-    safety: safety_score
-  }
-}
++rubric = audit.rubric [
+  {name: "structure"   description: "has Goal, Why, What changes, Files affected, Task List, CRITICAL REMINDERS sections"  weight: 25}
+  {name: "coverage"    description: "every planted violation from the audit checklist has a corresponding finding and fix task"  weight: 30}
+  {name: "compliance"  description: "each task ends with just fmt + git commit, final verification task runs just test/diagnose"  weight: 25}
+  {name: "safety"      description: "output is substantive, not empty, not hedging, not a refusal"  weight: 20}
+]
 
 +scenarios = [
   {
-    name: "rust-audit: inline imports"
+    name: "rust-audit"
+    audit: "workgen/rules/rust-audit.md"
     root: "workgen/tests/fixtures/rust_audit"
     expected_findings: [
       "inline import"
@@ -62,154 +26,159 @@ use std/md
       "#[allow"
       "&String"
       "&Vec"
-      "swallow"
+      "swallowed error"
       "intermediate collect"
       "string literal"
     ]
     tags: ["rust" "smoke"]
   }
   {
-    name: "python-audit: quality"
+    name: "python-audit"
+    audit: "workgen/rules/python-audit.md"
     root: "workgen/tests/fixtures/python_audit"
     expected_findings: [
       "string literal"
       "free function"
       "mutable default"
-      "swallow"
+      "swallowed error"
       "intermediate list"
-      "dict"
+      "dict instead of dataclass"
       "StrEnum"
     ]
     tags: ["python"]
   }
   {
-    name: "performance-audit: anti-patterns"
+    name: "performance-audit"
+    audit: "workgen/rules/performance-audit.md"
     root: "workgen/tests/fixtures/perf_audit"
     expected_findings: [
-      "intermediate collect"
-      "clone"
-      "lock per"
-      "string concat"
-      "full sort"
+      "intermediate collect into Vec"
+      "unnecessary clone"
+      "lock contention"
+      "string concatenation in loop"
+      "full sort for partial result"
       "repeated HashMap lookup"
-      "with_capacity"
+      "missing with_capacity"
     ]
     tags: ["perf"]
   }
   {
-    name: "topology-audit: simplification"
+    name: "topology-audit"
+    audit: "workgen/rules/topology-audit.md"
     root: "workgen/tests/fixtures/topology_audit"
     expected_findings: [
-      "proxy"
-      "shuttle"
-      "call chain"
-      "repeated lock"
-      "parameter threading"
+      "proxy type"
+      "shuttle type"
+      "call chain depth"
+      "repeated lock acquisition"
+      "config parameter threading"
     ]
     tags: ["topology"]
   }
   {
-    name: "diagram-audit: graphviz"
+    name: "diagram-audit"
+    audit: "workgen/rules/diagram-audit.md"
     root: "workgen/tests/fixtures/diagram_audit"
     expected_findings: [
       "vertical bloat"
       "invisible edge"
-      "spaghetti"
-      "dummy"
-      "pause/resume"
+      "spaghetti edges"
+      "dummy cluster"
+      "pause/resume on same edge"
     ]
     tags: ["diagram"]
   }
   {
-    name: "diesel-audit: queries"
+    name: "diesel-audit"
+    audit: "workgen/rules/diesel-audit.md"
     root: "workgen/tests/fixtures/diesel_audit"
     expected_findings: [
-      "sequential quer"
+      "sequential queries"
       "raw SQL"
-      "loop"
-      "upsert"
+      "loop of individual upserts"
       "filter after load"
-      "transaction"
-      "DbEnum"
+      "missing transaction"
     ]
     tags: ["diesel"]
   }
   {
-    name: "perf-libs-audit: polars+rayon"
+    name: "perf-libs-audit"
+    audit: "workgen/rules/performance-audit-libs.md"
     root: "workgen/tests/fixtures/perf_libs_audit"
     expected_findings: [
-      "premature"
-      "collect"
-      "element-wise"
-      "round-trip"
-      "eager read"
-      "lock per"
-      "nested"
+      "premature collect"
+      "element-wise iteration"
+      "Polars round-trip"
+      "eager read instead of scan"
+      "lock per parallel iteration"
+      "nested parallelism"
     ]
     tags: ["perf-libs"]
   }
   {
-    name: "dioxus-audit: framework"
+    name: "dioxus-audit"
+    audit: "workgen/rules/dioxus-audit.md"
     root: "workgen/tests/fixtures/dioxus_audit"
     expected_findings: [
-      "#[server]"
-      "use_resource"
-      "use_effect"
-      "use_action"
+      "#[server] instead of HTTP method"
+      "use_resource instead of use_loader"
+      "use_effect reacting to use_action"
       "wrapper component"
-      "interpolation"
-      "Store"
+      "string interpolation in class"
+      "Signal instead of Store"
     ]
     tags: ["dioxus"]
   }
   {
-    name: "tailwind-audit: css"
+    name: "tailwind-audit"
+    audit: "workgen/rules/tailwind-audit.md"
     root: "workgen/tests/fixtures/tailwind_audit"
     expected_findings: [
-      "@tailwind"
-      "@utility"
-      "raw palette"
-      "dark:"
+      "@tailwind directives"
+      "component class in @utility"
+      "raw palette colors"
+      "dark: prefix"
       "outline-none"
-      "ring"
-      "border"
-      "focus:"
+      "bare ring"
+      "focus: instead of focus-visible:"
     ]
     tags: ["tailwind"]
   }
   {
-    name: "bevy-audit: ecs"
+    name: "bevy-audit"
+    audit: "workgen/rules/bevy-audit.md"
     root: "workgen/tests/fixtures/bevy_audit"
     expected_findings: [
       "monolithic plugin"
-      "chain"
-      "run condition"
-      "reflect"
-      "init_resource"
-      "Deref"
-      "schedule"
+      "chain without data dependency"
+      "duplicated run conditions"
+      "missing reflect"
+      "insert_resource instead of init_resource"
+      "missing Deref/DerefMut"
     ]
     tags: ["bevy"]
   }
   {
-    name: "bevy-ecosystem-audit: plugins"
+    name: "bevy-ecosystem-audit"
+    audit: "workgen/rules/bevy-ecosystem-audit.md"
     root: "workgen/tests/fixtures/bevy_eco_audit"
     expected_findings: [
-      "bevy_rand"
-      "volume"
-      "Rapier"
-      "egui"
+      "raw rand instead of bevy_rand"
+      "unconfigured audio playback"
+      "manual physics instead of Rapier"
+      "unscoped egui window"
     ]
     tags: ["bevy-eco"]
   }
   {
-    name: "primitives-audit: dioxus"
+    name: "primitives-audit"
+    audit: "workgen/rules/primitives-audit.md"
     root: "workgen/tests/fixtures/primitives_audit"
     expected_findings: [
-      "AlertDialog"
-      "Tooltip"
-      "Select"
-      "Tabs"
+      "custom dialog/AlertDialog"
+      "custom tooltip"
+      "custom select/dropdown"
+      "custom tabs"
     ]
     tags: ["primitives"]
   }

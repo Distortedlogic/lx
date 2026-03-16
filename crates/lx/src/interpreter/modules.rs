@@ -201,6 +201,15 @@ fn collect_exports(program: &Program, interp: &Interpreter) -> ModuleExports {
                     bindings.insert(name.clone(), val);
                 }
             }
+            Stmt::AgentDecl {
+                exported: true,
+                name,
+                ..
+            } => {
+                if let Some(val) = interp.env.get(name) {
+                    bindings.insert(name.clone(), val);
+                }
+            }
             _ => {}
         }
     }

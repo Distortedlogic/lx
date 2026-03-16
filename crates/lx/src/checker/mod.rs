@@ -148,6 +148,15 @@ impl Checker {
                 Type::Unit
             }
             Stmt::TraitDecl { .. } => Type::Unit,
+            Stmt::AgentDecl { methods, init, .. } => {
+                for m in methods {
+                    self.synth(&m.handler);
+                }
+                if let Some(expr) = init {
+                    self.synth(expr);
+                }
+                Type::Unit
+            }
             Stmt::FieldUpdate { value, .. } => {
                 self.synth(value);
                 Type::Unit

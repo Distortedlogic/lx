@@ -25,7 +25,7 @@ Non-obvious choices that cause confusion if forgotten:
 - **is_func_def ambiguity**: `(a b c) (expr)` with all bare Ident params NOT a func def. Defaults/underscores/type annotations override.
 - **`~>`/`~>?` at concat precedence**. `agent ~>? msg ^ | process` = `((agent ~>? msg) ^) | process`.
 - **`yield` is callback-based**. No handler → runtime error. Subsumed by `RuntimeCtx.yield_` backend.
-- **`RuntimeCtx` for backend pluggability**. All I/O builtins receive `&Arc<RuntimeCtx>`. Traits: `AiBackend`, `EmitBackend`, `HttpBackend`, `ShellBackend`, `YieldBackend`, `LogBackend`. Standard defaults in `crates/lx/src/backends/defaults.rs`.
+- **`RuntimeCtx` for backend pluggability**. All I/O builtins receive `&Arc<RuntimeCtx>`. Traits: `AiBackend`, `EmitBackend`, `HttpBackend`, `ShellBackend`, `YieldBackend`, `LogBackend`, `UserBackend`. Defaults in `backends/defaults.rs` + `backends/user.rs`.
 - **`with` is scoped binding**. Lexical scope, not dynamic. Supports `:=` mutable.
 - **`with ... as` uses `stop_ident` parser flag**. Expression parsing stops at `Ident("as")` to prevent it being consumed as application argument. Multi-resource separated by `,` (Semi token). Cleanup via `Closeable` convention (record with `.close` field).
 - **Record field update via `<-`**. Requires `:=` binding. Adding new fields allowed.
@@ -44,6 +44,9 @@ Non-obvious choices that cause confusion if forgotten:
 - **`std/introspect` is separate from `std/agent`**. Cross-cutting runtime metadata. Bounded action log (1000 entries).
 - **`std/knowledge` is file-backed JSON**. Shared via path. Provenance metadata. File-level locking.
 - **`std/diag` uses existing lexer+parser**. Walks AST, does not execute. Graph IR is plain lx records.
+- **`std/user` default is `NoopUserBackend`**. Auto-approves confirm, picks first choice, returns default/empty for ask. Tests and batch mode work without stdin. CLI can upgrade to `StdinStdoutUserBackend` for interactive terminal use.
+- **`std/profile` uses `DashMap` + atomic IDs**. Same pattern as `std/knowledge`. File-backed at `.lx/profiles/{name}.json`. Strategy helpers use `strategy:{problem}:{approach}` domain prefix convention.
+- **`Agent` is a keyword**. Lexed like `Protocol`/`Trait` (uppercase → TypeName special-case). Produces `Stmt::AgentDecl` and `Value::Agent`. Methods stored in `IndexMap<String, Value>`. Reserved fields: `uses`, `init`, `on`. Trait conformance validated at definition time (missing method = hard runtime error, not catchable with `??`).
 
 ## Technical Debt
 
@@ -56,7 +59,7 @@ Non-obvious choices that cause confusion if forgotten:
 - Shell line is single-line only — forces `${ }` for complex commands
 - Named args + default params + currying interaction
 - Unicode chars in lexer cause panics (byte vs char indexing in comments)
-- 19+ files over 300-line limit (parser: 3, interpreter: 4, builtins: 2, stdlib: 5+, lexer: 1, core: 1)
+- 24 files over 300-line limit (statements.rs at 812 is worst offender; parser: 4, interpreter: 4, builtins: 2, stdlib: 9, lexer: 1, core: 2, cli: 1)
 
 ## Session History
 
@@ -92,4 +95,4 @@ Non-obvious choices that cause confusion if forgotten:
 | 46 | 03-16 | Spec consolidation: 9 merges applied. Eliminated `std/strategy` (→ `std/profile`), `std/reputation` (→ `std/trace`), `checkpoint`/`on_interrupt` keywords (→ `user.check` + `:signal` lifecycle hook), `plan.run_incremental` (→ `std/pipeline`), `agent.teach` (→ dialogue convention), `workflow.peers` (→ topic convention), constraint propagation spec (→ `with context` ambient), provenance spec (→ `std/trace`), `Goal`/`Task` (→ docs). Agent/Trait declaration specs from Session 45b integrated. Net: 21 planned features (down from ~33) |
 | 47 | 03-16 | Error message overhaul: cross-language keyword hints (30+ keywords), value/type in all mismatch errors, Pattern Display impl, Value::short_display(). `cargo install` to host. Quick syntax reference in NEXT_PROMPT for cold-start agents. 66/66 tests |
 | 48 | 03-16 | Gap analysis: 7 unplanned features for dynamic multi-agent coordination. New specs: `agents-task-graph` (DAG execution), `agents-capability-routing` (declarative routing), `agents-deadline` (time propagation), `agents-introspect-live` (system observation), `agents-dialogue-branch` (fork/compare/merge), `agents-format-negotiate` (Protocol adapters), `agents-hot-reload` (handler swap). Updated ROADMAP (28 features), PRIORITIES (28 items), OPINION (8 new gaps). No code changes |
-| 49 | 03-16 | `std/user`: 9 functions (confirm, choose, ask, ask_with, progress, progress_pct, status, table, check). `UserBackend` trait on `RuntimeCtx`. Signal check via `.lx/signals/{pid}.json`. `std/profile`: 15 functions — persistent agent identity (learn/recall/forget, preferences, history, merge, age, decay) + strategy helpers (best_strategy, rank_strategies, adapt_strategy). File-backed `.lx/profiles/{name}.json`. 68/68 tests |
+| 49 | 03-16 | `std/user`: 9 functions, `UserBackend` trait. `std/profile`: 15 functions, persistent identity + strategy helpers. `Agent` declarations: new `AgentKw` token, `Stmt::AgentDecl` AST node, `Value::Agent` variant. Parser handles `Agent Name: TraitList = { body }` with `uses`/`init`/`on` reserved fields. Trait conformance validated at definition time. Method access via `.`. 69/69 tests |

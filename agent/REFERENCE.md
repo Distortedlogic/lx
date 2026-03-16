@@ -12,13 +12,13 @@ crates/lx/src/
   checker/     mod.rs, synth.rs, types.rs
   interpreter/ mod.rs, agents.rs, apply.rs, collections.rs, eval.rs, modules.rs, patterns.rs, refine.rs, shell.rs
   builtins/    mod.rs, call.rs, str.rs, coll.rs, hof.rs, hof_extra.rs
-  stdlib/      mod.rs + 61 module files
+  stdlib/      mod.rs + 66 module files
   ast.rs, token.rs, value.rs, value_display.rs, env.rs, error.rs, span.rs, lib.rs
 crates/lx-cli/src/main.rs
 doc/           35 quick-reference docs for implemented features
-spec/          51 specs (10 eliminated by merges in Session 46, 7 added in Session 48)
+spec/          51 spec files
 agent/         Context files (this folder)
-tests/         66 test suites (.lx files + 11_modules dir)
+tests/         69 test suites (.lx files + 11_modules dir)
   fixtures/    agent_echo.lx, mcp_test_server.py, yield_orchestrator.py, http_test_server.py, yield_simple.lx, yield_multi.lx, yield_pipeline.lx
 flows/
   lib/         10 reusable .lx library modules
@@ -44,7 +44,7 @@ Extensions to `std/agent` follow the split-file pattern:
 
 ## Adding Language-Level Features (keywords, AST nodes)
 
-For new keywords like `Trait`, `Protocol`, `with ... as`:
+For new keywords like `Agent`, `Trait`, `Protocol`, `with ... as`:
 1. **Token**: add variant to `token.rs`'s `TokenKind` enum
 2. **Lexer**: add keyword recognition in `lexer/mod.rs` (lowercase → keyword table at ~line 330; uppercase → TypeName special-case at ~line 345)
 3. **AST**: add node to `ast.rs`'s `Expr` or `Stmt` enum

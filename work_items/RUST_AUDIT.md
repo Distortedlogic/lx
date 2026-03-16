@@ -1,0 +1,1 @@
+The work item document has been written to `work_items/RUST_AUDIT_FIXTURE_CLEANUP.md`. It covers all 14 audit findings with 7 tasks (6 implementation + 1 verification), organized foundation-first: imports/types first, then function-by-function fixes, then caller updates in main, then final verification.

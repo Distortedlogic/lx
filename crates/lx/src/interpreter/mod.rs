@@ -407,6 +407,53 @@ impl Interpreter {
                 self.env = env.into_arc();
                 Ok(Value::Unit)
             }
+            Stmt::AgentDecl {
+                name,
+                traits,
+                uses: _,
+                init,
+                on: _,
+                methods,
+                exported,
+            } => {
+                let mut method_map = IndexMap::new();
+                for m in methods {
+                    let handler = self.eval(&m.handler)?;
+                    method_map.insert(m.name.clone(), handler);
+                }
+                let init_val = match init {
+                    Some(expr) => Some(Box::new(self.eval(expr)?)),
+                    None => None,
+                };
+                for trait_name in traits {
+                    if let Some(Value::Trait { handles, .. }) = self.env.get(trait_name) {
+                        for required in handles.iter() {
+                            let key = required.to_string();
+                            if !method_map.contains_key(&key) {
+                                return Err(LxError::runtime(
+                                    format!(
+                                        "Agent {name} missing method '{key}' required by {trait_name}"
+                                    ),
+                                    stmt.span,
+                                ));
+                            }
+                        }
+                    }
+                }
+                let val = Value::Agent {
+                    name: Arc::from(name.as_str()),
+                    traits: Arc::new(
+                        traits.iter().map(|s| Arc::from(s.as_str())).collect(),
+                    ),
+                    methods: Arc::new(method_map),
+                    init: init_val,
+                };
+                let _ = exported;
+                let mut env = self.env.child();
+                env.bind(name.clone(), val);
+                self.env = env.into_arc();
+                Ok(Value::Unit)
+            }
             Stmt::FieldUpdate {
                 name,
                 fields,

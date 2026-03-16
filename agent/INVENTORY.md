@@ -16,6 +16,7 @@ What lx can do right now. For project health/status, see the "Where We're At" se
 
 ## Agent System
 
+- `Agent Name: TraitList = { methods }` — first-class agent declarations with trait conformance, method access via `.`, `uses`/`init`/`on` reserved fields, `Value::Agent` runtime representation
 - `~>` send, `~>?` ask — infix operators, subprocess-transparent
 - `Protocol Name = {field: Type}` — message contracts with runtime validation
 - Protocol composition (`{..Base extra: Str}`), unions (`A | B | C` with `_variant`), field constraints (`where`)
@@ -31,9 +32,9 @@ What lx can do right now. For project health/status, see the "Where We're At" se
 ## Stdlib (39 modules)
 
 - Data: `std/json`, `std/md`, `std/re`, `std/math`, `std/time`
-- System: `std/fs`, `std/env`, `std/http`, `std/git`
-- Resilience: `std/retry` — `retry` (default 3 attempts, exponential backoff), `retry_with` (configurable max, backoff strategy, base_ms, max_delay_ms, jitter, retry_on predicate). Returns `Ok value` on success, `Err Exhausted {attempts last_error elapsed_ms}` on exhaustion
-- Git: `std/git` — `status`, `branch`, `root`, `is_repo`, `branches`, `remotes`, `log`, `show`, `blame`, `blame_range`, `diff`, `diff_stat`, `grep`, `add`, `commit`, `commit_with`, `tag`, `tag_with`, `create_branch`, `create_branch_at`, `delete_branch`, `checkout`, `checkout_create`, `merge`, `stash`/`stash_with`/`stash_pop`/`stash_list`/`stash_drop`, `fetch`, `pull`, `push`, `push_with`
+- System: `std/fs`, `std/env`, `std/http`
+- Git: `std/git` — 36 functions: `status`, `branch`, `root`, `is_repo`, `branches`, `remotes`, `log`, `show`, `blame`, `blame_range`, `diff`, `diff_stat`, `grep`, `add`, `commit`, `commit_with`, `tag`, `tag_with`, `create_branch`, `create_branch_at`, `delete_branch`, `checkout`, `checkout_create`, `merge`, `stash`/`stash_with`/`stash_pop`/`stash_list`/`stash_drop`, `fetch`, `pull`, `push`, `push_with`
+- Resilience: `std/retry` — `retry` (default 3 attempts, exponential backoff), `retry_with` (configurable). Returns `Ok value` on success, `Err Exhausted {attempts last_error elapsed_ms}` on exhaustion
 - Communication: `std/agent`, `std/mcp`, `std/ai`
 - Scheduling: `std/cron`
 - Orchestration: `std/ctx`, `std/tasks`, `std/audit`, `std/circuit`, `std/plan`, `std/saga`
@@ -79,4 +80,4 @@ What lx can do right now. For project health/status, see the "Where We're At" se
 
 ## Test Coverage
 
-68 test suites (67 .lx files + 11_modules dir) in `tests/`. Fixtures in `tests/fixtures/`.
+69 test suites (68 .lx files + 11_modules dir) in `tests/`. Fixtures in `tests/fixtures/`.

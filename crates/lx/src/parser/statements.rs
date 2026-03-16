@@ -605,15 +605,12 @@ impl super::Parser {
         let mut methods = Vec::new();
         self.skip_semis();
         while *self.peek() != TokenKind::RBrace {
-            let field_name = match self.peek().clone() {
-                TokenKind::Ident(n) => n,
-                _ => {
-                    return Err(LxError::parse(
-                        "expected field name in Agent body",
-                        self.tokens[self.pos].span,
-                        None,
-                    ));
-                }
+            let TokenKind::Ident(field_name) = self.peek().clone() else {
+                return Err(LxError::parse(
+                    "expected field name in Agent body",
+                    self.tokens[self.pos].span,
+                    None,
+                ));
             };
             match field_name.as_str() {
                 "uses" => {
