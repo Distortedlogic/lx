@@ -1,6 +1,10 @@
 pub(crate) mod agent;
+mod agent_capability;
 mod agent_dialogue;
+mod agent_gate;
+mod agent_handoff;
 mod agent_intercept;
+mod agent_supervise;
 mod agent_reconcile;
 mod agent_reconcile_strat;
 mod agents_auditor;
@@ -10,6 +14,7 @@ mod agents_planner;
 mod agents_reviewer;
 mod agents_router;
 mod ai;
+mod ai_structured;
 mod audit;
 mod circuit;
 mod cron;

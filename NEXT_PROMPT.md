@@ -25,7 +25,7 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 
 ## Current State
 
-`just diagnose` clean. `just test`: **47/47 PASS**. All core language features and stdlib modules implemented. `RuntimeCtx` backend refactor complete. `refine` expression implemented. `agent.reconcile` implemented. `trace.improvement_rate` / `trace.should_stop` implemented. `agent.dialogue` / `agent.dialogue_turn` / `agent.dialogue_history` / `agent.dialogue_end` implemented. `agent.intercept` implemented.
+`just diagnose` clean. `just test`: **52/52 PASS**. All core language features and stdlib modules implemented. `RuntimeCtx` backend refactor complete. `refine` expression implemented. `agent.reconcile` implemented. `trace.improvement_rate` / `trace.should_stop` implemented. `agent.dialogue` / `agent.dialogue_turn` / `agent.dialogue_history` / `agent.dialogue_end` implemented. `agent.intercept` implemented. `Handoff` Protocol + `agent.as_context` implemented. `agent.supervise` + `agent.gate` + `agent.capabilities` implemented. `ai.prompt_structured` + `ai.prompt_structured_with` implemented.
 
 ### What's implemented
 
@@ -49,7 +49,7 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 **29 stdlib modules:**
 - Data: `std/json`, `std/md`, `std/re`, `std/math`, `std/time`
 - System: `std/fs`, `std/env`, `std/http`
-- Communication: `std/agent` (incl. `agent.reconcile`, `agent.dialogue`, `agent.intercept`), `std/mcp`, `std/ai`
+- Communication: `std/agent` (incl. `agent.reconcile`, `agent.dialogue`, `agent.intercept`, `Handoff` Protocol, `agent.as_context`, `agent.capabilities`, `agent.gate`, `agent.supervise`), `std/mcp`, `std/ai`
 - Scheduling: `std/cron` (cron expressions, intervals, one-shot timers, fire-time queries)
 - Orchestration: `std/ctx`, `std/tasks`, `std/audit`, `std/circuit`, `std/plan`, `std/saga`
 - Intelligence: `std/knowledge`, `std/introspect`
@@ -71,6 +71,10 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 - Result reconciliation (`agent.reconcile`): structured merging of parallel results — 6 strategies (union, intersection, vote, highest_confidence, max_score, merge_fields) + custom Fn. Vote supports quorum (unanimous/majority/any/N), weighted voting. Union/intersection use key fn + conflict resolution. Returns `{merged sources conflicts dropped rounds dissenting}`
 - Multi-turn dialogue (`agent.dialogue`): stateful conversation sessions with context accumulation. `agent.dialogue agent config` creates session, `agent.dialogue_turn session msg` sends turn with accumulated history, `agent.dialogue_history session` returns history, `agent.dialogue_end session` closes. Config: `{role? context? max_turns?}`. Subsumes negotiation pattern. Handler receives `{type content history session_id role? context?}`
 - Message middleware (`agent.intercept`): `agent.intercept agent (msg next) { ... }` returns a new agent with middleware applied. `next msg` forwards to original agent. Composable by chaining. Short-circuit by not calling next. Applies to both `~>` and `~>?`. Original agent unchanged (immutable)
+- Structured handoff (`Handoff` Protocol + `agent.as_context`): `use std/agent {Handoff}` for Protocol access. `Handoff {result: ... tried: [...] ...}` validates and fills defaults. `agent.as_context handoff` formats as Markdown for LLM consumption. Fields: result, tried, assumptions, uncertainties, recommendations, files_read, tools_used, duration_ms
+- Capability discovery (`Capabilities` Protocol + `agent.capabilities` + `agent.advertise`): `agent.capabilities agent` sends `{type: "capabilities"}` query. `Capabilities` Protocol with protocols, tools, domains, budget_remaining, accepts, status fields. `agent.advertise name caps` registers capabilities
+- Approval gates (`GateResult` Protocol + `agent.gate`): `agent.gate name config` blocks on yield backend for approval. Config: `{show? timeout? on_timeout?}`. Returns `Ok GateResult` (approved) or `Err` (rejected/timeout). Timeout policies: abort, approve, reject, escalate
+- Supervision (`agent.supervise` + `agent.child` + `agent.supervise_stop`): Erlang-style supervision with lazy restart. Strategies: one_for_one, one_for_all, rest_for_one. Restart types: permanent, transient, temporary. `agent.child sup id` checks liveness and restarts if needed. Max restart intensity tracking
 
 **Runtime backends (`RuntimeCtx`):**
 - All I/O-touching builtins receive `&Arc<RuntimeCtx>` — backend traits for AI, HTTP, shell, emit, yield, logging
@@ -86,21 +90,15 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 These have specs in `spec/` but no Rust implementation yet:
 
 - `emit` agent-to-human output: fire-and-forget, replaces `$echo` for user-facing output
-- `agent.intercept` — message middleware (tracing, rate-limiting, transformation)
-- `Handoff` Protocol + `agent.as_context` — structured context transfer convention (not a function)
 - `|>>` streaming pipe — reactive dataflow, lazy until consumed
-- `agent.supervise` — Erlang-style restart strategies (one_for_one/one_for_all/rest_for_one)
 - `with context` — ambient deadline/budget propagation to agent ops
 - `caller` implicit binding in handlers — agents ask back without orchestrator
-- `agent.gate` — structured human-in-the-loop with timeout policies
-- `agent.capabilities` — runtime capability discovery via `Capabilities` protocol
 - `_priority` field on messages — binary (`:critical` or default), not 4-level
 - `agent.reconcile` deliberation — re-ask agents when quorum not met (requires agent refs in results)
 - `workflow.peers` / `workflow.share` — passive sibling visibility in `par` (convenience over blackboard)
 - `Goal`/`Task` standard Protocols — convention, no wrapper functions
 - Deadlock detection: runtime wait-for graph, cycle detection on `~>?`, `DeadlockErr`
 - `Skill` declarations — self-describing, discoverable capability units with typed I/O + `std/skill` registry
-- `ai.prompt_structured` — Protocol as output schema for LLM calls, auto-retry on schema violation
 - `std/budget` — cumulative cost/resource accounting, projection, adaptive strategy (absorbs `std/circuit` on implementation)
 - `std/reputation` — cross-interaction agent quality tracking, learning router feedback
 - `plan.run_incremental` — memoized plan execution, input-hash cache invalidation
@@ -134,14 +132,12 @@ These have specs in `spec/` but no Rust implementation yet:
 
 Full plan: `design/stdlib_roadmap.md`. Specs for all planned features are in `spec/`.
 
-### Completed stdlib roadmap items (1-24):
+### Completed stdlib roadmap items (1-27, 34):
 
-All 18 stdlib items + RuntimeCtx backend refactor + `refine` expression + `agent.reconcile` + `trace.improvement_rate`/`trace.should_stop` + `agent.dialogue` + `agent.intercept` done.
+All 18 stdlib items + RuntimeCtx backend refactor + `refine` expression + `agent.reconcile` + `trace.improvement_rate`/`trace.should_stop` + `agent.dialogue` + `agent.intercept` + `Handoff` Protocol + `agent.as_context` + `agent.supervise` + `agent.gate` + `agent.capabilities` + `ai.prompt_structured` done.
 
 ### Next priorities (pick from these):
-25. **`Handoff` Protocol + `agent.as_context`** — Protocol convention + formatting helper in `std/agent`. Spec: `spec/agents-handoff.md`.
 26. **`|>>` streaming pipe** — New operator. Reactive dataflow. Spec: `spec/concurrency-reactive.md`. Requires parser + interpreter changes.
-27. **`agent.supervise` + `agent.gate` + `agent.capabilities`** — Extensions to `std/agent`. Spec: `spec/agents-supervision.md`, `spec/agents-gates.md`, `spec/agents-capability.md`.
 28. **`with context`** — Ambient context propagation. Spec: `spec/agents-ambient.md`. Requires parser + interpreter changes.
 29. **`caller` implicit binding + `_priority` (binary)** — Interpreter-level. Spec: `spec/agents-clarify.md`, `spec/agents-priority.md`.
 30. **`workflow.peers` / `workflow.share`** — Convenience over blackboard. Spec: `spec/agents-broadcast.md`.
@@ -179,7 +175,7 @@ crates/lx/src/
   checker/   mod.rs, synth.rs, types.rs
   interpreter/ mod.rs, agents.rs, apply.rs, collections.rs, eval.rs, modules.rs, patterns.rs, refine.rs, shell.rs
   builtins/  mod.rs, call.rs, str.rs, coll.rs, hof.rs, hof_extra.rs
-  stdlib/    mod.rs, agent.rs, agent_dialogue.rs, agent_reconcile.rs, agent_reconcile_strat.rs, agents_auditor.rs, agents_grader.rs, agents_monitor.rs, agents_planner.rs, agents_reviewer.rs, agents_router.rs, ai.rs, audit.rs, circuit.rs, diag.rs, diag_walk.rs, introspect.rs, knowledge.rs, memory.rs, plan.rs, saga.rs, tasks.rs, trace.rs, trace_progress.rs, trace_query.rs, json.rs, json_conv.rs, ctx.rs, math.rs, fs.rs, env.rs, re.rs, md.rs, md_build.rs, mcp.rs, mcp_rpc.rs, mcp_stdio.rs, mcp_http.rs, http.rs, time.rs, cron.rs
+  stdlib/    mod.rs, agent.rs, agent_capability.rs, agent_dialogue.rs, agent_gate.rs, agent_handoff.rs, agent_intercept.rs, agent_reconcile.rs, agent_reconcile_strat.rs, agent_supervise.rs, agents_auditor.rs, agents_grader.rs, agents_monitor.rs, agents_planner.rs, agents_reviewer.rs, agents_router.rs, ai.rs, audit.rs, circuit.rs, diag.rs, diag_walk.rs, introspect.rs, knowledge.rs, memory.rs, plan.rs, saga.rs, tasks.rs, trace.rs, trace_progress.rs, trace_query.rs, json.rs, json_conv.rs, ctx.rs, math.rs, fs.rs, env.rs, re.rs, md.rs, md_build.rs, mcp.rs, mcp_rpc.rs, mcp_stdio.rs, mcp_http.rs, http.rs, time.rs, cron.rs
   ast.rs, token.rs, value.rs, value_display.rs, env.rs, error.rs, span.rs, lib.rs
 crates/lx-cli/src/main.rs
 spec/          62 language spec files

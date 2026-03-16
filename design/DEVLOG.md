@@ -4,7 +4,7 @@ Session history + design decisions. For priorities and gap analysis, see `NEXT_P
 
 ## Implementation Status
 
-**46/46 PASS.** 29 stdlib modules (12 base + 8 orchestration/intelligence + 6 standard agents + 2 infrastructure + 1 visualization). 14 flow programs. Type checker. Regex literals. `lx diagram` CLI. `refine` expression. `agent.reconcile` (6 strategies). `trace.improvement_rate` / `trace.should_stop` (diminishing returns detection). `agent.dialogue` (multi-turn sessions). `just diagnose` clean.
+**52/52 PASS.** 29 stdlib modules (12 base + 8 orchestration/intelligence + 6 standard agents + 2 infrastructure + 1 visualization). 14 flow programs. Type checker. Regex literals. `lx diagram` CLI. `refine` expression. `agent.reconcile` (6 strategies). `trace.improvement_rate` / `trace.should_stop`. `agent.dialogue` (multi-turn sessions). `agent.intercept` (message middleware). `Handoff` Protocol + `agent.as_context`. `Capabilities` Protocol + `agent.capabilities` + `agent.advertise`. `GateResult` Protocol + `agent.gate`. `agent.supervise` + `agent.child` + `agent.supervise_stop` (Erlang-style supervision). `ai.prompt_structured` + `ai.prompt_structured_with` (Protocol-validated LLM output). `just diagnose` clean.
 
 ## Key Design Decisions
 

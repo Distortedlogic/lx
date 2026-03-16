@@ -148,7 +148,7 @@ Interceptors apply to both `~>` (send) and `~>?` (ask). For `~>`, the middleware
 
 ## Implementation Status
 
-Planned. `agent.intercept` in `std/agent`. Returns a wrapper agent record whose handler calls the middleware chain.
+Implemented. `crates/lx/src/stdlib/agent_intercept.rs`. Tests: `tests/47_agent_intercept.lx`. Returns a new agent record with intercepted handler. Middleware receives `(msg next)` where `next` is a captured builtin that dispatches to the original agent (handler or subprocess).
 
 ## Cross-References
 

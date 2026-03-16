@@ -144,7 +144,7 @@ result = escalation_chain | fold_until (Err {}) (agent, prev) {
 
 ## Implementation Status
 
-Planned. `Handoff` Protocol defined in `std/agent`. `agent.as_context` is a formatting helper in `stdlib/agent.rs`. No `agent.handoff` function — handoff is just a Protocol applied to normal `~>?`.
+Implemented. `crates/lx/src/stdlib/agent_handoff.rs`. Tests: `tests/48_agent_handoff.lx`. `Handoff` Protocol exposed via `use std/agent {Handoff}` (selective import needed since parser doesn't allow uppercase after `.`). `agent.as_context` formats as Markdown with section headers.
 
 ## Cross-References
 

@@ -1,0 +1,56 @@
+-- 51_agent_supervise.lx
+-- Tests: spec/agents-supervision.md (agent.supervise, agent.child, agent.supervise_stop)
+-- Phase: Supervision trees with lazy restart
+
+use std/agent
+
+-- basic supervision with in-process agents
+counter = 0
+sup = agent.supervise {
+  strategy: "one_for_one"
+  max_restarts: 3
+  window: 60
+  children: [
+    {id: "echo" spawn: () {handler: (msg) {echo: msg}} restart: "permanent"}
+    {id: "double" spawn: () {handler: (msg) msg.x * 2} restart: "transient"}
+  ]
+} ^
+
+-- agent.child retrieves child agent
+echo = agent.child sup "echo"
+result = echo ~>? {text: "hello"}
+assert (result.echo.text == "hello") "child echo works"
+
+doubler = agent.child sup "double"
+assert (doubler ~>? {x: 5} == 10) "child doubler works"
+
+-- supervise_stop cleans up
+agent.supervise_stop sup ^
+
+-- supervision with max_restarts tracking
+sup2 = agent.supervise {
+  strategy: "one_for_one"
+  max_restarts: 2
+  window: 60
+  children: [
+    {id: "worker" spawn: () {handler: (msg) msg.value + 1} restart: "permanent"}
+  ]
+} ^
+w = agent.child sup2 "worker"
+assert (w ~>? {value: 5} == 6) "supervised worker works"
+agent.supervise_stop sup2 ^
+
+-- supervision preserves child identity
+sup3 = agent.supervise {
+  strategy: "one_for_one"
+  max_restarts: 5
+  children: [
+    {id: "a" spawn: () {name: "alpha" handler: (msg) "a:" ++ msg} restart: "permanent"}
+    {id: "b" spawn: () {name: "beta" handler: (msg) "b:" ++ msg} restart: "permanent"}
+  ]
+} ^
+a = agent.child sup3 "a"
+b = agent.child sup3 "b"
+assert (a ~>? "test" == "a:test") "child a responds"
+assert (b ~>? "test" == "b:test") "child b responds"
+agent.supervise_stop sup3 ^

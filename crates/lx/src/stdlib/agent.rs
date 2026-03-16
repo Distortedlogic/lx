@@ -13,13 +13,13 @@ use crate::span::Span;
 use crate::stdlib::json_conv;
 use crate::value::Value;
 
-struct AgentProcess {
-    _child: Child,
-    stdin: BufWriter<ChildStdin>,
-    stdout: BufReader<ChildStdout>,
+pub(super) struct AgentProcess {
+    pub(super) _child: Child,
+    pub(super) stdin: BufWriter<ChildStdin>,
+    pub(super) stdout: BufReader<ChildStdout>,
 }
 
-static REGISTRY: LazyLock<DashMap<u32, AgentProcess>> = LazyLock::new(DashMap::new);
+pub(super) static REGISTRY: LazyLock<DashMap<u32, AgentProcess>> = LazyLock::new(DashMap::new);
 
 pub fn build() -> IndexMap<String, Value> {
     let mut m = IndexMap::new();
@@ -31,6 +31,38 @@ pub fn build() -> IndexMap<String, Value> {
     m.insert("status".into(), mk("agent.status", 1, bi_status));
     m.insert("reconcile".into(), super::agent_reconcile::mk_reconcile());
     m.insert("intercept".into(), super::agent_intercept::mk_intercept());
+    m.insert("Handoff".into(), super::agent_handoff::mk_handoff_protocol());
+    m.insert("as_context".into(), super::agent_handoff::mk_as_context());
+    m.insert(
+        "Capabilities".into(),
+        super::agent_capability::mk_capabilities_protocol(),
+    );
+    m.insert(
+        "capabilities".into(),
+        super::agent_capability::mk_capabilities(),
+    );
+    m.insert("advertise".into(), super::agent_capability::mk_advertise());
+    m.insert(
+        "GateResult".into(),
+        super::agent_gate::mk_gate_result_protocol(),
+    );
+    m.insert("gate".into(), super::agent_gate::mk_gate());
+    m.insert("mock".into(), super::agent_mock::mk_mock());
+    m.insert("mock_calls".into(), super::agent_mock::mk_mock_calls());
+    m.insert(
+        "mock_assert_called".into(),
+        super::agent_mock::mk_mock_assert_called(),
+    );
+    m.insert(
+        "mock_assert_not_called".into(),
+        super::agent_mock::mk_mock_assert_not_called(),
+    );
+    m.insert("supervise".into(), super::agent_supervise::mk_supervise());
+    m.insert("child".into(), super::agent_supervise::mk_child());
+    m.insert(
+        "supervise_stop".into(),
+        super::agent_supervise::mk_supervise_stop(),
+    );
     m.insert("dialogue".into(), super::agent_dialogue::mk_dialogue());
     m.insert(
         "dialogue_turn".into(),
