@@ -1,135 +1,72 @@
 # Implementation Plan
 
-Architecture, crate choices, and phased build plan for `lx` — an agentic workflow language.
+Architecture, crate choices, and build strategy for `lx`.
 
 ## Architecture
 
 ```
 crates/lx/          -- core library (lexer, parser, type checker, interpreter)
-crates/lx-cli/      -- `lx` binary (run, fmt, test, check, build, repl, notebook, watch, agent, init)
+crates/lx-cli/      -- `lx` binary (run, fmt, test, check, agent, diagram)
 ```
 
-Two crates. The library is the language engine — everything from source text to execution. The CLI is a thin shell that wires up subcommands to library calls. This split lets the lx engine be embedded in other tools (MCP server, agent processes, editor integration, REPL) without pulling in CLI deps. The `lx agent` subcommand runs scripts as long-lived agent processes with cron scheduling and channel listeners.
+Two crates. The library is the language engine. The CLI is a thin shell. This split lets the lx engine be embedded (MCP server, agent processes, editor integration) without pulling in CLI deps.
 
 ## Why Hand-Written Lexer + Pratt Parser
 
-Parser generators (lalrpop, pest, chumsky) and lexer generators (logos) were evaluated. A hand-written approach wins for lx specifically:
-
-**Lexing has modal transitions.** `$` switches to shell mode (raw text until newline). `r/` switches to regex mode. `$^` is a single token. `"..."` has `{expr}` interpolation which re-enters expression mode mid-string. Logos can handle simple tokens but the mode switching requires a hand-written state machine anyway — at that point logos adds complexity without reducing code.
-
-**Pratt parsing is the natural fit for lx's precedence table.** The 17-level precedence table with postfix `^`, sections `(* 2)`, and the three `?` modes maps directly to a Pratt parser. Each precedence level is a number. Adding/changing operators means changing a number. Parser generators require encoding precedence in grammar rules, which is indirect and harder to modify.
-
-**Error recovery requires hand-written control.** The spec says "recover after first error, report up to 5." Synchronization points (find the next `}`, `;`, or newline and resume) are trivial in a hand-written parser but require framework-specific APIs in generators.
-
-**The grammar is small.** 9 keywords, ~20 operators, ~6 expression forms. This is not C++ or Rust. A hand-written parser for lx is ~400-500 lines (split across files), well within maintenance bounds.
+Parser generators were evaluated. Hand-written wins for lx:
+- **Modal lexing**: `$` → shell mode, `r/` → regex mode, `"..."` → interpolation. Needs a state machine.
+- **Pratt parsing**: 17-level precedence table with postfix `^`, sections `(* 2)`, three `?` modes maps directly to binding powers.
+- **Error recovery**: synchronization points are trivial hand-written.
+- **Small grammar**: ~9 keywords, ~20 operators. ~500 lines of parser (split across files).
 
 ## Crate Choices
 
-### Core Pipeline (lexer → parser → checker → interpreter)
-
-**No external crate for lexing or parsing.** Hand-written, as argued above. The lexer is a state machine over `&str` producing `Token` values with `Span` (byte offset + length). The parser is recursive descent with Pratt precedence climbing.
-
-### Error Diagnostics: `miette`
-
-[miette](https://github.com/zkat/miette) produces the exact diagnostic format lx needs: source spans, underlined expressions, "expected/got/fix" labels. Used by stilts in reference/. Supports both human-readable and JSON output (`--json` flag maps to `miette::JSONReportHandler`). The alternative (ariadne) is also good but miette's JSON support matches the spec requirement for `lx run --json`.
-
-### Arbitrary Precision Integers: `num-bigint` + `num-traits`
-
-The spec says integers are arbitrary precision by default. `num-bigint` is the standard Rust crate for this. `num-traits` provides the `Zero`, `One`, and arithmetic traits. Together they're ~15k lines of well-tested bigint math. No reason to hand-write this.
-
-### Regex Runtime: `regex`
-
-Already in the workspace. Powers `r/pattern/flags` at runtime. The lx regex literal compiles to a `regex::Regex` value.
-
-### Async Runtime: `tokio`
-
-Not currently used at runtime. The interpreter is synchronous. Shell commands use `std::process::Command`. `par`/`sel`/`pmap` execute sequentially. Tokio is planned for real async concurrency.
-
-### HTTP Client: `reqwest`
-
-Already in the workspace. Powers `std/net/http`. The lx runtime wraps reqwest calls.
-
-### JSON/TOML/YAML/CSV: `serde_json`, `toml`, `serde_yaml`, `csv`
-
-Standard ecosystem crates. lx values serialize to/from serde's data model. A lx map becomes a serde map, a lx list becomes a serde sequence.
-
-### Agent Ecosystem (implemented)
-
-- **pulldown-cmark** — Markdown parser for `std/md`.
-- `std/mcp` — JSON-RPC 2.0 over subprocess stdin/stdout + HTTP streaming transport via `reqwest`.
-- `std/agent` — subprocess spawning via `std::process::Command`, JSON-line protocol over stdin/stdout.
-- `std/cron` — cron expression scheduling (uses `chrono`).
-
-### Not Needed (v1)
-
-- **cranelift / LLVM** — AOT compilation (`lx build`) is v2. v1 is interpreted.
-- **tree-sitter** — lx doesn't need incremental parsing. Full parse on every run.
-- **serde derive on AST** — AST nodes don't need serialization. Only lx *values* do.
+| Crate | Purpose |
+|-------|---------|
+| `miette` + `thiserror` | Error diagnostics with source context |
+| `clap` v4 derive | CLI argument parsing |
+| `num-bigint` / `num-traits` / `num-integer` | Arbitrary-precision integers |
+| `indexmap` | Ordered maps (records, maps) |
+| `regex` | `r/pattern/` literals + `std/re` |
+| `serde_json` (preserve_order) | JSON conversion, agent/MCP protocol |
+| `pulldown-cmark` | `std/md` markdown parsing |
+| `reqwest` (blocking, json) | `std/mcp` HTTP transport, `std/http` |
+| `chrono` | `std/time` timestamp formatting/parsing |
+| `cron` | `std/cron` cron expression parsing + scheduling |
+| `strum` (derive) | Enum Display/IntoStaticStr derives |
+| `dashmap` | Concurrent registries (agent, mcp, tool defs, trace stores) |
+| `parking_lot` | Fast Mutex for Env, module cache |
 
 ## Data Flow
 
 ```
 source: &str
-  → Lexer → Vec<Token>        (or streaming iterator)
-  → Parser → Ast              (tree of Expr/Stmt nodes)
-  → Checker → Ast + TypeInfo  (bidirectional type inference, warnings)
-  → Interpreter → Value       (tree-walking execution)
+  → Lexer → Vec<Token>
+  → Parser → Ast
+  → Checker → Ast + TypeInfo  (optional, `lx check` only)
+  → Interpreter → Value       (tree-walking, receives &Arc<RuntimeCtx>)
 ```
-
-Each stage is a separate module. Each stage's output is the next stage's input. The checker is optional (`lx run` can skip it for speed; `lx check` runs it alone).
 
 ## Key Types
 
 ```
 Token { kind: TokenKind, span: Span }
 Span { offset: u32, len: u16 }
-Expr — enum of all expression forms (Literal, Binary, Pipe, Match, Shell, Par, Sel, ...)
-Stmt — Binding | ExprStmt
-Value — enum of runtime values (Int, Float, Str, Bool, List, Record, Map, Set, Tuple, Fn, ...)
-Env — scope chain (HashMap<String, Value> + parent pointer)
+Expr — enum of all expression forms (~30 variants)
+Value — enum of runtime values (~20 variants)
+Env — scope chain (HashMap<String, Value> + parent Arc)
+RuntimeCtx — backend traits (AI, HTTP, shell, emit, yield, log)
+BuiltinFn: fn(&[Value], Span, &Arc<RuntimeCtx>) -> Result<Value, LxError>
 ```
 
-`Expr` is the big enum — one variant per grammar production. `Value` is the runtime representation. The interpreter walks `Expr` and produces `Value`.
+## Scale
 
-## Concurrency Implementation
+~17800 lines of Rust across 2 crates: lexer, parser, checker, interpreter, AST, builtins, 29 stdlib modules, backends, CLI. 45 test files. 62 spec files.
 
-Currently **sequential**. `par { a; b; c }` evaluates each expression in order and collects results into a tuple. `sel` evaluates the first arm. `pmap f xs` maps sequentially. The syntax and semantics are in place — real async (tokio) is planned but not yet wired in.
+## Concurrency
 
-The interpreter's `eval` function is `fn eval(&mut self, expr: &SExpr) -> Result<Value, LxError>`. Synchronous.
+Currently **sequential**. `par`/`sel`/`pmap` evaluate in order. Real async (tokio) is planned.
 
-## Module Structure (Actual)
-
-```
-crates/lx/src/
-  lib.rs                        -- pub use of all modules
-  span.rs                       -- Span, source location types
-  token.rs                      -- TokenKind enum, Token struct
-  ast.rs                        -- Expr, Stmt, Pattern enums + UseStmt, UseKind
-  value.rs                      -- Value enum, structural equality, Display
-  env.rs                        -- Env scope chain (HashMap + parent Arc)
-  error.rs                      -- LxError type, diagnostic formatting
-  iterator.rs                   -- LxIter trait, IterSource (Nat/Cycle/Live)
-  lexer/mod.rs                  -- Lexer state machine (modes: normal, shell, regex, string interp)
-  lexer/numbers.rs              -- Number lexing
-  lexer/strings.rs              -- String/shell lexing with interpolation
-  parser/mod.rs                 -- Pratt parser, infix/postfix, use statements
-  parser/prefix.rs              -- Prefix parsing (literals, parens, sections, functions, shell)
-  parser/pattern.rs             -- Pattern parsing for match arms
-  interpreter/mod.rs            -- Tree-walking eval, stmt dispatch
-  interpreter/apply.rs          -- Function application, currying, pipes, sections, field access
-  interpreter/collections.rs    -- List/record/map/set/tuple evaluation
-  interpreter/modules.rs        -- Module loading, path resolution, export collection
-  interpreter/patterns.rs       -- Pattern matching
-  interpreter/shell.rs          -- Shell command execution via sh -c
-  builtins/mod.rs               -- Built-in registration, HOF helpers
-  builtins/str.rs               -- String functions
-  builtins/coll.rs              -- Collection functions
-  builtins/hof.rs               -- Higher-order functions (map, filter, fold, etc.)
-crates/lx-cli/src/main.rs      -- CLI: run, test (with subdirectory scanning)
-```
-
-Target: each file ≤300 lines. Files have been split to stay near this limit. `parser/mod.rs` (~300) is the largest.
-
-## Phased Build Plan
+## Build Phases
 
 See [implementation-phases.md](implementation-phases.md) for the detailed phase breakdown.

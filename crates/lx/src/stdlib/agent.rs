@@ -30,6 +30,20 @@ pub fn build() -> IndexMap<String, Value> {
     m.insert("name".into(), mk("agent.name", 1, bi_name));
     m.insert("status".into(), mk("agent.status", 1, bi_status));
     m.insert("reconcile".into(), super::agent_reconcile::mk_reconcile());
+    m.insert("intercept".into(), super::agent_intercept::mk_intercept());
+    m.insert("dialogue".into(), super::agent_dialogue::mk_dialogue());
+    m.insert(
+        "dialogue_turn".into(),
+        super::agent_dialogue::mk_dialogue_turn(),
+    );
+    m.insert(
+        "dialogue_history".into(),
+        super::agent_dialogue::mk_dialogue_history(),
+    );
+    m.insert(
+        "dialogue_end".into(),
+        super::agent_dialogue::mk_dialogue_end(),
+    );
     m
 }
 

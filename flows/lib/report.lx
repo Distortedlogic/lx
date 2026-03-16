@@ -1,0 +1,21 @@
+-- Report generation -- build structured markdown and write to file.
+-- Composes std/md into high-level operations: section, bullets, table.
+-- write: render full document to disk, return path.
+-- Used by: discovery_system, mcp_tool_audit, research, perf_analysis, post_hoc_review.
+
+use std/md
+use std/fs
+
++write = (path title sections) {
+  doc = md.doc [md.h1 title ..sections]
+  md.render doc | (out) fs.write path out ^
+  path
+}
+
++section = (heading blocks) [md.h2 heading ..blocks]
+
++text = (content) [md.para content]
+
++bullets = (items) [md.list items]
+
++table = (headers rows) [md.table headers rows]

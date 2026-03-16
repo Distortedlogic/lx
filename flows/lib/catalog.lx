@@ -1,0 +1,55 @@
+-- Canonical agent catalog — the single source of truth for all specialist agents.
+-- Each entry: name, domain, script path, terminal flag.
+-- Keyword-based routing: score prompt against domain keyword lists, pick best match.
+-- Used by: agent_lifecycle, defense_layers, subagent_fine_tuning.
+
+use std/re
+
+Protocol +Specialist = {
+  name: Str
+  domain: Str
+  script: Str
+  terminal: Bool
+}
+
++catalog = [
+  Specialist {name: "researcher"       domain: "research"     script: "agents/researcher.lx"       terminal: true}
+  Specialist {name: "context-engine"   domain: "codebase"     script: "agents/context_engine.lx"   terminal: true}
+  Specialist {name: "gritql"           domain: "ast-search"   script: "agents/gritql.lx"           terminal: true}
+  Specialist {name: "agent-auditor"    domain: "security"     script: "agents/agent_auditor.lx"    terminal: false}
+  Specialist {name: "research-analyst" domain: "research"     script: "agents/research_analyst.lx" terminal: false}
+  Specialist {name: "perf-analyzer"    domain: "performance"  script: "agents/perf_analyzer.lx"    terminal: false}
+  Specialist {name: "project-setup"    domain: "scaffolding"  script: "agents/project_setup.lx"    terminal: false}
+  Specialist {name: "tool-maker"       domain: "tool-gen"     script: "agents/tool_maker.lx"       terminal: false}
+  Specialist {name: "seeder"           domain: "seeding"      script: "agents/seeder.lx"           terminal: true}
+  Specialist {name: "teacher"          domain: "training"     script: "agents/teacher.lx"          terminal: false}
+]
+
++by_domain = (domain) catalog | find (s) s.domain == domain
+
++by_name = (name) catalog | find (s) s.name == name
+
+keywords = %{
+  "research": ["research" "compare" "investigate" "how do others"]
+  "codebase": ["our code" "codebase" "find where" "grep" "search"]
+  "security": ["audit" "injection" "stuck" "suspicious"]
+  "performance": ["slow" "latency" "perf" "benchmark" "rate limit"]
+  "scaffolding": ["new service" "setup" "scaffold" "create project"]
+  "tool-gen": ["tool gap" "missing tool" "generate tool" "build mcp"]
+}
+
++route = (prompt) {
+  scores = keywords | entries | map (domain, words) {
+    score = words | filter (w) re.is_match w (lower prompt) | len
+    {domain: domain  score: score}
+  }
+  best = scores | sort_by (.score) | rev | first
+  best ? {
+    Some b -> {
+      domain: b.domain
+      confidence: b.score > 2 ? 0.9 : (b.score > 0 ? 0.6 : 0.1)
+      specialist: by_domain b.domain
+    }
+    None -> {domain: "general"  confidence: 0.1  specialist: None}
+  }
+}

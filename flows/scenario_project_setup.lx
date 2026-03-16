@@ -1,23 +1,18 @@
--- GOAL: New service scaffolding with dependency-ordered steps.
--- Orchestrator (project-bootstrap) runs 5 steps in order:
---   Step 1: scaffold project (scaffolding specialist).
---   Step 2: create Forgejo repo (forgejo MCP).
---   Step 3: create database (postgresql MCP).
---   Step 4: add health monitor (uptime-kuma MCP).
---   Step 5: verify all resources exist.
--- Dependency order matters: repo before DB, DB before monitor, etc.
+-- GOAL: New service scaffolding with compensating rollback on failure.
+-- Multi-step setup as a saga (std/saga) -- automatic undo if any step fails:
+--   Step 1: scaffold project via scaffolder agent.
+--   Step 2: create Forgejo repo via forgejo MCP.
+--   Step 3: create database via postgresql MCP (conditional on config.db).
+--   Step 4: add health monitor via uptime-kuma MCP (conditional on config.monitoring).
+-- Each step has a compensate function: rm -rf, delete_repo, DROP DATABASE, etc.
+-- Conditional steps use list spreading: ..config.db ? {true -> [step]; false -> []}.
 -- Source: mcp-toolbelt/arch_diagrams/scenario_project_setup
 
-use std/agent
+use std/saga
 use std/mcp
-use std/json
+use ./lib/dispatch
 
-Protocol SetupConfig = {
-  name: Str
-  lang: Str
-  db: Bool
-  monitoring: Bool
-}
+Protocol SetupConfig = {name: Str  lang: Str  db: Bool  monitoring: Bool}
 
 +main = () {
   config = SetupConfig {
@@ -27,75 +22,56 @@ Protocol SetupConfig = {
     monitoring: true
   }
 
-  scaffolder = agent.spawn {command: "lx" args: ["run" "agents/scaffolder.lx"]} ^
   forgejo = mcp.connect {command: "forgejo-mcp" args: []} ^
   pg = mcp.connect {command: "postgresql-mcp" args: []} ^
+  db_name = config.name | replace "-" "_"
 
-  $echo "Step 1: Scaffold project..."
-  scaffold_result = scaffolder ~>? {
-    action: "scaffold"
-    name: config.name
-    lang: config.lang
-    template: "service"
-  } ^
-  $echo "  created {scaffold_result.path}"
-
-  $echo "Step 2: Create repository..."
-  repo = mcp.call forgejo "create_repo" {
-    name: config.name
-    description: "{config.name} service"
-    private: true
-  } ^
-  $echo "  repo: {repo.url}"
-
-  config.db ? {
-    true -> {
-      $echo "Step 3: Create database..."
-      mcp.call pg "execute" {
-        query: "CREATE DATABASE {config.name |  replace "-" "_"}"
-      } ^
-      $echo "  database created"
+  steps = [
+    {
+      name: "scaffold"
+      action: () dispatch.run_one "agents/scaffolder.lx" {
+        action: "scaffold"  name: config.name  lang: config.lang  template: "service"
+      }
+      compensate: (result) $^rm -rf {result.path}
     }
-    false -> $echo "Step 3: Skipping database (not requested)"
-  }
-
-  config.monitoring ? {
-    true -> {
-      $echo "Step 4: Add monitoring..."
-      monitor = mcp.connect {command: "uptime-kuma-mcp" args: []} ^
-      mcp.call monitor "add_monitor" {
-        name: config.name
-        url: "http://{config.name}:8080/health"
-        interval: 60
+    {
+      name: "repo"
+      action: () mcp.call forgejo "create_repo" {
+        name: config.name  description: "{config.name} service"  private: true
       } ^
-      mcp.close monitor
-      $echo "  health check monitor added"
+      compensate: () mcp.call forgejo "delete_repo" {name: config.name} ^
     }
-    false -> $echo "Step 4: Skipping monitoring"
-  }
-
-  $echo "\nStep 5: Verify setup..."
-  checks = [
-    ("repo" (mcp.call forgejo "get_repo" {name: config.name}))
-    ("scaffold" (fs.exists? scaffold_result.path))
+    ..config.db ? {
+      true -> [{
+        name: "database"
+        action: () mcp.call pg "execute" {query: "CREATE DATABASE {db_name}"} ^
+        compensate: () mcp.call pg "execute" {query: "DROP DATABASE IF EXISTS {db_name}"} ^
+      }]
+      false -> []
+    }
+    ..config.monitoring ? {
+      true -> [{
+        name: "monitoring"
+        action: () {
+          mon = mcp.connect {command: "uptime-kuma-mcp" args: []} ^
+          result = mcp.call mon "add_monitor" {
+            name: config.name  url: "http://{config.name}:8080/health"  interval: 60
+          } ^
+          mcp.close mon
+          result
+        }
+        compensate: () ()
+      }]
+      false -> []
+    }
   ]
-  failures = checks | filter (name, result) {
-    result ? {
-      Ok _ -> false
-      Err _ -> true
-      false -> true
-      _ -> false
-    }
+
+  result = saga.run steps
+  result ? {
+    Ok outcomes -> $echo "setup complete: {outcomes | map (.name) | join ", "}"
+    Err e -> $echo "setup failed at step '{e.step}': {e.error}"
   }
 
-  failures | empty? ? {
-    true -> $echo "all checks passed"
-    false -> {
-      failures | each (name, _) $echo "  FAIL: {name}"
-    }
-  }
-
-  agent.kill scaffolder ^
   mcp.close forgejo
   mcp.close pg
 }

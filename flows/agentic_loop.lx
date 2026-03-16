@@ -1,86 +1,45 @@
--- GOAL: Core ReAct agent loop (Thought → Action → Observation → loop or terminate).
--- Implements doom loop detection (tracks last 3 actions, detects repetition/stagnation).
--- Circuit breaker: hard limits at 25 turns, 300s timeout, token budget.
--- Verification loop: after each action, optionally verify the observation before continuing.
--- Plan-and-execute variant: decompose task → per-subtask ReAct → replan gate.
+-- GOAL: ReAct agent loop with session tracing and knowledge persistence.
+-- Delegates to lib/react for the core Thought -> Action -> Observation loop.
+-- Traces session outcome into std/trace for post-hoc analysis.
+-- Persists successful results to std/knowledge for cross-session compounding.
+-- This flow demonstrates: react engine + trace + knowledge composition.
 -- Source: mcp-toolbelt/arch_diagrams/agentic_loop
 
-use std/agent
-use std/json
-use std/ctx
-use std/time
-use std/re
-
-Protocol Thought = {reasoning: Str  action: Str  args: Record}
-Protocol Observation = {result: Any  success: Bool}
-
-max_turns = 25
-max_time_ms = 300000
+use std/trace
+use std/knowledge
+use ./lib/react
 
 +main = () {
   task = "fix the failing test in src/parser.rs"
 
-  worker = agent.spawn {command: "lx" args: ["run" "agents/react_worker.lx"]} ^
+  session = trace.create {name: "react-session"  source: task}
 
-  turn := 0
-  start = time.now ()
-  history := []
-  last_actions := []
-
-  result := loop {
-    turn <- turn + 1
-
-    elapsed = (time.now ()).ms - start.ms
-    turn > max_turns ? break (Err "circuit breaker: max turns ({max_turns})")
-    elapsed > max_time_ms ? break (Err "circuit breaker: timeout ({max_time_ms}ms)")
-
-    doom = detect_doom_loop last_actions
-    doom ? {
-      "stuck" -> break (Err "circuit breaker: doom loop detected — repeating actions")
-      "stagnating" -> {
-        worker ~>? {action: "hint" msg: "you seem stuck, try a different approach"} ^
-      }
-      _ -> ()
-    }
-
-    thought = worker ~>? {action: "think" task: task history: history} ^
-
-    thought.action == "done" ? break (Ok thought)
-
-    observation = worker ~>? {
-      action: "execute"
-      tool: thought.action
-      args: thought.args
-    } ^
-
-    history <- [..history {turn: turn  thought: thought  observation: observation}]
-
-    last_actions <- last_actions | len >= 3 ? {
-      true -> [..last_actions.1.. thought.action]
-      false -> [..last_actions thought.action]
-    }
-
-    !observation.success ? {
-      true -> {
-        verify = worker ~>? {action: "verify" observation: observation} ^
-        !verify.should_continue ? break (Err "verification failed: {verify.reason}")
-      }
-      false -> ()
-    }
+  result = react.run {
+    script: "agents/react_worker.lx"
+    task: task
+    max_turns: 25
+    max_time_ms: 300000
   }
 
-  agent.kill worker ^
-
   result ? {
-    Ok r -> $echo "completed in {turn} turns: {r.reasoning}"
-    Err e -> $echo "FAILED: {e}"
+    Ok r -> {
+      trace.record session {name: "complete"  input: task  output: r  success: true}
+      kb = knowledge.create {name: "react-results"}
+      knowledge.store kb task (to_str r) "react" {confidence: 0.8}
+      $echo "completed: {r.reasoning}"
+    }
+    Err e -> {
+      trace.record session {name: "failed"  input: task  output: e  success: false}
+      $echo "FAILED: {e}"
+    }
   }
 }
 
-detect_doom_loop = (actions) {
-  actions | len < 3 ? "ok" : {
-    actions.0 == actions.1 && actions.1 == actions.2 ? "stuck" : {
-      actions.0 == actions.2 ? "stagnating" : "ok"
-    }
++run = (task opts) {
+  react.run {
+    script: opts.script ?? "agents/react_worker.lx"
+    task: task
+    max_turns: opts.max_turns ?? 25
+    max_time_ms: opts.max_time_ms ?? 300000
   }
 }

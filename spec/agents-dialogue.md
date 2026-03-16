@@ -149,7 +149,7 @@ If the agent disconnects mid-dialogue, the next `dialogue_turn` returns `Err Dis
 
 ## Implementation Status
 
-Planned. Depends on `std/agent` subprocess protocol extension.
+Implemented. `crates/lx/src/stdlib/agent_dialogue.rs`. Tests: `tests/46_agent_dialogue.lx`. Session state stored in global `DashMap`. Supports both in-process agents (handler functions) and subprocess agents (__pid). Config accepts Record or () for defaults.
 
 ## Cross-References
 

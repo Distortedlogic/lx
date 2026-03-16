@@ -168,25 +168,7 @@ unsubscribe bus id             -- ()
 topics bus                     -- [Str] (all active topics)
 ```
 
-`Bus` is an opaque type. `SubId` is an opaque handle for unsubscribing. Handlers are `(msg) -> ()` functions invoked synchronously in subscription order.
-
-### Patterns
-
-Reactive multi-agent monitoring:
-```
-use std/events
-
-bus = events.create ()
-events.subscribe bus "file_changed" (evt) {
-  analyzer ~>? {path: evt.path action: "reanalyze"} ^
-}
-events.subscribe bus "test_failed" (evt) {
-  log.warn "test failed: {evt.name}"
-  notifier ~> {alert: evt.name}
-}
-
-fs_watcher ~>? {watch: "src/" bus}
-```
+`Bus` is an opaque type. Handlers are `(msg) -> ()` functions invoked synchronously in subscription order.
 
 ## std/budget
 
@@ -221,9 +203,11 @@ rank rep task_type             -- [{agent score}] (sorted best-first)
 
 `Rep` is an opaque file-backed type. EWMA per (agent, task_type) pair. Configurable `decay_half_life`. Spec: `spec/agents-reputation.md`.
 
-## std/trace extensions (planned)
+## std/trace extensions
 
-Causal chain queries via parent-child span trees. `trace.chain` walks from failure to root cause. `trace.improvement_rate`/`trace.should_stop` query scored progress spans.
+**Implemented:** `trace.improvement_rate N store` computes improvement rate over last N progress spans (spans named "progress" with score field). Returns `{avg_delta recent_delta trend samples}`. Trend is one of "improving"/"steady"/"diminishing"/"plateau"/"regressing"/"insufficient". `trace.should_stop {min_delta: Float window: Int} store` returns true if all deltas in the last `window` score changes are at or below `min_delta`. Spec: `spec/agents-progress.md`.
+
+**Planned:** Causal chain queries via parent-child span trees. `trace.chain` walks from failure to root cause.
 
 ## std/skill
 

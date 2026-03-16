@@ -20,7 +20,7 @@ Every rule in this file applies to all agents — main agent and subagents alike
 
 ## Code Style
 
-- **No code comments or doc strings** - this is a waste, dont do it.
+- **No code comments or doc strings** - this is a waste, dont do it. **Exception:** `flows/` and `flows/lib/` — lx program files use `--` header comments to document their goal, architecture, and source diagram. These headers are the only documentation for what each flow demonstrates and must be kept current.
 - **No redundant self-assignments** - Do not write or keep pointless rebindings like `let x = x;` / `let mut x = x;` (or `let x = (x);`). If mutability is needed, make the original binding `mut` or restructure the closure/capture.
 - **No extraneous free functions** - If a function takes a struct/enum as its first parameter or accesses that type's fields, implement it as a method on that type, not a free function. Only keep free functions for truly type-agnostic helpers that do not operate on a specific type.
 - **No inline import paths at call sites** - Do not use `module::path::Type` at call sites. Add a `use` statement at the top of the file and use the short name at the call site.

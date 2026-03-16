@@ -1,15 +1,15 @@
 -- GOAL: Multi-source research with parallel specialists and synthesis.
--- Orchestrator (research-analyst) plans research strategy, then fans out to 3 specialists:
---   research: web_search + web_fetch + summarize → external patterns and best practices.
---   context-engine: codebase_retrieval + repo_retrieval → our current approach and gaps.
---   github: code_search + list_repos → OSS implementations and libraries.
--- Synthesis: combine external + internal + OSS → compare & contrast → recommendation report.
+-- Fan-out to 3 specialists via dispatch.run_one, parallel via par:
+--   researcher: web search -> external patterns and best practices.
+--   context-engine: codebase retrieval -> current approach and gaps.
+--   github-search: code search -> OSS implementations and libraries.
+-- Merge via agent.reconcile (merge_fields). Synthesis picks best OSS or external patterns.
+-- Output: markdown report via lib/report with findings, gap analysis, OSS table.
 -- Source: mcp-toolbelt/arch_diagrams/scenario_research
 
 use std/agent
-use std/json
-use std/mcp
-use std/md
+use ./lib/dispatch
+use ./lib/report
 
 Protocol ResearchRequest = {topic: Str  compare_to: Str  find_oss: Bool}
 
@@ -20,42 +20,40 @@ Protocol ResearchRequest = {topic: Str  compare_to: Str  find_oss: Bool}
     find_oss: true
   }
 
-  researcher = agent.spawn {command: "lx" args: ["run" "agents/researcher.lx"]} ^
-  ctx_engine = agent.spawn {command: "lx" args: ["run" "agents/context_engine.lx"]} ^
-  gh_search = agent.spawn {command: "lx" args: ["run" "agents/github_search.lx"]} ^
-
-  (external internal oss) = par {
-    researcher ~>? {action: "search" topic: request.topic} ^
-    ctx_engine ~>? {action: "search" path: request.compare_to topic: request.topic} ^
-    gh_search ~>? {action: "search" query: request.topic lang: "rust"} ^
+  (external, internal, oss) = par {
+    dispatch.run_one "agents/researcher.lx" {action: "search"  topic: request.topic}
+    dispatch.run_one "agents/context_engine.lx" {action: "search"  path: request.compare_to  topic: request.topic}
+    dispatch.run_one "agents/github_search.lx" {action: "search"  query: request.topic  lang: "rust"}
   }
 
-  report = md.doc [
-    md.h1 "Research: {request.topic}"
-    md.h2 "External Findings"
-    md.list (external.findings | map (.summary))
-    md.h2 "Our Codebase"
-    md.para "Current approach: {internal.summary}"
-    md.list (internal.gaps | map (g) "GAP: {g}")
-    md.h2 "OSS Libraries"
-    md.table
-      ["Name" "Stars" "License" "Fit"]
-      (oss.repos | map (r) [r.name (to_str r.stars) r.license r.fit])
-    md.h2 "Recommendation"
-    md.para (synthesize external internal oss)
+  merged = agent.reconcile [external internal oss] {
+    strategy: "merge_fields"
+  }
+
+  report.write "research_report.md" "Research: {request.topic}" [
+    ..report.section "External Findings" [
+      ..report.bullets (external.findings | map (.summary))
+    ]
+    ..report.section "Our Codebase" [
+      ..report.text "Current approach: {internal.summary}"
+      ..report.bullets (internal.gaps | map (g) "GAP: {g}")
+    ]
+    ..report.section "OSS Libraries" [
+      ..report.table
+        ["Name" "Stars" "License" "Fit"]
+        (oss.repos | map (r) [r.name (to_str r.stars) r.license r.fit])
+    ]
+    ..report.section "Recommendation" [
+      ..report.text (synthesize external oss)
+    ]
   ]
 
-  md.render report | (out) fs.write "research_report.md" out ^
   $echo "research report written to research_report.md"
-
-  agent.kill researcher ^
-  agent.kill ctx_engine ^
-  agent.kill gh_search ^
 }
 
-synthesize = (external internal oss) {
-  best_oss = oss.repos | filter (r) r.fit == "high" | first
-  best_oss ? {
+synthesize = (external oss) {
+  best = oss.repos | filter (r) r.fit == "high" | first
+  best ? {
     Some lib -> "Use {lib.name} ({lib.license}). Covers {external.findings | len} patterns we're missing."
     None -> "No strong OSS match. Implement based on external patterns: {external.findings.0.summary}"
   }

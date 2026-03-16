@@ -1,54 +1,56 @@
 -- GOAL: Performance analysis via 5 parallel domain specialists.
--- Orchestrator (code-perf) fans out to: perf-db, perf-memory, perf-compute, perf-threading, perf-network.
--- Each specialist analyzes its domain, returns findings with severity + location + fix.
--- Aggregation: collect findings, resolve conflicts (same location, different fixes), prioritize.
+-- Fan-out to: perf-db, perf-memory, perf-compute, perf-threading, perf-network.
+-- Each specialist returns findings with severity + location + fix.
+-- Aggregation via agent.reconcile (union): dedup by location, keep higher severity.
+-- Conflict detection: same location, different fixes from different domains.
+-- Output: severity-sorted findings + markdown report via lib/report.
 -- Source: mcp-toolbelt/arch_diagrams/scenario_perf_analysis
 
 use std/agent
-use std/json
+use ./lib/dispatch
+use ./lib/report
 
-Protocol PerfRequest = {path: Str  concern: Str}
 Protocol PerfFinding = {domain: Str  severity: Str  location: Str  issue: Str  fix: Str}
 
 domains = ["db" "memory" "compute" "threading" "network"]
 
 +main = () {
-  request = PerfRequest {path: "src/" concern: "high latency on API endpoints"}
+  path = "src/"
+  concern = "high latency on API endpoints"
 
-  specialists = domains | map (d) {
-    agent.spawn {command: "lx" args: ["run" "agents/perf_{d}.lx"]} ^
+  results = domains | pmap (d) {
+    dispatch.run_one "agents/perf_{d}.lx" {path: path  concern: concern  domain: d}
   }
 
-  results = specialists
-    | zip domains
-    | pmap (agent, domain) {
-      agent ~>? {path: request.path concern: request.concern domain: domain} ^
+  merged = agent.reconcile results {
+    strategy: "union"
+    key: (r) r.location ?? "global"
+    flatten: "findings"
+    conflict: (a b) a.severity < b.severity ? b : a
+  }
+
+  findings = merged.merged | sort_by (.severity) | rev
+
+  conflict_notes = merged.conflicts | map (c) {
+    "CONFLICT at {c.key}: {c.values | map (.fix) | join " vs "}"
+  }
+
+  finding_rows = findings | map (f) [f.severity f.domain f.location f.issue f.fix]
+
+  report.write "perf_report.md" "Performance Analysis: {concern}" [
+    ..report.text "Path: {path} | {findings | len} findings across {domains | len} domains"
+    ..report.section "Findings" [
+      ..report.table ["Severity" "Domain" "Location" "Issue" "Fix"] finding_rows
+    ]
+    ..conflict_notes | empty? ? {
+      false -> report.section "Conflicts" [..report.bullets conflict_notes]
+      true -> []
     }
+  ]
 
-  findings = results | flat_map (.findings)
-    | sort_by (.severity)
-    | rev
-
-  conflicts = find_conflicts findings
-  conflicts | each (c) {
-    $echo "CONFLICT: {c.a.domain} says '{c.a.fix}' but {c.b.domain} says '{c.b.fix}'"
-  }
-
-  $echo "\n=== Performance Analysis ==="
-  $echo "Concern: {request.concern}"
-  $echo "Findings: {findings | len}"
   findings | each (f) {
-    $echo "[{f.severity}] {f.domain}: {f.location} — {f.issue}"
-    $echo "  Fix: {f.fix}"
+    $echo "[{f.severity}] {f.domain}: {f.location} -- {f.issue}"
   }
-
-  specialists | each (a) agent.kill a ^
-}
-
-find_conflicts = (findings) {
-  findings | flat_map (a) {
-    findings | filter (b) {
-      a.location == b.location && a.domain != b.domain && a.fix != b.fix
-    } | map (b) {conflict: true  a: a  b: b}
-  }
+  $echo "\n{findings | len} findings, {merged.conflicts | len} conflicts"
+  $echo "report written to perf_report.md"
 }

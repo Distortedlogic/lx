@@ -69,6 +69,12 @@ enum Expr {
 
     Stream { agent: Box<SExpr>, msg: Box<SExpr> },
     Checkpoint { name: String, body: Vec<Spanned<Stmt>> },
+
+    AgentSend { agent: Box<SExpr>, msg: Box<SExpr> },
+    AgentAsk { agent: Box<SExpr>, msg: Box<SExpr> },
+    FieldUpdate { target: String, fields: Vec<String>, value: Box<SExpr> },
+    With { bindings: Vec<WithBinding>, body: Vec<Spanned<Stmt>> },
+    Refine { expr: Box<SExpr>, config: Box<SExpr> },
 }
 ```
 
@@ -274,6 +280,14 @@ enum UnaryOp { Neg, Not }
 `Stream` is the AST node for `~>>?`. Distinct from `Binary` because streaming has different runtime semantics (returns a lazy iterator, not a single value).
 
 `Checkpoint` captures the checkpoint name (string literal) and block body. `rollback` is a built-in function that triggers a `BreakSignal`-like mechanism targeting the named checkpoint.
+
+`AgentSend` (`~>`) and `AgentAsk` (`~>?`) are distinct AST nodes (not Binary) because agent communication has different runtime semantics — subprocess I/O, JSON-line protocol, response handling.
+
+`FieldUpdate` (`name.field <- value`) requires a mutable `:=` binding. `fields` is a path supporting nested access (`name.a.b <- value`).
+
+`With` captures scoped bindings and a body block. Returns the body's last value. Each `WithBinding` has name, mutability flag, and value expression.
+
+`Refine` captures the initial expression and a config record expression (parsed at runtime for `grade`, `revise`, `threshold`, `max_rounds`, `on_round`).
 
 ## Cross-References
 

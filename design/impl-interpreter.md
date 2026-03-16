@@ -12,6 +12,7 @@ The interpreter is `fn eval(&mut self, expr: &SExpr) -> Result<Value, LxError>`.
 struct Interpreter {
     env: Arc<Env>,
     source: Arc<str>,
+    ctx: Arc<RuntimeCtx>,
 }
 ```
 
@@ -19,26 +20,11 @@ struct Interpreter {
 
 ```rust
 enum Value {
-    Int(BigInt),
-    Float(f64),
-    Bool(bool),
-    Str(Arc<str>),
-    Regex(Arc<regex::Regex>),
-    Unit,
-
-    List(Arc<Vec<Value>>),
-    Record(Arc<IndexMap<String, Value>>),
-    Map(Arc<IndexMap<ValueKey, Value>>),
-    Tuple(Arc<Vec<Value>>),
-
-    Func(LxFunc),
-    BuiltinFunc(BuiltinFunc),
-
-    Ok(Box<Value>),
-    Err(Box<Value>),
-    Some(Box<Value>),
-    None,
-
+    Int(BigInt), Float(f64), Bool(bool), Str(Arc<str>), Regex(Arc<regex::Regex>), Unit,
+    List(Arc<Vec<Value>>), Record(Arc<IndexMap<String, Value>>),
+    Map(Arc<IndexMap<ValueKey, Value>>), Tuple(Arc<Vec<Value>>),
+    Func(LxFunc), BuiltinFunc(BuiltinFunc),
+    Ok(Box<Value>), Err(Box<Value>), Some(Box<Value>), None,
     Tagged { tag: Arc<str>, values: Arc<Vec<Value>> },
     TaggedCtor { tag: Arc<str>, arity: usize, applied: Vec<Value> },
     Range { start: i64, end: i64, inclusive: bool },
@@ -74,7 +60,7 @@ struct LxFunc {
 struct BuiltinFunc {
     name: &'static str,
     arity: usize,
-    func: fn(&[Value], Span) -> Result<Value, LxError>,
+    func: fn(&[Value], Span, &Arc<RuntimeCtx>) -> Result<Value, LxError>,
     applied: Vec<Value>,
 }
 ```
@@ -116,7 +102,7 @@ When applying a function with arity N to a single tuple of size N, the tuple is 
 
 `eval_shell(ShellExpr)`:
 1. Evaluate interpolation holes and concatenate into a command string
-2. Spawn via `std::process::Command::new("sh").arg("-c").arg(&cmd_str)`
+2. Spawn via `ShellBackend::exec()` on `RuntimeCtx` (default: `sh -c`)
 3. Capture stdout, stderr, exit code
 4. `$cmd`: return `Ok({out err code})` or `Err(msg)`
 5. `$^cmd`: exit 0 → `Ok(stdout)`, else `Err({msg code})`
@@ -136,6 +122,38 @@ When applying a function with arity N to a single tuple of size N, the tuple is 
 
 `par`, `sel`, `pmap`, `pmap_n`, `timeout` are implemented but **sequential**. `par` evaluates each statement in order and collects results into a tuple. Real async (tokio) is planned.
 
+### Agent Communication
+
+`eval(AgentSend { agent, msg })`: evaluate agent and msg, send message via agent protocol (subprocess stdin JSON-line or in-process handler). Fire-and-forget, returns `Unit`.
+
+`eval(AgentAsk { agent, msg })`: send message and wait for response. Returns the response value. Composes with `^` and `|`.
+
+### With (scoped bindings)
+
+`eval(With { bindings, body })`:
+1. Create child env
+2. Evaluate each binding and insert into child env
+3. Evaluate body in child env
+4. Return body's last value
+
+### Field Update
+
+`eval(FieldUpdate { target, field, value })`:
+1. Look up `target` in env (must be mutable `:=` binding)
+2. Clone the record, insert/replace `field` with evaluated `value`
+3. Replace the binding in env with the updated record
+
+### Refine
+
+`eval(Refine { expr, grade, revise, threshold, max_rounds, on_round })`:
+1. Evaluate initial `expr` → `work`
+2. Loop up to `max_rounds`:
+   a. Call `grade(work)` → must return record with `.score` field
+   b. If `score >= threshold` → return `Ok {work rounds final_score}`
+   c. If `on_round` provided, call `on_round(round, work, score)`
+   d. Call `revise(work)` → `work`
+3. If loop exhausts → return `Err {work rounds final_score reason: "max rounds"}`
+
 ### Checkpoint / Rollback
 
 `eval(Checkpoint { name, body })`:
@@ -144,27 +162,17 @@ When applying a function with arity N to a single tuple of size N, the tuple is 
 3. If `rollback name` is called (via `RollbackSignal`), restore the snapshot and return `Err {rolled_back: name}`
 4. If body completes normally, discard snapshot and return the result
 
-`rollback` is a built-in function that emits a `RollbackSignal` (similar to `BreakSignal`). Only valid inside a matching `checkpoint` block.
-
 ### Stream (`~>>?`)
 
 `eval(Stream { agent, msg })`:
 1. Evaluate `agent` and `msg`
 2. Send the message to the agent
-3. Return a lazy `Value::List` that reads incremental `yield` responses from the agent until the agent completes or errors
-4. Currently sequential (returns collected list). Real streaming depends on async runtime.
+3. Return a collected `Value::List` of incremental responses
+4. Currently sequential. Real streaming depends on async runtime.
 
-### Emit
+### Emit — NOT YET IMPLEMENTED
 
-`eval(Emit { value })`:
-1. Evaluate `value`
-2. If `emit_handler` is set, call it with the value. Handler signature: `Arc<dyn Fn(Value, Span) -> Result<(), LxError>>`
-3. If no handler: `println!` for `Value::Str`, `serde_json::to_string` for structured values
-4. Return `Value::Unit`
-
-Unlike `YieldHandler`, `EmitHandler` returns `Result<(), LxError>` (not `Result<Value, LxError>`) — emit is fire-and-forget, no response is expected.
-
-In subprocess agent mode, the default handler writes `{"type":"emit","value":...}` as a JSON-line to stdout, consistent with the agent JSON-line protocol.
+`EmitBackend` trait exists on `RuntimeCtx` but `emit` is not yet a keyword in the AST/parser. Currently agents use `$echo` or `log.info` for output. Adding `emit` as an AST node + parser keyword is a planned feature.
 
 ## Division and Index Panics
 
@@ -176,3 +184,4 @@ Division by zero (`/`, `//`, `%`) is a runtime panic. For safe alternatives: `ma
 - Built-in functions: [impl-builtins.md](impl-builtins.md)
 - Stdlib modules: [impl-stdlib.md](impl-stdlib.md)
 - Shell spec: [shell.md](../spec/shell.md)
+- Runtime backends: [runtime-backends.md](../spec/runtime-backends.md)

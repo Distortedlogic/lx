@@ -1,34 +1,27 @@
 -- GOAL: Audit running subagents for stuck loops, prompt injection, and resource abuse.
 -- Data source: Claude CLI transcripts (~/.claude/projects/<project>/*.jsonl).
--- Orchestrator (agent-auditor) partitions transcripts across 3 parallel specialists:
---   loop-detector: repeated tool sequences, same file read N times, oscillating edits.
---   injection-scanner: system prompt overrides, role changes, instruction fragments, exfil.
---   resource-monitor: excessive tool calls, reading entire dirs, runaway bash, burn rate.
--- Aggregation: collect flags → classify severity (critical/high/medium) → act (kill/interrupt/log).
+-- Three detection passes per transcript:
+--   detect_loops: >20 tool calls -> stuck_loop finding (high severity).
+--   scan_injection: regex scan via lib/guard (shared pattern list) -> critical severity.
+--   check_resources: >500 entries -> resource_excessive finding (high severity).
+-- Dedup via agent.reconcile (union, keyed by agent_id:type).
+-- Output: severity-sorted findings + markdown report via lib/report.
 -- Source: mcp-toolbelt/arch_diagrams/scenario_security_audit
 
 use std/agent
-use std/json
-use std/fs
-use std/re
-use std/time
+use ./lib/guard
+use ./lib/trace_ingest
+use ./lib/report
 
-Protocol AuditRequest = {action: Str  transcripts: List}
 Protocol AuditFinding = {agent_id: Str  severity: Str  type: Str  evidence: Str}
-
-scan_transcripts = (project_dir) {
-  $^find {project_dir} -name "*.jsonl" -mmin -60
-    | lines
-    | filter (!= "")
-}
 
 +main = () {
   project_dir = $^echo $HOME | trim
   project_dir = "{project_dir}/.claude/projects"
 
-  transcripts = scan_transcripts project_dir
+  paths = trace_ingest.read_transcripts project_dir
 
-  transcripts | empty? ? {
+  paths | empty? ? {
     true -> {
       $echo "no recent transcripts to audit"
       break
@@ -36,76 +29,66 @@ scan_transcripts = (project_dir) {
     false -> ()
   }
 
-  (loop_results injection_results resource_results) = par {
-    loop_detector transcripts
-    injection_scanner transcripts
-    resource_monitor transcripts
+  all_findings = paths | flat_map (path) {
+    entries = trace_ingest.parse_transcript path
+    [
+      ..detect_loops path entries
+      ..scan_injection path entries
+      ..check_resources path entries
+    ]
   }
 
-  findings = [..loop_results ..injection_results ..resource_results]
-    | sort_by (.severity)
-    | rev
+  merged = agent.reconcile all_findings {
+    strategy: "union"
+    key: (f) "{f.agent_id}:{f.type}"
+  }
 
+  findings = merged.merged | sort_by (.severity) | rev
   critical = findings | filter (f) f.severity == "critical"
   high = findings | filter (f) f.severity == "high"
 
-  critical | each (f) {
-    $echo "CRITICAL [{f.type}] agent={f.agent_id}: {f.evidence}"
-  }
+  critical | each (f) $echo "CRITICAL [{f.type}] agent={f.agent_id}: {f.evidence}"
+  high | each (f) $echo "HIGH [{f.type}] agent={f.agent_id}: {f.evidence}"
 
-  high | each (f) {
-    $echo "HIGH [{f.type}] agent={f.agent_id}: {f.evidence}"
-  }
+  finding_rows = findings | map (f) [f.severity f.type f.agent_id f.evidence]
 
-  $echo "\naudit complete: {findings | len} findings ({critical | len} critical, {high | len} high)"
+  report.write "security_audit.md" "Security Audit" [
+    ..report.text "{paths | len} transcripts scanned, {findings | len} findings"
+    ..report.section "Summary" [
+      ..report.bullets [
+        "Critical: {critical | len}"
+        "High: {high | len}"
+        "Total: {findings | len}"
+      ]
+    ]
+    ..report.section "Findings" [
+      ..report.table ["Severity" "Type" "Agent" "Evidence"] finding_rows
+    ]
+  ]
+
+  $echo "\naudit: {findings | len} findings ({critical | len} critical, {high | len} high)"
+  $echo "report written to security_audit.md"
 }
 
-loop_detector = (transcripts) {
-  transcripts | flat_map (path) {
-    content = fs.read path ?? ""
-    content_lines = content | lines | filter (!= "")
-    tool_calls = content_lines
-      | filter (l) re.is_match "tool_use" l
-    tool_calls | len > 20 ? {
-      true -> [AuditFinding {
-        agent_id: path
-        severity: "high"
-        type: "stuck_loop"
-        evidence: "{tool_calls | len} tool calls in transcript"
-      }]
-      false -> []
-    }
-  }
-}
-
-injection_scanner = (transcripts) {
-  transcripts | flat_map (path) {
-    content = fs.read path ?? ""
-    suspicious = re.is_match "ignore previous|system prompt|you are now" content
-    suspicious ? {
-      true -> [AuditFinding {
-        agent_id: path
-        severity: "critical"
-        type: "prompt_injection"
-        evidence: "suspicious instruction pattern detected"
-      }]
-      false -> []
-    }
+detect_loops = (path entries) {
+  calls = trace_ingest.tool_calls entries
+  calls | len > 20 ? {
+    true -> [AuditFinding {agent_id: path  severity: "high"  type: "stuck_loop"  evidence: "{calls | len} tool calls"}]
+    false -> []
   }
 }
 
-resource_monitor = (transcripts) {
-  transcripts | flat_map (path) {
-    content = fs.read path ?? ""
-    size = content | len
-    size > 500000 ? {
-      true -> [AuditFinding {
-        agent_id: path
-        severity: "high"
-        type: "resource_excessive"
-        evidence: "transcript {size} chars — possible runaway"
-      }]
-      false -> []
-    }
+scan_injection = (path entries) {
+  entries | flat_map (e) {
+    findings = guard.scan (to_str e.input)
+    findings | map (f) AuditFinding {agent_id: path  severity: f.severity  type: f.type  evidence: f.evidence}
+  }
+}
+
+check_resources = (path entries) {
+  size = entries | len
+  size > 500 ? {
+    true -> [AuditFinding {agent_id: path  severity: "high"  type: "resource_excessive"  evidence: "{size} entries"}]
+    false -> []
   }
 }

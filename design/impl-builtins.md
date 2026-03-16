@@ -6,7 +6,7 @@ Implements: [stdlib.md](../spec/stdlib.md), [iteration.md](../spec/iteration.md)
 
 ## Registration
 
-Built-in functions are registered in the root `Env` before user code runs. Each built-in is a `BuiltinFunc` value with the signature `fn(&[Value], Span) -> Result<Value, LxError>`.
+Built-in functions are registered in the root `Env` before user code runs. Each built-in is a `BuiltinFunc` value with the signature `fn(&[Value], Span, &Arc<RuntimeCtx>) -> Result<Value, LxError>`. The `RuntimeCtx` parameter provides access to backend traits (AI, HTTP, shell, emit, yield, log) — most builtins ignore it (use `_ctx`) but I/O builtins dispatch through it.
 
 Built-ins use the same currying mechanism as user functions. `map f` returns a partially-applied `BuiltinFunc` waiting for its second argument.
 

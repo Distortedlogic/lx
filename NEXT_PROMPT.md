@@ -25,7 +25,7 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 
 ## Current State
 
-`just diagnose` clean. `just test`: **44/44 PASS**. All core language features and stdlib modules implemented. `RuntimeCtx` backend refactor complete. `refine` expression implemented. `agent.reconcile` implemented.
+`just diagnose` clean. `just test`: **47/47 PASS**. All core language features and stdlib modules implemented. `RuntimeCtx` backend refactor complete. `refine` expression implemented. `agent.reconcile` implemented. `trace.improvement_rate` / `trace.should_stop` implemented. `agent.dialogue` / `agent.dialogue_turn` / `agent.dialogue_history` / `agent.dialogue_end` implemented. `agent.intercept` implemented.
 
 ### What's implemented
 
@@ -49,11 +49,12 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 **29 stdlib modules:**
 - Data: `std/json`, `std/md`, `std/re`, `std/math`, `std/time`
 - System: `std/fs`, `std/env`, `std/http`
-- Communication: `std/agent` (incl. `agent.reconcile`), `std/mcp`, `std/ai`
-- Orchestration: `std/ctx`, `std/cron`, `std/tasks`, `std/audit`, `std/circuit`, `std/plan`, `std/saga`
+- Communication: `std/agent` (incl. `agent.reconcile`, `agent.dialogue`, `agent.intercept`), `std/mcp`, `std/ai`
+- Scheduling: `std/cron` (cron expressions, intervals, one-shot timers, fire-time queries)
+- Orchestration: `std/ctx`, `std/tasks`, `std/audit`, `std/circuit`, `std/plan`, `std/saga`
 - Intelligence: `std/knowledge`, `std/introspect`
 - Standard agents: `std/agents/auditor`, `std/agents/router`, `std/agents/grader`, `std/agents/planner`, `std/agents/monitor`, `std/agents/reviewer`
-- Infrastructure: `std/memory`, `std/trace`
+- Infrastructure: `std/memory`, `std/trace` (incl. `trace.improvement_rate`, `trace.should_stop`)
 - Visualization: `std/diag`
 
 **Key stdlib details:**
@@ -68,6 +69,8 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 - Multi-agent transactions (`std/saga`): `saga.run` executes steps in order with compensating undo on failure. `saga.run_with` adds options (timeout, max_retries, on_compensate callback). `saga.define`/`saga.execute` for reusable saga definitions with initial context. Supports dependency ordering.
 - Program visualization (`std/diag`): AST walker extracts workflow graph (agents, messages, control flow), emits Mermaid flowchart. `lx diagram file.lx` CLI subcommand + `diag.extract`/`diag.to_mermaid` library API
 - Result reconciliation (`agent.reconcile`): structured merging of parallel results — 6 strategies (union, intersection, vote, highest_confidence, max_score, merge_fields) + custom Fn. Vote supports quorum (unanimous/majority/any/N), weighted voting. Union/intersection use key fn + conflict resolution. Returns `{merged sources conflicts dropped rounds dissenting}`
+- Multi-turn dialogue (`agent.dialogue`): stateful conversation sessions with context accumulation. `agent.dialogue agent config` creates session, `agent.dialogue_turn session msg` sends turn with accumulated history, `agent.dialogue_history session` returns history, `agent.dialogue_end session` closes. Config: `{role? context? max_turns?}`. Subsumes negotiation pattern. Handler receives `{type content history session_id role? context?}`
+- Message middleware (`agent.intercept`): `agent.intercept agent (msg next) { ... }` returns a new agent with middleware applied. `next msg` forwards to original agent. Composable by chaining. Short-circuit by not calling next. Applies to both `~>` and `~>?`. Original agent unchanged (immutable)
 
 **Runtime backends (`RuntimeCtx`):**
 - All I/O-touching builtins receive `&Arc<RuntimeCtx>` — backend traits for AI, HTTP, shell, emit, yield, logging
@@ -83,7 +86,6 @@ You own this language. Change spec, design, tests, flows, Rust code freely. Only
 These have specs in `spec/` but no Rust implementation yet:
 
 - `emit` agent-to-human output: fire-and-forget, replaces `$echo` for user-facing output
-- `agent.dialogue` / `agent.dialogue_turn` — multi-turn sessions (subsumes negotiation pattern)
 - `agent.intercept` — message middleware (tracing, rate-limiting, transformation)
 - `Handoff` Protocol + `agent.as_context` — structured context transfer convention (not a function)
 - `|>>` streaming pipe — reactive dataflow, lazy until consumed
@@ -94,7 +96,6 @@ These have specs in `spec/` but no Rust implementation yet:
 - `agent.capabilities` — runtime capability discovery via `Capabilities` protocol
 - `_priority` field on messages — binary (`:critical` or default), not 4-level
 - `agent.reconcile` deliberation — re-ask agents when quorum not met (requires agent refs in results)
-- `trace.improvement_rate` / `trace.should_stop` — gradient progress tracking via trace spans
 - `workflow.peers` / `workflow.share` — passive sibling visibility in `par` (convenience over blackboard)
 - `Goal`/`Task` standard Protocols — convention, no wrapper functions
 - Deadlock detection: runtime wait-for graph, cycle detection on `~>?`, `DeadlockErr`
@@ -133,14 +134,11 @@ These have specs in `spec/` but no Rust implementation yet:
 
 Full plan: `design/stdlib_roadmap.md`. Specs for all planned features are in `spec/`.
 
-### Completed stdlib roadmap items (1-21):
+### Completed stdlib roadmap items (1-24):
 
-All 18 stdlib items + RuntimeCtx backend refactor + `refine` expression + `agent.reconcile` done: std/ai, std/tasks, std/audit, std/circuit, std/knowledge, std/plan, std/introspect, std/agents/auditor, std/agents/router, std/agents/grader, std/agents/planner, std/memory, std/trace, std/agents/monitor, std/agents/reviewer, MCP Embeddings (typed decl), std/diag, std/saga, RuntimeCtx backends, `refine`, `agent.reconcile`.
+All 18 stdlib items + RuntimeCtx backend refactor + `refine` expression + `agent.reconcile` + `trace.improvement_rate`/`trace.should_stop` + `agent.dialogue` + `agent.intercept` done.
 
 ### Next priorities (pick from these):
-22. **`trace.improvement_rate` / `trace.should_stop`** — Extension to `std/trace`. Gradient progress tracking via scored trace spans. Spec: `spec/agents-progress.md`.
-23. **`agent.dialogue`** — Extension to `std/agent`. Multi-turn sessions. Subsumes negotiation pattern. Spec: `spec/agents-dialogue.md`.
-24. **`agent.intercept`** — Extension to `std/agent`. Message middleware. Spec: `spec/agents-intercept.md`.
 25. **`Handoff` Protocol + `agent.as_context`** — Protocol convention + formatting helper in `std/agent`. Spec: `spec/agents-handoff.md`.
 26. **`|>>` streaming pipe** — New operator. Reactive dataflow. Spec: `spec/concurrency-reactive.md`. Requires parser + interpreter changes.
 27. **`agent.supervise` + `agent.gate` + `agent.capabilities`** — Extensions to `std/agent`. Spec: `spec/agents-supervision.md`, `spec/agents-gates.md`, `spec/agents-capability.md`.
@@ -181,12 +179,12 @@ crates/lx/src/
   checker/   mod.rs, synth.rs, types.rs
   interpreter/ mod.rs, agents.rs, apply.rs, collections.rs, eval.rs, modules.rs, patterns.rs, refine.rs, shell.rs
   builtins/  mod.rs, call.rs, str.rs, coll.rs, hof.rs, hof_extra.rs
-  stdlib/    mod.rs, agent.rs, agent_reconcile.rs, agent_reconcile_strat.rs, agents_auditor.rs, agents_grader.rs, agents_monitor.rs, agents_planner.rs, agents_reviewer.rs, agents_router.rs, ai.rs, audit.rs, circuit.rs, diag.rs, diag_walk.rs, introspect.rs, knowledge.rs, memory.rs, plan.rs, saga.rs, tasks.rs, trace.rs, json.rs, json_conv.rs, ctx.rs, math.rs, fs.rs, env.rs, re.rs, md.rs, md_build.rs, mcp.rs, mcp_rpc.rs, mcp_stdio.rs, mcp_http.rs, http.rs, time.rs, cron.rs
+  stdlib/    mod.rs, agent.rs, agent_dialogue.rs, agent_reconcile.rs, agent_reconcile_strat.rs, agents_auditor.rs, agents_grader.rs, agents_monitor.rs, agents_planner.rs, agents_reviewer.rs, agents_router.rs, ai.rs, audit.rs, circuit.rs, diag.rs, diag_walk.rs, introspect.rs, knowledge.rs, memory.rs, plan.rs, saga.rs, tasks.rs, trace.rs, trace_progress.rs, trace_query.rs, json.rs, json_conv.rs, ctx.rs, math.rs, fs.rs, env.rs, re.rs, md.rs, md_build.rs, mcp.rs, mcp_rpc.rs, mcp_stdio.rs, mcp_http.rs, http.rs, time.rs, cron.rs
   ast.rs, token.rs, value.rs, value_display.rs, env.rs, error.rs, span.rs, lib.rs
 crates/lx-cli/src/main.rs
 spec/          62 language spec files
 design/        11 impl design docs + DEVLOG + CURRENT_OPINION
-tests/         44 .lx test files
+tests/         45 .lx test files
   fixtures/    agent_echo.lx, mcp_test_server.py, yield_orchestrator.py, etc.
 flows/         14 .lx programs translating arch_diagrams
   specs/       14 target goal + scenario specs
@@ -205,6 +203,7 @@ flows/         14 .lx programs translating arch_diagrams
 | `pulldown-cmark` | `std/md` markdown parsing |
 | `reqwest` (blocking, json) | `std/mcp` HTTP transport, `std/http` |
 | `chrono` | `std/time` timestamp formatting/parsing |
+| `cron` | `std/cron` cron expression parsing + scheduling |
 | `strum` (derive) | Enum Display/IntoStaticStr derives |
 | `dashmap` | Concurrent registries (agent, mcp, tool defs) |
 | `parking_lot` | Fast Mutex for Env, module cache |

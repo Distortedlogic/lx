@@ -1,0 +1,63 @@
+-- Prompt injection detection + composable guard wrappers.
+-- check: fast pass/fail regex scan against known injection patterns.
+-- scan: detailed Finding records for each match.
+-- run_parallel: concurrent guard + agent execution, block on failure.
+-- run_blocking: guard first, agent only if passed.
+-- Used by: defense_layers, scenario_security_audit.
+
+use std/re
+
+Protocol +GuardResult = {pass: Bool  reason: Str}
+
+Protocol +Finding = {severity: Str  type: Str  evidence: Str  source: Str}
+
++patterns = [
+  "ignore previous instructions"
+  "you are now"
+  "system prompt override"
+  "forget everything"
+  "new persona"
+  "ignore all prior"
+  "disregard your instructions"
+]
+
++scan = (text) {
+  lowered = lower text
+  patterns | flat_map (p) {
+    re.is_match (lower p) lowered ? {
+      true -> [Finding {severity: "critical"  type: "prompt_injection"  evidence: p  source: "guard"}]
+      false -> []
+    }
+  }
+}
+
++check = (input) {
+  text = input ? {
+    {content: c ..} -> c
+    _ -> to_str input
+  }
+  findings = scan text
+  findings | empty? ? {
+    true -> GuardResult {pass: true  reason: "ok"}
+    false -> GuardResult {pass: false  reason: "injection pattern: {findings.0.evidence}"}
+  }
+}
+
++run_parallel = (input agent_fn) {
+  (guard_result, agent_result) = par {
+    check input
+    agent_fn input
+  }
+  guard_result.pass ? {
+    true -> agent_result
+    false -> Err "blocked by guardrail: {guard_result.reason}"
+  }
+}
+
++run_blocking = (input agent_fn) {
+  result = check input
+  result.pass ? {
+    true -> agent_fn input
+    false -> Err "blocked by guardrail: {result.reason}"
+  }
+}

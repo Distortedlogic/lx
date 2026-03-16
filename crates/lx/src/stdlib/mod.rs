@@ -1,4 +1,6 @@
 pub(crate) mod agent;
+mod agent_dialogue;
+mod agent_intercept;
 mod agent_reconcile;
 mod agent_reconcile_strat;
 mod agents_auditor;
@@ -32,6 +34,8 @@ mod saga;
 mod tasks;
 mod time;
 mod trace;
+mod trace_progress;
+mod trace_query;
 
 use crate::interpreter::ModuleExports;
 
