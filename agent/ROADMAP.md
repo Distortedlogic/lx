@@ -7,7 +7,6 @@ Future features only. For what's already implemented, see `agent/INVENTORY.md`.
 | Module              | Spec                                    | Purpose                                                       | Priority |
 | ------------------- | --------------------------------------- | ------------------------------------------------------------- | -------- |
 | `std/pipeline`      | `spec/agents-pipeline-checkpoint.md`    | Stage-boundary checkpoint/resume (absorbs `plan.run_incremental`) | Tier 2 |
-| `std/test`          | `spec/testing-satisfaction.md`          | Satisfaction-based agentic testing: spec/scenarios/grading     | Tier 2   |
 | `std/flow`          | `spec/flow-composition.md`              | Flows as first-class values: load, run, pipe, par, branch     | Tier 2   |
 | `std/workspace`     | `spec/agents-workspace.md`             | Concurrent multi-agent editing with region claiming/conflicts  | Tier 3   |
 | `std/registry`      | `spec/agents-discovery.md`              | Cross-process agent discovery, health, load-balanced dispatch  | Tier 3   |
@@ -40,7 +39,6 @@ Future features only. For what's already implemented, see `agent/INVENTORY.md`.
 | `lx.toml` manifest   | `spec/package-manifest.md`     | Package identity, deps, entry, backend config     | Tier 2   |
 | `lx init`            | `spec/package-manifest.md`     | Scaffold new project with manifest                | Tier 2   |
 | `lx install/update`  | `spec/package-manifest.md`     | Dependency resolution and locking                 | Tier 3   |
-| `lx signal`          | `spec/toolchain.md`            | Send interrupt signals to running agents (absorbed by `std/user` signal poll) | Done |
 
 ## Planned Language Changes (parser/interpreter work required)
 

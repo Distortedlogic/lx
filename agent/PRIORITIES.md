@@ -2,13 +2,9 @@
 
 Ordered work queue. Top item = next thing to implement. Each entry explains WHY it's at this position so you can judge whether circumstances have changed.
 
-## Tier 1 — Highest leverage remaining
-
-No parser changes needed. Pure stdlib modules that fill gaps agents hit constantly. Completed: `std/retry` (Session 44), `std/user` + `std/profile` (Session 49).
-
 ## Tier 2 — Agent identity, communication, testing, packaging
 
-`Agent` declarations completed (Session 49).
+Tier 1 completed: `std/retry` (Session 44), `std/user` + `std/profile` (Session 49), `Agent` declarations (Session 49).
 
 1. **Enforced `Trait` methods** (`spec/agents-trait.md`) — Trait methods have typed signatures (same `{input} -> output` syntax as MCP declarations). Validated at Agent definition time and spawn time. Absorbs `Skill` declarations — Trait methods ARE skills, with optional description/examples for LLM discovery. `trait.methods`/`trait.match` replace `std/skill`.
 

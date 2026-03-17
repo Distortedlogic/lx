@@ -48,6 +48,7 @@ What lx can do right now. For project health/status, see the "Where We're At" se
 - Interaction: `std/user` — `confirm`, `choose`, `ask`, `ask_with`, `progress`, `progress_pct`, `status`, `table`, `check` (signal poll). `UserBackend` trait on `RuntimeCtx` — `NoopUserBackend` (default/test), `StdinStdoutUserBackend` (terminal)
 - Identity: `std/profile` — persistent agent profiles: `load`, `save`, `learn`, `recall`, `recall_prefix`, `forget`, `preference`, `get_preference`, `history`, `merge`, `age`, `decay`. Strategy helpers: `best_strategy`, `rank_strategies`, `adapt_strategy`. File-backed at `.lx/profiles/{name}.json`
 - Visualization: `std/diag`
+- Testing: `std/test` (test runner infrastructure, test/describe blocks), `std/describe` (BDD-style describe/it blocks with structured results)
 
 ## Agent Extensions (11 sub-modules of `std/agent`)
 
@@ -67,8 +68,6 @@ What lx can do right now. For project health/status, see the "Where We're At" se
 
 - `ai.prompt_structured` — Protocol-validated LLM output with auto-retry
 - `trace.improvement_rate` + `trace.should_stop` — diminishing returns detection
-- `std/test` — test runner infrastructure (test/describe blocks)
-- `std/describe` — BDD-style describe/it blocks with structured results
 
 ## Runtime
 

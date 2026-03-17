@@ -18,8 +18,7 @@ raw = `no {interpolation}`   -- raw string (backtick)
 Collections:
 ```lx
 [1 2 3]                      -- list (space-separated, no commas)
-{x: 1  y: 2}                 -- record (fixed keys)
-{x  y}                       -- record shorthand (x: x  y: y)
+{x: 1  y: 2}                 -- record (fixed keys, all fields need key: value)
 (1 "hello" true)             -- tuple
 %{"key": "value"}            -- map (arbitrary keys)
 ```

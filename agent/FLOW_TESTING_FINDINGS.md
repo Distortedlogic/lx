@@ -153,9 +153,11 @@ x = {_: 0} -- parse error: Underscore token not valid as record key
 
 **Should fix:** Add empty record literal syntax (e.g. `{:}`) or make `{}` context-sensitive (block when followed by statements, record when assigned to a binding expecting a Record).
 
-### 10. Lambda closures from imported modules break in `invoke_flow`
+### 10. ~~Lambda closures from imported modules break in `invoke_flow`~~ (MISDIAGNOSED — see #13)
 
-**What:** This is the most serious runtime issue found. Functions from imported modules work correctly when called via `lx run` (normal `use` import path) but fail when the flow is invoked via `test.run` → `invoke_flow` → fresh `Interpreter::new` → `exec` → `call_value`.
+**What:** ~~This is the most serious runtime issue found.~~ **UPDATE: This was misdiagnosed. The actual cause was Finding #13 (function calls inside list literals). With #13 fixed, `invoke_flow` works correctly with imported modules.** Original writeup preserved below for context.
+
+Functions from imported modules work correctly when called via `lx run` (normal `use` import path) but fail when the flow is invoked via `test.run` → `invoke_flow` → fresh `Interpreter::new` → `exec` → `call_value`.
 
 Specifically, lambda parameters inside closures from imported modules resolve to wrong values (the variable name resolves to a Func instead of the lambda argument value).
 

@@ -28,7 +28,7 @@ Tech debt (currying, unicode, 300-line files, fake concurrency) tracked in `agen
 
 **No project identity or packaging** — No manifest, no way to name a project, declare dependencies, or configure backends. Spec: `spec/package-manifest.md`.
 
-**No way to test agentic flows** — `assert` is binary pass/fail, useless for non-deterministic agent output. Need satisfaction-based testing. Spec: `spec/testing-satisfaction.md`.
+**Agentic flow testing is basic** — `std/test` and `std/describe` provide test runner infrastructure and BDD-style blocks, but satisfaction-based testing (spec + scenarios + grader + threshold scoring for non-deterministic output) is still unimplemented. Spec: `spec/testing-satisfaction.md`.
 
 **Flows aren't composable** — Flows (entire .lx programs) require manual `agent.spawn` + `~>?` + `agent.kill`. Need flows as first-class values. Spec: `spec/flow-composition.md`.
 
