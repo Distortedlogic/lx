@@ -25,6 +25,7 @@ mod circuit;
 mod context;
 mod cron;
 mod ctx;
+mod describe;
 pub mod diag;
 mod diag_walk;
 mod env;
@@ -56,6 +57,7 @@ mod re;
 mod retry;
 mod saga;
 mod tasks;
+mod test;
 mod time;
 mod trace;
 mod trace_progress;
@@ -99,6 +101,7 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
             "budget" => budget::build(),
             "circuit" => circuit::build(),
             "context" => context::build(),
+            "describe" => describe::build(),
             "diag" => diag::build(),
             "knowledge" => knowledge::build(),
             "memory" => memory::build(),
@@ -107,6 +110,7 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
             "prompt" => prompt::build(),
             "retry" => retry::build(),
             "saga" => saga::build(),
+            "test" => test::build(),
             "introspect" => introspect::build(),
             "profile" => profile::build(),
             "trace" => trace::build(),
@@ -151,6 +155,7 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
             | "budget"
             | "circuit"
             | "context"
+            | "describe"
             | "diag"
             | "knowledge"
             | "memory"
@@ -159,6 +164,7 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
             | "prompt"
             | "retry"
             | "saga"
+            | "test"
             | "introspect"
             | "profile"
             | "trace"

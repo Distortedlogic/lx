@@ -1,0 +1,66 @@
+use std/fs
+use std/json
+use std/re
+
+injection_patterns = [
+  "ignore previous instructions"
+  "you are now"
+  "system prompt override"
+  "forget everything"
+]
+
+scan_text = (text patterns) {
+  lowered = lower text
+  patterns | flat_map (p) {
+    pat = lower p
+    matched = re.is_match pat lowered
+    matched ? {
+      true -> [{severity: "critical"  type: "prompt_injection"  evidence: p}]
+      false -> []
+    }
+  }
+}
+
+parse_transcript = (path) {
+  content = fs.read path ?? ""
+  content | lines | filter (!= "") | flat_map (line) {
+    json.parse line ? {
+      Ok entry -> {
+        t = get "type" entry ?? "unknown"
+        n = get "name" entry ?? ""
+        i = to_str (get "input" entry ?? "")
+        o = to_str (get "output" entry ?? "")
+        [{type: t  name: n  input: i  output: o}]
+      }
+      Err _ -> []
+    }
+  }
+}
+
++run = (input) {
+  dir = input.project_dir
+  paths = $^find {dir} -name "*.jsonl" | lines | filter (!= "")
+
+  paths | empty? ? {
+    true -> Ok {findings: 0  critical: 0  high: 0  report: "no transcripts found"}
+    false -> {
+      all_entries = paths | flat_map parse_transcript
+      tool_calls = all_entries | filter (e) { e.type == "tool_use" }
+      injection = all_entries | flat_map (e) { scan_text e.input injection_patterns }
+      loops = tool_calls | len > 20 ? {
+        true -> [{severity: "high"  type: "stuck_loop"  evidence: "{tool_calls | len} tool calls"}]
+        false -> []
+      }
+      findings = [..injection ..loops]
+      critical = findings | filter (x) { x.severity == "critical" }
+      high = findings | filter (x) { x.severity == "high" }
+
+      Ok {
+        findings: (findings | len)
+        critical: (critical | len)
+        high: (high | len)
+        report: "{findings | len} findings ({critical | len} critical, {high | len} high)"
+      }
+    }
+  }
+}

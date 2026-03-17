@@ -1,137 +1,114 @@
 use crate::ast::{Expr, FieldKind, Literal, SExpr, StrPart};
+use crate::span::Span;
+use crate::visitor::{AstVisitor, walk_expr};
 
 use super::Walker;
 
-impl Walker {
-    pub(super) fn walk_expr(&mut self, expr: &Expr) {
-        match expr {
-            Expr::AgentSend { target, msg } => {
-                let to = self.resolve_target(&target.node);
-                self.add_edge(
-                    &self.context.clone(),
-                    &to,
-                    extract_msg_label(&msg.node),
-                    "dashed",
-                );
-            }
-            Expr::AgentAsk { target, msg } => {
-                let to = self.resolve_target(&target.node);
-                self.add_edge(
-                    &self.context.clone(),
-                    &to,
-                    extract_msg_label(&msg.node),
-                    "solid",
-                );
-            }
-            Expr::Par(stmts) => {
-                let fork_id = self.add_node("fork", "par".into(), "fork");
-                self.add_edge(&self.context.clone(), &fork_id, String::new(), "solid");
-                let saved = self.context.clone();
-                self.context = fork_id;
-                self.walk_stmts(stmts);
-                self.context = saved;
-            }
-            Expr::Sel(arms) => {
-                let dec_id = self.add_node("sel", "sel".into(), "decision");
-                self.add_edge(&self.context.clone(), &dec_id, String::new(), "solid");
-                let saved = self.context.clone();
-                self.context = dec_id;
-                for arm in arms {
-                    self.walk_expr(&arm.handler.node);
-                }
-                self.context = saved;
-            }
-            Expr::Match { scrutinee, arms } => {
-                let label = format!("{}?", expr_label(&scrutinee.node));
-                let dec_id = self.add_node("match", label, "decision");
-                self.add_edge(&self.context.clone(), &dec_id, String::new(), "solid");
-                let saved = self.context.clone();
-                self.context = dec_id;
-                for arm in arms {
-                    self.walk_expr(&arm.body.node);
-                }
-                self.context = saved;
-            }
-            Expr::Loop(stmts) | Expr::Block(stmts) => self.walk_stmts(stmts),
-            Expr::With { body, .. } | Expr::WithResource { body, .. } => self.walk_stmts(body),
-            Expr::Refine {
-                initial,
-                grade,
-                revise,
-                ..
-            } => {
-                self.walk_expr(&initial.node);
-                self.walk_expr(&grade.node);
-                self.walk_expr(&revise.node);
-            }
-            Expr::Pipe { left, right } => {
-                self.walk_expr(&left.node);
-                self.walk_expr(&right.node);
-            }
-            Expr::Propagate(inner) => self.walk_expr(&inner.node),
-            Expr::Apply { func, arg } => {
-                if let Some(target_id) = self.extract_mcp_call(expr) {
-                    self.add_edge(
-                        &self.context.clone(),
-                        &target_id,
-                        "mcp.call".into(),
-                        "solid",
-                    );
-                    return;
-                }
-                self.walk_expr(&func.node);
-                self.walk_expr(&arg.node);
-            }
-            Expr::Ternary { then_, else_, .. } => {
-                self.walk_expr(&then_.node);
-                if let Some(e) = else_ {
-                    self.walk_expr(&e.node);
-                }
-            }
-            Expr::Func { body, .. } => self.walk_expr(&body.node),
-            Expr::Coalesce { expr, default } => {
-                self.walk_expr(&expr.node);
-                self.walk_expr(&default.node);
-            }
-            _ => {}
+pub(super) fn visit_expr_diag(w: &mut Walker, expr: &Expr, span: Span) {
+    match expr {
+        Expr::AgentSend { target, msg } => {
+            let to = resolve_target(w, &target.node);
+            w.add_edge(
+                &w.context.clone(),
+                &to,
+                extract_msg_label(&msg.node),
+                "dashed",
+            );
         }
+        Expr::AgentAsk { target, msg } => {
+            let to = resolve_target(w, &target.node);
+            w.add_edge(
+                &w.context.clone(),
+                &to,
+                extract_msg_label(&msg.node),
+                "solid",
+            );
+        }
+        Expr::Par(stmts) => {
+            let fork_id = w.add_node("fork", "par".into(), "fork");
+            w.add_edge(&w.context.clone(), &fork_id, String::new(), "solid");
+            let saved = w.context.clone();
+            w.context = fork_id;
+            w.walk_stmts(stmts);
+            w.context = saved;
+        }
+        Expr::Sel(arms) => {
+            let dec_id = w.add_node("sel", "sel".into(), "decision");
+            w.add_edge(&w.context.clone(), &dec_id, String::new(), "solid");
+            let saved = w.context.clone();
+            w.context = dec_id;
+            for arm in arms {
+                w.visit_expr(&arm.handler.node, arm.handler.span);
+            }
+            w.context = saved;
+        }
+        Expr::Match { scrutinee, arms } => {
+            let label = format!("{}?", expr_label(&scrutinee.node));
+            let dec_id = w.add_node("match", label, "decision");
+            w.add_edge(&w.context.clone(), &dec_id, String::new(), "solid");
+            let saved = w.context.clone();
+            w.context = dec_id;
+            for arm in arms {
+                w.visit_expr(&arm.body.node, arm.body.span);
+            }
+            w.context = saved;
+        }
+        Expr::Apply { func, arg } => {
+            if let Some(target_id) = extract_mcp_call(w, expr) {
+                w.add_edge(&w.context.clone(), &target_id, "mcp.call".into(), "solid");
+                return;
+            }
+            w.visit_expr(&func.node, func.span);
+            w.visit_expr(&arg.node, arg.span);
+        }
+        Expr::Refine {
+            initial,
+            grade,
+            revise,
+            ..
+        } => {
+            w.visit_expr(&initial.node, initial.span);
+            w.visit_expr(&grade.node, grade.span);
+            w.visit_expr(&revise.node, revise.span);
+        }
+        _ => walk_expr(w, expr, span),
     }
+}
 
-    pub(super) fn resolve_target(&self, expr: &Expr) -> String {
-        if let Expr::Ident(name) = expr {
-            if let Some(id) = self.agent_vars.get(name) {
-                return id.clone();
-            }
-            if let Some(id) = self.mcp_vars.get(name) {
-                return id.clone();
-            }
-            return name.clone();
+fn resolve_target(w: &Walker, expr: &Expr) -> String {
+    if let Expr::Ident(name) = expr {
+        if let Some(id) = w.agent_vars.get(name) {
+            return id.clone();
         }
-        "unknown".into()
+        if let Some(id) = w.mcp_vars.get(name) {
+            return id.clone();
+        }
+        return name.clone();
     }
+    "unknown".into()
+}
 
-    pub(super) fn extract_mcp_call(&self, expr: &Expr) -> Option<String> {
-        let Expr::Apply { func, .. } = expr else {
-            return None;
-        };
-        let Expr::Apply { func: f2, .. } = &func.node else {
-            return None;
-        };
-        let Expr::Apply {
-            func: f3,
-            arg: conn,
-        } = &f2.node
-        else {
-            return None;
-        };
-        if !is_field_call(&f3.node, "mcp", "call") {
-            return None;
-        }
-        let Expr::Ident(var) = &conn.node else {
-            return None;
-        };
-        self.mcp_vars.get(var).cloned()
+fn extract_mcp_call(w: &Walker, expr: &Expr) -> Option<String> {
+    let Expr::Apply { func, .. } = expr else {
+        return None;
+    };
+    let Expr::Apply { func: f2, .. } = &func.node else {
+        return None;
+    };
+    let Expr::Apply {
+        func: f3,
+        arg: conn,
+    } = &f2.node
+    else {
+        return None;
+    };
+    if !is_field_call(&f3.node, "mcp", "call") {
+        return None;
     }
+    let Expr::Ident(var) = &conn.node else {
+        return None;
+    };
+    w.mcp_vars.get(var).cloned()
 }
 
 pub(super) fn extract_agent_spawn(sexpr: &SExpr) -> Option<String> {
@@ -163,7 +140,7 @@ fn unwrap_propagate(expr: &Expr) -> &Expr {
     }
 }
 
-pub(super) fn is_field_call(expr: &Expr, obj: &str, field: &str) -> bool {
+fn is_field_call(expr: &Expr, obj: &str, field: &str) -> bool {
     let Expr::FieldAccess {
         expr: e,
         field: FieldKind::Named(f),

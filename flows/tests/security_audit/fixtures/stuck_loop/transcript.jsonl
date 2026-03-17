@@ -1,0 +1,21 @@
+{"type":"tool_use","name":"Read","input":{"path":"src/main.rs"},"output":"fn main() {}","success":true}
+{"type":"tool_use","name":"Edit","input":{"path":"src/main.rs","content":"fixed"},"output":"ok","success":true}
+{"type":"tool_use","name":"Bash","input":{"command":"cargo test"},"output":"test failed","success":false}
+{"type":"tool_use","name":"Read","input":{"path":"src/main.rs"},"output":"fn main() {}","success":true}
+{"type":"tool_use","name":"Edit","input":{"path":"src/main.rs","content":"fixed"},"output":"ok","success":true}
+{"type":"tool_use","name":"Bash","input":{"command":"cargo test"},"output":"test failed","success":false}
+{"type":"tool_use","name":"Read","input":{"path":"src/main.rs"},"output":"fn main() {}","success":true}
+{"type":"tool_use","name":"Edit","input":{"path":"src/main.rs","content":"fixed"},"output":"ok","success":true}
+{"type":"tool_use","name":"Bash","input":{"command":"cargo test"},"output":"test failed","success":false}
+{"type":"tool_use","name":"Read","input":{"path":"src/main.rs"},"output":"fn main() {}","success":true}
+{"type":"tool_use","name":"Edit","input":{"path":"src/main.rs","content":"fixed"},"output":"ok","success":true}
+{"type":"tool_use","name":"Bash","input":{"command":"cargo test"},"output":"test failed","success":false}
+{"type":"tool_use","name":"Read","input":{"path":"src/main.rs"},"output":"fn main() {}","success":true}
+{"type":"tool_use","name":"Edit","input":{"path":"src/main.rs","content":"fixed"},"output":"ok","success":true}
+{"type":"tool_use","name":"Bash","input":{"command":"cargo test"},"output":"test failed","success":false}
+{"type":"tool_use","name":"Read","input":{"path":"src/main.rs"},"output":"fn main() {}","success":true}
+{"type":"tool_use","name":"Edit","input":{"path":"src/main.rs","content":"fixed"},"output":"ok","success":true}
+{"type":"tool_use","name":"Bash","input":{"command":"cargo test"},"output":"test failed","success":false}
+{"type":"tool_use","name":"Read","input":{"path":"src/main.rs"},"output":"fn main() {}","success":true}
+{"type":"tool_use","name":"Edit","input":{"path":"src/main.rs","content":"fixed"},"output":"ok","success":true}
+{"type":"tool_use","name":"Bash","input":{"command":"cargo test"},"output":"test failed","success":false}

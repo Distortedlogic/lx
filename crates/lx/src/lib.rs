@@ -14,3 +14,4 @@ pub mod token;
 pub mod value;
 mod value_display;
 mod value_impls;
+pub mod visitor;

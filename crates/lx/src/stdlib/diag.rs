@@ -10,6 +10,7 @@ use crate::span::Span;
 use crate::value::Value;
 
 use crate::ast::Program;
+use crate::visitor::AstVisitor;
 
 use super::diag_walk::{DiagEdge, DiagNode, Graph, Walker};
 
@@ -49,7 +50,7 @@ fn bi_to_mermaid(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<V
 
 pub fn extract_mermaid(program: &Program) -> String {
     let mut walker = Walker::new();
-    walker.walk_program(program);
+    walker.visit_program(program);
     to_mermaid(&walker.into_graph())
 }
 
@@ -59,7 +60,7 @@ fn extract_graph(src: &str, span: Span) -> Result<Graph, LxError> {
     let program = crate::parser::parse(tokens)
         .map_err(|e| LxError::runtime(format!("diag: parse error: {e}"), span))?;
     let mut walker = Walker::new();
-    walker.walk_program(&program);
+    walker.visit_program(&program);
     Ok(walker.into_graph())
 }
 

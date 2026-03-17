@@ -1,0 +1,109 @@
+-- 69_test.lx
+-- Tests: spec/testing-satisfaction.md (std/test module)
+-- Phase: satisfaction testing framework
+
+use std/test
+
+-- Test 1: spec construction
+spec = test.spec "demo" {
+  flow: "tests/fixtures/test_flow.lx"
+  grader: (output scenario) { correct: 1.0 }
+  threshold: 0.5
+}
+assert (spec.name == "demo") "spec has name"
+assert (spec.flow == "tests/fixtures/test_flow.lx") "spec has flow"
+assert (spec.threshold == 0.5) "spec has threshold"
+assert (spec.scenarios | len == 0) "spec starts with empty scenarios"
+
+-- Test 2: scenario attachment
+spec2 = test.spec "two-scenario" {
+  flow: "tests/fixtures/test_flow.lx"
+  grader: (output scenario) { correct: 1.0 }
+}
+spec2 = test.scenario spec2 "first" {
+  input: {x: 5}
+  runs: 1
+}
+spec2 = test.scenario spec2 "second" {
+  input: {x: 10}
+  runs: 2
+  tags: ["smoke"]
+}
+assert (spec2.scenarios | len == 2) "two scenarios attached"
+
+s1 = spec2.scenarios | first ^
+assert (s1.name == "first") "first scenario name"
+
+s2 = spec2.scenarios | last ^
+assert (s2.name == "second") "second scenario name"
+assert (s2.runs == 2) "second scenario runs"
+
+-- Test 3: test.run with passing flow (deterministic)
+pass_spec = test.spec "pass-test" {
+  flow: "tests/fixtures/test_flow.lx"
+  grader: (output scenario) {
+    correct: output == scenario.input.x * 2 ? 1.0 : 0.0
+  }
+  threshold: 0.5
+}
+pass_spec = test.scenario pass_spec "double five" {
+  input: {x: 5}
+  runs: 2
+}
+result = test.run pass_spec ^
+assert (result.passed == true) "all-pass spec passes"
+assert (result.score == 1.0) "perfect score"
+assert (result.scenarios | len == 1) "one scenario result"
+
+sr = result.scenarios | first ^
+assert (sr.passed == true) "scenario passed"
+assert (sr.runs | len == 2) "two runs recorded"
+assert (sr.mean == 1.0) "mean is 1.0"
+
+-- Test 4: test.run with failing grader
+fail_spec = test.spec "fail-test" {
+  flow: "tests/fixtures/test_flow.lx"
+  grader: (output scenario) { score: 0.0 }
+  threshold: 0.5
+}
+fail_spec = test.scenario fail_spec "always-fail" {
+  input: {x: 1}
+  runs: 1
+}
+fail_result = test.run fail_spec ^
+assert (fail_result.passed == false) "failing spec fails"
+assert (fail_result.score == 0.0) "zero score"
+
+-- Test 5: test.run_scenario runs only named scenario
+multi_spec = test.spec "multi" {
+  flow: "tests/fixtures/test_flow.lx"
+  grader: (output scenario) { correct: 1.0 }
+  threshold: 0.5
+}
+multi_spec = test.scenario multi_spec "alpha" {
+  input: {x: 1}
+  runs: 1
+}
+multi_spec = test.scenario multi_spec "beta" {
+  input: {x: 2}
+  runs: 1
+}
+single_result = test.run_scenario multi_spec "beta" ^
+assert (single_result.scenarios | len == 1) "only one scenario ran"
+sr_single = single_result.scenarios | first ^
+assert (sr_single.name == "beta") "correct scenario ran"
+
+-- Test 6: weighted scores
+w_spec = test.spec "weighted" {
+  flow: "tests/fixtures/test_flow.lx"
+  grader: (output scenario) { a: 1.0  b: 0.0 }
+  threshold: 0.5
+  weights: {a: 3.0  b: 1.0}
+}
+w_spec = test.scenario w_spec "weighted-test" {
+  input: {x: 1}
+  runs: 1
+}
+w_result = test.run w_spec ^
+w_sr = w_result.scenarios | first ^
+assert (w_sr.score == 0.75) "weighted score is 0.75"

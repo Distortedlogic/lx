@@ -3,7 +3,9 @@ mod diag_walk_expr;
 
 use std::collections::HashMap;
 
-use crate::ast::{BindTarget, Program, SStmt, Stmt};
+use crate::ast::{BindTarget, Binding, Expr, McpToolDecl, SExpr, SStmt};
+use crate::span::Span;
+use crate::visitor::AstVisitor;
 
 use diag_walk_expr::{extract_agent_spawn, extract_mcp_connect};
 
@@ -74,49 +76,9 @@ impl Walker {
         });
     }
 
-    pub fn walk_program(&mut self, program: &Program) {
-        for stmt in &program.stmts {
-            self.walk_stmt(&stmt.node);
-        }
-    }
-
     pub(super) fn walk_stmts(&mut self, stmts: &[SStmt]) {
         for stmt in stmts {
-            self.walk_stmt(&stmt.node);
-        }
-    }
-
-    fn walk_stmt(&mut self, stmt: &Stmt) {
-        match stmt {
-            Stmt::Binding(binding) => {
-                let name = match &binding.target {
-                    BindTarget::Name(n) | BindTarget::Reassign(n) => Some(n.clone()),
-                    _ => None,
-                };
-                if let Some(ref var_name) = name {
-                    if let Some(spawn_label) = extract_agent_spawn(&binding.value) {
-                        let id = self.add_node("agent", spawn_label, "agent");
-                        self.agent_vars.insert(var_name.clone(), id);
-                        return;
-                    }
-                    if let Some(mcp_label) = extract_mcp_connect(&binding.value) {
-                        let id = self.add_node("tool", mcp_label, "tool");
-                        self.mcp_vars.insert(var_name.clone(), id);
-                        return;
-                    }
-                }
-                self.walk_expr(&binding.value.node);
-            }
-            Stmt::McpDecl { name, .. } => {
-                let id = self.add_node("tool", name.clone(), "tool");
-                self.mcp_vars.insert(name.clone(), id);
-            }
-            Stmt::AgentDecl { name, .. } => {
-                let id = self.add_node("agent", name.clone(), "agent");
-                self.agent_vars.insert(name.clone(), id);
-            }
-            Stmt::Expr(sexpr) => self.walk_expr(&sexpr.node),
-            _ => {}
+            self.visit_stmt(&stmt.node, stmt.span);
         }
     }
 
@@ -125,5 +87,51 @@ impl Walker {
             nodes: self.nodes,
             edges: self.edges,
         }
+    }
+}
+
+impl AstVisitor for Walker {
+    fn visit_binding(&mut self, binding: &Binding, _span: Span) {
+        let name = match &binding.target {
+            BindTarget::Name(n) | BindTarget::Reassign(n) => Some(n.clone()),
+            _ => None,
+        };
+        if let Some(ref var_name) = name {
+            if let Some(spawn_label) = extract_agent_spawn(&binding.value) {
+                let id = self.add_node("agent", spawn_label, "agent");
+                self.agent_vars.insert(var_name.clone(), id);
+                return;
+            }
+            if let Some(mcp_label) = extract_mcp_connect(&binding.value) {
+                let id = self.add_node("tool", mcp_label, "tool");
+                self.mcp_vars.insert(var_name.clone(), id);
+                return;
+            }
+        }
+        self.visit_expr(&binding.value.node, binding.value.span);
+    }
+
+    fn visit_mcp_decl(&mut self, name: &str, _tools: &[McpToolDecl], _exported: bool, _span: Span) {
+        let id = self.add_node("tool", name.to_string(), "tool");
+        self.mcp_vars.insert(name.to_string(), id);
+    }
+
+    fn visit_agent_decl(
+        &mut self,
+        name: &str,
+        _traits: &[String],
+        _uses: &[(String, String)],
+        _init: Option<&SExpr>,
+        _on: Option<&SExpr>,
+        _methods: &[crate::ast::AgentMethod],
+        _exported: bool,
+        _span: Span,
+    ) {
+        let id = self.add_node("agent", name.to_string(), "agent");
+        self.agent_vars.insert(name.to_string(), id);
+    }
+
+    fn visit_expr(&mut self, expr: &Expr, span: Span) {
+        diag_walk_expr::visit_expr_diag(self, expr, span);
     }
 }

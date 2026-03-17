@@ -80,7 +80,7 @@ fn keyword_hint(name: &str) -> Option<&'static str> {
 }
 
 pub struct Interpreter {
-    env: Arc<Env>,
+    pub(crate) env: Arc<Env>,
     source: String,
     pub(crate) source_dir: Option<PathBuf>,
     pub(crate) module_cache: Arc<Mutex<HashMap<PathBuf, ModuleExports>>>,
