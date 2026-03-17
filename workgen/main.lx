@@ -74,14 +74,15 @@ required_sections = ["Goal" "Why" "What changes" "Files affected" "Task List" "C
 }
 
 gather_context = (root) {
-  tree = ($^rg --files --type rust --type toml {root} 2>/dev/null) ?? ""
-  tree_trimmed = tree | lines | take 200 | join "\n"
-  sources = tree | lines | take 30 | map (f) {
+  tree = ($^find {root} -name "*.rs" -o -name "*.py" -o -name "*.css" -o -name "*.toml" 2>/dev/null) ?? ""
+  files = tree | lines | take 200
+  file_list = files | join "\n"
+  sources = files | take 30 | map (f) {
     content = fs.read f ?? ""
     trimmed = content | lines | take 50 | join "\n"
     "--- {f} ---\n{trimmed}"
   } | join "\n\n"
-  "{tree_trimmed}\n\n{sources}"
+  "{file_list}\n\n{sources}"
 }
 
 investigate = (audit_content context) {
