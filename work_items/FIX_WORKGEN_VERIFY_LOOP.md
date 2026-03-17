@@ -15,7 +15,7 @@ In the parse_llm_json function, after extract_llm_text successfully returns the 
 
 **workgen/main.lx — RULES_FILE validation:**
 
-In the +main function, read RULES_FILE the same way AUDIT_FILE is read (env.get with ?? "" fallback). Check both together: if either is empty, emit a single error message naming both required env vars with a usage example, then return Err. Remove the "workgen/rules/work-item.md" default.
+In the +main function, read RULES_FILE the same way AUDIT_FILE is read (env.get with ?? "" fallback). Validate each individually — if audit_path is empty, emit "error: AUDIT_FILE not set"; if rules_path is empty, emit "error: RULES_FILE not set". If either is missing, emit a usage example and return Err. Remove the "workgen/rules/work-item.md" default.
 
 # How it works
 
@@ -44,9 +44,9 @@ Verify: run `just diagnose` and confirm it passes.
 **Subject:** Make RULES_FILE required with clear error message
 **ActiveForm:** Updating workgen env var validation
 
-Edit workgen/main.lx. In the +main function, change the env var handling: read rules_path with env.get "RULES_FILE" ?? "" (removing the "workgen/rules/work-item.md" default). Check both audit_path and rules_path — if either is empty, emit an error message that names both AUDIT_FILE and RULES_FILE as required, shows a usage example referencing the justfile (e.g., just -f workgen/justfile audit-rust), and return Err. Only call run when both are non-empty.
+Edit workgen/main.lx. In the +main function, change the env var handling: read both audit_path and rules_path upfront with env.get ... ?? "" (removing the "workgen/rules/work-item.md" default from rules_path). Validate each individually — if audit_path is empty, emit "error: AUDIT_FILE not set"; if rules_path is empty, emit "error: RULES_FILE not set". If either is missing, also emit a usage example referencing the justfile (e.g., just -f workgen/justfile audit-rust) and return Err. Only call run when both are non-empty.
 
-Verify: run `cargo run -p lx-cli -- run workgen/run.lx` with no env vars set and confirm the error message names both AUDIT_FILE and RULES_FILE.
+Verify: run `cargo run -p lx-cli -- run workgen/run.lx` with no env vars set and confirm the error message names the specific missing variable(s).
 
 ## Task 3: Run workgen smoke test end-to-end
 

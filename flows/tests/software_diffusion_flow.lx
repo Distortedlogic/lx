@@ -1,0 +1,50 @@
+use std/fs
+use std/json
+
++run = (input) {
+  data_path = input.data_path
+  content = fs.read data_path ^
+  data = json.parse content ^
+
+  stages = data.stages ?? []
+
+  completed := 0
+  final_output := ""
+  type_errors_fixed := 0
+  failed_at := ""
+
+  stages | each (stage) {
+    name = stage.name ?? "unknown"
+    success = stage.success ?? false
+    output = stage.output ?? ""
+
+    success ? {
+      true -> {
+        completed <- completed + 1
+        final_output <- output
+        fixes = get "type_errors_fixed" stage ?? 0
+        type_errors_fixed <- type_errors_fixed + fixes
+      }
+      false -> {
+        no_fail_yet = failed_at == ""
+        no_fail_yet ? {
+          true -> { failed_at <- name }
+          false -> ()
+        }
+      }
+    }
+  }
+
+  total = stages | len
+  all_succeeded = completed == total
+
+  Ok {
+    stages_completed: completed
+    final_output: final_output
+    type_errors_fixed: type_errors_fixed
+    implementation: all_succeeded ? {
+      true -> "complete"
+      false -> "failed at {failed_at}"
+    }
+  }
+}

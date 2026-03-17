@@ -1,0 +1,44 @@
+use std/fs
+use std/json
+
+severity_rank = (sev) {
+  sev ? {
+    "critical" -> 4
+    "high" -> 3
+    "medium" -> 2
+    "low" -> 1
+    _ -> 0
+  }
+}
+
++run = (input) {
+  data_path = input.data_path
+  content = fs.read data_path ^
+  data = json.parse content ^
+
+  path = data.path ?? "unknown"
+  concern = data.concern ?? "unknown"
+  results = data.specialist_results ?? []
+
+  significant = results | filter (r) { r.severity != "none" }
+  sorted = significant | sort_by (r) {
+    rank = severity_rank r.severity
+    0 - rank
+  }
+
+  all_domains = significant | map (r) { r.domain }
+  categories = all_domains | join ", "
+  top_issue = sorted | first
+
+  top_str = top_issue ? {
+    Some issue -> "{issue.domain}: {issue.finding}"
+    None -> "none"
+  }
+
+  Ok {
+    findings: sorted | map (r) { "{r.domain}/{r.severity}: {r.finding}" } | join "; "
+    categories: categories
+    top_issue: top_str
+    total_findings: significant | len
+  }
+}

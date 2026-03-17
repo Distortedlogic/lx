@@ -1,0 +1,10 @@
+[
+  {"thought": "Edit the file", "action": "Edit", "observation": "applied change A", "done": false},
+  {"thought": "Run tests", "action": "Bash", "observation": "test failed", "done": false},
+  {"thought": "Revert the edit", "action": "Edit", "observation": "reverted change A", "done": false},
+  {"thought": "Try different edit", "action": "Edit", "observation": "applied change B", "done": false},
+  {"thought": "Run tests again", "action": "Bash", "observation": "test failed", "done": false},
+  {"thought": "Revert again", "action": "Edit", "observation": "reverted change B", "done": false},
+  {"thought": "Try yet another edit", "action": "Edit", "observation": "applied change C", "done": false},
+  {"thought": "Run tests", "action": "Bash", "observation": "test failed", "done": false}
+]

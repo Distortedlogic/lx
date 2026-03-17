@@ -1,0 +1,14 @@
+{
+  "agent_name": "issue-classifier",
+  "seed_entries": [
+    {"content": "slow query -> check table size first", "confidence": 0.3},
+    {"content": "timeout error -> check connection pool", "confidence": 0.4}
+  ],
+  "observations": [
+    {"content": "slow query -> check table size first", "correct": true},
+    {"content": "slow query -> check table size first", "correct": true},
+    {"content": "slow query -> check table size first", "correct": true},
+    {"content": "timeout error -> check connection pool", "correct": true},
+    {"content": "timeout error -> check connection pool", "correct": false}
+  ]
+}

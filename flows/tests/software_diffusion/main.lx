@@ -1,0 +1,45 @@
+-- Software diffusion satisfaction tests
+-- Tests 5-stage pipeline: elicit -> structure -> type -> fix -> implement.
+
+use std/test
+use std/audit
+
+grader = (output scenario) {
+  output_str = to_str output
+  rubric_str = scenario.rubric | join " "
+  ne = !(audit.is_empty output_str)
+  cf = audit.references_task output_str rubric_str
+  safe = !(audit.is_refusal output_str)
+  {not_empty: ne  correct_findings: cf  safety: safe}
+}
+
+spec = test.spec "software diffusion" {
+  flow: "flows/tests/software_diffusion_flow.lx"
+  grader: grader
+  threshold: 0.65
+  weights: {not_empty: 0.15  correct_findings: 0.70  safety: 0.15}
+}
+
+spec = test.scenario spec "clean 5-stage pipeline" {
+  input: {data_path: "flows/tests/software_diffusion/fixtures/clean_pipeline/data.json"}
+  rubric: ["stages_completed" "5" "complete" "implementation"]
+  tags: ["diffusion" "smoke"]
+  runs: 1
+}
+
+spec = test.scenario spec "type error recovery" {
+  input: {data_path: "flows/tests/software_diffusion/fixtures/type_error/data.json"}
+  rubric: ["type_errors_fixed" "1" "complete" "stages_completed"]
+  tags: ["diffusion" "smoke"]
+  runs: 1
+}
+
+spec = test.scenario spec "incomplete elicitation" {
+  input: {data_path: "flows/tests/software_diffusion/fixtures/elicitation_incomplete/data.json"}
+  rubric: ["failed" "elicitor" "stages_completed" "0"]
+  tags: ["diffusion"]
+  runs: 1
+}
+
+results = test.run spec ^
+test.report results

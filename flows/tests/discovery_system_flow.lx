@@ -1,0 +1,40 @@
+use std/fs
+use std/json
+use ../lib/scoring
+
++run = (input) {
+  data_path = input.data_path
+  threshold = get "threshold" input ?? 0.5
+  content = fs.read data_path ^
+  data = json.parse content ^
+
+  query = data.query ?? "unknown"
+  candidates = data.candidates ?? []
+
+  scored = candidates | map (c) {
+    relevance = c.relevance ?? 0.0
+    quality = c.quality ?? 0.0
+    activity = c.activity ?? 0.0
+    stars = c.stars ?? 0
+    star_score = scoring.normalize 0.0 10000.0 (to_float stars)
+    score = relevance * 0.4 + quality * 0.3 + activity * 0.2 + star_score * 0.1
+    {name: c.name  score: score  language: c.language ?? "unknown"  stars: stars}
+  }
+
+  ranked = scored | sort_by (c) { 0.0 - c.score }
+  above = ranked | filter (c) { c.score >= threshold }
+
+  top = ranked | first
+  top_str = top ? {
+    Some c -> "{c.name} (score: {c.score})"
+    None -> "none"
+  }
+
+  Ok {
+    ranked: ranked | map (c) { "{c.name}: {c.score}" } | join "; "
+    top_pick: top_str
+    total_candidates: candidates | len
+    above_threshold: above | len
+    query: query
+  }
+}

@@ -1,0 +1,68 @@
+use std/fs
+use std/json
+
++run = (input) {
+  data_path = input.data_path
+  content = fs.read data_path ^
+  data = json.parse content ^
+
+  agent_name = data.agent_name ?? "unknown"
+  seed_entries = data.seed_entries ?? []
+  observations = data.observations ?? []
+
+  seeded := seed_entries | len
+  entries := seed_entries | map (e) {
+    {content: e.content  confidence: e.confidence ?? 0.3  confirmations: 0  contradictions: 0}
+  }
+
+  observations | each (obs) {
+    matched = entries | find (e) { e.content == obs.content }
+    matched ? {
+      Some existing -> {
+        new_conf = obs.correct ? {
+          true -> existing.confidence + 0.1
+          false -> existing.confidence - 0.15
+        }
+        new_confs = new_conf > 1.0 ? 1.0 : (new_conf < 0.0 ? 0.0 : new_conf)
+        new_confirm = obs.correct ? {
+          true -> existing.confirmations + 1
+          false -> existing.confirmations
+        }
+        new_contra = obs.correct ? {
+          true -> existing.contradictions
+          false -> existing.contradictions + 1
+        }
+        entries <- entries | map (e) {
+          e.content == obs.content ? {
+            true -> {content: e.content  confidence: new_confs  confirmations: new_confirm  contradictions: new_contra}
+            false -> e
+          }
+        }
+      }
+      None -> ()
+    }
+  }
+
+  promoted = entries | filter (e) { e.confidence >= 0.7 }
+  demoted = entries | filter (e) { e.confidence < 0.1 }
+  drifted = entries | filter (e) { e.contradictions >= 2 }
+  errors = drifted | map (e) { "drift: {e.content} ({e.contradictions} contradictions)" }
+
+  phase = seeded > 0 ? {
+    true -> promoted | len > 0 ? {
+      true -> "maintained"
+      false -> "seeded"
+    }
+    false -> "empty"
+  }
+
+  Ok {
+    phases_completed: phase
+    final_state: entries | map (e) { "{e.content}: conf={e.confidence}" } | join "; "
+    memory_entries: entries | len
+    errors: errors | join "; "
+    seeded: seeded
+    promoted: promoted | len
+    drifted: drifted | len
+  }
+}

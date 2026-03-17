@@ -1,0 +1,6 @@
+{
+  "gap": "need full PR workflow for Forgejo",
+  "design": {"tool_name": "forgejo-mcp", "tools": ["create_pull", "get_pull", "comment_on_pull", "approve_pull", "merge_pull"]},
+  "scaffold": {"files": ["src/main.rs", "src/pulls.rs", "src/reviews.rs", "src/comments.rs", "Cargo.toml"]},
+  "code": {"compile_success": true, "warnings": 0, "smoke_results": [{"tool": "create_pull", "pass": true}, {"tool": "get_pull", "pass": true}, {"tool": "comment_on_pull", "pass": true}, {"tool": "approve_pull", "pass": true}, {"tool": "merge_pull", "pass": true}]}
+}

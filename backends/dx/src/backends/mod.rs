@@ -50,6 +50,7 @@ pub fn build_runtime_ctx(
             agent_id: agent_id.clone(),
         }),
         user: Arc::new(DxUserBackend::new(bus.clone(), agent_id)),
+        source_dir: parking_lot::Mutex::new(None),
         on_agent_event: Some(Arc::new(move |event: AgentEvent| {
             match event {
                 AgentEvent::Spawned { id, name } => {

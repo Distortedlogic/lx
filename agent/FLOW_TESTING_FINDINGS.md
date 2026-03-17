@@ -2,7 +2,7 @@
 
 Issues discovered while building satisfaction tests for the 14 flow specs. Each finding is a real lx language/runtime issue that should be fixed to make the language more usable for its target audience (agents writing lx programs).
 
-Updated after completing Tasks 1-5 of FLOW_SATISFACTION_TESTS.md (Protocol +Name fix, lib fixes, security_audit + defense_layers suites).
+Updated after completing all 12 tasks of FLOW_SATISFACTION_TESTS.md. 11 deterministic suites (35 scenarios) + 3 live-only stubs.
 
 ## Parse-Level Issues
 
@@ -268,12 +268,56 @@ loops = detect_loops entries threshold
 [..injection ..loops]
 ```
 
+### Safe function calls inside list literals
+```lx
+-- Function calls are NOT consumed inside [...]:
+-- BAD:  [normalize entry]  → parsed as two elements [normalize, entry]
+-- GOOD: bind first, then use in list:
+normalized = normalize entry
+[normalized]
+```
+
 ### Self-contained test flows (workaround for finding #10)
 ```lx
--- Inline all logic instead of importing modules:
-use std/fs
-use std/json
-use std/re
--- (inline scan_text, parse_transcript, etc.)
-+run = (input) { ... }
+-- Finding #10 was MISDIAGNOSED. The actual cause was finding #13 below.
+-- Test flows CAN import flow lib modules — the invoke_flow closure chain works.
+-- The real issue was [f x] inside list literals (see finding #13).
 ```
+
+### 13. Function calls inside list literals silently produce wrong results (FIXED in transcript.lx)
+
+**What:** `[normalize entry]` inside `transcript.lx:parse` was parsed as a two-element list `[normalize, entry]` instead of `[(normalize entry)]`. This caused `flat_map` to spread a `Func` value into the entry list, which later failed with "field access on Func, not Record".
+
+**Root cause:** `is_application_candidate` in `parser/helpers.rs` disables juxtaposition (function application) when `collection_depth > 0` — only `TypeConstructor` calls are allowed inside list/record/map literals. This is by design so `[a b c]` means three elements, but it makes `[f x]` silently wrong (two elements instead of one).
+
+**Fix applied:** Changed `transcript.lx` to extract the call to a temp binding before the list literal.
+
+**Impact:** This was the REAL cause of Finding #10's symptoms. With this fix, `invoke_flow` works correctly with imported modules. Test flows can now import `flows/lib/` modules directly.
+
+**Should fix in parser:** Consider a lint or warning when an `Ident` followed by another expression appears inside a list literal, since this is almost always a function call that the author expects to be applied.
+
+### 14. Tuple-destructuring lambda params fail in `call_value` HOF chains
+
+**What:** `| filter (tool, uses) uses | len >= 2 | map (tool, uses) {tool ...}` in `transcript.extract_patterns` fails with "undefined variable 'tool'" when the flow is invoked via `test.run`.
+
+**Root cause:** Not fully diagnosed. Tuple auto-splatting in `call_value` may not properly bind lambda parameters when chained through multiple HOF stages (`group_by | entries | filter | map`) and called through the builtin `call_value` path rather than `Interpreter::apply_func`. The same pattern works via `lx run` but not via `test.run → invoke_flow → call_value`.
+
+**Workaround:** Avoid `extract_patterns`/`extract_mistakes` in test flows. Use simpler inline logic: `good | map (e) { e.name }` instead of the complex group_by/entries/filter/map chain.
+
+**Should fix:** Investigate whether `call_value`'s tuple-splatting handles all cases correctly, especially in deep HOF chains where the env chain crosses module boundaries.
+
+### 15. `trace.record` drops Int scores — should_stop never triggers
+
+**What:** `trace.record` uses `v.as_float()` to extract the `score` field, but `audit::build_eval_result` returns `Value::Int` for scores. Since `as_float()` only matches `Value::Float`, all progress record scores are stored as `None`. This means `progress_scores()` always returns an empty vec, `should_stop` always returns false, and verify loops run indefinitely.
+
+**Root cause:** `trace.rs:bi_record` line 143: `fields.get("score").and_then(|v| v.as_float())` — `as_float()` doesn't coerce Int→Float. The audit module's `build_eval_result` uses `Value::Int(BigInt::from(score))` for the score field.
+
+**Workaround:** Fixed in-place — `trace.rs:bi_record` now matches both `Value::Float` and `Value::Int` (via `num_traits::ToPrimitive::to_f64()`).
+
+### 16. `workgen/main.lx` record shorthand `{path: out_path  name}` fails
+
+**What:** In `workgen/main.lx:89`, `Ok {path: out_path  name}` crashes with "cannot call Str, not a function" because lx doesn't support shorthand record field syntax. `out_path  name` is parsed as a function call `out_path(name)`.
+
+**Root cause:** lx record literals require `key: value` pairs for every field. There's no shorthand where `{name}` means `{name: name}`.
+
+**Workaround:** Fixed in-place — changed to `{path: out_path  name: name}`.

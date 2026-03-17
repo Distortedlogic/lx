@@ -93,21 +93,10 @@ impl Interpreter {
                         ))
                     }
                 }
-                other => {
-                    eprintln!("[DBG] field access .{name} on {} = {}", other.type_name(), other.short_display());
-                    if let Expr::Ident(ref ident_name) = expr.node {
-                        eprintln!("[DBG] expr was Ident('{ident_name}')");
-                    } else {
-                        eprintln!("[DBG] expr node = {:?}", std::mem::discriminant(&expr.node));
-                    }
-                    if let Value::Func(lf) = other {
-                        eprintln!("[DBG] Func params={:?} arity={} applied={}", lf.params, lf.arity, lf.applied.len());
-                    }
-                    Err(LxError::type_err(
-                        format!("field access on {}, not Record", other.type_name()),
-                        span,
-                    ))
-                }
+                other => Err(LxError::type_err(
+                    format!("field access on {}, not Record", other.type_name()),
+                    span,
+                )),
             },
             FieldKind::Index(idx) => {
                 let items = match &val {

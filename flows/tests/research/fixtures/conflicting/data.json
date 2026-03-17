@@ -1,0 +1,13 @@
+{
+  "request": "research database migration strategies",
+  "web_results": [
+    {"title": "Always Use Reversible Migrations", "source": "web", "summary": "Reversible migrations allow safe rollback in production", "relevance": 0.85},
+    {"title": "Irreversible Migrations Are Fine", "source": "web", "summary": "With good backups, irreversible migrations reduce complexity", "relevance": 0.8}
+  ],
+  "codebase_results": [
+    {"path": "migrations/", "source": "codebase", "summary": "Current approach uses irreversible migrations with backup scripts", "relevance": 0.9}
+  ],
+  "github_results": [
+    {"repo": "diesel-rs/diesel", "source": "github", "stars": 12000, "summary": "Diesel supports both reversible and irreversible migrations", "relevance": 0.7}
+  ]
+}

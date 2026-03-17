@@ -32,17 +32,30 @@ required_sections = ["Goal" "Why" "What changes" "Files affected" "Task List" "C
 
 +main = () {
   audit_path = env.get "AUDIT_FILE" ?? ""
+  rules_path = env.get "RULES_FILE" ?? ""
+  root = env.get "ROOT" ?? "."
+
+  missing := false
   audit_path == "" ? {
     true -> {
       emit "error: AUDIT_FILE not set"
-      emit "usage: AUDIT_FILE=rules/rust-audit lx run workgen/run.lx"
-      Err "AUDIT_FILE not set"
+      missing <- true
     }
-    false -> {
-      rules_path = env.get "RULES_FILE" ?? "workgen/rules/work-item.md"
-      root = env.get "ROOT" ?? "."
-      run audit_path rules_path root
+    false -> ()
+  }
+  rules_path == "" ? {
+    true -> {
+      emit "error: RULES_FILE not set"
+      missing <- true
     }
+    false -> ()
+  }
+  missing ? {
+    true -> {
+      emit "usage: just -f workgen/justfile audit-rust"
+      Err "required env vars not set"
+    }
+    false -> run audit_path rules_path root
   }
 }
 
@@ -73,7 +86,7 @@ required_sections = ["Goal" "Why" "What changes" "Files affected" "Task List" "C
   trace.record {name: "complete"  input: name  output: out_path} session ^
 
   emit "\n=== complete: {out_path} ==="
-  Ok {path: out_path  name}
+  Ok {path: out_path  name: name}
 }
 
 gather_tree = (root) {

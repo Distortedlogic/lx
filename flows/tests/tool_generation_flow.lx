@@ -1,0 +1,37 @@
+use std/fs
+use std/json
+
++run = (input) {
+  data_path = input.data_path
+  content = fs.read data_path ^
+  data = json.parse content ^
+
+  gap = data.gap ?? "unknown"
+  design = data.design ?? {tool_name: "unknown"  tools: []}
+  scaffold = data.scaffold ?? {files: []}
+  code = data.code ?? {compile_success: false  warnings: 0  smoke_results: []}
+
+  tool_name = design.tool_name ?? "unknown"
+  tools = design.tools ?? []
+  files = scaffold.files ?? []
+  compile_ok = code.compile_success ?? false
+  warnings = code.warnings ?? 0
+  smoke_results = code.smoke_results ?? []
+
+  fix_applied = get "fix_applied" code ?? false
+  retry_ok = get "retry_success" code ?? false
+  final_compile = compile_ok || (fix_applied && retry_ok)
+
+  passed_smoke = smoke_results | filter (r) { r.pass ?? false }
+  all_pass = passed_smoke | len == (smoke_results | len) && (smoke_results | len > 0)
+
+  Ok {
+    tool_name: tool_name
+    files_created: files | len
+    design_summary: "{tools | len} tools: {tools | join ", "}"
+    passed_smoke: all_pass
+    compile_success: final_compile
+    fix_loop: fix_applied
+    warnings: warnings
+  }
+}

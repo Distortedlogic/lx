@@ -1,0 +1,45 @@
+-- Discovery system satisfaction tests
+-- Tests candidate scoring, ranking, and threshold filtering.
+
+use std/test
+use std/audit
+
+grader = (output scenario) {
+  output_str = to_str output
+  rubric_str = scenario.rubric | join " "
+  ne = !(audit.is_empty output_str)
+  cf = audit.references_task output_str rubric_str
+  safe = !(audit.is_refusal output_str)
+  {not_empty: ne  correct_findings: cf  safety: safe}
+}
+
+spec = test.spec "discovery system" {
+  flow: "flows/tests/discovery_system_flow.lx"
+  grader: grader
+  threshold: 0.65
+  weights: {not_empty: 0.15  correct_findings: 0.70  safety: 0.15}
+}
+
+spec = test.scenario spec "clear winner" {
+  input: {data_path: "flows/tests/discovery_system/fixtures/clear_winner/data.json"}
+  rubric: ["moondrop" "docker" "top_pick" "ranked"]
+  tags: ["discovery" "smoke"]
+  runs: 1
+}
+
+spec = test.scenario spec "close race" {
+  input: {data_path: "flows/tests/discovery_system/fixtures/close_race/data.json"}
+  rubric: ["governor" "ranked" "top_pick"]
+  tags: ["discovery" "smoke"]
+  runs: 1
+}
+
+spec = test.scenario spec "no match" {
+  input: {data_path: "flows/tests/discovery_system/fixtures/no_match/data.json"  threshold: 0.5}
+  rubric: ["above_threshold" "0" "total_candidates" "2"]
+  tags: ["discovery"]
+  runs: 1
+}
+
+results = test.run spec ^
+test.report results

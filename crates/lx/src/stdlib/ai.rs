@@ -72,6 +72,9 @@ pub(crate) fn parse_llm_json(
         Ok(t) => t,
         Err(msg) => return Ok(Err(msg)),
     };
+    if text.trim().is_empty() {
+        return Ok(Err(format!("{context}: empty LLM response")));
+    }
     let jv = serde_json::from_str::<serde_json::Value>(text.trim())
         .or_else(|_| serde_json::from_str(strip_json_fences(&text)))
         .map_err(|e| LxError::runtime(format!("{context}: JSON parse: {e}"), span))?;

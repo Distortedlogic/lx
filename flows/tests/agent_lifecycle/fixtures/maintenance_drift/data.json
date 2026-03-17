@@ -1,0 +1,13 @@
+{
+  "agent_name": "classifier-v2",
+  "seed_entries": [
+    {"content": "urgent -> sprint-1", "confidence": 0.85},
+    {"content": "bug -> triage first", "confidence": 0.7}
+  ],
+  "observations": [
+    {"content": "urgent -> sprint-1", "correct": false},
+    {"content": "urgent -> sprint-1", "correct": false},
+    {"content": "urgent -> sprint-1", "correct": false},
+    {"content": "bug -> triage first", "correct": true}
+  ]
+}

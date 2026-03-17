@@ -1,0 +1,13 @@
+{
+  "request": "research how other projects handle rate limiting",
+  "web_results": [
+    {"title": "Token Bucket Algorithm", "source": "web", "summary": "Token bucket allows burst traffic while maintaining average rate", "relevance": 0.9},
+    {"title": "Sliding Window Rate Limiting", "source": "web", "summary": "Sliding window provides smoother rate limiting than fixed window", "relevance": 0.85}
+  ],
+  "codebase_results": [
+    {"path": "src/middleware/rate.rs", "source": "codebase", "summary": "Simple counter-based rate limiting, no per-user limits", "relevance": 0.95}
+  ],
+  "github_results": [
+    {"repo": "governor-rs/governor", "source": "github", "stars": 2100, "summary": "Production-ready rate limiting for Rust using generic cell rate algorithm", "relevance": 0.92}
+  ]
+}

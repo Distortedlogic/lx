@@ -1,0 +1,8 @@
+{
+  "agent_name": "new-agent",
+  "seed_entries": [],
+  "observations": [
+    {"content": "pattern A", "correct": false},
+    {"content": "pattern B", "correct": false}
+  ]
+}

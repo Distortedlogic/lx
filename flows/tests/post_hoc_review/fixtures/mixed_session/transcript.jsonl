@@ -1,0 +1,6 @@
+{"type": "tool_use", "name": "Read", "input": {"path": "src/config.rs"}, "output": "pub struct Config { port: u16 }", "success": true}
+{"type": "tool_use", "name": "Edit", "input": {"path": "src/config.rs", "content": "pub struct Config { port: u16, host: String }"}, "output": "ok", "success": true}
+{"type": "tool_use", "name": "Bash", "input": {"command": "cargo test"}, "output": "FAILED: missing host field", "success": false}
+{"type": "tool_use", "name": "Edit", "input": {"path": "src/main.rs", "content": "Config { port: 8080, host: localhost }"}, "output": "ok", "success": true}
+{"type": "tool_use", "name": "Bash", "input": {"command": "cargo test"}, "output": "all tests passed", "success": true}
+{"type": "tool_use", "name": "Read", "input": {"path": "src/config.rs"}, "output": "pub struct Config { port: u16, host: String }", "success": true}

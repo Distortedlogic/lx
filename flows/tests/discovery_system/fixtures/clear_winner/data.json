@@ -1,0 +1,8 @@
+{
+  "query": "mcp-server docker container management",
+  "candidates": [
+    {"name": "moondrop/docker-mcp", "stars": 2100, "language": "Rust", "relevance": 0.95, "quality": 0.88, "activity": 0.9},
+    {"name": "some/docker-tool", "stars": 50, "language": "Rust", "relevance": 0.4, "quality": 0.5, "activity": 0.3},
+    {"name": "old/container-lib", "stars": 300, "language": "Go", "relevance": 0.3, "quality": 0.6, "activity": 0.1}
+  ]
+}

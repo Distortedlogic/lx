@@ -1,0 +1,7 @@
+{
+  "query": "rate limiting middleware rust",
+  "candidates": [
+    {"name": "governor-rs/governor", "stars": 2000, "language": "Rust", "relevance": 0.85, "quality": 0.9, "activity": 0.85},
+    {"name": "benwis/tower-governor", "stars": 1800, "language": "Rust", "relevance": 0.83, "quality": 0.88, "activity": 0.87}
+  ]
+}

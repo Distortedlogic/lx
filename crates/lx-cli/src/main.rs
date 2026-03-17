@@ -1,7 +1,9 @@
-use std::io::{BufRead, Write};
+use std::io::{BufRead, IsTerminal, Write};
 use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
+
+use lx::backends::{RuntimeCtx, StdinStdoutUserBackend};
 
 use clap::{Parser, Subcommand};
 
@@ -56,7 +58,15 @@ fn run_file(path: &str, _json: bool) -> ExitCode {
             return ExitCode::from(1);
         }
     };
-    match run(&source, path) {
+    let ctx = if std::io::stdin().is_terminal() {
+        Arc::new(RuntimeCtx {
+            user: Arc::new(StdinStdoutUserBackend),
+            ..RuntimeCtx::default()
+        })
+    } else {
+        Arc::new(RuntimeCtx::default())
+    };
+    match run(&source, path, ctx) {
         Ok(()) => ExitCode::SUCCESS,
         Err(errors) => {
             let named = miette::NamedSource::new(path, source.clone());
@@ -142,7 +152,8 @@ fn run_tests(dir: &str) -> ExitCode {
                 continue;
             }
         };
-        match run(&source, entry.path.to_str().unwrap_or(&entry.name)) {
+        let ctx = Arc::new(RuntimeCtx::default());
+        match run(&source, entry.path.to_str().unwrap_or(&entry.name), ctx) {
             Ok(()) => {
                 println!("PASS {}", entry.name);
                 passed += 1;
@@ -181,11 +192,10 @@ struct TestEntry {
     path: std::path::PathBuf,
 }
 
-fn run(source: &str, filename: &str) -> Result<(), Vec<lx::error::LxError>> {
+fn run(source: &str, filename: &str, ctx: Arc<RuntimeCtx>) -> Result<(), Vec<lx::error::LxError>> {
     let tokens = lx::lexer::lex(source).map_err(|e| vec![e])?;
     let program = lx::parser::parse(tokens).map_err(|e| vec![e])?;
     let source_dir = Path::new(filename).parent().map(|p| p.to_path_buf());
-    let ctx = Arc::new(lx::backends::RuntimeCtx::default());
     let mut interp = lx::interpreter::Interpreter::new(source, source_dir, ctx);
     match interp.exec(&program) {
         Ok(val) => {

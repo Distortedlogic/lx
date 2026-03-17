@@ -140,7 +140,14 @@ fn bi_record(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();
-    let score = fields.get("score").and_then(|v| v.as_float());
+    let score = fields.get("score").and_then(|v| match v {
+        Value::Float(f) => Some(*f),
+        Value::Int(n) => {
+            use num_traits::ToPrimitive;
+            n.to_f64()
+        }
+        _ => None,
+    });
     let duration_ms = fields
         .get("duration_ms")
         .and_then(|v| v.as_int())

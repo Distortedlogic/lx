@@ -1,0 +1,11 @@
+{
+  "request": "research custom agent memory tier system",
+  "web_results": [
+    {"title": "RAG Pattern Overview", "source": "web", "summary": "Retrieval augmented generation uses vector stores for context", "relevance": 0.6},
+    {"title": "Agent Memory Systems", "source": "web", "summary": "General approaches to persistent agent memory", "relevance": 0.5}
+  ],
+  "codebase_results": [
+    {"path": "src/memory/ctx.json", "source": "codebase", "summary": "Flat JSON context file, no tiering, no L0-L3 separation", "relevance": 0.8}
+  ],
+  "github_results": []
+}

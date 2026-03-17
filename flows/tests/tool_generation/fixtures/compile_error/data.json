@@ -1,0 +1,6 @@
+{
+  "gap": "need prometheus metrics export",
+  "design": {"tool_name": "prometheus-mcp", "tools": ["list_metrics", "query_range"]},
+  "scaffold": {"files": ["src/main.rs", "src/metrics.rs", "Cargo.toml"]},
+  "code": {"compile_success": false, "error": "missing dependency: prometheus-rs", "fix_applied": true, "retry_success": true, "warnings": 0, "smoke_results": [{"tool": "list_metrics", "pass": true}, {"tool": "query_range", "pass": true}]}
+}

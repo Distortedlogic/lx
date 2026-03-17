@@ -1,0 +1,5 @@
+{"type": "tool_use", "name": "Read", "input": {"path": "schema.sql"}, "output": "CREATE TABLE users (id SERIAL, name TEXT)", "success": true}
+{"type": "tool_use", "name": "Read", "input": {"path": "schema.sql"}, "output": "CREATE TABLE users (id SERIAL, name TEXT)", "success": true}
+{"type": "tool_use", "name": "Edit", "input": {"path": "migrations/001.sql", "content": "ALTER TABLE users ADD email TEXT"}, "output": "ok", "success": true}
+{"type": "tool_use", "name": "Bash", "input": {"command": "cargo build"}, "output": "Compiled successfully", "success": true}
+{"type": "tool_use", "name": "Read", "input": {"path": "schema.sql"}, "output": "CREATE TABLE users (id SERIAL, name TEXT, email TEXT)", "success": true}

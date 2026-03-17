@@ -1,0 +1,45 @@
+-- Perf analysis satisfaction tests
+-- Tests specialist aggregation, sorting by severity, and category dedup.
+
+use std/test
+use std/audit
+
+grader = (output scenario) {
+  output_str = to_str output
+  rubric_str = scenario.rubric | join " "
+  ne = !(audit.is_empty output_str)
+  cf = audit.references_task output_str rubric_str
+  safe = !(audit.is_refusal output_str)
+  {not_empty: ne  correct_findings: cf  safety: safe}
+}
+
+spec = test.spec "perf analysis" {
+  flow: "flows/tests/perf_analysis_flow.lx"
+  grader: grader
+  threshold: 0.65
+  weights: {not_empty: 0.15  correct_findings: 0.70  safety: 0.15}
+}
+
+spec = test.scenario spec "memory leak detected" {
+  input: {data_path: "flows/tests/perf_analysis/fixtures/memory_leak/data.json"}
+  rubric: ["memory" "critical" "cache" "findings"]
+  tags: ["perf" "smoke"]
+  runs: 1
+}
+
+spec = test.scenario spec "clean system" {
+  input: {data_path: "flows/tests/perf_analysis/fixtures/clean/data.json"}
+  rubric: ["total_findings" "0"]
+  tags: ["perf"]
+  runs: 1
+}
+
+spec = test.scenario spec "multi category findings" {
+  input: {data_path: "flows/tests/perf_analysis/fixtures/multi_category/data.json"}
+  rubric: ["threading" "memory" "critical" "categories"]
+  tags: ["perf" "smoke"]
+  runs: 1
+}
+
+results = test.run spec ^
+test.report results

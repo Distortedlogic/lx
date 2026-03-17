@@ -5,7 +5,7 @@ WORK_ITEM_RULES := RULES / "work-item.md"
 
 [no-cd]
 audit:
-  @just --justfile {{justfile()}} --choose
+  RULES_DIR={{RULES}} WORK_ITEM_RULES={{WORK_ITEM_RULES}} lx run {{LX}}/workgen/audit.lx
 
 [no-cd]
 audit-bevy:

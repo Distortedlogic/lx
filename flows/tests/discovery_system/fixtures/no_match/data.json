@@ -1,0 +1,7 @@
+{
+  "query": "custom agent memory L0-L3 tier system",
+  "candidates": [
+    {"name": "some/rag-lib", "stars": 100, "language": "Python", "relevance": 0.2, "quality": 0.4, "activity": 0.3},
+    {"name": "other/vector-store", "stars": 50, "language": "TypeScript", "relevance": 0.15, "quality": 0.3, "activity": 0.2}
+  ]
+}

@@ -18,7 +18,10 @@ Protocol +TraceEntry = {type: Str  name: Str  input: Any  output: Any  success: 
   content = fs.read path ?? ""
   content | lines | filter (!= "") | flat_map (line) {
     json.parse line ? {
-      Ok entry -> [normalize entry]
+      Ok entry -> {
+        normalized = normalize entry
+        [normalized]
+      }
       Err _ -> []
     }
   }

@@ -1,0 +1,10 @@
+{
+  "mode": "audit",
+  "task": "code-quality",
+  "findings": [
+    {"category": "style", "severity": "low", "description": "unused import in src/main.rs"},
+    {"category": "safety", "severity": "medium", "description": "unwrap on fallible operation"}
+  ],
+  "grade_scores": [0.96],
+  "threshold": 0.95
+}
