@@ -35,7 +35,7 @@ required_sections = ["Goal" "Why" "What changes" "Files affected" "Task List" "C
   audit_path == "" ? {
     true -> {
       emit "error: AUDIT_FILE not set"
-      emit "usage: AUDIT_FILE=rules/rust-audit lx run flows/work_item.lx"
+      emit "usage: AUDIT_FILE=rules/rust-audit lx run workgen/run.lx"
       Err "AUDIT_FILE not set"
     }
     false -> {
@@ -74,15 +74,14 @@ required_sections = ["Goal" "Why" "What changes" "Files affected" "Task List" "C
 }
 
 gather_context = (root) {
-  tree = ($^find {root} -name "*.rs" -o -name "*.py" -o -name "*.css" -o -name "*.toml" 2>/dev/null) ?? ""
-  files = tree | lines | take 200
-  file_list = files | join "\n"
-  sources = files | take 30 | map (f) {
+  tree = ($^rg --files --type rust --type toml {root} 2>/dev/null) ?? ""
+  tree_trimmed = tree | lines | take 200 | join "\n"
+  sources = tree | lines | take 30 | map (f) {
     content = fs.read f ?? ""
     trimmed = content | lines | take 50 | join "\n"
     "--- {f} ---\n{trimmed}"
   } | join "\n\n"
-  "{file_list}\n\n{sources}"
+  "{tree_trimmed}\n\n{sources}"
 }
 
 investigate = (audit_content context) {

@@ -72,3 +72,11 @@ audit-file file:
 # run workgen satisfaction tests (optional: TEST_TAG=smoke for filtered)
 audit-test tag="":
   TEST_TAG={{tag}} cargo run -p lx-cli -- run workgen/tests/run.lx
+
+# run flow satisfaction tests
+test-flows:
+  cargo run -p lx-cli -- test flows/tests/
+
+# run flow satisfaction tests with tag filter
+test-flows-tagged tag:
+  LX_TEST_TAG={{tag}} cargo run -p lx-cli -- test flows/tests/

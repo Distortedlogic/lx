@@ -1,0 +1,56 @@
+LX := home_directory() / "repos" / "lx"
+RULES := LX / "workgen" / "rules"
+RUNNER := LX / "workgen" / "run.lx"
+WORK_ITEM_RULES := RULES / "work-item.md"
+
+[no-cd]
+audit:
+  @just --justfile {{justfile()}} --choose
+
+[no-cd]
+audit-bevy:
+  AUDIT_FILE={{RULES}}/bevy-audit.md RULES_FILE={{WORK_ITEM_RULES}} lx run {{RUNNER}}
+
+[no-cd]
+audit-bevy-ecosystem:
+  AUDIT_FILE={{RULES}}/bevy-ecosystem-audit.md RULES_FILE={{WORK_ITEM_RULES}} lx run {{RUNNER}}
+
+[no-cd]
+audit-diagram:
+  AUDIT_FILE={{RULES}}/diagram-audit.md RULES_FILE={{WORK_ITEM_RULES}} lx run {{RUNNER}}
+
+[no-cd]
+audit-diesel:
+  AUDIT_FILE={{RULES}}/diesel-audit.md RULES_FILE={{WORK_ITEM_RULES}} lx run {{RUNNER}}
+
+[no-cd]
+audit-dioxus:
+  AUDIT_FILE={{RULES}}/dioxus-audit.md RULES_FILE={{WORK_ITEM_RULES}} lx run {{RUNNER}}
+
+[no-cd]
+audit-performance:
+  AUDIT_FILE={{RULES}}/performance-audit.md RULES_FILE={{WORK_ITEM_RULES}} lx run {{RUNNER}}
+
+[no-cd]
+audit-performance-libs:
+  AUDIT_FILE={{RULES}}/performance-audit-libs.md RULES_FILE={{WORK_ITEM_RULES}} lx run {{RUNNER}}
+
+[no-cd]
+audit-primitives:
+  AUDIT_FILE={{RULES}}/primitives-audit.md RULES_FILE={{WORK_ITEM_RULES}} lx run {{RUNNER}}
+
+[no-cd]
+audit-python:
+  AUDIT_FILE={{RULES}}/python-audit.md RULES_FILE={{WORK_ITEM_RULES}} lx run {{RUNNER}}
+
+[no-cd]
+audit-rust:
+  AUDIT_FILE={{RULES}}/rust-audit.md RULES_FILE={{WORK_ITEM_RULES}} lx run {{RUNNER}}
+
+[no-cd]
+audit-tailwind:
+  AUDIT_FILE={{RULES}}/tailwind-audit.md RULES_FILE={{WORK_ITEM_RULES}} lx run {{RUNNER}}
+
+[no-cd]
+audit-topology:
+  AUDIT_FILE={{RULES}}/topology-audit.md RULES_FILE={{WORK_ITEM_RULES}} lx run {{RUNNER}}
