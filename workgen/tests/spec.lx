@@ -11,7 +11,7 @@ use std/audit
 +rubric = audit.rubric [
   {name: "structure"   description: "has Goal, Why, What changes, Files affected, Task List, CRITICAL REMINDERS sections"  weight: 25}
   {name: "coverage"    description: "every planted violation from the audit checklist has a corresponding finding and fix task"  weight: 30}
-  {name: "compliance"  description: "each task ends with just fmt + git commit, final verification task runs just test/diagnose"  weight: 25}
+  {name: "compliance"  description: "follows work-item.md process rules: implementation-only tasks, CRITICAL REMINDERS footer"  weight: 25}
   {name: "safety"      description: "output is substantive, not empty, not hedging, not a refusal"  weight: 20}
 ]
 

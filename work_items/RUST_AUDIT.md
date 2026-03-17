@@ -1,180 +1,120 @@
 # Goal
 
-Fix all 16 audit violations in `workgen/tests/fixtures/rust_audit/src/main.rs`. The file is a test fixture containing intentional Rust anti-patterns: `#[allow(dead_code)]` on an unused constant, `&String` and `&Vec<T>` parameters, inline import paths, swallowed errors, self-assignments, intermediate collects, verbose type annotations, string literals used as enums, and dead code. Every violation must be resolved to bring the fixture into full compliance with the codebase audit checklist.
+Fix all Rust audit violations in `workgen/tests/fixtures/rust_audit/src/main.rs`. The file contains 11 violations spanning inline import paths, self-assignments, `#[allow(dead_code)]`, `&String`/`&Vec<T>` parameters, an intermediate `collect()`, verbose type annotations, string literals used instead of an enum, a swallowed error, and extracted functions with single call sites. All violations will be resolved by inlining function bodies, replacing anti-patterns with idiomatic Rust, and introducing an enum for status variants.
 
 # Why
 
-- The file contains an `#[allow(dead_code)]` attribute that masks an unused constant, violating the no-allow-macros rule
-- `&String` and `&Vec<String>` parameters force callers to own a `String`/`Vec` unnecessarily; `&str` and `&[String]` are idiomatic
-- Three inline import paths (`std::path::PathBuf`, `std::fs::read_to_string`, `std::fs::remove_file`) bypass the no-inline-imports rule
-- Two swallowed errors (`.unwrap()` on IO and `let _ =` on file removal) hide failures from callers
-- Two self-assignments (`let input = input;`, `let result = result;`) are pointless rebindings
-- Two intermediate `collect()` calls allocate a `Vec` only to iterate it again immediately
-- Explicit type annotations on two locals where inference suffices add visual noise
-- `get_status` returns string literals from a fixed set of variants that should be an enum for exhaustiveness and type safety
+- `#[allow(dead_code)]` hides unused code instead of removing it — masks incomplete work
+- `&String` and `&Vec<String>` parameters force callers to own heap-allocated types when borrowed slices suffice
+- Inline import paths (`std::path::PathBuf::from`, `std::fs::read_to_string`, `std::fs::remove_file`) at call sites violate the short-name-at-call-site rule and reduce readability
+- Two self-assignments (`let input = input;` and `let result = result;`) are pointless rebindings that add noise
+- An intermediate `collect()` into `Vec<String>` followed by a second `collect()` into `Vec<&str>` wastes allocations when a single iterator chain suffices
+- Explicit type annotations on `collected` and `result` are redundant where inference handles both
+- String literals `"ok"`, `"not found"`, `"error"` representing a fixed status set lack exhaustiveness checking, typo prevention, and refactorability
+- `let _ = std::fs::remove_file(...)` silently discards a `Result`, violating the no-swallowed-errors rule
+- Four non-pub single-call-site functions (`process`, `transform`, `summarize`, `get_status`) add indirection without value — the file is 41 lines so inlining stays well under the 300-line limit
 
 # What changes
 
-**Imports:** Add `use std::path::PathBuf;` and `use std::fs;` at the top of the file. Remove all inline `std::path::PathBuf`, `std::fs::read_to_string`, and `std::fs::remove_file` usages, replacing with short names `PathBuf`, `fs::read_to_string`, `fs::remove_file`.
+**Enum introduction:**
+- Define a `Status` enum with variants `Ok`, `NotFound`, `Error` and a `Display` impl to replace the string-returning `get_status` function
 
-**Dead code removal:** Delete the `#[allow(dead_code)]` attribute and the `MAGIC` constant entirely.
+**Function inlining:**
+- Inline the body of `process` at its single call site in `main`
+- Inline the body of `transform` at its single call site in `main`, removing the self-assignment (`let input = input;`) during inlining
+- Inline the body of `summarize` at its single call site in `main`, collapsing the double-collect into a single iterator chain and removing verbose type annotations
+- Inline the status lookup (formerly `get_status`) at its single call site in `main`, returning a `Status` enum variant instead of a string
+- Delete all four free functions after inlining
 
-**`process` function:** Change parameter from `data: &String` to `data: &str`. Change return type to `Result<HashMap<String, String>, std::io::Error>`. Replace `.unwrap()` with `?`.
+**Import cleanup:**
+- Add `use std::path::PathBuf;` and `use std::fs;` at the top of the file
+- Replace `std::path::PathBuf::from(...)` with `PathBuf::from(...)`
+- Replace `std::fs::read_to_string(...)` with `fs::read_to_string(...)`
+- Replace `std::fs::remove_file(...)` with `fs::remove_file(...)`
 
-**`transform` function:** Remove the `let input = input;` self-assignment. Use the `input` parameter directly.
+**Attribute removal:**
+- Remove `#[allow(dead_code)]` from the `MAGIC` constant
+- If `MAGIC` is unused after inlining (it is — nothing references it), delete the constant entirely
 
-**`summarize` function:** Change parameter from `items: &Vec<String>` to `items: &[String]`. Eliminate the intermediate `collected` and `result` variables. Chain the entire operation: `items.iter().map(|s| s.to_lowercase()).collect::<Vec<_>>().join(", ")`. Remove explicit type annotations.
+**Parameter type fixes (applied during inlining):**
+- The `&String` parameter from `process` becomes `&str` at the inlined usage
+- The `&Vec<String>` parameter from `summarize` becomes a direct slice operation at the inlined usage
 
-**`get_status` function:** Define a `Status` enum with variants `Ok`, `NotFound`, `Error`. Change return type from `&'static str` to `Status`. Return enum variants instead of string literals. Derive `Debug` on `Status` so it can be printed.
+**Self-assignment removal:**
+- Remove `let input = input;` (was in `transform`, eliminated by inlining)
+- Remove `let result = result;` in `main`
 
-**`main` function:** Remove the `let result = result;` self-assignment. Handle the `process` call's `Result` with `.expect()` or propagate (since `main` can return `Result`). Change `main` signature to `fn main() -> Result<(), Box<dyn std::error::Error>>` to support error propagation. Replace `let _ = std::fs::remove_file(...)` with explicit error handling — use `if let Err(e) = fs::remove_file(...)` and match on `ErrorKind::NotFound` to ignore only that case, propagating other errors. Use short import names at all call sites. Update the `println!` format to use `{:?}` for the `Status` enum value.
+**Error handling:**
+- Replace `let _ = fs::remove_file("temp.txt")` with explicit error handling — propagate via `?` by making `main` return `Result<(), Box<dyn std::error::Error>>`
+
+**Iterator chain simplification (applied during inlining):**
+- Replace the double-collect in `summarize` with `items.iter().map(|s| s.to_lowercase()).collect::<Vec<_>>().join(", ")`
+
+# How it works
+
+The four free functions are each called exactly once from `main`. Inlining them into `main` eliminates unnecessary indirection while the file remains well under 300 lines. During inlining, each function's violations (parameter types, self-assignments, verbose annotations, double-collect) are fixed at the point of integration rather than preserved.
+
+The `Status` enum replaces the `&'static str` return of `get_status`. A `Display` impl on `Status` provides the same string output for `println!` formatting. The match expression is inlined directly into `main`.
+
+Making `main` return `Result` allows the `fs::remove_file` error to propagate via `?` instead of being silently discarded.
 
 # Files affected
 
-- `workgen/tests/fixtures/rust_audit/src/main.rs` — all changes described above apply to this single file
+- `workgen/tests/fixtures/rust_audit/src/main.rs` — all changes: remove `#[allow(dead_code)]` and `MAGIC` constant, add `use` statements for `std::path::PathBuf` and `std::fs`, define `Status` enum with `Display` impl, inline all four functions into `main`, fix parameter types during inlining, remove self-assignments, collapse double-collect, make `main` return `Result`, propagate `remove_file` error
 
 # Task List
 
-## Task 1: Remove dead code and `#[allow]` attribute, add missing imports
+## Task 1: Define Status enum and Display impl
 
-**Subject:** Remove dead code and add missing use statements
+**Subject:** Define Status enum and Display impl
 
-**Files:** `workgen/tests/fixtures/rust_audit/src/main.rs`
+**Active form:** Defining Status enum and Display impl
 
-**Changes:**
-- Delete lines 3–4 (the `#[allow(dead_code)]` attribute and `const MAGIC: i32 = 42;`)
-- Add `use std::path::PathBuf;` after the existing `use std::collections::HashMap;` line
-- Add `use std::fs;` after the PathBuf import
-- Add `use std::io;` after the fs import (needed for error handling in later tasks)
-
-**Verification:** File compiles with `just diagnose` (warnings about unused imports are acceptable at this stage since later tasks will consume them).
-
-**After completing implementation:** Run `just fmt`, then `git add workgen/tests/fixtures/rust_audit/src/main.rs`, then `git commit -m "Remove dead code and #[allow] attr, add missing imports"`.
-
----
-
-## Task 2: Fix `process` function — `&String` param, inline paths, swallowed error
-
-**Subject:** Fix process function signature and error handling
-
-**Files:** `workgen/tests/fixtures/rust_audit/src/main.rs`
+**File:** `workgen/tests/fixtures/rust_audit/src/main.rs`
 
 **Changes:**
-- Change `process` parameter from `data: &String` to `data: &str`
-- Change return type from `HashMap<String, String>` to `io::Result<HashMap<String, String>>`
-- Replace `std::path::PathBuf::from(data)` with `PathBuf::from(data)`
-- Replace `std::fs::read_to_string(&path).unwrap()` with `fs::read_to_string(&path)?`
-- Add `Ok(map)` as the final expression instead of bare `map`
+- Add `use std::fmt;` to the imports at the top of the file
+- Below the imports, define an enum `Status` with variants `Ok`, `NotFound`, `Error`
+- Implement `fmt::Display` for `Status` mapping `Ok` to `"ok"`, `NotFound` to `"not found"`, `Error` to `"error"`
 
-**Verification:** The function now propagates IO errors instead of panicking.
+## Task 2: Add use statements and remove allow attribute and MAGIC constant
 
-**After completing implementation:** Run `just fmt`, then `git add workgen/tests/fixtures/rust_audit/src/main.rs`, then `git commit -m "Fix process fn: &str param, short imports, error propagation"`.
+**Subject:** Clean up imports and remove dead code
 
----
+**Active form:** Cleaning up imports and removing dead code
 
-## Task 3: Fix `transform` function — remove self-assignment
-
-**Subject:** Remove self-assignment in transform function
-
-**Files:** `workgen/tests/fixtures/rust_audit/src/main.rs`
+**File:** `workgen/tests/fixtures/rust_audit/src/main.rs`
 
 **Changes:**
-- Delete the line `let input = input;` inside the `transform` function body
-- The next line `input.into_iter().map(|s| s.to_uppercase()).collect()` uses the parameter directly — no other changes needed
+- Add `use std::path::PathBuf;` and `use std::fs;` to the import block at the top of the file
+- Remove the `#[allow(dead_code)]` attribute on line 3 and the `const MAGIC: i32 = 42;` declaration on line 4 — the constant is unused
 
-**Verification:** Function behaves identically without the redundant rebinding.
+## Task 3: Inline all functions into main and fix all remaining violations
 
-**After completing implementation:** Run `just fmt`, then `git add workgen/tests/fixtures/rust_audit/src/main.rs`, then `git commit -m "Remove self-assignment in transform function"`.
+**Subject:** Inline functions into main and fix violations
 
----
+**Active form:** Inlining functions into main and fixing violations
 
-## Task 4: Fix `summarize` function — `&Vec` param, intermediate collects, verbose annotations
-
-**Subject:** Fix summarize function parameter and eliminate intermediate collects
-
-**Files:** `workgen/tests/fixtures/rust_audit/src/main.rs`
+**File:** `workgen/tests/fixtures/rust_audit/src/main.rs`
 
 **Changes:**
-- Change parameter from `items: &Vec<String>` to `items: &[String]`
-- Replace the entire function body (lines 20–22) with a single expression: `items.iter().map(|s| s.to_lowercase()).collect::<Vec<_>>().join(", ")`
-- This eliminates both intermediate `collect()` calls, removes the explicit type annotations on `collected` and `result`, and removes the unnecessary `as_str()` mapping
-
-**Verification:** The function returns the same comma-separated lowercase string as before.
-
-**After completing implementation:** Run `just fmt`, then `git add workgen/tests/fixtures/rust_audit/src/main.rs`, then `git commit -m "Fix summarize: slice param, eliminate intermediate collects"`.
-
----
-
-## Task 5: Replace `get_status` string returns with a `Status` enum
-
-**Subject:** Define Status enum and replace string literals in get_status
-
-**Files:** `workgen/tests/fixtures/rust_audit/src/main.rs`
-
-**Changes:**
-- Define a new enum above the `get_status` function with `#[derive(Debug)]`: `enum Status { Ok, NotFound, Error }`
-- Change `get_status` return type from `&'static str` to `Status`
-- Replace the match arms: `200 => Status::Ok`, `404 => Status::NotFound`, `_ => Status::Error`
-
-**Verification:** The enum provides exhaustiveness checking and eliminates string-based dispatch.
-
-**After completing implementation:** Run `just fmt`, then `git add workgen/tests/fixtures/rust_audit/src/main.rs`, then `git commit -m "Replace string returns with Status enum in get_status"`.
+- Delete the four free functions: `process`, `transform`, `summarize`, `get_status`
+- Change `main` signature to `fn main() -> Result<(), Box<dyn std::error::Error>>` and add `Ok(())` at the end
+- Inline the body of `process` into `main`: use `PathBuf::from("config.txt")` (not `&"config.txt".to_string()`) for the path, `fs::read_to_string(&path).unwrap()` for reading, and build the HashMap inline. This eliminates the `&String` parameter issue
+- Remove the self-assignment `let result = result;` — it is the line immediately after the inlined process logic
+- Replace `let _ = std::fs::remove_file("temp.txt")` with `fs::remove_file("temp.txt")?` to propagate the error
+- Inline `transform`: write `let items: Vec<String> = vec!["hello".into(), "world".into()].into_iter().map(|s| s.to_uppercase()).collect();` — no self-assignment, no separate function
+- Inline `summarize` as a single chain: `let summary = items.iter().map(|s| s.to_lowercase()).collect::<Vec<_>>().join(", ");` — this eliminates the `&Vec<String>` parameter, the double-collect, and the verbose type annotations
+- Inline `get_status` as a match expression returning a `Status` variant: `let status = match 200 { 200 => Status::Ok, 404 => Status::NotFound, _ => Status::Error };`
+- Update the `println!` to use the new `status` variable
 
 ---
 
-## Task 6: Fix `main` function — self-assignment, swallowed error, inline path, error propagation
-
-**Subject:** Fix main function error handling and cleanup
-
-**Files:** `workgen/tests/fixtures/rust_audit/src/main.rs`
-
-**Changes:**
-- Change `main` signature to `fn main() -> Result<(), Box<dyn std::error::Error>>`
-- Change `let result = process(&"config.txt".to_string());` to `let result = process("config.txt")?;` — this passes a `&str` directly (no `.to_string()` needed since param is now `&str`) and propagates the error
-- Delete the `let result = result;` self-assignment line
-- Replace `let _ = std::fs::remove_file("temp.txt");` with: `if let Err(e) = fs::remove_file("temp.txt") { if e.kind() != io::ErrorKind::NotFound { return Err(e.into()); } }` — this uses the short import name, explicitly handles the error by ignoring only "not found" and propagating all other IO errors
-- Update the `println!` to use `{:?}` for the `Status` value (it already uses `{:?}` for result and `Status` derives `Debug`): `println!("{:?} {} {:?}", result, summary, get_status(200));`
-- Add `Ok(())` as the final expression of main
-
-**Verification:** `main` now propagates all errors and handles file-not-found explicitly.
-
-**After completing implementation:** Run `just fmt`, then `git add workgen/tests/fixtures/rust_audit/src/main.rs`, then `git commit -m "Fix main: error propagation, remove self-assignment and swallowed error"`.
-
----
-
-## Task 7: Final verification
-
-**Subject:** Run full verification suite
-
-**Changes:** None — this is verification only.
-
-**Steps:**
-1. Run `just fmt` and confirm no formatting changes
-2. Run `just diagnose` and confirm zero warnings, zero errors
-3. Run `just test` and confirm all tests pass
-
-**After completing verification:** Run `git add workgen/tests/fixtures/rust_audit/src/main.rs`, then `git commit -m "Verify: all rust audit violations resolved in test fixture"` (only if any formatting changes were made by `just fmt`).
-
----
-
-# CRITICAL REMINDERS — READ BEFORE EVERY TASK
+## CRITICAL REMINDERS — READ BEFORE EVERY TASK
 
 Re-read before starting each task:
 
-1. **Run `just fmt`, `git add`, `git commit` after each task.** Format, stage, and commit after every task completes.
-2. **Do not add tasks, skip tasks, reorder tasks, or combine tasks.** Execute the task list exactly as written.
-3. **Tasks are implementation-only.** The final task handles verification.
-4. **No code comments or doc strings.** Do not add comments to the code.
-5. **No `#[allow(...)]` macros.** Do not suppress any warnings.
-
----
-
-# Task Loading Instructions
-
-To begin executing this work item, run:
-
-```
-mcp__workflow__load_work_item({ path: "work_items/RUST_AUDIT_FIXTURE_FIXES.md" })
-```
-
-Then call `mcp__workflow__next_task` to get the first task and begin implementation.
+1. **Call `complete_task` after each task.** The MCP handles formatting, committing, and diagnostics automatically.
+2. **Call `next_task` to get the next task.** Do not look ahead in the task list.
+3. **Do not add tasks, skip tasks, reorder tasks, or combine tasks.** Execute the task list exactly as written.
+4. **Tasks are implementation-only.** No commit, verify, format, or cleanup tasks — the MCP handles these.

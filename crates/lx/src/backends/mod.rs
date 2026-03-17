@@ -12,6 +12,11 @@ use crate::error::LxError;
 use crate::span::Span;
 use crate::value::Value;
 
+pub enum AgentEvent {
+    Spawned { id: String, name: String },
+    Killed { id: String },
+}
+
 pub struct RuntimeCtx {
     pub ai: Arc<dyn AiBackend>,
     pub emit: Arc<dyn EmitBackend>,
@@ -20,6 +25,7 @@ pub struct RuntimeCtx {
     pub yield_: Arc<dyn YieldBackend>,
     pub log: Arc<dyn LogBackend>,
     pub user: Arc<dyn UserBackend>,
+    pub on_agent_event: Option<Arc<dyn Fn(AgentEvent) + Send + Sync>>,
 }
 
 impl Default for RuntimeCtx {
@@ -32,6 +38,7 @@ impl Default for RuntimeCtx {
             yield_: Arc::new(StdinStdoutYieldBackend),
             log: Arc::new(StderrLogBackend),
             user: Arc::new(NoopUserBackend),
+            on_agent_event: None,
         }
     }
 }

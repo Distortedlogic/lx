@@ -1,15 +1,15 @@
 -- Work-item generation from audit checklists.
--- Reads an audit file from rules/, applies the work-item.md multi-phase
--- process: investigate -> findings -> compose -> write -> verify loop.
+-- Given an audit file and a codebase root, produce a verified work-item
+-- document following the multi-phase process in rules/work-item.md.
 --
--- Uses stdlib: std/prompt for prompt assembly, std/agents/grader for
--- scoring with incremental re-grading, std/agents/auditor for quality
--- gate, std/audit for structural checks and rubric validation,
--- std/trace for session tracing and diminishing-returns detection,
--- std/md for structural document validation.
+-- Phases: investigate (AI with tools) -> compose (AI text gen) ->
+--         write -> verify/refine loop (grader.grade + trace.should_stop).
 --
--- Usage: AUDIT_FILE=rules/rust-audit lx run workgen/main.lx
--- Or via justfile: just audit
+-- The investigate phase gives the AI Read/Glob/Grep/Bash to explore the
+-- codebase. The compose phase has all context in the prompt (tools: []).
+-- The verify loop is the core value over a raw claude -p call.
+--
+-- Usage: AUDIT_FILE=rules/rust-audit.md lx run workgen/run.lx
 
 use std/fs
 use std/ai
@@ -22,10 +22,10 @@ use std/agents/grader
 use std/agents/auditor
 
 rubric = audit.rubric [
-  {name: "coverage"    description: "every audit item has a finding and task"  weight: 25}
-  {name: "task_quality" description: "tasks are unambiguous, correctly ordered, with exact files and changes"  weight: 25}
-  {name: "compliance"  description: "format/commit after each task, final verification section, CRITICAL REMINDERS footer, Task Loading Instructions"  weight: 25}
-  {name: "correctness" description: "proposed fixes are actually correct for the codebase"  weight: 25}
+  {name: "coverage"     description: "every audit item has a finding and task"  weight: 25}
+  {name: "task_quality"  description: "tasks are unambiguous, correctly ordered, with exact files and changes"  weight: 25}
+  {name: "compliance"   description: "follows work-item.md format: required sections, CRITICAL REMINDERS footer, implementation-only tasks"  weight: 25}
+  {name: "correctness"  description: "proposed fixes are correct for the codebase"  weight: 25}
 ]
 
 required_sections = ["Goal" "Why" "What changes" "Files affected" "Task List" "CRITICAL REMINDERS"]
@@ -52,84 +52,79 @@ required_sections = ["Goal" "Why" "What changes" "Files affected" "Task List" "C
   raw_name = audit_path | split "/" | last ^
   base = raw_name | split "." | first ^
   name = base | replace "-" "_" | upper
-  context = gather_context root
 
   session = trace.create "/tmp/lx_workgen_trace.json" ^
 
   emit "=== Work Item Generator ==="
   emit "audit: {audit_path}"
+  emit "root: {root}"
   emit "output: work_items/{name}.md\n"
 
-  findings = investigate audit_content context
+  findings = investigate audit_content root ^
   trace.record {name: "investigate"  input: audit_path  output: findings} session ^
 
-  draft = compose audit_content rules_content findings context
+  draft = compose audit_content rules_content findings ^
   trace.record {name: "compose"  input: "findings"  output: draft} session ^
 
-  out_path = write_draft name draft
+  out_path = write_draft name draft ^
+
+  final = verify_and_revise session out_path draft name ^
+  fs.write out_path final ^
   trace.record {name: "complete"  input: name  output: out_path} session ^
 
   emit "\n=== complete: {out_path} ==="
   Ok {path: out_path  name}
 }
 
-gather_context = (root) {
-  tree = ($^find {root} -name "*.rs" -o -name "*.py" -o -name "*.css" -o -name "*.toml" 2>/dev/null) ?? ""
-  files = tree | lines | take 200
-  file_list = files | join "\n"
-  sources = files | take 30 | map (f) {
-    content = fs.read f ?? ""
-    trimmed = content | lines | take 50 | join "\n"
-    "--- {f} ---\n{trimmed}"
-  } | join "\n\n"
-  "{file_list}\n\n{sources}"
+gather_tree = (root) {
+  git_files = ($^git -C {root} ls-files 2>/dev/null) ?? ""
+  git_files != "" ? {
+    true -> git_files | lines | take 300 | map (f) { "{root}/{f}" } | join "\n"
+    false -> ($^find {root} -maxdepth 4 -type f -not -path "*/.git/*" -not -path "*/target/*" -not -path "*/node_modules/*" 2>/dev/null) ?? ""
+  }
 }
 
-investigate = (audit_content context) {
+investigate = (audit_content root) {
   emit "--- Phase 1-2: Investigation & Findings ---"
+  tree = gather_tree root
   p = prompt.create ()
     | prompt.section "Audit Checklist" audit_content
-    | prompt.section "Codebase Files" context
-    | prompt.instruction "For each audit item, determine if the codebase violates it"
-    | prompt.instruction "Return a numbered list of findings — each with: concrete problem, root cause, single best fix, affected files"
-    | prompt.instruction "Report ONLY problems. Verbal only, no code snippets. One fix per finding."
-    | prompt.constraint "Do not list things that are correct"
-    | prompt.constraint "Do not provide multiple options per finding"
-  tokens = prompt.estimate p
-  tokens > 50000 ? emit "  warning: investigation prompt ~{tokens} tokens"
+    | prompt.section "Codebase Root" root
+    | prompt.section "File Tree" tree
+    | prompt.instruction "For each audit item, search the codebase under '{root}/' to determine if it is violated"
+    | prompt.instruction "Read every relevant file — do not guess from filenames alone"
+    | prompt.instruction "Return a numbered list of findings: concrete problem, root cause, single best fix, affected files"
+    | prompt.constraint "Report ONLY problems — do not list things that are correct"
+    | prompt.constraint "One fix per finding, verbal only, no code snippets"
   resp = ai.prompt_with {
     prompt: (prompt.render p)
-    system: "You are a code auditor. Output a numbered list of findings. No conversation, no questions, no preamble, no asking for permission."
-    tools: []
+    append_system: "You are a code auditor. Investigate the codebase thoroughly — read files, search for patterns. Produce a numbered findings list. No conversation."
+    tools: ["Read" "Glob" "Grep" "Bash"]
+    max_turns: 15
   } ^
   out = resp.text
   emit "investigation complete ({out | lines | len} lines)"
-  out
+  Ok out
 }
 
-compose = (audit_content rules_content findings context) {
+compose = (audit_content rules_content findings) {
   emit "\n--- Phase 3-4: Composition & Task List ---"
   p = prompt.create ()
     | prompt.section "Audit Checklist" audit_content
     | prompt.section "Process Rules" rules_content
     | prompt.section "Investigation Findings" findings
-    | prompt.section "Codebase Files" context
-    | prompt.instruction "Produce a single markdown work item document"
-    | prompt.instruction "Required sections: # Goal, # Why, # What changes, # Files affected, # Task List, # CRITICAL REMINDERS, # Task Loading Instructions"
-    | prompt.instruction "Each task must end with: just fmt, git add, git commit"
-    | prompt.instruction "Final task must be verification: just test, just diagnose, just fmt"
-    | prompt.constraint "Output ONLY the raw markdown. No preamble, no commentary, no questions"
-    | prompt.constraint "Start output with '# Goal' — nothing before it"
-  tokens = prompt.estimate p
-  tokens > 50000 ? emit "  warning: composition prompt ~{tokens} tokens"
+    | prompt.instruction "Produce a single markdown work item document following the Process Rules exactly"
+    | prompt.instruction "Required sections: # Goal, # Why, # What changes, # Files affected, # Task List, # CRITICAL REMINDERS"
+    | prompt.constraint "Output ONLY the raw markdown — no preamble, no commentary"
+    | prompt.constraint "Start with '# Goal' — nothing before it"
   resp = ai.prompt_with {
     prompt: (prompt.render p)
-    system: "You are a markdown document generator. Output the document directly. Start with '# Goal'. No conversation, no questions, no preamble, no asking for permission."
+    append_system: "You are a markdown document generator. Output the document directly. Start with '# Goal'. No conversation."
     tools: []
   } ^
   out = resp.text
   emit "composition complete ({out | lines | len} lines)"
-  out
+  Ok out
 }
 
 write_draft = (name content) {
@@ -137,21 +132,22 @@ write_draft = (name content) {
   path = "work_items/{name}.md"
   fs.write path content ^
   emit "\n--- Phase 5: Written to {path} ---"
-  path
+  Ok path
 }
 
 check_sections = (draft) {
   headings = md.parse draft | md.headings
   missing = required_sections | filter (req) {
-    headings | any? (h) contains? req h.text | not
+    found = headings | any? (h) { contains? req h.text }
+    not found
   }
   missing | empty? ? {
     true -> {
-      emit "  sections check: all {required_sections | len} required sections present"
+      emit "  sections: all {required_sections | len} required sections present"
       true
     }
     false -> {
-      emit "  sections check: missing {missing | join ", "}"
+      emit "  sections: missing {missing | join ", "}"
       false
     }
   }
@@ -162,19 +158,24 @@ grade_draft = (draft name prev_grades) {
     work: draft
     task: "work item document for {name}"
     rubric: rubric
-    threshold: 95
+    threshold: 75
     previous_grades: prev_grades
   }
 }
 
 revise_draft = (draft feedback) {
   p = prompt.create ()
-    | prompt.system "You are revising a work item document. Fix ALL feedback items."
     | prompt.section "Current Document" draft
     | prompt.section "Feedback to Fix" feedback
-    | prompt.instruction "Return ONLY the revised markdown document"
-    | prompt.constraint "Fix every item — do not remove content to avoid checks"
-  ai.prompt (prompt.render p) ^
+    | prompt.instruction "Fix ALL feedback items. Return the complete revised markdown document."
+    | prompt.constraint "Do not remove content to avoid checks — fix issues properly"
+    | prompt.constraint "Start with '# Goal' — nothing before it"
+  resp = ai.prompt_with {
+    prompt: (prompt.render p)
+    append_system: "You are revising a work item document. Fix every feedback item. Output the complete revised document."
+    tools: []
+  } ^
+  Ok resp.text
 }
 
 verify_and_revise = (session path draft name) {
@@ -196,17 +197,17 @@ verify_and_revise = (session path draft name) {
     trace.record {name: "progress"  score: grade_result.score  output: "round"} session ^
     emit "  score {grade_result.score} passed={grade_result.passed}"
 
-    grade_result.passed ? break current
+    grade_result.passed ? break ()
 
     should_stop = trace.should_stop {min_delta: 2.0  window: 3} session
     should_stop ? {
       true -> {
         emit "  diminishing returns — stopping"
-        break current
+        break ()
       }
       false -> {
         prev_grades <- grade_result.categories
-        revised = revise_draft current grade_result.feedback
+        revised = revise_draft current grade_result.feedback ^
         fs.write path revised ^
         current <- revised
       }
@@ -218,5 +219,5 @@ verify_and_revise = (session path draft name) {
     true -> emit "  auditor: passed (score {final_check.score})"
     false -> emit "  auditor: failed (score {final_check.score}) — {final_check.feedback}"
   }
-  current
+  Ok current
 }

@@ -1,5 +1,6 @@
 pub(crate) mod agent;
 mod agent_capability;
+mod agent_ipc;
 mod agent_dialogue;
 mod agent_dispatch;
 mod agent_gate;

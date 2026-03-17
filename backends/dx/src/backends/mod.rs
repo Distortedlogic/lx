@@ -7,9 +7,11 @@ pub mod yield_;
 
 use std::sync::Arc;
 
-use lx::backends::{ClaudeCodeAiBackend, ProcessShellBackend, ReqwestHttpBackend, RuntimeCtx};
+use std::time::Instant;
 
-use crate::event::EventBus;
+use lx::backends::{AgentEvent, ClaudeCodeAiBackend, ProcessShellBackend, ReqwestHttpBackend, RuntimeCtx};
+
+use crate::event::{EventBus, RuntimeEvent};
 use crate::langfuse::LangfuseClient;
 
 use ai::DxAiBackend;
@@ -47,6 +49,24 @@ pub fn build_runtime_ctx(
             langfuse,
             agent_id: agent_id.clone(),
         }),
-        user: Arc::new(DxUserBackend::new(bus, agent_id)),
+        user: Arc::new(DxUserBackend::new(bus.clone(), agent_id)),
+        on_agent_event: Some(Arc::new(move |event: AgentEvent| {
+            match event {
+                AgentEvent::Spawned { id, name } => {
+                    bus.send(RuntimeEvent::AgentSpawned {
+                        agent_id: id,
+                        name,
+                        config: serde_json::Value::Null,
+                        ts: Instant::now(),
+                    });
+                }
+                AgentEvent::Killed { id } => {
+                    bus.send(RuntimeEvent::AgentKilled {
+                        agent_id: id,
+                        ts: Instant::now(),
+                    });
+                }
+            }
+        })),
     })
 }
