@@ -122,13 +122,18 @@ fn resolve_module_path(
     }
     let mut result = if path[0] == "." || path[0] == ".." {
         let mut base = source_dir.to_path_buf();
-        if path[0] == ".." {
+        let mut idx = 0;
+        while idx < path.len() && path[idx] == ".." {
             base = base
                 .parent()
                 .ok_or_else(|| LxError::runtime("cannot go above root directory", span))?
                 .to_path_buf();
+            idx += 1;
         }
-        for segment in &path[1..] {
+        if idx == 0 {
+            idx = 1;
+        }
+        for segment in &path[idx..] {
             base.push(segment);
         }
         base

@@ -1,11 +1,11 @@
 pub(crate) mod agent;
 mod agent_capability;
-mod agent_ipc;
 mod agent_dialogue;
 mod agent_dispatch;
 mod agent_gate;
 mod agent_handoff;
 mod agent_intercept;
+mod agent_ipc;
 mod agent_mock;
 mod agent_negotiate;
 mod agent_pubsub;

@@ -25,6 +25,19 @@ impl super::Parser {
 
     pub(super) fn parse_block_or_record(&mut self, start: u32) -> Result<SExpr, LxError> {
         self.skip_semis();
+        if *self.peek() == TokenKind::Colon
+            && self
+                .tokens
+                .get(self.pos + 1)
+                .is_some_and(|t| t.kind == TokenKind::RBrace)
+        {
+            self.advance();
+            let end = self.expect_kind(&TokenKind::RBrace)?.span.end();
+            return Ok(SExpr::new(
+                Expr::Record(vec![]),
+                Span::from_range(start, end),
+            ));
+        }
         if super::looks_like_record(self) {
             return self.parse_record(start);
         }
@@ -51,7 +64,12 @@ impl super::Parser {
                 let name = self.expect_ident("record field")?;
                 if *self.peek() == TokenKind::Colon {
                     self.advance();
+                    let saved_depth = self.collection_depth;
+                    self.collection_depth = 0;
+                    self.record_field_depth += 1;
                     let value = self.parse_expr(0)?;
+                    self.record_field_depth -= 1;
+                    self.collection_depth = saved_depth;
                     fields.push(RecordField {
                         name: Some(name),
                         value,

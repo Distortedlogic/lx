@@ -189,3 +189,37 @@ validate = (n) n < 0 ? {
 assert (validate 50 == Ok 50)
 assert (validate (-1) == Err "negative")
 assert (validate 200 == Err "too large")
+
+-- Protocol +Name export syntax (+ between keyword and name)
+Protocol +ExportedProto = {value: Int}
+ep = ExportedProto {value: 42}
+assert (ep.value == 42) "Protocol +Name creates usable protocol"
+
+-- both syntaxes are equivalent
+Protocol PlainProto = {x: Str}
+pp = PlainProto {x: "hi"}
+assert (pp.x == "hi") "Protocol without + works"
+
+-- record field values with function calls and pipes
+r_pipe = {x: [1 2 3] | sum}
+assert (r_pipe.x == 6) "record field with pipe"
+r_call = {x: to_str 42}
+assert (r_call.x == "42") "record field with function call"
+r_prefix = {x: not true}
+assert (r_prefix.x == false) "record field with prefix op"
+
+-- list/record spread with function call (use parens to wrap fn call)
+make_list = (a b) [a b a + b]
+assert ([..(make_list 1 2)] == [1 2 3]) "list spread with paren fn call"
+assert ([..(make_list 1 2); 10] == [1 2 3 10]) "list spread + extra elements"
+
+-- empty record literal {:}
+empty = {:}
+assert (empty == {:}) "empty record"
+assert (keys empty | len == 0) "empty record has no keys"
+
+-- missing record field returns None
+r_miss = {x: 1}
+assert (r_miss.x == 1) "present field works"
+assert (r_miss.y == None) "missing field returns None"
+assert (r_miss.y ?? 42 == 42) "missing field coalesces"

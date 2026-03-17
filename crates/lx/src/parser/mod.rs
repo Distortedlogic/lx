@@ -28,6 +28,7 @@ pub fn parse(tokens: Vec<Token>) -> Result<Program, LxError> {
         pos: 0,
         no_juxtapose: false,
         collection_depth: 0,
+        record_field_depth: 0,
         stop_ident: None,
     }
     .parse_program()
@@ -38,6 +39,7 @@ pub(crate) struct Parser {
     pub(crate) pos: usize,
     pub(crate) no_juxtapose: bool,
     pub(crate) collection_depth: u32,
+    pub(crate) record_field_depth: u32,
     pub(crate) stop_ident: Option<String>,
 }
 
@@ -119,6 +121,12 @@ impl Parser {
                 continue;
             }
             if self.is_application_candidate(&left, min_bp) {
+                if self.record_field_depth > 0
+                    && matches!(self.peek(), TokenKind::Ident(_))
+                    && self.tokens.get(self.pos + 1).map(|t| &t.kind) == Some(&TokenKind::Colon)
+                {
+                    break;
+                }
                 if matches!(self.peek(), TokenKind::Ident(_))
                     && self.tokens.get(self.pos + 1).map(|t| &t.kind) == Some(&TokenKind::Colon)
                 {

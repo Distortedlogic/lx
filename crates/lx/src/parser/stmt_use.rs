@@ -7,11 +7,13 @@ impl super::Parser {
     pub(super) fn parse_use_stmt(&mut self, start: u32) -> Result<SStmt, LxError> {
         self.advance();
         let mut path = Vec::new();
-        if *self.peek() == TokenKind::DotDot {
+        while *self.peek() == TokenKind::DotDot {
             self.advance();
             path.push("..".to_string());
             self.expect_kind(&TokenKind::Slash)?;
-        } else if *self.peek() == TokenKind::Dot
+        }
+        if path.is_empty()
+            && *self.peek() == TokenKind::Dot
             && self
                 .tokens
                 .get(self.pos + 1)

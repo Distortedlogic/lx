@@ -6,10 +6,14 @@ use crate::token::TokenKind;
 impl super::Parser {
     pub(super) fn parse_trait_decl(
         &mut self,
-        exported: bool,
+        mut exported: bool,
         start: u32,
     ) -> Result<SStmt, LxError> {
         self.advance();
+        if *self.peek() == TokenKind::Plus {
+            self.advance();
+            exported = true;
+        }
         let name = self.expect_type_name("Trait declaration")?;
         self.expect_kind(&TokenKind::Assign)?;
         self.expect_kind(&TokenKind::LBrace)?;
@@ -75,10 +79,14 @@ impl super::Parser {
 
     pub(super) fn parse_agent_decl(
         &mut self,
-        exported: bool,
+        mut exported: bool,
         start: u32,
     ) -> Result<SStmt, LxError> {
         self.advance();
+        if *self.peek() == TokenKind::Plus {
+            self.advance();
+            exported = true;
+        }
         let name = self.expect_type_name("Agent declaration")?;
         let traits = if *self.peek() == TokenKind::Colon {
             self.advance();

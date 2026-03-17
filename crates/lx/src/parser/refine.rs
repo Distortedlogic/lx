@@ -5,7 +5,7 @@ use crate::token::TokenKind;
 
 impl super::Parser {
     pub(crate) fn parse_refine(&mut self, start: u32) -> Result<SExpr, LxError> {
-        let initial = self.parse_expr(0)?;
+        let initial = self.parse_expr(32)?;
         self.expect_kind(&TokenKind::LBrace)?;
         let mut grade = None;
         let mut revise = None;

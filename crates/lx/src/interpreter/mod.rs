@@ -92,6 +92,7 @@ impl Interpreter {
     pub fn new(source: &str, source_dir: Option<PathBuf>, ctx: Arc<RuntimeCtx>) -> Self {
         let mut env = Env::new();
         crate::builtins::register(&mut env);
+        *ctx.source_dir.lock() = source_dir.clone();
         Self {
             env: env.into_arc(),
             source: source.to_string(),

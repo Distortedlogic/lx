@@ -4,8 +4,16 @@ use crate::span::Span;
 use crate::token::TokenKind;
 
 impl super::Parser {
-    pub(super) fn parse_mcp_decl(&mut self, exported: bool, start: u32) -> Result<SStmt, LxError> {
+    pub(super) fn parse_mcp_decl(
+        &mut self,
+        mut exported: bool,
+        start: u32,
+    ) -> Result<SStmt, LxError> {
         self.advance();
+        if *self.peek() == TokenKind::Plus {
+            self.advance();
+            exported = true;
+        }
         let name = self.expect_type_name("MCP declaration")?;
         self.expect_kind(&TokenKind::Assign)?;
         self.expect_kind(&TokenKind::LBrace)?;

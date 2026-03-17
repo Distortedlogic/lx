@@ -77,10 +77,7 @@ impl Interpreter {
         let val = self.eval(expr)?;
         match field {
             FieldKind::Named(name) => match &val {
-                Value::Record(r) => r
-                    .get(name)
-                    .cloned()
-                    .ok_or_else(|| LxError::runtime(format!("field '{name}' not found"), span)),
+                Value::Record(r) => Ok(r.get(name).cloned().unwrap_or(Value::None)),
                 Value::Agent { methods, init, .. } => {
                     if let Some(m) = methods.get(name) {
                         Ok(m.clone())
@@ -96,10 +93,21 @@ impl Interpreter {
                         ))
                     }
                 }
-                other => Err(LxError::type_err(
-                    format!("field access on {}, not Record", other.type_name()),
-                    span,
-                )),
+                other => {
+                    eprintln!("[DBG] field access .{name} on {} = {}", other.type_name(), other.short_display());
+                    if let Expr::Ident(ref ident_name) = expr.node {
+                        eprintln!("[DBG] expr was Ident('{ident_name}')");
+                    } else {
+                        eprintln!("[DBG] expr node = {:?}", std::mem::discriminant(&expr.node));
+                    }
+                    if let Value::Func(lf) = other {
+                        eprintln!("[DBG] Func params={:?} arity={} applied={}", lf.params, lf.arity, lf.applied.len());
+                    }
+                    Err(LxError::type_err(
+                        format!("field access on {}, not Record", other.type_name()),
+                        span,
+                    ))
+                }
             },
             FieldKind::Index(idx) => {
                 let items = match &val {
@@ -125,10 +133,9 @@ impl Interpreter {
             FieldKind::Computed(key_expr) => {
                 let key = self.eval(key_expr)?;
                 match (&val, &key) {
-                    (Value::Record(r), Value::Str(s)) => r
-                        .get(s.as_ref())
-                        .cloned()
-                        .ok_or_else(|| LxError::runtime(format!("field '{s}' not found"), span)),
+                    (Value::Record(r), Value::Str(s)) => {
+                        Ok(r.get(s.as_ref()).cloned().unwrap_or(Value::None))
+                    }
                     (Value::Map(m), Value::Str(s)) => {
                         let vk = crate::value::ValueKey(Value::Str(s.clone()));
                         m.get(&vk)

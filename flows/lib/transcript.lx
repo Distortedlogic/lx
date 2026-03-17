@@ -25,13 +25,7 @@ Protocol +TraceEntry = {type: Str  name: Str  input: Any  output: Any  success: 
 }
 
 normalize = (entry) {
-  TraceEntry {
-    type: get "type" entry ?? "unknown"
-    name: get "name" entry ?? ""
-    input: get "input" entry ?? %{}
-    output: get "output" entry ?? %{}
-    success: get "success" entry ?? true
-  }
+  TraceEntry {type: entry.type ?? "unknown"  name: entry.name ?? ""  input: entry.input ?? %{}  output: entry.output ?? %{}  success: entry.success ?? true}
 }
 
 +tool_calls = (entries) entries | filter (e) e.type == "tool_use"

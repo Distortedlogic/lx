@@ -26,6 +26,7 @@ pub struct RuntimeCtx {
     pub log: Arc<dyn LogBackend>,
     pub user: Arc<dyn UserBackend>,
     pub on_agent_event: Option<Arc<dyn Fn(AgentEvent) + Send + Sync>>,
+    pub source_dir: parking_lot::Mutex<Option<std::path::PathBuf>>,
 }
 
 impl Default for RuntimeCtx {
@@ -39,6 +40,7 @@ impl Default for RuntimeCtx {
             log: Arc::new(StderrLogBackend),
             user: Arc::new(NoopUserBackend),
             on_agent_event: None,
+            source_dir: parking_lot::Mutex::new(None),
         }
     }
 }

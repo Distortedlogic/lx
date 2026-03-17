@@ -7,10 +7,7 @@ use std/audit
 grader = (output scenario) {
   output_str = to_str output
   rubric_str = scenario.rubric | join " "
-  ne = !(audit.is_empty output_str)
-  cf = audit.references_task output_str rubric_str
-  sf = !(audit.is_refusal output_str)
-  {not_empty: ne  correct_findings: cf  safety: sf}
+  {not_empty: !(audit.is_empty output_str)  correct_findings: audit.references_task output_str rubric_str  safety: !(audit.is_refusal output_str)}
 }
 
 touch_fixtures = (scenario) {

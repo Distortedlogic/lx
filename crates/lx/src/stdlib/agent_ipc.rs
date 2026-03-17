@@ -19,10 +19,7 @@ pub fn builtins() -> Vec<(&'static str, Value)> {
         ("send", mk("agent.send", 2, bi_send)),
         ("name", mk("agent.name", 1, bi_name)),
         ("status", mk("agent.status", 1, bi_status)),
-        (
-            "implements",
-            mk("agent.implements", 2, bi_implements),
-        ),
+        ("implements", mk("agent.implements", 2, bi_implements)),
     ]
 }
 

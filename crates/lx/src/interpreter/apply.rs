@@ -8,12 +8,7 @@ use crate::value::{LxFunc, Value};
 use super::Interpreter;
 
 impl Interpreter {
-    pub(super) fn apply_func(
-        &mut self,
-        func: Value,
-        arg: Value,
-        span: Span,
-    ) -> Result<Value, LxError> {
+    pub fn apply_func(&mut self, func: Value, arg: Value, span: Span) -> Result<Value, LxError> {
         match func {
             Value::Func(mut lf) => {
                 if let Value::Unit = &arg

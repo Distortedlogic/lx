@@ -59,3 +59,6 @@ use ./lib_types : t
 colors = [Red Green Blue]
 names = colors | map t.color_name
 assert (names == ["red" "green" "blue"])
+
+-- multi-level parent import (test is in sub/sub2, goes up 2 levels)
+-- tested via: lx run tests/11_modules/sub/sub2/deep_import.lx
