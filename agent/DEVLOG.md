@@ -59,7 +59,7 @@ Non-obvious choices that cause confusion if forgotten:
 - Shell line is single-line only — forces `${ }` for complex commands
 - Named args + default params + currying interaction
 - Unicode chars in lexer cause panics (byte vs char indexing in comments)
-- 24 files over 300-line limit (statements.rs at 812 is worst offender; parser: 4, interpreter: 4, builtins: 2, stdlib: 9, lexer: 1, core: 2, cli: 1)
+- 6 files over 300-line limit (agent_reconcile_strat.rs 326, cron.rs 320, main.rs 315, str.rs 314, mcp.rs 304, tasks.rs 302)
 
 ## Session History
 

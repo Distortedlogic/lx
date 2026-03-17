@@ -6,24 +6,27 @@ Stable how-to guides and codebase layout. Changes infrequently.
 
 ```
 crates/lx/src/
-  backends/    mod.rs (traits + RuntimeCtx), defaults.rs (standard impls), user.rs (UserBackend impls)
-  lexer/       mod.rs, numbers.rs, strings.rs
-  parser/      mod.rs, func.rs, infix.rs, paren.rs, pattern.rs, prefix.rs, refine.rs, statements.rs, type_ann.rs
-  checker/     mod.rs, synth.rs, types.rs
-  interpreter/ mod.rs, agents.rs, apply.rs, collections.rs, eval.rs, modules.rs, patterns.rs, refine.rs, shell.rs
-  builtins/    mod.rs, call.rs, str.rs, coll.rs, hof.rs, hof_extra.rs
-  stdlib/      mod.rs + 66 module files
-  ast.rs, token.rs, value.rs, value_display.rs, env.rs, error.rs, span.rs, lib.rs
+  ast/         AST node definitions + type annotation AST
+  backends/    RuntimeCtx struct, backend traits (Ai/Emit/Http/Shell/Yield/Log/User), default impls
+  lexer/       Tokenizer — mod, numbers, strings, keywords, helpers
+  parser/      Recursive descent — mod + split files per feature (func, infix, prefix, pattern, statements, etc.)
+  checker/     Bidirectional type checker — mod, synth, types
+  interpreter/ Tree-walking evaluator — mod + split files (agents, apply, eval, modules, patterns, etc.)
+  builtins/    Built-in functions — mod, call, str, coll, hof, convert, register, etc.
+  visitor/     AST visitor/walker infrastructure
+  stdlib/      39 registered modules across ~85 .rs files (use `std_module_exists` in mod.rs as source of truth)
+  token.rs, value.rs, value_display.rs, value_impls.rs, ast_display.rs, env.rs, error.rs, span.rs, lib.rs
 crates/lx-cli/src/main.rs
-doc/           35 quick-reference docs for implemented features
+doc/           35 quick-reference docs
 spec/          51 spec files
 agent/         Context files (this folder)
-tests/         69 test suites (.lx files + 11_modules dir)
-  fixtures/    agent_echo.lx, mcp_test_server.py, yield_orchestrator.py, http_test_server.py, yield_simple.lx, yield_multi.lx, yield_pipeline.lx
+tests/         71 test suites (70 .lx files + 11_modules dir)
+  fixtures/    Test helpers (agent_echo.lx, orchestrators, servers, test flows)
 flows/
-  lib/         10 reusable .lx library modules
-  examples/    13 .lx programs translating arch_diagrams
+  lib/         15 reusable .lx library modules
+  examples/    14 .lx programs translating arch_diagrams
   specs/       14 target goal + scenario specs
+  tests/       Flow satisfaction test suites
 ```
 
 ## Adding a Stdlib Module
@@ -86,17 +89,23 @@ When adding errors, follow these rules:
 | tool_generation     | std/ai, std/tasks, std/agents/auditor                                        |
 | defense_layers      | std/agents/monitor, std/circuit, std/trace, capability attenuation           |
 | mcp_tool_audit      | std/tasks, std/audit                                                         |
+| software_diffusion  | std/ai, std/tasks, std/agents/planner                                        |
 | (any flow)          | std/diag (visualize any flow's structure)                                    |
 
 | Library (lib/)      | Purpose                                                                      |
 | ------------------- | ---------------------------------------------------------------------------- |
 | catalog             | Tool/capability catalog management                                           |
 | dispatch            | Message dispatch helpers                                                     |
+| github              | GitHub API interaction patterns                                              |
 | grading             | Output grading utilities                                                     |
 | guard               | Guard/validation patterns                                                    |
+| guidance            | Guidance/instruction patterns                                                |
+| mcp_session         | MCP session management                                                       |
 | memory              | Memory management patterns                                                   |
 | react               | ReAct loop implementation                                                    |
 | report              | Report generation utilities                                                  |
 | scoring             | Scoring/ranking helpers                                                      |
+| specialists         | Specialist agent patterns                                                    |
+| training            | Training/fine-tuning patterns                                                |
 | transcript          | Conversation transcript handling                                             |
 | workflow            | Workflow composition patterns                                                |

@@ -40,7 +40,7 @@ Future features only. For what's already implemented, see `agent/INVENTORY.md`.
 | `lx.toml` manifest   | `spec/package-manifest.md`     | Package identity, deps, entry, backend config     | Tier 2   |
 | `lx init`            | `spec/package-manifest.md`     | Scaffold new project with manifest                | Tier 2   |
 | `lx install/update`  | `spec/package-manifest.md`     | Dependency resolution and locking                 | Tier 3   |
-| `lx signal`          | `spec/toolchain.md`            | Send interrupt signals to running agents           | Tier 1   |
+| `lx signal`          | `spec/toolchain.md`            | Send interrupt signals to running agents (absorbed by `std/user` signal poll) | Done |
 
 ## Planned Language Changes (parser/interpreter work required)
 
@@ -65,6 +65,9 @@ Future features only. For what's already implemented, see `agent/INVENTORY.md`.
 | `std/user`       | 49      | 9 functions, `UserBackend` trait, signal poll via `.lx/signals/` |
 | `std/profile`    | 49      | 15 functions, persistent identity + strategy helpers, file-backed |
 | `Agent` declarations | 49  | `Agent Name: TraitList = { body }`, `Value::Agent`, trait conformance |
+| `lx signal`       | 49      | Absorbed by `std/user` signal poll via `.lx/signals/`            |
+| `std/test`         | post-49 | Test runner infrastructure                                       |
+| `std/describe`     | post-49 | BDD-style describe/it blocks                                     |
 
 ## Eliminated by Merges
 

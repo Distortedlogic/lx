@@ -49,7 +49,7 @@ What lx can do right now. For project health/status, see the "Where We're At" se
 - Identity: `std/profile` — persistent agent profiles: `load`, `save`, `learn`, `recall`, `recall_prefix`, `forget`, `preference`, `get_preference`, `history`, `merge`, `age`, `decay`. Strategy helpers: `best_strategy`, `rank_strategies`, `adapt_strategy`. File-backed at `.lx/profiles/{name}.json`
 - Visualization: `std/diag`
 
-## Agent Extensions (13 sub-modules of `std/agent`)
+## Agent Extensions (11 sub-modules of `std/agent`)
 
 - `agent.reconcile` — 6 merge strategies (union, intersection, vote, highest_confidence, max_score, merge_fields) + custom Fn
 - `agent.dialogue` — multi-turn stateful sessions with config `{role? context? max_turns?}`
@@ -67,6 +67,8 @@ What lx can do right now. For project health/status, see the "Where We're At" se
 
 - `ai.prompt_structured` — Protocol-validated LLM output with auto-retry
 - `trace.improvement_rate` + `trace.should_stop` — diminishing returns detection
+- `std/test` — test runner infrastructure (test/describe blocks)
+- `std/describe` — BDD-style describe/it blocks with structured results
 
 ## Runtime
 
@@ -80,4 +82,4 @@ What lx can do right now. For project health/status, see the "Where We're At" se
 
 ## Test Coverage
 
-69 test suites (68 .lx files + 11_modules dir) in `tests/`. Fixtures in `tests/fixtures/`.
+71 test suites (70 .lx files + 11_modules dir) in `tests/`. Fixtures in `tests/fixtures/`.
