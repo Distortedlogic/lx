@@ -21,7 +21,7 @@ crates/lx-cli/src/  main.rs, manifest.rs, testing.rs, listing.rs, run.rs, agent_
 doc/           35 quick-reference docs
 spec/          51 spec files
 agent/         Context files (this folder)
-tests/         71 test suites (70 .lx files + 11_modules dir)
+tests/         72 test suites (71 .lx files + 11_modules dir)
   fixtures/    Test helpers (agent_echo.lx, orchestrators, servers, test flows)
 flows/
   lib/         15 reusable .lx library modules
@@ -58,6 +58,25 @@ For new keywords like `Agent`, `Trait`, `Protocol`, `with ... as`:
 7. **Diag walker**: add walk case in `stdlib/diag_walk.rs`
 8. **Module exports**: add export case in `interpreter/modules.rs`
 9. **Value** (if runtime representation needed): add variant to `value.rs`, update `structural_eq`, `hash_value`, `value_display.rs`
+
+## Module Resolution
+
+`interpreter/modules.rs` handles all `use` statements. Resolution order in `eval_use`:
+
+1. **Stdlib** — `std_module_exists(&path)` checks if it's a built-in module
+2. **Workspace member** — `resolve_workspace_module(&path)` checks if `path[0]` matches a workspace member name (requires `path.len() >= 2`). Resolves rest of path from member's root dir. Member map lives on `RuntimeCtx.workspace_members` (populated by CLI).
+3. **Relative** — `resolve_module_path(source_dir, &path)` handles `./` and `../` prefixes
+
+Key functions: `eval_use` (dispatch), `load_module` (parse + execute + cache), `collect_exports` (extract `+` bindings). Module cache keyed by canonical path prevents double-loading. `loading` set detects circular imports.
+
+## Modifying the CLI
+
+CLI lives in `crates/lx-cli/src/`. `main.rs` has the clap `Command` enum and dispatch.
+
+1. **Add subcommand**: add variant to `Command` enum in `main.rs`, add match arm in `main()`
+2. **Add flag to existing command**: add `#[arg]` field to the variant struct
+3. **Workspace-aware commands**: use `manifest::find_workspace_root` + `manifest::load_workspace` to discover members. For member filtering: accept `-m`/`--member` flag, filter `ws.members` by name.
+4. **Populate RuntimeCtx for workspace imports**: call `manifest::try_load_workspace_members()` and set `ctx.workspace_members` before running any lx code. Without this, `use member/path` won't resolve.
 
 ## Error Messages
 

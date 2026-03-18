@@ -1,8 +1,8 @@
 -- Tick: control register for brain/
 -- Rewritten every tick. The previous agent wrote this to program YOU.
 -- Context files in brain/ are your memory across sessions. Keep them accurate.
--- Shared protocol: `TICK_PROTOCOL.md` (sibling cross-read guide, end-of-tick handoff)
--- Format: Identity → Siblings → State → Task → Reading → Context → Rules → End of Tick
+-- BEFORE writing code: follow Start of Tick Protocol in `TICK_PROTOCOL.md`
+-- AFTER finishing work: follow End of Tick Protocol in `TICK_PROTOCOL.md`
 
 ## Identity
 
@@ -27,9 +27,11 @@ See `TICK_PROTOCOL.md` for cross-read guidance.
 71/71 tests pass (2026-03-18). `just diagnose` clean. All brain files under 300 lines.
 22 lx files: protocols.lx, traits.lx, main.lx, orchestrator.lx, 6 agents, 12 lib modules.
 Two sessions closed 26 gaps. No test infrastructure yet (brain/tests/ doesn't exist).
-**Workspace system shipped (Session 53).** `brain/lx.toml` exists but has no `[test]`
+**Workspace system shipped (Sessions 53-54).** `brain/lx.toml` exists but has no `[test]`
 section — add one when you create brain/tests/ (see `tests/lx.toml` for example).
 After adding tests: verify with `lx test -m brain`.
+**Cross-member imports now work (Session 54).** `use flows/lib/scoring {normalize}` resolves
+via workspace member name. Brain files can import from flows/, workgen/, tests/ by name.
 
 ## This Tick
 
@@ -72,5 +74,5 @@ Use `agent.mock` for faking agent responses. Use `describe`/`it` test blocks.
 
 ## End of Tick
 
-Follow `TICK_PROTOCOL.md`. Verify, update `brain/STATUS.md`, rewrite this file for the
-next agent. Keep TICK.md under 100 lines — factor stable content to context files, don't delete.
+**MANDATORY: Execute ALL 5 steps in `TICK_PROTOCOL.md` as one uninterrupted sequence.**
+Do not declare completion without running every step. Do not skip context file reviews.

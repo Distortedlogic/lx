@@ -1,8 +1,8 @@
 -- Tick: control register for agent/
 -- Rewritten every tick. The previous agent wrote this to program YOU.
 -- Context files in agent/ are your memory across sessions. Keep them accurate.
--- Shared protocol: `TICK_PROTOCOL.md` (sibling cross-read guide, end-of-tick handoff)
--- Format: Identity → Siblings → State → Task → Reading → Context → Rules → End of Tick
+-- BEFORE writing code: follow Start of Tick Protocol in `TICK_PROTOCOL.md`
+-- AFTER finishing work: follow End of Tick Protocol in `TICK_PROTOCOL.md`
 
 ## Identity
 
@@ -69,5 +69,5 @@ resolves via member name), `lx run member-name` resolves via manifest entry,
 
 ## End of Tick
 
-Follow `TICK_PROTOCOL.md`. Verify, update context files, rewrite this file for the next
-agent. Keep TICK.md under 100 lines — factor stable content to context files, don't delete.
+**MANDATORY: Execute ALL 5 steps in `TICK_PROTOCOL.md` as one uninterrupted sequence.**
+Do not declare completion without running every step. Do not skip context file reviews.

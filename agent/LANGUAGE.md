@@ -157,8 +157,12 @@ use std/json                   -- whole module (json.parse, json.encode)
 use std/json : j               -- aliased (j.parse, j.encode)
 use std/json {parse encode}    -- selective (parse, encode as bare names)
 use ./util                     -- relative import
+use brain/protocols            -- workspace member import (member/path)
 +exported_fn = (x) x * 2      -- + prefix = exported
 ```
+
+Resolution order: stdlib → workspace member → relative path.
+Workspace: first path segment matches member name → resolve rest from member's root.
 
 ## Control Flow
 

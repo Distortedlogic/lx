@@ -1,8 +1,8 @@
 -- Tick: control register for workgen/
 -- Rewritten every tick. The previous agent wrote this to program YOU.
 -- Context files in workgen/ are your memory across sessions. Keep them accurate.
--- Shared protocol: `TICK_PROTOCOL.md` (sibling cross-read guide, end-of-tick handoff)
--- Format: Identity → Siblings → State → Task → Reading → Context → Rules → End of Tick
+-- BEFORE writing code: follow Start of Tick Protocol in `TICK_PROTOCOL.md`
+-- AFTER finishing work: follow End of Tick Protocol in `TICK_PROTOCOL.md`
 
 ## Identity
 
@@ -26,8 +26,10 @@ See `TICK_PROTOCOL.md` for cross-read guidance.
 Core pipeline works (`main.lx`, 237 lines). `run.lx` is the entry point (2026-03-18).
 Test runner (`tests/run.lx`) has a **blocking runtime error**: `split: second arg must be
 Str`. Run `lx run workgen/tests/run.lx` to see exact location. 71/71 lx suite pass.
-**Workspace system shipped (Session 53).** `workgen/lx.toml` exists with `[test] dir =
+**Workspace system shipped (Sessions 53-54).** `workgen/lx.toml` exists with `[test] dir =
 "tests/" pattern = "*.lx"`. Verify with `lx test -m workgen` after fixing tests.
+**Cross-member imports now work (Session 54).** `use flows/lib/scoring {normalize}` resolves
+via workspace member name. Workgen files can import from flows/, brain/, tests/ by name.
 
 ## This Tick
 
@@ -69,5 +71,5 @@ Str`. Run `lx run workgen/tests/run.lx` to see exact location. 71/71 lx suite pa
 
 ## End of Tick
 
-Follow `TICK_PROTOCOL.md`. Verify, rewrite this file for the next agent.
-Keep TICK.md under 100 lines — factor stable content to context files, don't delete.
+**MANDATORY: Execute ALL 5 steps in `TICK_PROTOCOL.md` as one uninterrupted sequence.**
+Do not declare completion without running every step. Do not skip context file reviews.
