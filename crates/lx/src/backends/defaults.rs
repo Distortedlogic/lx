@@ -164,7 +164,11 @@ impl HttpBackend for ReqwestHttpBackend {
         }
         match builder.send() {
             Ok(resp) => response_to_value(resp, span),
-            Err(e) => Ok(Value::Err(Box::new(Value::Str(Arc::from(e.to_string()))))),
+            Err(e) => Ok(Value::Err(Box::new(crate::stdlib::agent_errors::upstream(
+                url,
+                0,
+                &e.to_string(),
+            )))),
         }
     }
 }

@@ -42,9 +42,10 @@ pub fn ask_subprocess(pid: u32, msg: &Value, span: Span) -> Result<Value, LxErro
         .read_line(&mut response)
         .map_err(|e| LxError::runtime(format!("agent.ask: read error: {e}"), span))?;
     if response.is_empty() {
-        return Ok(Value::Err(Box::new(Value::Str(Arc::from(
+        return Ok(Value::Err(Box::new(super::agent_errors::unavailable(
+            &format!("pid:{pid}"),
             "agent disconnected",
-        )))));
+        ))));
     }
     let jv: serde_json::Value = serde_json::from_str(response.trim())
         .map_err(|e| LxError::runtime(format!("agent.ask: JSON decode: {e}"), span))?;

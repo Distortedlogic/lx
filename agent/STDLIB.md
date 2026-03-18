@@ -119,6 +119,31 @@ ts = tasks.submit ts "review" {output: findings} ^
 ts = tasks.pass ts "review" ^
 ```
 
+## Pipeline (std/pipeline)
+
+```lx
+use std/pipeline
+
+pipe = pipeline.create "my-pipeline" {storage: ".lx/pipelines/"} ^
+
+result1 = pipeline.stage pipe "step1" input_data (input) {
+  process input ^
+} ^
+
+result2 = pipeline.stage pipe "step2" result1 (input) {
+  transform input ^
+} ^
+
+pipeline.complete pipe ^
+
+st = pipeline.status pipe
+pipeline.invalidate pipe "step1"
+pipeline.clean pipe
+all = pipeline.list ()
+```
+
+`pipeline.stage` caches completed stage outputs. On re-run with the same input, cached results are returned without re-executing the body. If input changes (hash mismatch), the stage re-executes. `invalidate`/`invalidate_from` remove a stage's cache plus all downstream stages.
+
 ## Other Stdlib Modules
 
 | Module            | Purpose                                                              |
@@ -135,6 +160,7 @@ ts = tasks.pass ts "review" ^
 | `std/ctx`         | Key-value context: `empty`, `set`, `get`, `merge`, `save`, `load`    |
 | `std/memory`      | Tiered memory: `create`, `store`, `recall`, `promote`, `consolidate` |
 | `std/knowledge`   | File-backed KB: `create`, `store`, `get`, `query`, `merge`, `expire` |
+| `std/pipeline`    | Stage caching: `create`, `stage`, `complete`, `status`, `invalidate`, `clean`, `list` |
 | `std/plan`        | Plan execution: `run` with `on_step` callback, `replan`, `skip`      |
 | `std/saga`        | Compensating transactions: `run`, `define`, `execute`                |
 | `std/cron`        | Scheduling: `every`, `after`, `at`, `schedule`, `run`                |

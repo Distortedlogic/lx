@@ -3,7 +3,7 @@
 
 # Design Health
 
-Updated after Session 54 (2026-03-18).
+Updated after Session 55 (2026-03-18).
 
 ## What Works
 
@@ -17,12 +17,10 @@ Updated after Session 54 (2026-03-18).
 
 **Record field value parsing is too restrictive on single lines.** `{key: f x y  other: z}` on one line doesn't work — the parser terminates the value too early. Multiline records work fine. Every flow author learns to use multiline or extract to temp bindings.
 
-**No pipeline checkpoint/resume.** Multi-stage workflows restart from scratch when a late stage fails. This is the top priority in `agent/PRIORITIES.md`.
-
 **`lx check` is noisy on files with imports.** The type checker doesn't resolve `use` statements — it only sees the parsed AST of a single file. Any file that imports and uses external names produces false "undefined variable" diagnostics. `lx check` on the workspace reports 122 errors, almost all false positives from unresolved imports. Single-file `lx check tests/01_literals.lx` (no imports) works correctly. Fix requires the checker to either resolve imports or suppress diagnostics for imported names.
 
 See `agent/PRIORITIES.md` for the full ordered work queue.
 
 ## Bottom Line
 
-The core agent architecture is solid — spawn, message, validate, supervise, reconcile, and resource-scope all work end-to-end. Error handling is now uniform (field miss → None, Protocol fail → Err, tagged errors for pattern matching). Workspace fully operational — manifests, cross-member module resolution (`use brain/protocols`), `lx run/test/check/list` all workspace-aware. Next priority: `std/pipeline` checkpoint/resume.
+The core agent architecture is solid — spawn, message, validate, supervise, reconcile, and resource-scope all work end-to-end. Error handling is now uniform (field miss → None, Protocol fail → Err, tagged errors for pattern matching). Workspace fully operational — manifests, cross-member module resolution (`use brain/protocols`), `lx run/test/check/list` all workspace-aware. `std/pipeline` now provides checkpoint/resume for multi-stage workflows — no more re-executing completed stages on failure. Next priority: `AgentErr` structured errors.

@@ -110,6 +110,9 @@ pub fn build() -> IndexMap<String, Value> {
     );
     m.insert("subscribers".into(), super::agent_pubsub::mk_subscribers());
     m.insert("topics".into(), super::agent_pubsub::mk_topics());
+    for (name, val) in super::agent_errors::tagged_ctors() {
+        m.insert(name.into(), val);
+    }
     m
 }
 
@@ -201,8 +204,9 @@ fn bi_kill(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, L
             }
             Ok(Value::Ok(Box::new(Value::Unit)))
         }
-        None => Ok(Value::Err(Box::new(Value::Str(Arc::from(
-            "agent not found",
-        ))))),
+        None => Ok(Value::Err(Box::new(super::agent_errors::unavailable(
+            &format!("pid:{pid}"),
+            "agent not found in registry",
+        )))),
     }
 }

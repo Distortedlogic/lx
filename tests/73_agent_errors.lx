@@ -1,0 +1,116 @@
+-- 73_agent_errors.lx
+-- Tests: AgentErr structured error variants (spec/agents-errors.md)
+
+use std/agent {Timeout RateLimited BudgetExhausted ContextOverflow Incompetent Upstream PermissionDenied ProtocolViolation Unavailable Cancelled Internal}
+
+-- === Construct variants ===
+
+t = Timeout {elapsed_ms: 5000 deadline_ms: 3000}
+assert (t == Timeout {elapsed_ms: 5000 deadline_ms: 3000}) "timeout construction"
+
+rl = RateLimited {retry_after_ms: 1000 limit: "10/min"}
+assert (rl == RateLimited {retry_after_ms: 1000 limit: "10/min"}) "rate limited"
+
+be = BudgetExhausted {used: 150.0 limit: 100.0 resource: "tokens"}
+assert (be == BudgetExhausted {used: 150.0 limit: 100.0 resource: "tokens"}) "budget exhausted"
+
+co = ContextOverflow {size: 200000 capacity: 128000 content: "truncated..."}
+assert (co == ContextOverflow {size: 200000 capacity: 128000 content: "truncated..."}) "context overflow"
+
+inc = Incompetent {agent: "reviewer-1" task: "audit" score: 0.3 threshold: 0.7}
+assert (inc == Incompetent {agent: "reviewer-1" task: "audit" score: 0.3 threshold: 0.7}) "incompetent"
+
+up = Upstream {service: "api.example.com" code: 503 message: "Service Unavailable"}
+assert (up == Upstream {service: "api.example.com" code: 503 message: "Service Unavailable"}) "upstream"
+
+pd = PermissionDenied {action: "write" resource: "/etc/passwd"}
+assert (pd == PermissionDenied {action: "write" resource: "/etc/passwd"}) "permission denied"
+
+pv = ProtocolViolation {expected: "ReviewResult" got: "Str" message: "bad response"}
+assert (pv == ProtocolViolation {expected: "ReviewResult" got: "Str" message: "bad response"}) "protocol violation"
+
+ua = Unavailable {agent: "worker-3" reason: "process exited"}
+assert (ua == Unavailable {agent: "worker-3" reason: "process exited"}) "unavailable"
+
+ca = Cancelled {reason: "user interrupt"}
+assert (ca == Cancelled {reason: "user interrupt"}) "cancelled"
+
+int = Internal {message: "unexpected state"}
+assert (int == Internal {message: "unexpected state"}) "internal"
+
+-- === Pattern matching on variants ===
+
+handle_err = (e) e ? {
+  Timeout info        -> "timeout: {info.elapsed_ms}ms"
+  RateLimited info    -> "rate limited: wait {info.retry_after_ms}ms"
+  BudgetExhausted info -> "budget: {info.resource} {info.used}/{info.limit}"
+  Upstream info       -> "upstream: {info.service} ({info.code})"
+  Unavailable info    -> "unavailable: {info.agent}"
+  _                   -> "other"
+}
+
+assert (handle_err t == "timeout: 5000ms") "match timeout"
+assert (handle_err rl == "rate limited: wait 1000ms") "match rate limited"
+assert (handle_err be == "budget: tokens 150/100") "match budget exhausted"
+assert (handle_err up == "upstream: api.example.com (503)") "match upstream"
+assert (handle_err ua == "unavailable: worker-3") "match unavailable"
+
+-- === Err wrapping and pattern-matched recovery ===
+
+fail_fn = () Err (Timeout {elapsed_ms: 100 deadline_ms: 50})
+result = fail_fn ()
+assert (err? result == true) "Err wrapping works"
+
+recovered = result ? {
+  Ok v -> v
+  Err e -> e ? {
+    Timeout info -> "recovered after {info.elapsed_ms}ms"
+    _ -> "unknown"
+  }
+}
+assert (recovered == "recovered after 100ms") "Err match with two-level pattern"
+
+-- === ^ propagation ===
+
+propagate_fn = () {
+  fail_fn () ^
+}
+prop_result = propagate_fn ()
+assert (err? prop_result == true) "propagation preserves Err"
+
+-- === Retry integration pattern ===
+
+retry_decision = (e) e ? {
+  Timeout _      -> true
+  RateLimited _  -> true
+  Upstream info  -> info.code >= 500
+  _              -> false
+}
+
+assert (retry_decision (Timeout {elapsed_ms: 0 deadline_ms: 0}) == true) "retry timeout"
+assert (retry_decision (RateLimited {retry_after_ms: 0 limit: ""}) == true) "retry rate limited"
+assert (retry_decision (Upstream {service: "" code: 503 message: ""}) == true) "retry 503"
+assert (retry_decision (Upstream {service: "" code: 404 message: ""}) == false) "no retry 404"
+assert (retry_decision (Cancelled {reason: ""}) == false) "no retry cancelled"
+
+-- === Budget.spend returns BudgetExhausted ===
+
+use std/budget
+small = budget.create {tokens: 100}
+budget.spend small {tokens: 50} ^
+over = budget.spend small {tokens: 60}
+assert (err? over == true) "spend over budget is Err"
+
+over_resource = over ? {
+  Err e -> e ? {
+    BudgetExhausted info -> info.resource
+    _ -> "unknown"
+  }
+  _ -> "unknown"
+}
+assert (over_resource == "tokens") "budget returns BudgetExhausted variant"
+
+-- === ?? coalescing still works ===
+assert ((Err (Timeout {elapsed_ms: 0 deadline_ms: 0}) ?? "fallback") == "fallback") "?? on AgentErr"
+
+log.info "73_agent_errors: all passed"

@@ -1,0 +1,103 @@
+-- 72_pipeline.lx
+-- Tests: std/pipeline module (checkpoint/resume for multi-stage pipelines)
+
+use std/pipeline
+use std/fs
+
+test_dir = "/tmp/lx_pipeline_test/"
+exists = fs.exists test_dir
+exists ? fs.remove test_dir ^ : ()
+
+-- === Create pipeline ===
+pipe = pipeline.create "test-pipe" {storage: test_dir} ^
+assert (pipe.name == "test-pipe") "create returns named handle"
+
+-- === Stage execution ===
+call_count := 0
+r1 = pipeline.stage pipe "step1" "input-a" (input) {
+  call_count <- call_count + 1
+  {processed: input count: call_count}
+} ^
+assert (r1.processed == "input-a") "stage returns body result"
+assert (r1.count == 1) "body was executed"
+
+-- === Cache hit: same input returns cached ===
+r2 = pipeline.stage pipe "step1" "input-a" (input) {
+  call_count <- call_count + 1
+  {processed: input count: call_count}
+} ^
+assert (r2.processed == "input-a") "cache hit returns same value"
+assert (call_count == 1) "body NOT re-executed on cache hit"
+
+-- === Cache miss: different input re-executes ===
+r3 = pipeline.stage pipe "step1" "input-b" (input) {
+  call_count <- call_count + 1
+  {processed: input count: call_count}
+} ^
+assert (r3.processed == "input-b") "cache miss: new input processed"
+assert (call_count == 2) "body re-executed on input change"
+
+-- === Second stage ===
+r4 = pipeline.stage pipe "step2" r3 (input) {
+  {derived: input.processed upstream_count: input.count}
+} ^
+assert (r4.derived == "input-b") "second stage receives first stage output"
+assert (r4.upstream_count == 2) "upstream data preserved"
+
+-- === Status ===
+st = pipeline.status pipe
+assert (st.name == "test-pipe") "status: correct name"
+assert (len st.stages >= 2) "status: tracks stages"
+
+-- === Invalidate ===
+inv_count := 0
+pipe2 = pipeline.create "test-inv" {storage: test_dir} ^
+
+s1 = pipeline.stage pipe2 "a" 1 (x) {
+  inv_count <- inv_count + 1
+  x + 10
+} ^
+assert (s1 == 11) "inv stage a"
+
+s2 = pipeline.stage pipe2 "b" s1 (x) {
+  inv_count <- inv_count + 1
+  x + 20
+} ^
+assert (s2 == 31) "inv stage b"
+assert (inv_count == 2) "both stages ran"
+
+pipeline.invalidate pipe2 "a"
+
+s1b = pipeline.stage pipe2 "a" 1 (x) {
+  inv_count <- inv_count + 1
+  x + 10
+} ^
+assert (inv_count == 3) "invalidated stage re-executed"
+
+s2b = pipeline.stage pipe2 "b" s1b (x) {
+  inv_count <- inv_count + 1
+  x + 20
+} ^
+assert (inv_count == 4) "downstream stage re-executed after invalidation"
+
+-- === Complete ===
+done = pipeline.complete pipe ^
+assert (ok? (Ok done) == true) "complete succeeds"
+
+-- === List ===
+all = pipeline.list ()
+assert (len all >= 1) "list returns registered pipelines"
+
+-- === Error handling in stage ===
+pipe3 = pipeline.create "test-err" {storage: test_dir} ^
+fail_body = (x) Err "stage failed on purpose"
+no_input = ()
+err_result = pipeline.stage pipe3 "failing" no_input fail_body
+assert (err? err_result == true) "failed stage returns Err"
+
+-- === Clean ===
+pipeline.clean pipe
+pipeline.clean pipe2
+pipeline.clean pipe3
+
+log.info "72_pipeline: all passed"

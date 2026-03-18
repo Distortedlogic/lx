@@ -24,25 +24,25 @@ See `TICK_PROTOCOL.md` for cross-read guidance.
 
 ## State
 
-Session 54 (2026-03-18). **72/72 tests pass.** `just diagnose` clean.
-Complete core, full agent system, 40 stdlib modules, 12 agent extensions.
-Last session: Workspace Phase 2 — module resolver gains workspace step (`use brain/X`
-resolves via member name), `lx run member-name` resolves via manifest entry,
-`lx check` workspace iteration. All workspace commands now workspace-aware.
+Session 55 (2026-03-18). **73/73 tests pass.** `just diagnose` clean.
+Complete core, full agent system, 41 stdlib modules, 12 agent extensions.
+Last session: `std/pipeline` checkpoint/resume — 8 functions (`create`, `stage`,
+`complete`, `status`, `invalidate`, `invalidate_from`, `clean`, `list`). Stage-boundary
+caching with input-hash invalidation, file-backed storage.
 
 ## This Tick
 
-**`std/pipeline` checkpoint/resume** — Priority #3 from `agent/PRIORITIES.md`.
+**`AgentErr` structured errors** — Priority #4 from `agent/PRIORITIES.md`.
 
-1. **`pipeline.stage`** — caches completed stage outputs, resumes from last success
-2. **`pipeline.create`** — define multi-stage pipeline with named stages
-3. **`pipeline.run`** — execute pipeline, skip completed stages on re-run
+1. Define 11 standard agent error variants as convention (Timeout, Rejected, NotFound, etc.)
+2. Update stdlib agents to use these variants consistently
+3. Document the error taxonomy for pattern matching
 
 ## Read These Files
 
-1. `spec/agents-pipeline-checkpoint.md` — pipeline checkpoint spec
+1. `spec/agents-errors.md` — error taxonomy spec
 2. `agent/REFERENCE.md` — codebase layout, especially stdlib module pattern
-3. `agent/STDLIB.md` — existing stdlib reference
+3. `agent/AGENTS.md` — current agent system reference
 
 ## Context Files
 

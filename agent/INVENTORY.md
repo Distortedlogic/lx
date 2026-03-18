@@ -32,7 +32,7 @@
 - `emit` — agent-to-human fire-and-forget output via EmitBackend
 - `with name = expr { body }` — scoped bindings + record field update (`name.field <- value`)
 
-## Stdlib (40 modules)
+## Stdlib (41 modules)
 
 - Data: `std/json`, `std/md`, `std/re`, `std/math`, `std/time`
 - System: `std/fs`, `std/env`, `std/http`
@@ -40,7 +40,7 @@
 - Resilience: `std/retry` — `retry` (default 3 attempts, exponential backoff), `retry_with` (configurable). Returns `Ok value` on success, `Err Exhausted {attempts last_error elapsed_ms}` on exhaustion
 - Communication: `std/agent`, `std/mcp`, `std/ai`
 - Scheduling: `std/cron`
-- Orchestration: `std/ctx`, `std/tasks`, `std/audit`, `std/circuit`, `std/plan`, `std/saga`
+- Orchestration: `std/ctx`, `std/tasks`, `std/audit`, `std/circuit`, `std/plan`, `std/saga`, `std/pipeline`
 - Concurrency: `std/pool` — worker pools: `create`, `fan_out`, `map`, `submit`, `status`, `shutdown`
 - Cost management: `std/budget` — `create`, `spend`, `remaining`, `used`, `used_pct`, `project`, `status`, `slice` (sub-budgets)
 - Prompt assembly: `std/prompt` — `create`, `system`, `section`, `constraint`, `instruction`, `example`, `compose`, `render`, `render_within`, `estimate`, `sections`, `without`
@@ -92,4 +92,4 @@
 
 ## Test Coverage
 
-72 test suites (71 .lx files + 11_modules dir) in `tests/`. Fixtures in `tests/fixtures/`.
+73 test suites (72 .lx files + 11_modules dir) in `tests/`. Fixtures in `tests/fixtures/`.

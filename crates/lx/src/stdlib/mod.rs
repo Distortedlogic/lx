@@ -2,6 +2,7 @@ pub(crate) mod agent;
 mod agent_capability;
 mod agent_dialogue;
 mod agent_dispatch;
+pub mod agent_errors;
 mod agent_gate;
 mod agent_handoff;
 mod agent_intercept;
@@ -48,6 +49,8 @@ pub(crate) mod mcp;
 mod md;
 mod md_build;
 mod memory;
+mod pipeline;
+mod pipeline_io;
 mod plan;
 mod pool;
 mod profile;
@@ -107,6 +110,7 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
             "diag" => diag::build(),
             "knowledge" => knowledge::build(),
             "memory" => memory::build(),
+            "pipeline" => pipeline::build(),
             "plan" => plan::build(),
             "pool" => pool::build(),
             "prompt" => prompt::build(),
@@ -162,6 +166,7 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
             | "diag"
             | "knowledge"
             | "memory"
+            | "pipeline"
             | "plan"
             | "pool"
             | "prompt"

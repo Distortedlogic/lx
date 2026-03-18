@@ -143,7 +143,9 @@ fn bi_fan_out(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value
                 if let Some(mut pool) = POOLS.get_mut(&pool_id) {
                     pool.failed += 1;
                 }
-                results.push(Value::Err(Box::new(Value::Str(Arc::from(format!("{e}"))))));
+                results.push(Value::Err(Box::new(super::agent_errors::internal(
+                    &format!("{e}"),
+                ))));
             }
         }
     }
@@ -178,7 +180,9 @@ fn bi_map(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, Lx
                 if let Some(mut pool) = POOLS.get_mut(&pool_id) {
                     pool.failed += 1;
                 }
-                results.push(Value::Err(Box::new(Value::Str(Arc::from(format!("{e}"))))));
+                results.push(Value::Err(Box::new(super::agent_errors::internal(
+                    &format!("{e}"),
+                ))));
             }
         }
     }

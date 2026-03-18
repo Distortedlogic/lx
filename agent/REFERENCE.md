@@ -15,13 +15,13 @@ crates/lx/src/
   interpreter/ Tree-walking evaluator — mod + split files (agents, apply, eval, modules, patterns, etc.)
   builtins/    Built-in functions — mod, call, str, coll, hof, convert, register, etc.
   visitor/     AST visitor/walker infrastructure
-  stdlib/      40 registered modules across ~86 .rs files (use `std_module_exists` in mod.rs as source of truth)
+  stdlib/      41 registered modules across ~88 .rs files (use `std_module_exists` in mod.rs as source of truth)
   token.rs, value.rs, value_display.rs, value_impls.rs, ast_display.rs, env.rs, error.rs, span.rs, lib.rs
 crates/lx-cli/src/  main.rs, manifest.rs, testing.rs, listing.rs, run.rs, agent_cmd.rs
 doc/           35 quick-reference docs
 spec/          51 spec files
 agent/         Context files (this folder)
-tests/         72 test suites (71 .lx files + 11_modules dir)
+tests/         73 test suites (72 .lx files + 11_modules dir)
   fixtures/    Test helpers (agent_echo.lx, orchestrators, servers, test flows)
 flows/
   lib/         15 reusable .lx library modules

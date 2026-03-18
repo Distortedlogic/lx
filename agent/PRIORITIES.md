@@ -13,7 +13,7 @@ Top item = next thing to implement. Each entry explains WHY it's at this positio
 
 Tier 1 completed: `std/retry` (Session 44), `std/user` + `std/profile` (Session 49), `Agent` declarations (Session 49). Enforced `Trait` methods (Session 51). Brain-driven improvements (Session 52).
 
-3. **`std/pipeline` checkpoint/resume** (`spec/agents-pipeline-checkpoint.md`) — Multi-stage pipelines restart from scratch when a late stage fails. `pipeline.stage` caches completed stage outputs, resumes from last success on re-run.
+3. ~~**`std/pipeline` checkpoint/resume**~~ — SHIPPED Session 55. 8 functions: `create`, `stage`, `complete`, `status`, `invalidate`, `invalidate_from`, `clean`, `list`.
 
 4. **`AgentErr` structured errors** (`spec/agents-errors.md`) — Tagged error mechanism works (`Err Timeout "msg"`). Remaining: define 11 standard agent error variants as convention and update stdlib.
 

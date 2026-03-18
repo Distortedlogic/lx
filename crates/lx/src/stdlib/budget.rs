@@ -160,13 +160,15 @@ fn bi_spend(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value,
     if exceeded.is_empty() {
         Ok(Value::Ok(Box::new(Value::Unit)))
     } else {
-        let names: Vec<Value> = exceeded
-            .into_iter()
-            .map(|s| Value::Str(Arc::from(s.as_str())))
-            .collect();
-        Ok(Value::Err(Box::new(record! {
-            "exceeded" => Value::List(Arc::new(names)),
-        })))
+        let b = BUDGETS
+            .get(&id)
+            .ok_or_else(|| LxError::runtime("budget: not found", span))?;
+        let resource = &exceeded[0];
+        let used_val = b.used.get(resource).copied().unwrap_or(0.0);
+        let limit_val = b.initial.get(resource).copied().unwrap_or(0.0);
+        Ok(Value::Err(Box::new(super::agent_errors::budget_exhausted(
+            used_val, limit_val, resource,
+        ))))
     }
 }
 
