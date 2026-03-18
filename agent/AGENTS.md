@@ -196,6 +196,26 @@ agent.publish t {kind: "status" data: "running"}
 responses = agent.publish_collect t msg ^
 ```
 
+### Capability Routing
+
+```lx
+agent.register reviewer {traits: ["Reviewer"] domains: ["code" "security"]} ^
+agent.register worker {protocols: ["TaskRequest"] max_concurrent: 5} ^
+
+result = agent.route msg {trait: "Reviewer"} ^
+result = agent.route msg {trait: "Reviewer" prefer: "round_robin" fallback: backup} ^
+results = agent.route_multi msg {trait: "Reviewer"} ^
+reconciled = agent.route_multi msg {
+  trait: "Reviewer"
+  reconcile: {strategy: "vote" vote_field: "approved"}
+} ^
+
+agents = agent.registered {trait: "Reviewer"} ^
+agent.unregister reviewer ^
+```
+
+Selection: `"least_busy"` (default), `"round_robin"`, `"random"`, or custom `(agents) -> Agent`.
+
 ### Other Extensions
 
 ```lx
@@ -210,4 +230,38 @@ mock = agent.mock [
   {match: "any" respond: {error: "unexpected"}}
 ]
 agent.mock_assert_called mock {task: "review"} ^
+```
+
+## AgentErr (Structured Error Variants)
+
+11 tagged error variants for pattern-matched recovery. Import via selective import:
+
+```lx
+use std/agent {Timeout RateLimited BudgetExhausted Upstream Unavailable}
+```
+
+| Variant | Fields | When |
+|---------|--------|------|
+| `Timeout` | `elapsed_ms deadline_ms` | Operation exceeded deadline |
+| `RateLimited` | `retry_after_ms limit` | Upstream rate limit hit |
+| `BudgetExhausted` | `used limit resource` | Cost budget exceeded |
+| `ContextOverflow` | `size capacity content` | Input exceeds context window |
+| `Incompetent` | `agent task score threshold` | Agent below quality threshold |
+| `Upstream` | `service code message` | External service error |
+| `PermissionDenied` | `action resource` | Operation not permitted |
+| `ProtocolViolation` | `expected got message` | Message shape mismatch |
+| `Unavailable` | `agent reason` | Agent not running/registered |
+| `Cancelled` | `reason` | Operation cancelled |
+| `Internal` | `message` | Catch-all unexpected failure |
+
+Match errors with two-level pattern matching:
+```lx
+result ? {
+  Err e -> e ? {
+    Timeout info -> retry_with_longer_deadline info
+    Upstream info -> info.code >= 500 ? retry : fail
+    _ -> Err e
+  }
+  Ok v -> v
+}
 ```

@@ -12,6 +12,7 @@ mod statements;
 mod stmt_agent;
 mod stmt_mcp;
 mod stmt_protocol;
+mod stmt_trait;
 mod stmt_use;
 mod type_ann;
 

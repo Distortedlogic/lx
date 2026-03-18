@@ -10,7 +10,7 @@ impl super::Parser {
         while *self.peek() != TokenKind::RBracket {
             if *self.peek() == TokenKind::DotDot {
                 self.advance();
-                elems.push(ListElem::Spread(self.parse_expr(32)?));
+                elems.push(ListElem::Spread(self.parse_expr(0)?));
             } else {
                 elems.push(ListElem::Single(self.parse_expr(0)?));
             }

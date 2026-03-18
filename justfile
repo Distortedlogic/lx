@@ -92,3 +92,7 @@ test-flows:
 # run flow satisfaction tests with tag filter
 test-flows-tagged tag:
   LX_TEST_TAG={{tag}} cargo run -p lx-cli -- test flows/tests/
+
+# build vscode extension vsix (install via VS Code UI: Ctrl+Shift+P > Install from VSIX)
+package-vscode:
+  cd editors/vscode && pnpm install --frozen-lockfile && pnpm package

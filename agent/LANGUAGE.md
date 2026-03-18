@@ -115,6 +115,20 @@ Err Timeout "took too long"
 result ? { Err Timeout msg -> retry; Err e -> fail e; Ok v -> v }
 ```
 
+AgentErr variants (11 standard tagged errors via `use std/agent {Timeout ...}`):
+```lx
+use std/agent {Timeout BudgetExhausted Upstream}
+result ? {
+  Err e -> e ? {
+    Timeout info -> "retry after {info.elapsed_ms}ms"
+    BudgetExhausted info -> "over budget on {info.resource}"
+    Upstream info -> "service {info.service} error {info.code}"
+    _ -> "unknown: {e}"
+  }
+  Ok v -> v
+}
+```
+
 ## Pattern Matching
 
 ```lx

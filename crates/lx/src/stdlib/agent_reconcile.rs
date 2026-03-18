@@ -10,6 +10,7 @@ use crate::record;
 use crate::span::Span;
 use crate::value::Value;
 
+use super::agent_reconcile_score as score;
 use super::agent_reconcile_strat as strat;
 
 pub fn mk_reconcile() -> Value {
@@ -227,9 +228,9 @@ fn bi_reconcile(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Val
         Strategy::Union => strat::do_union(results, &cfg, span, ctx),
         Strategy::Intersection => strat::do_intersection(results, &cfg, span, ctx),
         Strategy::Vote => strat::do_vote(results, &cfg, span, ctx),
-        Strategy::HighestConfidence => strat::do_highest_confidence(results, span),
-        Strategy::MaxScore => strat::do_max_score(results, &cfg, span, ctx),
-        Strategy::MergeFields => strat::do_merge_fields(results, &cfg, span, ctx),
+        Strategy::HighestConfidence => score::do_highest_confidence(results, span),
+        Strategy::MaxScore => score::do_max_score(results, &cfg, span, ctx),
+        Strategy::MergeFields => score::do_merge_fields(results, &cfg, span, ctx),
         Strategy::Custom(f) => {
             let merged = call_value(&f, args[0].clone(), span, ctx)?;
             Ok(make_result(

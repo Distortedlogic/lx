@@ -24,25 +24,32 @@ See `TICK_PROTOCOL.md` for cross-read guidance.
 
 ## State
 
-Session 55 (2026-03-18). **73/73 tests pass.** `just diagnose` clean.
-Complete core, full agent system, 41 stdlib modules, 12 agent extensions.
-Last session: `std/pipeline` checkpoint/resume — 8 functions (`create`, `stage`,
-`complete`, `status`, `invalidate`, `invalidate_from`, `clean`, `list`). Stage-boundary
-caching with input-hash invalidation, file-backed storage.
+Session 61 (2026-03-18). **78/78 tests pass.** `just diagnose` clean (0 errors, 7 pre-existing warnings).
+Complete core, full agent system, 44 stdlib modules, 12 agent extensions, ~100 stdlib .rs files.
+Last session: Bug fixes — list spread bp, Agent body uppercase, 7 file splits. Parser foundation solid.
 
 ## This Tick
 
-**`AgentErr` structured errors** — Priority #4 from `agent/PRIORITIES.md`.
+**Feature consolidation audit** — Tier 0, Session 62 from `agent/PRIORITIES.md`. This is a
+collaborative design session with the user. The feature surface (44 stdlib modules, 12 agent
+extensions) was built across 61 sessions — many features likely overlap or share mechanics.
 
-1. Define 11 standard agent error variants as convention (Timeout, Rejected, NotFound, etc.)
-2. Update stdlib agents to use these variants consistently
-3. Document the error taxonomy for pattern matching
+Goals:
+1. Audit the full stdlib + agent extension surface with the user
+2. Identify generic primitives that cover the same ground with fewer composable building blocks
+3. Find overlapping modules that should be merged (reconcile/vote, routing mechanisms, retry/circuit)
+4. Plan restructuring — layer specific instances on top of generic ones for DRYness
+
+Do NOT proceed to Tier 2 features until this consolidation is done. Wait for user direction.
+
+If the user wants to skip consolidation and build features instead, proceed to Tier 2 item 10:
+`introspect.system` live observation (`spec/agents-introspect-live.md`).
 
 ## Read These Files
 
-1. `spec/agents-errors.md` — error taxonomy spec
-2. `agent/REFERENCE.md` — codebase layout, especially stdlib module pattern
-3. `agent/AGENTS.md` — current agent system reference
+1. `agent/PRIORITIES.md` — the work queue, to understand context
+2. `agent/INVENTORY.md` — full feature surface to audit
+3. `agent/HEALTH.md` — current assessment
 
 ## Context Files
 

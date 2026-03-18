@@ -1,11 +1,25 @@
 use std::sync::Arc;
 
+use num_bigint::BigInt;
+
 use crate::ast::{ProtocolEntry, ProtocolField, SExpr};
 use crate::error::LxError;
 use crate::span::Span;
 use crate::value::{ProtoFieldDef, Value};
 
 use super::Interpreter;
+
+fn inject_deadline(msg: Value) -> Value {
+    let Some(ms) = crate::stdlib::deadline::current_remaining_ms() else {
+        return msg;
+    };
+    let Value::Record(fields) = msg else {
+        return msg;
+    };
+    let mut fields = (*fields).clone();
+    fields.insert("_deadline_ms".into(), Value::Int(BigInt::from(ms)));
+    Value::Record(Arc::new(fields))
+}
 
 fn extract_pid(agent: &Value, span: Span) -> Result<u32, LxError> {
     let Value::Record(fields) = agent else {
@@ -48,7 +62,7 @@ impl Interpreter {
         span: Span,
     ) -> Result<Value, LxError> {
         let target = self.eval(target_expr)?;
-        let msg = self.eval(msg_expr)?;
+        let msg = inject_deadline(self.eval(msg_expr)?);
         if matches!(target, Value::Record(ref f) if f.contains_key("__pid")) {
             let pid = extract_pid(&target, span)?;
             crate::stdlib::agent::send_subprocess(pid, &msg, span)?;
@@ -66,7 +80,7 @@ impl Interpreter {
         span: Span,
     ) -> Result<Value, LxError> {
         let target = self.eval(target_expr)?;
-        let msg = self.eval(msg_expr)?;
+        let msg = inject_deadline(self.eval(msg_expr)?);
         if matches!(target, Value::Record(ref f) if f.contains_key("__pid")) {
             let pid = extract_pid(&target, span)?;
             return crate::stdlib::agent::ask_subprocess(pid, &msg, span);

@@ -1,3 +1,6 @@
+#[path = "diag_types.rs"]
+mod diag_types;
+
 #[path = "diag_walk_expr.rs"]
 mod diag_walk_expr;
 
@@ -15,35 +18,12 @@ use crate::ast::{
 use crate::span::Span;
 use crate::visitor::{AstVisitor, walk_program};
 
+pub(crate) use diag_types::*;
+
 use diag_helpers::{
     extract_agent_spawn, extract_field_call_parts, extract_mcp_connect, is_resource_create,
     is_resource_module, unwrap_propagate,
 };
-
-pub(crate) struct DiagNode {
-    pub id: String,
-    pub label: String,
-    pub kind: String,
-    pub children: Vec<DiagNode>,
-}
-
-pub(crate) struct DiagEdge {
-    pub from: String,
-    pub to: String,
-    pub label: String,
-    pub style: String,
-}
-
-pub(crate) struct Subgraph {
-    pub label: String,
-    pub node_ids: Vec<String>,
-}
-
-pub(crate) struct Graph {
-    pub nodes: Vec<DiagNode>,
-    pub edges: Vec<DiagEdge>,
-    pub subgraphs: Vec<Subgraph>,
-}
 
 pub(crate) struct Walker {
     pub nodes: Vec<DiagNode>,

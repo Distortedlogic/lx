@@ -12,7 +12,7 @@
 - Type checker: `lx check` — bidirectional inference, unification, structural subtyping
 - Concurrency: `par`, `sel`, `pmap`, `pmap_n`, `timeout` (sequential impl — real async needs tokio)
 - Shell: `$cmd`, `$^cmd`, `${...}` with interpolation
-- Error handling: `^` propagation, `??` coalescing, `(?? default)` sections. Structured error tags: `Err Timeout "msg"` with pattern matching. Uniform `None` on miss for Record, Map, and Agent field access
+- Error handling: `^` propagation, `??` coalescing, `(?? default)` sections. Structured error tags: `Err Timeout "msg"` with pattern matching. Uniform `None` on miss for Record, Map, and Agent field access. `AgentErr` structured errors: 11 tagged variants (Timeout, RateLimited, BudgetExhausted, ContextOverflow, Incompetent, Upstream, PermissionDenied, ProtocolViolation, Unavailable, Cancelled, Internal) via `use std/agent {Timeout ...}`
 - Arithmetic: `/` always returns Float (Python 3 semantics), `//` for integer division, mixed Int/Float auto-promotion
 - Modules: `use ./path`, aliasing, selective imports, `+` exports, workspace member resolution (`use brain/protocols`)
 
@@ -32,7 +32,7 @@
 - `emit` — agent-to-human fire-and-forget output via EmitBackend
 - `with name = expr { body }` — scoped bindings + record field update (`name.field <- value`)
 
-## Stdlib (41 modules)
+## Stdlib (44 modules)
 
 - Data: `std/json`, `std/md`, `std/re`, `std/math`, `std/time`
 - System: `std/fs`, `std/env`, `std/http`
@@ -40,7 +40,7 @@
 - Resilience: `std/retry` — `retry` (default 3 attempts, exponential backoff), `retry_with` (configurable). Returns `Ok value` on success, `Err Exhausted {attempts last_error elapsed_ms}` on exhaustion
 - Communication: `std/agent`, `std/mcp`, `std/ai`
 - Scheduling: `std/cron`
-- Orchestration: `std/ctx`, `std/tasks`, `std/audit`, `std/circuit`, `std/plan`, `std/saga`, `std/pipeline`
+- Orchestration: `std/ctx`, `std/tasks`, `std/audit`, `std/circuit`, `std/plan`, `std/saga`, `std/pipeline`, `std/taskgraph`, `std/deadline`
 - Concurrency: `std/pool` — worker pools: `create`, `fan_out`, `map`, `submit`, `status`, `shutdown`
 - Cost management: `std/budget` — `create`, `spend`, `remaining`, `used`, `used_pct`, `project`, `status`, `slice` (sub-budgets)
 - Prompt assembly: `std/prompt` — `create`, `system`, `section`, `constraint`, `instruction`, `example`, `compose`, `render`, `render_within`, `estimate`, `sections`, `without`
@@ -51,9 +51,11 @@
 - Interaction: `std/user` — `confirm`, `choose`, `ask`, `ask_with`, `progress`, `progress_pct`, `status`, `table`, `check` (signal poll). `UserBackend` trait on `RuntimeCtx` — `NoopUserBackend` (default/test), `StdinStdoutUserBackend` (terminal)
 - Identity: `std/profile` — persistent agent profiles: `load`, `save`, `learn`, `recall`, `recall_prefix`, `forget`, `preference`, `get_preference`, `history`, `merge`, `age`, `decay`. Strategy helpers: `best_strategy`, `rank_strategies`, `adapt_strategy`. File-backed at `.lx/profiles/{name}.json`
 - Visualization: `std/diag`
-- Testing: `std/test` (test runner infrastructure, test/describe blocks), `std/describe` (BDD-style describe/it blocks with structured results)
+- Testing: `std/test` (satisfaction testing: `spec`, `scenario`, `run`, `run_scenario`, `report`), `std/describe` (BDD-style describe/it blocks with structured results)
+- Flow composition: `std/flow` — `load`, `run`, `pipe`, `parallel`, `branch`, `with_retry`, `with_timeout`, `with_fallback`. Flows as first-class composable values with isolated interpreter execution
+- Task graphs: `std/taskgraph` — `create`, `add`, `remove`, `run`, `run_with`, `validate`, `topo`, `status`, `dot`. DAG-aware subtask decomposition with topological execution, dependency result threading (`input_from`), per-task retry/timeout/on_fail policy, wave-based parallel scheduling, DOT export
 
-## Agent Extensions (11 sub-modules of `std/agent`)
+## Agent Extensions (12 sub-modules of `std/agent`)
 
 - `agent.reconcile` — 6 merge strategies (union, intersection, vote, highest_confidence, max_score, merge_fields) + custom Fn
 - `agent.dialogue` — multi-turn stateful sessions with config `{role? context? max_turns?}`
@@ -66,6 +68,7 @@
 - `agent.dispatch` — pattern-based message routing without LLM
 - `agent.negotiate` — N-party iterative consensus with converge function
 - `agent.topic` / `agent.subscribe` / `agent.publish` — in-process pub/sub with filtered subscriptions
+- `agent.route` / `agent.register` — capability-based routing: register agents with traits/protocols/domains, route by filter with selection strategies (least_busy, round_robin, random, custom), fan-out with reconcile via `route_multi`
 
 ## Other Extensions
 
@@ -92,4 +95,4 @@
 
 ## Test Coverage
 
-73 test suites (72 .lx files + 11_modules dir) in `tests/`. Fixtures in `tests/fixtures/`.
+78 test suites (77 .lx files + 11_modules dir) in `tests/`. Fixtures in `tests/fixtures/`.

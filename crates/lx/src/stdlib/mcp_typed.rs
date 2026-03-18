@@ -41,7 +41,7 @@ pub(crate) fn typed_call(
     let result = mcp_rpc::with_proc(&args[0], "tools/call", &params, span)?;
     if result.get("isError") == Some(&serde_json::Value::Bool(true)) {
         let msg = extract_text(&result);
-        return Ok(Value::Err(Box::new(super::agent_errors::upstream(
+        return Ok(Value::Err(Box::new(crate::stdlib::agent_errors::upstream(
             tool_name, 0, &msg,
         ))));
     }

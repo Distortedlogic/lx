@@ -1,0 +1,4 @@
++run = (input) {
+  assert false "forced failure"
+  input
+}

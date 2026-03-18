@@ -60,6 +60,27 @@ check = audit.quick_check {output: text  task: "documentation"}
 full = auditor.audit {output: text  task: "documentation"}
 ```
 
+## Deadline (Time Propagation)
+
+```lx
+use std/deadline
+
+dl = deadline.create 5000 ^
+body = () {
+  remaining = deadline.remaining () ^
+  expired = deadline.expired () ^
+  deadline.check () ^
+  sub = deadline.slice 0.3 ^
+  remaining
+}
+result = deadline.scope dl body ^
+
+dl2 = deadline.create_at (time.now().ms + 10000) ^
+deadline.extend dl2 5000 ^
+```
+
+`deadline.scope` establishes a deadline context. `remaining`, `expired`, `check`, and `slice` read the current scope (thread-local stack). `scope` returns `Result Any Str`. When `~>?`/`~>` is called inside a scope, `_deadline_ms` is auto-injected into Record messages.
+
 ## Budget (Cost Tracking)
 
 ```lx
@@ -160,6 +181,7 @@ all = pipeline.list ()
 | `std/ctx`         | Key-value context: `empty`, `set`, `get`, `merge`, `save`, `load`    |
 | `std/memory`      | Tiered memory: `create`, `store`, `recall`, `promote`, `consolidate` |
 | `std/knowledge`   | File-backed KB: `create`, `store`, `get`, `query`, `merge`, `expire` |
+| `std/deadline`    | Time budgets: `create`, `create_at`, `scope`, `remaining`, `expired`, `check`, `slice`, `extend` |
 | `std/pipeline`    | Stage caching: `create`, `stage`, `complete`, `status`, `invalidate`, `clean`, `list` |
 | `std/plan`        | Plan execution: `run` with `on_step` callback, `replan`, `skip`      |
 | `std/saga`        | Compensating transactions: `run`, `define`, `execute`                |
@@ -168,6 +190,55 @@ all = pipeline.list ()
 | `std/user`        | Interactive: `confirm`, `choose`, `ask`, `progress`, `table`         |
 | `std/profile`     | Persistent identity: `load`, `save`, `learn`, `recall`, `preference` |
 | `std/diag`        | Visualization: `extract`, `to_mermaid`                               |
+| `std/flow`        | Flow composition: `load`, `run`, `pipe`, `parallel`, `branch`, `with_retry`, `with_timeout`, `with_fallback` |
+| `std/taskgraph`   | DAG execution: `create`, `add`, `remove`, `run`, `run_with`, `validate`, `topo`, `status`, `dot` |
+
+## Flow Composition (std/flow)
+
+```lx
+use std/flow
+
+f = flow.load "review.lx" ^
+result = flow.run f {task: "review"} ^
+
+pipeline = flow.pipe [
+  flow.load "extract.lx" ^
+  flow.load "transform.lx" ^
+]
+result = flow.run pipeline input ^
+
+ensemble = flow.parallel [
+  flow.load "reviewer1.lx" ^
+  flow.load "reviewer2.lx" ^
+]
+results = flow.run ensemble input ^
+
+resilient = flow.load "flaky.lx" ^
+  | flow.with_timeout 300
+  | flow.with_retry {max: 3}
+  | flow.with_fallback (flow.load "safe.lx" ^)
+result = flow.run resilient input ^
+```
+
+`flow.load` reads and parses a .lx file, returning a Flow record. `flow.run` executes in an isolated interpreter with shared RuntimeCtx. Flows must export `+run` or `+main`. `flow.branch` takes a router function that receives input and returns a Flow.
+
+## Task Graphs (std/taskgraph)
+
+```lx
+use std/taskgraph
+
+g = taskgraph.create "code-review" ^
+taskgraph.add g "parse" {handler: parse_fn  input: {files: changed}} ^
+taskgraph.add g "lint" {handler: lint_fn  input: {files: changed}} ^
+taskgraph.add g "review" {
+  depends: ["parse" "lint"]
+  input_from: (results) {ast: results.parse.ast  warnings: results.lint.issues}
+  handler: review_fn
+} ^
+results = taskgraph.run g ^
+```
+
+Task options: `handler` (function), `input` (static), `depends` (task ID list), `input_from` (transform dep results), `timeout` (ms), `retry` (count), `on_fail` ("fail"|"skip"). `taskgraph.validate` checks cycles + unknown deps. `taskgraph.topo` returns topological order. `taskgraph.dot` exports DOT graph. `taskgraph.run_with` adds `on_complete`/`on_fail` callbacks and `max_parallel`.
 
 ## Standard Agents
 

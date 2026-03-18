@@ -96,6 +96,11 @@ pub fn build() -> IndexMap<String, Value> {
         super::agent_dialogue::mk_dialogue_end(),
     );
     m.insert("negotiate".into(), super::agent_negotiate::mk_negotiate());
+    m.insert("register".into(), super::agent_route::mk_register());
+    m.insert("unregister".into(), super::agent_route::mk_unregister());
+    m.insert("registered".into(), super::agent_route::mk_registered());
+    m.insert("route".into(), super::agent_route::mk_route());
+    m.insert("route_multi".into(), super::agent_route::mk_route_multi());
     m.insert("topic".into(), super::agent_pubsub::mk_topic());
     m.insert("subscribe".into(), super::agent_pubsub::mk_subscribe());
     m.insert(

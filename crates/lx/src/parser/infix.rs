@@ -102,7 +102,7 @@ impl super::Parser {
     fn parse_dot(&mut self, left: SExpr, start: u32) -> Result<SExpr, LxError> {
         let tok = self.advance().clone();
         match tok.kind {
-            TokenKind::Ident(name) => {
+            TokenKind::Ident(name) | TokenKind::TypeName(name) => {
                 let span = Span::from_range(start, tok.span.end());
                 Ok(SExpr::new(
                     Expr::FieldAccess {

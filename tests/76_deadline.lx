@@ -1,0 +1,111 @@
+-- test: deadline
+use std/deadline
+use std/time
+
+-- create returns Ok with handle
+dl = deadline.create 5000 ^
+has_id = has_key? "__deadline_id" dl
+assert (has_id == true) "handle has __deadline_id"
+
+-- scope runs body and returns Ok-wrapped result
+dl2 = deadline.create 5000 ^
+body2 = () 42
+result = deadline.scope dl2 body2 ^
+assert (result == 42) "scope returns body value"
+
+-- remaining returns positive ms inside scope
+dl3 = deadline.create 10000 ^
+body3 = () { deadline.remaining () ^ }
+result = deadline.scope dl3 body3
+r = result ^
+assert (r > 0) "remaining is positive"
+assert (r <= 10000) "remaining is <= initial"
+
+-- expired returns false when time remains
+dl4 = deadline.create 10000 ^
+body4 = () { deadline.expired () ^ }
+result = deadline.scope dl4 body4
+e = result ^
+assert (e == false) "not expired with time left"
+
+-- expired returns true when deadline is past
+dl5 = deadline.create 1 ^
+time.sleep 10
+body5 = () { deadline.expired () ^ }
+result = deadline.scope dl5 body5
+e2 = result ^
+assert (e2 == true) "expired after deadline passed"
+
+-- check returns Ok when time remains
+dl6 = deadline.create 10000 ^
+body6 = () { deadline.check () ^ }
+result = deadline.scope dl6 body6
+c = result ^
+assert (c == ()) "check returns unit when ok"
+
+-- check returns Err when expired
+dl7 = deadline.create 1 ^
+time.sleep 10
+body7 = () { deadline.check () }
+result = deadline.scope dl7 body7
+inner = result ^
+assert (err? inner == true) "check returns Err when expired"
+
+-- slice creates sub-deadline
+dl8 = deadline.create 10000 ^
+body8 = () {
+  sub = deadline.slice 0.5 ^
+  has_key? "__deadline_id" sub
+}
+result = deadline.scope dl8 body8
+s = result ^
+assert (s == true) "slice returns handle"
+
+-- slice sub-deadline has correct proportion
+dl9 = deadline.create 10000 ^
+body9 = () {
+  sub = deadline.slice 0.5 ^
+  inner_body = () { deadline.remaining () ^ }
+  deadline.scope sub inner_body ^
+}
+result = deadline.scope dl9 body9
+sub_remaining = result ^
+assert (sub_remaining > 0) "sub-deadline has time"
+assert (sub_remaining <= 5100) "sub-deadline is <= 50% + margin"
+
+-- extend adds time to deadline
+dl10 = deadline.create 1000 ^
+deadline.extend dl10 5000 ^
+body10 = () { deadline.remaining () ^ }
+result = deadline.scope dl10 body10
+ext = result ^
+assert (ext > 4000) "extend added time"
+
+-- create_at with future epoch works
+now = time.now ()
+future_ms = now.ms + 10000
+dl11 = deadline.create_at future_ms ^
+body11 = () { deadline.remaining () ^ }
+result = deadline.scope dl11 body11
+at_r = result ^
+assert (at_r > 0) "create_at future has time remaining"
+
+-- deadline propagation via ~>? injects _deadline_ms
+worker = {handler: (msg) msg}
+dl12 = deadline.create 10000 ^
+body12 = () {
+  worker ~>? {task: "test"}
+}
+result = deadline.scope dl12 body12
+msg_back = result ^
+has_dl = has_key? "_deadline_ms" msg_back
+assert (has_dl == true) "message has _deadline_ms"
+assert (msg_back._deadline_ms > 0) "_deadline_ms is positive"
+assert (msg_back._deadline_ms <= 10000) "_deadline_ms <= initial"
+
+-- no deadline scope: ~>? does not inject _deadline_ms
+resp2 = worker ~>? {task: "no_deadline"}
+no_dl = not (has_key? "_deadline_ms" resp2)
+assert (no_dl == true) "no injection outside scope"
+
+log.info "76_deadline: all passed"

@@ -11,7 +11,10 @@ mod agent_mock;
 mod agent_negotiate;
 mod agent_pubsub;
 mod agent_reconcile;
+mod agent_reconcile_score;
 mod agent_reconcile_strat;
+mod agent_route;
+mod agent_route_table;
 mod agent_supervise;
 mod agents_auditor;
 mod agents_grader;
@@ -27,10 +30,12 @@ mod circuit;
 mod context;
 mod cron;
 mod ctx;
+pub(crate) mod deadline;
 mod describe;
 pub mod diag;
 mod diag_walk;
 mod env;
+mod flow;
 mod fs;
 mod git;
 mod git_branch;
@@ -60,6 +65,7 @@ mod prompt;
 mod re;
 mod retry;
 mod saga;
+mod taskgraph;
 mod tasks;
 mod test;
 mod time;
@@ -93,6 +99,7 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
             "fs" => fs::build(),
             "git" => git::build(),
             "env" => env::build(),
+            "flow" => flow::build(),
             "re" => re::build(),
             "md" => md::build(),
             "agent" => agent::build(),
@@ -100,6 +107,7 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
             "http" => http::build(),
             "time" => time::build(),
             "cron" => cron::build(),
+            "deadline" => deadline::build(),
             "ai" => ai::build(),
             "tasks" => tasks::build(),
             "audit" => audit::build(),
@@ -116,6 +124,7 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
             "prompt" => prompt::build(),
             "retry" => retry::build(),
             "saga" => saga::build(),
+            "taskgraph" => taskgraph::build(),
             "test" => test::build(),
             "introspect" => introspect::build(),
             "profile" => profile::build(),
@@ -149,6 +158,7 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
             | "fs"
             | "git"
             | "env"
+            | "flow"
             | "re"
             | "md"
             | "agent"
@@ -161,6 +171,7 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
             | "audit"
             | "budget"
             | "circuit"
+            | "deadline"
             | "context"
             | "describe"
             | "diag"
@@ -172,6 +183,7 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
             | "prompt"
             | "retry"
             | "saga"
+            | "taskgraph"
             | "test"
             | "introspect"
             | "profile"

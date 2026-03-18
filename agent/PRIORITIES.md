@@ -3,7 +3,31 @@
 
 # Priorities
 
-Top item = next thing to implement. Each entry explains WHY it's at this position. Items 1, 22, 23, and Tier 5 require parser/interpreter changes; the rest are stdlib-only.
+Top item = next thing to implement. Each entry explains WHY it's at this position.
+
+## Tier 0 — Bug fixes (foundation before features)
+
+BUGS.md says "fix bugs before new features." 60 sessions of feature work have accumulated known parser bugs, gotchas, and code quality violations. Every new feature built on a buggy parser inherits those bugs. Fix the foundation before adding more surface area.
+
+**Session 61: Parser bug fixes + code quality** ✓ DONE
+
+- [x] List spread bp — changed `parse_expr(32)` to `parse_expr(0)` (consistent with non-spread element parsing)
+- [x] Module `../../` multi-level — already had loop; confirmed working, removed stale BUGS.md entry
+- [x] Single-line multi-field records — already working; confirmed with tests, removed stale BUGS.md entry
+- [x] Agent body uppercase tokens — accept `TypeName` in Agent body + dot access
+- [x] Split all 7 over-300-line files (7 new files: stmt_trait, agent_reconcile_score, cron_helpers, str_extra, diag_types, walk_helpers, tasks_transition)
+- [ ] Wire Agent `uses` — deferred (not critical, workaround exists)
+
+**Not fixing (by design / architectural):**
+- Named-arg `:` vs ternary `:` — inherent parser ambiguity, workaround (parenthesize) is fine
+- `is_func_def` heuristic ambiguity — inherent to juxtaposition syntax, workarounds documented
+- Keyword field names — fundamental to how keywords work, `flow.parallel` pattern is fine
+- par/sel/pmap sequential — needs tokio, architectural change
+- Trait conformance uncatchable — by design (hard error at definition time)
+
+**Session 62: Feature consolidation audit (collaborative with user)**
+
+Run in parallel with or immediately after bug fixes. The feature surface (44 stdlib modules, 12 agent extensions) was built across 60 sessions — many features likely overlap or share mechanics (reconcile/vote, multiple routing mechanisms, retry/circuit/resilience patterns). Audit the full space with the user, identify generic primitives that cover the same ground with fewer composable building blocks, then restructure. Layer specific instances on top of generic ones for DRYness. This is a joint design session, not a solo implementation tick. Do NOT proceed to Tier 2 features until this is done — consolidation may eliminate, merge, or reshape planned features.
 
 ## Tier 1 — Infrastructure (multiplicative improvement to every tick)
 
@@ -15,17 +39,17 @@ Tier 1 completed: `std/retry` (Session 44), `std/user` + `std/profile` (Session 
 
 3. ~~**`std/pipeline` checkpoint/resume**~~ — SHIPPED Session 55. 8 functions: `create`, `stage`, `complete`, `status`, `invalidate`, `invalidate_from`, `clean`, `list`.
 
-4. **`AgentErr` structured errors** (`spec/agents-errors.md`) — Tagged error mechanism works (`Err Timeout "msg"`). Remaining: define 11 standard agent error variants as convention and update stdlib.
+4. ~~**`AgentErr` structured errors**~~ — SHIPPED Session 56. 11 tagged error variants with constructors, stdlib migration (budget, agent, mcp, pool, http).
 
-5. **`std/test` satisfaction testing** (`spec/testing-satisfaction.md`) — Spec + scenarios + grader + threshold scoring for non-deterministic agentic flows.
+5. ~~**`std/test` satisfaction testing**~~ — SHIPPED Session 50+. `test.spec`, `test.scenario`, `test.run`, `test.run_scenario`, `test.report`.
 
-6. **`std/flow` composition** (`spec/flow-composition.md`) — Flows as first-class values: `flow.load`/`flow.run`/`flow.pipe`/`flow.par`.
+6. ~~**`std/flow` composition**~~ — SHIPPED Session 57. 8 functions: `load`, `run`, `pipe`, `parallel`, `branch`, `with_retry`, `with_timeout`, `with_fallback`.
 
-7. **`std/taskgraph` DAG execution** (`spec/agents-task-graph.md`) — Dependency-ordered subtask decomposition. Declare tasks + dependencies + agents, runtime executes in topological order with max parallelism. Eliminates manual DAG scheduling boilerplate in every non-trivial multi-agent flow.
+7. ~~**`std/taskgraph` DAG execution**~~ — SHIPPED Session 58. 9 functions: `create`, `add`, `remove`, `run`, `run_with`, `validate`, `topo`, `status`, `dot`. Kahn's algorithm, wave-based execution, `input_from` result threading, per-task retry/timeout, `on_fail` policy, DOT export.
 
-8. **`std/deadline` time propagation** (`spec/agents-deadline.md`) — Time budgets that propagate across `~>?` boundaries. Sub-agents know remaining time, can degrade gracefully. `deadline.scope`, `deadline.remaining`, `deadline.slice`. Orthogonal to `std/budget` (cost).
+8. ~~**`std/deadline` time propagation**~~ — SHIPPED Session 59. 8 functions: `create`, `create_at`, `scope`, `remaining`, `expired`, `check`, `slice`, `extend`. Thread-local scope stack, auto `_deadline_ms` injection on `~>?`/`~>`.
 
-9. **`agent.route`/`register` capability routing** (`spec/agents-capability-routing.md`) — Declarative routing: `agent.route msg {trait: "Reviewer"}` finds the best available agent by trait/protocol/domain with load-awareness. `agent.route_multi` fans out to all matching + reconcile. Stepping stone to `std/registry`.
+9. ~~**`agent.route`/`register` capability routing**~~ — SHIPPED Session 60. 5 functions: `register`, `unregister`, `registered`, `route`, `route_multi`. Trait/protocol/domain filtering, selection strategies (least_busy, round_robin, random, custom), load tracking, reconcile integration.
 
 10. **`introspect.system` live observation** (`spec/agents-introspect-live.md`) — "What are all agents doing right now?" Structured system snapshot: agent states, in-flight messages, active dialogues, pool status, bottleneck detection. Extensions to existing `std/introspect`.
 

@@ -1,5 +1,7 @@
 #[path = "tasks_query.rs"]
 mod tasks_query;
+#[path = "tasks_transition.rs"]
+mod tasks_transition;
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -38,17 +40,38 @@ pub fn build() -> IndexMap<String, Value> {
         mk("tasks.children", 2, tasks_query::bi_children),
     );
     m.insert("list".into(), mk("tasks.list", 2, tasks_query::bi_list));
-    m.insert("start".into(), mk("tasks.start", 2, bi_start));
+    m.insert(
+        "start".into(),
+        mk("tasks.start", 2, tasks_transition::bi_start),
+    );
     m.insert(
         "update".into(),
         mk("tasks.update", 3, tasks_query::bi_update),
     );
-    m.insert("submit".into(), mk("tasks.submit", 3, bi_submit));
-    m.insert("audit".into(), mk("tasks.audit", 2, bi_audit));
-    m.insert("pass".into(), mk("tasks.pass", 2, bi_pass));
-    m.insert("fail".into(), mk("tasks.fail", 3, bi_fail));
-    m.insert("revise".into(), mk("tasks.revise", 2, bi_revise));
-    m.insert("complete".into(), mk("tasks.complete", 3, bi_complete));
+    m.insert(
+        "submit".into(),
+        mk("tasks.submit", 3, tasks_transition::bi_submit),
+    );
+    m.insert(
+        "audit".into(),
+        mk("tasks.audit", 2, tasks_transition::bi_audit),
+    );
+    m.insert(
+        "pass".into(),
+        mk("tasks.pass", 2, tasks_transition::bi_pass),
+    );
+    m.insert(
+        "fail".into(),
+        mk("tasks.fail", 3, tasks_transition::bi_fail),
+    );
+    m.insert(
+        "revise".into(),
+        mk("tasks.revise", 2, tasks_transition::bi_revise),
+    );
+    m.insert(
+        "complete".into(),
+        mk("tasks.complete", 3, tasks_transition::bi_complete),
+    );
     m
 }
 
@@ -197,106 +220,4 @@ fn bi_get(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, L
             format!("task '{tid}' not found").as_str(),
         ))))),
     }
-}
-
-fn transition(
-    store_val: &Value,
-    task_id_val: &Value,
-    extra: Option<&Value>,
-    from: &[&str],
-    to: &str,
-    span: Span,
-) -> Result<Value, LxError> {
-    let sid = store_id(store_val, span)?;
-    let tid = task_id_val
-        .as_str()
-        .ok_or_else(|| LxError::type_err("tasks: id must be Str", span))?;
-    let mut store = STORES
-        .get_mut(&sid)
-        .ok_or_else(|| LxError::runtime("tasks: store not found", span))?;
-    let task = store
-        .tasks
-        .get(tid)
-        .ok_or_else(|| LxError::runtime(format!("tasks: task '{tid}' not found"), span))?
-        .clone();
-    let Value::Record(r) = task else {
-        return Err(LxError::runtime("tasks: corrupt task record", span));
-    };
-    let status = r.get("status").and_then(|v| v.as_str()).unwrap_or("");
-    if !from.contains(&status) {
-        return Ok(Value::Err(Box::new(Value::Str(Arc::from(
-            format!("tasks: cannot transition '{status}' -> '{to}'").as_str(),
-        )))));
-    }
-    let mut fields = (*r).clone();
-    fields.insert("status".into(), Value::Str(Arc::from(to)));
-    fields.insert("updated_at".into(), Value::Str(now()));
-    if let Some(Value::Record(ef)) = extra {
-        for (k, v) in ef.iter() {
-            if k != "id" && k != "status" && k != "created_at" {
-                fields.insert(k.clone(), v.clone());
-            }
-        }
-    }
-    store
-        .tasks
-        .insert(tid.to_string(), Value::Record(Arc::new(fields)));
-    persist(&store, span)?;
-    Ok(Value::Ok(Box::new(Value::Unit)))
-}
-
-fn bi_start(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    transition(&args[0], &args[1], None, &["todo"], "in_progress", span)
-}
-
-fn bi_submit(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    transition(
-        &args[0],
-        &args[1],
-        Some(&args[2]),
-        &["in_progress", "revision"],
-        "submitted",
-        span,
-    )
-}
-
-fn bi_audit(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    transition(
-        &args[0],
-        &args[1],
-        None,
-        &["submitted"],
-        "pending_audit",
-        span,
-    )
-}
-
-fn bi_pass(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    transition(&args[0], &args[1], None, &["pending_audit"], "passed", span)
-}
-
-fn bi_fail(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    transition(
-        &args[0],
-        &args[1],
-        Some(&args[2]),
-        &["pending_audit"],
-        "failed",
-        span,
-    )
-}
-
-fn bi_revise(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    transition(&args[0], &args[1], None, &["failed"], "revision", span)
-}
-
-fn bi_complete(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    transition(
-        &args[0],
-        &args[1],
-        Some(&args[2]),
-        &["passed"],
-        "complete",
-        span,
-    )
 }
