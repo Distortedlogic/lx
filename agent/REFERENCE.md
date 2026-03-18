@@ -1,6 +1,7 @@
-# Reference
+-- Memory: ROM. Codebase layout and how-to guides for implementation work.
+-- Update when file structure changes or new how-to patterns emerge.
 
-Stable how-to guides and codebase layout. Changes infrequently.
+# Reference
 
 ## Codebase Layout
 
@@ -16,7 +17,7 @@ crates/lx/src/
   visitor/     AST visitor/walker infrastructure
   stdlib/      40 registered modules across ~86 .rs files (use `std_module_exists` in mod.rs as source of truth)
   token.rs, value.rs, value_display.rs, value_impls.rs, ast_display.rs, env.rs, error.rs, span.rs, lib.rs
-crates/lx-cli/src/main.rs
+crates/lx-cli/src/  main.rs, manifest.rs, testing.rs, listing.rs, run.rs, agent_cmd.rs
 doc/           35 quick-reference docs
 spec/          51 spec files
 agent/         Context files (this folder)
@@ -67,6 +68,14 @@ When adding errors, follow these rules:
 - Undefined variable hints: `keyword_hint()` in `interpreter/mod.rs` maps 30+ cross-language keywords to lx equivalents
 - Binding pattern hints: `binding_pattern_hint()` detects `mut`/`let`/`var` and suggests `:=`
 - Pattern display: `Pattern` impl Display in `ast.rs` for readable error output
+
+## std/diag Architecture
+
+Four files: `diag.rs` (API + mermaid render), `diag_walk.rs` (walker, pre-registration),
+`diag_walk_expr.rs` (expression handler with uncurry/classify/handle), `diag_helpers.rs`
+(pure helpers). Utility modules (prompt, json, math, etc.) excluded from diagrams to reduce
+noise. Pre-registration pass solves forward references. Resource args scanned for tracked
+variables across all curried positions.
 
 ## Running Flows
 

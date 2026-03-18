@@ -201,7 +201,7 @@ New stdlib module with functions: `load`, `run`, `pipe`, `par`, `branch`, `with_
 
 ## Cross-References
 
-- Functions: FEATURES.md (Functions section) — flows extend function composition to programs
+- Functions: LANGUAGE.md (Functions section) — flows extend function composition to programs
 - Agents: [stdlib-agents.md](stdlib-agents.md) — `agent.spawn` is process-level, flows are interpreter-level
 - Pipelines: [agents-pipeline.md](agents-pipeline.md) — agent pipelines with backpressure
 - Plans: `std/plan` — plan steps can be flows

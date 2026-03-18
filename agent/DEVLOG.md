@@ -1,6 +1,7 @@
-# lx Development Log
+-- Memory: journal. Design decisions, architectural debt, and session history.
+-- Append-only. Add a session entry every tick. Never delete history.
 
-Design decisions, technical debt, and session history. Read `TICK.md` first for orientation.
+# lx Development Log
 
 ## Key Design Decisions
 
@@ -75,3 +76,5 @@ Architectural constraints that inform design decisions. Not actionable bugs (tho
 | 50+ | 03-17 | Flow testing infrastructure: `std/test` (test runner, test/describe blocks), `std/describe` (BDD-style describe/it with structured results). Flow satisfaction test suites for 14 flow specs — 11 deterministic suites (35 scenarios) + 3 live-only stubs. Discovered and documented 16 findings in FLOW_TESTING_FINDINGS.md. Fixed: `Protocol +Name` syntax, `refine` initial expression parsing, `trace.record` Int score handling. 71/71 tests |
 | 51 | 03-17 | Enforced Trait methods: `Trait Name = { method: {input} -> output }` with typed MCP-style signatures. `TraitMethodDecl` AST node, `TraitMethodDef` runtime value. Agent conformance checks method existence at definition time. `agent.implements` now structural (checks methods, not string tags). `std/trait` module: `trait.methods` (extract signatures) + `trait.match` (keyword matching). Protocol-named inputs supported (`method: ProtoName -> output`). Old `handles`/`provides` syntax removed. 71/71 tests |
 | 52 | 03-18 | Brain-driven language improvements (10 fixes): `/` returns Float for Int/Int (Python 3), `//` for integer division. Map/Agent field miss → `None` (uniform with Record). Protocol validation → `Err` values (catchable). Record spread allows fn calls (`{..mk () ...}`). Agent `uses`/`on` wired to runtime (`Value::Agent` gains fields). `receive` keyword for agent msg loops. `ai.prompt_json` lightweight structured output. Brain sweep: removed 14 `to_float`, converted 5 agents to `receive`. 71/71 tests |
+| 53 | 03-18 | Workspace Phase 1: `lx.toml` manifest parsing (`WorkspaceManifest`/`PackageManifest`), workspace discovery (walk up from cwd), `lx test` workspace-aware (iterate members, per-member results), `lx test -m name` filter, `lx list` member summary. CLI refactored: `main.rs` split into 6 files (main, manifest, testing, listing, run, agent_cmd). `toml` crate added. `lx.toml` files for tests/, brain/, workgen/, flows/. Confirmed unicode crash already fixed (deleted from BUGS.md). 71/71 tests |
+| 54 | 03-18 | Workspace Phase 2: Module resolver gains workspace step — `use brain/protocols` resolves via member name (between relative and stdlib in resolution order). `lx run member-name` resolves to member's `entry` field from manifest. `lx check` gains workspace iteration (`lx check` = all members, `lx check -m name` = one member). `RuntimeCtx.workspace_members` carries member→dir map. Test and run commands auto-populate workspace members. 72/72 tests |

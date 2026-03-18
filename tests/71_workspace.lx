@@ -1,0 +1,20 @@
+use flows/lib/scoring {normalize scale_stars}
+
+n = normalize 0.0 10.0 5.0
+assert (n == 0.5) "normalize from workspace member"
+
+n2 = normalize 0.0 100.0 75.0
+assert (n2 == 0.75) "normalize 75/100"
+
+s = scale_stars 5000
+assert (s == 10.0) "scale_stars high"
+
+s2 = scale_stars 50
+assert (s2 == 4.0) "scale_stars medium"
+
+s3 = scale_stars 5
+assert (s3 == 1.0) "scale_stars low"
+
+use flows/lib/scoring
+n3 = scoring.normalize 10.0 20.0 15.0
+assert (n3 == 0.5) "whole-module workspace import"

@@ -19,6 +19,8 @@ impl Interpreter {
                     span,
                 )
             })?
+        } else if let Some(file_path) = self.resolve_workspace_module(&use_stmt.path) {
+            self.load_module(&file_path, span)?
         } else {
             let source_dir = self
                 .source_dir
@@ -60,6 +62,19 @@ impl Interpreter {
         }
         self.env = env.into_arc();
         Ok(())
+    }
+
+    fn resolve_workspace_module(&self, path: &[String]) -> Option<PathBuf> {
+        if path.len() < 2 {
+            return None;
+        }
+        let member_dir = self.ctx.workspace_members.get(&path[0])?;
+        let mut result = member_dir.clone();
+        for segment in &path[1..] {
+            result.push(segment);
+        }
+        result.set_extension("lx");
+        Some(result)
     }
 
     fn load_module(&mut self, file_path: &PathBuf, span: Span) -> Result<ModuleExports, LxError> {

@@ -1,17 +1,10 @@
-# Known Bugs
+-- Memory: interrupt vector table. Known faults in the lx implementation.
+-- Delete entries when fixed. Add entries when discovered. Fix bugs before new features.
 
-Active defects in the lx implementation. Fix these before building new features.
+# Known Bugs
 Each entry has: severity, root cause, affected files, workaround.
 
 When you fix a bug, delete its entry. When you discover a bug, add it here.
-
-## Crash
-
-### Unicode in comments panics lexer
-- **Root cause:** Byte indexing in comment scanner; non-ASCII chars span multiple bytes
-- **Affected:** `crates/lx/src/lexer/mod.rs` (comment skipping logic)
-- **Reproduce:** Any `-- é` or `-- 日本語` comment
-- **Workaround:** ASCII-only comments
 
 ## Parser
 

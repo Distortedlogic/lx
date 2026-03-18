@@ -37,6 +37,7 @@ strum = { version = "0.26", features = ["derive"] }
 cron = { version = "0.15" }
 dashmap = "6"
 fastrand = "2"
+toml = "0.8"
 parking_lot = "0.12"
 
 [workspace.lints.rust]

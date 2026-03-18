@@ -1,0 +1,2 @@
+[workspace]
+members = ["tests", "brain", "workgen", "flows"]

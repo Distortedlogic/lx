@@ -22,6 +22,18 @@ diagnose:
 test:
   cargo run -p lx-cli -- test tests/
 
+# run all workspace member tests
+test-all:
+  cargo run -p lx-cli -- test
+
+# run tests for a specific workspace member
+test-member member:
+  cargo run -p lx-cli -- test -m {{member}}
+
+# list workspace members
+list:
+  cargo run -p lx-cli -- list
+
 # run a single .lx file
 run file:
   cargo run -p lx-cli -- run {{file}}

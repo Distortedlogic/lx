@@ -182,7 +182,7 @@ The interpreter's module resolver (`interpreter/modules.rs`) gains a new resolut
 
 ## Cross-References
 
-- Module system: FEATURES.md (Modules section)
+- Module system: LANGUAGE.md (Modules section)
 - Test runner: [testing-satisfaction.md](testing-satisfaction.md)
 - Toolchain: [toolchain.md](toolchain.md) (`lx init`, `lx test`)
 - Sandboxing: [toolchain.md](toolchain.md) (Sandboxing section)

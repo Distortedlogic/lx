@@ -1,0 +1,8 @@
+[package]
+name = "flows"
+version = "0.1.0"
+description = "Agentic workflow examples and libraries"
+
+[test]
+dir = "tests/"
+pattern = "*_flow.lx"

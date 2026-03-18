@@ -96,10 +96,13 @@ Specs for planned/unimplemented features. See [stdlib-modules.md](spec/stdlib-mo
 | [TICK.md](agent/TICK.md) | Tick-loop control register: identity, state, next task |
 | [PRIORITIES.md](agent/PRIORITIES.md) | Ordered work queue with rationale |
 | [INVENTORY.md](agent/INVENTORY.md) | Full list of implemented features |
-| [OPINION.md](agent/OPINION.md) | Design self-critique: what works, what's wrong |
+| [HEALTH.md](agent/HEALTH.md) | Design assessment: what works, what's wrong |
+| [BUGS.md](agent/BUGS.md) | Known bugs with root causes and workarounds |
 | [DEVLOG.md](agent/DEVLOG.md) | Design decisions, tech debt, session history |
 | [REFERENCE.md](agent/REFERENCE.md) | Codebase layout, how-to guides |
-| [FEATURES.md](agent/FEATURES.md) | Complete lx language guide for agents |
+| [LANGUAGE.md](agent/LANGUAGE.md) | Core lx syntax and semantics |
+| [AGENTS.md](agent/AGENTS.md) | Agent system and extensions |
+| [STDLIB.md](agent/STDLIB.md) | Standard library reference |
 | [GOTCHAS.md](agent/GOTCHAS.md) | Non-obvious behaviors that trip up implementation |
 
 ## Test Suite — `tests/`

@@ -1,6 +1,9 @@
-# Design Opinion
+-- Memory: diagnostic register. Honest assessment of what works and what's broken.
+-- Rewrite when the assessment changes. Keep it short and honest.
 
-Written by the language designer (Claude). Updated after Session 52 (2026-03-18).
+# Design Health
+
+Updated after Session 53 (2026-03-18).
 
 ## What Works
 
@@ -20,4 +23,4 @@ See `agent/PRIORITIES.md` for the full ordered work queue.
 
 ## Bottom Line
 
-The core agent architecture is solid — spawn, message, validate, supervise, reconcile, and resource-scope all work end-to-end. Error handling is now uniform (field miss → None, Protocol fail → Err, tagged errors for pattern matching). The main remaining pain point is pipeline checkpoint/resume.
+The core agent architecture is solid — spawn, message, validate, supervise, reconcile, and resource-scope all work end-to-end. Error handling is now uniform (field miss → None, Protocol fail → Err, tagged errors for pattern matching). Workspace Phase 1 shipped — `lx.toml` manifests, `lx test`/`lx list` across members. Next infrastructure priority: workspace module resolution (Phase 2).

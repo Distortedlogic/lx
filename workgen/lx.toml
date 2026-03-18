@@ -1,0 +1,9 @@
+[package]
+name = "workgen"
+version = "0.1.0"
+entry = "run.lx"
+description = "Work-item generation from audit checklists"
+
+[test]
+dir = "tests/"
+pattern = "*.lx"

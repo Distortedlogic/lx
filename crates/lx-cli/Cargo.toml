@@ -13,6 +13,8 @@ lx = { path = "../lx" }
 clap = { version = "4", features = ["derive"] }
 miette = { version = "7", features = ["fancy"] }
 serde_json.workspace = true
+serde = { workspace = true }
+toml = { workspace = true }
 
 [lints]
 workspace = true

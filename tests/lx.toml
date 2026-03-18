@@ -1,0 +1,9 @@
+[package]
+name = "tests"
+version = "0.1.0"
+description = "lx language test suite"
+
+[test]
+dir = "."
+pattern = "*.lx"
+runner = "suite"

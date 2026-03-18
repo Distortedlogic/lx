@@ -1,6 +1,7 @@
-# workgen Reference
+-- Memory: ROM. File map, APIs, fixtures — how workgen works.
+-- Update when workgen structure changes.
 
-Stable reference for workgen development. Changes infrequently.
+# workgen Reference
 
 ## Tooling
 

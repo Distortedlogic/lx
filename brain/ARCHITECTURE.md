@@ -1,5 +1,5 @@
--- Brain Architecture: stable reference for fast orientation
--- Read this once when you need to understand the brain. Not required every tick.
+-- Memory: ROM. Brain structure reference — module map, data flow, patterns in use.
+-- Update when brain files are added/removed or architecture changes. Not needed every tick.
 
 ## Overview
 
@@ -90,3 +90,17 @@ sel racing for complex inputs. par for parallel work. pmap_n for rate-limited fa
 
 See brain/STATUS.md "Known Remaining Gaps" for the full list.
 Key: agent.mock (no tests), std/agents/* (unused stdlib agents), lib-as-Agents pattern.
+
+## Dogfood Relationship
+
+Three systems form a feedback loop:
+- **brain/ → lx language**: Writing brain code surfaces language gaps (Session 52: 12 fixes)
+- **Context files → brain/ (narrow)**: The context files are rudimentary scaffolding — flat
+  markdown read once per tick. They teach what INFORMATION categories matter across sessions
+  (bugs, priorities, capabilities, health). The brain program is orders of magnitude more
+  expressive: cron timing, pub/sub routing, parallel racing, memory tiers, refinement loops.
+  Don't model brain/ after the context files — model it after what they CANNOT do.
+- **lx language → brain/**: New features immediately simplify brain code (receive, ai.prompt_json)
+
+The convergence goal: the brain program eventually replaces the manual context file system.
+The context files are scaffolding removed when the building stands.

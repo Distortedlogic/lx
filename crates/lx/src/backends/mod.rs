@@ -4,6 +4,8 @@ mod user;
 pub use defaults::*;
 pub use user::*;
 
+use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use indexmap::IndexMap;
@@ -26,7 +28,8 @@ pub struct RuntimeCtx {
     pub log: Arc<dyn LogBackend>,
     pub user: Arc<dyn UserBackend>,
     pub on_agent_event: Option<Arc<dyn Fn(AgentEvent) + Send + Sync>>,
-    pub source_dir: parking_lot::Mutex<Option<std::path::PathBuf>>,
+    pub source_dir: parking_lot::Mutex<Option<PathBuf>>,
+    pub workspace_members: HashMap<String, PathBuf>,
 }
 
 impl Default for RuntimeCtx {
@@ -41,6 +44,7 @@ impl Default for RuntimeCtx {
             user: Arc::new(NoopUserBackend),
             on_agent_event: None,
             source_dir: parking_lot::Mutex::new(None),
+            workspace_members: HashMap::new(),
         }
     }
 }

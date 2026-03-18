@@ -1,6 +1,7 @@
-# Implemented Feature Inventory
+-- Memory: capability register. Everything lx can do right now.
+-- Add entries when features ship. Keep current — a stale inventory misleads the next you.
 
-What lx can do right now. For project health/status, see the "State" section of `TICK.md`.
+# Implemented Feature Inventory
 
 ## Core Language
 
@@ -13,7 +14,7 @@ What lx can do right now. For project health/status, see the "State" section of 
 - Shell: `$cmd`, `$^cmd`, `${...}` with interpolation
 - Error handling: `^` propagation, `??` coalescing, `(?? default)` sections. Structured error tags: `Err Timeout "msg"` with pattern matching. Uniform `None` on miss for Record, Map, and Agent field access
 - Arithmetic: `/` always returns Float (Python 3 semantics), `//` for integer division, mixed Int/Float auto-promotion
-- Modules: `use ./path`, aliasing, selective imports, `+` exports
+- Modules: `use ./path`, aliasing, selective imports, `+` exports, workspace member resolution (`use brain/protocols`)
 
 ## Agent System
 
@@ -80,8 +81,15 @@ What lx can do right now. For project health/status, see the "State" section of 
 
 ## CLI
 
-`lx run`, `lx test`, `lx check`, `lx agent`, `lx diagram`
+`lx run`, `lx test`, `lx check`, `lx agent`, `lx diagram`, `lx list`
+
+- **Workspace support**: `lx.toml` manifest parsing, workspace discovery (walk up from cwd), `lx test` iterates members, `lx test -m name` filters, `lx list` shows member summary, `lx run member-name` resolves to entry file, `lx check` / `lx check -m name` workspace iteration
+- Justfile recipes: `just test`, `just test-all` (workspace), `just test-member <name>`, `just list`, `just diagnose`, `just fmt`, `just build`, `just install`
+
+## Workspace
+
+`lx.toml` manifests — root workspace declares `[workspace].members`, each member has `[package]` (name, version, entry, description) and optional `[test]` (dir, pattern, runner). This repo is the first workspace: tests, brain, workgen, flows. Module resolver checks workspace members between relative and stdlib paths (`use member/path` → member's root directory).
 
 ## Test Coverage
 
-71 test suites (70 .lx files + 11_modules dir) in `tests/`. Fixtures in `tests/fixtures/`.
+72 test suites (71 .lx files + 11_modules dir) in `tests/`. Fixtures in `tests/fixtures/`.

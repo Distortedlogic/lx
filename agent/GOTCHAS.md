@@ -1,6 +1,7 @@
-# Gotchas
+-- Memory: errata sheet. Non-obvious behaviors that trip up implementation or testing.
+-- Add when you discover a gotcha. Remove when the behavior is fixed or no longer surprising.
 
-Permanent language behaviors that are non-obvious and trip up implementation or testing.
+# Gotchas
 
 ## Language
 

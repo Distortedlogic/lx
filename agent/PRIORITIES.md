@@ -1,16 +1,21 @@
+-- Memory: program queue. Ordered feature work — what to build next.
+-- Reorder when priorities shift. Remove when shipped. Add when specced.
+
 # Priorities
 
-Ordered work queue. Top item = next thing to implement. Each entry explains WHY it's at this position so you can judge whether circumstances have changed. Each entry links its spec file. Items 1, 22, 23, and Tier 5 require parser/interpreter changes; the rest are stdlib-only.
+Top item = next thing to implement. Each entry explains WHY it's at this position. Items 1, 22, 23, and Tier 5 require parser/interpreter changes; the rest are stdlib-only.
 
-## Tier 2 — Agent identity, communication, testing, packaging
+## Tier 1 — Infrastructure (multiplicative improvement to every tick)
 
-Tier 1 completed: `std/retry` (Session 44), `std/user` + `std/profile` (Session 49), `Agent` declarations (Session 49). Enforced `Trait` methods (Session 51).
+1. ~~**Workspace Phase 2**~~ — SHIPPED Session 54. Module resolver workspace step, `lx run member-name`, `lx check` workspace iteration.
 
-1. **`std/pipeline` checkpoint/resume** (`spec/agents-pipeline-checkpoint.md`) — Multi-stage pipelines restart from scratch when a late stage fails. `pipeline.stage` caches completed stage outputs, resumes from last success on re-run. Input hashing for automatic cache invalidation. Also covers the `plan.run_incremental` use case — same mechanism.
+## Tier 2 — Agent features
 
-3. **`AgentErr` structured errors** (`spec/agents-errors.md`) — Tagged error mechanism now works (`Err Timeout "msg"` with pattern matching). Remaining: define the 11 standard agent error variants as a convention and update stdlib to use them.
+Tier 1 completed: `std/retry` (Session 44), `std/user` + `std/profile` (Session 49), `Agent` declarations (Session 49). Enforced `Trait` methods (Session 51). Brain-driven improvements (Session 52).
 
-4. **`lx.toml` package manifest** (`spec/package-manifest.md`) — Project boundary, deps, backend config. Unblocks `std/test` and `std/flow`.
+3. **`std/pipeline` checkpoint/resume** (`spec/agents-pipeline-checkpoint.md`) — Multi-stage pipelines restart from scratch when a late stage fails. `pipeline.stage` caches completed stage outputs, resumes from last success on re-run.
+
+4. **`AgentErr` structured errors** (`spec/agents-errors.md`) — Tagged error mechanism works (`Err Timeout "msg"`). Remaining: define 11 standard agent error variants as convention and update stdlib.
 
 5. **`std/test` satisfaction testing** (`spec/testing-satisfaction.md`) — Spec + scenarios + grader + threshold scoring for non-deterministic agentic flows.
 

@@ -1,4 +1,5 @@
--- Brain Status: what's been done, what remains, session log
+-- Memory: journal + gap tracker. Session history and remaining work for brain/.
+-- Add a session entry every tick. Update remaining gaps when work is done.
 
 ## Current State (2026-03-18)
 
@@ -45,7 +46,7 @@ Worked through high and medium priority gaps from the initial audit. Changes acr
 
 ### Session: 2026-03-18 — Initial audit and 10-point overhaul
 
-Audited brain/ against agent/FEATURES.md. Found and closed these gaps:
+Audited brain/ against agent/LANGUAGE.md. Found and closed these gaps:
 
 | # | Priority | Status | What was done |
 |---|----------|--------|---------------|

@@ -1,0 +1,5 @@
+[package]
+name = "brain"
+version = "0.1.0"
+entry = "main.lx"
+description = "Claude cognitive self-model"

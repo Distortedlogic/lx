@@ -1,5 +1,10 @@
-use std::io::{BufRead, IsTerminal, Write};
-use std::path::Path;
+mod agent_cmd;
+mod listing;
+mod manifest;
+mod run;
+mod testing;
+
+use std::io::IsTerminal;
 use std::process::ExitCode;
 use std::sync::Arc;
 
@@ -18,36 +23,80 @@ struct Cli {
 enum Command {
     Run {
         file: String,
-        #[arg(long, help = "Output diagnostics as JSON")]
+        #[arg(long)]
         json: bool,
     },
     Test {
-        #[arg(help = "Directory containing .lx test files")]
-        dir: String,
+        #[arg()]
+        dir: Option<String>,
+        #[arg(short, long)]
+        member: Option<String>,
     },
     Check {
-        file: String,
+        #[arg()]
+        file: Option<String>,
+        #[arg(short, long)]
+        member: Option<String>,
     },
     Agent {
-        #[arg(help = "Agent script file (must evaluate to a handler function)")]
         script: String,
     },
     Diagram {
         file: String,
-        #[arg(short, long, help = "Write Mermaid output to file instead of stdout")]
+        #[arg(short, long)]
         output: Option<String>,
     },
+    List,
 }
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
-        Command::Run { file, json } => run_file(&file, json),
-        Command::Check { file } => check_file(&file),
-        Command::Test { dir } => run_tests(&dir),
-        Command::Agent { script } => run_agent(&script),
+        Command::Run { file, json } => {
+            let resolved = resolve_run_target(&file);
+            run_file(&resolved, json)
+        }
+        Command::Check { file, member } => {
+            if let Some(file) = file {
+                check_file(&file)
+            } else {
+                check_workspace(member.as_deref())
+            }
+        }
+        Command::Test { dir, member } => {
+            if let Some(dir) = dir {
+                testing::run_tests_dir(&dir)
+            } else {
+                testing::run_workspace_tests(member.as_deref())
+            }
+        }
+        Command::Agent { script } => agent_cmd::run_agent(&script),
         Command::Diagram { file, output } => run_diagram(&file, output.as_deref()),
+        Command::List => listing::list_workspace(),
     }
+}
+
+fn resolve_run_target(target: &str) -> String {
+    let path = std::path::Path::new(target);
+    if path.exists() && path.is_file() {
+        return target.to_string();
+    }
+    let Ok(cwd) = std::env::current_dir() else {
+        return target.to_string();
+    };
+    let Some(root) = manifest::find_workspace_root(&cwd) else {
+        return target.to_string();
+    };
+    let Ok(ws) = manifest::load_workspace(&root) else {
+        return target.to_string();
+    };
+    for member in &ws.members {
+        if member.name == target {
+            let entry = member.entry.as_deref().unwrap_or("main.lx");
+            return member.dir.join(entry).to_string_lossy().to_string();
+        }
+    }
+    target.to_string()
 }
 
 fn run_file(path: &str, _json: bool) -> ExitCode {
@@ -58,15 +107,18 @@ fn run_file(path: &str, _json: bool) -> ExitCode {
             return ExitCode::from(1);
         }
     };
-    let ctx = if std::io::stdin().is_terminal() {
-        Arc::new(RuntimeCtx {
+    let ws_members = manifest::try_load_workspace_members();
+    let mut ctx_val = if std::io::stdin().is_terminal() {
+        RuntimeCtx {
             user: Arc::new(StdinStdoutUserBackend),
             ..RuntimeCtx::default()
-        })
+        }
     } else {
-        Arc::new(RuntimeCtx::default())
+        RuntimeCtx::default()
     };
-    match run(&source, path, ctx) {
+    ctx_val.workspace_members = ws_members;
+    let ctx = Arc::new(ctx_val);
+    match run::run(&source, path, ctx) {
         Ok(()) => ExitCode::SUCCESS,
         Err(errors) => {
             let named = miette::NamedSource::new(path, source.clone());
@@ -91,7 +143,7 @@ fn run_file(path: &str, _json: bool) -> ExitCode {
 }
 
 fn check_file(path: &str) -> ExitCode {
-    let (source, program) = match read_and_parse(path) {
+    let (source, program) = match run::read_and_parse(path) {
         Ok(sp) => sp,
         Err(code) => return code,
     };
@@ -110,106 +162,121 @@ fn check_file(path: &str) -> ExitCode {
     }
 }
 
-fn run_tests(dir: &str) -> ExitCode {
-    let mut entries: Vec<TestEntry> = Vec::new();
-    for entry in std::fs::read_dir(dir).unwrap_or_else(|e| {
-        eprintln!("error: cannot read directory {dir}: {e}");
-        std::process::exit(1);
-    }) {
-        let Ok(entry) = entry else { continue };
-        let path = entry.path();
-        if path.extension().and_then(|e| e.to_str()) == Some("lx") {
-            let name = path
-                .file_name()
-                .expect("test file must have name")
-                .to_string_lossy()
-                .to_string();
-            entries.push(TestEntry { name, path });
-        } else if path.is_dir() {
-            let main_lx = path.join("main.lx");
-            if main_lx.exists() {
-                let name = path
-                    .file_name()
-                    .expect("dir must have name")
-                    .to_string_lossy()
-                    .to_string();
-                entries.push(TestEntry {
-                    name,
-                    path: main_lx,
-                });
+fn check_workspace(member_filter: Option<&str>) -> ExitCode {
+    let cwd = match std::env::current_dir() {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("error: cannot determine cwd: {e}");
+            return ExitCode::from(1);
+        }
+    };
+    let Some(root) = manifest::find_workspace_root(&cwd) else {
+        eprintln!("error: no workspace lx.toml found");
+        return ExitCode::from(1);
+    };
+    let Ok(ws) = manifest::load_workspace(&root) else {
+        eprintln!("error: failed to load workspace");
+        return ExitCode::from(1);
+    };
+    let members: Vec<&manifest::Member> = if let Some(filter) = member_filter {
+        let found: Vec<_> = ws.members.iter().filter(|m| m.name == filter).collect();
+        if found.is_empty() {
+            eprintln!("error: no member named '{filter}'");
+            eprintln!(
+                "available: {}",
+                ws.members
+                    .iter()
+                    .map(|m| m.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+            return ExitCode::from(1);
+        }
+        found
+    } else {
+        ws.members.iter().collect()
+    };
+
+    let mut total_ok = 0u32;
+    let mut total_err = 0u32;
+    let mut any_failure = false;
+
+    for member in &members {
+        let files = collect_lx_files(&member.dir);
+        let mut member_ok = 0u32;
+        let mut member_err = 0u32;
+        for file in &files {
+            let path_str = file.display().to_string();
+            match run::read_and_parse(&path_str) {
+                Ok((source, program)) => {
+                    let result = lx::checker::check(&program);
+                    if result.diagnostics.is_empty() {
+                        member_ok += 1;
+                    } else {
+                        member_err += 1;
+                        for d in &result.diagnostics {
+                            let err = lx::error::LxError::type_err(&d.msg, d.span);
+                            let named = miette::NamedSource::new(path_str.clone(), source.clone());
+                            let report = miette::Report::new(err).with_source_code(named);
+                            eprintln!("{report:?}");
+                        }
+                    }
+                }
+                Err(_) => {
+                    member_err += 1;
+                }
             }
         }
-    }
-    entries.sort_by(|a, b| a.name.cmp(&b.name));
-    let mut passed = 0;
-    let mut failed = 0;
-    let mut fail_details = Vec::new();
-    for entry in &entries {
-        let source = match std::fs::read_to_string(&entry.path) {
-            Ok(s) => s,
-            Err(e) => {
-                println!("SKIP {}: {e}", entry.name);
-                continue;
-            }
-        };
-        let ctx = Arc::new(RuntimeCtx::default());
-        match run(&source, entry.path.to_str().unwrap_or(&entry.name), ctx) {
-            Ok(()) => {
-                println!("PASS {}", entry.name);
-                passed += 1;
-            }
-            Err(errors) => {
-                let named = miette::NamedSource::new(&entry.name, source.clone());
-                let first = &errors[0];
-                let line = format!("{first}");
-                println!("FAIL {}: {line}", entry.name);
-                failed += 1;
-                fail_details.push((entry.name.clone(), errors, named));
-            }
+        let status = if member_err > 0 { "FAIL" } else { "ok" };
+        println!(
+            "{:<16} {} checked, {} errors — {status}",
+            member.name,
+            member_ok + member_err,
+            member_err
+        );
+        total_ok += member_ok;
+        total_err += member_err;
+        if member_err > 0 {
+            any_failure = true;
         }
     }
+
     println!(
-        "\n{passed} passed, {failed} failed, {} total",
-        passed + failed
+        "\nTOTAL: {} files, {} errors, {} members",
+        total_ok + total_err,
+        total_err,
+        members.len()
     );
-    if !fail_details.is_empty() {
-        println!("\n--- failures ---");
-        for (name, errors, named) in &fail_details {
-            println!("\n{name}:");
-            for err in errors {
-                let report = miette::Report::new(err.clone()).with_source_code(named.clone());
-                eprintln!("{report:?}");
-            }
-        }
+    if any_failure {
         ExitCode::from(1)
     } else {
         ExitCode::SUCCESS
     }
 }
 
-struct TestEntry {
-    name: String,
-    path: std::path::PathBuf,
+fn collect_lx_files(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+    let mut files = Vec::new();
+    collect_lx_files_rec(dir, &mut files);
+    files.sort();
+    files
 }
 
-fn run(source: &str, filename: &str, ctx: Arc<RuntimeCtx>) -> Result<(), Vec<lx::error::LxError>> {
-    let tokens = lx::lexer::lex(source).map_err(|e| vec![e])?;
-    let program = lx::parser::parse(tokens).map_err(|e| vec![e])?;
-    let source_dir = Path::new(filename).parent().map(|p| p.to_path_buf());
-    let mut interp = lx::interpreter::Interpreter::new(source, source_dir, ctx);
-    match interp.exec(&program) {
-        Ok(val) => {
-            if !matches!(val, lx::value::Value::Unit) {
-                println!("{val}");
-            }
-            Ok(())
+fn collect_lx_files_rec(dir: &std::path::Path, files: &mut Vec<std::path::PathBuf>) {
+    let Ok(read_dir) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in read_dir.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_lx_files_rec(&path, files);
+        } else if path.extension().and_then(|e| e.to_str()) == Some("lx") {
+            files.push(path);
         }
-        Err(e) => Err(vec![e]),
     }
 }
 
 fn run_diagram(path: &str, output: Option<&str>) -> ExitCode {
-    let (_source, program) = match read_and_parse(path) {
+    let (_source, program) = match run::read_and_parse(path) {
         Ok(sp) => sp,
         Err(code) => return code,
     };
@@ -223,93 +290,6 @@ fn run_diagram(path: &str, output: Option<&str>) -> ExitCode {
             println!("wrote diagram to {out_path}");
         }
         None => print!("{mermaid}"),
-    }
-    ExitCode::SUCCESS
-}
-
-fn read_and_parse(path: &str) -> Result<(String, lx::ast::Program), ExitCode> {
-    let source = std::fs::read_to_string(path).map_err(|e| {
-        eprintln!("error: cannot read {path}: {e}");
-        ExitCode::from(1)
-    })?;
-    let tokens = lx::lexer::lex(&source).map_err(|e| {
-        let named = miette::NamedSource::new(path, source.clone());
-        eprintln!("{:?}", miette::Report::new(e).with_source_code(named));
-        ExitCode::from(1)
-    })?;
-    let program = lx::parser::parse(tokens).map_err(|e| {
-        let named = miette::NamedSource::new(path, source.clone());
-        eprintln!("{:?}", miette::Report::new(e).with_source_code(named));
-        ExitCode::from(1)
-    })?;
-    Ok((source, program))
-}
-
-fn run_agent(script_path: &str) -> ExitCode {
-    let source = match std::fs::read_to_string(script_path) {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("agent error: cannot read {script_path}: {e}");
-            return ExitCode::from(1);
-        }
-    };
-    let tokens = match lx::lexer::lex(&source) {
-        Ok(t) => t,
-        Err(e) => {
-            eprintln!("agent error: {e}");
-            return ExitCode::from(1);
-        }
-    };
-    let program = match lx::parser::parse(tokens) {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!("agent error: {e}");
-            return ExitCode::from(1);
-        }
-    };
-    let source_dir = Path::new(script_path).parent().map(|p| p.to_path_buf());
-    let ctx = Arc::new(lx::backends::RuntimeCtx::default());
-    let mut interp = lx::interpreter::Interpreter::new(&source, source_dir, ctx);
-    let handler = match interp.exec(&program) {
-        Ok(val) => val,
-        Err(e) => {
-            eprintln!("agent error: {e}");
-            return ExitCode::from(1);
-        }
-    };
-    let stdin = std::io::stdin();
-    let reader = std::io::BufReader::new(stdin.lock());
-    for line in reader.lines() {
-        let Ok(line) = line else { break };
-        if line.trim().is_empty() {
-            continue;
-        }
-        let json_val: serde_json::Value = match serde_json::from_str(&line) {
-            Ok(v) => v,
-            Err(e) => {
-                println!(
-                    "{}",
-                    serde_json::json!({"__err": format!("JSON decode: {e}")})
-                );
-                continue;
-            }
-        };
-        let msg = lx::stdlib::json_conv::json_to_lx(json_val);
-        match interp.call(handler.clone(), msg) {
-            Ok(result) => {
-                let result_json =
-                    lx::stdlib::json_conv::lx_to_json(&result, lx::span::Span::default());
-                match result_json {
-                    Ok(j) => println!("{}", serde_json::to_string(&j).unwrap_or_default()),
-                    Err(e) => println!("{}", serde_json::json!({"__err": format!("{e}")})),
-                }
-            }
-            Err(e) => println!("{}", serde_json::json!({"__err": format!("{e}")})),
-        }
-        if let Err(e) = std::io::stdout().flush() {
-            eprintln!("agent: stdout flush failed: {e}");
-            return ExitCode::from(1);
-        }
     }
     ExitCode::SUCCESS
 }
