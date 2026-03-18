@@ -1,0 +1,144 @@
+-- Task decomposition and planning specialist
+-- Source: breaks down complex goals into executable step sequences
+
+use std/ai
+use std/prompt
+use std/plan
+use ../traits {Planner}
+use ../protocols {ActionPlan}
+
+Protocol PlanStep = {
+  id: Str
+  description: Str
+  action: Str
+  tool: Str
+  depends: [Str]
+  estimated_tokens: Int
+  can_parallelize: Bool
+}
+
+Protocol PlanResult = {
+  steps: [PlanStep]
+  total_estimated_tokens: Int
+  parallel_groups: [[Str]]
+  critical_path: [Str]
+  risks: [Str]
+}
+
+Agent TaskPlanner: Planner = {
+  plan = (msg) {
+    tools_text = msg.tools | join ", "
+
+    p = prompt.create ()
+      | prompt.system "You create precise, minimal execution plans."
+      | prompt.section "Goal" msg.goal
+      | prompt.section "Available Tools" tools_text
+      | prompt.instruction "Create 10 or fewer steps. Each step: ID, description, tool, dependencies."
+      | prompt.constraint "Minimize steps. Identify parallelizable ones. No circular deps."
+
+    resp = ai.prompt (prompt.render p) ^
+
+    steps = resp.text | lines
+      | filter (l) len (trim l) > 0
+      | enumerate
+      | map (i line) {
+          id: "s{i}"
+          action: trim line
+          tool: msg.tools | get 0 ?? "ai"
+          args: trim line
+          depends: i > 0 ? ["s{i - 1}"] : []
+        }
+
+    estimated = steps | len * 0.01
+
+    ActionPlan {
+      goal: msg.goal
+      steps: steps
+      estimated_cost: estimated
+      risk: estimated > 1.0 ? "high" : estimated > 0.3 ? "medium" : "low"
+      fallback: "simplify approach and retry with fewer tools"
+    }
+  }
+
+  replan = (msg) {
+    remaining = msg.plan.steps
+      | filter (s) not (s.depends | contains? msg.failure)
+
+    p = prompt.create ()
+      | prompt.system "You adapt plans when steps fail."
+      | prompt.section "Failed Step" msg.failure
+      | prompt.section "Remaining Steps" (remaining | map (.action) | join "\n")
+      | prompt.instruction "Create an alternative plan that works around the failure."
+
+    resp = ai.prompt (prompt.render p) ^
+    new_steps = resp.text | lines
+      | filter (l) len (trim l) > 0
+      | enumerate
+      | map (i line) {
+          id: "r{i}"
+          action: trim line
+          tool: "ai"
+          args: trim line
+          depends: i > 0 ? ["r{i - 1}"] : []
+        }
+
+    {..msg.plan  steps: new_steps}
+  }
+
+  estimate_cost = (msg) {
+    msg.steps | len * 500.0
+  }
+}
+
++execute_plan = (plan_result: PlanResult  executor: Any) -> Any {
+  steps = plan_result.steps | map (step) {
+    {id: step.id  action: {description: step.description  tool: step.tool}  depends: step.depends}
+  }
+
+  plan.run steps executor (step_id result) {
+    result ? {
+      Ok _ -> plan.continue ()
+      Err e & (e | to_str | contains? "recoverable") -> {
+        log.warn "step {step_id} failed recoverably: {e}, replanning"
+        recovery_step = {
+          id: "recovery_{step_id}"
+          action: {description: "retry {step_id} with simplified approach"  tool: "ai"}
+          depends: []
+        }
+        plan.insert_after step_id recovery_step
+      }
+      Err e -> {
+        log.warn "step {step_id} failed: {e}, skipping"
+        plan.skip ()
+      }
+    }
+  }
+}
+
+find_parallel_groups = (steps: [PlanStep]) -> [[Str]] {
+  groups := []
+  current_group := []
+  last_dep := ""
+
+  steps | each (step) {
+    has_new_dep = step.depends | len > 0 && step.depends != [last_dep]
+    has_new_dep ? {
+      current_group | len > 0 ? { groups <- [..groups  current_group] } : ()
+      current_group <- [step.id]
+      last_dep <- step.id
+    } : {
+      current_group <- [..current_group  step.id]
+    }
+  }
+
+  current_group | len > 0 ? [..groups  current_group] : groups
+}
+
++main = () {
+  receive {
+    plan -> TaskPlanner.plan
+    replan -> TaskPlanner.replan
+    estimate -> TaskPlanner.estimate_cost
+    _ -> (msg) Err "unknown action: {msg.action ?? 'none'}"
+  }
+}

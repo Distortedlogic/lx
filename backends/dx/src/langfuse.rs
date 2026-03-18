@@ -24,8 +24,8 @@ impl LangfuseClient {
     pub fn from_env() -> Self {
         let public_key = std::env::var("LANGFUSE_PUBLIC_KEY").ok();
         let secret_key = std::env::var("LANGFUSE_SECRET_KEY").ok();
-        let base_url = std::env::var("LANGFUSE_BASE_URL")
-            .unwrap_or_else(|_| DEFAULT_BASE_URL.to_string());
+        let base_url =
+            std::env::var("LANGFUSE_BASE_URL").unwrap_or_else(|_| DEFAULT_BASE_URL.to_string());
 
         let (auth_header, enabled) = match (public_key, secret_key) {
             (Some(pk), Some(sk)) => {
@@ -91,12 +91,7 @@ impl LangfuseClient {
         }
     }
 
-    pub fn create_span(
-        &self,
-        trace: &LangfuseTrace,
-        name: &str,
-        input: &str,
-    ) -> LangfuseSpan {
+    pub fn create_span(&self, trace: &LangfuseTrace, name: &str, input: &str) -> LangfuseSpan {
         let span_id = Uuid::new_v4().to_string();
         if self.enabled {
             let body = json!({
@@ -115,12 +110,7 @@ impl LangfuseClient {
         }
     }
 
-    pub fn log_event(
-        &self,
-        trace_id: &str,
-        level: &str,
-        msg: &str,
-    ) {
+    pub fn log_event(&self, trace_id: &str, level: &str, msg: &str) {
         if !self.enabled {
             return;
         }
@@ -168,10 +158,7 @@ impl<'a> LangfuseTrace<'a> {
         let Some(ref auth) = self.client.auth_header else {
             return;
         };
-        let url = format!(
-            "{}/api/public/traces/{}",
-            self.client.base_url, self.id
-        );
+        let url = format!("{}/api/public/traces/{}", self.client.base_url, self.id);
         let req = self
             .client
             .http
@@ -192,12 +179,7 @@ pub struct LangfuseGeneration<'a> {
 }
 
 impl<'a> LangfuseGeneration<'a> {
-    pub fn end_success(
-        &self,
-        output: &str,
-        duration_ms: u64,
-        model: &str,
-    ) {
+    pub fn end_success(&self, output: &str, duration_ms: u64, model: &str) {
         self.end_with(json!({
             "output": output,
             "endTime": Utc::now().to_rfc3339(),
@@ -253,10 +235,7 @@ impl<'a> LangfuseSpan<'a> {
         let Some(ref auth) = self.client.auth_header else {
             return;
         };
-        let url = format!(
-            "{}/api/public/spans/{}",
-            self.client.base_url, self.id
-        );
+        let url = format!("{}/api/public/spans/{}", self.client.base_url, self.id);
         let body = json!({
             "output": output,
             "endTime": Utc::now().to_rfc3339(),

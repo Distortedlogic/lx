@@ -36,11 +36,7 @@ impl ProgramRunner {
         );
 
         let agent_id = "main".to_string();
-        let ctx = build_runtime_ctx(
-            self.bus.clone(),
-            self.langfuse.clone(),
-            agent_id,
-        );
+        let ctx = build_runtime_ctx(self.bus.clone(), self.langfuse.clone(), agent_id);
 
         self.bus.send(RuntimeEvent::ProgramStarted {
             source_path: source_path.to_string(),
@@ -48,9 +44,7 @@ impl ProgramRunner {
         });
 
         let start = Instant::now();
-        let source_dir = Path::new(source_path)
-            .parent()
-            .map(|p| p.to_path_buf());
+        let source_dir = Path::new(source_path).parent().map(|p| p.to_path_buf());
 
         let source_clone = source.clone();
         let result = tokio::task::spawn_blocking(move || {

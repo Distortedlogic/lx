@@ -1,6 +1,6 @@
 # Implemented Feature Inventory
 
-What lx can do right now. For project health/status, see the "Where We're At" section of `NEXT_PROMPT.md`.
+What lx can do right now. For project health/status, see the "State" section of `TICK.md`.
 
 ## Core Language
 
@@ -11,14 +11,16 @@ What lx can do right now. For project health/status, see the "Where We're At" se
 - Type checker: `lx check` — bidirectional inference, unification, structural subtyping
 - Concurrency: `par`, `sel`, `pmap`, `pmap_n`, `timeout` (sequential impl — real async needs tokio)
 - Shell: `$cmd`, `$^cmd`, `${...}` with interpolation
-- Error handling: `^` propagation, `??` coalescing, `(?? default)` sections
+- Error handling: `^` propagation, `??` coalescing, `(?? default)` sections. Structured error tags: `Err Timeout "msg"` with pattern matching. Uniform `None` on miss for Record, Map, and Agent field access
+- Arithmetic: `/` always returns Float (Python 3 semantics), `//` for integer division, mixed Int/Float auto-promotion
 - Modules: `use ./path`, aliasing, selective imports, `+` exports
 
 ## Agent System
 
-- `Agent Name: TraitList = { methods }` — first-class agent declarations with trait conformance, method access via `.`, `uses`/`init`/`on` reserved fields, `Value::Agent` runtime representation
+- `Agent Name: TraitList = { methods }` — first-class agent declarations with trait conformance, method access via `.`, `uses`/`init`/`on` reserved fields (all wired to runtime), `Value::Agent` runtime representation
+- `receive { action -> handler }` — agent message loop sugar, desugars to yield/loop/match
 - `~>` send, `~>?` ask — infix operators, subprocess-transparent
-- `Protocol Name = {field: Type}` — message contracts with runtime validation
+- `Protocol Name = {field: Type}` — message contracts with runtime validation (returns `Err` on validation failure, catchable with `??`)
 - Protocol composition (`{..Base extra: Str}`), unions (`A | B | C` with `_variant`), field constraints (`where`)
 - `Trait Name = { handles: [...] provides: [...] requires: [...] }` — agent behavioral contracts
 - `agent.implements` — runtime trait checking for routing/filtering
@@ -29,7 +31,7 @@ What lx can do right now. For project health/status, see the "Where We're At" se
 - `emit` — agent-to-human fire-and-forget output via EmitBackend
 - `with name = expr { body }` — scoped bindings + record field update (`name.field <- value`)
 
-## Stdlib (39 modules)
+## Stdlib (40 modules)
 
 - Data: `std/json`, `std/md`, `std/re`, `std/math`, `std/time`
 - System: `std/fs`, `std/env`, `std/http`
@@ -44,7 +46,7 @@ What lx can do right now. For project health/status, see the "Where We're At" se
 - Context windows: `std/context` — `create`, `add`, `usage`, `pressure`, `estimate`, `pin`/`unpin`, `evict`, `evict_until`, `items`, `get`, `remove`, `clear`
 - Intelligence: `std/knowledge`, `std/introspect`
 - Standard agents: `std/agents/auditor`, `std/agents/router`, `std/agents/grader`, `std/agents/planner`, `std/agents/monitor`, `std/agents/reviewer`
-- Infrastructure: `std/memory`, `std/trace`
+- Infrastructure: `std/memory`, `std/trace`, `std/trait`
 - Interaction: `std/user` — `confirm`, `choose`, `ask`, `ask_with`, `progress`, `progress_pct`, `status`, `table`, `check` (signal poll). `UserBackend` trait on `RuntimeCtx` — `NoopUserBackend` (default/test), `StdinStdoutUserBackend` (terminal)
 - Identity: `std/profile` — persistent agent profiles: `load`, `save`, `learn`, `recall`, `recall_prefix`, `forget`, `preference`, `get_preference`, `history`, `merge`, `age`, `decay`. Strategy helpers: `best_strategy`, `rank_strategies`, `adapt_strategy`. File-backed at `.lx/profiles/{name}.json`
 - Visualization: `std/diag`
@@ -67,6 +69,7 @@ What lx can do right now. For project health/status, see the "Where We're At" se
 ## Other Extensions
 
 - `ai.prompt_structured` — Protocol-validated LLM output with auto-retry
+- `ai.prompt_json` — lightweight structured output from inline record shape (no Protocol needed)
 - `trace.improvement_rate` + `trace.should_stop` — diminishing returns detection
 
 ## Runtime

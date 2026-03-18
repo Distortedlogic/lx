@@ -14,10 +14,10 @@ double = (x: Int) -> Int x * 2
 assert (double 5 == 10) "return type annotation"
 
 -- Return type with error type
-safe_div = (a: Int b: Int) -> Int ^ Str {
+safe_div = (a: Int b: Int) -> Float ^ Str {
   b == 0 ? Err "division by zero" : Ok (a / b)
 }
-assert (safe_div 10 2 == Ok 5) "fallible return type"
+assert (safe_div 10 2 == Ok 5.0) "fallible return type"
 assert (safe_div 10 0 == Err "division by zero") "fallible error case"
 
 -- Mixed: some params typed, some not

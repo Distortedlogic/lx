@@ -1,16 +1,14 @@
 # Priorities
 
-Ordered work queue. Top item = next thing to implement. Each entry explains WHY it's at this position so you can judge whether circumstances have changed.
+Ordered work queue. Top item = next thing to implement. Each entry explains WHY it's at this position so you can judge whether circumstances have changed. Each entry links its spec file. Items 1, 22, 23, and Tier 5 require parser/interpreter changes; the rest are stdlib-only.
 
 ## Tier 2 — Agent identity, communication, testing, packaging
 
-Tier 1 completed: `std/retry` (Session 44), `std/user` + `std/profile` (Session 49), `Agent` declarations (Session 49).
+Tier 1 completed: `std/retry` (Session 44), `std/user` + `std/profile` (Session 49), `Agent` declarations (Session 49). Enforced `Trait` methods (Session 51).
 
-1. **Enforced `Trait` methods** (`spec/agents-trait.md`) — Trait methods have typed signatures (same `{input} -> output` syntax as MCP declarations). Validated at Agent definition time and spawn time. Absorbs `Skill` declarations — Trait methods ARE skills, with optional description/examples for LLM discovery. `trait.methods`/`trait.match` replace `std/skill`.
+1. **`std/pipeline` checkpoint/resume** (`spec/agents-pipeline-checkpoint.md`) — Multi-stage pipelines restart from scratch when a late stage fails. `pipeline.stage` caches completed stage outputs, resumes from last success on re-run. Input hashing for automatic cache invalidation. Also covers the `plan.run_incremental` use case — same mechanism.
 
-2. **`std/pipeline` checkpoint/resume** (`spec/agents-pipeline-checkpoint.md`) — Multi-stage pipelines restart from scratch when a late stage fails. `pipeline.stage` caches completed stage outputs, resumes from last success on re-run. Input hashing for automatic cache invalidation. Also covers the `plan.run_incremental` use case — same mechanism.
-
-3. **`AgentErr` structured errors** (`spec/agents-errors.md`) — Every agent failure is `Err "string"`. Tagged union with 11 variants for pattern-matched recovery.
+3. **`AgentErr` structured errors** (`spec/agents-errors.md`) — Tagged error mechanism now works (`Err Timeout "msg"` with pattern matching). Remaining: define the 11 standard agent error variants as a convention and update stdlib to use them.
 
 4. **`lx.toml` package manifest** (`spec/package-manifest.md`) — Project boundary, deps, backend config. Unblocks `std/test` and `std/flow`.
 

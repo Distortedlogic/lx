@@ -62,15 +62,18 @@ pub enum Value {
     },
     Trait {
         name: Arc<str>,
-        handles: Arc<Vec<Arc<str>>>,
-        provides: Arc<Vec<Arc<str>>>,
+        methods: Arc<Vec<TraitMethodDef>>,
         requires: Arc<Vec<Arc<str>>>,
+        description: Option<Arc<str>>,
+        tags: Arc<Vec<Arc<str>>>,
     },
     Agent {
         name: Arc<str>,
         traits: Arc<Vec<Arc<str>>>,
         methods: Arc<IndexMap<String, Value>>,
         init: Option<Box<Value>>,
+        uses: Arc<Vec<(Arc<str>, Arc<str>)>>,
+        on: Option<Box<Value>>,
     },
 }
 
@@ -222,4 +225,11 @@ pub enum McpOutputDef {
     Simple(String),
     Record(Vec<ProtoFieldDef>),
     List(Box<McpOutputDef>),
+}
+
+#[derive(Debug, Clone)]
+pub struct TraitMethodDef {
+    pub name: String,
+    pub input: Vec<ProtoFieldDef>,
+    pub output: McpOutputDef,
 }

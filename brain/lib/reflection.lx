@@ -1,0 +1,130 @@
+-- Reflection engine: post-action evaluation and learning
+-- Source: metacognitive loop — evaluate outcomes, extract patterns, update strategy
+
+use std/ai
+use std/prompt
+use std/trace
+use std/knowledge
+use ../protocols {Reflection FeedbackSignal}
+
++reflect = (action: Str  outcome: Str  expectation: Str) -> Reflection {
+  quality = assess_quality outcome expectation
+
+  p = prompt.create ()
+    | prompt.system "You reflect on actions and extract lessons. Be honest about what worked and what didn't."
+    | prompt.section "Action Taken" action
+    | prompt.section "Outcome" outcome
+    | prompt.section "Expectation" expectation
+    | prompt.instruction "1) Did it achieve its goal? 2) What worked? 3) What didn't? 4) Lesson?"
+    | prompt.constraint "One sentence per answer. No fluff."
+
+  resp = ai.prompt (prompt.render p) ^
+  lessons = resp.text | lines | filter (l) len (trim l) > 0
+
+  Reflection {
+    action: action
+    outcome: outcome
+    quality: quality
+    lesson: lessons | last ?? "no lesson extracted"
+    should_remember: quality < 0.5 || quality > 0.9
+    strategy_worked: quality >= 0.7
+  }
+}
+
+assess_quality = (outcome: Str  expectation: Str) -> Float {
+  outcome_lower = outcome | lower
+  expectation_lower = expectation | lower
+
+  has_error = outcome_lower | contains? "error" || outcome_lower | contains? "failed"
+  has_success = outcome_lower | contains? "success" || outcome_lower | contains? "done"
+  matches_expectation = outcome_lower | contains? expectation_lower
+
+  has_error ? 0.2 : matches_expectation ? 0.9 : has_success ? 0.8 : 0.5
+}
+
++extract_patterns = (reflections: [Reflection]) -> Any {
+  successful = reflections | filter (.strategy_worked)
+  failed = reflections | filter (r) not r.strategy_worked
+
+  success_actions = successful | map (.action) | group_by identity
+  failure_actions = failed | map (.action) | group_by identity
+
+  {
+    winning_patterns: success_actions | entries | filter (action count) len count > 1 | map (.0)
+    losing_patterns: failure_actions | entries | filter (action count) len count > 1 | map (.0)
+    lessons: reflections | filter (.should_remember) | map (.lesson)
+    success_rate: (len successful) / (math.max 1 (len reflections))
+  }
+}
+
++update_strategy = (current_strategy: Str  patterns: Any) -> Any {
+  patterns.success_rate > 0.8 ? {
+    {strategy: current_strategy  action: "continue"  reason: "high success rate"}
+  } : patterns.success_rate < 0.3 ? {
+    new_strategy = current_strategy ? {
+      "direct" -> "decompose"
+      "decompose" -> "analogical"
+      "analogical" -> "adversarial"
+      "adversarial" -> "direct"
+      _ -> "decompose"
+    }
+    {strategy: new_strategy  action: "switch"  reason: "low success rate ({patterns.success_rate})"}
+  } : {
+    {strategy: current_strategy  action: "adapt"  reason: "moderate success, tweaking"}
+  }
+}
+
++process_feedback = (feedback: Any) -> FeedbackSignal {
+  FeedbackSignal {
+    kind: feedback.kind ?? "general"
+    score: feedback.score ?? 0.5
+    detail: feedback.detail ?? to_str feedback
+    source: feedback.source ?? "user"
+  }
+}
+
++batch_reflect = (actions_and_outcomes: [Any]) -> Any {
+  reflections = actions_and_outcomes | map (pair) {
+    reflect pair.action pair.outcome (pair.expectation ?? "success") ^
+  }
+
+  patterns = extract_patterns reflections
+  lessons = reflections | filter (.should_remember) | map (.lesson)
+
+  {
+    reflections: reflections
+    patterns: patterns
+    lessons: lessons
+    overall_quality: reflections | map (.quality) | fold 0.0 (+) / (len reflections)
+  }
+}
+
++trace_reflection = (session: Any  reflection: Reflection) -> Any {
+  trace.record {
+    name: "reflection"
+    input: reflection.action
+    output: reflection.lesson
+    tags: [
+      reflection.strategy_worked ? "success" : "failure"
+      reflection.should_remember ? "memorable" : "routine"
+    ]
+  } session ^
+
+  reflection.quality | (q) trace.score "reflection" q session ^
+}
+
++improvement_suggestions = (patterns: Any) -> [Str] {
+  losing = patterns.losing_patterns | join ", "
+  winning = patterns.winning_patterns | join ", "
+
+  losing | len > 0 ? {
+    p = prompt.create ()
+      | prompt.system "You suggest improvements based on action patterns."
+      | prompt.section "Actions that keep failing" losing
+      | prompt.section "Actions that work" winning
+      | prompt.instruction "Suggest 2-3 concrete changes to improve success rate."
+
+    resp = ai.prompt (prompt.render p) ^
+    resp.text | lines | filter (l) len (trim l) > 0
+  } : ["current approach is working well"]
+}

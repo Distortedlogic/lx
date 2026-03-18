@@ -46,7 +46,7 @@ impl Interpreter {
         Ok(Value::Unit)
     }
 
-    fn resolve_mcp_output(&self, out: &McpOutputType) -> McpOutputDef {
+    pub(super) fn resolve_mcp_output(&self, out: &McpOutputType) -> McpOutputDef {
         match out {
             McpOutputType::Named(n) => {
                 if let Some(Value::Protocol { fields, .. }) = self.env.get(n) {
@@ -78,38 +78,35 @@ impl Interpreter {
         name: &str,
         fields: &Arc<Vec<ProtoFieldDef>>,
         arg: &Value,
-        span: Span,
+        _span: Span,
     ) -> Result<Value, LxError> {
         let Value::Record(rec) = arg else {
-            return Err(LxError::runtime(
-                format!("Protocol {name}: expected Record, got {}", arg.type_name()),
-                span,
-            ));
+            return Ok(Value::Err(Box::new(Value::Str(Arc::from(format!(
+                "Protocol {name}: expected Record, got {}",
+                arg.type_name()
+            ))))));
         };
         let mut result = rec.as_ref().clone();
         for field in fields.iter() {
             match rec.get(&field.name) {
                 Some(val) => {
                     if field.type_name != "Any" && val.type_name() != field.type_name {
-                        return Err(LxError::runtime(
-                            format!(
-                                "Protocol {name}: field '{}' expected {}, got {}",
-                                field.name,
-                                field.type_name,
-                                val.type_name()
-                            ),
-                            span,
-                        ));
+                        return Ok(Value::Err(Box::new(Value::Str(Arc::from(format!(
+                            "Protocol {name}: field '{}' expected {}, got {}",
+                            field.name,
+                            field.type_name,
+                            val.type_name()
+                        ))))));
                     }
                 }
                 None => {
                     if let Some(ref default) = field.default {
                         result.insert(field.name.clone(), default.clone());
                     } else {
-                        return Err(LxError::runtime(
-                            format!("Protocol {name}: missing required field '{}'", field.name),
-                            span,
-                        ));
+                        return Ok(Value::Err(Box::new(Value::Str(Arc::from(format!(
+                            "Protocol {name}: missing required field '{}'",
+                            field.name
+                        ))))));
                     }
                 }
             }
@@ -126,13 +123,10 @@ impl Interpreter {
                 match ok.as_bool() {
                     Some(true) => {}
                     _ => {
-                        return Err(LxError::runtime(
-                            format!(
-                                "Protocol {name}: field '{}' constraint violated",
-                                field.name
-                            ),
-                            span,
-                        ));
+                        return Ok(Value::Err(Box::new(Value::Str(Arc::from(format!(
+                            "Protocol {name}: field '{}' constraint violated",
+                            field.name
+                        ))))));
                     }
                 }
             }
@@ -148,21 +142,15 @@ impl Interpreter {
         span: Span,
     ) -> Result<Value, LxError> {
         let Value::Record(rec) = arg else {
-            return Err(LxError::runtime(
-                format!(
-                    "Protocol union {name}: expected Record, got {}",
-                    arg.type_name()
-                ),
-                span,
-            ));
+            return Ok(Value::Err(Box::new(Value::Str(Arc::from(format!(
+                "Protocol union {name}: expected Record, got {}",
+                arg.type_name()
+            ))))));
         };
         for variant_name in variants.iter() {
-            let proto = self.env.get(variant_name.as_ref()).ok_or_else(|| {
-                LxError::runtime(
-                    format!("Protocol union {name}: variant '{variant_name}' not in scope"),
-                    span,
-                )
-            })?;
+            let Some(proto) = self.env.get(variant_name.as_ref()) else {
+                continue;
+            };
             let Value::Protocol {
                 fields: ref proto_fields,
                 ..
@@ -187,13 +175,10 @@ impl Interpreter {
             }
         }
         let variant_names: Vec<&str> = variants.iter().map(|v| v.as_ref()).collect();
-        Err(LxError::runtime(
-            format!(
-                "Protocol union {name}: no variant matched. Tried: {}",
-                variant_names.join(", ")
-            ),
-            span,
-        ))
+        Ok(Value::Err(Box::new(Value::Str(Arc::from(format!(
+            "Protocol union {name}: no variant matched. Tried: {}",
+            variant_names.join(", ")
+        ))))))
     }
 
     fn try_match_variant(

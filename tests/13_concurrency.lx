@@ -113,7 +113,7 @@ assert (par_fail () == Err "div by zero")
   safe_div 10 2
   safe_div 5 0
 }
-assert (r1 == Ok 5)
+assert (r1 == Ok 5.0)
 assert (r2 == Err "div by zero")
 
 -- pmap without ^ collects individual Results (no cancellation)
@@ -122,9 +122,9 @@ divide_by = (x) x ? {
   n -> Ok (100 / n)
 }
 mixed = [2 0 5] | pmap divide_by
-assert (mixed.0 == Ok 50)
+assert (mixed.0 == Ok 50.0)
 assert (mixed.1 == Err "zero")
-assert (mixed.2 == Ok 20)
+assert (mixed.2 == Ok 20.0)
 
 -- concurrent code with immutable captures (allowed)
 base = 100

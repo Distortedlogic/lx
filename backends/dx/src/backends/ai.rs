@@ -19,10 +19,7 @@ pub struct DxAiBackend {
 impl AiBackend for DxAiBackend {
     fn prompt(&self, text: &str, opts: &AiOpts, span: Span) -> Result<Value, LxError> {
         let call_id = next_call_id();
-        let model_name = opts
-            .model
-            .clone()
-            .unwrap_or_else(|| "claude".to_string());
+        let model_name = opts.model.clone().unwrap_or_else(|| "claude".to_string());
 
         self.bus.send(RuntimeEvent::AiCallStart {
             agent_id: self.agent_id.clone(),
@@ -37,12 +34,9 @@ impl AiBackend for DxAiBackend {
             &format!("ai.prompt:{}", self.agent_id),
             serde_json::json!({}),
         );
-        let generation = self.langfuse.create_generation(
-            &trace,
-            "ai.prompt",
-            &model_name,
-            text,
-        );
+        let generation = self
+            .langfuse
+            .create_generation(&trace, "ai.prompt", &model_name, text);
 
         let start = Instant::now();
         let result = self.inner.prompt(text, opts, span);
@@ -53,15 +47,9 @@ impl AiBackend for DxAiBackend {
             Ok(val) => {
                 let response_text = format!("{val}");
                 let cost = val.float_field("cost");
-                let actual_model = val
-                    .str_field("model")
-                    .unwrap_or(&model_name);
+                let actual_model = val.str_field("model").unwrap_or(&model_name);
 
-                generation.end_success(
-                    &response_text,
-                    duration_ms,
-                    actual_model,
-                );
+                generation.end_success(&response_text, duration_ms, actual_model);
 
                 self.bus.send(RuntimeEvent::AiCallComplete {
                     agent_id: self.agent_id.clone(),

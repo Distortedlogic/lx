@@ -1,0 +1,171 @@
+-- Message protocols for the Claude brain cognitive architecture
+-- Source: models the information shapes flowing between cognitive subsystems
+
+Protocol Perception = {
+  raw: Str
+  intent: Str
+  complexity: Str
+  entities: [Str]
+  domain: Str
+  urgency: Str = "normal"
+  requires_tools: Bool = false
+  requires_agents: Bool = false
+  ambiguity: Float = 0.0 where ambiguity >= 0.0 && ambiguity <= 1.0
+}
+
+Protocol Thought = {
+  id: Str
+  content: Str
+  kind: Str
+  confidence: Float where confidence >= 0.0 && confidence <= 1.0
+  evidence: [Str]
+  depends_on: [Str]
+  alternatives: [Str]
+}
+
+Protocol ReasoningChain = {
+  goal: Str
+  thoughts: [Thought]
+  conclusion: Str
+  confidence: Float where confidence >= 0.0 && confidence <= 1.0
+  strategy: Str
+}
+
+Protocol ActionPlan = {
+  goal: Str
+  steps: [{id: Str  action: Str  tool: Str  args: Any  depends: [Str]}]
+  estimated_cost: Float where estimated_cost >= 0.0
+  risk: Str
+  fallback: Str
+}
+
+Protocol ActionResult = {
+  step_id: Str
+  success: Bool
+  output: Any
+  cost: Float where cost >= 0.0
+  duration_ms: Int where duration_ms >= 0
+}
+
+Protocol Reflection = {
+  action: Str
+  outcome: Str
+  quality: Float where quality >= 0.0 && quality <= 1.0
+  lesson: Str
+  should_remember: Bool
+  strategy_worked: Bool
+}
+
+Protocol MemoryEntry = {
+  content: Str
+  domain: Str
+  confidence: Float where confidence >= 0.0 && confidence <= 1.0
+  source: Str
+  tags: [Str]
+}
+
+Protocol ToolRequest = {
+  tool: Str
+  args: Any
+  reason: Str
+  priority: Str = "normal"
+  timeout_ms: Int = 30000 where timeout_ms > 0
+}
+
+Protocol ToolResult = {
+  tool: Str
+  success: Bool
+  output: Any
+  tokens_used: Int where tokens_used >= 0
+  duration_ms: Int where duration_ms >= 0
+}
+
+Protocol CognitiveState = {
+  turn: Int where turn >= 0
+  context_pressure: Float where context_pressure >= 0.0 && context_pressure <= 1.0
+  budget_status: Str
+  active_goal: Str
+  memory_load: Int where memory_load >= 0
+  stuck_count: Int where stuck_count >= 0
+  strategy: Str
+}
+
+Protocol Response = {
+  content: Str
+  confidence: Float where confidence >= 0.0 && confidence <= 1.0
+  reasoning_depth: Int where reasoning_depth >= 0
+  tools_used: [Str]
+  sources: [Str]
+  follow_up: [Str]
+}
+
+Protocol FeedbackSignal = {
+  kind: Str
+  score: Float where score >= 0.0 && score <= 1.0
+  detail: Str
+  source: Str
+}
+
+Protocol Hypothesis = {
+  claim: Str
+  evidence_for: [Str]
+  evidence_against: [Str]
+  confidence: Float where confidence >= 0.0 && confidence <= 1.0
+  testable: Bool
+  test_action: Str
+}
+
+Protocol ContextItem = {
+  key: Str
+  content: Str
+  tokens: Int where tokens >= 0
+  priority: Str
+  pinned: Bool
+  source: Str
+}
+
+Protocol AgentTask = {
+  id: Str
+  specialist: Str
+  instruction: Str
+  context: Str
+  constraints: [Str]
+  timeout_ms: Int = 60000 where timeout_ms > 0
+}
+
+Protocol AgentResult = {
+  task_id: Str
+  specialist: Str
+  output: Any
+  confidence: Float where confidence >= 0.0 && confidence <= 1.0
+  tokens_used: Int where tokens_used >= 0
+}
+
+Protocol QualityGrade = {
+  score: Float where score >= 0.0 && score <= 100.0
+  passed: Bool
+  feedback: Str
+  categories: [{name: Str  score: Float  weight: Float}]
+  suggestions: [Str]
+}
+
+Protocol Identity = {
+  name: Str
+  role: Str
+  values: [Str]
+  strengths: [Str]
+  preferences: [{key: Str  value: Any}]
+}
+
+Protocol Timestamped = {timestamp: Int where timestamp >= 0}
+
+Protocol PerceptionEvent = {..Timestamped  perception: Any}
+Protocol ReasoningEvent = {..Timestamped  chain: Any  strategy: Str}
+Protocol ExecutionEvent = {..Timestamped  results: [Any]  tool_count: Int where tool_count >= 0}
+Protocol ResponseEvent = {..Timestamped  response: Any  confidence: Float where confidence >= 0.0 && confidence <= 1.0}
+Protocol ReflectionEvent = {..Timestamped  reflection: Any  lesson: Str}
+
+Protocol CognitiveEvent =
+  PerceptionEvent | ReasoningEvent | ExecutionEvent | ResponseEvent | ReflectionEvent
+
+CognitivePhase = | Perceiving | Reasoning | Executing | Responding | Reflecting | Complete

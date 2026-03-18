@@ -28,39 +28,31 @@ impl AgentTerminalManager {
 
             loop {
                 match rx.recv().await {
-                    Ok(event) => {
-                        match &event {
-                            RuntimeEvent::AgentSpawned {
-                                agent_id, name, ..
-                            } => {
-                                let writer = (self.factory)(agent_id, name);
-                                let handle = spawn_pty_writer(
-                                    &self.bus,
-                                    agent_id.clone(),
-                                    writer,
-                                );
-                                agent_handles.insert(agent_id.clone(), handle);
+                    Ok(event) => match &event {
+                        RuntimeEvent::AgentSpawned { agent_id, name, .. } => {
+                            let writer = (self.factory)(agent_id, name);
+                            let handle = spawn_pty_writer(&self.bus, agent_id.clone(), writer);
+                            agent_handles.insert(agent_id.clone(), handle);
+                        }
+                        RuntimeEvent::AgentKilled { agent_id, .. } => {
+                            if let Some(handle) = agent_handles.remove(agent_id) {
+                                handle.abort();
                             }
-                            RuntimeEvent::AgentKilled { agent_id, .. } => {
-                                if let Some(handle) = agent_handles.remove(agent_id) {
-                                    handle.abort();
-                                }
+                        }
+                        RuntimeEvent::ProgramStarted { .. }
+                        | RuntimeEvent::ProgramFinished { .. } => {
+                            if let Err(e) = main_pty.write_event(&event) {
+                                eprintln!("main pty error: {e}");
                             }
-                            RuntimeEvent::ProgramStarted { .. }
-                            | RuntimeEvent::ProgramFinished { .. } => {
+                        }
+                        other => {
+                            if other.agent_id().map_or(false, |id| id == "main") {
                                 if let Err(e) = main_pty.write_event(&event) {
                                     eprintln!("main pty error: {e}");
                                 }
                             }
-                            other => {
-                                if other.agent_id().map_or(false, |id| id == "main") {
-                                    if let Err(e) = main_pty.write_event(&event) {
-                                        eprintln!("main pty error: {e}");
-                                    }
-                                }
-                            }
                         }
-                    }
+                    },
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
                         eprintln!("terminal manager: lagged {n} events");

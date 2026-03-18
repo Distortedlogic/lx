@@ -1,0 +1,204 @@
+-- Orchestrator: coordinates the full cognitive pipeline with supervision
+-- Source: pub/sub event bus, middleware tracing, human gates, cron scheduling, task lifecycle
+-- Architecture: saga-based pipeline with reactive specialist agents
+
+use std/agent
+use std/saga
+use std/trace
+use std/budget
+use std/cron
+use std/ctx
+use std/tasks
+use std/diag
+use std/time
+
+use ./protocols {Response CognitiveState PerceptionEvent ReasoningEvent ResponseEvent}
+use ./lib/perception : perceive
+use ./lib/reasoning : reason
+use ./lib/memory_mgr : mem
+use ./lib/context_mgr : ctx_mgr
+use ./lib/identity : identity
+use ./lib/quality : quality
+use ./lib/monitor : monitor
+use ./lib/reflection : reflection
+use ./lib/dialogue : dialogue
+use ./lib/cognitive_saga : cognitive_saga
+use ./agents/dispatcher : dispatch
+
++run = (input: Str) -> Any {
+  state = monitor.init ()
+  conversation = dialogue.init_conversation ()
+  memory_store = mem.init () ^
+  context_win = ctx_mgr.init 128000
+  id = identity.core ()
+  saga_ctx = ctx.empty ()
+
+  ctx_mgr.pin_identity context_win id
+
+  with trace.create "/tmp/brain_orchestrator.json" ^ as trace_session {
+    workforce = dispatch.create_workforce ()
+    traced_workforce = dispatch.setup_tracing workforce trace_session
+    topics = dispatch.setup_pubsub traced_workforce
+
+    ts = tasks.empty ()
+    ts = tasks.create ts "cognitive_loop" {priority: "high"}
+    ts = tasks.start ts "cognitive_loop" ^
+
+    gate_check = identity.gate_destructive input
+    gate_check ? {
+      Err reason -> {
+        emit "Blocked: {reason}"
+        Err reason
+      }
+      Ok _ -> {
+        saga_steps = cognitive_saga.build input state memory_store context_win traced_workforce trace_session saga_ctx
+
+        result = saga.run saga_steps
+
+        result ? {
+          Ok outputs -> handle_success outputs input conversation memory_store trace_session topics ts ^
+          Err failure -> handle_failure failure input conversation trace_session traced_workforce ts ^
+        }
+      }
+    }
+  }
+}
+
+handle_success = (outputs: Any  input: Str  conversation: Any  memory_store: Any  trace_session: Any  topics: Any  ts: Any) -> Any {
+  response = outputs.respond
+  conversation = dialogue.add_turn conversation "user" input
+  conversation = dialogue.add_turn conversation "assistant" response.content
+
+  agent.publish topics.response ResponseEvent {
+    response: response
+    confidence: response.confidence
+    timestamp: time.now ()
+  }
+
+  quality_check = quality.final_audit response.content input ^
+
+  refl = reflection.reflect input response.content "high quality response" ^
+  refl.should_remember ? {
+    mem.remember memory_store {
+      content: refl.lesson
+      domain: "meta"
+      confidence: refl.quality
+      source: "reflection"
+      tags: ["lesson"]
+    } ^
+  } : ()
+
+  ts = tasks.submit ts "cognitive_loop" {output: response.content} ^
+  ts = tasks.pass ts "cognitive_loop" ^
+
+  mem.save memory_store ^
+
+  emit response.content
+
+  {
+    response: response
+    quality: quality_check
+    conversation: dialogue.conversation_summary conversation
+    reflection: refl
+    trace: trace_session
+  }
+}
+
+handle_failure = (failure: Any  input: Str  conversation: Any  trace_session: Any  workforce: Any  ts: Any) -> Any {
+  log.err "cognitive saga failed at step: {failure.failed_step ?? 'unknown'}"
+
+  ts = tasks.submit ts "cognitive_loop" {output: "saga failed"} ^
+
+  emit "I encountered an issue. Let me try a simpler approach."
+
+  fallback = reason.reason input "" ["keep it simple"] ^
+
+  dispatch.shutdown workforce
+
+  {
+    response: {content: fallback.conclusion  confidence: 0.3  reasoning_depth: 1  tools_used: []  sources: ["fallback"]  follow_up: []}
+    quality: {quick_passed: true  full_passed: false  score: 30.0  feedback: "fallback"  reasons: []}
+    conversation: "fallback"
+    reflection: {action: input  outcome: "saga failed"  quality: 0.3  lesson: "pipeline failed, used fallback"  should_remember: true  strategy_worked: false}
+    trace: trace_session
+  }
+}
+
++run_with_budget = (input: Str  token_budget: Int) -> Any {
+  b = budget.create {tokens: token_budget  api_calls: 20  wall_time: 300}
+  remaining = budget.remaining b
+  log.info "budget: {remaining.tokens} tokens, {remaining.api_calls} calls"
+
+  result = run input ^
+
+  spent = budget.used b
+  log.info "finished — used {spent.tokens} tokens, {spent.api_calls} calls"
+  {..result  budget_used: spent}
+}
+
++run_continuous = () -> Any {
+  emit "Claude brain orchestrator ready"
+
+  cron.every 300000 () () {
+    store = mem.init () ^
+    consolidated = mem.consolidate store
+    log.info "memory consolidation: {consolidated.promoted} promoted"
+    mem.save store ^
+  }
+
+  cron.every 60000 () () {
+    state = monitor.init ()
+    health = monitor.check_health state
+    health.strategy != "normal" ? log.warn "health: {health.strategy}" : ()
+  }
+
+  input := yield {kind: "ready"}
+  conversation := dialogue.init_conversation ()
+
+  loop {
+    input ? {
+      None -> break ()
+      Some raw -> {
+        conversation <- dialogue.add_turn conversation "user" raw
+        result = run raw ^
+        conversation <- dialogue.add_turn conversation "assistant" result.response.content
+
+        input <- yield {
+          kind: "response"
+          data: result.response.content
+          turn: dialogue.turn_count conversation
+          quality: result.quality.score ?? 0
+        }
+      }
+    }
+  }
+
+  emit "Session ended. {dialogue.conversation_summary conversation}"
+}
+
++visualize = () -> Str {
+  diag.to_mermaid {
+    title: "Claude Brain Cognitive Pipeline"
+    nodes: [
+      {id: "input" label: "Input"}
+      {id: "perceive" label: "Perceive"}
+      {id: "recall" label: "Recall Memory"}
+      {id: "reason" label: "Reason"}
+      {id: "execute" label: "Execute Tools"}
+      {id: "respond" label: "Respond"}
+      {id: "reflect" label: "Reflect"}
+      {id: "output" label: "Output"}
+    ]
+    edges: [
+      {from: "input" to: "perceive"}
+      {from: "perceive" to: "recall"}
+      {from: "perceive" to: "reason"}
+      {from: "recall" to: "reason"}
+      {from: "reason" to: "execute"}
+      {from: "reason" to: "respond"}
+      {from: "execute" to: "respond"}
+      {from: "respond" to: "reflect"}
+      {from: "reflect" to: "output"}
+    ]
+  }
+}

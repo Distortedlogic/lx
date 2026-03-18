@@ -6,7 +6,7 @@
 assert (2 + 3 == 5)
 assert (10 - 4 == 6)
 assert (3 * 7 == 21)
-assert (15 / 3 == 5)
+assert (15 / 3 == 5.0)
 assert (17 % 5 == 2)
 assert (7 // 2 == 3)
 
@@ -24,7 +24,7 @@ assert (-(2 * 3) == -6)
 
 -- left associativity
 assert (10 - 3 - 2 == 5)
-assert (100 / 10 / 2 == 5)
+assert (100 / 10 / 2 == 5.0)
 
 -- integer division
 assert (7 // 2 == 3)

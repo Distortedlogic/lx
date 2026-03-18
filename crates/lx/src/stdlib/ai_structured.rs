@@ -19,6 +19,42 @@ pub fn mk_prompt_structured_with() -> Value {
     mk("ai.prompt_structured_with", 2, bi_prompt_structured_with)
 }
 
+pub fn mk_prompt_json() -> Value {
+    mk("ai.prompt_json", 2, bi_prompt_json)
+}
+
+fn bi_prompt_json(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+    let prompt = args[0]
+        .as_str()
+        .ok_or_else(|| LxError::type_err("ai.prompt_json: first arg must be prompt Str", span))?;
+    let Value::Record(shape) = &args[1] else {
+        return Err(LxError::type_err(
+            "ai.prompt_json: second arg must be shape Record",
+            span,
+        ));
+    };
+    let fields = record_to_fields(shape);
+    let augmented = augment_prompt(prompt, "json", &fields);
+    run_structured(ctx, &augmented, &AiOpts::default(), &fields, 2, span)
+}
+
+fn record_to_fields(rec: &IndexMap<String, Value>) -> Vec<ProtoFieldDef> {
+    rec.iter()
+        .map(|(name, val)| {
+            let type_name = match val {
+                Value::List(_) => "List".to_string(),
+                _ => val.type_name().to_string(),
+            };
+            ProtoFieldDef {
+                name: name.clone(),
+                type_name,
+                default: None,
+                constraint: None,
+            }
+        })
+        .collect()
+}
+
 fn bi_prompt_structured(
     args: &[Value],
     span: Span,

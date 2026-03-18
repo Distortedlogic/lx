@@ -48,9 +48,10 @@ pub enum Stmt {
     },
     TraitDecl {
         name: String,
-        handles: Vec<String>,
-        provides: Vec<String>,
+        methods: Vec<TraitMethodDecl>,
         requires: Vec<String>,
+        description: Option<String>,
+        tags: Vec<String>,
         exported: bool,
     },
     AgentDecl {
@@ -199,6 +200,7 @@ pub enum Expr {
         max_rounds: Box<SExpr>,
         on_round: Option<Box<SExpr>>,
     },
+    Receive(Vec<ReceiveArm>),
 
     Shell {
         mode: ShellMode,
@@ -283,5 +285,11 @@ pub struct MatchArm {
 #[derive(Debug, Clone)]
 pub struct SelArm {
     pub expr: SExpr,
+    pub handler: SExpr,
+}
+
+#[derive(Debug, Clone)]
+pub struct ReceiveArm {
+    pub action: String,
     pub handler: SExpr,
 }

@@ -26,9 +26,7 @@ pub fn format_ai_complete(
     duration_ms: u64,
 ) -> String {
     let cost_str = cost.map_or(String::new(), |c| format!(", ${c:.4}"));
-    format!(
-        "{response}\n{DIM}({model}{cost_str}, {duration_ms}ms){RESET}"
-    )
+    format!("{response}\n{DIM}({model}{cost_str}, {duration_ms}ms){RESET}")
 }
 
 pub fn format_ai_error(error: &str) -> String {
@@ -120,16 +118,11 @@ pub fn format_program_finished(result: &Result<String, String>, duration_ms: u64
 
 pub fn format_event(event: &RuntimeEvent) -> String {
     match event {
-        RuntimeEvent::AgentSpawned {
-            agent_id, name, ..
-        } => format_agent_spawned(agent_id, name),
+        RuntimeEvent::AgentSpawned { agent_id, name, .. } => format_agent_spawned(agent_id, name),
         RuntimeEvent::AgentKilled { agent_id, .. } => format_agent_killed(agent_id),
-        RuntimeEvent::AiCallStart {
-            model, prompt, ..
-        } => format_ai_start(
-            model.as_deref().unwrap_or("unknown"),
-            prompt,
-        ),
+        RuntimeEvent::AiCallStart { model, prompt, .. } => {
+            format_ai_start(model.as_deref().unwrap_or("unknown"), prompt)
+        }
         RuntimeEvent::AiCallComplete {
             response,
             model,
@@ -156,9 +149,7 @@ pub fn format_event(event: &RuntimeEvent) -> String {
             message,
             ..
         } => format_progress(*current, *total, message),
-        RuntimeEvent::ProgramStarted { source_path, .. } => {
-            format_program_started(source_path)
-        }
+        RuntimeEvent::ProgramStarted { source_path, .. } => format_program_started(source_path),
         RuntimeEvent::ProgramFinished {
             result,
             duration_ms,
@@ -169,17 +160,13 @@ pub fn format_event(event: &RuntimeEvent) -> String {
             to_agent,
             msg,
             ..
-        } => format!(
-            "{CYAN}[MSG] {from_agent} -> {to_agent}:{RESET} {msg}"
-        ),
+        } => format!("{CYAN}[MSG] {from_agent} -> {to_agent}:{RESET} {msg}"),
         RuntimeEvent::MessageAsk {
             from_agent,
             to_agent,
             msg,
             ..
-        } => format!(
-            "{CYAN}[ASK] {from_agent} -> {to_agent}:{RESET} {msg}"
-        ),
+        } => format!("{CYAN}[ASK] {from_agent} -> {to_agent}:{RESET} {msg}"),
         RuntimeEvent::MessageResponse {
             from_agent,
             to_agent,
@@ -200,8 +187,6 @@ pub fn format_event(event: &RuntimeEvent) -> String {
             input,
             output,
             ..
-        } => format!(
-            "{DIM}[SPAN] {name}: {input} -> {output}{RESET}"
-        ),
+        } => format!("{DIM}[SPAN] {name}: {input} -> {output}{RESET}"),
     }
 }

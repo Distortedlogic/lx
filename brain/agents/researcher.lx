@@ -1,0 +1,137 @@
+-- Information gathering specialist: searches, reads, explores codebases
+-- Source: dispatched when the brain needs facts before reasoning
+
+use std/ai
+use std/prompt
+use std/fs
+use std/re
+use ../traits {Researcher}
+
+Protocol Finding = {
+  source: Str
+  content: Str
+  relevance: Float
+  confidence: Float
+}
+
+Protocol ResearchResult = {
+  question: Str
+  findings: [Finding]
+  answer: Str
+  confidence: Float
+  sources_consulted: [Str]
+  gaps: [Str]
+}
+
+Agent InfoGatherer: Researcher = {
+  research = (msg) {
+    findings := []
+    sources_consulted := []
+
+    msg.sources | each (source) {
+      source_findings = investigate_source source msg.question ^
+      findings <- [..findings  ..source_findings]
+      sources_consulted <- [..sources_consulted  source]
+    }
+
+    findings <- findings | sort_by (.relevance) | rev | take 20
+
+    answer = synthesize_findings findings msg.question ^
+    confidence = findings | empty? ? 0.1
+      : findings | map (.confidence) | fold 0.0 (+) / (len findings)
+
+    ResearchResult {
+      question: msg.question
+      findings: findings
+      answer: answer
+      confidence: confidence
+      sources_consulted: sources_consulted
+      gaps: findings | len < 3 ? ["insufficient sources found"] : []
+    }
+  }
+
+  search = (msg) {
+    msg.source ? {
+      "codebase" -> search_codebase msg.query
+      "filesystem" -> search_filesystem msg.query
+      _ -> []
+    }
+  }
+}
+
+investigate_source = (source: Str  question: Str) -> [Finding] {
+  source ? {
+    "codebase" -> search_codebase question
+    "filesystem" -> search_filesystem question
+    _ -> [Finding {source: source  content: "unknown source: {source}"  relevance: 0.0  confidence: 0.0}]
+  }
+}
+
+search_codebase = (question: Str) -> [Finding] {
+  keywords = extract_keywords question
+  results = keywords | flat_map (kw) {
+    grep_result = $^rg --type rust -l "{kw}" . ?? ""
+    grep_result | lines | filter (l) len (trim l) > 0
+  } | uniq | take 10
+
+  results | map (file_path) Finding {
+    source: file_path
+    content: fs.read file_path ?? "unreadable" | take 500
+    relevance: 0.7
+    confidence: 0.8
+  }
+}
+
+search_filesystem = (question: Str) -> [Finding] {
+  keywords = extract_keywords question
+  results = keywords | flat_map (kw) {
+    found = $^find . -name "*{kw}*" -type f 2>/dev/null ?? ""
+    found | lines | filter (l) len (trim l) > 0
+  } | uniq | take 10
+
+  results | map (path) Finding {
+    source: path
+    content: fs.read path ?? "unreadable" | take 300
+    relevance: 0.5
+    confidence: 0.7
+  }
+}
+
+extract_keywords = (text: Str) -> [Str] {
+  stop_words = ["the" "a" "an" "is" "are" "was" "were" "in" "on" "at" "to" "for" "of" "and" "or"]
+  text | lower | split " "
+    | filter (w) len w > 2
+    | filter (w) not (stop_words | contains? w)
+    | uniq | take 5
+}
+
+synthesize_findings = (findings: [Finding]  question: Str) -> Str {
+  findings_text = findings | take 10
+    | enumerate
+    | map (i f) "[{i + 1}] ({f.source}): {f.content}"
+    | join "\n\n"
+
+  p = prompt.create ()
+    | prompt.system "You synthesize research findings into a clear answer."
+    | prompt.section "Question" question
+    | prompt.section "Findings" findings_text
+    | prompt.instruction "Answer the question based on the findings. Cite sources by number."
+    | prompt.constraint "If findings are insufficient, say what's missing."
+
+  resp = ai.prompt (prompt.render p) ^
+  resp.text
+}
+
++main = () {
+  agent.advertise {
+    protocols: ["ResearchResult" "Finding"]
+    domains: ["researcher" "research" "search" "information"]
+    tools: ["ai" "fs"]
+  }
+
+  receive {
+    research -> InfoGatherer.research
+    search -> InfoGatherer.search
+    _ -> (msg) Err "unknown action: {msg.action ?? 'none'}"
+  }
+}

@@ -34,8 +34,8 @@ impl DxYieldBackend {
 
 impl YieldBackend for DxYieldBackend {
     fn yield_value(&self, value: Value, span: Span) -> Result<Value, LxError> {
-        let json_val = lx_to_json(&value, span)
-            .map_err(|e| LxError::runtime(format!("yield: {e}"), span))?;
+        let json_val =
+            lx_to_json(&value, span).map_err(|e| LxError::runtime(format!("yield: {e}"), span))?;
 
         let prompt_id = next_prompt_id();
 

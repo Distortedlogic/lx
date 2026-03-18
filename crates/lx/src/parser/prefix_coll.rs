@@ -53,7 +53,12 @@ impl super::Parser {
         while *self.peek() != TokenKind::RBrace {
             if *self.peek() == TokenKind::DotDot {
                 self.advance();
-                let value = self.parse_expr(32)?;
+                let saved_depth = self.collection_depth;
+                self.collection_depth = 0;
+                self.record_field_depth += 1;
+                let value = self.parse_expr(31)?;
+                self.record_field_depth -= 1;
+                self.collection_depth = saved_depth;
                 fields.push(RecordField {
                     name: None,
                     value,

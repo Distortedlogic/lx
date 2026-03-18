@@ -1,0 +1,142 @@
+-- Tiered memory management: working → episodic → semantic → procedural
+-- Source: persistent recall across turns, consolidation, and decay
+
+use std/memory
+use std/knowledge
+use std/profile
+use std/time
+use std/json
+use std/fs
+use ../protocols {MemoryEntry}
+
+brain_dir = "{env.home ()}/.lx/brain"
+
++init = () -> Any {
+  fs.exists brain_dir ? () : fs.mkdir brain_dir ^
+
+  working = memory.create "{brain_dir}/working.json" ^
+  episodic = memory.create "{brain_dir}/episodic.json" ^
+  semantic = knowledge.create "{brain_dir}/semantic.json" ^
+  persona = profile.load {name: "claude" create: true} ^
+
+  {working: working  episodic: episodic  semantic: semantic  persona: persona}
+}
+
++remember = (store: Any  entry: MemoryEntry) -> Bool {
+  tagged = {..entry  timestamp: time.now ()}
+
+  tagged.confidence >= 0.8 ? {
+    memory.store {
+      content: tagged.content
+      tier: 2
+      confidence: tagged.confidence
+      tags: tagged.tags
+    } store.episodic ^
+  } : {
+    memory.store {
+      content: tagged.content
+      tier: 1
+      confidence: tagged.confidence
+      tags: tagged.tags
+    } store.working ^
+  }
+
+  tagged.domain | len > 0 ? {
+    knowledge.store tagged.domain {
+      content: tagged.content
+      source: tagged.source
+      confidence: tagged.confidence
+    } {
+      source: tagged.source
+      confidence: tagged.confidence
+      tags: tagged.tags
+    } store.semantic ^
+  } : ()
+
+  true
+}
+
++recall = (store: Any  query: Str  domain: Str) -> [Any] {
+  (working_hits episodic_hits semantic_hits) = par {
+    memory.recall query store.working
+    memory.recall query store.episodic
+    knowledge.query domain query store.semantic
+  }
+
+  [
+    ..working_hits | map (m) {..m  source: "working"  recency: 1.0}
+    ..episodic_hits | map (m) {..m  source: "episodic"  recency: 0.7}
+    ..semantic_hits | map (m) {..m  source: "semantic"  recency: 0.5}
+  ]
+    | sort_by (m) m.confidence * m.recency
+    | rev
+}
+
++recall_domain = (store: Any  domain: Str) -> [Any] {
+  knowledge.query domain "" store.semantic
+}
+
++learn_preference = (store: Any  key: Str  value: Any) -> Any {
+  profile.preference store.persona key value ^
+}
+
++get_preference = (store: Any  key: Str) -> Any {
+  profile.get_preference store.persona key
+}
+
++learn_skill = (store: Any  domain: Str  knowledge_data: Any) -> Any {
+  profile.learn store.persona domain knowledge_data ^
+}
+
++recall_skill = (store: Any  domain: Str) -> Any {
+  profile.recall store.persona domain
+}
+
++best_strategy = (store: Any  domain: Str) -> Any {
+  profile.best_strategy store.persona domain
+}
+
++consolidate = (store: Any) -> Any {
+  promoted = memory.consolidate store.working ^
+  promoted_episodic = memory.consolidate store.episodic ^
+
+  high_confidence = memory.tier 1 store.working
+    | filter (m) m.confidence >= 0.85
+
+  high_confidence | each (m) memory.promote m store.working ^
+
+  {promoted: promoted  promoted_episodic: promoted_episodic  elevated: len high_confidence}
+}
+
++forget_stale = (store: Any  max_age_seconds: Int) -> Int {
+  profile.decay store.persona max_age_seconds ^
+  memory.consolidate store.working ^
+}
+
++working_load = (store: Any) -> Int {
+  memory.tier 1 store.working | len
+}
+
++save = (store: Any) -> Any {
+  profile.save store.persona ^
+}
+
++merge_context = (store: Any  items: [Any]) -> Any {
+  items | each (item) {
+    remember store {
+      content: item.content
+      domain: item.domain ?? "context"
+      confidence: item.confidence ?? 0.5
+      source: item.source ?? "context"
+      tags: item.tags ?? []
+    }
+  }
+}
+
++history = (store: Any) -> Any {
+  profile.history store.persona
+}
+
++adapt_strategy = (store: Any  domain: Str) -> Any {
+  profile.adapt_strategy store.persona domain
+}

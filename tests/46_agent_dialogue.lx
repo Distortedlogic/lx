@@ -61,7 +61,7 @@ end2 = agent.dialogue_end s4
 assert (end2 == Ok ()) "double end is ok"
 
 -- dialogue with handler that uses accumulated context
-accumulator = {handler: (msg) {turn_count: (msg.history | len) / 2}}
+accumulator = {handler: (msg) {turn_count: (msg.history | len) // 2}}
 s5 = agent.dialogue accumulator {} ^
 r1 = agent.dialogue_turn s5 "first" ^
 assert (r1.turn_count == 0) "accumulator sees 0 prior turns"

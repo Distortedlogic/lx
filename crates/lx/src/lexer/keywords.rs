@@ -14,6 +14,7 @@ pub(super) fn ident_or_keyword(text: &str) -> TokenKind {
         "yield" => TokenKind::Yield,
         "with" => TokenKind::With,
         "refine" => TokenKind::Refine,
+        "receive" => TokenKind::Receive,
         _ => TokenKind::Ident(text.to_string()),
     }
 }

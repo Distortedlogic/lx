@@ -12,7 +12,7 @@ use crate::value::Value;
 use crate::ast::Program;
 use crate::visitor::AstVisitor;
 
-use super::diag_walk::{DiagEdge, DiagNode, Graph, Walker};
+use super::diag_walk::{DiagEdge, DiagNode, Graph, Subgraph, Walker};
 
 pub fn build() -> IndexMap<String, Value> {
     let mut m = IndexMap::new();
@@ -119,7 +119,11 @@ fn value_to_graph(val: &Value, span: Span) -> Result<Graph, LxError> {
             .collect::<Result<_, _>>()?,
         _ => return Err(LxError::type_err("graph.edges must be List", span)),
     };
-    Ok(Graph { nodes, edges })
+    Ok(Graph {
+        nodes,
+        edges,
+        subgraphs: vec![],
+    })
 }
 
 fn value_to_node(val: &Value, span: Span) -> Result<DiagNode, LxError> {
@@ -165,18 +169,36 @@ fn value_to_edge(val: &Value, span: Span) -> Result<DiagEdge, LxError> {
     })
 }
 
+fn node_shape(node: &DiagNode, indent: &str) -> String {
+    match node.kind.as_str() {
+        "agent" => format!("{indent}{}[\"{}\"]", node.id, node.label),
+        "tool" => format!("{indent}{}([\"{}\"])", node.id, node.label),
+        "decision" => format!("{indent}{}{{\"{}\"}}", node.id, node.label),
+        "fork" | "join" => format!("{indent}{}[[\"{}\"]]", node.id, node.label),
+        "loop" => format!("{indent}{}{{{{\"{}\"}}}}", node.id, node.label),
+        "resource" => format!("{indent}{}[(\"{}\")]", node.id, node.label),
+        "user" => format!("{indent}{}[/\"{}\"\\]", node.id, node.label),
+        "io" => format!("{indent}{}>\"{}\"]", node.id, node.label),
+        "type" => format!("{indent}{}((\"{}\"))", node.id, node.label),
+        _ => format!("{indent}{}[\"{}\"]", node.id, node.label),
+    }
+}
+
 fn to_mermaid(graph: &Graph) -> String {
     let mut out = String::from("flowchart TD\n");
+    let sg_ids: std::collections::HashSet<&str> = graph
+        .subgraphs
+        .iter()
+        .flat_map(|sg| sg.node_ids.iter().map(|s| s.as_str()))
+        .collect();
+    for sg in &graph.subgraphs {
+        emit_subgraph(&mut out, sg, &graph.nodes);
+    }
     for node in &graph.nodes {
-        let shape = match node.kind.as_str() {
-            "agent" => format!("    {}[\"{}\"]", node.id, node.label),
-            "tool" => format!("    {}([\"{}\"])", node.id, node.label),
-            "decision" => format!("    {}{{\"{}\"}}", node.id, node.label),
-            "fork" | "join" => format!("    {}[[\"{}\"]]\n", node.id, node.label),
-            _ => format!("    {}[\"{}\"]", node.id, node.label),
-        };
-        out.push_str(&shape);
-        out.push('\n');
+        if !sg_ids.contains(node.id.as_str()) {
+            out.push_str(&node_shape(node, "    "));
+            out.push('\n');
+        }
     }
     for edge in &graph.edges {
         let arrow = match edge.style.as_str() {
@@ -196,13 +218,36 @@ fn to_mermaid(graph: &Graph) -> String {
     out.push_str("    classDef agent fill:#e1f5fe,stroke:#0288d1\n");
     out.push_str("    classDef tool fill:#f3e5f5,stroke:#7b1fa2\n");
     out.push_str("    classDef decision fill:#fff3e0,stroke:#ef6c00\n");
+    out.push_str("    classDef loop fill:#e8f5e9,stroke:#388e3c\n");
+    out.push_str("    classDef resource fill:#fce4ec,stroke:#c62828\n");
+    out.push_str("    classDef user fill:#ede7f6,stroke:#4527a0\n");
+    out.push_str("    classDef io fill:#e0f2f1,stroke:#00695c\n");
+    out.push_str("    classDef type fill:#f5f5f5,stroke:#616161\n");
     for node in &graph.nodes {
-        match node.kind.as_str() {
-            "agent" => out.push_str(&format!("    class {} agent\n", node.id)),
-            "tool" => out.push_str(&format!("    class {} tool\n", node.id)),
-            "decision" => out.push_str(&format!("    class {} decision\n", node.id)),
-            _ => {}
+        let class = match node.kind.as_str() {
+            "agent" | "tool" | "decision" | "loop" | "resource" | "user" | "io" | "type" => {
+                Some(node.kind.as_str())
+            }
+            "fork" | "join" => Some("agent"),
+            _ => None,
+        };
+        if let Some(c) = class {
+            out.push_str(&format!("    class {} {c}\n", node.id));
         }
     }
     out
+}
+
+fn emit_subgraph(out: &mut String, sg: &Subgraph, nodes: &[DiagNode]) {
+    out.push_str(&format!(
+        "    subgraph sg_{} [\"{}\"]\n",
+        sg.label, sg.label
+    ));
+    for nid in &sg.node_ids {
+        if let Some(node) = nodes.iter().find(|n| n.id == *nid) {
+            out.push_str(&node_shape(node, "        "));
+            out.push('\n');
+        }
+    }
+    out.push_str("    end\n");
 }

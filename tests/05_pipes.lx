@@ -31,7 +31,7 @@ result = 10 | (x) {
   half = x / 2
   half + 1
 }
-assert (result == 6)
+assert (result == 6.0)
 
 -- multi-stage pipeline
 result = [5 3 1 4 2]

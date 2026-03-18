@@ -8,6 +8,7 @@ mod eval_ops;
 mod exec_stmt;
 mod modules;
 mod patterns;
+mod receive;
 mod refine;
 mod shell;
 
@@ -288,6 +289,7 @@ impl Interpreter {
                 span,
             ),
             Expr::Shell { mode, parts } => self.eval_shell(mode, parts, span),
+            Expr::Receive(arms) => self.eval_receive(arms, span),
         }
     }
 }

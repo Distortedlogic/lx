@@ -1,0 +1,102 @@
+-- Inner critic: challenges assumptions, finds flaws, prevents overconfidence
+-- Source: adversarial self-review before committing to a response
+
+use std/ai
+use std/prompt
+use ../traits {Critic}
+
+Protocol Critique = {
+  flaws: [Str]
+  risks: [Str]
+  missing: [Str]
+  overconfident: Bool
+  suggested_improvements: [Str]
+  severity: Str
+  revised_confidence: Float
+}
+
+Agent InnerCritic: Critic = {
+  critique = (msg) {
+    p = prompt.create ()
+      | prompt.system "You are a rigorous critic. Find flaws, gaps, and risks. Be honest, not kind."
+      | prompt.section "Content ({msg.content_type})" msg.content
+      | prompt.section "Original Task" msg.task
+      | prompt.section "Claimed Confidence" (to_str msg.confidence)
+      | prompt.instruction "Find: 1) Factual errors 2) Logical gaps 3) Missing edge cases 4) Security risks"
+      | prompt.constraint "If the content is actually good, say so briefly. Don't manufacture issues."
+
+    resp = ai.prompt (prompt.render p) ^
+    issues = resp.text | lines | filter (starts? "- ") | map (drop 2)
+
+    flaws = issues | filter (contains? "error")
+    risks = issues | filter (contains? "risk")
+    issue_count = len flaws + len risks
+
+    confidence_penalty = issue_count * 0.1
+    revised = msg.confidence - confidence_penalty | math.max 0.1
+
+    {
+      flaws: flaws
+      risks: risks
+      severity: issue_count > 5 ? "high" : issue_count > 2 ? "medium" : issue_count > 0 ? "low" : "none"
+      revised_confidence: revised
+    }
+  }
+
+  challenge = (msg) {
+    p = prompt.create ()
+      | prompt.system "You challenge assumptions by finding counterexamples and edge cases."
+      | prompt.section "Assumption" msg.assumption
+      | prompt.section "Context" msg.context
+      | prompt.instruction "1) State the assumption. 2) Find counterexamples. 3) Where does it break?"
+
+    resp = ai.prompt (prompt.render p) ^
+    counterexamples = resp.text | lines | filter (starts? "- ") | map (drop 2)
+    {holds: counterexamples | empty?  counterexamples: counterexamples}
+  }
+
+  verify_code = (msg) {
+    (correctness safety) = par {
+      check_correctness msg.code msg.task
+      check_safety msg.code msg.language
+    }
+    {all_passed: correctness.ok && safety.ok}
+  }
+}
+
+check_correctness = (code: Str  task: Str) -> {ok: Bool  issues: [Str]} {
+  p = prompt.create ()
+    | prompt.system "You verify code correctness."
+    | prompt.section "Code" code
+    | prompt.section "Task" task
+    | prompt.instruction "Does this code correctly accomplish the task? List any bugs."
+
+  resp = ai.prompt (prompt.render p) ^
+  bugs = resp.text | lines | filter (starts? "- ") | map (drop 2)
+  {ok: bugs | empty?  issues: bugs}
+}
+
+check_safety = (code: Str  language: Str) -> {ok: Bool  issues: [Str]} {
+  dangerous = [
+    "eval(" "exec(" "system(" "subprocess" "__import__"
+    "DROP TABLE" "DELETE FROM" "rm -rf" "chmod 777"
+    "innerHTML" "document.write" ".env"
+  ]
+  found = dangerous | filter (d) code | contains? d
+  {ok: found | empty?  issues: found | map (d) "dangerous pattern: {d}"}
+}
+
++main = () {
+  agent.advertise {
+    protocols: ["Critique"]
+    domains: ["critic" "review" "verification" "quality"]
+    tools: ["ai"]
+  }
+
+  receive {
+    critique -> InnerCritic.critique
+    challenge -> InnerCritic.challenge
+    verify_code -> InnerCritic.verify_code
+    _ -> (msg) Err "unknown action: {msg.action ?? 'none'}"
+  }
+}

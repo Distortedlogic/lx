@@ -1,0 +1,157 @@
+-- Tool orchestration: selection, execution, result integration
+-- Source: bridges cognitive intent to concrete actions via MCP/shell/AI
+
+use std/ai
+use std/prompt
+use std/mcp
+use std/budget
+use std/retry
+use std/circuit
+use std/time
+use ../protocols {ToolRequest ToolResult ActionPlan ActionResult}
+
+MCP CognitiveTools = {
+  Read {path: Str} -> {content: Str}
+  Write {path: Str  content: Str} -> {success: Bool}
+  Edit {path: Str  old: Str  new: Str} -> {success: Bool}
+  Glob {pattern: Str} -> [Str]
+  Grep {pattern: Str  path: Str} -> [{file: Str  line: Int  content: Str}]
+  Bash {command: Str} -> {stdout: Str  stderr: Str  code: Int}
+  Agent {prompt: Str} -> {result: Str}
+  WebSearch {query: Str} -> [{title: Str  url: Str  snippet: Str}]
+  WebFetch {url: Str} -> {body: Str  status: Int}
+}
+
+tool_costs = %{
+  "Read": 0.01  "Write": 0.01  "Edit": 0.01  "Glob": 0.005
+  "Grep": 0.01  "Bash": 0.02  "Agent": 0.5
+  "WebSearch": 0.05  "WebFetch": 0.03
+}
+
++available_tools = () -> [Any] {
+  ["Read" "Write" "Edit" "Glob" "Grep" "Bash" "Agent" "WebSearch" "WebFetch"]
+    | map (name) {name: name  cost: get name tool_costs ?? 0.01}
+}
+
++select_tools = (task: Str  tools: [Any]) -> [Any] {
+  p = prompt.create ()
+    | prompt.system "You select the minimal set of tools needed for a task."
+    | prompt.section "Task" task
+    | prompt.section "Available Tools" (tools | map (t) "{t.name}: {t.description}" | join "\n")
+    | prompt.instruction "List only the tool names needed, one per line."
+    | prompt.constraint "Prefer cheaper tools. Only include what's strictly necessary."
+
+  resp = ai.prompt (prompt.render p) ^
+  selected_names = resp.text | lines | map trim | filter (x) len x > 0
+
+  tools | filter (t) selected_names | contains? t.name
+}
+
++plan_execution = (goal: Str  selected_tools: [Any]  b: Any) -> ActionPlan {
+  estimated = selected_tools | map (.cost) | sum
+  budget_ok = budget.remaining b | (r) r.tokens > to_int (estimated * 1000.0)
+  budget_ok ? () : log.warn "budget tight for planned execution"
+
+  p = prompt.create ()
+    | prompt.system "You create step-by-step execution plans using available tools."
+    | prompt.section "Goal" goal
+    | prompt.section "Tools" (selected_tools | map (.name) | join ", ")
+    | prompt.instruction "Create ordered steps. Each step: tool name + arguments + what it achieves."
+    | prompt.constraint "Minimize steps. Parallelize when dependencies allow."
+
+  resp = ai.prompt (prompt.render p) ^
+
+  steps = resp.text | lines
+    | filter (l) len (trim l) > 0
+    | enumerate
+    | map (i line) {
+        id: "step_{i}"
+        action: trim line
+        tool: selected_tools | get (math.min i (len selected_tools - 1)) | (.name) ?? "Bash"
+        args: trim line
+        depends: i > 0 ? ["step_{i - 1}"] : []
+      }
+
+  ActionPlan {
+    goal: goal
+    steps: steps
+    estimated_cost: estimated
+    risk: estimated > 1.0 ? "high" : estimated > 0.3 ? "medium" : "low"
+    fallback: "simplify approach and retry with fewer tools"
+  }
+}
+
++execute_with_retry = (request: ToolRequest  breaker: Any) -> Any {
+  circuit.is_tripped breaker ? Err "circuit breaker tripped" : {
+    result = retry.retry_with {
+      max_attempts: 3
+      base_delay_ms: 500
+      backoff: "exponential"
+    } () {
+      execute_single request ^
+    }
+
+    result ? {
+      Ok r -> { circuit.record true breaker; Ok r }
+      Err e -> { circuit.record false breaker; Err e }
+    }
+  }
+}
+
+execute_single = (request: ToolRequest) -> ToolResult {
+  start = time.now ()
+
+  output = request.tool ? {
+    "Bash" -> $^{request.args} ? { Ok out -> Ok out; Err e -> Err "shell error: {e}" }
+    "Read" -> { use std/fs; fs.read request.args ^ }
+    _ -> Err "tool {request.tool} requires MCP dispatch"
+  }
+
+  elapsed = time.now () - start
+
+  output ? {
+    Ok out -> Ok (ToolResult {
+      tool: request.tool
+      success: true
+      output: out
+      tokens_used: len (to_str out) / 4
+      duration_ms: elapsed
+    })
+    Err e -> Err e
+  }
+}
+
++integrate_results = (results: [ToolResult]  goal: Str) -> Str {
+  successful = results | filter (.success)
+  failed = results | filter (r) not r.success
+
+  failed | len > 0 ? log.warn "{len failed} tool calls failed" : ()
+
+  outputs = successful | map (r) "## {r.tool}\n{to_str r.output}" | join "\n\n"
+
+  p = prompt.create ()
+    | prompt.system "You integrate tool results into a coherent answer."
+    | prompt.section "Goal" goal
+    | prompt.section "Tool Outputs" outputs
+    | prompt.instruction "Synthesize these results into a clear, direct answer."
+    | prompt.constraint "Don't mention the tools themselves. Just present the answer."
+
+  resp = ai.prompt (prompt.render p) ^
+  resp.text
+}
+
++total_cost = (results: [ToolResult]) -> Float {
+  results | map (.tokens_used) | sum * 0.001
+}
+
+make_tool_filter = (category: Str) (tools: [Any]) -> [Any] {
+  tools | filter (t) t.category ?? "" == category
+}
+
+fs_tools = make_tool_filter "fs"
+search_tools = make_tool_filter "search"
+web_tools = make_tool_filter "web"
+
+make_executor = (breaker: Any) (request: ToolRequest) -> Any {
+  execute_with_retry request breaker
+}

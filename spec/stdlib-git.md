@@ -307,7 +307,7 @@ Rationale for shell-over-libgit2: `git2-rs` (libgit2) is a large dependency that
 
 ## Cross-References
 
-- Shell commands: NEXT_PROMPT.md (`$cmd` syntax)
+- Shell commands: TICK.md (`$cmd` syntax)
 - File system: [stdlib-modules.md](stdlib-modules.md) (`std/fs`)
 - Agent workflows: [stdlib-agents.md](stdlib-agents.md) (agents using git for code tasks)
 - Diff/patch: relates to `~>>?` streaming for incremental code review

@@ -1,0 +1,144 @@
+-- Saga step definitions for the cognitive pipeline with real compensations
+-- Source: each step has a do/undo pair — undo actually reverses side effects
+
+use std/trace
+use std/ctx
+use std/agent {Handoff}
+use ../protocols {Response}
+use ../lib/perception : perceive
+use ../lib/reasoning : reason
+use ../lib/memory_mgr : mem
+use ../lib/tools : tools
+use ../lib/context_mgr : ctx_mgr
+
++build = (input: Str  state: Any  memory_store: Any  context_win: Any  workforce: Any  trace_session: Any  saga_ctx: Any) -> [Any] {
+  [
+    {
+      id: "perceive"
+      do: (prev) {
+        p = perceive.perceive input [] ^
+        trace.record {name: "perceive" input: input output: p.intent} trace_session ^
+        ctx_mgr.add_perception context_win p
+        ctx.set "perception_key" "perception_{p.intent}" saga_ctx
+        p
+      }
+      undo: (result) {
+        key = ctx.get "perception_key" saga_ctx ?? "perception_unknown"
+        ctx_mgr.clear_ephemeral context_win
+        ctx.set "perception_key" "" saga_ctx
+        log.info "perception compensated — cleared context entry {key}"
+      }
+    }
+    {
+      id: "recall"
+      do: (prev) {
+        perception = prev.perceive
+        recalled = mem.recall memory_store perception.raw perception.domain
+        trace.record {name: "recall" input: perception.domain output: "found {len recalled}"} trace_session ^
+        ctx.set "recall_count" (len recalled) saga_ctx
+        recalled | take 10
+      }
+      undo: (result) {
+        ctx.set "recall_count" 0 saga_ctx
+      }
+      depends: ["perceive"]
+    }
+    {
+      id: "reason"
+      do: (prev) {
+        perception = prev.perceive
+        memories = prev.recall | map (.content) | join "\n"
+
+        handoff = Handoff {
+          from: "perception"
+          to: "reasoning"
+          context: agent.as_context {
+            intent: perception.intent
+            domain: perception.domain
+            complexity: perception.complexity
+            memories: memories
+          }
+          task: perception.raw
+        }
+
+        chain = reason.reason handoff.task handoff.context [] ^
+        ctx_mgr.add_reasoning context_win chain
+        ctx.set "reasoning_key" "reasoning_{chain.goal | take 20}" saga_ctx
+        trace.record {name: "reason" input: perception.intent output: chain.strategy} trace_session ^
+        chain
+      }
+      undo: (result) {
+        key = ctx.get "reasoning_key" saga_ctx ?? "reasoning_unknown"
+        ctx_mgr.clear_ephemeral context_win
+        ctx.set "reasoning_key" "" saga_ctx
+        log.info "reasoning compensated — cleared context entry {key}"
+      }
+      depends: ["perceive" "recall"]
+    }
+    {
+      id: "execute"
+      do: (prev) {
+        perception = prev.perceive
+        chain = prev.reason
+
+        perception.requires_agents ? {
+          dispatch = use ../agents/dispatcher
+          dispatch.fan_out workforce [{
+            id: "deep_analysis"
+            specialist: "analyst"
+            instruction: chain.conclusion
+            context: perception.raw
+            constraints: []
+            timeout_ms: 30000
+          }] ^
+        } : perception.requires_tools ? {
+          available = tools.available_tools ()
+          selected = tools.select_tools chain.conclusion available ^
+          selected | map (tool) {
+            tools.execute_with_retry
+              {tool: tool.name  args: chain.conclusion  reason: perception.intent  priority: "normal"  timeout_ms: 30000}
+              state.breaker
+              ? { Ok r -> r; Err e -> {tool: tool.name  success: false  output: e  tokens_used: 0  duration_ms: 0} }
+          }
+        } : []
+      }
+      undo: (result) log.info "execution compensated — tool results discarded"
+      depends: ["reason"]
+    }
+    {
+      id: "respond"
+      do: (prev) {
+        chain = prev.reason
+        results = prev.execute
+        successful = results | filter (r) r.success ?? true
+
+        handoff = Handoff {
+          from: "execution"
+          to: "response"
+          context: agent.as_context {
+            goal: chain.goal
+            conclusion: chain.conclusion
+            strategy: chain.strategy
+            tool_count: successful | len
+          }
+          task: chain.goal
+        }
+
+        content = successful | len > 0 ? {
+          tools.integrate_results successful handoff.task ^
+        } : chain.conclusion
+
+        Response {
+          content: content
+          confidence: chain.confidence
+          reasoning_depth: chain.thoughts | len
+          tools_used: successful | map (r) to_str (r.tool ?? "")
+          sources: successful | map (r) to_str (r.tool ?? "reasoning") | uniq
+          follow_up: []
+        }
+      }
+      undo: (result) log.info "response compensated — not emitted"
+      depends: ["reason" "execute"]
+    }
+  ]
+}

@@ -71,12 +71,12 @@ r4 = agent.negotiate [scorer_a scorer_b] {
   converge: (responses) {
     avg = responses | map (.position) | map (.score) | fold 0 (+)
     avg = avg / (len responses)
-    avg >= 70 ? {true -> Ok {avg_score: avg}; false -> "continue"}
+    avg >= 70.0 ? {true -> Ok {avg_score: avg}; false -> "continue"}
   }
 } ^
 
 assert (r4.rounds == 1) "score converged round 1"
-assert (r4.result.avg_score == 80) "avg score 80"
+assert (r4.result.avg_score == 80.0) "avg score 80"
 
 -- === Agents receive positions from prior round ===
 position_aware = agent.mock [

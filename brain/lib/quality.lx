@@ -1,0 +1,155 @@
+-- Quality assurance: self-grading, refinement loops, response auditing
+-- Source: metacognitive quality gate — catch errors before they reach the user
+
+use std/ai
+use std/prompt
+use std/audit
+use std/trace
+use std/agents/grader
+use std/agents/auditor
+use ../protocols {QualityGrade Response}
+
++response_rubric = () -> Any {
+  audit.rubric [
+    {name: "accuracy" description: "factually correct, no hallucinations" weight: 30}
+    {name: "relevance" description: "directly answers what was asked" weight: 25}
+    {name: "completeness" description: "covers all aspects of the question" weight: 20}
+    {name: "clarity" description: "clear, well-structured, easy to follow" weight: 15}
+    {name: "conciseness" description: "no unnecessary filler or repetition" weight: 10}
+  ]
+}
+
++code_rubric = () -> Any {
+  audit.rubric [
+    {name: "correctness" description: "code works as intended" weight: 35}
+    {name: "safety" description: "no security vulnerabilities" weight: 25}
+    {name: "style" description: "clean, idiomatic, no unnecessary complexity" weight: 15}
+    {name: "completeness" description: "handles edge cases, error paths" weight: 15}
+    {name: "scope" description: "only changes what was asked, nothing extra" weight: 10}
+  ]
+}
+
++quick_check = (output: Str  task: Str) -> Any {
+  audit.quick_check {output: output  min_length: 10  no_hedging: true  no_refusal: true  task: task}
+}
+
++grade_response = (response: Str  task: Str) -> QualityGrade {
+  rubric = response_rubric ()
+  result = audit.evaluate rubric {output: response  threshold: 75  task: task}
+
+  QualityGrade {
+    score: result.score
+    passed: result.passed
+    feedback: result.feedback ?? ""
+    categories: result.scores ?? []
+    suggestions: result.failed_checks ?? []
+  }
+}
+
++grade_code = (code: Str  task: Str) -> QualityGrade {
+  rubric = code_rubric ()
+  result = audit.evaluate rubric {output: code  threshold: 80  task: task}
+
+  QualityGrade {
+    score: result.score
+    passed: result.passed
+    feedback: result.feedback ?? ""
+    categories: result.scores ?? []
+    suggestions: result.failed_checks ?? []
+  }
+}
+
++should_refine = (grade: QualityGrade  round: Int  max_rounds: Int = 3) -> Bool {
+  round >= max_rounds ? false
+    : grade.passed ? false
+    : grade.score < 30 ? false
+    : true
+}
+
++refine_response = (initial_response: Str  task: Str) -> Str {
+  with trace.create "/tmp/brain_quality_trace.json" ^ as quality_trace {
+    result = refine initial_response {
+      grade: (work) {
+        g = grade_response work task
+        trace.record {name: "quality_grade" input: task output: g.feedback score: g.score / 100.0} quality_trace ^
+        {score: to_int g.score  feedback: g.feedback}
+      }
+      revise: (work feedback) {
+        stop = trace.should_stop {min_delta: 2.0  window: 3} quality_trace
+        stop ? {
+          log.info "diminishing returns detected, stopping refinement"
+          work
+        } : {
+          rate = trace.improvement_rate quality_trace
+          log.info "improvement rate: {rate}"
+
+          p = prompt.create ()
+            | prompt.system `You improve responses based on feedback.`
+            | prompt.section "Original Response" work
+            | prompt.section "Feedback" feedback
+            | prompt.section "Task" task
+            | prompt.instruction `Improve the response addressing the feedback.`
+            | prompt.constraint `Keep what's good, fix what's not.`
+
+          resp = ai.prompt (prompt.render p) ^
+          resp.text
+        }
+      }
+      threshold: 80
+      max_rounds: 3
+      on_round: (round work score) log.info "quality refinement round {round}: {score}"
+    }
+
+    result ? {
+      Ok r -> r.work
+      Err r -> {
+        log.warn "refinement didn't reach threshold: {r.final_score}"
+        r.work
+      }
+    }
+  }
+}
+
++refine_code = (initial_code: Str  task: Str) -> Str {
+  with trace.create "/tmp/brain_code_trace.json" ^ as code_trace {
+    result = refine initial_code {
+      grade: (work) {
+        g = grade_code work task
+        trace.record {name: "code_grade" input: task output: g.feedback score: g.score / 100.0} code_trace ^
+        {score: to_int g.score  feedback: g.feedback}
+      }
+      revise: (work feedback) {
+        stop = trace.should_stop {min_delta: 2.0  window: 3} code_trace
+        stop ? work : {
+          p = prompt.create ()
+            | prompt.system `You fix code based on review feedback.`
+            | prompt.section "Code" work
+            | prompt.section "Issues" feedback
+            | prompt.instruction `Fix the issues. Return only the corrected code.`
+
+          resp = ai.prompt (prompt.render p) ^
+          resp.text
+        }
+      }
+      threshold: 85
+      max_rounds: 3
+    }
+
+    result ? { Ok r -> r.work; Err r -> r.work }
+  }
+}
+
++final_audit = (response: Str  task: Str) -> Any {
+  (quick full) = par {
+    quick_check response task
+    auditor.audit {output: response  task: task}
+  }
+
+  {
+    quick_passed: quick.passed
+    full_passed: full.passed
+    score: full.score
+    feedback: full.feedback
+    reasons: quick.reasons ?? []
+  }
+}

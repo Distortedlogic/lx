@@ -118,16 +118,40 @@ impl Interpreter {
             Stmt::McpDecl { name, tools, .. } => self.eval_mcp_decl(name, tools, stmt.span),
             Stmt::TraitDecl {
                 name,
-                handles,
-                provides,
+                methods,
                 requires,
+                description,
+                tags,
                 exported,
             } => {
+                let mut method_defs = Vec::new();
+                for m in methods {
+                    let mut input = Vec::new();
+                    for f in &m.input {
+                        let default = match &f.default {
+                            Some(e) => Some(self.eval(e)?),
+                            None => None,
+                        };
+                        input.push(crate::value::ProtoFieldDef {
+                            name: f.name.clone(),
+                            type_name: f.type_name.clone(),
+                            default,
+                            constraint: None,
+                        });
+                    }
+                    let output = self.resolve_mcp_output(&m.output);
+                    method_defs.push(crate::value::TraitMethodDef {
+                        name: m.name.clone(),
+                        input,
+                        output,
+                    });
+                }
                 let val = Value::Trait {
                     name: Arc::from(name.as_str()),
-                    handles: Arc::new(handles.iter().map(|s| Arc::from(s.as_str())).collect()),
-                    provides: Arc::new(provides.iter().map(|s| Arc::from(s.as_str())).collect()),
+                    methods: Arc::new(method_defs),
                     requires: Arc::new(requires.iter().map(|s| Arc::from(s.as_str())).collect()),
+                    description: description.as_ref().map(|s| Arc::from(s.as_str())),
+                    tags: Arc::new(tags.iter().map(|s| Arc::from(s.as_str())).collect()),
                 };
                 let _ = exported;
                 let mut env = self.env.child();
@@ -138,9 +162,9 @@ impl Interpreter {
             Stmt::AgentDecl {
                 name,
                 traits,
-                uses: _,
+                uses,
                 init,
-                on: _,
+                on,
                 methods,
                 exported,
             } => {
@@ -153,14 +177,28 @@ impl Interpreter {
                     Some(expr) => Some(Box::new(self.eval(expr)?)),
                     None => None,
                 };
+                let uses_resolved: Vec<(Arc<str>, Arc<str>)> = uses
+                    .iter()
+                    .map(|(binding, module)| {
+                        (Arc::from(binding.as_str()), Arc::from(module.as_str()))
+                    })
+                    .collect();
+                let on_val = match on {
+                    Some(expr) => Some(Box::new(self.eval(expr)?)),
+                    None => None,
+                };
                 for trait_name in traits {
-                    if let Some(Value::Trait { handles, .. }) = self.env.get(trait_name) {
-                        for required in handles.iter() {
-                            let key = required.to_string();
-                            if !method_map.contains_key(&key) {
+                    if let Some(Value::Trait {
+                        methods: trait_methods,
+                        ..
+                    }) = self.env.get(trait_name)
+                    {
+                        for required in trait_methods.iter() {
+                            if !method_map.contains_key(&required.name) {
                                 return Err(LxError::runtime(
                                     format!(
-                                        "Agent {name} missing method '{key}' required by {trait_name}"
+                                        "Agent {name} missing method '{}' required by Trait {trait_name}",
+                                        required.name
                                     ),
                                     stmt.span,
                                 ));
@@ -173,6 +211,8 @@ impl Interpreter {
                     traits: Arc::new(traits.iter().map(|s| Arc::from(s.as_str())).collect()),
                     methods: Arc::new(method_map),
                     init: init_val,
+                    uses: Arc::new(uses_resolved),
+                    on: on_val,
                 };
                 let _ = exported;
                 let mut env = self.env.child();

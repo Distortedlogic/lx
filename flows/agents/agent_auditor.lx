@@ -15,3 +15,5 @@ use std/agent
 +handlers = %{"audit": audit  "verify": verify}
 
 +main = () { agent.dispatch handlers }
+
+

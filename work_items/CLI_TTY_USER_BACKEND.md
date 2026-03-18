@@ -64,10 +64,8 @@ Verify: confirm the justfile parses by running `just --justfile workgen/justfile
 
 ## Task 4: Remove workaround entry
 
-**Subject:** Remove UserBackend workaround from WORKAROUNDS.md
-**ActiveForm:** Removing resolved workaround
-
-Edit agent/WORKAROUNDS.md. Remove the "RuntimeCtx" section (the `UserBackend` default is `NoopUserBackend` entry). The workaround is resolved by the TTY detection in Task 1.
+**Subject:** ~~Remove UserBackend workaround from WORKAROUNDS.md~~
+**Status:** RESOLVED — agent/WORKAROUNDS.md was deleted (file no longer exists). No action needed.
 
 Verify: run `just diagnose` and confirm it passes.
 

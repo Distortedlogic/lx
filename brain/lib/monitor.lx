@@ -1,0 +1,144 @@
+-- Self-monitoring: circuit breakers, stuck detection, strategy adaptation
+-- Source: metacognitive watchdog — prevents doom loops and wasted resources
+
+use std/introspect
+use std/circuit
+use std/budget
+use std/time
+use ../protocols {CognitiveState}
+
++init = () -> Any {
+  breaker = circuit.create {
+    max_turns: 50
+    max_actions: 200
+    max_time_ms: 600000
+    max_repeats: 4
+    repetition_window: 5
+  }
+
+  b = budget.create {
+    tokens: 100000
+    api_calls: 50
+    wall_time: 600
+    tight_at: 50
+    critical_at: 85
+  }
+
+  {breaker: breaker  budget: b  start_time: time.now ()}
+}
+
++tick = (state: Any) -> Any {
+  circuit.tick state.breaker
+  state
+}
+
++record_action = (state: Any  action_type: Str  target: Str) -> Any {
+  introspect.record {type: action_type  target: target}
+  circuit.record action_type state.breaker
+  state
+}
+
++spend = (state: Any  tokens: Int  api_calls: Int) -> Any {
+  b = budget.spend state.budget {tokens: tokens  api_calls: api_calls} ^
+  {..state  budget: b}
+}
+
++check_health = (state: Any) -> CognitiveState {
+  tripped = circuit.is_tripped state.breaker
+  budget_status = budget.status state.budget
+  elapsed = introspect.elapsed ()
+  turn = introspect.turn_count ()
+  stuck = introspect.is_stuck ()
+  action_count = introspect.actions () | len
+
+  CognitiveState {
+    turn: turn
+    context_pressure: 0.0
+    budget_status: budget_status
+    active_goal: ""
+    memory_load: 0
+    stuck_count: stuck ? 1 : 0
+    strategy: tripped ? "circuit_tripped" : stuck ? "stuck" : "normal"
+  }
+}
+
++is_healthy = (state: Any) -> Bool {
+  health = check_health state
+  health.strategy == "normal" && health.budget_status != "exceeded"
+}
+
++should_stop = (state: Any) -> Bool {
+  circuit.is_tripped state.breaker
+}
+
++should_simplify = (state: Any) -> Bool {
+  health = check_health state
+  health.budget_status == "critical" || health.stuck_count > 0
+}
+
++suggest_strategy = (state: Any) -> Str {
+  health = check_health state
+
+  suggestion = health.strategy ? {
+    "circuit_tripped" -> "stop"
+    "stuck" -> {
+      actions = introspect.actions ()
+      repeated = introspect.similar_actions actions 3
+      repeated | len > 0 ?
+        "pivot — repeated actions: {repeated | map (.type) | join ', '}"
+        : "simplify — reduce scope and try different approach"
+    }
+    _ -> {
+      health.budget_status ? {
+        "critical" -> "economize — budget critical, skip non-essential"
+        "tight" -> "efficient — budget tight, prefer cheap tools"
+        "exceeded" -> "stop — budget exceeded"
+        _ -> "continue"
+      }
+    }
+  }
+
+  suggestion != "continue" ? introspect.strategy_shift suggestion : ()
+  suggestion
+}
+
++checkpoint = (state: Any  name: Str) -> Any {
+  introspect.mark name
+  log.info "checkpoint: {name} | turn: {introspect.turn_count ()} | budget: {budget.status state.budget}"
+}
+
++actions_since = (name: Str) -> [Any] {
+  introspect.actions_since name
+}
+
++remaining_budget = (state: Any) -> Any {
+  budget.remaining state.budget
+}
+
++project_budget = (state: Any  remaining_steps: Int) -> Any {
+  budget.project state.budget {remaining_steps: remaining_steps}
+}
+
++status_report = (state: Any) -> Any {
+  health = check_health state
+  remaining = budget.remaining state.budget
+  suggestion = suggest_strategy state
+
+  {
+    turn: health.turn
+    budget_status: health.budget_status
+    remaining_tokens: remaining.tokens
+    remaining_api_calls: remaining.api_calls
+    stuck: health.stuck_count > 0
+    circuit_tripped: health.strategy == "circuit_tripped"
+    suggestion: suggestion
+  }
+}
+
++guard = (state: Any  action_description: Str) -> Any {
+  is_healthy state ? Ok state : {
+    report = status_report state
+    log.warn "guard blocked: {action_description} — {report.suggestion}"
+    Err "blocked by monitor: {report.suggestion}"
+  }
+}

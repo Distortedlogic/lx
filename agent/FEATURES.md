@@ -19,6 +19,7 @@ Collections:
 ```lx
 [1 2 3]                      -- list (space-separated, no commas)
 {x: 1  y: 2}                 -- record (fixed keys, all fields need key: value)
+{:}                          -- empty record
 (1 "hello" true)             -- tuple
 %{"key": "value"}            -- map (arbitrary keys)
 ```
@@ -45,6 +46,21 @@ Type annotations (validated by `lx check`, ignored by `lx run`):
 ```lx
 add = (x: Int y: Int) -> Int x + y
 safe_div = (a: Int b: Int) -> Int ^ Str { ... }
+```
+
+## Arithmetic
+
+`/` always returns Float (even for two Ints). `//` is integer division:
+```lx
+7 / 2          -- 3.5 (Float)
+7 // 2         -- 3 (Int)
+15 / 3         -- 5.0 (Float)
+```
+
+Mixed Int/Float auto-promotes to Float:
+```lx
+3 * 0.5        -- 1.5 (Int * Float → Float)
+10 + 2.0       -- 12.0 (Int + Float → Float)
 ```
 
 ## Pipes — The Core Composition Tool
@@ -203,12 +219,26 @@ Composition: `Protocol Extended = {..Base  extra: Str}`.
 
 ### Traits (Behavioral Contracts)
 
+Typed method signatures using MCP syntax (`{input} -> output`):
+
 ```lx
 Trait Reviewer = {
-  handles: [ReviewRequest]
-  provides: [summarize]
+  description: "Code review agent"
+  review: {file: Str  depth: Str = "normal"} -> {approved: Bool  findings: List}
+  summarize: {findings: List} -> Str
   requires: [:ai :fs]
+  tags: ["code" "review"]
 }
+```
+
+Methods can reference named Protocols as input: `review: ReviewRequest -> {findings: List}`.
+
+Discovery via `std/trait`:
+
+```lx
+use std/trait
+methods = trait.methods Reviewer
+best = trait.match Reviewer "find issues"
 ```
 
 ### Agent Declarations
@@ -219,10 +249,11 @@ Agent CodeReviewer: Reviewer = {
     analysis = ai.prompt "Review {msg.file}" ^
     {approved: true  findings: [analysis.text]}
   }
-  summarize = (findings) findings | join "\n"
+  summarize = (msg) msg.findings | join "\n"
 }
 ```
 
+Trait conformance validated at definition time — missing methods halt execution.
 Access methods via `.`: `CodeReviewer.review {file: "main.rs"}`.
 Reserved fields: `uses` (MCP connections), `init` (startup logic), `on` (lifecycle hooks).
 
@@ -275,6 +306,20 @@ yield {kind: "approval" data: changes}   -- pause for orchestrator input
 emit "Status update"                      -- fire-and-forget to human (strings → stdout)
 emit {progress: 50 stage: "analyzing"}   -- structured emit (records → JSON)
 ```
+
+### Receive (Agent Message Handler)
+
+`receive` replaces the yield/loop/match boilerplate for agent message handlers:
+
+```lx
+receive {
+  analyze -> (msg) analyze_fn msg
+  compare -> (msg) compare_fn msg
+  _ -> (msg) Err "unknown action"
+}
+```
+
+Desugars to: yield `{kind: "ready"}`, enter loop, dispatch on `msg.action`, yield `{kind: "result" data: result}`, break on None.
 
 ### Refine (Iterative Improvement)
 
@@ -400,6 +445,9 @@ resp.text                    -- the response text
 
 -- Protocol-validated structured output (auto-retries on schema violation)
 result = ai.prompt_structured {prompt: "Rate this"  protocol: ScoreProtocol} ^
+
+-- Lightweight structured JSON output (no Protocol needed, shape from example record)
+result = ai.prompt_json "Classify this intent" {intent: "" findings: [""]} ^
 ```
 
 ### Prompt Assembly (std/prompt)
@@ -653,16 +701,7 @@ merged = agent.reconcile [results.0 results.1 results.2] {
 
 ## Gotchas
 
-- **List indexing uses `.N`**: `xs.0`, `xs.1`, not `at` or `nth`
-- **No truthiness**: `x > 0 ? "yes" : "no"` works, but `x ? "yes" : "no"` requires Bool
-- **Tuple commas**: `(a, b)` = tuple binding, `(a b)` = function application
-- **`|` inside `$`** is a shell pipe, not lx pipe
-- **`+` at column 0** = export, anywhere else = addition
-- **Protocol/Trait failures are hard errors** — not catchable with `??`
-- **Record equality is order-independent**: `{a: 1 b: 2} == {b: 2 a: 1}`
-- **`none?` is collection-only** (2-arg predicate). Use `!some?` for Maybe
-- **No `func?` predicate** — no way to test if something is callable
-- **Unicode in .lx files can cause panics** — avoid non-ASCII characters
+See `agent/GOTCHAS.md` for non-obvious behaviors and temporary workarounds.
 
 ## Operator Precedence (high to low)
 

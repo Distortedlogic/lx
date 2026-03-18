@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use lx::backends::ShellBackend;
 use lx::backends::ProcessShellBackend;
+use lx::backends::ShellBackend;
 use lx::error::LxError;
 use lx::span::Span;
 use lx::value::Value;
@@ -81,21 +81,12 @@ fn extract_shell_fields(val: &Value) -> (i32, String, String) {
                 .int_field("code")
                 .map(|n| format!("{n}").parse::<i32>().unwrap_or(0))
                 .unwrap_or(0);
-            let stdout = inner
-                .str_field("out")
-                .unwrap_or("")
-                .to_string();
-            let stderr = inner
-                .str_field("err")
-                .unwrap_or("")
-                .to_string();
+            let stdout = inner.str_field("out").unwrap_or("").to_string();
+            let stderr = inner.str_field("err").unwrap_or("").to_string();
             (code, stdout, stderr)
         }
         Value::Err(inner) => {
-            let msg = inner
-                .str_field("msg")
-                .unwrap_or("")
-                .to_string();
+            let msg = inner.str_field("msg").unwrap_or("").to_string();
             (1, String::new(), msg)
         }
         other => (0, format!("{other}"), String::new()),

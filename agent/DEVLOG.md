@@ -1,65 +1,41 @@
 # lx Development Log
 
-Design decisions, technical debt, and session history. Read `NEXT_PROMPT.md` first for orientation.
+Design decisions, technical debt, and session history. Read `TICK.md` first for orientation.
 
 ## Key Design Decisions
 
 Non-obvious choices that cause confusion if forgotten:
 
-- **Pipe HIGHER than comparison**. `data | sort | len > 5` = `((data | sort) | len) > 5`.
-- **`^` and `??` LOWER than `|`**. `url | fetch ^` = `(url | fetch) ^`.
 - **Function body extent** — `map (x) x * 2 | sum` gives map body `x * 2 | sum`. Use blocks or sections.
-- **Division by zero is a panic**. Use `math.safe_div` for recoverable.
 - **Tuple auto-spread**: N-param function + single N-tuple → auto-destructure.
-- **`none?` is 2-arg only** (collection predicate). Use `!some?` for Maybe.
-- **`$echo "hello {name}"`** — `"` are shell quotes, `{name}` is lx interpolation.
-- **`+` at column 0** is export. Anywhere else is addition.
-- **Record equality is order-independent**.
-- **`log` is a record** with `.info`, `.warn`, `.err`, `.debug` fields.
 - **Application requires callable left-side**. `[1 2 3]` is three elements, not application.
 - **Collection-mode**: inside `[]`, only TypeConstructor triggers application.
-- **`??` unwraps Ok/Some**. Non-Result/Maybe values pass through.
 - **Default params reduce effective arity**. 1 required arg + defaults → executes immediately.
 - **Tuple variables need commas**. `(b, a)` tuple. `(b a)` is application.
-- **`{x: (f 42)}`** — parens for function calls in record field values.
+- **`{x: (f 42)}`** — parens for function calls in single-line record field values (multiline records support full expressions).
 - **is_func_def ambiguity**: `(a b c) (expr)` with all bare Ident params NOT a func def. Defaults/underscores/type annotations override.
-- **`~>`/`~>?` at concat precedence**. `agent ~>? msg ^ | process` = `((agent ~>? msg) ^) | process`.
 - **`yield` is callback-based**. No handler → runtime error. Subsumed by `RuntimeCtx.yield_` backend.
 - **`RuntimeCtx` for backend pluggability**. All I/O builtins receive `&Arc<RuntimeCtx>`. Traits: `AiBackend`, `EmitBackend`, `HttpBackend`, `ShellBackend`, `YieldBackend`, `LogBackend`, `UserBackend`. Defaults in `backends/defaults.rs` + `backends/user.rs`.
-- **`with` is scoped binding**. Lexical scope, not dynamic. Supports `:=` mutable.
 - **`with ... as` uses `stop_ident` parser flag**. Expression parsing stops at `Ident("as")` to prevent it being consumed as application argument. Multi-resource separated by `,` (Semi token). Cleanup via `Closeable` convention (record with `.close` field).
-- **Record field update via `<-`**. Requires `:=` binding. Adding new fields allowed.
 - **`MCP` declarations are typed tool contracts**. Callable → record of wrapper functions.
 - **Type annotations don't consume lowercase idents as type args**. `(x: Maybe a)` treats `a` as next param, not type var. Write `(x: (Maybe a))`.
 - **`{` after type tokens is body, not record type**. `-> Int { body }` — `{` starts body. Record return types need parens: `-> ({x: Int})`.
-- **`lx check` is optional**. `lx run` ignores annotations. Checker uses bidirectional inference + unification.
-- **Protocol failures are runtime errors**, not lx-level `Err` values. Not catchable with `??`.
 - **Protocol `where` constraints bind the field name**. `score: Float where score >= 0.0`.
-- **Protocol union `_variant` injection**. First matching variant in declaration order injects `_variant` field.
 - **Protocol spread overrides**: later fields override same-named spread fields.
-- **`Trait` is a keyword**. Lexed like `Protocol`/`MCP` (uppercase → TypeName, but special-cased). Produces `Stmt::TraitDecl` and `Value::Trait`. Trait names stored in agent `__traits` list field.
-- **`agent.implements` not `agent.implements?`**. The `?` suffix parses as ternary operator. Use bare name.
-- **`std/pool` is sequential**. Like `par`/`pmap`, pools distribute work sequentially. Abstraction value is organizational — round-robin dispatch, status tracking.
-- **`std/plan` treats plans as data**. `plan.run` with `on_step` callback. `PlanAction` tagged union controls flow.
-- **`std/introspect` is separate from `std/agent`**. Cross-cutting runtime metadata. Bounded action log (1000 entries).
-- **`std/knowledge` is file-backed JSON**. Shared via path. Provenance metadata. File-level locking.
-- **`std/diag` uses existing lexer+parser**. Walks AST, does not execute. Graph IR is plain lx records.
-- **`std/user` default is `NoopUserBackend`**. Auto-approves confirm, picks first choice, returns default/empty for ask. Tests and batch mode work without stdin. CLI can upgrade to `StdinStdoutUserBackend` for interactive terminal use.
+- **`Trait` has typed methods**. `Trait Name = { method: {input} -> output }` — methods use MCP tool signature syntax (`{fields} -> type`). Reserved fields: `description` (Str), `requires` ([symbols]), `tags` ([Str]). Conformance validated at Agent definition time — missing method = hard runtime error. `Value::Trait` holds `methods: Vec<TraitMethodDef>` (same shape as `McpToolDef`). `std/trait` module provides `trait.methods` (extract signatures as records) and `trait.match` (keyword matching).
+- **`agent.implements` is structural**. Checks method names against Trait's declared methods. Works with both `Value::Agent` and `Value::Record`. Falls back to `__traits` string tags for empty-method traits. No `?` suffix — parses as ternary operator.
 - **`std/profile` uses `DashMap` + atomic IDs**. Same pattern as `std/knowledge`. File-backed at `.lx/profiles/{name}.json`. Strategy helpers use `strategy:{problem}:{approach}` domain prefix convention.
 - **`Agent` is a keyword**. Lexed like `Protocol`/`Trait` (uppercase → TypeName special-case). Produces `Stmt::AgentDecl` and `Value::Agent`. Methods stored in `IndexMap<String, Value>`. Reserved fields: `uses`, `init`, `on`. Trait conformance validated at definition time (missing method = hard runtime error, not catchable with `??`).
 
 ## Technical Debt
 
-- Builtins (str.rs, coll.rs, hof.rs) still use "X expects Y" without showing actual type — interpreter errors are fixed, stdlib next
-- `par`/`sel`/`pmap`/`std/pool` are sequential; real async needs `tokio`
-- Named-arg parser consumes ternary `:` separator (workaround: parens)
-- Assert parsing greedy — `assert (expr) "msg"` consumes msg when `(expr)` is callable
+Architectural constraints that inform design decisions. Not actionable bugs (those are in `BUGS.md`).
+
+- `par`/`sel`/`pmap`/`std/pool` are sequential — real async needs tokio (architectural)
 - Currying removal deferred — requires parser architecture change
-- `it` in `sel` blocks — only implicit binding
-- Shell line is single-line only — forces `${ }` for complex commands
-- Named args + default params + currying interaction
-- Unicode chars in lexer cause panics (byte vs char indexing in comments)
-- 6 files over 300-line limit (agent_reconcile_strat.rs 326, cron.rs 320, main.rs 315, str.rs 314, mcp.rs 304, tasks.rs 302)
+- `it` in `sel` blocks — only implicit binding, no explicit name
+- Shell line is single-line only — forces `${ }` for multi-line commands
+- Named args + default params + currying have complex interaction edge cases
 
 ## Session History
 
@@ -97,3 +73,5 @@ Non-obvious choices that cause confusion if forgotten:
 | 48 | 03-16 | Gap analysis: 7 unplanned features for dynamic multi-agent coordination. New specs: `agents-task-graph` (DAG execution), `agents-capability-routing` (declarative routing), `agents-deadline` (time propagation), `agents-introspect-live` (system observation), `agents-dialogue-branch` (fork/compare/merge), `agents-format-negotiate` (Protocol adapters), `agents-hot-reload` (handler swap). Updated ROADMAP (28 features), PRIORITIES (28 items), OPINION (8 new gaps). No code changes |
 | 49 | 03-16 | `std/user`: 9 functions, `UserBackend` trait. `std/profile`: 15 functions, persistent identity + strategy helpers. `Agent` declarations: new `AgentKw` token, `Stmt::AgentDecl` AST node, `Value::Agent` variant. Parser handles `Agent Name: TraitList = { body }` with `uses`/`init`/`on` reserved fields. Trait conformance validated at definition time. Method access via `.`. 69/69 tests |
 | 50+ | 03-17 | Flow testing infrastructure: `std/test` (test runner, test/describe blocks), `std/describe` (BDD-style describe/it with structured results). Flow satisfaction test suites for 14 flow specs — 11 deterministic suites (35 scenarios) + 3 live-only stubs. Discovered and documented 16 findings in FLOW_TESTING_FINDINGS.md. Fixed: `Protocol +Name` syntax, `refine` initial expression parsing, `trace.record` Int score handling. 71/71 tests |
+| 51 | 03-17 | Enforced Trait methods: `Trait Name = { method: {input} -> output }` with typed MCP-style signatures. `TraitMethodDecl` AST node, `TraitMethodDef` runtime value. Agent conformance checks method existence at definition time. `agent.implements` now structural (checks methods, not string tags). `std/trait` module: `trait.methods` (extract signatures) + `trait.match` (keyword matching). Protocol-named inputs supported (`method: ProtoName -> output`). Old `handles`/`provides` syntax removed. 71/71 tests |
+| 52 | 03-18 | Brain-driven language improvements (10 fixes): `/` returns Float for Int/Int (Python 3), `//` for integer division. Map/Agent field miss → `None` (uniform with Record). Protocol validation → `Err` values (catchable). Record spread allows fn calls (`{..mk () ...}`). Agent `uses`/`on` wired to runtime (`Value::Agent` gains fields). `receive` keyword for agent msg loops. `ai.prompt_json` lightweight structured output. Brain sweep: removed 14 `to_float`, converted 5 agents to `receive`. 71/71 tests |

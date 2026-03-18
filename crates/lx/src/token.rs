@@ -91,6 +91,7 @@ pub enum TokenKind {
     Yield,
     With,
     Refine,
+    Receive,
 
     Export,
     Semi,

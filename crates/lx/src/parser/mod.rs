@@ -6,6 +6,7 @@ mod pattern;
 mod prefix;
 mod prefix_coll;
 mod prefix_with;
+mod receive;
 mod refine;
 mod statements;
 mod stmt_agent;

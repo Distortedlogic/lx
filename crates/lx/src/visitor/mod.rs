@@ -1,8 +1,8 @@
 use crate::ast::{
     AgentMethod, BinOp, Binding, Expr, FieldKind, FieldPattern, ListElem, Literal, MapEntry,
     MatchArm, McpToolDecl, Param, Pattern, Program, ProtocolEntry, ProtocolUnionDef, RecordField,
-    SExpr, SPattern, SType, Section, SelArm, ShellMode, Stmt, StrPart, TypeExpr, TypeField,
-    UnaryOp, UseStmt,
+    SExpr, SPattern, SType, Section, SelArm, ShellMode, Stmt, StrPart, TraitMethodDecl, TypeExpr,
+    TypeField, UnaryOp, UseStmt,
 };
 use crate::span::Span;
 
@@ -48,9 +48,10 @@ pub trait AstVisitor {
     fn visit_trait_decl(
         &mut self,
         _name: &str,
-        _handles: &[String],
-        _provides: &[String],
+        _methods: &[TraitMethodDecl],
         _requires: &[String],
+        _description: Option<&str>,
+        _tags: &[String],
         _exported: bool,
         _span: Span,
     ) {

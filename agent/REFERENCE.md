@@ -14,7 +14,7 @@ crates/lx/src/
   interpreter/ Tree-walking evaluator — mod + split files (agents, apply, eval, modules, patterns, etc.)
   builtins/    Built-in functions — mod, call, str, coll, hof, convert, register, etc.
   visitor/     AST visitor/walker infrastructure
-  stdlib/      39 registered modules across ~85 .rs files (use `std_module_exists` in mod.rs as source of truth)
+  stdlib/      40 registered modules across ~86 .rs files (use `std_module_exists` in mod.rs as source of truth)
   token.rs, value.rs, value_display.rs, value_impls.rs, ast_display.rs, env.rs, error.rs, span.rs, lib.rs
 crates/lx-cli/src/main.rs
 doc/           35 quick-reference docs

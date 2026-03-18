@@ -24,9 +24,17 @@ pub struct SpanInfo {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum UserPromptKind {
-    Confirm { message: String },
-    Choose { message: String, options: Vec<String> },
-    Ask { message: String, default: Option<String> },
+    Confirm {
+        message: String,
+    },
+    Choose {
+        message: String,
+        options: Vec<String>,
+    },
+    Ask {
+        message: String,
+        default: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone)]

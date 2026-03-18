@@ -9,7 +9,9 @@ use std::sync::Arc;
 
 use std::time::Instant;
 
-use lx::backends::{AgentEvent, ClaudeCodeAiBackend, ProcessShellBackend, ReqwestHttpBackend, RuntimeCtx};
+use lx::backends::{
+    AgentEvent, ClaudeCodeAiBackend, ProcessShellBackend, ReqwestHttpBackend, RuntimeCtx,
+};
 
 use crate::event::{EventBus, RuntimeEvent};
 use crate::langfuse::LangfuseClient;
@@ -51,22 +53,20 @@ pub fn build_runtime_ctx(
         }),
         user: Arc::new(DxUserBackend::new(bus.clone(), agent_id)),
         source_dir: parking_lot::Mutex::new(None),
-        on_agent_event: Some(Arc::new(move |event: AgentEvent| {
-            match event {
-                AgentEvent::Spawned { id, name } => {
-                    bus.send(RuntimeEvent::AgentSpawned {
-                        agent_id: id,
-                        name,
-                        config: serde_json::Value::Null,
-                        ts: Instant::now(),
-                    });
-                }
-                AgentEvent::Killed { id } => {
-                    bus.send(RuntimeEvent::AgentKilled {
-                        agent_id: id,
-                        ts: Instant::now(),
-                    });
-                }
+        on_agent_event: Some(Arc::new(move |event: AgentEvent| match event {
+            AgentEvent::Spawned { id, name } => {
+                bus.send(RuntimeEvent::AgentSpawned {
+                    agent_id: id,
+                    name,
+                    config: serde_json::Value::Null,
+                    ts: Instant::now(),
+                });
+            }
+            AgentEvent::Killed { id } => {
+                bus.send(RuntimeEvent::AgentKilled {
+                    agent_id: id,
+                    ts: Instant::now(),
+                });
             }
         })),
     })

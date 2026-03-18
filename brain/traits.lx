@@ -1,0 +1,112 @@
+-- Behavioral contracts for the Claude brain cognitive subsystems
+-- Source: defines what each cognitive module and specialist agent must be able to do
+
+Trait Perceiver = {
+  description: "Parses raw input into structured perception"
+  perceive: {raw: Str  history: List} -> Perception
+  classify_intent: {raw: Str} -> Str
+  extract_entities: {raw: Str} -> List
+  assess_complexity: {raw: Str} -> Str
+  requires: [:ai]
+  tags: ["cognition" "input"]
+}
+
+Trait Reasoner = {
+  description: "Produces chains of thought toward a goal"
+  reason: {goal: Str  context: Str  constraints: List} -> ReasoningChain
+  decompose: {problem: Str} -> List
+  hypothesize: {observation: Str  context: Str} -> Hypothesis
+  evaluate_hypothesis: {hypothesis: Hypothesis  evidence: List} -> Hypothesis
+  requires: [:ai]
+  tags: ["cognition" "reasoning"]
+}
+
+Trait Planner = {
+  description: "Converts goals into executable action plans"
+  plan: {goal: Str  tools: List  budget: Any} -> ActionPlan
+  replan: {plan: ActionPlan  failure: Str} -> ActionPlan
+  estimate_cost: {steps: List} -> Float
+  requires: [:ai]
+  tags: ["cognition" "planning"]
+}
+
+Trait Reflector = {
+  description: "Evaluates actions and extracts lessons"
+  reflect: {action: Str  outcome: Str  expectation: Str} -> Reflection
+  grade_response: {response: Str  task: Str} -> QualityGrade
+  should_refine: {grade: QualityGrade  round: Int} -> Bool
+  requires: [:ai]
+  tags: ["cognition" "metacognition"]
+}
+
+Trait ToolUser = {
+  description: "Selects and orchestrates tool usage"
+  select_tools: {task: Str  available: List} -> List
+  execute_tool: {request: ToolRequest} -> ToolResult
+  integrate_results: {results: List  goal: Str} -> Str
+  requires: [:ai :mcp]
+  tags: ["cognition" "tools"]
+}
+
+Trait MemoryKeeper = {
+  description: "Manages tiered memory storage and recall"
+  store: {entry: MemoryEntry} -> Bool
+  recall: {query: Str  domain: Str} -> List
+  consolidate: {} -> Int
+  forget_stale: {max_age_seconds: Int} -> Int
+  requires: [:fs]
+  tags: ["cognition" "memory"]
+}
+
+Trait SelfMonitor = {
+  description: "Watches cognitive state for anomalies"
+  check_health: {} -> CognitiveState
+  detect_loops: {actions: List} -> Bool
+  suggest_strategy: {state: CognitiveState} -> Str
+  should_yield: {state: CognitiveState} -> Bool
+  tags: ["cognition" "metacognition"]
+}
+
+Trait Communicator = {
+  description: "Assembles responses for human consumption"
+  compose: {reasoning: ReasoningChain  results: List  identity: Identity} -> Response
+  adapt_tone: {response: Str  user_style: Str} -> Str
+  summarize: {content: Str  max_tokens: Int} -> Str
+  requires: [:ai]
+  tags: ["cognition" "output"]
+}
+
+Trait Analyst = {
+  description: "Deep analysis specialist — finds what others miss"
+  analyze: {topic: Str  context: Str  depth: Str} -> {summary: Str  findings: List  confidence: Float}
+  compare: {items: List  criteria: List  context: Str} -> {comparison: Str  winner_index: Int}
+  investigate: {question: Str  tools: List} -> {hypothesis: Str  evidence_needed: List}
+  requires: [:ai]
+  tags: ["specialist" "analysis"]
+}
+
+Trait Critic = {
+  description: "Adversarial self-review — challenges assumptions, finds flaws"
+  critique: {content: Str  content_type: Str  task: Str  confidence: Float} -> {flaws: List  risks: List  severity: Str  revised_confidence: Float}
+  challenge: {assumption: Str  context: Str} -> {holds: Bool  counterexamples: List}
+  verify_code: {code: Str  language: Str  task: Str} -> {all_passed: Bool}
+  requires: [:ai]
+  tags: ["specialist" "quality"]
+}
+
+Trait Researcher = {
+  description: "Information gathering — searches, reads, synthesizes"
+  research: {question: Str  scope: Str  sources: List} -> {answer: Str  findings: List  confidence: Float  gaps: List}
+  search: {query: Str  source: Str} -> List
+  requires: [:ai :fs]
+  tags: ["specialist" "research"]
+}
+
+Trait Synthesizer = {
+  description: "Response assembly — combines reasoning, results, and identity"
+  synthesize: {reasoning: Any  tool_results: List  identity: Any  user_style: Str  task: Str} -> Response
+  format: {response: Any} -> Str
+  compose_parts: {sections: List} -> Str
+  requires: [:ai]
+  tags: ["specialist" "output"]
+}

@@ -46,9 +46,7 @@ pub fn spawn_pty_writer<W: Write + Send + 'static>(
                         &event,
                         RuntimeEvent::AgentKilled { agent_id: id, .. } if id == &agent_id
                     );
-                    let matches = event
-                        .agent_id()
-                        .map_or(false, |id| id == agent_id);
+                    let matches = event.agent_id().map_or(false, |id| id == agent_id);
                     if matches {
                         if let Err(e) = pty.write_event(&event) {
                             eprintln!("pty writer error for {agent_id}: {e}");

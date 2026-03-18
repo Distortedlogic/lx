@@ -14,11 +14,8 @@ impl WsStream {
         Self { bus }
     }
 
-    pub async fn stream_to<S, E>(
-        &self,
-        sink: &mut S,
-        agent_filter: Option<String>,
-    ) where
+    pub async fn stream_to<S, E>(&self, sink: &mut S, agent_filter: Option<String>)
+    where
         S: futures::Sink<Message, Error = E> + Unpin,
         E: std::fmt::Display,
     {
@@ -69,9 +66,7 @@ fn serialize_event(event: &RuntimeEvent) -> String {
         RuntimeEvent::ProgramStarted { .. } => "program_started",
         RuntimeEvent::ProgramFinished { .. } => "program_finished",
     };
-    let agent = event
-        .agent_id()
-        .unwrap_or("system");
+    let agent = event.agent_id().unwrap_or("system");
     serde_json::json!({
         "type": type_name,
         "agent_id": agent,

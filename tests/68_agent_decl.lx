@@ -27,11 +27,9 @@ Agent Counter = {
 }
 assert (Counter.init == {count: 0}) "init is accessible"
 
--- === Agent with Trait conformance ===
+-- === Agent with Trait conformance (typed methods) ===
 Trait Greetable = {
-  handles: [greet]
-  provides: []
-  requires: []
+  greet: {name: Str} -> Str
 }
 
 Agent Greeter: Greetable = {
@@ -41,14 +39,10 @@ assert (Greeter.greet {name: "world"} == "hello world") "trait-conformant agent 
 
 -- === Agent with multiple traits ===
 Trait Readable = {
-  handles: [read]
-  provides: []
-  requires: []
+  read: {key: Str} -> Str
 }
 Trait Writable = {
-  handles: [write]
-  provides: []
-  requires: []
+  write: {key: Str} -> Str
 }
 Agent Storage: [Readable Writable] = {
   read = (msg) "reading {msg.key}"

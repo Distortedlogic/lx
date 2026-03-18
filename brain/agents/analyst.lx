@@ -1,0 +1,90 @@
+-- Deep analysis specialist: investigates problems thoroughly
+-- Source: dispatched when perception flags a complex or ambiguous input
+
+use std/ai
+use std/prompt
+use ../traits {Analyst}
+
+Protocol AnalysisResult = {
+  summary: Str
+  findings: [Str]
+  confidence: Float
+  gaps: [Str]
+  recommendations: [Str]
+}
+
+Agent DeepAnalyst: Analyst = {
+  analyze = (msg) {
+    depth_instruction = msg.depth ? {
+      "shallow" -> "Give a brief, high-level analysis in 2-3 sentences."
+      "standard" -> "Provide a thorough analysis covering key aspects."
+      "deep" -> "Perform exhaustive analysis. Consider edge cases and second-order effects."
+      _ -> "Provide a thorough analysis."
+    }
+
+    p = prompt.create ()
+      | prompt.system "You are an analytical specialist. You find what others miss."
+      | prompt.section "Topic" msg.topic
+      | prompt.section "Context" msg.context
+      | prompt.instruction depth_instruction
+      | prompt.constraint "Structure: Summary, Findings (bulleted), Gaps, Recommendations"
+
+    resp = ai.prompt (prompt.render p) ^
+    sections = resp.text | lines | partition (starts? "- ")
+    findings = sections.0 | map (drop 2) | map trim
+
+    AnalysisResult {
+      summary: sections.1 | join "\n" | lines | first ?? resp.text
+      findings: findings
+      confidence: 0.7
+      gaps: []
+      recommendations: findings | take 3
+    }
+  }
+
+  compare = (msg) {
+    items_text = msg.items
+      | enumerate
+      | map (i item) "### Option {i + 1}\n{to_str item}"
+      | join "\n\n"
+
+    p = prompt.create ()
+      | prompt.system "You compare options systematically against criteria."
+      | prompt.section "Options" items_text
+      | prompt.section "Criteria" (msg.criteria | join ", ")
+      | prompt.section "Context" msg.context
+      | prompt.instruction "Evaluate each option against each criterion. Pick a winner."
+
+    resp = ai.prompt (prompt.render p) ^
+    {comparison: resp.text  winner_index: 0}
+  }
+
+  investigate = (msg) {
+    p = prompt.create ()
+      | prompt.system "You investigate questions by forming hypotheses and identifying evidence."
+      | prompt.section "Question" msg.question
+      | prompt.section "Available Tools" (msg.tools | join ", ")
+      | prompt.instruction "1) Form a hypothesis. 2) List evidence needed. 3) Suggest tool calls."
+
+    resp = ai.prompt (prompt.render p) ^
+    {
+      hypothesis: resp.text | lines | first ?? ""
+      evidence_needed: resp.text | lines | filter (starts? "- ") | map (drop 2)
+    }
+  }
+}
+
++main = () {
+  agent.advertise {
+    protocols: ["AnalysisResult"]
+    domains: ["analyst" "analysis" "investigation" "comparison"]
+    tools: ["ai"]
+  }
+
+  receive {
+    analyze -> DeepAnalyst.analyze
+    compare -> DeepAnalyst.compare
+    investigate -> DeepAnalyst.investigate
+    _ -> (msg) Err "unknown action: {msg.action ?? 'none'}"
+  }
+}

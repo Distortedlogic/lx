@@ -1,0 +1,160 @@
+-- Multi-agent dispatcher: spawns and coordinates specialist agents
+-- Source: the brain's workforce coordinator — spawn, route, fan-out, reconcile, supervise
+-- Architecture: agents spawned as subprocesses, communicate via ~>?, pub/sub for events
+
+use std/agent
+use std/pool
+use std/trace
+use ../protocols {AgentTask AgentResult}
+
++create_workforce = () -> Any {
+  (analyst critic researcher) = par {
+    agent.spawn {command: "lx" args: ["run" "brain/agents/analyst.lx"]} ^
+    agent.spawn {command: "lx" args: ["run" "brain/agents/critic.lx"]} ^
+    agent.spawn {command: "lx" args: ["run" "brain/agents/researcher.lx"]} ^
+  }
+
+  {analyst: analyst  critic: critic  researcher: researcher}
+}
+
++setup_tracing = (workforce: Any  session: Any) -> Any {
+  traced_analyst = agent.intercept workforce.analyst (msg next) {
+    trace.record {name: "analyst_msg" input: msg.action ?? "unknown"} session ^
+    next msg
+  }
+  traced_critic = agent.intercept workforce.critic (msg next) {
+    trace.record {name: "critic_msg" input: msg.action ?? "unknown"} session ^
+    next msg
+  }
+  traced_researcher = agent.intercept workforce.researcher (msg next) {
+    trace.record {name: "researcher_msg" input: msg.action ?? "unknown"} session ^
+    next msg
+  }
+  {analyst: traced_analyst  critic: traced_critic  researcher: traced_researcher}
+}
+
++setup_pubsub = (workforce: Any) -> Any {
+  perception_topic = agent.topic "perception"
+  reasoning_topic = agent.topic "reasoning"
+  response_topic = agent.topic "response"
+
+  agent.subscribe_filtered perception_topic workforce.analyst (msg) {
+    msg.complexity ?? "simple" == "complex"
+  }
+  agent.subscribe reasoning_topic workforce.critic
+  agent.subscribe response_topic workforce.researcher
+
+  {
+    perception: perception_topic
+    reasoning: reasoning_topic
+    response: response_topic
+  }
+}
+
++dispatch_task = (workforce: Any  task: AgentTask) -> AgentResult {
+  worker = route_to_worker workforce task.specialist
+
+  result = worker ~>? {
+    action: task.specialist == "critic" ? "critique" : "analyze"
+    topic: task.instruction
+    context: task.context
+    depth: "standard"
+    content: task.instruction
+    content_type: "text"
+    task: task.instruction
+    confidence: 0.5
+    question: task.instruction
+    scope: "broad"
+    sources: ["codebase"]
+  } ^
+
+  AgentResult {
+    task_id: task.id
+    specialist: task.specialist
+    output: result
+    confidence: result.confidence ?? 0.5
+    tokens_used: 500
+  }
+}
+
+route_to_worker = (workforce: Any  specialist: Str) -> Any {
+  caps = [
+    agent.capabilities workforce.analyst ^
+    agent.capabilities workforce.critic ^
+    agent.capabilities workforce.researcher ^
+  ]
+    | zip [workforce.analyst workforce.critic workforce.researcher]
+
+  matched = caps | find (cap_worker) {
+    (cap worker) = cap_worker
+    cap.domains ?? [] | contains? specialist
+  }
+
+  matched ? {
+    Some (cap worker) -> worker
+    None -> specialist ? {
+      "analyst" -> workforce.analyst
+      "critic" -> workforce.critic
+      "researcher" -> workforce.researcher
+      _ -> workforce.analyst
+    }
+  }
+}
+
++fan_out = (workforce: Any  tasks: [AgentTask]) -> [AgentResult] {
+  tasks | pmap_n 3 (task) dispatch_task workforce task ^
+}
+
++fan_out_and_reconcile = (workforce: Any  tasks: [AgentTask]  strategy: Str = "merge_fields") -> Any {
+  results = fan_out workforce tasks ^
+  agent.reconcile results {strategy: strategy}
+}
+
++parallel_review = (workforce: Any  content: Str  task: Str) -> Any {
+  (analysis critique) = par {
+    workforce.analyst ~>? {action: "analyze" topic: task context: content depth: "standard"} ^
+    workforce.critic ~>? {action: "critique" content: content content_type: "text" task: task confidence: 0.7} ^
+  }
+
+  agreement = (analysis.confidence ?? 0.5) > 0.7 && (critique.revised_confidence ?? 0.5) > 0.5
+
+  agreement ? {
+    {analysis: analysis  critique: critique  consensus: true}
+  } : {
+    negotiated = agent.negotiate [workforce.analyst workforce.critic] {
+      topic: "review of: {task}"
+      max_rounds: 3
+      strategy: "convergence"
+    }
+    {analysis: analysis  critique: critique  consensus: false  negotiated: negotiated}
+  }
+}
+
++supervised_workforce = (workforce: Any) -> Any {
+  agent.supervise {
+    strategy: "one_for_one"
+    max_restarts: 3
+    window: 120
+    children: [
+      {id: "analyst" spawn: () agent.spawn {command: "lx" args: ["run" "brain/agents/analyst.lx"]} ^  restart: "permanent"}
+      {id: "critic" spawn: () agent.spawn {command: "lx" args: ["run" "brain/agents/critic.lx"]} ^  restart: "permanent"}
+      {id: "researcher" spawn: () agent.spawn {command: "lx" args: ["run" "brain/agents/researcher.lx"]} ^  restart: "permanent"}
+    ]
+  }
+}
+
++status = (workforce: Any) -> Any {
+  {
+    analyst: workforce.analyst | to_str
+    critic: workforce.critic | to_str
+    researcher: workforce.researcher | to_str
+  }
+}
+
++shutdown = (workforce: Any) -> Any {
+  par {
+    agent.kill workforce.analyst
+    agent.kill workforce.critic
+    agent.kill workforce.researcher
+  }
+}

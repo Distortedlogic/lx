@@ -13,17 +13,14 @@ Priorities (PRIORITIES.md):
 {ctx.priorities}
 
 Design opinion (OPINION.md):
-{ctx.opinion}
-
-Roadmap (unimplemented):
-{ctx.roadmap}"
+{ctx.opinion}"
 }
 
 +worker = (ctx task) {
 "{ctx.claude_md}
 
---- COLD START: agent/NEXT_PROMPT.md ---
-{ctx.next_prompt}
+--- COLD START: agent/CONTINUE.md ---
+{ctx.continue_md}
 
 --- YOUR TASK ---
 {task.task}
@@ -53,11 +50,11 @@ VERIFIED FACTS (mechanical, not AI-claimed):
 FILES CHANGED:
 {diff_stat}
 
-CURRENT NEXT_PROMPT.md:
-{ctx.next_prompt}
+CURRENT CONTINUE.md:
+{ctx.continue_md}
 
 CURRENT DEVLOG.md (recent):
 {ctx.devlog}
 
-The next_prompt field MUST state {v.pass_count} tests passing."
+The continue_md field MUST state {v.pass_count} tests passing."
 }

@@ -71,6 +71,13 @@ pub enum McpOutputType {
 }
 
 #[derive(Debug, Clone)]
+pub struct TraitMethodDecl {
+    pub name: String,
+    pub input: Vec<ProtocolField>,
+    pub output: McpOutputType,
+}
+
+#[derive(Debug, Clone)]
 pub struct AgentMethod {
     pub name: String,
     pub handler: SExpr,

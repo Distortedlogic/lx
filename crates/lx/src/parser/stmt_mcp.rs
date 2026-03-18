@@ -64,7 +64,7 @@ impl super::Parser {
         ))
     }
 
-    fn parse_mcp_output_type(&mut self) -> Result<McpOutputType, LxError> {
+    pub(super) fn parse_mcp_output_type(&mut self) -> Result<McpOutputType, LxError> {
         if *self.peek() == TokenKind::LBracket {
             self.advance();
             let inner = self.parse_mcp_output_type()?;

@@ -1,0 +1,147 @@
+-- Self-introspection: the brain observing its own processes
+-- Source: metacognitive awareness — am I on track, what am I doing, should I change
+
+use std/introspect
+use std/trace
+use std/time
+use std/prompt
+use std/ai
+use ../protocols {CognitiveState}
+
++self_assess = () -> Any {
+  identity = introspect.self ()
+  elapsed = introspect.elapsed ()
+  turns = introspect.turn_count ()
+  actions = introspect.actions ()
+  stuck = introspect.is_stuck ()
+
+  {
+    identity: identity
+    elapsed_ms: elapsed
+    turns: turns
+    action_count: actions | len
+    is_stuck: stuck
+    action_diversity: actions | map (.type) | uniq | len
+    recent_actions: actions | rev | take 5
+  }
+}
+
++detect_doom_loop = (actions: [Any]  window: Int) -> Any {
+  recent = actions | rev | take window
+  types = recent | map (.type)
+  targets = recent | map (.target)
+
+  type_groups = types | group_by identity
+  repeated_types = type_groups | entries
+    | filter (type occurrences) len occurrences > window / 2
+    | map (.0)
+
+  target_groups = targets | group_by identity
+  repeated_targets = target_groups | entries
+    | filter (target occurrences) len occurrences > window / 2
+    | map (.0)
+
+  {
+    is_looping: repeated_types | len > 0
+    repeated_actions: repeated_types
+    repeated_targets: repeated_targets
+    severity: repeated_types | len > 2 ? "critical"
+      : repeated_types | len > 0 ? "warning"
+      : "ok"
+  }
+}
+
++strategy_analysis = () -> Any {
+  actions = introspect.actions ()
+
+  actions | len < 5 ? {
+    current: "too_early"
+    recommendation: "continue — not enough data"
+    actions_analyzed: actions | len
+  } : {
+    assessment = self_assess ()
+    loop_check = detect_doom_loop actions 10
+
+    recommendation = loop_check.is_looping ?
+      "PIVOT — doom loop on: {loop_check.repeated_actions | join ', '}"
+      : assessment.is_stuck ?
+        "CHANGE — agent is stuck, try different approach"
+        : assessment.action_diversity < 3 ?
+          "DIVERSIFY — too narrow, explore more angles"
+          : "CONTINUE — healthy progress"
+
+    {
+      current: loop_check.is_looping ? "looping" : assessment.is_stuck ? "stuck" : "healthy"
+      recommendation: recommendation
+      actions_analyzed: actions | len
+      diversity: assessment.action_diversity
+    }
+  }
+}
+
++time_pressure = () -> Any {
+  elapsed = introspect.elapsed ()
+  budget_info = introspect.budget ()
+
+  elapsed_pct = budget_info.total_ms > 0 ?
+    elapsed / budget_info.total_ms * 100.0
+    : 0.0
+
+  {
+    elapsed_ms: elapsed
+    elapsed_pct: elapsed_pct
+    remaining_ms: math.max 0 (budget_info.total_ms - elapsed)
+    pressure: elapsed_pct > 80.0 ? "critical"
+      : elapsed_pct > 60.0 ? "high"
+      : elapsed_pct > 40.0 ? "moderate"
+      : "low"
+  }
+}
+
++generate_status = () -> Any {
+  assessment = self_assess ()
+  strategy = strategy_analysis ()
+  time_info = time_pressure ()
+
+  status_text = [
+    "Turn {assessment.turns} | {assessment.action_count} actions | {assessment.action_diversity} unique types"
+    "Strategy: {strategy.current} — {strategy.recommendation}"
+    "Time: {time_info.pressure} ({time_info.elapsed_ms}ms elapsed)"
+  ] | join "\n"
+
+  {
+    text: status_text
+    assessment: assessment
+    strategy: strategy
+    time: time_info
+    healthy: strategy.current == "healthy" && time_info.pressure != "critical"
+  }
+}
+
++narrate_thinking = (goal: Str  current_step: Str) -> Str {
+  assessment = self_assess ()
+  action_list = assessment.recent_actions | map (a) "{a.type}: {a.target}" | join " → "
+  "Pursuing: {goal}\nCurrent: {current_step}\nPath: {action_list}\nTurn: {assessment.turns}"
+}
+
++should_pivot = () -> Bool {
+  strategy = strategy_analysis ()
+  strategy.current == "looping" || strategy.current == "stuck"
+}
+
++suggest_pivot = () -> [Str] {
+  assessment = self_assess ()
+  strategy = strategy_analysis ()
+
+  strategy.current != "healthy" ? {
+    p = prompt.create ()
+      | prompt.system "You suggest alternative approaches when current strategy isn't working."
+      | prompt.section "Current Strategy" strategy.current
+      | prompt.section "Recent Actions" (assessment.recent_actions | map (.type) | join ", ")
+      | prompt.section "Recommendation" strategy.recommendation
+      | prompt.instruction "Suggest 2 concrete alternative approaches."
+
+    resp = ai.prompt (prompt.render p) ^
+    resp.text | lines | filter (l) len (trim l) > 0
+  } : ["current approach is working"]
+}

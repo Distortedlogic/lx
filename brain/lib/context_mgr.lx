@@ -1,0 +1,138 @@
+-- Context window management: pressure monitoring, eviction, prioritization
+-- Source: manages the finite attention window — what to keep, what to evict
+
+use std/context
+use std/prompt
+use std/ai
+use std/time
+use ../protocols {ContextItem CognitiveState}
+
++init = (capacity: Int) -> Any {
+  context.create {capacity: capacity}
+}
+
++add_item = (win: Any  item: ContextItem) -> Any {
+  context.add win {key: item.key  content: item.content  tokens: item.tokens  priority: item.priority}
+}
+
++add_perception = (win: Any  perception: Any) -> Any {
+  context.add win {
+    key: "perception_{perception.intent}"
+    content: "Intent: {perception.intent} | Domain: {perception.domain} | Input: {perception.raw}"
+    tokens: len perception.raw / 4 + 20
+    priority: "high"
+  }
+}
+
++add_reasoning = (win: Any  chain: Any) -> Any {
+  summary = chain.thoughts | map (.content) | join " → "
+  context.add win {
+    key: "reasoning_{chain.goal | take 20}"
+    content: "Goal: {chain.goal}\nChain: {summary}\nConclusion: {chain.conclusion}"
+    tokens: len summary / 4 + 30
+    priority: "normal"
+  }
+}
+
++add_tool_result = (win: Any  result: Any) -> Any {
+  context.add win {
+    key: "tool_{result.tool}_{time.now ()}"
+    content: to_str result.output
+    tokens: result.tokens_used
+    priority: "normal"
+  }
+}
+
++pin_identity = (win: Any  identity: Any) -> Any {
+  context.add win {
+    key: "identity"
+    content: "I am {identity.name}, a {identity.role}. Values: {identity.values | join ', '}."
+    tokens: 50
+    priority: "high"
+  }
+  context.pin "identity" win
+}
+
++pin_user_context = (win: Any  key: Str  content: Str) -> Any {
+  tokens = len content / 4
+  context.add win {key: key  content: content  tokens: tokens  priority: "high"}
+  context.pin key win
+}
+
++pressure = (win: Any) -> Float {
+  context.usage win | (.pressure)
+}
+
++pressure_level = (win: Any) -> Str {
+  p = pressure win
+  p < 0.3 ? "low" : p < 0.6 ? "moderate" : p < 0.85 ? "high" : "critical"
+}
+
++manage_pressure = (win: Any) -> Any {
+  level = pressure_level win
+  level ? {
+    "critical" -> {
+      context.evict_until win "lowest_priority" {target_pct: 0.6}
+      log.warn "context pressure critical — evicted to 60%"
+      win
+    }
+    "high" -> {
+      context.evict win "largest"
+      log.info "context pressure high — evicted largest item"
+      win
+    }
+    _ -> win
+  }
+}
+
++summarize_and_compress = (win: Any) -> Any {
+  items = context.items win
+  unpinned = items | filter (i) not (context.is_pinned i.key win ?? false)
+
+  unpinned | len < 3 ? win : {
+    to_compress = unpinned | sort_by (.tokens) | rev | take 3
+
+    to_compress | each (item) {
+      compressed = compress_item item ^
+      context.remove win item.key
+      context.add win {
+        key: item.key
+        content: compressed
+        tokens: len compressed / 4
+        priority: item.priority
+      }
+    }
+
+    win
+  }
+}
+
+compress_item = (item: Any) -> Str {
+  p = prompt.create ()
+    | prompt.system "You compress text to its essential meaning."
+    | prompt.section "Content" item.content
+    | prompt.instruction "Compress to ~25% of original length. Keep all facts."
+
+  resp = ai.prompt (prompt.render p) ^
+  resp.text
+}
+
++snapshot = (win: Any) -> Any {
+  usage = context.usage win
+  items = context.items win
+  {
+    capacity: usage.capacity
+    used: usage.used
+    available: usage.available
+    pressure: usage.pressure
+    item_count: len items
+    pinned_count: items | filter (.pinned ?? false) | len
+  }
+}
+
++clear_ephemeral = (win: Any) -> Int {
+  items = context.items win
+  ephemeral = items | filter (i) i.priority == "low"
+  ephemeral | each (item) context.remove win item.key
+  len ephemeral
+}

@@ -28,10 +28,6 @@ impl LogBackend for LangfuseLogBackend {
             ts: Instant::now(),
         });
 
-        self.langfuse.log_event(
-            &self.agent_id,
-            level_str,
-            msg,
-        );
+        self.langfuse.log_event(&self.agent_id, level_str, msg);
     }
 }

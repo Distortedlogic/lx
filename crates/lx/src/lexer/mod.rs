@@ -88,7 +88,10 @@ impl<'src> Lexer<'src> {
             }
             if self.source[self.pos..].starts_with("--") {
                 while self.pos < self.source.len() && !self.source[self.pos..].starts_with('\n') {
-                    self.pos += 1;
+                    self.pos += self.source[self.pos..]
+                        .chars()
+                        .next()
+                        .map_or(1, |c| c.len_utf8());
                 }
             } else {
                 break;

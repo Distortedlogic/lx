@@ -42,7 +42,7 @@ assert ((+ 1) 5 == 6)
 -- (- 1) is unary negation (-1), not a section. Use (+ (-1)) for "subtract 1"
 assert ((- 1) == -1)
 assert ((* 3) 4 == 12)
-assert ((/ 2) 10 == 5)
+assert ((/ 2) 10 == 5.0)
 assert ((% 3) 7 == 1)
 assert ((// 3) 10 == 3)
 assert ((++ "!") "hi" == "hi!")
@@ -57,7 +57,7 @@ assert ((>= 0) 0 == true)
 
 -- left sections
 assert ((10 -) 3 == 7)
-assert ((100 /) 4 == 25)
+assert ((100 /) 4 == 25.0)
 assert ((10 %) 3 == 1)
 
 -- field sections

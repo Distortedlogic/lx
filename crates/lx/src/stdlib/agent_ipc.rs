@@ -104,28 +104,38 @@ fn bi_status(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
 }
 
 fn bi_implements(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let Value::Record(agent) = &args[0] else {
-        return Err(LxError::type_err(
-            "implements?: expected agent record",
-            span,
-        ));
-    };
     let Value::Trait {
-        name: trait_name, ..
+        methods: trait_methods,
+        ..
     } = &args[1]
     else {
-        return Err(LxError::type_err("implements?: expected Trait value", span));
+        return Err(LxError::type_err("implements: expected Trait value", span));
     };
-    if let Some(Value::List(traits)) = agent.get("__traits") {
-        let found = traits.iter().any(|t| {
-            if let Value::Str(s) = t {
-                s.as_ref() == trait_name.as_ref()
-            } else {
-                false
+    match &args[0] {
+        Value::Agent { methods, .. } => {
+            let found = trait_methods
+                .iter()
+                .all(|tm| methods.contains_key(&tm.name));
+            Ok(Value::Bool(found))
+        }
+        Value::Record(agent) => {
+            if trait_methods.is_empty() {
+                let Value::Trait { name, .. } = &args[1] else {
+                    unreachable!()
+                };
+                if let Some(Value::List(traits)) = agent.get("__traits") {
+                    let found = traits
+                        .iter()
+                        .any(|t| matches!(t, Value::Str(s) if s.as_ref() == name.as_ref()));
+                    return Ok(Value::Bool(found));
+                }
             }
-        });
-        Ok(Value::Bool(found))
-    } else {
-        Ok(Value::Bool(false))
+            let found = trait_methods.iter().all(|tm| agent.contains_key(&tm.name));
+            Ok(Value::Bool(found))
+        }
+        _ => Err(LxError::type_err(
+            "implements: expected Agent or Record",
+            span,
+        )),
     }
 }

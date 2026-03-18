@@ -49,7 +49,9 @@ assert (m0.source == "a")
 
 -- pool with trait constraint
 Protocol ReviewRequest = {task: Str  path: Str}
-Trait Reviewer = {handles: [ReviewRequest]}
+Trait Reviewer = {
+  review: ReviewRequest -> Str
+}
 
 tp = pool.create {
   name: "reviewers"

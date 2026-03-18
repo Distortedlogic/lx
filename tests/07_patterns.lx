@@ -136,7 +136,7 @@ result = checked_div 10 2 ? {
   Ok v  -> v
   Err _ -> -1
 }
-assert (result == 5)
+assert (result == 5.0)
 result2 = checked_div 10 0 ? {
   Ok v  -> v
   Err _ -> -1

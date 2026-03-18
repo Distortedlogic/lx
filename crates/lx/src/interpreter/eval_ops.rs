@@ -83,7 +83,13 @@ impl Interpreter {
                 if b.sign() == num_bigint::Sign::NoSign {
                     return Err(LxError::division_by_zero(span));
                 }
-                Ok(Value::Int(a / b))
+                let af = a
+                    .to_f64()
+                    .ok_or_else(|| LxError::runtime("int too large for float", span))?;
+                let bf = b
+                    .to_f64()
+                    .ok_or_else(|| LxError::runtime("int too large for float", span))?;
+                Ok(Value::Float(af / bf))
             }
             (BinOp::IntDiv, Value::Int(a), Value::Int(b)) => {
                 if b.sign() == num_bigint::Sign::NoSign {

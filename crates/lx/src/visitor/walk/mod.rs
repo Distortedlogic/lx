@@ -43,12 +43,21 @@ pub fn walk_stmt<V: AstVisitor + ?Sized>(v: &mut V, stmt: &Stmt, span: Span) {
         }
         Stmt::TraitDecl {
             name,
-            handles,
-            provides,
+            methods,
             requires,
+            description,
+            tags,
             exported,
         } => {
-            v.visit_trait_decl(name, handles, provides, requires, *exported, span);
+            v.visit_trait_decl(
+                name,
+                methods,
+                requires,
+                description.as_deref(),
+                tags,
+                *exported,
+                span,
+            );
         }
         Stmt::AgentDecl {
             name,
@@ -200,6 +209,11 @@ pub fn walk_expr<V: AstVisitor + ?Sized>(v: &mut V, expr: &Expr, span: Span) {
             );
         }
         Expr::Shell { mode, parts } => v.visit_shell(*mode, parts, span),
+        Expr::Receive(arms) => {
+            for arm in arms {
+                v.visit_expr(&arm.handler.node, arm.handler.span);
+            }
+        }
     }
 }
 

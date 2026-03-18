@@ -93,17 +93,18 @@ Specs for planned/unimplemented features. See [stdlib-modules.md](spec/stdlib-mo
 
 | Document | Contents |
 |---|---|
-| [NEXT_PROMPT.md](agent/NEXT_PROMPT.md) | Cold-start bootstrap: identity, current status, file map |
+| [TICK.md](agent/TICK.md) | Tick-loop control register: identity, state, next task |
 | [PRIORITIES.md](agent/PRIORITIES.md) | Ordered work queue with rationale |
 | [INVENTORY.md](agent/INVENTORY.md) | Full list of implemented features |
 | [OPINION.md](agent/OPINION.md) | Design self-critique: what works, what's wrong |
-| [ROADMAP.md](agent/ROADMAP.md) | All planned future features |
 | [DEVLOG.md](agent/DEVLOG.md) | Design decisions, tech debt, session history |
 | [REFERENCE.md](agent/REFERENCE.md) | Codebase layout, how-to guides |
+| [FEATURES.md](agent/FEATURES.md) | Complete lx language guide for agents |
+| [GOTCHAS.md](agent/GOTCHAS.md) | Non-obvious behaviors that trip up implementation |
 
 ## Test Suite — `tests/`
 
-65 test suites (64 `.lx` files + 11_modules dir) testing every language feature. Run with `just test`.
+71 test suites (70 `.lx` files + 11_modules dir) testing every language feature. Run with `just test`.
 
 | File | Tests |
 |---|---|
@@ -141,4 +142,4 @@ Specs for planned/unimplemented features. See [stdlib-modules.md](spec/stdlib-mo
 
 ## Status
 
-v0.1 — **65/65 tests pass.** `just diagnose` clean (2 pre-existing clippy warnings). 36 stdlib modules, 13 agent extensions, 6 standard agents. Complete core language, full agent system, structured git access. The language name is **lx**, file extension `.lx`.
+v0.1 — **71/71 tests pass.** `just diagnose` clean. 40 stdlib modules, 11 agent extensions, 6 standard agents. Complete core language, full agent system, structured git access. The language name is **lx**, file extension `.lx`.

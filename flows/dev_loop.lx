@@ -29,7 +29,7 @@ Protocol TaskPick = {
 }
 
 Protocol ContextUpdate = {
-  next_prompt: Str
+  continue_md: Str
   devlog_append: Str
 }
 
@@ -38,11 +38,10 @@ agent_dir = "{root}/agent"
 
 read_context = () {
   {
-    next_prompt: (fs.read "{agent_dir}/NEXT_PROMPT.md" ^)
+    continue_md: (fs.read "{agent_dir}/CONTINUE.md" ^)
     state: (fs.read "{agent_dir}/INVENTORY.md" ^)
     priorities: (fs.read "{agent_dir}/PRIORITIES.md" ^)
     opinion: (fs.read "{agent_dir}/OPINION.md" ^)
-    roadmap: (fs.read "{agent_dir}/ROADMAP.md" ^)
     devlog: (fs.read "{agent_dir}/DEVLOG.md" ^)
     claude_md: (fs.read "{root}/CLAUDE.md" ^)
   }
@@ -101,14 +100,14 @@ update_context = (ctx task v) {
   prompt = dev_prompts.update_context ctx task v diff_stat stamp
   updates = ai.prompt_structured ContextUpdate prompt ^
 
-  fs.write "{agent_dir}/NEXT_PROMPT.md" updates.next_prompt ^
+  fs.write "{agent_dir}/CONTINUE.md" updates.continue_md ^
   fs.append "{agent_dir}/DEVLOG.md" ("\n" ++ updates.devlog_append) ^
 
-  verified = fs.read "{agent_dir}/NEXT_PROMPT.md" ^
+  verified = fs.read "{agent_dir}/CONTINUE.md" ^
   has_count = contains? (to_str v.pass_count) verified
   has_count ? {
     true -> emit "context verified: test count {v.pass_count} present"
-    false -> emit "WARNING: updated NEXT_PROMPT.md missing test count {v.pass_count}"
+    false -> emit "WARNING: updated CONTINUE.md missing test count {v.pass_count}"
   }
 }
 

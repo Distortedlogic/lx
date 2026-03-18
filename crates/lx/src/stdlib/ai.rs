@@ -23,6 +23,7 @@ pub fn build() -> IndexMap<String, Value> {
         "prompt_structured_with".into(),
         super::ai_structured::mk_prompt_structured_with(),
     );
+    m.insert("prompt_json".into(), super::ai_structured::mk_prompt_json());
     m
 }
 

@@ -110,6 +110,7 @@ impl super::Parser {
             }
             TokenKind::With => self.parse_with(tok.span.offset),
             TokenKind::Refine => self.parse_refine(tok.span.offset),
+            TokenKind::Receive => self.parse_receive(tok.span.offset),
             TokenKind::Dollar => self.parse_shell(ShellMode::Normal, tok.span.offset),
             TokenKind::DollarCaret => self.parse_shell(ShellMode::Propagate, tok.span.offset),
             TokenKind::DollarBrace => self.parse_shell(ShellMode::Block, tok.span.offset),
@@ -239,6 +240,7 @@ impl super::Parser {
                 | TokenKind::Yield
                 | TokenKind::With
                 | TokenKind::Refine
+                | TokenKind::Receive
                 | TokenKind::Dollar
                 | TokenKind::DollarCaret
                 | TokenKind::DollarBrace

@@ -58,9 +58,7 @@ assert (kinds | contains? "loop") "found loop"
 -- === extract with agent declaration ===
 src4 = `
 Trait Greetable = {
-  handles: [greet]
-  provides: []
-  requires: []
+  greet: {name: Str} -> Str
 }
 Agent Greeter: Greetable = {
   greet = (msg) "hello"

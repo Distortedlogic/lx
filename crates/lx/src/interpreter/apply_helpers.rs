@@ -78,7 +78,9 @@ impl Interpreter {
         match field {
             FieldKind::Named(name) => match &val {
                 Value::Record(r) => Ok(r.get(name).cloned().unwrap_or(Value::None)),
-                Value::Agent { methods, init, .. } => {
+                Value::Agent {
+                    methods, init, on, ..
+                } => {
                     if let Some(m) = methods.get(name) {
                         Ok(m.clone())
                     } else if name == "init" {
@@ -86,11 +88,13 @@ impl Interpreter {
                             Some(v) => Ok(*v.clone()),
                             None => Ok(Value::Unit),
                         }
+                    } else if name == "on" {
+                        match on {
+                            Some(v) => Ok(*v.clone()),
+                            None => Ok(Value::None),
+                        }
                     } else {
-                        Err(LxError::runtime(
-                            format!("Agent method '{name}' not found"),
-                            span,
-                        ))
+                        Ok(Value::None)
                     }
                 }
                 other => Err(LxError::type_err(
@@ -127,9 +131,7 @@ impl Interpreter {
                     }
                     (Value::Map(m), Value::Str(s)) => {
                         let vk = crate::value::ValueKey(Value::Str(s.clone()));
-                        m.get(&vk)
-                            .cloned()
-                            .ok_or_else(|| LxError::runtime(format!("key '{s}' not found"), span))
+                        Ok(m.get(&vk).cloned().unwrap_or(Value::None))
                     }
                     (Value::List(items), Value::Int(n)) => {
                         let i = n.to_i64().ok_or_else(|| {
