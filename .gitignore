@@ -1,7 +1,10 @@
-/target
-Cargo.lock
+**/target/
+/Cargo.lock
 *.swp
 *.swo
 .DS_Store
+node_modules/
+*.vsix
+editors/vscode/dist/
 
 .env
