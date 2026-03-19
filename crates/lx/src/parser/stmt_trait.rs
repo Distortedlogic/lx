@@ -1,4 +1,4 @@
-use crate::ast::{ProtocolField, SStmt, Stmt, TraitMethodDecl};
+use crate::ast::{AgentMethod, ProtocolField, SStmt, Stmt, TraitMethodDecl};
 use crate::error::LxError;
 use crate::span::Span;
 use crate::token::TokenKind;
@@ -18,26 +18,36 @@ impl super::Parser {
         self.expect_kind(&TokenKind::Assign)?;
         self.expect_kind(&TokenKind::LBrace)?;
         let mut methods = Vec::new();
+        let mut defaults = Vec::new();
         let mut requires = Vec::new();
         let mut description = None;
         let mut tags = Vec::new();
         self.skip_semis();
         while *self.peek() != TokenKind::RBrace {
             let field = self.expect_ident("Trait field")?;
-            self.expect_kind(&TokenKind::Colon)?;
-            match field.as_str() {
-                "requires" => {
-                    requires = self.parse_trait_symbol_list()?;
-                }
-                "description" => {
-                    description = Some(self.parse_trait_string()?);
-                }
-                "tags" => {
-                    tags = self.parse_trait_string_list()?;
-                }
-                _ => {
-                    let method = self.parse_trait_method(field)?;
-                    methods.push(method);
+            if *self.peek() == TokenKind::Assign {
+                self.advance();
+                let handler = self.parse_expr(0)?;
+                defaults.push(AgentMethod {
+                    name: field,
+                    handler,
+                });
+            } else {
+                self.expect_kind(&TokenKind::Colon)?;
+                match field.as_str() {
+                    "requires" => {
+                        requires = self.parse_trait_symbol_list()?;
+                    }
+                    "description" => {
+                        description = Some(self.parse_trait_string()?);
+                    }
+                    "tags" => {
+                        tags = self.parse_trait_string_list()?;
+                    }
+                    _ => {
+                        let method = self.parse_trait_method(field)?;
+                        methods.push(method);
+                    }
                 }
             }
             self.skip_semis();
@@ -47,6 +57,7 @@ impl super::Parser {
             Stmt::TraitDecl {
                 name,
                 methods,
+                defaults,
                 requires,
                 description,
                 tags,

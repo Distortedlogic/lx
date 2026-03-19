@@ -5,8 +5,8 @@
 -- Returns Ok(thought) on done, Err(reason) on circuit break or verification failure.
 
 use std/agent
-use std/circuit
-use std/introspect
+use pkg/circuit {CircuitBreaker}
+use pkg/introspect {Inspector}
 
 Protocol +ReactConfig = {
   script: Str
@@ -16,25 +16,25 @@ Protocol +ReactConfig = {
 }
 
 +run = (config) {
-  breaker = circuit.create {
+  breaker = CircuitBreaker {
     max_turns: config.max_turns
     max_time_ms: config.max_time_ms
     max_repeats: 3
   }
-  ctx = introspect.self {name: "react"  budget: config.max_time_ms}
+  ins = Inspector {}
 
   worker = agent.spawn {command: "lx" args: ["run" config.script]} ^
   history := []
 
   result := loop {
-    circuit.tick breaker
-    circuit.is_tripped breaker ? break (Err (circuit.status breaker).reason)
+    breaker.tick ()
+    breaker.is_tripped () ? break (Err (breaker.status ()).reason)
 
-    introspect.tick_turn ctx
-    introspect.is_stuck ctx ? {
+    ins.tick_turn ()
+    ins.is_stuck () ? {
       true -> {
-        shift = introspect.strategy_shift ctx
-        worker ~>? {action: "hint" msg: shift.suggestion} ^
+        ins.strategy_shift "stuck"
+        worker ~>? {action: "hint" msg: "try a different approach"} ^
       }
       false -> ()
     }
@@ -42,11 +42,11 @@ Protocol +ReactConfig = {
     thought = worker ~>? {action: "think" task: config.task history: history} ^
     thought.action == "done" ? break (Ok thought)
 
-    introspect.record ctx {action: thought.action}
-    circuit.record breaker thought.action
+    ins.record {type: thought.action  target: thought.action}
+    breaker.record thought.action
 
     observation = worker ~>? {action: "execute" tool: thought.action args: thought.args} ^
-    history <- [..history {turn: (introspect.turn_count ctx) thought: thought observation: observation}]
+    history <- [..history {turn: (ins.turn_count ()) thought: thought observation: observation}]
 
     !observation.success ? {
       true -> {

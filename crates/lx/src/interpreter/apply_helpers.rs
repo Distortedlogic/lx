@@ -97,6 +97,16 @@ impl Interpreter {
                         Ok(Value::None)
                     }
                 }
+                Value::Object { id, methods, .. } => {
+                    if let Some(method) = methods.get(name) {
+                        Ok(Self::inject_self(method, &val))
+                    } else {
+                        Ok(crate::value::object_store_get_field(*id, name).unwrap_or(Value::None))
+                    }
+                }
+                Value::Store { .. } => crate::stdlib::store_method(name, &val).ok_or_else(|| {
+                    LxError::type_err(format!("Store has no method '{name}'"), span)
+                }),
                 other => Err(LxError::type_err(
                     format!("field access on {}, not Record", other.type_name()),
                     span,
@@ -155,6 +165,18 @@ impl Interpreter {
                     )),
                 }
             }
+        }
+    }
+
+    fn inject_self(method: &Value, self_val: &Value) -> Value {
+        if let Value::Func(lf) = method {
+            let mut method_env = lf.closure.child();
+            method_env.bind("self".to_string(), self_val.clone());
+            let mut lf = lf.clone();
+            lf.closure = method_env.into_arc();
+            Value::Func(lf)
+        } else {
+            method.clone()
         }
     }
 

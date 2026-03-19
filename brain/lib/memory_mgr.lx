@@ -1,8 +1,8 @@
 -- Tiered memory management: working → episodic → semantic → procedural
 -- Source: persistent recall across turns, consolidation, and decay
 
-use std/memory
-use std/knowledge
+use pkg/memory {MemoryStore}
+use pkg/knowledge {KnowledgeBase}
 use std/profile
 use std/time
 use std/json
@@ -14,9 +14,9 @@ brain_dir = "{env.home ()}/.lx/brain"
 +init = () -> Any {
   fs.exists brain_dir ? () : fs.mkdir brain_dir ^
 
-  working = memory.create "{brain_dir}/working.json" ^
-  episodic = memory.create "{brain_dir}/episodic.json" ^
-  semantic = knowledge.create "{brain_dir}/semantic.json" ^
+  working = MemoryStore {path: "{brain_dir}/working.json"} ^
+  episodic = MemoryStore {path: "{brain_dir}/episodic.json"} ^
+  semantic = KnowledgeBase {path: "{brain_dir}/semantic.json"} ^
   persona = profile.load {name: "claude" create: true} ^
 
   {working: working  episodic: episodic  semantic: semantic  persona: persona}
@@ -26,23 +26,23 @@ brain_dir = "{env.home ()}/.lx/brain"
   tagged = {..entry  timestamp: time.now ()}
 
   tagged.confidence >= 0.8 ? {
-    memory.store {
+    store.episodic.store {
       content: tagged.content
       tier: 2
       confidence: tagged.confidence
       tags: tagged.tags
-    } store.episodic ^
+    } ^
   } : {
-    memory.store {
+    store.working.store {
       content: tagged.content
       tier: 1
       confidence: tagged.confidence
       tags: tagged.tags
-    } store.working ^
+    } ^
   }
 
   tagged.domain | len > 0 ? {
-    knowledge.store tagged.domain {
+    store.semantic.store tagged.domain {
       content: tagged.content
       source: tagged.source
       confidence: tagged.confidence
@@ -50,7 +50,7 @@ brain_dir = "{env.home ()}/.lx/brain"
       source: tagged.source
       confidence: tagged.confidence
       tags: tagged.tags
-    } store.semantic ^
+    } ^
   } : ()
 
   true
@@ -58,9 +58,9 @@ brain_dir = "{env.home ()}/.lx/brain"
 
 +recall = (store: Any  query: Str  domain: Str) -> [Any] {
   (working_hits episodic_hits semantic_hits) = par {
-    memory.recall query store.working
-    memory.recall query store.episodic
-    knowledge.query domain query store.semantic
+    store.working.recall query
+    store.episodic.recall query
+    store.semantic.query domain query
   }
 
   [
@@ -73,7 +73,7 @@ brain_dir = "{env.home ()}/.lx/brain"
 }
 
 +recall_domain = (store: Any  domain: Str) -> [Any] {
-  knowledge.query domain "" store.semantic
+  store.semantic.query domain ""
 }
 
 +learn_preference = (store: Any  key: Str  value: Any) -> Any {
@@ -97,24 +97,24 @@ brain_dir = "{env.home ()}/.lx/brain"
 }
 
 +consolidate = (store: Any) -> Any {
-  promoted = memory.consolidate store.working ^
-  promoted_episodic = memory.consolidate store.episodic ^
+  promoted = store.working.consolidate () ^
+  promoted_episodic = store.episodic.consolidate () ^
 
-  high_confidence = memory.tier 1 store.working
+  high_confidence = store.working.tier 1
     | filter (m) m.confidence >= 0.85
 
-  high_confidence | each (m) memory.promote m store.working ^
+  high_confidence | each (m) store.working.promote m ^
 
   {promoted: promoted  promoted_episodic: promoted_episodic  elevated: len high_confidence}
 }
 
 +forget_stale = (store: Any  max_age_seconds: Int) -> Int {
   profile.decay store.persona max_age_seconds ^
-  memory.consolidate store.working ^
+  store.working.consolidate () ^
 }
 
 +working_load = (store: Any) -> Int {
-  memory.tier 1 store.working | len
+  store.working.tier 1 | len
 }
 
 +save = (store: Any) -> Any {

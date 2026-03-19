@@ -1,8 +1,8 @@
 use crate::ast::{
-    AgentMethod, BinOp, Binding, Expr, FieldKind, FieldPattern, ListElem, Literal, MapEntry,
-    MatchArm, McpToolDecl, Param, Pattern, Program, ProtocolEntry, ProtocolUnionDef, RecordField,
-    SExpr, SPattern, SType, Section, SelArm, ShellMode, Stmt, StrPart, TraitMethodDecl, TypeExpr,
-    TypeField, UnaryOp, UseStmt,
+    AgentMethod, BinOp, Binding, ClassField, Expr, FieldKind, FieldPattern, ListElem, Literal,
+    MapEntry, MatchArm, McpToolDecl, Param, Pattern, Program, ProtocolEntry, ProtocolUnionDef,
+    RecordField, SExpr, SPattern, SType, Section, SelArm, ShellMode, Stmt, StrPart,
+    TraitMethodDecl, TypeExpr, TypeField, UnaryOp, UseStmt,
 };
 use crate::span::Span;
 
@@ -68,6 +68,17 @@ pub trait AstVisitor {
         span: Span,
     ) {
         walk_agent_decl(self, init, on, methods, span);
+    }
+    fn visit_class_decl(
+        &mut self,
+        _name: &str,
+        _traits: &[String],
+        fields: &[ClassField],
+        methods: &[AgentMethod],
+        _exported: bool,
+        span: Span,
+    ) {
+        walk_class_decl(self, fields, methods, span);
     }
     fn visit_field_update(&mut self, _name: &str, _fields: &[String], value: &SExpr, span: Span) {
         walk_field_update(self, value, span);

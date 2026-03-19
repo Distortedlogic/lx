@@ -1,0 +1,106 @@
+-- lx package: ContextWindow class for capacity management with eviction
+-- Uses Store for item storage with seq ordering.
+-- Generic operations (get/keys/remove/save/load) come from Collection.
+-- Domain-specific: capacity, eviction, pinning, pressure.
+
+use pkg/collection {Collection}
+
++Class ContextWindow : [Collection] = {
+  entries: Store ()
+  capacity: 8000
+  seq: 0
+
+  next_seq = () {
+    self.seq <- self.seq + 1
+    self.seq
+  }
+
+  add = (item) {
+    key = item.key
+    content = item.content ?? ""
+    tokens = item.tokens ?? ((len content) // 4)
+    pri = item.priority ?? "normal"
+    seq = self.next_seq ()
+    self.entries.remove key
+    self.entries.set key {key: key  content: content  tokens: tokens  priority: pri  pinned: false  seq: seq}
+    Ok ()
+  }
+
+  items = () {
+    self.entries.values () | sort_by (.seq)
+  }
+
+  used_tokens = () {
+    self.entries.values () | map (.tokens) | fold 0 (+)
+  }
+
+  usage = () {
+    used = self.used_tokens ()
+    avail = self.capacity - used
+    pct = self.capacity > 0 ? (used * 100.0 / self.capacity) : 0.0
+    {used: used  capacity: self.capacity  available: avail  pct: pct}
+  }
+
+  pressure = () {
+    u = self.usage ()
+    u.pct >= 90.0 ? "critical" : (u.pct >= 75.0 ? "high" : (u.pct >= 50.0 ? "moderate" : "low"))
+  }
+
+  pin = (key) {
+    item = self.entries.get key
+    item == None ? (Err "not found") : {
+      self.entries.set key {..item, pinned: true}
+      Ok ()
+    }
+  }
+
+  unpin = (key) {
+    item = self.entries.get key
+    item == None ? (Err "not found") : {
+      self.entries.set key {..item, pinned: false}
+      Ok ()
+    }
+  }
+
+  priority_rank = (p) {
+    p == "critical" ? 3 : (p == "high" ? 2 : (p == "normal" ? 1 : 0))
+  }
+
+  evict_one = (strategy) {
+    evictable = self.entries.values () | filter (e) not e.pinned
+    (len evictable) == 0 ? false : {
+      by_seq = (.seq)
+      by_tokens_desc = (e) 0 - e.tokens
+      by_priority = (e) self.priority_rank e.priority
+      target = strategy == "oldest" ? (evictable | sort_by by_seq | first ^) : (strategy == "largest" ? (evictable | sort_by by_tokens_desc | first ^) : (evictable | sort_by by_priority | first ^))
+      self.entries.remove target.key
+      true
+    }
+  }
+
+  evict = (strategy) {
+    self.evict_one strategy
+    Ok ()
+  }
+
+  evict_until = (strategy opts) {
+    target_pct = opts.target_pct ?? 50.0
+    loop {
+      pct = self.capacity > 0 ? (self.used_tokens () * 100.0 / self.capacity) : 0.0
+      pct <= target_pct ? break
+      evicted = self.evict_one strategy
+      not evicted ? break : ()
+    }
+    Ok ()
+  }
+
+  clear = () {
+    self.entries.keys () | each (k) {
+      item = self.entries.get k
+      (item != None && not item.pinned) ? (self.entries.remove k) : ()
+    }
+    Ok ()
+  }
+}
+
++estimate = (text) (len text) // 4

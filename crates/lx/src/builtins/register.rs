@@ -53,6 +53,7 @@ fn bi_len(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, L
         Value::Record(r) => r.len(),
         Value::Map(m) => m.len(),
         Value::Tuple(t) => t.len(),
+        Value::Store { id } => crate::stdlib::store_len(*id),
         other => {
             return Err(LxError::type_err(
                 format!("len expects collection, got {}", other.type_name()),
@@ -70,6 +71,7 @@ fn bi_empty(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value,
         Value::Record(r) => r.is_empty(),
         Value::Map(m) => m.is_empty(),
         Value::Tuple(t) => t.is_empty(),
+        Value::Store { id } => crate::stdlib::store_len(*id) == 0,
         other => {
             return Err(LxError::type_err(
                 format!("empty? expects collection, got {}", other.type_name()),
@@ -180,4 +182,5 @@ pub fn register(env: &mut Env) {
     );
     env.bind("log".into(), Value::Record(Arc::new(log_fields)));
     super::hof::register(env);
+    env.bind("Store".into(), crate::stdlib::build_constructor());
 }

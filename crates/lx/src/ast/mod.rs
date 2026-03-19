@@ -49,6 +49,7 @@ pub enum Stmt {
     TraitDecl {
         name: String,
         methods: Vec<TraitMethodDecl>,
+        defaults: Vec<AgentMethod>,
         requires: Vec<String>,
         description: Option<String>,
         tags: Vec<String>,
@@ -60,6 +61,13 @@ pub enum Stmt {
         uses: Vec<(String, String)>,
         init: Option<SExpr>,
         on: Option<SExpr>,
+        methods: Vec<AgentMethod>,
+        exported: bool,
+    },
+    ClassDecl {
+        name: String,
+        traits: Vec<String>,
+        fields: Vec<ClassField>,
         methods: Vec<AgentMethod>,
         exported: bool,
     },

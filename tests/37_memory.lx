@@ -1,77 +1,78 @@
 -- 37_memory.lx
--- Tests: std/memory module (tiered memory with promotion/demotion)
+-- Tests: pkg/memory MemoryStore class (tiered memory with promotion/demotion)
 
-use std/memory
+use pkg/memory {MemoryStore}
 use std/fs
 
 path = "/tmp/lx_memory_test.json"
-fs.remove path ?? ()
 
 -- create memory store
-mem = memory.create path ^
+mem = MemoryStore ()
 
 -- store entries at different tiers
-id1 = memory.store {content: "always use snake_case for variables" tier: 0 confidence: 0.3 tags: ["style"]} mem ^
-id2 = memory.store {content: "auth tokens expire after 1 hour" tier: 1 confidence: 0.6 tags: ["auth" "infra"]} mem ^
-id3 = memory.store {content: "run tests before merging" tier: 2 confidence: 0.85 tags: ["process"]} mem ^
+id1 = mem.store {content: "always use snake_case for variables" tier: 0 confidence: 0.3 tags: ["style"]} ^
+id2 = mem.store {content: "auth tokens expire after 1 hour" tier: 1 confidence: 0.6 tags: ["auth" "infra"]} ^
+id3 = mem.store {content: "run tests before merging" tier: 2 confidence: 0.85 tags: ["process"]} ^
 
 -- recall by keyword
-results = memory.recall "auth tokens" mem
+results = mem.recall "auth tokens"
 assert (len results > 0) "recall: found auth entry"
 assert (results.0.content == "auth tokens expire after 1 hour") "recall: correct content"
 
 -- recall returns empty for no match
-empty = memory.recall "xyzzy nonsense" mem
+empty = mem.recall "xyzzy nonsense"
 assert (len empty == 0) "recall: no match"
 
 -- tier filtering
-t0 = memory.tier 0 mem
+t0 = mem.tier 0
 assert (len t0 == 1) "tier: L0 has 1 entry"
-t1 = memory.tier 1 mem
+t1 = mem.tier 1
 assert (len t1 == 1) "tier: L1 has 1 entry"
-t2 = memory.tier 2 mem
+t2 = mem.tier 2
 assert (len t2 == 1) "tier: L2 has 1 entry"
 
 -- all entries
-all = memory.all mem
+all = mem.all ()
 assert (len all == 3) "all: 3 entries"
 
 -- promote increases confidence and tier
-memory.promote id1 mem ^
-entry_after = memory.tier 0 mem
+mem.promote id1 ^
+entry_after = mem.tier 0
 promoted = entry_after.0
 assert (promoted.confidence > 0.3) "promote: confidence increased"
 assert (promoted.confirmed == 1) "promote: confirmed count"
 
 -- demote decreases confidence
-memory.demote id3 mem ^
-t2_after = memory.tier 2 mem
+mem.demote id3 ^
+t2_after = mem.tier 2
 assert (len t2_after == 1) "demote: still tier 2 (confidence high enough)"
 
 -- multiple promotions can raise tier
-memory.promote id1 mem ^
-memory.promote id1 mem ^
-memory.promote id1 mem ^
-l0_after = memory.tier 0 mem
-l1_after = memory.tier 1 mem
+mem.promote id1 ^
+mem.promote id1 ^
+mem.promote id1 ^
+l0_after = mem.tier 0
+l1_after = mem.tier 1
 assert (len l0_after == 0) "multi-promote: no longer tier 0"
 assert (len l1_after >= 1) "multi-promote: promoted to tier 1+"
 
 -- forget removes entry
-memory.forget id3 mem ^
-all_after = memory.all mem
+mem.forget id3 ^
+all_after = mem.all ()
 assert (len all_after == 2) "forget: removed entry"
 
 -- consolidate promotes confirmed entries
-memory.promote id2 mem ^
-memory.promote id2 mem ^
-memory.promote id2 mem ^
-result = memory.consolidate mem
+mem.promote id2 ^
+mem.promote id2 ^
+mem.promote id2 ^
+result = mem.consolidate ()
 assert (result.promoted >= 0) "consolidate: has promoted count"
 
--- persistence: reload from disk
-mem2 = memory.create path ^
-all2 = memory.all mem2
+-- persistence: save + reload
+mem.save path
+mem2 = MemoryStore ()
+mem2.load path
+all2 = mem2.all ()
 assert (len all2 == 2) "persistence: reloaded entries"
 
 -- cleanup

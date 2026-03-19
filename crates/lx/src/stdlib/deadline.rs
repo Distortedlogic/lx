@@ -232,6 +232,37 @@ fn bi_slice(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value,
     Ok(Value::Ok(Box::new(make_handle(id))))
 }
 
+pub(crate) struct DeadlineGuard {
+    id: u64,
+}
+
+impl DeadlineGuard {
+    pub(crate) fn is_expired(&self) -> bool {
+        DEADLINES
+            .get(&self.id)
+            .is_none_or(|dl| Instant::now() >= dl.expires_at)
+    }
+}
+
+impl Drop for DeadlineGuard {
+    fn drop(&mut self) {
+        SCOPE_STACK.with(|stack| stack.borrow_mut().pop());
+        DEADLINES.remove(&self.id);
+    }
+}
+
+pub(crate) fn scoped(ms: u64) -> DeadlineGuard {
+    let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+    DEADLINES.insert(
+        id,
+        DeadlineState {
+            expires_at: Instant::now() + Duration::from_millis(ms),
+        },
+    );
+    SCOPE_STACK.with(|stack| stack.borrow_mut().push(id));
+    DeadlineGuard { id }
+}
+
 fn bi_extend(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = deadline_id(&args[0], span)?;
     let ms = extract_ms(&args[1], "deadline.extend", span)?;

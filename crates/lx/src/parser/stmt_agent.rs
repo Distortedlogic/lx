@@ -81,7 +81,7 @@ impl super::Parser {
         ))
     }
 
-    fn parse_agent_trait_list(&mut self) -> Result<Vec<String>, LxError> {
+    pub(super) fn parse_agent_trait_list(&mut self) -> Result<Vec<String>, LxError> {
         if *self.peek() == TokenKind::LBracket {
             self.advance();
             let mut traits = Vec::new();

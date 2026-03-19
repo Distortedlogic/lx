@@ -2,7 +2,7 @@
 -- Source: adversarial self-review before committing to a response
 
 use std/ai
-use std/prompt
+use pkg/prompt
 use ../traits {Critic}
 
 Protocol Critique = {

@@ -1,63 +1,63 @@
 -- 29_circuit.lx
--- Tests: std/circuit module (circuit breakers for agentic loops)
+-- Tests: pkg/circuit CircuitBreaker class (circuit breakers for agentic loops)
 
-use std/circuit
+use pkg/circuit {CircuitBreaker}
 
 -- === Create ===
-b = circuit.create {max_turns: 5 max_actions: 10 repetition_window: 3}
+b = CircuitBreaker {max_turns: 5 max_actions: 10 repetition_window: 3}
 
 -- === Initial state ===
-st = circuit.status b
+st = b.status ()
 assert (st.turns == 0) "initial turns"
 assert (st.tripped == false) "initial not tripped"
-assert (circuit.is_tripped b == false) "is_tripped false"
+assert (b.is_tripped () == false) "is_tripped false"
 
 -- === Tick ===
-circuit.tick b ^
-circuit.tick b ^
-st2 = circuit.status b
+b.tick () ^
+b.tick () ^
+st2 = b.status ()
 assert (st2.turns == 2) "ticks counted"
-assert (circuit.check b | ok? == true) "check ok after 2 ticks"
+assert (b.check () | ok? == true) "check ok after 2 ticks"
 
 -- === Record actions ===
-circuit.record b "searched for auth" ^
-circuit.record b "read token.rs" ^
-st3 = circuit.status b
+b.record "searched for auth" ^
+b.record "read token.rs" ^
+st3 = b.status ()
 assert (st3.action_count == 2) "actions recorded"
 
 -- === Turn limit trip ===
-circuit.tick b ^
-circuit.tick b ^
-circuit.tick b ^
-tripped = circuit.check b
+b.tick () ^
+b.tick () ^
+b.tick () ^
+tripped = b.check ()
 assert (err? tripped == true) "tripped after 5 ticks"
-assert (circuit.is_tripped b == true) "is_tripped true"
+assert (b.is_tripped () == true) "is_tripped true"
 
 -- === Reset ===
-circuit.reset b ^
-assert (circuit.is_tripped b == false) "reset clears trip"
-st4 = circuit.status b
+b.reset () ^
+assert (b.is_tripped () == false) "reset clears trip"
+st4 = b.status ()
 assert (st4.turns == 0) "reset clears turns"
 assert (st4.action_count == 0) "reset clears actions"
 
 -- === Repetition detection ===
-b2 = circuit.create {max_turns: 100 repetition_window: 3}
-circuit.record b2 "search X" ^
-circuit.record b2 "search X" ^
-assert (circuit.is_tripped b2 == false) "2 repeats not enough"
-circuit.record b2 "search X" ^
-assert (circuit.is_tripped b2 == true) "3 repeats trips"
+b2 = CircuitBreaker {max_turns: 100 repetition_window: 3}
+b2.record "search X" ^
+b2.record "search X" ^
+assert (b2.is_tripped () == false) "2 repeats not enough"
+b2.record "search X" ^
+assert (b2.is_tripped () == true) "3 repeats trips"
 
 -- === Action limit ===
-b3 = circuit.create {max_turns: 100 max_actions: 3}
-circuit.record b3 "a" ^
-circuit.record b3 "b" ^
-assert (circuit.is_tripped b3 == false) "2 actions ok"
-circuit.record b3 "c" ^
-assert (circuit.is_tripped b3 == true) "3 actions trips"
+b3 = CircuitBreaker {max_turns: 100 max_actions: 3}
+b3.record "a" ^
+b3.record "b" ^
+assert (b3.is_tripped () == false) "2 actions ok"
+b3.record "c" ^
+assert (b3.is_tripped () == true) "3 actions trips"
 
 -- === Status with reason ===
-st5 = circuit.status b3
+st5 = b3.status ()
 assert (st5.tripped == true) "status shows tripped"
 assert (len st5.reason > 0) "status has reason"
 

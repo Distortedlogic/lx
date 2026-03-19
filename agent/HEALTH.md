@@ -3,7 +3,7 @@
 
 # Design Health
 
-Updated after Session 61 (2026-03-18).
+Updated after Session 62 (2026-03-18).
 
 ## What Works
 
@@ -11,7 +11,7 @@ Updated after Session 61 (2026-03-18).
 
 **Boundary validation covers both directions.** `Protocol` validates agent-to-agent. `MCP` declarations validate agent-to-tool. `Trait` declarations validate agent behavioral contracts at definition time. No unvalidated boundary.
 
-**Error messages are self-teaching.** Writing `if x then y` produces `undefined variable 'if' — lx uses 'cond ? then_expr : else_expr'`. Every type mismatch shows the actual value and type received. Agents learn lx syntax from the errors themselves.
+**`std/store` enables Rust→lx migration.** The generic concurrent k/v store extracts the DashMap+handle boilerplate that 14+ modules reimplement. First 5 conversions (knowledge, circuit, prompt, tasks, trace) each reduced to 30-50% of the Rust line count while passing all existing tests. The lx packages are readable, modifiable, and composable — exactly what lx is for.
 
 ## What's Still Wrong
 
@@ -19,6 +19,12 @@ Updated after Session 61 (2026-03-18).
 
 See `agent/PRIORITIES.md` for the full ordered work queue.
 
+## What's Still Wrong (continued)
+
+**Export names shadow builtins in lx packages.** `+filter` as an export name shadows the builtin `filter` HOF inside the module. Discovered when converting trace — had to rename `trace.filter` → `trace.query`. Any lx package exporting a name that matches a builtin (filter, map, fold, etc.) will hit this. Not a parser bug — it's environment scoping. Workaround: avoid builtin names in exports, or capture the builtin before the export (`keep = filter`).
+
+**`? { }` is always parsed as match block.** `cond ? { ... }` after `?` starts a match block, not a regular block. Record spreads like `{..a, b: c}` inside `? { ... }` fail with "unexpected DotDot in pattern." Workaround: use parens `? ({..a, b: c})` or extract to a function.
+
 ## Bottom Line
 
-Session 61 fixed the parser foundation: list spread bp, module multi-level `../..`, Agent body uppercase tokens, dot access for uppercase fields. All 7 over-300-line files split. Remaining parser bugs (named-arg ternary ambiguity, assert greedy parsing) are inherent to juxtaposition syntax — workarounds documented, not fixable without parser architecture change. 78/78 tests pass. Ready for feature consolidation audit (Tier 0 Session 62).
+Session 62: feature consolidation + `std/store` + 9 module→package conversions. 44 Rust stdlib → 35 Rust + 9 lx packages. Net ~-2770 lines Rust. Conversion wave hit its natural limit — budget/profile/pipeline stay Rust because lx lacks dynamic record field access, randomness, and hashing. Identified a real language gap: lx needs a generic `Class` keyword (Agent minus messaging) for plain stateful objects. 79/79 tests pass.

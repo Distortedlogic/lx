@@ -8,8 +8,7 @@
 -- Demonstrates: workflow.run, transcript ingestion, pattern extraction, knowledge persistence.
 -- Source: mcp-toolbelt/arch_diagrams/scenario_post_hoc_review
 
-use std/trace
-use std/knowledge
+use pkg/knowledge {KnowledgeBase}
 use std/agents/reviewer
 use ../lib/transcript
 use ../lib/report
@@ -37,7 +36,7 @@ use ../lib/workflow
     bad = transcript.failures entries
 
     calls | zip results | each (call, result) {
-      trace.record session {
+      session.record {
         name: call.name
         input: call.input
         output: result.output
@@ -54,9 +53,9 @@ use ../lib/workflow
       mistakes: mistakes
     }
 
-    kb = knowledge.create {name: "experience"}
-    patterns | each (p) knowledge.store kb p.tool p.description "post-hoc" {confidence: 0.7}
-    mistakes | each (m) knowledge.store kb m.what m.lesson "post-hoc" {confidence: 0.9}
+    kb = KnowledgeBase {path: "experience"}
+    patterns | each (p) kb.store p.tool p.description {source: "post-hoc"  confidence: 0.7}
+    mistakes | each (m) kb.store m.what m.lesson {source: "post-hoc"  confidence: 0.9}
 
     report.write "review_report.md" "Post-Hoc Review" [
       ..report.text "Transcript: {path}"

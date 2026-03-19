@@ -1,0 +1,163 @@
+use std/store
+use std/time
+
+-- create returns Store value
+s = store.create ()
+assert (type_of s == "Store") "create returns Store"
+
+-- set and get
+store.set s "key1" 42
+v = store.get s "key1"
+assert (v == 42) "get returns set value"
+
+-- get missing key returns None
+missing = store.get s "nope"
+assert (missing == None) "missing key returns None"
+
+-- overwrite
+store.set s "key1" 99
+assert (store.get s "key1" == 99) "overwrite works"
+
+-- count
+store.set s "key2" "hello"
+assert (store.count s == 2) "count is 2"
+
+-- keys
+ks = store.keys s
+assert (len ks == 2) "keys returns 2"
+assert (contains? "key1" ks == true) "keys contains key1"
+assert (contains? "key2" ks == true) "keys contains key2"
+
+-- entries
+es = store.entries s
+assert (len es == 2) "entries returns 2"
+first_entry = es | first ^
+assert (has_key? "key" first_entry == true) "entry has key field"
+assert (has_key? "value" first_entry == true) "entry has value field"
+
+-- remove
+removed = store.remove s "key1"
+assert (removed == 99) "remove returns old value"
+assert (store.count s == 1) "count after remove"
+assert (store.get s "key1" == None) "removed key is gone"
+
+-- remove missing returns None
+r2 = store.remove s "nope"
+assert (r2 == None) "remove missing returns None"
+
+-- update
+store.set s "counter" 0
+store.update s "counter" (old) old + 1
+store.update s "counter" (old) old + 1
+assert (store.get s "counter" == 2) "update increments"
+
+-- update with Err does not modify
+store.set s "guarded" 10
+result = store.update s "guarded" (old) {
+  old > 5 ? Err "too high" : old + 1
+}
+assert (err? result == true) "update returns Err"
+assert (store.get s "guarded" == 10) "value unchanged on Err"
+
+-- update on missing key passes None
+store.update s "new_key" (old) {
+  old == None ? "created" : old
+}
+assert (store.get s "new_key" == "created") "update creates from None"
+
+-- query with predicate
+s2 = store.create ()
+store.set s2 "a" {score: 10}
+store.set s2 "b" {score: 5}
+store.set s2 "c" {score: 15}
+high = store.query s2 (e) e.value.score > 8
+assert (len high == 2) "query returns matching entries"
+
+-- clear
+store.clear s2
+assert (store.count s2 == 0) "clear empties store"
+
+-- record values
+s3 = store.create ()
+store.set s3 "user" {name: "Alice" age: 30}
+user = store.get s3 "user"
+assert (user.name == "Alice") "record value preserved"
+assert (user.age == 30) "record fields intact"
+
+-- persistence
+use std/fs
+now = time.now ()
+path = "/tmp/lx_store_test_{now.ms}.json"
+sp = store.create {persist: path}
+store.set sp "x" 1
+store.set sp "y" {nested: true}
+exists = fs.exists path
+assert (exists == true) "persist file created"
+
+-- reload from disk
+sp2 = store.create {persist: path}
+assert (store.get sp2 "x" == 1) "loaded x from disk"
+loaded_y = store.get sp2 "y"
+assert (loaded_y.nested == true) "loaded nested record from disk"
+
+-- cleanup
+fs.remove path
+
+-- === Store () builtin constructor ===
+d = Store ()
+assert (type_of d == "Store") "Store () creates Store"
+assert (len d == 0) "new Store is empty"
+
+-- dot-access methods
+d.set "name" "Alice"
+d.set "age" 30
+assert (d.get "name" == "Alice") "dot get"
+assert (d.len () == 2) "dot len"
+assert (d.has "name" == true) "dot has"
+assert (d.has "missing" == false) "dot has missing"
+
+-- dot keys/values/entries
+dk = d.keys ()
+assert (len dk == 2) "dot keys"
+dv = d.values ()
+assert (len dv == 2) "dot values"
+de = d.entries ()
+assert (len de == 2) "dot entries"
+
+-- dot remove
+removed_d = d.remove "age"
+assert (removed_d == 30) "dot remove returns value"
+assert (d.len () == 1) "dot len after remove"
+
+-- dot update
+d.set "counter" 0
+d.update "counter" (old) old + 10
+assert (d.get "counter" == 10) "dot update"
+
+-- dot filter/query
+d2 = Store ()
+d2.set "a" {score: 10}
+d2.set "b" {score: 5}
+d2.set "c" {score: 15}
+high_d = d2.filter (e) e.value.score > 8
+assert (len high_d == 2) "dot filter"
+
+-- dot clear
+d2.clear ()
+assert (d2.len () == 0) "dot clear"
+
+-- dot map
+d3 = Store ()
+d3.set "x" 1
+d3.set "y" 2
+mapped = d3.map (e) e.value * 10
+assert (len mapped == 2) "dot map"
+
+-- reference semantics
+d4 = Store ()
+d4.set "k" "v"
+d5 = d4
+d5.set "k2" "v2"
+assert (d4.len () == 2) "reference semantics: shared"
+
+log.info "78_store: all passed"

@@ -2,7 +2,7 @@
 -- Source: breaks down complex goals into executable step sequences
 
 use std/ai
-use std/prompt
+use pkg/prompt
 use std/plan
 use ../traits {Planner}
 use ../protocols {ActionPlan}

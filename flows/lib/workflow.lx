@@ -4,14 +4,14 @@
 -- and must return Ok result or Err reason.
 -- Returns the work function's Result unchanged after recording outcome.
 
-use std/trace
+use pkg/trace {TraceStore}
 
 +run = (name source work_fn) {
-  session = trace.create {name  source}
+  session = TraceStore {path: name}
   result = work_fn session
   result ? {
-    Ok r -> trace.record session {name: "complete"  input: source  output: r  success: true}
-    Err e -> trace.record session {name: "failed"  input: source  output: e  success: false}
+    Ok r -> session.record {name: "complete"  input: source  output: r  success: true}
+    Err e -> session.record {name: "failed"  input: source  output: e  success: false}
   }
   result
 }

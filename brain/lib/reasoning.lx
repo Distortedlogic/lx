@@ -2,9 +2,9 @@
 -- Source: core cognitive process — decompose, hypothesize, evaluate, conclude
 
 use std/ai
-use std/prompt
+use pkg/prompt
 use std/json
-use std/trace
+use pkg/trace {TraceStore}
 use ../protocols {Thought ReasoningChain Hypothesis}
 
 +reason = (goal: Str  context: Str  constraints: [Str]) -> ReasoningChain {

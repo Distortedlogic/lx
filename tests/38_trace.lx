@@ -1,62 +1,59 @@
 -- 38_trace.lx
--- Tests: std/trace module (trace collection, scoring, dataset export)
+-- Tests: pkg/trace TraceStore class (trace collection, scoring, dataset export)
 
-use std/trace
+use pkg/trace {TraceStore}
 use std/fs
 
-path = "/tmp/lx_trace_test.json"
 export_path = "/tmp/lx_trace_export.jsonl"
-fs.remove path ?? ()
 fs.remove export_path ?? ()
 
 -- create trace store
-t = trace.create path ^
+t = TraceStore ()
 
 -- record spans
-s1 = trace.record {name: "search" input: "find auth bugs" output: "found 3 issues" tags: ["research"]} t ^
-s2 = trace.record {name: "fix" input: "fix token refresh" output: "patched validate.rs" duration_ms: 5000 tags: ["coding"]} t ^
-s3 = trace.record {name: "review" input: "review the fix" output: "looks good" score: 0.9 tags: ["review"]} t ^
+s1 = t.record {name: "search" input: "find auth bugs" output: "found 3 issues" tags: ["research"]} ^
+s2 = t.record {name: "fix" input: "fix token refresh" output: "patched validate.rs" duration_ms: 5000 tags: ["coding"]} ^
+s3 = t.record {name: "review" input: "review the fix" output: "looks good" score: 0.9 tags: ["review"]} ^
 
 -- spans returns all
-all = trace.spans t
+all = t.all ()
 assert (len all == 3) "spans: 3 recorded"
 assert (all.0.name == "search") "spans: first name"
 assert (all.1.name == "fix") "spans: second name"
 
 -- score a span
-trace.score s1 0.85 t ^
-after = trace.spans t
+t.score s1 0.85 ^
+after = t.all ()
 scored_span = after.0
 assert (scored_span.score == 0.85) "score: updated"
 
 -- summary
-sum = trace.summary t
+sum = t.summary ()
 assert (sum.total == 3) "summary: total"
 assert (sum.scored == 2) "summary: scored count"
 assert (sum.avg_score > 0.0) "summary: has avg score"
 
 -- filter by name
-by_name = trace.filter {name: "fix"} t
+by_name = t.query {name: "fix"}
 assert (len by_name == 1) "filter: by name"
 assert (by_name.0.name == "fix") "filter: correct name"
 
 -- filter by tag
-by_tag = trace.filter {tag: "research"} t
+by_tag = t.query {tag: "research"}
 assert (len by_tag == 1) "filter: by tag"
 assert (by_tag.0.name == "search") "filter: correct tag match"
 
 -- filter by min_score
-by_score = trace.filter {min_score: 0.85} t
+by_score = t.query {min_score: 0.85}
 assert (len by_score == 2) "filter: by min_score"
 
 -- export as JSONL
-count = trace.export export_path t ^
+count = t.export export_path ^
 assert (count == 3) "export: 3 lines"
 exported = fs.read export_path ^
 assert (len exported > 0) "export: file has content"
 
 -- cleanup
-fs.remove path ^
 fs.remove export_path ^
 
 log.info "38_trace: all passed"

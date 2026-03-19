@@ -15,6 +15,8 @@
 - Error handling: `^` propagation, `??` coalescing, `(?? default)` sections. Structured error tags: `Err Timeout "msg"` with pattern matching. Uniform `None` on miss for Record, Map, and Agent field access. `AgentErr` structured errors: 11 tagged variants (Timeout, RateLimited, BudgetExhausted, ContextOverflow, Incompetent, Upstream, PermissionDenied, ProtocolViolation, Unavailable, Cancelled, Internal) via `use std/agent {Timeout ...}`
 - Arithmetic: `/` always returns Float (Python 3 semantics), `//` for integer division, mixed Int/Float auto-promotion
 - Modules: `use ./path`, aliasing, selective imports, `+` exports, workspace member resolution (`use brain/protocols`)
+- **`Class` keyword** — generic stateful objects with DashMap-backed fields and `self` method dispatch. `Class Name : [Traits] = { field: default; method = (params) { body } }`. Constructor: `Name {field_overrides}`. Interior mutability: `self.field <- val` mutates via global store (no reassign needed). Reference semantics: `a = b` shares same object.
+- **Trait default methods** — `Trait Name = { required: Sig -> Ret; default_method = (params) { body } }`. Default methods injected into conforming Class/Agent if not overridden.
 
 ## Agent System
 
@@ -23,8 +25,8 @@
 - `~>` send, `~>?` ask — infix operators, subprocess-transparent
 - `Protocol Name = {field: Type}` — message contracts with runtime validation (returns `Err` on validation failure, catchable with `??`)
 - Protocol composition (`{..Base extra: Str}`), unions (`A | B | C` with `_variant`), field constraints (`where`)
-- `Trait Name = { handles: [...] provides: [...] requires: [...] }` — agent behavioral contracts
-- `agent.implements` — runtime trait checking for routing/filtering
+- `Trait Name = { handles: [...] provides: [...] requires: [...] }` — agent behavioral contracts with default method implementations
+- `agent.implements` — runtime trait checking for routing/filtering (works for Agent, Object, Record)
 - `MCP` declarations — typed tool contracts, input/output validation, wrapper generation
 - `with expr as name { body }` — scoped resources with auto-cleanup (LIFO close, cleanup on error)
 - `yield` — callback-based coroutine, JSON-line orchestrator protocol
@@ -32,21 +34,31 @@
 - `emit` — agent-to-human fire-and-forget output via EmitBackend
 - `with name = expr { body }` — scoped bindings + record field update (`name.field <- value`)
 
-## Stdlib (44 modules)
+## Stdlib (35 Rust modules + 9 lx packages)
 
 - Data: `std/json`, `std/md`, `std/re`, `std/math`, `std/time`
 - System: `std/fs`, `std/env`, `std/http`
-- Git: `std/git` — 36 functions: `status`, `branch`, `root`, `is_repo`, `branches`, `remotes`, `log`, `show`, `blame`, `blame_range`, `diff`, `diff_stat`, `grep`, `add`, `commit`, `commit_with`, `tag`, `tag_with`, `create_branch`, `create_branch_at`, `delete_branch`, `checkout`, `checkout_create`, `merge`, `stash`/`stash_with`/`stash_pop`/`stash_list`/`stash_drop`, `fetch`, `pull`, `push`, `push_with`
-- Resilience: `std/retry` — `retry` (default 3 attempts, exponential backoff), `retry_with` (configurable). Returns `Ok value` on success, `Err Exhausted {attempts last_error elapsed_ms}` on exhaustion
+- Git: `std/git` — 36 functions
+- State primitive: `std/store` — generic concurrent k/v store: `create`, `set`, `get`, `update`, `remove`, `keys`, `entries`, `query`, `count`, `clear`, `persist`, `load`
+- Resilience: `std/retry`, `std/deadline`
 - Communication: `std/agent`, `std/mcp`, `std/ai`
 - Scheduling: `std/cron`
-- Orchestration: `std/ctx`, `std/tasks`, `std/audit`, `std/circuit`, `std/plan`, `std/saga`, `std/pipeline`, `std/taskgraph`, `std/deadline`
-- Concurrency: `std/pool` — worker pools: `create`, `fan_out`, `map`, `submit`, `status`, `shutdown`
-- Cost management: `std/budget` — `create`, `spend`, `remaining`, `used`, `used_pct`, `project`, `status`, `slice` (sub-budgets)
-- Prompt assembly: `std/prompt` — `create`, `system`, `section`, `constraint`, `instruction`, `example`, `compose`, `render`, `render_within`, `estimate`, `sections`, `without`
-- Context windows: `std/context` — `create`, `add`, `usage`, `pressure`, `estimate`, `pin`/`unpin`, `evict`, `evict_until`, `items`, `get`, `remove`, `clear`
-- Intelligence: `std/knowledge`, `std/introspect`
+- Orchestration: `std/ctx`, `std/audit`, `std/plan`, `std/saga`, `std/pipeline`, `std/taskgraph`
+- Cost management: `std/budget`
 - Standard agents: `std/agents/auditor`, `std/agents/router`, `std/agents/grader`, `std/agents/planner`, `std/agents/monitor`, `std/agents/reviewer`
+
+## lx Packages (pkg/ workspace member)
+
+Class-based packages (migrated from handle-passing to `Class` declarations):
+- `pkg/circuit` — `CircuitBreaker` class: turn/action/time/repetition trip conditions
+- `pkg/knowledge` — `KnowledgeBase` class: key-value knowledge base with file persistence
+- `pkg/prompt` — composable prompt assembly (pure record builder, not a Class)
+- `pkg/tasks` — `TaskStore` class: task state machine (todo→in_progress→submitted→pending_audit→passed→complete)
+- `pkg/trace` — `TraceStore` class: trace collection, scoring, filtering, progress analysis, JSONL export
+- `pkg/memory` — `MemoryStore` class: tiered memory with fuzzy keyword recall, promote/demote, consolidation
+- `pkg/context` — `ContextWindow` class: context window capacity management with priority eviction
+- `pkg/introspect` — `Inspector` class: agent self-monitoring: actions, markers, stuck detection, strategy shifts
+- `pkg/pool` — `Pool` class: worker pools with round-robin dispatch
 - Infrastructure: `std/memory`, `std/trace`, `std/trait`
 - Interaction: `std/user` — `confirm`, `choose`, `ask`, `ask_with`, `progress`, `progress_pct`, `status`, `table`, `check` (signal poll). `UserBackend` trait on `RuntimeCtx` — `NoopUserBackend` (default/test), `StdinStdoutUserBackend` (terminal)
 - Identity: `std/profile` — persistent agent profiles: `load`, `save`, `learn`, `recall`, `recall_prefix`, `forget`, `preference`, `get_preference`, `history`, `merge`, `age`, `decay`. Strategy helpers: `best_strategy`, `rank_strategies`, `adapt_strategy`. File-backed at `.lx/profiles/{name}.json`
@@ -74,7 +86,6 @@
 
 - `ai.prompt_structured` — Protocol-validated LLM output with auto-retry
 - `ai.prompt_json` — lightweight structured output from inline record shape (no Protocol needed)
-- `trace.improvement_rate` + `trace.should_stop` — diminishing returns detection
 
 ## Runtime
 
@@ -95,4 +106,4 @@
 
 ## Test Coverage
 
-78 test suites (77 .lx files + 11_modules dir) in `tests/`. Fixtures in `tests/fixtures/`.
+80 test suites (79 .lx files + 11_modules dir) in `tests/`. Fixtures in `tests/fixtures/`.

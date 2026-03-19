@@ -21,16 +21,29 @@ pub fn build() -> IndexMap<String, Value> {
     m
 }
 
-struct RetryOpts {
-    max: u64,
-    backoff: Backoff,
-    base_ms: u64,
-    max_delay_ms: u64,
-    jitter: bool,
-    retry_on: Option<Value>,
+pub(crate) struct RetryOpts {
+    pub(crate) max: u64,
+    pub(crate) backoff: Backoff,
+    pub(crate) base_ms: u64,
+    pub(crate) max_delay_ms: u64,
+    pub(crate) jitter: bool,
+    pub(crate) retry_on: Option<Value>,
 }
 
-enum Backoff {
+impl RetryOpts {
+    pub(crate) fn exponential(max: u64) -> Self {
+        Self {
+            max,
+            backoff: Backoff::Exponential,
+            base_ms: 100,
+            max_delay_ms: 30_000,
+            jitter: false,
+            retry_on: None,
+        }
+    }
+}
+
+pub(crate) enum Backoff {
     Constant,
     Linear,
     Exponential,
@@ -90,7 +103,7 @@ fn parse_opts(opts: &IndexMap<String, Value>, span: Span) -> Result<RetryOpts, L
     })
 }
 
-fn compute_delay(opts: &RetryOpts, attempt: u64) -> u64 {
+pub(crate) fn compute_delay(opts: &RetryOpts, attempt: u64) -> u64 {
     let raw = match opts.backoff {
         Backoff::Constant => opts.base_ms,
         Backoff::Linear => opts.base_ms.saturating_mul(attempt),

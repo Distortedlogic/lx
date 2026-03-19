@@ -4,7 +4,7 @@ mod walk_pattern;
 pub use walk_helpers::*;
 pub use walk_pattern::*;
 
-use crate::ast::{AgentMethod, Binding, Expr, Program, ProtocolEntry, SExpr, Stmt};
+use crate::ast::{AgentMethod, Binding, ClassField, Expr, Program, ProtocolEntry, SExpr, Stmt};
 use crate::span::Span;
 
 use super::AstVisitor;
@@ -43,6 +43,7 @@ pub fn walk_stmt<V: AstVisitor + ?Sized>(v: &mut V, stmt: &Stmt, span: Span) {
         Stmt::TraitDecl {
             name,
             methods,
+            defaults: _,
             requires,
             description,
             tags,
@@ -77,6 +78,15 @@ pub fn walk_stmt<V: AstVisitor + ?Sized>(v: &mut V, stmt: &Stmt, span: Span) {
                 *exported,
                 span,
             );
+        }
+        Stmt::ClassDecl {
+            name,
+            traits,
+            fields,
+            methods,
+            exported,
+        } => {
+            v.visit_class_decl(name, traits, fields, methods, *exported, span);
         }
         Stmt::FieldUpdate {
             name,
@@ -122,6 +132,20 @@ pub fn walk_agent_decl<V: AstVisitor + ?Sized>(
     }
     if let Some(o) = on {
         v.visit_expr(&o.node, o.span);
+    }
+    for m in methods {
+        v.visit_expr(&m.handler.node, m.handler.span);
+    }
+}
+
+pub fn walk_class_decl<V: AstVisitor + ?Sized>(
+    v: &mut V,
+    fields: &[ClassField],
+    methods: &[AgentMethod],
+    _span: Span,
+) {
+    for f in fields {
+        v.visit_expr(&f.default.node, f.default.span);
     }
     for m in methods {
         v.visit_expr(&m.handler.node, m.handler.span);

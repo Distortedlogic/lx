@@ -26,8 +26,6 @@ mod ai;
 mod ai_structured;
 mod audit;
 mod budget;
-mod circuit;
-mod context;
 mod cron;
 mod ctx;
 pub(crate) mod deadline;
@@ -45,33 +43,29 @@ mod git_log;
 mod git_ops;
 mod git_status;
 mod http;
-mod introspect;
 mod json;
 pub mod json_conv;
-mod knowledge;
 mod math;
 pub(crate) mod mcp;
 mod md;
 mod md_build;
-mod memory;
 mod pipeline;
 mod pipeline_io;
 mod plan;
-mod pool;
 mod profile;
 mod profile_io;
 mod profile_strategy;
-mod prompt;
 mod re;
-mod retry;
+pub(crate) mod retry;
 mod saga;
+mod step_deps;
+mod store;
+mod store_dispatch;
+
+pub(crate) use store_dispatch::{build_constructor, store_clone, store_len, store_method};
 mod taskgraph;
-mod tasks;
 mod test;
 mod time;
-mod trace;
-mod trace_progress;
-mod trace_query;
 mod trait_ops;
 mod user;
 
@@ -109,26 +103,18 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
             "cron" => cron::build(),
             "deadline" => deadline::build(),
             "ai" => ai::build(),
-            "tasks" => tasks::build(),
             "audit" => audit::build(),
             "budget" => budget::build(),
-            "circuit" => circuit::build(),
-            "context" => context::build(),
             "describe" => describe::build(),
             "diag" => diag::build(),
-            "knowledge" => knowledge::build(),
-            "memory" => memory::build(),
             "pipeline" => pipeline::build(),
             "plan" => plan::build(),
-            "pool" => pool::build(),
-            "prompt" => prompt::build(),
             "retry" => retry::build(),
             "saga" => saga::build(),
+            "store" => store::build(),
             "taskgraph" => taskgraph::build(),
             "test" => test::build(),
-            "introspect" => introspect::build(),
             "profile" => profile::build(),
-            "trace" => trace::build(),
             "trait" => trait_ops::build(),
             "user" => user::build(),
             _ => return None,
@@ -167,27 +153,19 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
             | "time"
             | "cron"
             | "ai"
-            | "tasks"
             | "audit"
             | "budget"
-            | "circuit"
             | "deadline"
-            | "context"
             | "describe"
             | "diag"
-            | "knowledge"
-            | "memory"
             | "pipeline"
             | "plan"
-            | "pool"
-            | "prompt"
             | "retry"
             | "saga"
+            | "store"
             | "taskgraph"
             | "test"
-            | "introspect"
             | "profile"
-            | "trace"
             | "trait"
             | "user"
     )

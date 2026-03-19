@@ -134,8 +134,25 @@ fn bi_implements(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<V
             let found = trait_methods.iter().all(|tm| agent.contains_key(&tm.name));
             Ok(Value::Bool(found))
         }
+        Value::Object {
+            methods, traits, ..
+        } => {
+            let Value::Trait {
+                name: trait_name, ..
+            } = &args[1]
+            else {
+                unreachable!()
+            };
+            if traits.iter().any(|t| t.as_ref() == trait_name.as_ref()) {
+                return Ok(Value::Bool(true));
+            }
+            let found = trait_methods
+                .iter()
+                .all(|tm| methods.contains_key(&tm.name));
+            Ok(Value::Bool(found))
+        }
         _ => Err(LxError::type_err(
-            "implements: expected Agent or Record",
+            "implements: expected Agent, Object, or Record",
             span,
         )),
     }

@@ -32,6 +32,9 @@ section — add one when you create brain/tests/ (see `tests/lx.toml` for exampl
 After adding tests: verify with `lx test -m brain`.
 **Cross-member imports now work (Session 54).** `use flows/lib/scoring {normalize}` resolves
 via workspace member name. Brain files can import from flows/, workgen/, tests/ by name.
+**Session 62: imports updated.** `std/knowledge` → `pkg/knowledge`, `std/circuit` → `pkg/circuit`,
+`std/prompt` → `pkg/prompt`, `std/tasks` → `pkg/tasks`, `std/trace` → `pkg/trace`.
+Also `trace.filter` renamed to `trace.query`. All brain files already updated.
 
 ## This Tick
 

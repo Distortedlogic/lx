@@ -1,15 +1,15 @@
 -- std/pool: agent worker pools
 
-use std/pool
+use pkg/pool {Pool}
 
 -- create pool with handler
-p = pool.create {
+p = Pool {
   name: "workers"
   size: 3
   handler: (msg) {
     {result: "processed-{msg.task}" source: msg.path}
   }
-} ^
+}
 
 assert (p.name == "workers")
 assert (p.size == 3)
@@ -20,7 +20,7 @@ tasks = [
   {task: "review" path: "src/api"}
   {task: "review" path: "src/db"}
 ]
-results = pool.fan_out p tasks ^
+results = p.fan_out tasks ^
 assert (len results == 3)
 
 r0 = results.[0] ?? {result: "none"}
@@ -28,19 +28,19 @@ assert (r0.result == "processed-review")
 assert (r0.source == "src/auth")
 
 -- status tracking
-status = pool.status p
+status = p.status ()
 assert (status.size == 3)
 assert (status.completed == 3)
 assert (status.failed == 0)
 
 -- submit: fire-and-forget
-pool.submit p {task: "index" path: "data"} ^
-status2 = pool.status p
+p.submit {task: "index" path: "data"} ^
+status2 = p.status ()
 assert (status2.completed == 4)
 
 -- map: transform items through pool
 items = ["a" "b" "c"]
-mapped = pool.map p items (item) {task: "analyze" path: item} ^
+mapped = p.map_tasks items (item) {task: "analyze" path: item} ^
 assert (len mapped == 3)
 
 m0 = mapped.[0] ?? {result: "none"}
@@ -53,27 +53,26 @@ Trait Reviewer = {
   review: ReviewRequest -> Str
 }
 
-tp = pool.create {
+tp = Pool {
   name: "reviewers"
   size: 2
   handler: (msg) {result: "reviewed"}
-  trait: Reviewer
-} ^
+}
 assert (tp.name == "reviewers")
 
 -- shutdown
-pool.shutdown p ^
+p.shutdown () ^
 
 -- pool handles errors gracefully
-err_pool = pool.create {
+err_pool = Pool {
   name: "err-workers"
   size: 1
   handler: (msg) {
     msg.task == "fail" ? Err "deliberate failure" : {ok: true}
   }
-} ^
+}
 
-err_results = pool.fan_out err_pool [{task: "ok"} {task: "fail"}] ^
+err_results = err_pool.fan_out [{task: "ok"} {task: "fail"}] ^
 assert (len err_results == 2)
 
-pool.shutdown err_pool ^
+err_pool.shutdown () ^

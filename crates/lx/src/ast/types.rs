@@ -84,6 +84,12 @@ pub struct AgentMethod {
 }
 
 #[derive(Debug, Clone)]
+pub struct ClassField {
+    pub name: String,
+    pub default: SExpr,
+}
+
+#[derive(Debug, Clone)]
 pub struct FieldPattern {
     pub name: String,
     pub pattern: Option<SPattern>,

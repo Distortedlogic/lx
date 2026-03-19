@@ -1,0 +1,136 @@
+-- lx package: TraceStore class for span recording and analysis
+-- Generic operations (keys/values/save/load) come from Collection.
+-- Domain-specific: record, score, summary, query, progress analysis.
+
+use std/time
+use std/json
+use std/fs
+use pkg/collection {Collection}
+
+keep = (pred list) filter pred list
+
+span_counter := 0
+
+next_span_id = () {
+  span_counter <- span_counter + 1
+  span_counter
+}
+
+has_score = (sp) sp.score != None
+has_duration = (sp) sp.duration_ms != None
+not_first = (p) p.0 > 0
+
+compute_deltas = (scores window) {
+  n = len scores
+  actual_window = window < n ? window : n
+  recent = drop (n - actual_window) scores
+  indexed = recent | enumerate | keep not_first
+  indexed | map (p) {
+    prev_score = (drop (p.0 - 1) recent) | first ^
+    p.1 - prev_score
+  }
+}
+
+classify_trend = (avg_delta recent_delta) {
+  recent_delta < 0.0 ? "regressing" : (avg_delta < 0.001 ? "plateau" : (recent_delta < avg_delta * 0.5 ? "diminishing" : (avg_delta > 0.01 ? "improving" : "steady")))
+}
+
++Class TraceStore : [Collection] = {
+  entries: Store ()
+
+  record = (span_rec) {
+    id = next_span_id ()
+    t = time.now ()
+    span = {
+      id: id
+      name: span_rec.name ?? ""
+      input: span_rec.input ?? ""
+      output: span_rec.output ?? ""
+      score: span_rec.score
+      duration_ms: span_rec.duration_ms
+      tags: span_rec.tags ?? []
+      created_at: t.iso
+    }
+    key = to_str id
+    self.entries.set key span
+    Ok id
+  }
+
+  score = (span_id score_val) {
+    key = to_str span_id
+    found = self.entries.get key
+    found == None ? (Err "span not found") : {
+      self.entries.set key {..found, score: score_val}
+      Ok ()
+    }
+  }
+
+  all = () {
+    self.entries.values () | sort_by (.id)
+  }
+
+  export = (path) {
+    sorted = self.all ()
+    lines = sorted | map (sp) json.encode sp
+    content = join "\n" lines
+    fs.write path content ^
+    Ok (len sorted)
+  }
+
+  summary = () {
+    spans = self.entries.values ()
+    total = len spans
+    scored_spans = spans | keep has_score
+    scored = len scored_spans
+    avg_score = scored > 0 ? ((scored_spans | map (.score) | fold 0 (+)) / scored) : 0.0
+    dur_spans = spans | keep has_duration
+    durations = dur_spans | map (.duration_ms)
+    avg_dur = (len durations) > 0 ? ((durations | fold 0 (+)) // (len durations)) : 0
+    {total: total  scored: scored  avg_score: avg_score  avg_duration_ms: avg_dur}
+  }
+
+  query = (criteria) {
+    name_f = criteria.name
+    min_sc = criteria.min_score
+    tag_f = criteria.tag
+    self.entries.values () | keep (sp) {
+      name_ok = name_f == None || sp.name == name_f
+      score_ok = min_sc == None || (sp.score != None && sp.score >= min_sc)
+      tag_ok = tag_f == None || (contains? tag_f sp.tags)
+      name_ok && score_ok && tag_ok
+    }
+  }
+
+  progress_scores = () {
+    prog = self.entries.values () | keep (sp) sp.name == "progress" && sp.score != None
+    prog | sort_by (.id) | map (.score)
+  }
+
+  improvement_rate = (window) {
+    scores = self.progress_scores ()
+    n = len scores
+    n < 2 ? ({avg_delta: 0.0  recent_delta: 0.0  trend: "insufficient"  samples: n}) : {
+      deltas = compute_deltas scores window
+      num_deltas = len deltas
+      actual = window < n ? window : n
+      num_deltas == 0 ? ({avg_delta: 0.0  recent_delta: 0.0  trend: "insufficient"  samples: actual}) : {
+        avg_d = (deltas | fold 0.0 (+)) / num_deltas
+        recent_d = last deltas ^
+        trend = classify_trend avg_d recent_d
+        {avg_delta: avg_d  recent_delta: recent_d  trend: trend  samples: actual}
+      }
+    }
+  }
+
+  should_stop = (opts) {
+    scores = self.progress_scores ()
+    n = len scores
+    min_delta = opts.min_delta
+    window = opts.window
+    n < 2 ? false : {
+      deltas = compute_deltas scores window
+      above = deltas | keep (> min_delta)
+      (len deltas) > 0 && (len above) == 0
+    }
+  }
+}

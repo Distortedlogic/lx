@@ -2,7 +2,7 @@
 -- Source: first stage of the cognitive loop — classify, extract, assess
 
 use std/ai
-use std/prompt
+use pkg/prompt
 use std/re
 use std/json
 use std/git

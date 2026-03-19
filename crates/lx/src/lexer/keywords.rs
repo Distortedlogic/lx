@@ -25,6 +25,7 @@ pub(super) fn type_name_or_keyword(text: &str) -> TokenKind {
         "MCP" => TokenKind::Mcp,
         "Trait" => TokenKind::Trait,
         "Agent" => TokenKind::AgentKw,
+        "Class" => TokenKind::ClassKw,
         _ => TokenKind::TypeName(text.to_string()),
     }
 }

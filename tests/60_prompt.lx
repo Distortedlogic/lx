@@ -1,7 +1,7 @@
 -- 60_prompt.lx
 -- Tests: std/prompt module (typed composable prompt assembly)
 
-use std/prompt
+use pkg/prompt
 use std/re
 
 has = (haystack needle) re.match needle haystack != None

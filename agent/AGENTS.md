@@ -20,7 +20,7 @@ Composition: `Protocol Extended = {..Base  extra: Str}`.
 
 ## Traits (Behavioral Contracts)
 
-Typed method signatures using MCP syntax (`{input} -> output`):
+Typed method signatures using MCP syntax (`{input} -> output`), plus default method implementations:
 
 ```lx
 Trait Reviewer = {
@@ -29,10 +29,36 @@ Trait Reviewer = {
   summarize: {findings: List} -> Str
   requires: [:ai :fs]
   tags: ["code" "review"]
+  summary = () { "Summary: " ++ (self.describe ()) }
 }
 ```
 
 Methods can reference named Protocols as input: `review: ReviewRequest -> {findings: List}`.
+Default methods (with `=`) are auto-injected into conforming Agent/Class if not overridden.
+
+## Classes (Stateful Objects)
+
+Agent minus messaging. For circuit breakers, stores, context windows, and other plain stateful objects:
+
+```lx
+Class Counter : [Checkable] = {
+  count: 0
+  max: 10
+  tick = () { self.count <- self.count + 1 }
+  check = () { self.count >= self.max ? (Err "limit") : (Ok ()) }
+}
+
+c = Counter {max: 5}
+c.tick ()
+c.check () ^
+```
+
+- Fields use `:` (name: default), methods use `=` (name = closure)
+- Constructor: `ClassName {field: val}` or `ClassName ()`
+- `self.field` reads, `self.field <- val` writes (in-place via global DashMap store)
+- Reference semantics: `a = b` shares same object. Both see mutations
+- Trait conformance + defaults work the same as Agent
+- Export with `+Class Name = { ... }`
 
 Discovery via `std/trait`:
 

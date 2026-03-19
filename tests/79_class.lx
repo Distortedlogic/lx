@@ -1,0 +1,113 @@
+-- Class: generic stateful objects (Agent minus messaging)
+
+-- basic class with fields and methods
+Class Counter = {
+  count: 0
+  max: 10
+  tick = () { self.count <- self.count + 1 }
+  value = () { self.count }
+  reset = () { self.count <- 0 }
+}
+
+c = Counter ()
+assert c.count == 0
+c.tick ()
+assert c.count == 1
+c.tick ()
+c.tick ()
+assert c.value () == 3
+c.reset ()
+assert c.count == 0
+
+-- constructor with field overrides
+c2 = Counter {max: 5}
+assert c2.max == 5
+assert c2.count == 0
+
+-- reference semantics: shared mutable state
+c3 = Counter ()
+c3.tick ()
+alias = c3
+alias.tick ()
+assert c3.count == 2
+assert alias.count == 2
+
+-- trait conformance
+Trait Checkable = {
+  check: {} -> Result
+}
+
+Class Breaker : [Checkable] = {
+  limit: 3
+  trips: 0
+  trip = () { self.trips <- self.trips + 1 }
+  check = () {
+    self.trips >= self.limit ? (Err "tripped") : (Ok ())
+  }
+}
+
+b = Breaker {limit: 2}
+r1 = b.check ()
+assert r1 == Ok ()
+b.trip ()
+b.trip ()
+r2 = b.check ()
+assert r2 == Err "tripped"
+
+-- trait default methods
+Trait Describable = {
+  describe: {} -> Str
+  summary = () { "Summary: " ++ (self.describe ()) }
+}
+
+Class Item : [Describable] = {
+  name: "unnamed"
+  describe = () { self.name }
+}
+
+item = Item {name: "widget"}
+assert item.describe () == "widget"
+assert item.summary () == "Summary: widget"
+
+-- override trait default
+Class Fancy : [Describable] = {
+  name: "fancy"
+  describe = () { self.name }
+  summary = () { "*** " ++ (self.name) ++ " ***" }
+}
+
+f = Fancy ()
+assert f.summary () == "*** fancy ***"
+
+-- nested field update
+Class Config = {
+  settings: {theme: "dark", size: 10}
+  get_theme = () { self.settings.theme }
+}
+
+cfg = Config ()
+assert cfg.get_theme () == "dark"
+cfg.settings <- {theme: "light", size: 10}
+assert cfg.get_theme () == "light"
+
+-- exported class
++Class Exported = {
+  val: 42
+  get = () { self.val }
+}
+
+e = Exported ()
+assert e.get () == 42
+
+-- multiple instances are independent
+a = Counter ()
+b2 = Counter ()
+a.tick ()
+a.tick ()
+a.tick ()
+assert a.count == 3
+assert b2.count == 0
+
+-- agent.implements works with objects
+use std/agent {implements}
+assert implements b Checkable

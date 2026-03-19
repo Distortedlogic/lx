@@ -8,7 +8,7 @@
 -- Source: mcp-toolbelt/arch_diagrams/discovery_system
 
 use std/ctx
-use std/knowledge
+use pkg/knowledge {KnowledgeBase}
 use std/json
 use ../lib/github
 use ../lib/report
@@ -17,7 +17,7 @@ use ../prompts/discovery
 
 +main = () {
   state = ctx.load ".discovery-state.json" ?? (ctx.empty ())
-  kb = knowledge.create {name: "discoveries"}
+  kb = KnowledgeBase {path: "discoveries"}
 
   candidates = github.search_axes discovery.axes
 
@@ -32,12 +32,12 @@ use ../prompts/discovery
   auto | each (c) {
     emit "[AUTO] {c.name} ({c.total}): {c.description}"
     integrate c
-    knowledge.store kb c.name (json.encode c) "discovery" {score: c.total}
+    kb.store c.name (json.encode c) {source: "discovery"  score: c.total}
   }
 
   review | each (c) {
     emit "[REVIEW] {c.name} ({c.total}): {c.url}"
-    knowledge.store kb c.name (json.encode c) "review" {score: c.total}
+    kb.store c.name (json.encode c) {source: "review"  score: c.total}
   }
 
   ctx.set "candidates_found" (scored | len) state

@@ -1,0 +1,5 @@
+[package]
+name = "pkg"
+version = "0.1.0"
+entry = "retry.lx"
+description = "lx packages extending std/"

@@ -24,32 +24,25 @@ See `TICK_PROTOCOL.md` for cross-read guidance.
 
 ## State
 
-Session 61 (2026-03-18). **78/78 tests pass.** `just diagnose` clean (0 errors, 7 pre-existing warnings).
-Complete core, full agent system, 44 stdlib modules, 12 agent extensions, ~100 stdlib .rs files.
-Last session: Bug fixes — list spread bp, Agent body uppercase, 7 file splits. Parser foundation solid.
+Session 63 (2026-03-18). **80/80 tests pass.** `just diagnose` clean (0 errors, 7 warnings).
+35 Rust stdlib modules + 9 lx packages in `pkg/`. `Class` keyword + Trait defaults shipped.
+5 collection packages in BROKEN intermediate state (partially refactored, tests failing).
 
 ## This Tick
 
-**Feature consolidation audit** — Tier 0, Session 62 from `agent/PRIORITIES.md`. This is a
-collaborative design session with the user. The feature surface (44 stdlib modules, 12 agent
-extensions) was built across 61 sessions — many features likely overlap or share mechanics.
+**Read `agent/SESSION_63_HANDOFF.md` first.** It contains the full design discussion,
+all rejected solutions, and the user-directed architecture for Dict + Collection Trait.
+That document is the primary context for this task.
 
-Goals:
-1. Audit the full stdlib + agent extension surface with the user
-2. Identify generic primitives that cover the same ground with fewer composable building blocks
-3. Find overlapping modules that should be merged (reconcile/vote, routing mechanisms, retry/circuit)
-4. Plan restructuring — layer specific instances on top of generic ones for DRYness
-
-Do NOT proceed to Tier 2 features until this consolidation is done. Wait for user direction.
-
-If the user wants to skip consolidation and build features instead, proceed to Tier 2 item 10:
-`introspect.system` live observation (`spec/agents-introspect-live.md`).
+**Task: Build `Dict` type, `Collection` Trait, refactor 5 collection Classes.**
 
 ## Read These Files
 
-1. `agent/PRIORITIES.md` — the work queue, to understand context
-2. `agent/INVENTORY.md` — full feature surface to audit
-3. `agent/HEALTH.md` — current assessment
+1. `agent/SESSION_63_HANDOFF.md` — **CRITICAL**: full design context, rejected solutions, architecture
+2. `agent/GOTCHAS.md` — lx parser traps (read before writing ANY lx code)
+3. `crates/lx/src/stdlib/store.rs` — existing store impl (reference for Dict's DashMap pattern)
+4. `crates/lx/src/interpreter/apply_helpers.rs` — dot access dispatch (add Dict handling here)
+5. `crates/lx/src/value.rs` — Value enum + object store (add Dict here)
 
 ## Context Files
 

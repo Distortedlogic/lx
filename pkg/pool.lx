@@ -1,0 +1,71 @@
+-- lx package: Pool class — worker pool with round-robin dispatch
++Class Pool = {
+  size: 1
+  name: "pool"
+  handler: None
+  workers: []
+  next: 0
+  completed: 0
+  failed: 0
+
+  ensure_workers = () {
+    (len self.workers) == 0 ? (self.build_workers ()) : ()
+  }
+
+  build_workers = () {
+    idx := 0
+    ws := []
+    loop {
+      idx >= self.size ? break
+      ws <- [..ws {name: "{self.name}-{idx}" handler: self.handler}]
+      idx <- idx + 1
+    }
+    self.workers <- ws
+  }
+
+  inc_completed = () {
+    self.completed <- self.completed + 1
+  }
+
+  inc_failed = () {
+    self.failed <- self.failed + 1
+  }
+
+  dispatch = (task) {
+    self.ensure_workers ()
+    idx = self.next % self.size
+    worker = self.workers | drop idx | first ^
+    self.next <- self.next + 1
+    result = worker.handler task
+    (err? result) ? (self.inc_failed ()) : (self.inc_completed ())
+    result
+  }
+
+  fan_out = (tasks) {
+    results = tasks | map (t) (self.dispatch t)
+    Ok results
+  }
+
+  map_tasks = (items mapper) {
+    tasks = items | map mapper
+    results = tasks | map (t) (self.dispatch t)
+    Ok results
+  }
+
+  submit = (task) {
+    self.dispatch task
+    Ok ()
+  }
+
+  status = () {
+    {size: self.size  completed: self.completed  failed: self.failed}
+  }
+
+  shutdown = () {
+    self.workers <- []
+    self.next <- 0
+    self.completed <- 0
+    self.failed <- 0
+    Ok ()
+  }
+}

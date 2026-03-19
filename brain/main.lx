@@ -5,7 +5,7 @@
 use std/ai
 use std/json
 use std/time
-use std/trace
+use pkg/trace {TraceStore}
 use std/agent
 
 use ./protocols {Perception ReasoningChain Response CognitiveState FeedbackSignal PerceptionEvent ReasoningEvent}
@@ -25,7 +25,7 @@ use ./lib/monitor : mon
 
   ctx.pin_identity context_win identity
 
-  with trace.create "/tmp/brain_trace.json" ^ as trace_session {
+  with TraceStore {path: "/tmp/brain_trace.json"} ^ as trace_session {
     with mem.init () ^ as memory_store {
       perception_topic = agent.topic "perception"
       reasoning_topic = agent.topic "reasoning"
@@ -34,7 +34,7 @@ use ./lib/monitor : mon
       perception = perceive_mod.perceive input history ^
       ctx.add_perception context_win perception
       state <- mon.record_action state "perceive" perception.intent
-      trace.record {name: "perception" input: input output: perception.intent} trace_session ^
+      trace_session.record {name: "perception" input: input output: perception.intent} ^
 
       agent.publish perception_topic PerceptionEvent {
         perception: perception
@@ -46,7 +46,7 @@ use ./lib/monitor : mon
       chain = race_reasoning perception state memory_store context_win ^
       ctx.add_reasoning context_win chain
       state <- mon.record_action state "reason" chain.strategy
-      trace.record {name: "reasoning" input: perception.intent output: chain.conclusion} trace_session ^
+      trace_session.record {name: "reasoning" input: perception.intent output: chain.conclusion} ^
 
       agent.publish reasoning_topic ReasoningEvent {
         chain: chain
@@ -67,7 +67,7 @@ use ./lib/monitor : mon
       mon.checkpoint state "executed"
 
       response = assemble_response chain tool_results perception identity state ^
-      trace.record {name: "response" input: chain.conclusion output: response.content} trace_session ^
+      trace_session.record {name: "response" input: chain.conclusion output: response.content} ^
 
       (response quality_result) = ensure_quality response perception.raw state ^
 

@@ -15,13 +15,14 @@ crates/lx/src/
   interpreter/ Tree-walking evaluator — mod + split files (agents, apply, eval, modules, patterns, etc.)
   builtins/    Built-in functions — mod, call, str, coll, hof, convert, register, etc.
   visitor/     AST visitor/walker infrastructure
-  stdlib/      44 registered modules across ~100 .rs files (use `std_module_exists` in mod.rs as source of truth)
+  stdlib/      35 registered Rust modules across ~82 .rs files (use `std_module_exists` in mod.rs as source of truth)
   token.rs, value.rs, value_display.rs, value_impls.rs, ast_display.rs, env.rs, error.rs, span.rs, lib.rs
 crates/lx-cli/src/  main.rs, manifest.rs, testing.rs, listing.rs, run.rs, agent_cmd.rs
 doc/           35 quick-reference docs
 spec/          51 spec files
 agent/         Context files (this folder)
-tests/         78 test suites (77 .lx files + 11_modules dir)
+pkg/           9 lx packages — 8 Class-based (CircuitBreaker, KnowledgeBase, TaskStore, TraceStore, MemoryStore, ContextWindow, Inspector, Pool) + prompt (functional)
+tests/         79 test suites (78 .lx files + 11_modules dir)
   fixtures/    Test helpers (agent_echo.lx, orchestrators, servers, test flows)
 flows/
   lib/         15 reusable .lx library modules
@@ -46,9 +47,21 @@ Extensions to `std/agent` follow the split-file pattern:
 4. For `BuiltinFunc` values with pre-applied args: set `arity` = total args (pre-applied + user-supplied), not just user-supplied count
 5. Protocols exposed as uppercase keys (e.g., `"Handoff"`) require selective import: `use std/agent {Handoff}`
 
+## Class Implementation
+
+Class follows the Agent pattern but without messaging (`uses`/`init`/`on`):
+- Token: `ClassKw` in `token.rs`
+- Lexer: `"Class"` in `lexer/keywords.rs`
+- AST: `Stmt::ClassDecl` + `ClassField` struct in `ast/mod.rs` + `ast/types.rs`
+- Parser: `parser/stmt_class.rs` — fields (`:`) vs methods (`=`)
+- Value: `Value::Class` (constructor) + `Value::Object` (instance with u64 DashMap handle) in `value.rs`
+- Object store: `OBJECTS` DashMap + helper functions (`object_store_insert/get_field/set_field/update_nested`) in `value.rs`
+- Interpreter: `exec_stmt.rs` (ClassDecl eval + Object FieldUpdate), `apply.rs` (Class constructor), `apply_helpers.rs` (Object field access with `inject_self`)
+- Trait defaults: `defaults: Vec<AgentMethod>` on `TraitDecl` AST, `defaults: Arc<IndexMap<String, Value>>` on `Value::Trait`, injected at ClassDecl/AgentDecl eval time
+
 ## Adding Language-Level Features (keywords, AST nodes)
 
-For new keywords like `Agent`, `Trait`, `Protocol`, `with ... as`:
+For new keywords like `Agent`, `Trait`, `Protocol`, `Class`, `with ... as`:
 1. **Token**: add variant to `token.rs`'s `TokenKind` enum
 2. **Lexer**: add keyword recognition in `lexer/mod.rs` (lowercase → keyword table at ~line 330; uppercase → TypeName special-case at ~line 345)
 3. **AST**: add node to `ast.rs`'s `Expr` or `Stmt` enum

@@ -25,9 +25,16 @@ BUGS.md says "fix bugs before new features." 60 sessions of feature work have ac
 - par/sel/pmap sequential — needs tokio, architectural change
 - Trait conformance uncatchable — by design (hard error at definition time)
 
-**Session 62: Feature consolidation audit (collaborative with user)**
+**Session 62: Feature consolidation audit (collaborative with user)** ✓ DONE
 
-Run in parallel with or immediately after bug fixes. The feature surface (44 stdlib modules, 12 agent extensions) was built across 60 sessions — many features likely overlap or share mechanics (reconcile/vote, multiple routing mechanisms, retry/circuit/resilience patterns). Audit the full space with the user, identify generic primitives that cover the same ground with fewer composable building blocks, then restructure. Layer specific instances on top of generic ones for DRYness. This is a joint design session, not a solo implementation tick. Do NOT proceed to Tier 2 features until this is done — consolidation may eliminate, merge, or reshape planned features.
+Full code review of 44 stdlib modules + 12 agent extensions. Mechanical deduplication (3 shared helpers),
+then identified `std/store` as the missing primitive enabling module→package migration. Converted 5 modules:
+- [x] Retry/step_deps/deadline delegation (internal Rust helpers)
+- [x] `std/store` new primitive (242 lines Rust, 12 functions)
+- [x] knowledge, circuit, prompt, tasks, trace, memory, context, introspect, pool → pkg/*.lx
+- [ ] budget, profile, pipeline — stay Rust (lx lacks dynamic record field access, randomness, hashing)
+- [ ] Agent sub-modules (dispatch, route, etc.) — can't extract from `agent.X` namespace
+- [x] **`Class` keyword** — generic stateful objects (Agent minus messaging). DashMap-backed, Trait defaults. 8 packages converted. Session 63
 
 ## Tier 1 — Infrastructure (multiplicative improvement to every tick)
 

@@ -18,6 +18,13 @@
 
 - **Trait conformance halts execution.** If an Agent declares a Trait but is missing a required method, it's a hard `LxError` — not `Value::Err`. `??` cannot catch it. This is by design but surprising if you expect defensive coding to work.
 
+## lx Package Traps
+
+- **Export names shadow builtins inside the module.** `+filter = (criteria s) { ... all | filter pred ... }` — the internal `filter` call recursively calls the export, not the builtin HOF. **Fix:** capture the builtin before the export: `keep = filter` at top of file, then use `keep` internally. Or rename the export to avoid collision (`trace.query` instead of `trace.filter`).
+- **Adjacent string interpolation blocks fail.** `"{head}{tail}"` — the first `{head}` evaluates to a Str, then `{tail}` tries to call the Str as a function. **Fix:** use `++` concatenation: `head ++ tail`. Or use a single interpolation with the full expression.
+- **Multi-line ternary chains don't parse.** `cond1 ? val1\n: cond2 ? val2\n: default` — the `:` on a new line is parsed as something else. **Fix:** keep the entire ternary chain on one line, or extract conditions into named bindings and nest: `cond1 ? val1 : (cond2 ? val2 : default)`.
+- **`{}` is Unit, not empty Record.** `f x {}` passes Unit as the second arg, not an empty record. This breaks functions expecting a Record (e.g., `tasks.list store {}`). **Fix:** use `()` explicitly for Unit, or handle Unit in the function: `filter_rec == () ? defaults : filter_rec.field`.
+
 ## Incomplete Wiring
 
 - **`uses` bindings are metadata-only.** `Value::Agent` holds `uses` and `on` fields, but `uses` bindings are not auto-connected to MCP servers at runtime. **Workaround:** Connect MCP manually in method bodies or `init`.

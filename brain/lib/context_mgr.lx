@@ -1,22 +1,22 @@
 -- Context window management: pressure monitoring, eviction, prioritization
 -- Source: manages the finite attention window — what to keep, what to evict
 
-use std/context
-use std/prompt
+use pkg/context {ContextWindow}
+use pkg/prompt
 use std/ai
 use std/time
 use ../protocols {ContextItem CognitiveState}
 
 +init = (capacity: Int) -> Any {
-  context.create {capacity: capacity}
+  ContextWindow {capacity: capacity}
 }
 
 +add_item = (win: Any  item: ContextItem) -> Any {
-  context.add win {key: item.key  content: item.content  tokens: item.tokens  priority: item.priority}
+  win.add {key: item.key  content: item.content  tokens: item.tokens  priority: item.priority}
 }
 
 +add_perception = (win: Any  perception: Any) -> Any {
-  context.add win {
+  win.add {
     key: "perception_{perception.intent}"
     content: "Intent: {perception.intent} | Domain: {perception.domain} | Input: {perception.raw}"
     tokens: len perception.raw / 4 + 20
@@ -26,7 +26,7 @@ use ../protocols {ContextItem CognitiveState}
 
 +add_reasoning = (win: Any  chain: Any) -> Any {
   summary = chain.thoughts | map (.content) | join " → "
-  context.add win {
+  win.add {
     key: "reasoning_{chain.goal | take 20}"
     content: "Goal: {chain.goal}\nChain: {summary}\nConclusion: {chain.conclusion}"
     tokens: len summary / 4 + 30
@@ -35,7 +35,7 @@ use ../protocols {ContextItem CognitiveState}
 }
 
 +add_tool_result = (win: Any  result: Any) -> Any {
-  context.add win {
+  win.add {
     key: "tool_{result.tool}_{time.now ()}"
     content: to_str result.output
     tokens: result.tokens_used
@@ -44,23 +44,23 @@ use ../protocols {ContextItem CognitiveState}
 }
 
 +pin_identity = (win: Any  identity: Any) -> Any {
-  context.add win {
+  win.add {
     key: "identity"
     content: "I am {identity.name}, a {identity.role}. Values: {identity.values | join ', '}."
     tokens: 50
     priority: "high"
   }
-  context.pin "identity" win
+  win.pin "identity"
 }
 
 +pin_user_context = (win: Any  key: Str  content: Str) -> Any {
   tokens = len content / 4
-  context.add win {key: key  content: content  tokens: tokens  priority: "high"}
-  context.pin key win
+  win.add {key: key  content: content  tokens: tokens  priority: "high"}
+  win.pin key
 }
 
 +pressure = (win: Any) -> Float {
-  context.usage win | (.pressure)
+  win.usage () | (.pressure)
 }
 
 +pressure_level = (win: Any) -> Str {
@@ -72,12 +72,12 @@ use ../protocols {ContextItem CognitiveState}
   level = pressure_level win
   level ? {
     "critical" -> {
-      context.evict_until win "lowest_priority" {target_pct: 0.6}
+      win.evict_until "lowest_priority" {target_pct: 0.6}
       log.warn "context pressure critical — evicted to 60%"
       win
     }
     "high" -> {
-      context.evict win "largest"
+      win.evict "largest"
       log.info "context pressure high — evicted largest item"
       win
     }
@@ -86,16 +86,16 @@ use ../protocols {ContextItem CognitiveState}
 }
 
 +summarize_and_compress = (win: Any) -> Any {
-  items = context.items win
-  unpinned = items | filter (i) not (context.is_pinned i.key win ?? false)
+  items = win.items ()
+  unpinned = items | filter (i) not (win.is_pinned i.key ?? false)
 
   unpinned | len < 3 ? win : {
     to_compress = unpinned | sort_by (.tokens) | rev | take 3
 
     to_compress | each (item) {
       compressed = compress_item item ^
-      context.remove win item.key
-      context.add win {
+      win.remove item.key
+      win.add {
         key: item.key
         content: compressed
         tokens: len compressed / 4
@@ -118,8 +118,8 @@ compress_item = (item: Any) -> Str {
 }
 
 +snapshot = (win: Any) -> Any {
-  usage = context.usage win
-  items = context.items win
+  usage = win.usage ()
+  items = win.items ()
   {
     capacity: usage.capacity
     used: usage.used
@@ -131,8 +131,8 @@ compress_item = (item: Any) -> Str {
 }
 
 +clear_ephemeral = (win: Any) -> Int {
-  items = context.items win
+  items = win.items ()
   ephemeral = items | filter (i) i.priority == "low"
-  ephemeral | each (item) context.remove win item.key
+  ephemeral | each (item) win.remove item.key
   len ephemeral
 }

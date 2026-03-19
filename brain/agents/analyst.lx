@@ -2,7 +2,7 @@
 -- Source: dispatched when perception flags a complex or ambiguous input
 
 use std/ai
-use std/prompt
+use pkg/prompt
 use ../traits {Analyst}
 
 Protocol AnalysisResult = {

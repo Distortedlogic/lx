@@ -1,6 +1,6 @@
 use std/fs
 use std/json
-use std/circuit
+use pkg/circuit {CircuitBreaker}
 
 +run = (input) {
   actions_path = input.actions_path
@@ -9,18 +9,18 @@ use std/circuit
   content = fs.read actions_path ^
   actions = json.parse content ^
 
-  breaker = circuit.create {max_turns: max_turns  repetition_window: rep_window}
+  breaker = CircuitBreaker {max_turns: max_turns  repetition_window: rep_window}
   completed := false
   last_thought := ""
   turn_count := 0
 
   actions | each (turn) {
-    tripped = circuit.is_tripped breaker
+    tripped = breaker.is_tripped ()
     !tripped && !completed ? {
       true -> {
-        circuit.tick breaker
+        breaker.tick ()
         action_name = turn.action ?? "unknown"
-        circuit.record breaker action_name
+        breaker.record action_name
         turn_count <- turn_count + 1
 
         is_done = turn.done ?? false
@@ -36,8 +36,8 @@ use std/circuit
     }
   }
 
-  status = circuit.status breaker
-  tripped_final = circuit.is_tripped breaker
+  status = breaker.status ()
+  tripped_final = breaker.is_tripped ()
   reason = get "reason" status ?? ""
   is_doom = reason | contains? "repetition"
   cb_fired = tripped_final && !is_doom

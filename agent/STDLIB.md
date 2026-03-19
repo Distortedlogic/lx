@@ -3,6 +3,12 @@
 
 # lx Standard Library
 
+**Note:** 8 modules are now Class-based packages in `pkg/`. Import the Class name:
+`use pkg/circuit {CircuitBreaker}`, `use pkg/knowledge {KnowledgeBase}`, `use pkg/tasks {TaskStore}`,
+`use pkg/trace {TraceStore}`, `use pkg/memory {MemoryStore}`, `use pkg/context {ContextWindow}`,
+`use pkg/introspect {Inspector}`, `use pkg/pool {Pool}`. `pkg/prompt` remains a pure record builder.
+Construct with `ClassName {field: val}` or `ClassName ()`. Methods via `instance.method args`.
+
 ## AI (std/ai)
 
 ```lx

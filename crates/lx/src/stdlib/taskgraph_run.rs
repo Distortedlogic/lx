@@ -189,16 +189,17 @@ fn execute_task(
         return Ok(input.clone());
     };
 
+    let _guard = timeout_ms.map(crate::stdlib::deadline::scoped);
+    let retry_opts = crate::stdlib::retry::RetryOpts::exponential((retry_count + 1) as u64);
     let mut last_err = None;
     for attempt in 0..=retry_count {
-        let start = std::time::Instant::now();
         match call_value(handler, input.clone(), span, ctx) {
             Ok(result) => {
-                if let Some(ms) = timeout_ms
-                    && start.elapsed().as_millis() > ms as u128
+                if let Some(ref g) = _guard
+                    && g.is_expired()
                 {
                     return Err(LxError::runtime(
-                        format!("taskgraph: task '{task_id}' exceeded {ms}ms timeout"),
+                        format!("taskgraph: task '{task_id}' exceeded timeout"),
                         span,
                     ));
                 }
@@ -207,7 +208,7 @@ fn execute_task(
             Err(e) => {
                 last_err = Some(e);
                 if attempt < retry_count {
-                    let delay = 100 * 2u64.pow(attempt);
+                    let delay = crate::stdlib::retry::compute_delay(&retry_opts, attempt as u64);
                     std::thread::sleep(std::time::Duration::from_millis(delay));
                 }
             }

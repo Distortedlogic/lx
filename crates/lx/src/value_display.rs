@@ -162,6 +162,9 @@ impl fmt::Display for Value {
             Value::McpDecl { name, .. } => write!(f, "<MCP {name}>"),
             Value::Trait { name, .. } => write!(f, "<Trait {name}>"),
             Value::Agent { name, .. } => write!(f, "<Agent {name}>"),
+            Value::Class { name, .. } => write!(f, "<Class {name}>"),
+            Value::Object { class_name, id, .. } => write!(f, "<{class_name}#{id}>"),
+            Value::Store { id } => write!(f, "<Store#{id}>"),
         }
     }
 }

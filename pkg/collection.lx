@@ -1,0 +1,15 @@
+-- lx package: Collection trait for Store-backed Classes
+-- Any Class with `entries: Store ()` can conform to Collection and get
+-- generic key-value operations for free via Trait defaults.
+
++Trait Collection = {
+  get = (key) { self.entries.get key }
+  keys = () { self.entries.keys () }
+  values = () { self.entries.values () }
+  remove = (key) { self.entries.remove key }
+  query = (pred) { self.entries.values () | filter pred }
+  len = () { self.entries.len () }
+  has = (key) { self.entries.has key }
+  save = (path) { self.entries.save path }
+  load = (path) { self.entries.load path }
+}

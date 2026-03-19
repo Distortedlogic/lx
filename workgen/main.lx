@@ -16,8 +16,8 @@ use std/ai
 use std/env
 use std/md
 use std/audit
-use std/trace
-use std/prompt
+use pkg/trace {TraceStore}
+use pkg/prompt
 use std/agents/grader
 use std/agents/auditor
 
@@ -66,7 +66,7 @@ required_sections = ["Goal" "Why" "What changes" "Files affected" "Task List" "C
   base = raw_name | split "." | first ^
   name = base | replace "-" "_" | upper
 
-  session = trace.create "/tmp/lx_workgen_trace.json" ^
+  session = TraceStore {path: "/tmp/lx_workgen_trace.json"}
 
   emit "=== Work Item Generator ==="
   emit "audit: {audit_path}"
@@ -74,16 +74,16 @@ required_sections = ["Goal" "Why" "What changes" "Files affected" "Task List" "C
   emit "output: work_items/{name}.md\n"
 
   findings = investigate audit_content root ^
-  trace.record {name: "investigate"  input: audit_path  output: findings} session ^
+  session.record {name: "investigate"  input: audit_path  output: findings} ^
 
   draft = compose audit_content rules_content findings ^
-  trace.record {name: "compose"  input: "findings"  output: draft} session ^
+  session.record {name: "compose"  input: "findings"  output: draft} ^
 
   out_path = write_draft name draft ^
 
   final = verify_and_revise session out_path draft name ^
   fs.write out_path final ^
-  trace.record {name: "complete"  input: name  output: out_path} session ^
+  session.record {name: "complete"  input: name  output: out_path} ^
 
   emit "\n=== complete: {out_path} ==="
   Ok {path: out_path  name: name}
@@ -207,12 +207,12 @@ verify_and_revise = (session path draft name) {
 
   loop {
     grade_result = grade_draft current name prev_grades
-    trace.record {name: "progress"  score: grade_result.score  output: "round"} session ^
+    session.record {name: "progress"  score: grade_result.score  output: "round"} ^
     emit "  score {grade_result.score} passed={grade_result.passed}"
 
     grade_result.passed ? break ()
 
-    should_stop = trace.should_stop {min_delta: 2.0  window: 3} session
+    should_stop = session.should_stop {min_delta: 2.0  window: 3}
     should_stop ? {
       true -> {
         emit "  diminishing returns — stopping"

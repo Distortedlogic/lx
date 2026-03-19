@@ -2,11 +2,11 @@
 -- Source: bridges cognitive intent to concrete actions via MCP/shell/AI
 
 use std/ai
-use std/prompt
+use pkg/prompt
 use std/mcp
 use std/budget
 use std/retry
-use std/circuit
+use pkg/circuit {CircuitBreaker}
 use std/time
 use ../protocols {ToolRequest ToolResult ActionPlan ActionResult}
 
@@ -82,7 +82,7 @@ tool_costs = %{
 }
 
 +execute_with_retry = (request: ToolRequest  breaker: Any) -> Any {
-  circuit.is_tripped breaker ? Err "circuit breaker tripped" : {
+  breaker.check () ? Err "circuit breaker tripped" : {
     result = retry.retry_with {
       max_attempts: 3
       base_delay_ms: 500
@@ -92,8 +92,8 @@ tool_costs = %{
     }
 
     result ? {
-      Ok r -> { circuit.record true breaker; Ok r }
-      Err e -> { circuit.record false breaker; Err e }
+      Ok r -> { breaker.record true; Ok r }
+      Err e -> { breaker.record false; Err e }
     }
   }
 }

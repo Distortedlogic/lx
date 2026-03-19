@@ -157,6 +157,17 @@ impl Checker {
                 }
                 Type::Unit
             }
+            Stmt::ClassDecl {
+                fields, methods, ..
+            } => {
+                for f in fields {
+                    self.synth(&f.default);
+                }
+                for m in methods {
+                    self.synth(&m.handler);
+                }
+                Type::Unit
+            }
             Stmt::FieldUpdate { value, .. } => {
                 self.synth(value);
                 Type::Unit

@@ -1,5 +1,7 @@
-use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, LazyLock};
 
+use dashmap::DashMap;
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 use strum::IntoStaticStr;
@@ -63,6 +65,7 @@ pub enum Value {
     Trait {
         name: Arc<str>,
         methods: Arc<Vec<TraitMethodDef>>,
+        defaults: Arc<IndexMap<String, Value>>,
         requires: Arc<Vec<Arc<str>>>,
         description: Option<Arc<str>>,
         tags: Arc<Vec<Arc<str>>>,
@@ -75,6 +78,88 @@ pub enum Value {
         uses: Arc<Vec<(Arc<str>, Arc<str>)>>,
         on: Option<Box<Value>>,
     },
+    Class {
+        name: Arc<str>,
+        traits: Arc<Vec<Arc<str>>>,
+        defaults: Arc<IndexMap<String, Value>>,
+        methods: Arc<IndexMap<String, Value>>,
+    },
+    Object {
+        class_name: Arc<str>,
+        id: u64,
+        traits: Arc<Vec<Arc<str>>>,
+        methods: Arc<IndexMap<String, Value>>,
+    },
+    Store {
+        id: u64,
+    },
+}
+
+static OBJECTS: LazyLock<DashMap<u64, IndexMap<String, Value>>> = LazyLock::new(DashMap::new);
+static NEXT_OBJ_ID: AtomicU64 = AtomicU64::new(1);
+
+pub fn object_store_insert(fields: IndexMap<String, Value>) -> u64 {
+    let id = NEXT_OBJ_ID.fetch_add(1, Ordering::Relaxed);
+    OBJECTS.insert(id, fields);
+    id
+}
+
+pub fn object_store_get_field(id: u64, field: &str) -> Option<Value> {
+    OBJECTS.get(&id).and_then(|f| f.get(field).cloned())
+}
+
+pub fn object_store_set_field(id: u64, field: &str, value: Value) {
+    if let Some(mut f) = OBJECTS.get_mut(&id) {
+        f.insert(field.to_string(), value);
+    }
+}
+
+pub fn object_store_update_nested(id: u64, path: &[String], value: Value) -> Result<(), String> {
+    let Some(mut fields) = OBJECTS.get_mut(&id) else {
+        return Err("object not found".into());
+    };
+    match path {
+        [field] => {
+            fields.insert(field.clone(), value);
+            Ok(())
+        }
+        [field, rest @ ..] => {
+            let inner = fields
+                .get(field)
+                .ok_or_else(|| format!("field '{field}' not found"))?
+                .clone();
+            let updated = update_nested_record(&inner, rest, value)?;
+            fields.insert(field.clone(), updated);
+            Ok(())
+        }
+        [] => Err("empty field path".into()),
+    }
+}
+
+fn update_nested_record(val: &Value, path: &[String], new_val: Value) -> Result<Value, String> {
+    let Value::Record(rec) = val else {
+        return Err(format!(
+            "field update requires Record, got {}",
+            val.type_name()
+        ));
+    };
+    match path {
+        [field] => {
+            let mut new_rec = rec.as_ref().clone();
+            new_rec.insert(field.clone(), new_val);
+            Ok(Value::Record(Arc::new(new_rec)))
+        }
+        [field, rest @ ..] => {
+            let inner = rec
+                .get(field)
+                .ok_or_else(|| format!("field '{field}' not found"))?;
+            let updated = update_nested_record(inner, rest, new_val)?;
+            let mut new_rec = rec.as_ref().clone();
+            new_rec.insert(field.clone(), updated);
+            Ok(Value::Record(Arc::new(new_rec)))
+        }
+        [] => Err("empty field path".into()),
+    }
 }
 
 #[derive(Debug, Clone)]

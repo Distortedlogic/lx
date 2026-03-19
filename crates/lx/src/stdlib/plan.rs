@@ -10,6 +10,8 @@ use crate::record;
 use crate::span::Span;
 use crate::value::Value;
 
+use super::step_deps;
+
 pub fn build() -> IndexMap<String, Value> {
     let mut m = IndexMap::new();
     m.insert("run".into(), mk("plan.run", 3, bi_run));
@@ -91,34 +93,6 @@ fn call3(
     call_value(&p2, c, span, ctx)
 }
 
-fn step_id(step: &Value) -> Option<&str> {
-    match step {
-        Value::Record(r) => r.get("id").and_then(|v| v.as_str()),
-        _ => None,
-    }
-}
-
-fn step_deps(step: &Value) -> Vec<String> {
-    match step {
-        Value::Record(r) => r
-            .get("depends")
-            .and_then(|v| v.as_list())
-            .map(|l| {
-                l.iter()
-                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                    .collect()
-            })
-            .unwrap_or_default(),
-        _ => vec![],
-    }
-}
-
-fn next_ready(remaining: &[Value], completed: &HashSet<String>) -> Option<usize> {
-    remaining
-        .iter()
-        .position(|step| step_deps(step).iter().all(|d| completed.contains(d)))
-}
-
 fn build_context(completed_results: &[(String, Value)]) -> Value {
     let items: Vec<Value> = completed_results
         .iter()
@@ -178,13 +152,13 @@ fn bi_run(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, Lx
         if remaining.is_empty() {
             break;
         }
-        let Some(idx) = next_ready(&remaining, &completed_ids) else {
+        let Some(idx) = step_deps::next_ready(&remaining, &completed_ids) else {
             return Ok(Value::Err(Box::new(Value::Str(Arc::from(
                 "plan: cycle or unmet dependencies in remaining steps",
             )))));
         };
         let step = remaining.remove(idx);
-        let sid = step_id(&step).unwrap_or("unknown").to_string();
+        let sid = step_deps::step_id(&step).unwrap_or("unknown").to_string();
         let context = build_context(&completed_results);
         let result = call2(executor, step.clone(), context, span, ctx)?;
         let plan_state = build_plan_state(&completed_results, &remaining, &step);
@@ -195,7 +169,7 @@ fn bi_run(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, Lx
             Some("continue") | None => {}
             Some("skip") => {
                 let to_skip = find_successors(&sid, &remaining);
-                remaining.retain(|s| step_id(s).is_none_or(|id| !to_skip.contains(id)));
+                remaining.retain(|s| step_deps::step_id(s).is_none_or(|id| !to_skip.contains(id)));
             }
             Some("abort") => {
                 let reason = match &action {
@@ -250,11 +224,14 @@ fn find_successors(current_id: &str, remaining: &[Value]) -> HashSet<String> {
     while changed {
         changed = false;
         for step in remaining {
-            let sid = step_id(step).unwrap_or("").to_string();
+            let sid = step_deps::step_id(step).unwrap_or("").to_string();
             if to_skip.contains(&sid) {
                 continue;
             }
-            if step_deps(step).iter().any(|d| to_skip.contains(d)) {
+            if step_deps::step_deps(step)
+                .iter()
+                .any(|d| to_skip.contains(d))
+            {
                 to_skip.insert(sid);
                 changed = true;
             }

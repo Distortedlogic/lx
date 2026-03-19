@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::ast::{Param, SExpr};
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::{LxFunc, Value};
+use crate::value::{self, LxFunc, Value};
 
 use super::Interpreter;
 
@@ -101,6 +101,42 @@ impl Interpreter {
                 self.apply_protocol_union(&name, &variants, &arg, span)
             }
             Value::McpDecl { name, tools } => self.apply_mcp_decl(&name, &tools, &arg, span),
+            Value::Class {
+                name,
+                traits,
+                defaults,
+                methods,
+            } => {
+                let overrides = match &arg {
+                    Value::Record(r) => r.as_ref().clone(),
+                    Value::Unit => indexmap::IndexMap::new(),
+                    _ => {
+                        return Err(LxError::type_err(
+                            format!(
+                                "Class {name} constructor expects Record or (), got {}",
+                                arg.type_name()
+                            ),
+                            span,
+                        ));
+                    }
+                };
+                let mut fields = defaults.as_ref().clone();
+                for (k, v) in overrides {
+                    fields.insert(k, v);
+                }
+                for v in fields.values_mut() {
+                    if let Value::Store { id: store_id } = v {
+                        *store_id = crate::stdlib::store_clone(*store_id);
+                    }
+                }
+                let id = value::object_store_insert(fields);
+                Ok(Value::Object {
+                    class_name: name,
+                    id,
+                    traits,
+                    methods,
+                })
+            }
             other => Err(LxError::type_err(
                 format!("cannot call {}, not a function", other.type_name()),
                 span,

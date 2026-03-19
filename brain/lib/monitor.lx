@@ -1,14 +1,14 @@
 -- Self-monitoring: circuit breakers, stuck detection, strategy adaptation
 -- Source: metacognitive watchdog — prevents doom loops and wasted resources
 
-use std/introspect
-use std/circuit
+use pkg/introspect {Inspector}
+use pkg/circuit {CircuitBreaker}
 use std/budget
 use std/time
 use ../protocols {CognitiveState}
 
 +init = () -> Any {
-  breaker = circuit.create {
+  breaker = CircuitBreaker {
     max_turns: 50
     max_actions: 200
     max_time_ms: 600000
@@ -28,13 +28,14 @@ use ../protocols {CognitiveState}
 }
 
 +tick = (state: Any) -> Any {
-  circuit.tick state.breaker
+  state.breaker.tick ()
   state
 }
 
 +record_action = (state: Any  action_type: Str  target: Str) -> Any {
-  introspect.record {type: action_type  target: target}
-  circuit.record action_type state.breaker
+  ins = Inspector ()
+  ins.record {type: action_type  target: target}
+  state.breaker.record action_type
   state
 }
 
@@ -44,12 +45,13 @@ use ../protocols {CognitiveState}
 }
 
 +check_health = (state: Any) -> CognitiveState {
-  tripped = circuit.is_tripped state.breaker
+  tripped = state.breaker.check ()
   budget_status = budget.status state.budget
-  elapsed = introspect.elapsed ()
-  turn = introspect.turn_count ()
-  stuck = introspect.is_stuck ()
-  action_count = introspect.actions () | len
+  ins = Inspector ()
+  elapsed = ins.elapsed ()
+  turn = ins.turn_count ()
+  stuck = ins.is_stuck ()
+  action_count = ins.actions () | len
 
   CognitiveState {
     turn: turn
@@ -68,7 +70,7 @@ use ../protocols {CognitiveState}
 }
 
 +should_stop = (state: Any) -> Bool {
-  circuit.is_tripped state.breaker
+  state.breaker.check ()
 }
 
 +should_simplify = (state: Any) -> Bool {
@@ -79,11 +81,12 @@ use ../protocols {CognitiveState}
 +suggest_strategy = (state: Any) -> Str {
   health = check_health state
 
+  ins = Inspector ()
   suggestion = health.strategy ? {
     "circuit_tripped" -> "stop"
     "stuck" -> {
-      actions = introspect.actions ()
-      repeated = introspect.similar_actions actions 3
+      actions = ins.actions ()
+      repeated = ins.similar_actions actions 3
       repeated | len > 0 ?
         "pivot — repeated actions: {repeated | map (.type) | join ', '}"
         : "simplify — reduce scope and try different approach"
@@ -98,17 +101,19 @@ use ../protocols {CognitiveState}
     }
   }
 
-  suggestion != "continue" ? introspect.strategy_shift suggestion : ()
+  suggestion != "continue" ? ins.strategy_shift suggestion : ()
   suggestion
 }
 
 +checkpoint = (state: Any  name: Str) -> Any {
-  introspect.mark name
-  log.info "checkpoint: {name} | turn: {introspect.turn_count ()} | budget: {budget.status state.budget}"
+  ins = Inspector ()
+  ins.mark name
+  log.info "checkpoint: {name} | turn: {ins.turn_count ()} | budget: {budget.status state.budget}"
 }
 
 +actions_since = (name: Str) -> [Any] {
-  introspect.actions_since name
+  ins = Inspector ()
+  ins.actions_since name
 }
 
 +remaining_budget = (state: Any) -> Any {

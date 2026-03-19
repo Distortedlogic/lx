@@ -27,6 +27,9 @@ impl super::Parser {
         if *self.peek() == TokenKind::AgentKw {
             return self.parse_agent_decl(exported, start);
         }
+        if *self.peek() == TokenKind::ClassKw {
+            return self.parse_class_decl(exported, start);
+        }
         if let Some(type_def) = self.try_parse_type_def(exported, start)? {
             return Ok(type_def);
         }

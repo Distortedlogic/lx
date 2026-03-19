@@ -1,19 +1,20 @@
 -- Self-introspection: the brain observing its own processes
 -- Source: metacognitive awareness — am I on track, what am I doing, should I change
 
-use std/introspect
-use std/trace
+use pkg/introspect {Inspector}
+use pkg/trace {TraceStore}
 use std/time
-use std/prompt
+use pkg/prompt
 use std/ai
 use ../protocols {CognitiveState}
 
 +self_assess = () -> Any {
-  identity = introspect.self ()
-  elapsed = introspect.elapsed ()
-  turns = introspect.turn_count ()
-  actions = introspect.actions ()
-  stuck = introspect.is_stuck ()
+  ins = Inspector ()
+  identity = ins.self ()
+  elapsed = ins.elapsed ()
+  turns = ins.turn_count ()
+  actions = ins.actions ()
+  stuck = ins.is_stuck ()
 
   {
     identity: identity
@@ -52,7 +53,8 @@ use ../protocols {CognitiveState}
 }
 
 +strategy_analysis = () -> Any {
-  actions = introspect.actions ()
+  ins = Inspector ()
+  actions = ins.actions ()
 
   actions | len < 5 ? {
     current: "too_early"
@@ -80,8 +82,9 @@ use ../protocols {CognitiveState}
 }
 
 +time_pressure = () -> Any {
-  elapsed = introspect.elapsed ()
-  budget_info = introspect.budget ()
+  ins = Inspector ()
+  elapsed = ins.elapsed ()
+  budget_info = ins.budget ()
 
   elapsed_pct = budget_info.total_ms > 0 ?
     elapsed / budget_info.total_ms * 100.0

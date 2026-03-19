@@ -2,9 +2,9 @@
 -- Source: metacognitive loop — evaluate outcomes, extract patterns, update strategy
 
 use std/ai
-use std/prompt
-use std/trace
-use std/knowledge
+use pkg/prompt
+use pkg/trace {TraceStore}
+use pkg/knowledge {KnowledgeBase}
 use ../protocols {Reflection FeedbackSignal}
 
 +reflect = (action: Str  outcome: Str  expectation: Str) -> Reflection {
@@ -100,7 +100,7 @@ assess_quality = (outcome: Str  expectation: Str) -> Float {
 }
 
 +trace_reflection = (session: Any  reflection: Reflection) -> Any {
-  trace.record {
+  session.record {
     name: "reflection"
     input: reflection.action
     output: reflection.lesson
@@ -108,9 +108,9 @@ assess_quality = (outcome: Str  expectation: Str) -> Float {
       reflection.strategy_worked ? "success" : "failure"
       reflection.should_remember ? "memorable" : "routine"
     ]
-  } session ^
+  } ^
 
-  reflection.quality | (q) trace.score "reflection" q session ^
+  reflection.quality | (q) session.score "reflection" q ^
 }
 
 +improvement_suggestions = (patterns: Any) -> [Str] {

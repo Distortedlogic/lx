@@ -8,7 +8,7 @@
 
 use std/fs
 use std/env
-use std/trace
+use pkg/trace {TraceStore}
 use std/agents/grader
 use std/audit
 use ../main : workgen
@@ -45,7 +45,7 @@ run_scenario = (scenario) {
 }
 
 +main = () {
-  session = trace.create "/tmp/lx_workgen_test_trace.json" ^
+  session = TraceStore {path: "/tmp/lx_workgen_test_trace.json"}
   tag_filter = env.get "TEST_TAG" ?? ""
 
   scenarios = tag_filter == "" ? {
@@ -60,7 +60,7 @@ run_scenario = (scenario) {
   results = scenarios | pmap_n 4 run_scenario
 
   results | each (r) {
-    trace.record {name: r.name  output: (to_str r.score)  score: r.score} session ^
+    session.record {name: r.name  output: (to_str r.score)  score: r.score} ^
   }
 
   passed_count = results | filter (.passed) | len

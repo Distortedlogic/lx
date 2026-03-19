@@ -1,70 +1,72 @@
 -- 32_introspect.lx
--- Tests: std/introspect module (agent self-awareness)
+-- Tests: pkg/introspect Inspector class (agent self-awareness)
 
-use std/introspect
+use pkg/introspect {Inspector}
+
+ins = Inspector ()
 
 -- === Self identity ===
-me = introspect.self ()
+me = ins.identity ()
 assert (me.name == "main") "self name"
 assert (me.role == "main") "self role"
 assert (me.pid > 0) "self pid"
 
 -- === Elapsed time ===
-t = introspect.elapsed ()
+t = ins.elapsed ()
 assert (t >= 0.0) "elapsed non-negative"
 
 -- === Turn count ===
-assert (introspect.turn_count () == 0) "initial turn count"
-introspect.tick_turn ()
-introspect.tick_turn ()
-assert (introspect.turn_count () == 2) "turn count after ticks"
+assert (ins.turn_count () == 0) "initial turn count"
+ins.tick_turn ()
+ins.tick_turn ()
+assert (ins.turn_count () == 2) "turn count after ticks"
 
 -- === Budget (unlimited) ===
-b = introspect.budget ()
+b = ins.budget ()
 assert (b.total == (0 - 1)) "budget unlimited total"
 assert (b.remaining == (0 - 1)) "budget unlimited remaining"
 
 -- === Record + actions ===
-introspect.record {type: "fs_read" target: "src/main.rs"}
-introspect.record {type: "mcp_call" target: "search"}
-introspect.record {type: "fs_read" target: "src/lib.rs"}
+ins.record {type: "fs_read" target: "src/main.rs"}
+ins.record {type: "mcp_call" target: "search"}
+ins.record {type: "fs_read" target: "src/lib.rs"}
 
-actions = introspect.actions ()
+actions = ins.get_actions ()
 assert (len actions == 3) "actions count"
 assert (actions.0.type == "fs_read") "action type"
 assert (actions.0.target == "src/main.rs") "action target"
 assert (len actions.0.time > 0) "action has timestamp"
 
 -- === Mark + actions_since ===
-introspect.mark "checkpoint_1"
-introspect.record {type: "shell" target: "cargo test"}
-introspect.record {type: "fs_read" target: "Cargo.toml"}
+ins.mark "checkpoint_1"
+ins.record {type: "shell" target: "cargo test"}
+ins.record {type: "fs_read" target: "Cargo.toml"}
 
-since = introspect.actions_since "checkpoint_1"
+since = ins.actions_since "checkpoint_1"
 assert (len since == 2) "actions_since marker"
 assert (since.0.type == "shell") "actions_since first"
 
 -- === Is stuck (not stuck) ===
-assert (introspect.is_stuck () == false) "not stuck with varied actions"
+assert (ins.is_stuck () == false) "not stuck with varied actions"
 
 -- === Is stuck (stuck) ===
-introspect.record {type: "search" target: "same query"}
-introspect.record {type: "search" target: "same query"}
-introspect.record {type: "search" target: "same query"}
-introspect.record {type: "search" target: "same query"}
-introspect.record {type: "search" target: "same query"}
-assert (introspect.is_stuck () == true) "stuck after 5 identical"
+ins.record {type: "search" target: "same query"}
+ins.record {type: "search" target: "same query"}
+ins.record {type: "search" target: "same query"}
+ins.record {type: "search" target: "same query"}
+ins.record {type: "search" target: "same query"}
+assert (ins.is_stuck () == true) "stuck after 5 identical"
 
 -- === Strategy shift resets stuck ===
-introspect.strategy_shift "try different approach"
-introspect.record {type: "analyze" target: "new file"}
-assert (introspect.is_stuck () == false) "not stuck after shift"
+ins.strategy_shift "try different approach"
+ins.record {type: "analyze" target: "new file"}
+assert (ins.is_stuck () == false) "not stuck after shift"
 
 -- === Similar actions ===
-introspect.record {type: "read" target: "x.rs"}
-introspect.record {type: "read" target: "x.rs"}
-introspect.record {type: "read" target: "x.rs"}
-sim = introspect.similar_actions 5
+ins.record {type: "read" target: "x.rs"}
+ins.record {type: "read" target: "x.rs"}
+ins.record {type: "read" target: "x.rs"}
+sim = ins.similar_actions 5
 assert (sim == 3) "similar actions count"
 
 log.info "32_introspect: all passed"

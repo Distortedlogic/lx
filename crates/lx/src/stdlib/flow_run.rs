@@ -163,20 +163,21 @@ fn run_retry(
             Value::Record(opts) => opts
                 .get("max")
                 .and_then(|v| v.as_int())
-                .and_then(|n| i64::try_from(n).ok()),
+                .and_then(|n| u64::try_from(n).ok()),
             _ => None,
         })
         .unwrap_or(3);
 
+    let retry_opts = crate::stdlib::retry::RetryOpts::exponential(max);
     let mut last_err = None;
     for attempt in 0..max {
         match run_flow(inner, input, span, ctx) {
             Ok(result) => return Ok(result),
             Err(e) => {
                 last_err = Some(e);
-                if attempt < max - 1 {
-                    let delay_ms = 100 * 2u64.pow(attempt as u32);
-                    std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+                if attempt + 1 < max {
+                    let delay = crate::stdlib::retry::compute_delay(&retry_opts, attempt);
+                    std::thread::sleep(std::time::Duration::from_millis(delay));
                 }
             }
         }
@@ -202,9 +203,9 @@ fn run_timeout(
         })
         .unwrap_or(300);
 
-    let start = std::time::Instant::now();
+    let guard = crate::stdlib::deadline::scoped(seconds as u64 * 1000);
     let result = run_flow(inner, input, span, ctx)?;
-    if start.elapsed().as_secs() > seconds as u64 {
+    if guard.is_expired() {
         return Err(LxError::runtime(
             format!("flow.run: exceeded {seconds}s timeout"),
             span,

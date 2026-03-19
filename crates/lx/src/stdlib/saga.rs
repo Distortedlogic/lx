@@ -11,6 +11,8 @@ use crate::record;
 use crate::span::Span;
 use crate::value::Value;
 
+use super::step_deps;
+
 pub fn build() -> IndexMap<String, Value> {
     let mut m = IndexMap::new();
     m.insert("run".into(), mk("saga.run", 1, bi_run));
@@ -45,34 +47,6 @@ fn parse_opts(v: &Value, span: Span) -> Result<SagaOpts, LxError> {
     })
 }
 
-fn step_id(step: &Value) -> Option<&str> {
-    match step {
-        Value::Record(r) => r.get("id").and_then(|v| v.as_str()),
-        _ => None,
-    }
-}
-
-fn step_deps(step: &Value) -> Vec<String> {
-    match step {
-        Value::Record(r) => r
-            .get("depends")
-            .and_then(|v| v.as_list())
-            .map(|l| {
-                l.iter()
-                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                    .collect()
-            })
-            .unwrap_or_default(),
-        _ => vec![],
-    }
-}
-
-fn next_ready(remaining: &[Value], completed: &HashSet<String>) -> Option<usize> {
-    remaining
-        .iter()
-        .position(|step| step_deps(step).iter().all(|d| completed.contains(d)))
-}
-
 fn build_prev(completed: &[(String, Value)]) -> Value {
     let mut fields = IndexMap::new();
     for (id, result) in completed {
@@ -95,16 +69,21 @@ fn try_step(
     span: Span,
     ctx: &Arc<RuntimeCtx>,
 ) -> Result<Value, Value> {
+    let retry_opts = super::retry::RetryOpts::exponential((retries + 1) as u64);
     for attempt in 0..=retries {
         let last = attempt == retries;
         match call_value(do_fn, prev.clone(), span, ctx) {
             Ok(Value::Err(e)) if last => return Err(*e),
-            Ok(Value::Err(_)) => continue,
+            Ok(Value::Err(_)) => {}
             Ok(v) => return Ok(v),
             Err(LxError::Propagate { value, .. }) if last => return Err(*value),
-            Err(LxError::Propagate { .. }) => continue,
+            Err(LxError::Propagate { .. }) => {}
             Err(e) if last => return Err(Value::Str(Arc::from(e.to_string()))),
-            Err(_) => continue,
+            Err(_) => {}
+        }
+        if !last {
+            let delay = super::retry::compute_delay(&retry_opts, attempt as u64);
+            std::thread::sleep(std::time::Duration::from_millis(delay));
         }
     }
     unreachable!()
@@ -198,11 +177,11 @@ fn run_saga(
                 comp_err,
             ));
         }
-        let Some(idx) = next_ready(&remaining, &completed_ids) else {
+        let Some(idx) = step_deps::next_ready(&remaining, &completed_ids) else {
             return Err(LxError::runtime("saga: cycle or unmet dependencies", span));
         };
         let step = remaining.remove(idx);
-        let sid = step_id(&step).unwrap_or("unknown").to_string();
+        let sid = step_deps::step_id(&step).unwrap_or("unknown").to_string();
         let do_fn = step_fn(&step, "do").ok_or_else(|| {
             LxError::type_err(format!("saga step '{sid}' missing 'do' function"), span)
         })?;

@@ -1,12 +1,12 @@
 -- Multi-turn dialogue management: conversation state, turn tracking, style adaptation
 -- Source: manages the conversation as a whole — not just single turns
 
-use std/context
-use std/prompt
+use pkg/context {ContextWindow}
+use pkg/prompt
 use std/agent
 use std/ai
 use std/time
-use std/trace
+use pkg/trace {TraceStore}
 use ../protocols {Perception Response Identity}
 
 ConversationState = {

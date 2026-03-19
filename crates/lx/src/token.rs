@@ -87,6 +87,7 @@ pub enum TokenKind {
     Mcp,
     Trait,
     AgentKw,
+    ClassKw,
     Emit,
     Yield,
     With,

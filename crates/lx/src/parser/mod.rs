@@ -10,6 +10,7 @@ mod receive;
 mod refine;
 mod statements;
 mod stmt_agent;
+mod stmt_class;
 mod stmt_mcp;
 mod stmt_protocol;
 mod stmt_trait;

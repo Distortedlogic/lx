@@ -9,7 +9,7 @@
 -- Source: mcp-toolbelt/arch_diagrams/agent_lifecycle + subagent_lifecycle
 
 use std/cron
-use std/trace
+use pkg/trace {TraceStore}
 use ../lib/catalog
 use ../lib/dispatch
 use ../lib/memory
@@ -31,7 +31,7 @@ Protocol AgentDef = {name: Str  purpose: Str  domain: Str}
 +seed = (def) {
   emit "seeding {def.name}..."
   mem = memory.create def.name
-  session = trace.create {name: "seed-{def.name}"  source: "lifecycle"}
+  session = TraceStore {path: "seed-{def.name}"}
 
   seeder = catalog.by_name "seeder" specialists.default
   entries = seeder ? {
@@ -45,7 +45,7 @@ Protocol AgentDef = {name: Str  purpose: Str  domain: Str}
   }
 
   count = memory.seed mem entries.patterns
-  trace.record session {name: "seeded"  input: def  output: {count}  success: true}
+  session.record {name: "seeded"  input: def  output: {count}  success: true}
   emit "  seeded {count} L1 entries"
   count
 }

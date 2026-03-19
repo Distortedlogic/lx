@@ -1,0 +1,101 @@
+-- lx package: CircuitBreaker class for agentic loop termination
+use std/time
+
+check_repetition = (acts w) {
+  can_check = w > 0 && (len acts) >= w
+  can_check ? (check_rep_window acts w) : None
+}
+
+check_rep_window = (acts w) {
+  act_len = len acts
+  n = act_len - w
+  window = drop n acts
+  head = first window ^
+  same_count = window | filter (== head) | len
+  same_count == w ? "repetition: last {w} actions identical" : None
+}
+
+find_trip_reason = (st) {
+  now = time.now ()
+  elapsed = (now.ms - st.start_ms) / 1000.0
+  turns_trip = st.turns >= st.max_turns
+  time_trip = elapsed >= st.max_time
+  action_trip = (len st.actions) >= st.max_actions
+  rep = check_repetition st.actions st.repetition_window
+  turns_trip ? "max_turns: {st.turns} >= {st.max_turns}" : (time_trip ? "max_time: exceeded {st.max_time}s" : (action_trip ? "max_actions: {len st.actions} >= {st.max_actions}" : rep))
+}
+
++Class CircuitBreaker = {
+  turns: 0
+  max_turns: 100
+  max_time: 300.0
+  max_actions: 1000
+  repetition_window: 5
+  actions: []
+  start_ms: 0
+  tripped: None
+
+  set_start = () {
+    now = time.now ()
+    self.start_ms <- now.ms
+  }
+
+  ensure_started = () {
+    (self.start_ms == 0) ? (self.set_start ()) : ()
+  }
+
+  set_tripped = (reason) {
+    self.tripped <- reason
+  }
+
+  trip_check = () {
+    reason = (self.tripped == None) ? (find_trip_reason self) : None
+    (reason != None) ? (self.set_tripped reason) : ()
+  }
+
+  tick = () {
+    self.ensure_started ()
+    self.turns <- self.turns + 1
+    self.trip_check ()
+    Ok ()
+  }
+
+  record = (action) {
+    self.ensure_started ()
+    self.actions <- [..self.actions action]
+    self.trip_check ()
+    Ok ()
+  }
+
+  check = () {
+    self.ensure_started ()
+    self.trip_check ()
+    self.tripped != None ? Err {reason: self.tripped} : Ok ()
+  }
+
+  is_tripped = () {
+    self.tripped != None
+  }
+
+  reset = () {
+    now = time.now ()
+    self.turns <- 0
+    self.actions <- []
+    self.start_ms <- now.ms
+    self.tripped <- None
+    Ok ()
+  }
+
+  status = () {
+    now = time.now ()
+    elapsed = (now.ms - self.start_ms) / 1000.0
+    base = {
+      turns: self.turns
+      elapsed: elapsed
+      action_count: len self.actions
+      actions: self.actions
+      tripped: self.tripped != None
+    }
+    self.tripped != None ? ({..base, reason: self.tripped}) : base
+  }
+}

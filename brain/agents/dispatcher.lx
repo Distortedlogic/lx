@@ -3,8 +3,8 @@
 -- Architecture: agents spawned as subprocesses, communicate via ~>?, pub/sub for events
 
 use std/agent
-use std/pool
-use std/trace
+use pkg/pool {Pool}
+use pkg/trace {TraceStore}
 use ../protocols {AgentTask AgentResult}
 
 +create_workforce = () -> Any {
@@ -19,15 +19,15 @@ use ../protocols {AgentTask AgentResult}
 
 +setup_tracing = (workforce: Any  session: Any) -> Any {
   traced_analyst = agent.intercept workforce.analyst (msg next) {
-    trace.record {name: "analyst_msg" input: msg.action ?? "unknown"} session ^
+    session.record {name: "analyst_msg" input: msg.action ?? "unknown"} ^
     next msg
   }
   traced_critic = agent.intercept workforce.critic (msg next) {
-    trace.record {name: "critic_msg" input: msg.action ?? "unknown"} session ^
+    session.record {name: "critic_msg" input: msg.action ?? "unknown"} ^
     next msg
   }
   traced_researcher = agent.intercept workforce.researcher (msg next) {
-    trace.record {name: "researcher_msg" input: msg.action ?? "unknown"} session ^
+    session.record {name: "researcher_msg" input: msg.action ?? "unknown"} ^
     next msg
   }
   {analyst: traced_analyst  critic: traced_critic  researcher: traced_researcher}

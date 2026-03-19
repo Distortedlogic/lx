@@ -4,11 +4,11 @@
 
 use std/agent
 use std/saga
-use std/trace
+use pkg/trace {TraceStore}
 use std/budget
 use std/cron
 use std/ctx
-use std/tasks
+use pkg/tasks {TaskStore}
 use std/diag
 use std/time
 
@@ -35,14 +35,14 @@ use ./agents/dispatcher : dispatch
 
   ctx_mgr.pin_identity context_win id
 
-  with trace.create "/tmp/brain_orchestrator.json" ^ as trace_session {
+  with TraceStore {path: "/tmp/brain_orchestrator.json"} ^ as trace_session {
     workforce = dispatch.create_workforce ()
     traced_workforce = dispatch.setup_tracing workforce trace_session
     topics = dispatch.setup_pubsub traced_workforce
 
-    ts = tasks.empty ()
-    ts = tasks.create ts "cognitive_loop" {priority: "high"}
-    ts = tasks.start ts "cognitive_loop" ^
+    ts = TaskStore ()
+    ts = ts.create "cognitive_loop" {priority: "high"}
+    ts = ts.start "cognitive_loop" ^
 
     gate_check = identity.gate_destructive input
     gate_check ? {
@@ -88,8 +88,8 @@ handle_success = (outputs: Any  input: Str  conversation: Any  memory_store: Any
     } ^
   } : ()
 
-  ts = tasks.submit ts "cognitive_loop" {output: response.content} ^
-  ts = tasks.pass ts "cognitive_loop" ^
+  ts = ts.submit "cognitive_loop" {output: response.content} ^
+  ts = ts.pass "cognitive_loop" ^
 
   mem.save memory_store ^
 
@@ -107,7 +107,7 @@ handle_success = (outputs: Any  input: Str  conversation: Any  memory_store: Any
 handle_failure = (failure: Any  input: Str  conversation: Any  trace_session: Any  workforce: Any  ts: Any) -> Any {
   log.err "cognitive saga failed at step: {failure.failed_step ?? 'unknown'}"
 
-  ts = tasks.submit ts "cognitive_loop" {output: "saga failed"} ^
+  ts = ts.submit "cognitive_loop" {output: "saga failed"} ^
 
   emit "I encountered an issue. Let me try a simpler approach."
 

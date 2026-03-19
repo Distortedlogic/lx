@@ -5,7 +5,7 @@
 -- Demonstrates: workflow.run, react engine composition, knowledge storage.
 -- Source: mcp-toolbelt/arch_diagrams/agentic_loop
 
-use std/knowledge
+use pkg/knowledge {KnowledgeBase}
 use ../lib/react
 use ../lib/report
 use ../lib/workflow
@@ -23,8 +23,8 @@ use ../lib/workflow
       max_time_ms: opts.max_time_ms ?? 300000
     } ^
 
-    kb = knowledge.create {name: "react-results"}
-    knowledge.store kb task (to_str r) "react" {confidence: 0.8}
+    kb = KnowledgeBase {path: "react-results"}
+    kb.store task (to_str r) {source: "react"  confidence: 0.8}
 
     report.write "react_report.md" "ReAct Session" [
       ..report.text "Task: {task}"
