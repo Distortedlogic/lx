@@ -2,21 +2,20 @@ use std/agent
 
 doubler = {name: "doubler" handler: (msg) { msg * 2 }}
 adder = {name: "adder" handler: (msg) { msg + 10 }}
-stringer = {name: "stringer" handler: (msg) { to_str msg }}
+tripler = {name: "tripler" handler: (msg) { msg * 3 }}
 
-pipe = agent.pipeline [doubler adder stringer] () ^
+pipe = agent.pipeline [doubler adder tripler] () ^
 assert (pipe.__pipeline_id > 0) "pipeline has ID"
 
 agent.pipeline_send pipe 5 ^
 result = agent.pipeline_collect pipe ^
-dbg result
-assert (result == "20") "5*2+10=20 as string"
+assert (result == 60) "(5*2+10)*3=60"
 
 results = agent.pipeline_batch pipe [1 2 3] ^
 assert (len results == 3) "batch returns 3 results"
-assert (results.0 == "12") "1*2+10=12"
-assert (results.1 == "14") "2*2+10=14"
-assert (results.2 == "16") "3*2+10=16"
+assert (results.0 == 36) "(1*2+10)*3=36"
+assert (results.1 == 42) "(2*2+10)*3=42"
+assert (results.2 == 48) "(3*2+10)*3=48"
 
 stats = agent.pipeline_stats pipe
 assert (stats.total_processed == 4) "4 items processed"

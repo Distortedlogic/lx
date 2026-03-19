@@ -70,7 +70,7 @@ Tier 1 completed: `std/retry` (Session 44), `std/user` + `std/profile` (Session 
 
 10. ~~**`introspect.system` live observation**~~ — SHIPPED Session 65. `std/introspect` module: 5 functions (`system`, `agents`, `agent`, `messages`, `bottleneck`). Aggregates from REGISTRY, SESSIONS, SUPERVISORS, TOPICS, ROUTE_TABLE. `introspect.watch` deferred (needs async).
 
-11. **`agent.pipeline`** (`spec/agents-pipeline.md`) — Consumer-driven flow control with backpressure.
+11. ~~**`agent.pipeline`**~~ — SHIPPED Session 66. 11 functions: `pipeline`, `pipeline_send`, `pipeline_collect`, `pipeline_batch`, `pipeline_stats`, `pipeline_on_pressure`, `pipeline_pause`, `pipeline_resume`, `pipeline_drain`, `pipeline_close`, `pipeline_add_worker`. Bounded buffers, 4 overflow policies, pressure callbacks, round-robin workers.
 
 12. **`~>>?` streaming ask** (`spec/agents-streaming.md`) — Stream partial results from long-running agents. Token already lexed (Session 31).
 

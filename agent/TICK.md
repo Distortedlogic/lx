@@ -24,20 +24,18 @@ See `TICK_PROTOCOL.md` for cross-read guidance.
 
 ## State
 
-Session 65 (2026-03-19). **81/81 tests pass.** `just diagnose` clean (0 errors, 0 warnings).
-31 Rust stdlib modules + 11 lx packages in `pkg/`. `std/introspect` shipped: system-wide
-live observation (5 functions aggregating from REGISTRY, SESSIONS, SUPERVISORS, TOPICS,
-ROUTE_TABLE). `AgentProcess` enriched with per-agent metrics (name, traits, spawn time,
-in-flight/completed/error counters).
+Session 66 (2026-03-19). **82/82 tests pass.** `just diagnose` clean (0 errors, 0 warnings).
+34 Rust stdlib modules + 11 lx packages in `pkg/`. `agent.pipeline` shipped: consumer-driven
+flow control with backpressure (11 functions, 3 Rust files). 13 agent extensions total.
 
 ## This Tick
 
-**Next priority from PRIORITIES.md: `agent.pipeline` consumer-driven flow control.**
+**Next priority from PRIORITIES.md: `~>>?` streaming ask.**
 
 ## Read These Files
 
 1. `agent/PRIORITIES.md` — feature queue, context for what to build
-2. `spec/agents-pipeline.md` — spec for `agent.pipeline` backpressure
+2. `spec/agents-streaming.md` — spec for `~>>?` streaming ask
 3. `agent/INVENTORY.md` — what's implemented
 4. `agent/REFERENCE.md` — codebase layout and how-tos
 5. `agent/GOTCHAS.md` — parser traps

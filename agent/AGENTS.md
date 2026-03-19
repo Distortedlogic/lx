@@ -246,6 +246,8 @@ agent.unregister reviewer ^
 
 Selection: `"least_busy"` (default), `"round_robin"`, `"random"`, or custom `(agents) -> Agent`.
 
+### Pipeline — `agent.pipeline [stages] opts ^`, then `pipeline_send/collect/batch/stats/on_pressure/pause/resume/drain/close/add_worker`. Overflow: block/drop_oldest/drop_newest/sample. Stages: `{name: "x" handler: fn}` or spawned agents.
+
 ### Other Extensions
 
 ```lx

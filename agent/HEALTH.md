@@ -3,7 +3,7 @@
 
 # Design Health
 
-Updated after Session 65 (2026-03-19).
+Updated after Session 66 (2026-03-19).
 
 ## What Works
 
@@ -29,4 +29,4 @@ See `agent/PRIORITIES.md` for the full ordered work queue.
 
 ## Bottom Line
 
-Session 65: `std/introspect` ships system-wide live observation — 5 functions aggregating from all global registries. `AgentProcess` enriched with name, traits, spawn time, in-flight/completed/error counters. `ask_subprocess` tracks message metrics. The runtime now has structured visibility into agent system state: who's running, who's blocked, what topics exist, which supervisors are active. `introspect.watch` (periodic monitoring) deferred until async infrastructure exists. 81/81 tests pass.
+Session 66: `agent.pipeline` ships consumer-driven flow control with backpressure — 11 functions connecting agents into processing pipelines with bounded buffers, overflow policies, pressure monitoring, and round-robin worker scaling. Tail-first pump algorithm ensures downstream stages drain first, creating natural backpressure. Synchronous implementation (real concurrency needs tokio). The agent system now supports both ad-hoc messaging (`~>?`, pub/sub, routing) and structured pipeline processing. 82/82 tests pass.

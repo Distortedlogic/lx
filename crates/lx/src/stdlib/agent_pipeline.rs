@@ -106,8 +106,7 @@ pub(super) fn pump(
                 continue;
             }
             let item = pipeline.stages[i].buffer.remove(0);
-            let worker_idx =
-                pipeline.stages[i].next_worker % pipeline.stages[i].agents.len();
+            let worker_idx = pipeline.stages[i].next_worker % pipeline.stages[i].agents.len();
             pipeline.stages[i].next_worker += 1;
             let agent = pipeline.stages[i].agents[worker_idx].clone();
             let start = Instant::now();

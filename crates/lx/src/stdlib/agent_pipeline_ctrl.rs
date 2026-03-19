@@ -9,7 +9,7 @@ use crate::error::LxError;
 use crate::span::Span;
 use crate::value::Value;
 
-use super::agent_pipeline::{get_pipeline_id, pump, Pipeline, PIPELINES};
+use super::agent_pipeline::{PIPELINES, Pipeline, get_pipeline_id, pump};
 
 fn pressure_rank(level: &str) -> u8 {
     match level {
@@ -57,10 +57,7 @@ fn build_stats(pipeline: &Pipeline) -> Value {
             let mut rec = IndexMap::new();
             rec.insert("name".into(), Value::Str(Arc::from(s.name.as_str())));
             rec.insert("queued".into(), Value::Int(BigInt::from(queued)));
-            rec.insert(
-                "processed".into(),
-                Value::Int(BigInt::from(s.processed)),
-            );
+            rec.insert("processed".into(), Value::Int(BigInt::from(s.processed)));
             rec.insert("avg_ms".into(), Value::Float(avg_ms));
             Value::Record(Arc::new(rec))
         })
@@ -121,11 +118,7 @@ pub(super) fn fire_pressure_callbacks(
     Ok(())
 }
 
-fn bi_pipeline_stats(
-    args: &[Value],
-    span: Span,
-    _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+fn bi_pipeline_stats(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = get_pipeline_id(&args[0], span)?;
     let pipeline = PIPELINES
         .get(&id)
@@ -158,11 +151,7 @@ fn bi_pipeline_on_pressure(
     Ok(Value::Ok(Box::new(Value::Unit)))
 }
 
-fn bi_pipeline_pause(
-    args: &[Value],
-    span: Span,
-    _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+fn bi_pipeline_pause(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = get_pipeline_id(&args[0], span)?;
     let mut pipeline = PIPELINES
         .get_mut(&id)
@@ -184,11 +173,7 @@ fn bi_pipeline_resume(
     Ok(Value::Ok(Box::new(Value::Unit)))
 }
 
-fn bi_pipeline_drain(
-    args: &[Value],
-    span: Span,
-    ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+fn bi_pipeline_drain(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = get_pipeline_id(&args[0], span)?;
     let mut pipeline = PIPELINES
         .get_mut(&id)
@@ -200,11 +185,7 @@ fn bi_pipeline_drain(
     Ok(Value::Ok(Box::new(Value::Unit)))
 }
 
-fn bi_pipeline_close(
-    args: &[Value],
-    span: Span,
-    ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+fn bi_pipeline_close(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = get_pipeline_id(&args[0], span)?;
     {
         let mut pipeline = PIPELINES
@@ -235,10 +216,7 @@ fn bi_pipeline_add_worker(
         .iter_mut()
         .find(|s| s.name == stage_name)
         .ok_or_else(|| {
-            LxError::runtime(
-                format!("pipeline: no stage named '{stage_name}'"),
-                span,
-            )
+            LxError::runtime(format!("pipeline: no stage named '{stage_name}'"), span)
         })?;
     stage.agents.push(agent);
     Ok(Value::Ok(Box::new(Value::Unit)))

@@ -1,5 +1,5 @@
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use num_bigint::BigInt;
 
@@ -11,7 +11,7 @@ use crate::span::Span;
 use crate::value::Value;
 
 use super::agent_pipeline::{
-    get_pipeline_id, pump, OverflowPolicy, Pipeline, PipelineStage, NEXT_ID, PIPELINES,
+    NEXT_ID, OverflowPolicy, PIPELINES, Pipeline, PipelineStage, get_pipeline_id, pump,
 };
 
 fn agent_name(agent: &Value) -> String {
@@ -50,10 +50,7 @@ fn send_to_pipeline(
     if buf_len >= pipeline.buffer_size {
         match pipeline.overflow {
             OverflowPolicy::Block => {
-                return Err(LxError::runtime(
-                    "pipeline: buffer full after drain",
-                    span,
-                ));
+                return Err(LxError::runtime("pipeline: buffer full after drain", span));
             }
             OverflowPolicy::DropOldest => {
                 pipeline.stages[0].buffer.remove(0);
@@ -97,17 +94,11 @@ fn bi_pipeline(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Val
     let mut overflow = OverflowPolicy::Block;
     if let Value::Record(opts) = &args[1] {
         if let Some(v) = opts.get("buffer") {
-            buffer_size = v
-                .as_int()
-                .and_then(|n| n.try_into().ok())
-                .ok_or_else(|| {
-                    LxError::type_err("agent.pipeline: buffer must be positive Int", span)
-                })?;
+            buffer_size = v.as_int().and_then(|n| n.try_into().ok()).ok_or_else(|| {
+                LxError::type_err("agent.pipeline: buffer must be positive Int", span)
+            })?;
             if buffer_size == 0 {
-                return Err(LxError::runtime(
-                    "agent.pipeline: buffer must be > 0",
-                    span,
-                ));
+                return Err(LxError::runtime("agent.pipeline: buffer must be > 0", span));
             }
         }
         if let Some(v) = opts.get("overflow") {
@@ -145,11 +136,7 @@ fn bi_pipeline(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Val
     })))
 }
 
-fn bi_pipeline_send(
-    args: &[Value],
-    span: Span,
-    ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+fn bi_pipeline_send(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = get_pipeline_id(&args[0], span)?;
     {
         let mut pipeline = PIPELINES
@@ -178,11 +165,7 @@ fn bi_pipeline_collect(
     }
 }
 
-fn bi_pipeline_batch(
-    args: &[Value],
-    span: Span,
-    ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+fn bi_pipeline_batch(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
     let id = get_pipeline_id(&args[0], span)?;
     let Value::List(items) = &args[1] else {
         return Err(LxError::type_err(

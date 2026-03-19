@@ -36,7 +36,7 @@
 - `emit` — agent-to-human fire-and-forget output via EmitBackend
 - `with name = expr { body }` — scoped bindings + record field update (`name.field <- value`)
 
-## Stdlib (31 Rust modules + 6 standard agents + 11 lx packages)
+## Stdlib (34 Rust modules + 6 standard agents + 11 lx packages)
 
 - Data: `std/json`, `std/md`, `std/re`, `std/math`, `std/time`
 - System: `std/fs`, `std/env`, `std/http`
@@ -85,6 +85,7 @@ Class-based packages using `entries: Store ()` + Collection Trait:
 - `agent.negotiate` — N-party iterative consensus with converge function
 - `agent.topic` / `agent.subscribe` / `agent.publish` — in-process pub/sub with filtered subscriptions
 - `agent.route` / `agent.register` — capability-based routing: register agents with traits/protocols/domains, route by filter with selection strategies (least_busy, round_robin, random, custom), fan-out with reconcile via `route_multi`
+- `agent.pipeline` — consumer-driven flow control with backpressure: 11 functions (`pipeline`, `pipeline_send`, `pipeline_collect`, `pipeline_batch`, `pipeline_stats`, `pipeline_on_pressure`, `pipeline_pause`, `pipeline_resume`, `pipeline_drain`, `pipeline_close`, `pipeline_add_worker`). Bounded buffers, 4 overflow policies (block, drop_oldest, drop_newest, sample), tail-first pump for backpressure, round-robin worker dispatch, pressure callbacks with level thresholds, per-stage stats with bottleneck detection
 
 ## Other Extensions
 
@@ -110,4 +111,4 @@ Class-based packages using `entries: Store ()` + Collection Trait:
 
 ## Test Coverage
 
-81 test suites (80 .lx files + 11_modules dir) in `tests/`. Fixtures in `tests/fixtures/`. 81/81 passing.
+82 test suites (81 .lx files + 11_modules dir) in `tests/`. Fixtures in `tests/fixtures/`. 82/82 passing.
