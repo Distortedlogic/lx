@@ -54,11 +54,14 @@ impl super::Parser {
             if *self.peek() == TokenKind::DotDot {
                 self.advance();
                 let saved_depth = self.collection_depth;
+                let saved_app = self.application_depth;
                 self.collection_depth = 0;
+                self.application_depth = 0;
                 self.record_field_depth += 1;
                 let value = self.parse_expr(31)?;
                 self.record_field_depth -= 1;
                 self.collection_depth = saved_depth;
+                self.application_depth = saved_app;
                 fields.push(RecordField {
                     name: None,
                     value,
@@ -70,11 +73,14 @@ impl super::Parser {
                 if *self.peek() == TokenKind::Colon {
                     self.advance();
                     let saved_depth = self.collection_depth;
+                    let saved_app = self.application_depth;
                     self.collection_depth = 0;
+                    self.application_depth = 0;
                     self.record_field_depth += 1;
                     let value = self.parse_expr(0)?;
                     self.record_field_depth -= 1;
                     self.collection_depth = saved_depth;
+                    self.application_depth = saved_app;
                     fields.push(RecordField {
                         name: Some(name),
                         value,

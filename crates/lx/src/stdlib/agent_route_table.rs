@@ -69,7 +69,7 @@ pub(super) fn agent_key(agent: &Value) -> String {
             }
             format!("anon:{}", NEXT_ROUTE_ID.fetch_add(1, Ordering::Relaxed))
         }
-        Value::Agent { name, .. } => name.to_string(),
+        Value::Class { name, .. } => name.to_string(),
         _ => format!("anon:{}", NEXT_ROUTE_ID.fetch_add(1, Ordering::Relaxed)),
     }
 }

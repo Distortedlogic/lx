@@ -7,7 +7,7 @@ pub use walk_pattern::*;
 use crate::ast::{AgentMethod, Binding, ClassField, Expr, Program, ProtocolEntry, SExpr, Stmt};
 use crate::span::Span;
 
-use super::AstVisitor;
+use super::{AgentDeclCtx, AstVisitor, RefineCtx, TraitDeclCtx};
 
 pub fn walk_program<V: AstVisitor + ?Sized>(v: &mut V, program: &Program) {
     for stmt in &program.stmts {
@@ -47,17 +47,16 @@ pub fn walk_stmt<V: AstVisitor + ?Sized>(v: &mut V, stmt: &Stmt, span: Span) {
             requires,
             description,
             tags,
-            exported,
+            exported: _,
         } => {
-            v.visit_trait_decl(
+            let ctx = TraitDeclCtx {
                 name,
                 methods,
                 requires,
-                description.as_deref(),
+                description: description.as_deref(),
                 tags,
-                *exported,
-                span,
-            );
+            };
+            v.visit_trait_decl(&ctx, span);
         }
         Stmt::AgentDecl {
             name,
@@ -66,18 +65,17 @@ pub fn walk_stmt<V: AstVisitor + ?Sized>(v: &mut V, stmt: &Stmt, span: Span) {
             init,
             on,
             methods,
-            exported,
+            exported: _,
         } => {
-            v.visit_agent_decl(
+            let ctx = AgentDeclCtx {
                 name,
                 traits,
                 uses,
-                init.as_ref(),
-                on.as_ref(),
+                init: init.as_ref(),
+                on: on.as_ref(),
                 methods,
-                *exported,
-                span,
-            );
+            };
+            v.visit_agent_decl(&ctx, span);
         }
         Stmt::ClassDecl {
             name,
@@ -120,20 +118,14 @@ pub fn walk_protocol<V: AstVisitor + ?Sized>(v: &mut V, entries: &[ProtocolEntry
     }
 }
 
-pub fn walk_agent_decl<V: AstVisitor + ?Sized>(
-    v: &mut V,
-    init: Option<&SExpr>,
-    on: Option<&SExpr>,
-    methods: &[AgentMethod],
-    _span: Span,
-) {
-    if let Some(i) = init {
+pub fn walk_agent_decl<V: AstVisitor + ?Sized>(v: &mut V, ctx: &AgentDeclCtx<'_>, _span: Span) {
+    if let Some(i) = ctx.init {
         v.visit_expr(&i.node, i.span);
     }
-    if let Some(o) = on {
+    if let Some(o) = ctx.on {
         v.visit_expr(&o.node, o.span);
     }
-    for m in methods {
+    for m in ctx.methods {
         v.visit_expr(&m.handler.node, m.handler.span);
     }
 }
@@ -221,15 +213,15 @@ pub fn walk_expr<V: AstVisitor + ?Sized>(v: &mut V, expr: &Expr, span: Span) {
             max_rounds,
             on_round,
         } => {
-            v.visit_refine(
+            let ctx = RefineCtx {
                 initial,
                 grade,
                 revise,
                 threshold,
                 max_rounds,
-                on_round.as_deref(),
-                span,
-            );
+                on_round: on_round.as_deref(),
+            };
+            v.visit_refine(&ctx, span);
         }
         Expr::Shell { mode, parts } => v.visit_shell(*mode, parts, span),
         Expr::Receive(arms) => {

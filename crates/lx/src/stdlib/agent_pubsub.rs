@@ -18,6 +18,8 @@ struct Topic {
     subscribers: Vec<Subscription>,
 }
 
+type DeliveryResults = Vec<(String, Result<Value, LxError>)>;
+
 static TOPICS: LazyLock<DashMap<String, Topic>> = LazyLock::new(DashMap::new);
 
 pub fn mk_topic() -> Value {
@@ -157,7 +159,7 @@ fn publish_to_subscribers(
     msg: &Value,
     span: Span,
     ctx: &Arc<RuntimeCtx>,
-) -> Result<Vec<(String, Result<Value, LxError>)>, LxError> {
+) -> Result<DeliveryResults, LxError> {
     let enriched = inject_topic(msg, topic);
     let mut results = Vec::new();
     if let Some(t) = TOPICS.get(topic) {

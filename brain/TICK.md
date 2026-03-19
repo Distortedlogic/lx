@@ -35,6 +35,11 @@ via workspace member name. Brain files can import from flows/, workgen/, tests/ 
 **Session 62: imports updated.** `std/knowledge` → `pkg/knowledge`, `std/circuit` → `pkg/circuit`,
 `std/prompt` → `pkg/prompt`, `std/tasks` → `pkg/tasks`, `std/trace` → `pkg/trace`.
 Also `trace.filter` renamed to `trace.query`. All brain files already updated.
+**Session 64 (agent/):** pkg packages rewritten with Store + Collection Trait. API change:
+`save path ^` and `load path ^` no longer work (save/load return Unit, not Result). Remove `^`
+from save/load calls. `remove key ^` also returns the value directly, not Result. Store is now
+a first-class value type (`Store ()` constructor, dot-access methods). Agent is a Class under
+the hood. Protocol is a Trait under the hood. See `agent/SESSION_64_HANDOFF.md` if needed.
 
 ## This Tick
 

@@ -3,11 +3,13 @@
 
 # lx Standard Library
 
-**Note:** 8 modules are now Class-based packages in `pkg/`. Import the Class name:
-`use pkg/circuit {CircuitBreaker}`, `use pkg/knowledge {KnowledgeBase}`, `use pkg/tasks {TaskStore}`,
+**Note:** 10 packages in `pkg/`. Import the Class/Trait name:
+`use pkg/collection {Collection}`, `use pkg/knowledge {KnowledgeBase}`, `use pkg/tasks {TaskStore}`,
 `use pkg/trace {TraceStore}`, `use pkg/memory {MemoryStore}`, `use pkg/context {ContextWindow}`,
-`use pkg/introspect {Inspector}`, `use pkg/pool {Pool}`. `pkg/prompt` remains a pure record builder.
-Construct with `ClassName {field: val}` or `ClassName ()`. Methods via `instance.method args`.
+`use pkg/circuit {CircuitBreaker}`, `use pkg/introspect {Inspector}`, `use pkg/pool {Pool}`.
+`pkg/prompt` remains a pure record builder. 5 collection packages (knowledge, tasks, memory, trace, context)
+use `entries: Store ()` + Collection Trait for generic operations. Construct with `ClassName {field: val}`
+or `ClassName ()`. Methods via `instance.method args`.
 
 ## AI (std/ai)
 
@@ -26,10 +28,33 @@ result = ai.prompt_structured ScoreProtocol "Rate this" ^
 result = ai.prompt_json "Classify this intent" {intent: "" findings: [""]} ^
 ```
 
-## Prompt Assembly (std/prompt)
+## Store (first-class Value)
+
+`Store` is a first-class value type (`Value::Store { id }`) with dot-access methods:
 
 ```lx
-use std/prompt
+s = Store ()
+s.set "key" value              s.get "key"
+s.keys ()                      s.values ()
+s.entries ()                   s.has "key"
+s.len ()                       s.remove "key"
+s.clear ()                     s.update "key" (v) v + 1
+s.filter (k v) condition       s.query {field: "value"}
+s.map (k v) transform          s.save "path.json"
+s.load "path.json"             s.persist "path.json"
+s.reload "path.json"
+```
+
+Reference semantics: `a = b` shares the same Store. Store cloning in Class constructors ensures each instance gets its own copy.
+
+## Collection Trait (pkg/collection)
+
+Generic operations for any Class with `entries: Store ()`. Provides 9 default methods: `get`, `keys`, `values`, `remove`, `query`, `len`, `has`, `save`, `load` — all delegating to `self.entries`. Any conforming Class gets these for free; domain-only methods remain on the Class. Used by: KnowledgeBase, TaskStore, TraceStore, MemoryStore, ContextWindow.
+
+## Prompt Assembly (pkg/prompt)
+
+```lx
+use pkg/prompt
 p = prompt.create ()
   | prompt.system "You are a code auditor"
   | prompt.section "Checklist" audit_text
@@ -39,14 +64,15 @@ p = prompt.create ()
 rendered = prompt.render p
 ```
 
-## Tracing (std/trace)
+## Tracing (pkg/trace)
 
 ```lx
-use std/trace
-session = trace.create "/tmp/trace.json" ^
-trace.record {name: "step1" input: x output: y} session ^
-rate = trace.improvement_rate session
-stop = trace.should_stop {min_delta: 2.0 window: 3} session
+use pkg/trace {TraceStore}
+t = TraceStore ()
+t.record {name: "step1" input: x output: y} ^
+sum = t.summary ()
+rate = t.improvement_rate 3
+stop = t.should_stop {min_delta: 2.0 window: 3}
 ```
 
 ## Grading and Auditing
@@ -98,52 +124,12 @@ budget.used_pct b     -- 25.0
 sub = budget.slice 0.3 b ^  -- sub-budget (30% of remaining)
 ```
 
-## Context Windows
-
-```lx
-use std/context
-ctx = context.create {max_tokens: 4000}
-ctx = context.add {role: "user" content: msg} ctx
-context.pressure ctx       -- 0.0 to 1.0
-ctx = context.pin "system" ctx
-ctx = context.evict_until 0.5 ctx
-```
-
-## Circuit Breakers
-
-```lx
-use std/circuit
-cb = circuit.create {threshold: 3 window: 60 cooldown: 30}
-cb = circuit.record true cb
-circuit.is_tripped cb
-```
-
 ## Retry with Backoff
 
 ```lx
 use std/retry
 result = retry.retry flaky_fn
 result = retry.retry_with {max_attempts: 5  base_delay_ms: 200} flaky_fn
-```
-
-## Worker Pools
-
-```lx
-use std/pool
-p = pool.create {size: 4 workers: [w1 w2 w3 w4]}
-results = pool.fan_out p tasks ^
-results = pool.map p items process ^
-```
-
-## Tasks
-
-```lx
-use std/tasks
-ts = tasks.empty ()
-ts = tasks.create ts "review" {priority: "high" parent: "audit"}
-ts = tasks.start ts "review" ^
-ts = tasks.submit ts "review" {output: findings} ^
-ts = tasks.pass ts "review" ^
 ```
 
 ## Pipeline (std/pipeline)
@@ -185,14 +171,11 @@ all = pipeline.list ()
 | `std/time`        | `now`, `sleep`, `format`, `parse`                                    |
 | `std/git`         | 36 functions: status, log, diff, blame, grep, commit, branch, etc.   |
 | `std/ctx`         | Key-value context: `empty`, `set`, `get`, `merge`, `save`, `load`    |
-| `std/memory`      | Tiered memory: `create`, `store`, `recall`, `promote`, `consolidate` |
-| `std/knowledge`   | File-backed KB: `create`, `store`, `get`, `query`, `merge`, `expire` |
 | `std/deadline`    | Time budgets: `create`, `create_at`, `scope`, `remaining`, `expired`, `check`, `slice`, `extend` |
 | `std/pipeline`    | Stage caching: `create`, `stage`, `complete`, `status`, `invalidate`, `clean`, `list` |
 | `std/plan`        | Plan execution: `run` with `on_step` callback, `replan`, `skip`      |
 | `std/saga`        | Compensating transactions: `run`, `define`, `execute`                |
 | `std/cron`        | Scheduling: `every`, `after`, `at`, `schedule`, `run`                |
-| `std/introspect`  | Self-observation: `elapsed`, `actions`, `is_stuck`, `strategy_shift`  |
 | `std/user`        | Interactive: `confirm`, `choose`, `ask`, `progress`, `table`         |
 | `std/profile`     | Persistent identity: `load`, `save`, `learn`, `recall`, `preference` |
 | `std/diag`        | Visualization: `extract`, `to_mermaid`                               |
@@ -291,7 +274,7 @@ audit_items
 
 **`^` early in pipes:** `url | fetch ^ | (.body) | json.parse ^ | (.data) | map process`
 
-**Prompt composition:** Use `std/prompt` builder, not string concatenation.
+**Prompt composition:** Use `pkg/prompt` builder, not string concatenation.
 
 **Scoped resources:** Always `with ... as` for connections needing cleanup.
 

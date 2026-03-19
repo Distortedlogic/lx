@@ -1,10 +1,11 @@
 use crate::token::TokenKind;
 
 impl super::Parser {
-    pub(super) fn is_func_def(&self) -> bool {
+    pub(super) fn is_func_def(&mut self) -> bool {
         let mut i = self.pos;
         let mut strong = false;
         let mut param_count = 0u32;
+        let mut param_names: Vec<&str> = Vec::new();
         loop {
             match self.tokens.get(i).map(|t| &t.kind) {
                 Some(TokenKind::LParen) => {
@@ -30,6 +31,9 @@ impl super::Parser {
                     }
                 }
                 Some(TokenKind::Ident(_)) | Some(TokenKind::Underscore) => {
+                    if let Some(TokenKind::Ident(name)) = self.tokens.get(i).map(|t| &t.kind) {
+                        param_names.push(name.as_str());
+                    }
                     if matches!(
                         self.tokens.get(i).map(|t| &t.kind),
                         Some(TokenKind::Underscore)
@@ -64,11 +68,27 @@ impl super::Parser {
                     if !is_body {
                         return false;
                     }
-                    if !strong
-                        && param_count >= 2
-                        && matches!(self.tokens.get(i).map(|t| &t.kind), Some(TokenKind::LParen))
-                    {
-                        return false;
+                    if !strong && param_count >= 2 {
+                        let body_kind = self.tokens.get(i).map(|t| &t.kind);
+                        if matches!(body_kind, Some(TokenKind::LParen)) {
+                            return false;
+                        }
+                        if self.application_depth > 0 {
+                            if matches!(body_kind, Some(TokenKind::LBrace)) {
+                                let saved = self.pos;
+                                self.pos = i + 1;
+                                let is_rec = super::looks_like_record(self);
+                                self.pos = saved;
+                                if is_rec {
+                                    return false;
+                                }
+                            }
+                            if let Some(TokenKind::Ident(body_id)) = body_kind
+                                && !param_names.contains(&body_id.as_str())
+                            {
+                                return false;
+                            }
+                        }
                     }
                     return true;
                 }

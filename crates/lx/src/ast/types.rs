@@ -37,7 +37,7 @@ pub enum Pattern {
 
 #[derive(Debug, Clone)]
 pub enum ProtocolEntry {
-    Field(ProtocolField),
+    Field(Box<ProtocolField>),
     Spread(String),
 }
 

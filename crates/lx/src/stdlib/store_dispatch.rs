@@ -43,6 +43,79 @@ pub fn store_method(name: &str, store_val: &Value) -> Option<Value> {
     })
 }
 
+pub fn object_insert(fields: indexmap::IndexMap<String, crate::value::Value>) -> u64 {
+    let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+    STORES.insert(
+        id,
+        StoreState {
+            data: fields,
+            path: None,
+        },
+    );
+    id
+}
+
+pub fn object_get_field(id: u64, field: &str) -> Option<crate::value::Value> {
+    STORES.get(&id).and_then(|s| s.data.get(field).cloned())
+}
+
+pub fn object_update_nested(
+    id: u64,
+    path: &[String],
+    value: crate::value::Value,
+) -> Result<(), String> {
+    let Some(mut s) = STORES.get_mut(&id) else {
+        return Err("object not found".into());
+    };
+    match path {
+        [field] => {
+            s.data.insert(field.clone(), value);
+            Ok(())
+        }
+        [field, rest @ ..] => {
+            let inner = s
+                .data
+                .get(field)
+                .ok_or_else(|| format!("field '{field}' not found"))?
+                .clone();
+            let updated = update_nested_record(&inner, rest, value)?;
+            s.data.insert(field.clone(), updated);
+            Ok(())
+        }
+        [] => Err("empty field path".into()),
+    }
+}
+
+fn update_nested_record(
+    val: &crate::value::Value,
+    path: &[String],
+    new_val: crate::value::Value,
+) -> Result<crate::value::Value, String> {
+    let crate::value::Value::Record(rec) = val else {
+        return Err(format!(
+            "field update requires Record, got {}",
+            val.type_name()
+        ));
+    };
+    match path {
+        [field] => {
+            let mut new_rec = rec.as_ref().clone();
+            new_rec.insert(field.clone(), new_val);
+            Ok(crate::value::Value::Record(Arc::new(new_rec)))
+        }
+        [field, rest @ ..] => {
+            let inner = rec
+                .get(field)
+                .ok_or_else(|| format!("field '{field}' not found"))?;
+            let updated = update_nested_record(inner, rest, new_val)?;
+            let mut new_rec = rec.as_ref().clone();
+            new_rec.insert(field.clone(), updated);
+            Ok(crate::value::Value::Record(Arc::new(new_rec)))
+        }
+        [] => Err("empty field path".into()),
+    }
+}
+
 pub fn store_len(id: u64) -> usize {
     STORES.get(&id).map(|s| s.data.len()).unwrap_or(0)
 }
@@ -86,11 +159,9 @@ fn bi_save_to(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Valu
     let s = STORES
         .get(&id)
         .ok_or_else(|| LxError::runtime("store: not found", span))?;
-    let json_val =
-        super::json_conv::lx_to_json(&Value::Record(Arc::new(s.data.clone())), span)?;
+    let json_val = super::json_conv::lx_to_json(&Value::Record(Arc::new(s.data.clone())), span)?;
     let pretty = serde_json::to_string_pretty(&json_val).unwrap_or_default();
-    std::fs::write(path, pretty)
-        .map_err(|e| LxError::runtime(format!("store.save: {e}"), span))?;
+    std::fs::write(path, pretty).map_err(|e| LxError::runtime(format!("store.save: {e}"), span))?;
     Ok(Value::Unit)
 }
 

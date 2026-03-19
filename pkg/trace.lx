@@ -51,8 +51,7 @@ classify_trend = (avg_delta recent_delta) {
       tags: span_rec.tags ?? []
       created_at: t.iso
     }
-    key = to_str id
-    self.entries.set key span
+    self.entries.set (to_str id) span
     Ok id
   }
 

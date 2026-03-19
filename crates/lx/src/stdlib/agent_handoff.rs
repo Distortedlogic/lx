@@ -27,9 +27,14 @@ pub fn mk_handoff_protocol() -> Value {
             constraint: None,
         },
     ];
-    Value::Protocol {
+    Value::Trait {
         name: Arc::from("Handoff"),
         fields: Arc::new(fields),
+        methods: Arc::new(Vec::new()),
+        defaults: Arc::new(indexmap::IndexMap::new()),
+        requires: Arc::new(Vec::new()),
+        description: None,
+        tags: Arc::new(Vec::new()),
     }
 }
 

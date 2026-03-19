@@ -24,25 +24,20 @@ See `TICK_PROTOCOL.md` for cross-read guidance.
 
 ## State
 
-Session 63 (2026-03-18). **80/80 tests pass.** `just diagnose` clean (0 errors, 7 warnings).
-35 Rust stdlib modules + 9 lx packages in `pkg/`. `Class` keyword + Trait defaults shipped.
-5 collection packages in BROKEN intermediate state (partially refactored, tests failing).
+Session 64 (2026-03-19). **80/80 tests pass.** `just diagnose` clean (0 errors, 0 warnings).
+30 Rust stdlib modules + 10 lx packages in `pkg/`. Type hierarchy refactored:
+Store → Class → Agent, Protocol unified into Trait. Parser `is_func_def` bug fixed.
 
 ## This Tick
 
-**Read `agent/SESSION_63_HANDOFF.md` first.** It contains the full design discussion,
-all rejected solutions, and the user-directed architecture for Dict + Collection Trait.
-That document is the primary context for this task.
-
-**Task: Build `Dict` type, `Collection` Trait, refactor 5 collection Classes.**
+**Next priority from PRIORITIES.md: `introspect.system` live observation.**
 
 ## Read These Files
 
-1. `agent/SESSION_63_HANDOFF.md` — **CRITICAL**: full design context, rejected solutions, architecture
-2. `agent/GOTCHAS.md` — lx parser traps (read before writing ANY lx code)
-3. `crates/lx/src/stdlib/store.rs` — existing store impl (reference for Dict's DashMap pattern)
-4. `crates/lx/src/interpreter/apply_helpers.rs` — dot access dispatch (add Dict handling here)
-5. `crates/lx/src/value.rs` — Value enum + object store (add Dict here)
+1. `agent/PRIORITIES.md` — feature queue, context for what to build
+2. `agent/INVENTORY.md` — what's implemented
+3. `agent/REFERENCE.md` — codebase layout and how-tos
+4. `agent/GOTCHAS.md` — parser traps
 
 ## Context Files
 

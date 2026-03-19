@@ -23,6 +23,25 @@ Collections:
 %{"key": "value"}            -- map (arbitrary keys)
 ```
 
+Store (first-class concurrent key/value):
+```lx
+s = Store ()                 -- constructor
+s.set "key" value            -- dot-access methods
+s.get "key"                  -- returns None if missing
+s.keys ()  s.values ()       -- all keys/values as lists
+s.entries ()                 -- list of {key value} records
+s.has "key"  s.len ()        -- predicates
+s.remove "key"               -- delete entry
+s.filter (k v) condition     -- filtered entries
+s.query {field: "value"}     -- record-pattern matching
+s.map (k v) transform        -- transform values
+s.update "key" (v) v + 1     -- update in place
+s.save "path.json"           -- persist to file
+s.load "path.json"           -- load from file
+s.clear ()                   -- remove all entries
+```
+Reference semantics: `a = b` shares the same Store. Both see mutations.
+
 Access and update:
 ```lx
 xs.0  xs.-1                  -- index / negative index

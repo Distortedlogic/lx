@@ -67,7 +67,7 @@ impl super::Parser {
                 continue;
             }
             let field = self.parse_protocol_field()?;
-            entries.push(ProtocolEntry::Field(field));
+            entries.push(ProtocolEntry::Field(Box::new(field)));
             self.skip_semis();
         }
         Ok(entries)

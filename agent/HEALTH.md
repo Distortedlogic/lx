@@ -3,7 +3,7 @@
 
 # Design Health
 
-Updated after Session 62 (2026-03-18).
+Updated after Session 64 (2026-03-19).
 
 ## What Works
 
@@ -11,7 +11,9 @@ Updated after Session 62 (2026-03-18).
 
 **Boundary validation covers both directions.** `Protocol` validates agent-to-agent. `MCP` declarations validate agent-to-tool. `Trait` declarations validate agent behavioral contracts at definition time. No unvalidated boundary.
 
-**`std/store` enables Rust→lx migration.** The generic concurrent k/v store extracts the DashMap+handle boilerplate that 14+ modules reimplement. First 5 conversions (knowledge, circuit, prompt, tasks, trace) each reduced to 30-50% of the Rust line count while passing all existing tests. The lx packages are readable, modifiable, and composable — exactly what lx is for.
+**Type hierarchy is clean: Store → Class → Agent.** Store is a first-class `Value::Store { id }` with dot-access methods. Class and Agent both produce `Value::Class` (distinguished by `ClassKind`). Protocol declarations produce `Value::Trait` with non-empty fields. No separate `Value::Agent` or `Value::Protocol` — fewer variants, shared trait injection logic. Object fields live in STORES (same backing as Store values), eliminating the separate OBJECTS DashMap.
+
+**Collection Trait proves the composability thesis.** `pkg/collection.lx` provides 9 methods as Trait defaults delegating to `self.entries`. Any Class with `entries: Store ()` conforming to Collection gets get/keys/values/remove/query/len/has/save/load for free. 5 packages (knowledge, tasks, memory, trace, context) rewritten — domain-only methods remain, generic operations come from Collection.
 
 ## What's Still Wrong
 
@@ -27,4 +29,4 @@ See `agent/PRIORITIES.md` for the full ordered work queue.
 
 ## Bottom Line
 
-Session 62: feature consolidation + `std/store` + 9 module→package conversions. 44 Rust stdlib → 35 Rust + 9 lx packages. Net ~-2770 lines Rust. Conversion wave hit its natural limit — budget/profile/pipeline stay Rust because lx lacks dynamic record field access, randomness, and hashing. Identified a real language gap: lx needs a generic `Class` keyword (Agent minus messaging) for plain stateful objects. 79/79 tests pass.
+Session 64: type hierarchy refactor unifies Store/Class/Agent into a clean stack. `Value::Agent` and `Value::Protocol` eliminated — Agent is `Value::Class { kind: Agent }`, Protocol is `Value::Trait` with non-empty fields. OBJECTS DashMap eliminated — Object fields backed by STORES. Store promoted to first-class value with dot-access methods. Collection Trait proves the pattern: 5 packages rewritten with generic operations from Trait defaults, domain-only methods retained. Parser bug (`is_func_def` in application context) fixed via `application_depth` tracking. 80/80 tests pass.

@@ -5,7 +5,7 @@
 
 ## Protocols (Message Contracts)
 
-Protocols validate message shapes at runtime. Returns Err on validation failure (catchable with `??`).
+Protocols are `Value::Trait` with non-empty `fields`. Callable as constructor, runtime validation. Display as `<Protocol X>`. Returns Err on validation failure (catchable with `??`).
 
 ```lx
 Protocol ReviewRequest = {file: Str  depth: Str = "standard"}
@@ -20,7 +20,7 @@ Composition: `Protocol Extended = {..Base  extra: Str}`.
 
 ## Traits (Behavioral Contracts)
 
-Typed method signatures using MCP syntax (`{input} -> output`), plus default method implementations:
+Typed method signatures using MCP syntax (`{input} -> output`), plus default method implementations. Behavioral Traits have empty `fields` and display as `<Trait X>`. Traits with non-empty `fields` are Protocols (see above).
 
 ```lx
 Trait Reviewer = {
@@ -38,7 +38,7 @@ Default methods (with `=`) are auto-injected into conforming Agent/Class if not 
 
 ## Classes (Stateful Objects)
 
-Agent minus messaging. For circuit breakers, stores, context windows, and other plain stateful objects:
+Agent minus messaging. Both produce `Value::Class` — Agent has `kind: Agent`, Class has `kind: Plain`. Shared trait injection via `inject_traits` helper. Object fields backed by STORES (same DashMap as Store values).
 
 ```lx
 Class Counter : [Checkable] = {
@@ -54,11 +54,12 @@ c.check () ^
 ```
 
 - Fields use `:` (name: default), methods use `=` (name = closure)
-- Constructor: `ClassName {field: val}` or `ClassName ()`
-- `self.field` reads, `self.field <- val` writes (in-place via global DashMap store)
+- Constructor: `ClassName {field: val}` or `ClassName ()`. Store fields are cloned per instance.
+- `self.field` reads, `self.field <- val` writes (in-place via STORES)
 - Reference semantics: `a = b` shares same object. Both see mutations
 - Trait conformance + defaults work the same as Agent
 - Export with `+Class Name = { ... }`
+- Display: `<Class X>` for Plain-kind, `<Agent X>` for Agent-kind
 
 Discovery via `std/trait`:
 
@@ -69,6 +70,8 @@ best = trait.match Reviewer "find issues"
 ```
 
 ## Agent Declarations
+
+Agents are `Value::Class { kind: Agent }` — Classes with messaging support (`uses`/`init`/`on`):
 
 ```lx
 Agent CodeReviewer: Reviewer = {
@@ -83,6 +86,7 @@ Agent CodeReviewer: Reviewer = {
 Trait conformance validated at definition time — missing methods halt execution.
 Access methods via `.`: `CodeReviewer.review {file: "main.rs"}`.
 Reserved fields: `uses` (MCP connections), `init` (startup logic), `on` (lifecycle hooks).
+Display: `<Agent CodeReviewer>`.
 
 ## Agent Messaging
 

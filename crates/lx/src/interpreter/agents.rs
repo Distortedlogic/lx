@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use indexmap::IndexMap;
 use num_bigint::BigInt;
 
 use crate::ast::{ProtocolEntry, ProtocolField, SExpr};
@@ -105,7 +106,7 @@ impl Interpreter {
                             span,
                         )
                     })?;
-                    let Value::Protocol { fields, .. } = &base else {
+                    let Value::Trait { fields, .. } = &base else {
                         return Err(LxError::runtime(
                             format!(
                                 "Protocol {name}: '{base_name}' is not a Protocol, got {}",
@@ -138,9 +139,14 @@ impl Interpreter {
                 }
             }
         }
-        let val = Value::Protocol {
+        let val = Value::Trait {
             name: Arc::from(name),
             fields: Arc::new(proto_fields),
+            methods: Arc::new(Vec::new()),
+            defaults: Arc::new(IndexMap::new()),
+            requires: Arc::new(Vec::new()),
+            description: None,
+            tags: Arc::new(Vec::new()),
         };
         let mut env = self.env.child();
         env.bind(name.to_string(), val);
@@ -175,7 +181,7 @@ impl Interpreter {
                     span,
                 )
             })?;
-            if !matches!(val, Value::Protocol { .. }) {
+            if !matches!(val, Value::Trait { .. }) {
                 return Err(LxError::runtime(
                     format!(
                         "Protocol union {name}: variant '{v}' is not a Protocol, got {}",

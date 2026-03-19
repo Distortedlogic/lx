@@ -10,6 +10,10 @@
 - **`()` before `(param) { body }` breaks argument parsing.** `f name () (x) { body }` — parser doesn't see 4 args. The `()` followed by `(x)` confuses it. **Fix:** bind either to a variable first: `input = ()` then `f name input (x) { body }`.
 - **`f arg () { body }` passes Unit then a separate block, not a closure.** `deadline.scope dl () { body }` — the `()` is consumed as Unit (second arg), and `{ body }` becomes a separate block expression. **Fix:** bind the closure first: `body_fn = () { ... }` then `f arg body_fn`.
 
+## Fixed Parser Traps (Session 64)
+
+- **`(expr) {record}` in application context no longer misparses.** Previously, `(to_str counter) {name: name}` was parsed as a 2-param function literal instead of a parenthesized expression + record. Fixed via `application_depth` tracking in the parser. In application context with 2+ bare-ident params and no strong signals, the parser rejects func-def when body is a record literal or an identifier not matching any param name.
+
 ## Keyword Field Names
 
 - **`par` is a keyword — can't use as record field via dot access.** `module.par` fails to parse because `par` is consumed as the `par { }` keyword. `std/flow` uses `flow.parallel` instead. Same applies to other keywords: `sel`, `match`, `if`, `use`, `emit`, `yield`, `refine`, `receive`, `Agent`, `Protocol`, `Trait`, `MCP`.
@@ -27,4 +31,4 @@
 
 ## Incomplete Wiring
 
-- **`uses` bindings are metadata-only.** `Value::Agent` holds `uses` and `on` fields, but `uses` bindings are not auto-connected to MCP servers at runtime. **Workaround:** Connect MCP manually in method bodies or `init`.
+- **`uses` bindings are metadata-only.** `Value::Class { kind: Agent }` holds `uses` and `on` fields, but `uses` bindings are not auto-connected to MCP servers at runtime. **Workaround:** Connect MCP manually in method bodies or `init`.

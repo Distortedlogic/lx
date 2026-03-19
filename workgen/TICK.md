@@ -30,6 +30,9 @@ Str`. Run `lx run workgen/tests/run.lx` to see exact location. 71/71 lx suite pa
 "tests/" pattern = "*.lx"`. Verify with `lx test -m workgen` after fixing tests.
 **Cross-member imports now work (Session 54).** `use flows/lib/scoring {normalize}` resolves
 via workspace member name. Workgen files can import from flows/, brain/, tests/ by name.
+**Session 64 (agent/):** pkg packages rewritten with Store + Collection Trait. If workgen
+uses save/load/remove from pkg packages, remove `^` after those calls (they return Unit/value
+directly, not Result).
 
 ## This Tick
 

@@ -157,12 +157,19 @@ impl fmt::Display for Value {
                     write!(f, "{start}..{end}")
                 }
             }
-            Value::Protocol { name, .. } => write!(f, "<Protocol {name}>"),
             Value::ProtocolUnion { name, .. } => write!(f, "<Protocol {name}>"),
             Value::McpDecl { name, .. } => write!(f, "<MCP {name}>"),
-            Value::Trait { name, .. } => write!(f, "<Trait {name}>"),
-            Value::Agent { name, .. } => write!(f, "<Agent {name}>"),
-            Value::Class { name, .. } => write!(f, "<Class {name}>"),
+            Value::Trait { name, fields, .. } => {
+                if !fields.is_empty() {
+                    write!(f, "<Protocol {name}>")
+                } else {
+                    write!(f, "<Trait {name}>")
+                }
+            }
+            Value::Class { name, kind, .. } => match kind {
+                crate::value::ClassKind::Agent => write!(f, "<Agent {name}>"),
+                crate::value::ClassKind::Plain => write!(f, "<Class {name}>"),
+            },
             Value::Object { class_name, id, .. } => write!(f, "<{class_name}#{id}>"),
             Value::Store { id } => write!(f, "<Store#{id}>"),
         }

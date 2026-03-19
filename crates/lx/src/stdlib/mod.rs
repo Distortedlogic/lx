@@ -62,7 +62,10 @@ mod step_deps;
 mod store;
 mod store_dispatch;
 
-pub(crate) use store_dispatch::{build_constructor, store_clone, store_len, store_method};
+pub(crate) use store_dispatch::{
+    build_constructor, object_get_field, object_insert, object_update_nested, store_clone,
+    store_len, store_method,
+};
 mod taskgraph;
 mod test;
 mod time;

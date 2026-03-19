@@ -32,6 +32,7 @@ pub fn parse(tokens: Vec<Token>) -> Result<Program, LxError> {
         no_juxtapose: false,
         collection_depth: 0,
         record_field_depth: 0,
+        application_depth: 0,
         stop_ident: None,
     }
     .parse_program()
@@ -43,6 +44,7 @@ pub(crate) struct Parser {
     pub(crate) no_juxtapose: bool,
     pub(crate) collection_depth: u32,
     pub(crate) record_field_depth: u32,
+    pub(crate) application_depth: u32,
     pub(crate) stop_ident: Option<String>,
 }
 
@@ -156,7 +158,9 @@ impl Parser {
                         span,
                     );
                 } else {
+                    self.application_depth += 1;
                     let arg = self.parse_expr(32)?;
+                    self.application_depth -= 1;
                     let span = Span::from_range(left.span.offset, arg.span.end());
                     left = SExpr::new(
                         Expr::Apply {

@@ -4,14 +4,17 @@ use indexmap::IndexMap;
 
 use crate::ast::{BindTarget, Stmt};
 use crate::error::LxError;
-use crate::value::{self, Value};
+use crate::value::Value;
 
 use super::Interpreter;
 
 fn binding_pattern_hint(pat_str: &str) -> Option<&'static str> {
-    let first_word = pat_str.split_whitespace().next().unwrap_or("");
-    let trimmed = first_word.trim_matches(|c| c == '(' || c == ')' || c == ',');
-    match trimmed {
+    match pat_str
+        .split_whitespace()
+        .next()
+        .unwrap_or("")
+        .trim_matches(|c| c == '(' || c == ')' || c == ',')
+    {
         "mut" => Some("lx uses `:=` for mutable bindings: `x := 0`"),
         "let" | "var" | "const" => {
             Some("lx bindings use `name = value` (or `name := value` for mutable)")
@@ -123,7 +126,7 @@ impl Interpreter {
                 requires,
                 description,
                 tags,
-                exported,
+                ..
             } => {
                 let mut method_defs = Vec::new();
                 for m in methods {
@@ -154,13 +157,13 @@ impl Interpreter {
                 }
                 let val = Value::Trait {
                     name: Arc::from(name.as_str()),
+                    fields: Arc::new(Vec::new()),
                     methods: Arc::new(method_defs),
                     defaults: Arc::new(default_impls),
                     requires: Arc::new(requires.iter().map(|s| Arc::from(s.as_str())).collect()),
                     description: description.as_ref().map(|s| Arc::from(s.as_str())),
                     tags: Arc::new(tags.iter().map(|s| Arc::from(s.as_str())).collect()),
                 };
-                let _ = exported;
                 let mut env = self.env.child();
                 env.bind(name.clone(), val);
                 self.env = env.into_arc();
@@ -173,7 +176,7 @@ impl Interpreter {
                 init,
                 on,
                 methods,
-                exported,
+                ..
             } => {
                 let mut method_map = IndexMap::new();
                 for m in methods {
@@ -194,40 +197,17 @@ impl Interpreter {
                     Some(expr) => Some(Box::new(self.eval(expr)?)),
                     None => None,
                 };
-                for trait_name in traits {
-                    if let Some(Value::Trait {
-                        methods: trait_methods,
-                        defaults: trait_defaults,
-                        ..
-                    }) = self.env.get(trait_name)
-                    {
-                        for (dname, dval) in trait_defaults.iter() {
-                            if !method_map.contains_key(dname) {
-                                method_map.insert(dname.clone(), dval.clone());
-                            }
-                        }
-                        for required in trait_methods.iter() {
-                            if !method_map.contains_key(&required.name) {
-                                return Err(LxError::runtime(
-                                    format!(
-                                        "Agent {name} missing method '{}' required by Trait {trait_name}",
-                                        required.name
-                                    ),
-                                    stmt.span,
-                                ));
-                            }
-                        }
-                    }
-                }
-                let val = Value::Agent {
+                Self::inject_traits(&mut method_map, traits, &self.env, "Agent", name, stmt.span)?;
+                let val = Value::Class {
                     name: Arc::from(name.as_str()),
+                    kind: crate::value::ClassKind::Agent,
                     traits: Arc::new(traits.iter().map(|s| Arc::from(s.as_str())).collect()),
+                    defaults: Arc::new(IndexMap::new()),
                     methods: Arc::new(method_map),
                     init: init_val,
-                    uses: Arc::new(uses_resolved),
                     on: on_val,
+                    uses: Arc::new(uses_resolved),
                 };
-                let _ = exported;
                 let mut env = self.env.child();
                 env.bind(name.clone(), val);
                 self.env = env.into_arc();
@@ -238,7 +218,7 @@ impl Interpreter {
                 traits,
                 fields,
                 methods,
-                exported,
+                ..
             } => {
                 let mut defaults_map = IndexMap::new();
                 for f in fields {
@@ -250,38 +230,17 @@ impl Interpreter {
                     let handler = self.eval(&m.handler)?;
                     method_map.insert(m.name.clone(), handler);
                 }
-                for trait_name in traits {
-                    if let Some(Value::Trait {
-                        methods: trait_methods,
-                        defaults: trait_defaults,
-                        ..
-                    }) = self.env.get(trait_name)
-                    {
-                        for (dname, dval) in trait_defaults.iter() {
-                            if !method_map.contains_key(dname) {
-                                method_map.insert(dname.clone(), dval.clone());
-                            }
-                        }
-                        for required in trait_methods.iter() {
-                            if !method_map.contains_key(&required.name) {
-                                return Err(LxError::runtime(
-                                    format!(
-                                        "Class {name} missing method '{}' required by Trait {trait_name}",
-                                        required.name
-                                    ),
-                                    stmt.span,
-                                ));
-                            }
-                        }
-                    }
-                }
+                Self::inject_traits(&mut method_map, traits, &self.env, "Class", name, stmt.span)?;
                 let val = Value::Class {
                     name: Arc::from(name.as_str()),
+                    kind: crate::value::ClassKind::Plain,
                     traits: Arc::new(traits.iter().map(|s| Arc::from(s.as_str())).collect()),
                     defaults: Arc::new(defaults_map),
                     methods: Arc::new(method_map),
+                    init: None,
+                    on: None,
+                    uses: Arc::new(Vec::new()),
                 };
-                let _ = exported;
                 let mut env = self.env.child();
                 env.bind(name.clone(), val);
                 self.env = env.into_arc();
@@ -297,7 +256,7 @@ impl Interpreter {
                     LxError::runtime(format!("undefined variable '{name}'"), stmt.span)
                 })?;
                 if let Value::Object { id, .. } = &current {
-                    value::object_store_update_nested(*id, fields, new_val)
+                    crate::stdlib::object_update_nested(*id, fields, new_val)
                         .map_err(|e| LxError::runtime(e, stmt.span))?;
                     return Ok(Value::Unit);
                 }

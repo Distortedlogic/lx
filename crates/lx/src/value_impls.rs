@@ -82,13 +82,11 @@ impl Value {
                     inclusive: i2,
                 },
             ) => s1 == s2 && e1 == e2 && i1 == i2,
-            (Value::Protocol { name: n1, .. }, Value::Protocol { name: n2, .. }) => n1 == n2,
             (Value::ProtocolUnion { name: n1, .. }, Value::ProtocolUnion { name: n2, .. }) => {
                 n1 == n2
             }
             (Value::McpDecl { name: n1, .. }, Value::McpDecl { name: n2, .. }) => n1 == n2,
             (Value::Trait { name: n1, .. }, Value::Trait { name: n2, .. }) => n1 == n2,
-            (Value::Agent { name: n1, .. }, Value::Agent { name: n2, .. }) => n1 == n2,
             (Value::Class { name: n1, .. }, Value::Class { name: n2, .. }) => n1 == n2,
             (Value::Object { id: i1, .. }, Value::Object { id: i2, .. }) => i1 == i2,
             (Value::Store { id: i1 }, Value::Store { id: i2 }) => i1 == i2,
@@ -146,11 +144,9 @@ impl Value {
                 end.hash(state);
                 inclusive.hash(state);
             }
-            Value::Protocol { name, .. } => name.hash(state),
             Value::ProtocolUnion { name, .. } => name.hash(state),
             Value::McpDecl { name, .. } => name.hash(state),
             Value::Trait { name, .. } => name.hash(state),
-            Value::Agent { name, .. } => name.hash(state),
             Value::Class { name, .. } => name.hash(state),
             Value::Object { id, .. } => id.hash(state),
             Value::Store { id } => id.hash(state),

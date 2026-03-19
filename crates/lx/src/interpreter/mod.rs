@@ -11,6 +11,7 @@ mod patterns;
 mod receive;
 mod refine;
 mod shell;
+mod traits;
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;

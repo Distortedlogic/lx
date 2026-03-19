@@ -9,6 +9,32 @@ use crate::span::Span;
 mod walk;
 pub use walk::*;
 
+pub struct TraitDeclCtx<'a> {
+    pub name: &'a str,
+    pub methods: &'a [TraitMethodDecl],
+    pub requires: &'a [String],
+    pub description: Option<&'a str>,
+    pub tags: &'a [String],
+}
+
+pub struct AgentDeclCtx<'a> {
+    pub name: &'a str,
+    pub traits: &'a [String],
+    pub uses: &'a [(String, String)],
+    pub init: Option<&'a SExpr>,
+    pub on: Option<&'a SExpr>,
+    pub methods: &'a [AgentMethod],
+}
+
+pub struct RefineCtx<'a> {
+    pub initial: &'a SExpr,
+    pub grade: &'a SExpr,
+    pub revise: &'a SExpr,
+    pub threshold: &'a SExpr,
+    pub max_rounds: &'a SExpr,
+    pub on_round: Option<&'a SExpr>,
+}
+
 pub trait AstVisitor {
     fn visit_program(&mut self, program: &Program) {
         walk_program(self, program);
@@ -45,29 +71,9 @@ pub trait AstVisitor {
         _span: Span,
     ) {
     }
-    fn visit_trait_decl(
-        &mut self,
-        _name: &str,
-        _methods: &[TraitMethodDecl],
-        _requires: &[String],
-        _description: Option<&str>,
-        _tags: &[String],
-        _exported: bool,
-        _span: Span,
-    ) {
-    }
-    fn visit_agent_decl(
-        &mut self,
-        _name: &str,
-        _traits: &[String],
-        _uses: &[(String, String)],
-        init: Option<&SExpr>,
-        on: Option<&SExpr>,
-        methods: &[AgentMethod],
-        _exported: bool,
-        span: Span,
-    ) {
-        walk_agent_decl(self, init, on, methods, span);
+    fn visit_trait_decl(&mut self, _ctx: &TraitDeclCtx<'_>, _span: Span) {}
+    fn visit_agent_decl(&mut self, ctx: &AgentDeclCtx<'_>, span: Span) {
+        walk_agent_decl(self, ctx, span);
     }
     fn visit_class_decl(
         &mut self,
@@ -197,19 +203,8 @@ pub trait AstVisitor {
     ) {
         walk_with_resource(self, resources, body, span);
     }
-    fn visit_refine(
-        &mut self,
-        initial: &SExpr,
-        grade: &SExpr,
-        revise: &SExpr,
-        threshold: &SExpr,
-        max_rounds: &SExpr,
-        on_round: Option<&SExpr>,
-        span: Span,
-    ) {
-        walk_refine(
-            self, initial, grade, revise, threshold, max_rounds, on_round, span,
-        );
+    fn visit_refine(&mut self, ctx: &RefineCtx<'_>, span: Span) {
+        walk_refine(self, ctx, span);
     }
     fn visit_shell(&mut self, _mode: ShellMode, parts: &[StrPart], span: Span) {
         walk_shell(self, parts, span);

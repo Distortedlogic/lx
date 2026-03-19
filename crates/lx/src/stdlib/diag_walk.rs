@@ -12,11 +12,11 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 use crate::ast::{
-    BindTarget, Binding, Expr, McpToolDecl, Program, ProtocolEntry, ProtocolUnionDef, SExpr, SStmt,
-    Stmt, TraitMethodDecl, UseStmt,
+    BindTarget, Binding, Expr, McpToolDecl, Program, ProtocolEntry, ProtocolUnionDef, SStmt, Stmt,
+    UseStmt,
 };
 use crate::span::Span;
-use crate::visitor::{AstVisitor, walk_program};
+use crate::visitor::{AgentDeclCtx, AstVisitor, TraitDeclCtx, walk_program};
 
 pub(crate) use diag_types::*;
 
@@ -233,17 +233,8 @@ impl AstVisitor for Walker {
         self.add_node("type", def.name.clone(), "type");
     }
 
-    fn visit_trait_decl(
-        &mut self,
-        name: &str,
-        _methods: &[TraitMethodDecl],
-        _requires: &[String],
-        _description: Option<&str>,
-        _tags: &[String],
-        _exported: bool,
-        _span: Span,
-    ) {
-        self.add_node("type", name.to_string(), "type");
+    fn visit_trait_decl(&mut self, ctx: &TraitDeclCtx<'_>, _span: Span) {
+        self.add_node("type", ctx.name.to_string(), "type");
     }
 
     fn visit_mcp_decl(&mut self, name: &str, _tools: &[McpToolDecl], _exported: bool, _span: Span) {
@@ -251,28 +242,18 @@ impl AstVisitor for Walker {
         self.mcp_vars.insert(name.to_string(), id);
     }
 
-    fn visit_agent_decl(
-        &mut self,
-        name: &str,
-        _traits: &[String],
-        _uses: &[(String, String)],
-        init: Option<&SExpr>,
-        on: Option<&SExpr>,
-        methods: &[crate::ast::AgentMethod],
-        _exported: bool,
-        _span: Span,
-    ) {
-        let id = self.add_node("agent", name.to_string(), "agent");
-        self.agent_vars.insert(name.to_string(), id.clone());
+    fn visit_agent_decl(&mut self, ctx: &AgentDeclCtx<'_>, _span: Span) {
+        let id = self.add_node("agent", ctx.name.to_string(), "agent");
+        self.agent_vars.insert(ctx.name.to_string(), id.clone());
         let saved = self.context.clone();
         self.context = id;
-        if let Some(i) = init {
+        if let Some(i) = ctx.init {
             self.visit_expr(&i.node, i.span);
         }
-        if let Some(o) = on {
+        if let Some(o) = ctx.on {
             self.visit_expr(&o.node, o.span);
         }
-        for m in methods {
+        for m in ctx.methods {
             self.visit_expr(&m.handler.node, m.handler.span);
         }
         self.context = saved;

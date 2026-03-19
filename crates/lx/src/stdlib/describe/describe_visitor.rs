@@ -1,6 +1,9 @@
-use crate::ast::{AgentMethod, BindTarget, Binding, McpToolDecl, SExpr, UseKind, UseStmt};
+use crate::ast::{BindTarget, Binding, McpToolDecl, SExpr, UseKind, UseStmt};
 use crate::span::Span;
-use crate::visitor::{AstVisitor, walk_apply, walk_loop, walk_match, walk_par, walk_sel};
+use crate::visitor::{
+    AgentDeclCtx, AstVisitor, RefineCtx, walk_apply, walk_loop, walk_match, walk_par, walk_refine,
+    walk_sel,
+};
 
 use super::describe_helpers::{
     expr_name, extract_agent_spawn, extract_ai_call, extract_ai_call_from_apply,
@@ -141,28 +144,15 @@ impl AstVisitor for Describer {
         self.visit_expr(&binding.value.node, binding.value.span);
     }
 
-    fn visit_agent_decl(
-        &mut self,
-        name: &str,
-        traits: &[String],
-        _uses: &[(String, String)],
-        _init: Option<&SExpr>,
-        _on: Option<&SExpr>,
-        methods: &[AgentMethod],
-        exported: bool,
-        _span: Span,
-    ) {
-        let method_names: Vec<String> = methods.iter().map(|m| m.name.clone()).collect();
+    fn visit_agent_decl(&mut self, ctx: &AgentDeclCtx<'_>, _span: Span) {
+        let method_names: Vec<String> = ctx.methods.iter().map(|m| m.name.clone()).collect();
         self.agents.push(AgentInfo {
-            name: name.to_string(),
-            traits: traits.to_vec(),
+            name: ctx.name.to_string(),
+            traits: ctx.traits.to_vec(),
             methods: method_names,
             declared: true,
             spawned_by: String::new(),
         });
-        if exported {
-            self.exports.push(name.to_string());
-        }
     }
 
     fn visit_mcp_decl(&mut self, name: &str, _tools: &[McpToolDecl], exported: bool, _span: Span) {
@@ -218,23 +208,12 @@ impl AstVisitor for Describer {
         walk_match(self, scrutinee, arms, span);
     }
 
-    fn visit_refine(
-        &mut self,
-        initial: &SExpr,
-        grade: &SExpr,
-        revise: &SExpr,
-        threshold: &SExpr,
-        max_rounds: &SExpr,
-        on_round: Option<&SExpr>,
-        span: Span,
-    ) {
+    fn visit_refine(&mut self, ctx: &RefineCtx<'_>, span: Span) {
         self.control_flow.push(ControlFlowInfo {
             kind: "refine".into(),
             label: "grade/revise loop".into(),
         });
-        crate::visitor::walk_refine(
-            self, initial, grade, revise, threshold, max_rounds, on_round, span,
-        );
+        walk_refine(self, ctx, span);
     }
 
     fn visit_loop(&mut self, stmts: &[crate::ast::SStmt], span: Span) {

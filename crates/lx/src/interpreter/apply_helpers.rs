@@ -13,7 +13,7 @@ impl Interpreter {
     fn make_section_func(&self, params: &[&str], body_expr: Expr, span: Span) -> Value {
         let body = Spanned::new(body_expr, span);
         let arity = params.len();
-        Value::Func(LxFunc {
+        Value::Func(Box::new(LxFunc {
             params: params.iter().map(|p| (*p).into()).collect(),
             defaults: vec![None; arity],
             body: Arc::new(body),
@@ -22,7 +22,7 @@ impl Interpreter {
             applied: vec![],
             source_text: Arc::from(self.source.as_str()),
             source_name: Arc::from(""),
-        })
+        }))
     }
 
     pub(super) fn eval_section(&mut self, sec: &Section, span: Span) -> Result<Value, LxError> {
@@ -78,7 +78,7 @@ impl Interpreter {
         match field {
             FieldKind::Named(name) => match &val {
                 Value::Record(r) => Ok(r.get(name).cloned().unwrap_or(Value::None)),
-                Value::Agent {
+                Value::Class {
                     methods, init, on, ..
                 } => {
                     if let Some(m) = methods.get(name) {
@@ -101,7 +101,7 @@ impl Interpreter {
                     if let Some(method) = methods.get(name) {
                         Ok(Self::inject_self(method, &val))
                     } else {
-                        Ok(crate::value::object_store_get_field(*id, name).unwrap_or(Value::None))
+                        Ok(crate::stdlib::object_get_field(*id, name).unwrap_or(Value::None))
                     }
                 }
                 Value::Store { .. } => crate::stdlib::store_method(name, &val).ok_or_else(|| {

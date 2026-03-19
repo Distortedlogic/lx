@@ -113,7 +113,18 @@ fn bi_implements(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<V
         return Err(LxError::type_err("implements: expected Trait value", span));
     };
     match &args[0] {
-        Value::Agent { methods, .. } => {
+        Value::Class {
+            methods, traits, ..
+        } => {
+            let Value::Trait {
+                name: trait_name, ..
+            } = &args[1]
+            else {
+                unreachable!()
+            };
+            if traits.iter().any(|t| t.as_ref() == trait_name.as_ref()) {
+                return Ok(Value::Bool(true));
+            }
             let found = trait_methods
                 .iter()
                 .all(|tm| methods.contains_key(&tm.name));

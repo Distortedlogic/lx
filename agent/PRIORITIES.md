@@ -20,7 +20,7 @@ BUGS.md says "fix bugs before new features." 60 sessions of feature work have ac
 
 **Not fixing (by design / architectural):**
 - Named-arg `:` vs ternary `:` — inherent parser ambiguity, workaround (parenthesize) is fine
-- `is_func_def` heuristic ambiguity — inherent to juxtaposition syntax, workarounds documented
+- `is_func_def` heuristic ambiguity — fixed in Session 64 (`application_depth` tracking)
 - Keyword field names — fundamental to how keywords work, `flow.parallel` pattern is fine
 - par/sel/pmap sequential — needs tokio, architectural change
 - Trait conformance uncatchable — by design (hard error at definition time)
@@ -35,6 +35,15 @@ then identified `std/store` as the missing primitive enabling module→package m
 - [ ] budget, profile, pipeline — stay Rust (lx lacks dynamic record field access, randomness, hashing)
 - [ ] Agent sub-modules (dispatch, route, etc.) — can't extract from `agent.X` namespace
 - [x] **`Class` keyword** — generic stateful objects (Agent minus messaging). DashMap-backed, Trait defaults. 8 packages converted. Session 63
+
+**Session 64: Store promotion, Collection Trait, type hierarchy refactor** ✓ DONE
+
+- [x] `Value::Store { id }` first-class type (dot-access methods, constructor, reference semantics)
+- [x] `Collection` Trait (`pkg/collection.lx`) — get/keys/values/remove/query/len/has/save/load defaults
+- [x] 5 collection packages rewritten (knowledge, tasks, memory, trace, context) using `entries: Store ()` + Collection
+- [x] Type hierarchy refactor: OBJECTS DashMap eliminated, `Value::Agent` → `Value::Class { kind: Agent }`, `Value::Protocol` → `Value::Trait` with fields
+- [x] `is_func_def()` parser bug fix — `application_depth` tracking for `(expr) {record}` disambiguation
+- [x] Boxed `LxFunc`/`ProtocolField`, visitor context structs, type alias for pubsub return
 
 ## Tier 1 — Infrastructure (multiplicative improvement to every tick)
 
@@ -58,7 +67,7 @@ Tier 1 completed: `std/retry` (Session 44), `std/user` + `std/profile` (Session 
 
 9. ~~**`agent.route`/`register` capability routing**~~ — SHIPPED Session 60. 5 functions: `register`, `unregister`, `registered`, `route`, `route_multi`. Trait/protocol/domain filtering, selection strategies (least_busy, round_robin, random, custom), load tracking, reconcile integration.
 
-10. **`introspect.system` live observation** (`spec/agents-introspect-live.md`) — "What are all agents doing right now?" Structured system snapshot: agent states, in-flight messages, active dialogues, pool status, bottleneck detection. Extensions to existing `std/introspect`.
+10. **`introspect.system` live observation** (`spec/agents-introspect-live.md`) — "What are all agents doing right now?" Structured system snapshot: agent states, in-flight messages, active dialogues, pool status, bottleneck detection. Extensions to existing `pkg/introspect`.
 
 11. **`agent.pipeline`** (`spec/agents-pipeline.md`) — Consumer-driven flow control with backpressure.
 
@@ -66,7 +75,7 @@ Tier 1 completed: `std/retry` (Session 44), `std/user` + `std/profile` (Session 
 
 ## Tier 3 — Multi-agent infrastructure, adaptive intelligence
 
-13. **`std/trace` extensions** — Provenance (message flow tracking as trace spans: `trace.enable_provenance`, `trace.message_path`, `trace.message_hops`) + reputation (agent scoring from trace data: `trace.agent_score`, `trace.agent_rank`). One observability system instead of three separate modules. Absorbs `spec/agents-provenance.md` and `spec/agents-reputation.md`.
+13. **`pkg/trace` extensions** — Provenance (message flow tracking as trace spans: `trace.enable_provenance`, `trace.message_path`, `trace.message_hops`) + reputation (agent scoring from trace data: `trace.agent_score`, `trace.agent_rank`). One observability system instead of three separate modules. Absorbs `spec/agents-provenance.md` and `spec/agents-reputation.md`.
 
 14. **`std/workspace` collaborative editing** (`spec/agents-workspace.md`) — Multiple agents editing the same artifact concurrently with region claiming and conflict resolution.
 

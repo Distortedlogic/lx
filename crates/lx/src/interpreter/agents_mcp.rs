@@ -49,7 +49,7 @@ impl Interpreter {
     pub(super) fn resolve_mcp_output(&self, out: &McpOutputType) -> McpOutputDef {
         match out {
             McpOutputType::Named(n) => {
-                if let Some(Value::Protocol { fields, .. }) = self.env.get(n) {
+                if let Some(Value::Trait { fields, .. }) = self.env.get(n) {
                     McpOutputDef::Record((*fields).clone())
                 } else {
                     McpOutputDef::Simple(n.clone())
@@ -151,7 +151,7 @@ impl Interpreter {
             let Some(proto) = self.env.get(variant_name.as_ref()) else {
                 continue;
             };
-            let Value::Protocol {
+            let Value::Trait {
                 fields: ref proto_fields,
                 ..
             } = proto

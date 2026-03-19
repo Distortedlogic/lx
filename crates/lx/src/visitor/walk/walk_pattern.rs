@@ -4,7 +4,7 @@ use crate::ast::{
 };
 use crate::span::Span;
 
-use crate::visitor::AstVisitor;
+use crate::visitor::{AstVisitor, RefineCtx};
 
 pub fn walk_func<V: AstVisitor + ?Sized>(
     v: &mut V,
@@ -172,22 +172,13 @@ pub fn walk_with_resource<V: AstVisitor + ?Sized>(
     }
 }
 
-pub fn walk_refine<V: AstVisitor + ?Sized>(
-    v: &mut V,
-    initial: &SExpr,
-    grade: &SExpr,
-    revise: &SExpr,
-    threshold: &SExpr,
-    max_rounds: &SExpr,
-    on_round: Option<&SExpr>,
-    _span: Span,
-) {
-    v.visit_expr(&initial.node, initial.span);
-    v.visit_expr(&grade.node, grade.span);
-    v.visit_expr(&revise.node, revise.span);
-    v.visit_expr(&threshold.node, threshold.span);
-    v.visit_expr(&max_rounds.node, max_rounds.span);
-    if let Some(o) = on_round {
+pub fn walk_refine<V: AstVisitor + ?Sized>(v: &mut V, ctx: &RefineCtx<'_>, _span: Span) {
+    v.visit_expr(&ctx.initial.node, ctx.initial.span);
+    v.visit_expr(&ctx.grade.node, ctx.grade.span);
+    v.visit_expr(&ctx.revise.node, ctx.revise.span);
+    v.visit_expr(&ctx.threshold.node, ctx.threshold.span);
+    v.visit_expr(&ctx.max_rounds.node, ctx.max_rounds.span);
+    if let Some(o) = ctx.on_round {
         v.visit_expr(&o.node, o.span);
     }
 }

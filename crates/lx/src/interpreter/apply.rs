@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::ast::{Param, SExpr};
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::{self, LxFunc, Value};
+use crate::value::{LxFunc, Value};
 
 use super::Interpreter;
 
@@ -96,7 +96,9 @@ impl Interpreter {
                     })
                 }
             }
-            Value::Protocol { name, fields } => self.apply_protocol(&name, &fields, &arg, span),
+            Value::Trait { name, fields, .. } if !fields.is_empty() => {
+                self.apply_protocol(&name, &fields, &arg, span)
+            }
             Value::ProtocolUnion { name, variants } => {
                 self.apply_protocol_union(&name, &variants, &arg, span)
             }
@@ -106,6 +108,7 @@ impl Interpreter {
                 traits,
                 defaults,
                 methods,
+                ..
             } => {
                 let overrides = match &arg {
                     Value::Record(r) => r.as_ref().clone(),
@@ -129,7 +132,7 @@ impl Interpreter {
                         *store_id = crate::stdlib::store_clone(*store_id);
                     }
                 }
-                let id = value::object_store_insert(fields);
+                let id = crate::stdlib::object_insert(fields);
                 Ok(Value::Object {
                     class_name: name,
                     id,
@@ -240,7 +243,7 @@ impl Interpreter {
             .as_ref()
             .map(|d| d.display().to_string())
             .unwrap_or_default();
-        Ok(Value::Func(LxFunc {
+        Ok(Value::Func(Box::new(LxFunc {
             params: param_names,
             defaults,
             body: Arc::new(body.clone()),
@@ -249,6 +252,6 @@ impl Interpreter {
             applied: vec![],
             source_text: Arc::from(self.source.as_str()),
             source_name: Arc::from(source_name.as_str()),
-        }))
+        })))
     }
 }

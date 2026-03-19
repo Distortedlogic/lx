@@ -98,7 +98,9 @@ fn bi_prompt_structured_with(
 
 fn extract_protocol(val: &Value, span: Span) -> Result<(String, Arc<Vec<ProtoFieldDef>>), LxError> {
     match val {
-        Value::Protocol { name, fields } => Ok((name.to_string(), Arc::clone(fields))),
+        Value::Trait { name, fields, .. } if !fields.is_empty() => {
+            Ok((name.to_string(), Arc::clone(fields)))
+        }
         _ => Err(LxError::type_err(
             "ai.prompt_structured: first arg must be a Protocol",
             span,
