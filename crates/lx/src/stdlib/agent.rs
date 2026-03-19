@@ -1,6 +1,8 @@
 use std::io::{BufReader, BufWriter};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, LazyLock};
+use std::time::Instant;
 
 use dashmap::DashMap;
 use indexmap::IndexMap;
@@ -18,6 +20,12 @@ pub(super) struct AgentProcess {
     pub(super) _child: Child,
     pub(super) stdin: BufWriter<ChildStdin>,
     pub(super) stdout: BufReader<ChildStdout>,
+    pub(super) name: String,
+    pub(super) traits: Vec<String>,
+    pub(super) spawned_at: Instant,
+    pub(super) in_flight: AtomicU64,
+    pub(super) completed: AtomicU64,
+    pub(super) errors: AtomicU64,
 }
 
 pub(super) static REGISTRY: LazyLock<DashMap<u32, AgentProcess>> = LazyLock::new(DashMap::new);
@@ -101,6 +109,50 @@ pub fn build() -> IndexMap<String, Value> {
     m.insert("registered".into(), super::agent_route::mk_registered());
     m.insert("route".into(), super::agent_route::mk_route());
     m.insert("route_multi".into(), super::agent_route::mk_route_multi());
+    m.insert(
+        "pipeline".into(),
+        super::agent_pipeline_io::mk_pipeline_create(),
+    );
+    m.insert(
+        "pipeline_send".into(),
+        super::agent_pipeline_io::mk_pipeline_send(),
+    );
+    m.insert(
+        "pipeline_collect".into(),
+        super::agent_pipeline_io::mk_pipeline_collect(),
+    );
+    m.insert(
+        "pipeline_batch".into(),
+        super::agent_pipeline_io::mk_pipeline_batch(),
+    );
+    m.insert(
+        "pipeline_stats".into(),
+        super::agent_pipeline_ctrl::mk_pipeline_stats(),
+    );
+    m.insert(
+        "pipeline_on_pressure".into(),
+        super::agent_pipeline_ctrl::mk_pipeline_on_pressure(),
+    );
+    m.insert(
+        "pipeline_pause".into(),
+        super::agent_pipeline_ctrl::mk_pipeline_pause(),
+    );
+    m.insert(
+        "pipeline_resume".into(),
+        super::agent_pipeline_ctrl::mk_pipeline_resume(),
+    );
+    m.insert(
+        "pipeline_drain".into(),
+        super::agent_pipeline_ctrl::mk_pipeline_drain(),
+    );
+    m.insert(
+        "pipeline_close".into(),
+        super::agent_pipeline_ctrl::mk_pipeline_close(),
+    );
+    m.insert(
+        "pipeline_add_worker".into(),
+        super::agent_pipeline_ctrl::mk_pipeline_add_worker(),
+    );
     m.insert("topic".into(), super::agent_pubsub::mk_topic());
     m.insert("subscribe".into(), super::agent_pubsub::mk_subscribe());
     m.insert(
@@ -159,29 +211,45 @@ fn bi_spawn(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, 
             .ok_or_else(|| LxError::runtime("agent.spawn: no stdout pipe", span))?,
     );
     let pid = child.id();
+    let trait_strs: Vec<String> = config
+        .get("implements")
+        .and_then(|v| v.as_list())
+        .map(|traits| {
+            traits
+                .iter()
+                .filter_map(|t| {
+                    if let Value::Trait { name, .. } = t {
+                        Some(name.to_string())
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        })
+        .unwrap_or_default();
     REGISTRY.insert(
         pid,
         AgentProcess {
             _child: child,
             stdin,
             stdout,
+            name: name.clone(),
+            traits: trait_strs.clone(),
+            spawned_at: Instant::now(),
+            in_flight: AtomicU64::new(0),
+            completed: AtomicU64::new(0),
+            errors: AtomicU64::new(0),
         },
     );
     let mut rec = IndexMap::new();
     rec.insert("__pid".into(), Value::Int(BigInt::from(pid)));
     rec.insert("name".into(), Value::Str(Arc::from(name.as_str())));
-    if let Some(Value::List(traits)) = config.get("implements") {
-        let trait_names: Vec<Value> = traits
+    if !trait_strs.is_empty() {
+        let trait_vals: Vec<Value> = trait_strs
             .iter()
-            .filter_map(|t| {
-                if let Value::Trait { name, .. } = t {
-                    Some(Value::Str(Arc::clone(name)))
-                } else {
-                    None
-                }
-            })
+            .map(|s| Value::Str(Arc::from(s.as_str())))
             .collect();
-        rec.insert("__traits".into(), Value::List(Arc::new(trait_names)));
+        rec.insert("__traits".into(), Value::List(Arc::new(trait_vals)));
     }
     if let Some(ref cb) = ctx.on_agent_event {
         cb(AgentEvent::Spawned {

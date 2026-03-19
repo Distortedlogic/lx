@@ -29,12 +29,15 @@
 - Object fields now live in STORES via helpers in `stdlib/store_dispatch.rs`
 - `object_insert`, `object_get_field`, `object_update_nested` wrap STORES access
 
-**Value::Agent removed:**
-- Agent declarations produce `Value::Class { kind: ClassKind::Agent }`
-- `ClassKind` enum: `Plain` | `Agent`
-- Class struct gained: `init: Option<Box<Value>>`, `on: Option<Box<Value>>`, `uses: Arc<Vec<(Arc<str>, Arc<str>)>>`
+**Value::Agent removed — Agent is a Trait in `pkg/agent.lx`:**
+- `Value::Class` has exactly 4 fields: `name`, `traits`, `defaults`, `methods`. No `ClassKind` enum.
+- `Agent` keyword auto-imports `pkg/agent {Agent}` and auto-adds "Agent" to traits list
+- `Class Worker : [Agent] = { ... }` also works (explicitly adding Agent to traits)
+- Agent Trait provides real defaults: init, perceive, reason, act, reflect, handle (auto-dispatch by msg.action via `method_of`), run (yield/loop message loop), think/think_with/think_structured (AI), use_tool/tools (tool hooks), describe (self-description via `methods_of`), ask/tell (inter-agent communication)
+- `init`/`on` go into the methods map; `uses` dropped
+- Two new builtins: `method_of(obj, name)` — returns a method by name or None; `methods_of(obj)` — returns list of method names
 - Shared `inject_traits` helper in `interpreter/traits.rs`
-- Display: `<Agent X>` for Agent-kind, `<Class X>` for Plain-kind
+- Display: checks traits list for "Agent" → `<Agent X>` if present, `<Class X>` otherwise
 
 **Value::Protocol removed:**
 - Protocol declarations produce `Value::Trait` with non-empty `fields: Arc<Vec<ProtoFieldDef>>`
@@ -59,7 +62,7 @@
 ## Key Design Decisions
 
 1. **Store IS the primitive** — no separate Dict type. Store already had the DashMap. Just gave it dot-access and a first-class Value type.
-2. **Agent IS a Class** — just with `kind: Agent` + init/on/uses. No separate Value variant needed.
+2. **Agent IS a Trait** — defined in `pkg/agent.lx`, not a ClassKind enum. `Agent` keyword auto-imports the Trait. `Value::Class` has 4 fields (name, traits, defaults, methods), no init/on/uses fields.
 3. **Protocol IS a Trait** — with field requirements instead of method requirements. Same conformance concept applied to data vs behavior.
 4. **One DashMap** — STORES backs everything. Objects and Stores share one global store.
 

@@ -24,20 +24,23 @@ See `TICK_PROTOCOL.md` for cross-read guidance.
 
 ## State
 
-Session 64 (2026-03-19). **80/80 tests pass.** `just diagnose` clean (0 errors, 0 warnings).
-30 Rust stdlib modules + 10 lx packages in `pkg/`. Type hierarchy refactored:
-Store → Class → Agent, Protocol unified into Trait. Parser `is_func_def` bug fixed.
+Session 65 (2026-03-19). **81/81 tests pass.** `just diagnose` clean (0 errors, 0 warnings).
+31 Rust stdlib modules + 11 lx packages in `pkg/`. `std/introspect` shipped: system-wide
+live observation (5 functions aggregating from REGISTRY, SESSIONS, SUPERVISORS, TOPICS,
+ROUTE_TABLE). `AgentProcess` enriched with per-agent metrics (name, traits, spawn time,
+in-flight/completed/error counters).
 
 ## This Tick
 
-**Next priority from PRIORITIES.md: `introspect.system` live observation.**
+**Next priority from PRIORITIES.md: `agent.pipeline` consumer-driven flow control.**
 
 ## Read These Files
 
 1. `agent/PRIORITIES.md` — feature queue, context for what to build
-2. `agent/INVENTORY.md` — what's implemented
-3. `agent/REFERENCE.md` — codebase layout and how-tos
-4. `agent/GOTCHAS.md` — parser traps
+2. `spec/agents-pipeline.md` — spec for `agent.pipeline` backpressure
+3. `agent/INVENTORY.md` — what's implemented
+4. `agent/REFERENCE.md` — codebase layout and how-tos
+5. `agent/GOTCHAS.md` — parser traps
 
 ## Context Files
 

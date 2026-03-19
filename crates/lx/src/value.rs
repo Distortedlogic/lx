@@ -67,13 +67,9 @@ pub enum Value {
     },
     Class {
         name: Arc<str>,
-        kind: ClassKind,
         traits: Arc<Vec<Arc<str>>>,
         defaults: Arc<IndexMap<String, Value>>,
         methods: Arc<IndexMap<String, Value>>,
-        init: Option<Box<Value>>,
-        on: Option<Box<Value>>,
-        uses: Arc<Vec<(Arc<str>, Arc<str>)>>,
     },
     Object {
         class_name: Arc<str>,
@@ -84,12 +80,6 @@ pub enum Value {
     Store {
         id: u64,
     },
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ClassKind {
-    Plain,
-    Agent,
 }
 
 #[derive(Debug, Clone)]

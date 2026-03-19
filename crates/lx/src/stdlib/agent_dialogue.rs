@@ -14,18 +14,18 @@ use crate::span::Span;
 use crate::value::Value;
 
 static NEXT_SESSION_ID: AtomicU64 = AtomicU64::new(1);
-static SESSIONS: std::sync::LazyLock<DashMap<u64, DialogueSession>> =
+pub(super) static SESSIONS: std::sync::LazyLock<DashMap<u64, DialogueSession>> =
     std::sync::LazyLock::new(DashMap::new);
 
-struct DialogueSession {
-    agent: Value,
-    history: Vec<HistoryEntry>,
-    role: Option<String>,
+pub(super) struct DialogueSession {
+    pub(super) agent: Value,
+    pub(super) history: Vec<HistoryEntry>,
+    pub(super) role: Option<String>,
     context: Option<String>,
     max_turns: Option<usize>,
 }
 
-struct HistoryEntry {
+pub(super) struct HistoryEntry {
     role: String,
     content: Value,
     time: String,

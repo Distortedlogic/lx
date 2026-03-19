@@ -251,6 +251,9 @@ impl Parser {
             let name = name.clone();
             self.advance();
             Ok(name)
+        } else if tok.kind == TokenKind::AgentKw {
+            self.advance();
+            Ok("Agent".into())
         } else {
             Err(LxError::parse(
                 format!("expected type name in {context}, found {:?}", tok.kind),

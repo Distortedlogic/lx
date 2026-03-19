@@ -1,5 +1,6 @@
 use std::io::{BufRead, Write};
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use num_bigint::BigInt;
 
@@ -24,6 +25,25 @@ pub fn builtins() -> Vec<(&'static str, Value)> {
 }
 
 pub fn ask_subprocess(pid: u32, msg: &Value, span: Span) -> Result<Value, LxError> {
+    if let Some(ap) = REGISTRY.get(&pid) {
+        ap.in_flight.fetch_add(1, Ordering::Relaxed);
+    }
+    let result = ask_subprocess_inner(pid, msg, span);
+    if let Some(ap) = REGISTRY.get(&pid) {
+        ap.in_flight.fetch_sub(1, Ordering::Relaxed);
+        match &result {
+            Ok(Value::Ok(_)) => {
+                ap.completed.fetch_add(1, Ordering::Relaxed);
+            }
+            _ => {
+                ap.errors.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+    }
+    result
+}
+
+fn ask_subprocess_inner(pid: u32, msg: &Value, span: Span) -> Result<Value, LxError> {
     let json = json_conv::lx_to_json(msg, span)?;
     let json_str = serde_json::to_string(&json)
         .map_err(|e| LxError::runtime(format!("agent.ask: JSON encode: {e}"), span))?;

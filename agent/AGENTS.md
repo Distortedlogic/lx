@@ -38,7 +38,7 @@ Default methods (with `=`) are auto-injected into conforming Agent/Class if not 
 
 ## Classes (Stateful Objects)
 
-Agent minus messaging. Both produce `Value::Class` — Agent has `kind: Agent`, Class has `kind: Plain`. Shared trait injection via `inject_traits` helper. Object fields backed by STORES (same DashMap as Store values).
+Both Class and Agent produce `Value::Class { name, traits, defaults, methods }`. Agent is a Trait defined in `pkg/agent.lx` — the `Agent` keyword auto-imports it and auto-adds "Agent" to the traits list. `Class Worker : [Agent] = { ... }` also works. Shared trait injection via `inject_traits` helper. Object fields backed by STORES (same DashMap as Store values).
 
 ```lx
 Class Counter : [Checkable] = {
@@ -59,7 +59,7 @@ c.check () ^
 - Reference semantics: `a = b` shares same object. Both see mutations
 - Trait conformance + defaults work the same as Agent
 - Export with `+Class Name = { ... }`
-- Display: `<Class X>` for Plain-kind, `<Agent X>` for Agent-kind
+- Display: checks traits list for "Agent" → `<Agent X>` if present, `<Class X>` otherwise
 
 Discovery via `std/trait`:
 
@@ -71,7 +71,7 @@ best = trait.match Reviewer "find issues"
 
 ## Agent Declarations
 
-Agents are `Value::Class { kind: Agent }` — Classes with messaging support (`uses`/`init`/`on`):
+Agent is a Trait defined in `pkg/agent.lx`. The `Agent` keyword auto-imports it and auto-adds "Agent" to the traits list. All agents get the Agent Trait's defaults: init, perceive, reason, act, reflect, handle (auto-dispatch by `msg.action` via `method_of`), run (yield/loop message loop), think/think_with/think_structured (AI), use_tool/tools (tool hooks), describe (self-description via `methods_of`), ask/tell (inter-agent communication). Override only the methods you need:
 
 ```lx
 Agent CodeReviewer: Reviewer = {
@@ -85,7 +85,7 @@ Agent CodeReviewer: Reviewer = {
 
 Trait conformance validated at definition time — missing methods halt execution.
 Access methods via `.`: `CodeReviewer.review {file: "main.rs"}`.
-Reserved fields: `uses` (MCP connections), `init` (startup logic), `on` (lifecycle hooks).
+`init`/`on` go into the methods map. `uses` dropped (use `with mcp.connect` instead).
 Display: `<Agent CodeReviewer>`.
 
 ## Agent Messaging

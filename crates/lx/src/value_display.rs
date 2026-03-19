@@ -166,10 +166,13 @@ impl fmt::Display for Value {
                     write!(f, "<Trait {name}>")
                 }
             }
-            Value::Class { name, kind, .. } => match kind {
-                crate::value::ClassKind::Agent => write!(f, "<Agent {name}>"),
-                crate::value::ClassKind::Plain => write!(f, "<Class {name}>"),
-            },
+            Value::Class { name, traits, .. } => {
+                if traits.iter().any(|t| t.as_ref() == "Agent") {
+                    write!(f, "<Agent {name}>")
+                } else {
+                    write!(f, "<Class {name}>")
+                }
+            }
             Value::Object { class_name, id, .. } => write!(f, "<{class_name}#{id}>"),
             Value::Store { id } => write!(f, "<Store#{id}>"),
         }

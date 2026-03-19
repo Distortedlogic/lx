@@ -91,6 +91,10 @@ impl super::Parser {
                         self.advance();
                         traits.push(n);
                     }
+                    TokenKind::AgentKw => {
+                        self.advance();
+                        traits.push("Agent".into());
+                    }
                     _ => {
                         return Err(LxError::parse(
                             "expected trait name",
@@ -108,6 +112,10 @@ impl super::Parser {
                 TokenKind::TypeName(n) | TokenKind::Ident(n) => {
                     self.advance();
                     Ok(vec![n])
+                }
+                TokenKind::AgentKw => {
+                    self.advance();
+                    Ok(vec!["Agent".into()])
                 }
                 _ => Err(LxError::parse(
                     "expected trait name after ':'",

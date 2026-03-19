@@ -3,10 +3,11 @@
 
 # lx Standard Library
 
-**Note:** 10 packages in `pkg/`. Import the Class/Trait name:
-`use pkg/collection {Collection}`, `use pkg/knowledge {KnowledgeBase}`, `use pkg/tasks {TaskStore}`,
-`use pkg/trace {TraceStore}`, `use pkg/memory {MemoryStore}`, `use pkg/context {ContextWindow}`,
-`use pkg/circuit {CircuitBreaker}`, `use pkg/introspect {Inspector}`, `use pkg/pool {Pool}`.
+**Note:** 11 packages in `pkg/`. Import the Class/Trait name:
+`use pkg/agent {Agent}`, `use pkg/collection {Collection}`, `use pkg/knowledge {KnowledgeBase}`,
+`use pkg/tasks {TaskStore}`, `use pkg/trace {TraceStore}`, `use pkg/memory {MemoryStore}`,
+`use pkg/context {ContextWindow}`, `use pkg/circuit {CircuitBreaker}`, `use pkg/introspect {Inspector}`,
+`use pkg/pool {Pool}`.
 `pkg/prompt` remains a pure record builder. 5 collection packages (knowledge, tasks, memory, trace, context)
 use `entries: Store ()` + Collection Trait for generic operations. Construct with `ClassName {field: val}`
 or `ClassName ()`. Methods via `instance.method args`.
@@ -46,6 +47,18 @@ s.reload "path.json"
 ```
 
 Reference semantics: `a = b` shares the same Store. Store cloning in Class constructors ensures each instance gets its own copy.
+
+## Agent Trait (pkg/agent)
+
+`Trait Agent` — base behavioral contract for all agents. `Agent` keyword auto-imports `pkg/agent {Agent}` and auto-adds "Agent" to traits list. `Class Worker : [Agent] = { ... }` also works. Defaults:
+
+- **Cognitive pipeline:** `init`, `perceive`, `reason`, `act`, `reflect` — override the phases you need
+- **Dispatch:** `handle(msg)` — auto-dispatches by `msg.action` via `method_of`, falls back to perceive→reason→act→reflect
+- **Message loop:** `run()` — init, then yield/loop: yield ready, handle msg, yield result
+- **AI:** `think(prompt)`, `think_with(config)`, `think_structured(protocol, prompt)`
+- **Tools:** `use_tool(name, input)`, `tools()` — override to wire tool execution
+- **Communication:** `ask(agent, msg)` wraps `~>?`, `tell(agent, msg)` wraps `~>`
+- **Self-description:** `describe()` — returns `{name, actions: methods_of self, tools}` via `methods_of` builtin
 
 ## Collection Trait (pkg/collection)
 
@@ -179,6 +192,7 @@ all = pipeline.list ()
 | `std/user`        | Interactive: `confirm`, `choose`, `ask`, `progress`, `table`         |
 | `std/profile`     | Persistent identity: `load`, `save`, `learn`, `recall`, `preference` |
 | `std/diag`        | Visualization: `extract`, `to_mermaid`                               |
+| `std/introspect`  | Live observation: `system`, `agents`, `agent`, `messages`, `bottleneck` |
 | `std/flow`        | Flow composition: `load`, `run`, `pipe`, `parallel`, `branch`, `with_retry`, `with_timeout`, `with_fallback` |
 | `std/taskgraph`   | DAG execution: `create`, `add`, `remove`, `run`, `run_with`, `validate`, `topo`, `status`, `dot` |
 
@@ -257,6 +271,7 @@ Six pre-built agents under `std/agents/`:
 **Type:** `type_of`, `to_str`, `ok?`, `err?`, `some?`
 **Effects:** `each` (returns unit), `tap` (returns original), `dbg` (debug print), `print` (stdout)
 **Control:** `identity`, `not`, `require`, `timeout`, `step`, `collect`
+**Reflection:** `method_of(obj, name)` — returns a method/field by name or None; `methods_of(obj)` — returns list of method names from Class/Object/Record
 **Logging:** `log.info`, `log.warn`, `log.err`, `log.debug`
 
 ## Idioms

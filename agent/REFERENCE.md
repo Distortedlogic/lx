@@ -15,14 +15,14 @@ crates/lx/src/
   interpreter/ Tree-walking evaluator — mod + split files (agents, apply, eval, modules, patterns, etc.)
   builtins/    Built-in functions — mod, call, str, coll, hof, convert, register, etc.
   visitor/     AST visitor/walker infrastructure
-  stdlib/      30 registered Rust modules + 6 standard agents across ~88 .rs files (use `std_module_exists` in mod.rs as source of truth)
+  stdlib/      31 registered Rust modules + 6 standard agents across ~89 .rs files (use `std_module_exists` in mod.rs as source of truth)
   token.rs, value.rs, value_display.rs, value_impls.rs, ast_display.rs, env.rs, error.rs, span.rs, lib.rs
 crates/lx-cli/src/  main.rs, manifest.rs, testing.rs, listing.rs, run.rs, agent_cmd.rs
 doc/           35 quick-reference docs
 spec/          51 spec files
 agent/         Context files (this folder)
-pkg/           10 lx packages — collection (Trait), 5 Collection-based Classes (KnowledgeBase, TaskStore, TraceStore, MemoryStore, ContextWindow), 3 standalone Classes (CircuitBreaker, Inspector, Pool), prompt (functional)
-tests/         80 test suites (79 .lx files + 11_modules dir)
+pkg/           11 lx packages — agent (Trait), collection (Trait), 5 Collection-based Classes (KnowledgeBase, TaskStore, TraceStore, MemoryStore, ContextWindow), 3 standalone Classes (CircuitBreaker, Inspector, Pool), prompt (functional)
+tests/         81 test suites (80 .lx files + 11_modules dir)
   fixtures/    Test helpers (agent_echo.lx, orchestrators, servers, test flows)
 flows/
   lib/         15 reusable .lx library modules
@@ -49,17 +49,18 @@ Extensions to `std/agent` follow the split-file pattern:
 
 ## Class/Agent Implementation
 
-Class and Agent share the same runtime representation: `Value::Class { kind: ClassKind }` where `ClassKind` is `Plain` or `Agent`. Agent adds `init`/`on`/`uses` reserved fields.
+Class and Agent share the same runtime representation: `Value::Class { name, traits, defaults, methods }`. No `ClassKind` enum. Agent is a Trait defined in `pkg/agent.lx` — the `Agent` keyword auto-imports it and auto-adds "Agent" to the traits list. `Class Worker : [Agent] = { ... }` also works.
 - Token: `ClassKw`/`AgentKw` in `token.rs`
 - Lexer: `"Class"`/`"Agent"` in `lexer/keywords.rs`
 - AST: `Stmt::ClassDecl`/`Stmt::AgentDecl` + `ClassField` struct in `ast/mod.rs` + `ast/types.rs`
 - Parser: `parser/stmt_class.rs` (Class), `parser/stmt_agent.rs` (Agent) — fields (`:`) vs methods (`=`)
-- Value: `Value::Class` (constructor, `ClassKind::Plain` or `ClassKind::Agent`) + `Value::Object` (instance with u64 STORES-backed handle) + `Value::Store { id }` (first-class k/v store) in `value.rs`
+- Value: `Value::Class { name, traits, defaults, methods }` + `Value::Object` (instance with u64 STORES-backed handle) + `Value::Store { id }` (first-class k/v store) in `value.rs`
 - Store backing: STORES DashMap in `stdlib/store.rs` + `store_dispatch.rs` (dot-access method dispatch). No separate OBJECTS DashMap — Object fields live in STORES.
 - Interpreter: `exec_stmt.rs` (ClassDecl/AgentDecl eval + Object FieldUpdate), `apply.rs` (Class/Agent constructor with Store cloning), `apply_helpers.rs` (Object/Store field access with `inject_self`)
-- Trait injection: `interpreter/traits.rs` — `inject_traits` helper shared between Class and Agent. Defaults from `Value::Trait` injected at definition time.
+- Trait injection: `interpreter/traits.rs` — `inject_traits` helper shared between Class and Agent. Defaults from `Value::Trait` (including the Agent Trait from `pkg/agent.lx`) injected at definition time. Agent Trait provides: init, perceive, reason, act, reflect, handle, run, think/think_with/think_structured, use_tool/tools, describe, ask/tell
+- Agent Trait dispatch: `handle` auto-dispatches by `msg.action` via `method_of` builtin. `describe` uses `methods_of` builtin for self-description
 - Protocol: `Value::Trait` with non-empty `fields` acts as Protocol (callable as constructor, runtime validation). No separate `Value::Protocol`.
-- Display: `<Agent X>` for Agent-kind, `<Class X>` for Plain-kind, `<Protocol X>` for Traits-with-fields, `<Trait X>` for behavioral Traits
+- Display: checks traits list for "Agent" → `<Agent X>` if present, `<Class X>` otherwise. `<Protocol X>` for Traits-with-fields, `<Trait X>` for behavioral Traits
 
 ## Adding Language-Level Features (keywords, AST nodes)
 

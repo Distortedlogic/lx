@@ -172,7 +172,6 @@ impl Interpreter {
             Stmt::AgentDecl {
                 name,
                 traits,
-                uses,
                 init,
                 on,
                 methods,
@@ -183,30 +182,38 @@ impl Interpreter {
                     let handler = self.eval(&m.handler)?;
                     method_map.insert(m.name.clone(), handler);
                 }
-                let init_val = match init {
-                    Some(expr) => Some(Box::new(self.eval(expr)?)),
-                    None => None,
-                };
-                let uses_resolved: Vec<(Arc<str>, Arc<str>)> = uses
-                    .iter()
-                    .map(|(binding, module)| {
-                        (Arc::from(binding.as_str()), Arc::from(module.as_str()))
-                    })
-                    .collect();
-                let on_val = match on {
-                    Some(expr) => Some(Box::new(self.eval(expr)?)),
-                    None => None,
-                };
-                Self::inject_traits(&mut method_map, traits, &self.env, "Agent", name, stmt.span)?;
+                if let Some(expr) = init {
+                    method_map.insert("init".into(), self.eval(expr)?);
+                }
+                if let Some(expr) = on {
+                    method_map.insert("on".into(), self.eval(expr)?);
+                }
+                if self.env.get("Agent").is_none() {
+                    let use_stmt = crate::ast::UseStmt {
+                        path: vec!["pkg".into(), "agent".into()],
+                        kind: crate::ast::UseKind::Selective(vec!["Agent".into()]),
+                    };
+                    self.eval_use(&use_stmt, stmt.span)?;
+                }
+                let mut all_traits: Vec<String> = vec!["Agent".into()];
+                for t in traits {
+                    if t != "Agent" {
+                        all_traits.push(t.clone());
+                    }
+                }
+                Self::inject_traits(
+                    &mut method_map,
+                    &all_traits,
+                    &self.env,
+                    "Agent",
+                    name,
+                    stmt.span,
+                )?;
                 let val = Value::Class {
                     name: Arc::from(name.as_str()),
-                    kind: crate::value::ClassKind::Agent,
-                    traits: Arc::new(traits.iter().map(|s| Arc::from(s.as_str())).collect()),
+                    traits: Arc::new(all_traits.iter().map(|s| Arc::from(s.as_str())).collect()),
                     defaults: Arc::new(IndexMap::new()),
                     methods: Arc::new(method_map),
-                    init: init_val,
-                    on: on_val,
-                    uses: Arc::new(uses_resolved),
                 };
                 let mut env = self.env.child();
                 env.bind(name.clone(), val);
@@ -233,13 +240,9 @@ impl Interpreter {
                 Self::inject_traits(&mut method_map, traits, &self.env, "Class", name, stmt.span)?;
                 let val = Value::Class {
                     name: Arc::from(name.as_str()),
-                    kind: crate::value::ClassKind::Plain,
                     traits: Arc::new(traits.iter().map(|s| Arc::from(s.as_str())).collect()),
                     defaults: Arc::new(defaults_map),
                     methods: Arc::new(method_map),
-                    init: None,
-                    on: None,
-                    uses: Arc::new(Vec::new()),
                 };
                 let mut env = self.env.child();
                 env.bind(name.clone(), val);

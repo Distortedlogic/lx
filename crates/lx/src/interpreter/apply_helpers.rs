@@ -78,21 +78,9 @@ impl Interpreter {
         match field {
             FieldKind::Named(name) => match &val {
                 Value::Record(r) => Ok(r.get(name).cloned().unwrap_or(Value::None)),
-                Value::Class {
-                    methods, init, on, ..
-                } => {
-                    if let Some(m) = methods.get(name) {
-                        Ok(m.clone())
-                    } else if name == "init" {
-                        match init {
-                            Some(v) => Ok(*v.clone()),
-                            None => Ok(Value::Unit),
-                        }
-                    } else if name == "on" {
-                        match on {
-                            Some(v) => Ok(*v.clone()),
-                            None => Ok(Value::None),
-                        }
+                Value::Class { methods, .. } => {
+                    if let Some(method) = methods.get(name) {
+                        Ok(Self::inject_self(method, &val))
                     } else {
                         Ok(Value::None)
                     }

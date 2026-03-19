@@ -13,19 +13,19 @@ use crate::span::Span;
 use crate::value::Value;
 
 static NEXT_SUP_ID: AtomicU64 = AtomicU64::new(1);
-static SUPERVISORS: std::sync::LazyLock<DashMap<u64, Supervisor>> =
+pub(super) static SUPERVISORS: std::sync::LazyLock<DashMap<u64, Supervisor>> =
     std::sync::LazyLock::new(DashMap::new);
 
-struct Supervisor {
-    strategy: String,
+pub(super) struct Supervisor {
+    pub(super) strategy: String,
     max_restarts: usize,
     _window: u64,
-    children: Vec<ChildSpec>,
-    restart_counts: Vec<usize>,
+    pub(super) children: Vec<ChildSpec>,
+    pub(super) restart_counts: Vec<usize>,
 }
 
-struct ChildSpec {
-    id: String,
+pub(super) struct ChildSpec {
+    pub(super) id: String,
     spawn_fn: Value,
     restart: String,
     current: Value,

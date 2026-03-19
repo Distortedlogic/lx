@@ -108,7 +108,6 @@ impl Interpreter {
                 traits,
                 defaults,
                 methods,
-                ..
             } => {
                 let overrides = match &arg {
                     Value::Record(r) => r.as_ref().clone(),

@@ -41,7 +41,8 @@ then identified `std/store` as the missing primitive enabling module→package m
 - [x] `Value::Store { id }` first-class type (dot-access methods, constructor, reference semantics)
 - [x] `Collection` Trait (`pkg/collection.lx`) — get/keys/values/remove/query/len/has/save/load defaults
 - [x] 5 collection packages rewritten (knowledge, tasks, memory, trace, context) using `entries: Store ()` + Collection
-- [x] Type hierarchy refactor: OBJECTS DashMap eliminated, `Value::Agent` → `Value::Class { kind: Agent }`, `Value::Protocol` → `Value::Trait` with fields
+- [x] Type hierarchy refactor: OBJECTS DashMap eliminated, `Value::Agent` removed, `Value::Protocol` → `Value::Trait` with fields
+- [x] Agent is now a Trait in `pkg/agent.lx` — `Agent` keyword auto-imports it, auto-adds "Agent" to traits list. `Value::Class` has 4 fields: name, traits, defaults, methods. No `ClassKind` enum. Two new builtins: `method_of(obj, name)`, `methods_of(obj)`
 - [x] `is_func_def()` parser bug fix — `application_depth` tracking for `(expr) {record}` disambiguation
 - [x] Boxed `LxFunc`/`ProtocolField`, visitor context structs, type alias for pubsub return
 
@@ -67,7 +68,7 @@ Tier 1 completed: `std/retry` (Session 44), `std/user` + `std/profile` (Session 
 
 9. ~~**`agent.route`/`register` capability routing**~~ — SHIPPED Session 60. 5 functions: `register`, `unregister`, `registered`, `route`, `route_multi`. Trait/protocol/domain filtering, selection strategies (least_busy, round_robin, random, custom), load tracking, reconcile integration.
 
-10. **`introspect.system` live observation** (`spec/agents-introspect-live.md`) — "What are all agents doing right now?" Structured system snapshot: agent states, in-flight messages, active dialogues, pool status, bottleneck detection. Extensions to existing `pkg/introspect`.
+10. ~~**`introspect.system` live observation**~~ — SHIPPED Session 65. `std/introspect` module: 5 functions (`system`, `agents`, `agent`, `messages`, `bottleneck`). Aggregates from REGISTRY, SESSIONS, SUPERVISORS, TOPICS, ROUTE_TABLE. `introspect.watch` deferred (needs async).
 
 11. **`agent.pipeline`** (`spec/agents-pipeline.md`) — Consumer-driven flow control with backpressure.
 

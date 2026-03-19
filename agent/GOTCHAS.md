@@ -31,4 +31,4 @@
 
 ## Incomplete Wiring
 
-- **`uses` bindings are metadata-only.** `Value::Class { kind: Agent }` holds `uses` and `on` fields, but `uses` bindings are not auto-connected to MCP servers at runtime. **Workaround:** Connect MCP manually in method bodies or `init`.
+- **`uses` bindings are dropped.** The `Agent` keyword parses `uses` declarations but they are not stored on the Class value. MCP servers must be connected manually in method bodies or `init`.

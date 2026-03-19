@@ -9,6 +9,9 @@ mod agent_intercept;
 mod agent_ipc;
 mod agent_mock;
 mod agent_negotiate;
+mod agent_pipeline;
+mod agent_pipeline_ctrl;
+mod agent_pipeline_io;
 mod agent_pubsub;
 mod agent_reconcile;
 mod agent_reconcile_score;
@@ -43,6 +46,7 @@ mod git_log;
 mod git_ops;
 mod git_status;
 mod http;
+mod introspect;
 mod json;
 pub mod json_conv;
 mod math;
@@ -102,6 +106,7 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
             "agent" => agent::build(),
             "mcp" => mcp::build(),
             "http" => http::build(),
+            "introspect" => introspect::build(),
             "time" => time::build(),
             "cron" => cron::build(),
             "deadline" => deadline::build(),
@@ -153,6 +158,7 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
             | "agent"
             | "mcp"
             | "http"
+            | "introspect"
             | "time"
             | "cron"
             | "ai"

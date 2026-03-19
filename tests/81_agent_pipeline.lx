@@ -1,0 +1,49 @@
+use std/agent
+
+doubler = {name: "doubler" handler: (msg) { msg * 2 }}
+adder = {name: "adder" handler: (msg) { msg + 10 }}
+stringer = {name: "stringer" handler: (msg) { to_str msg }}
+
+pipe = agent.pipeline [doubler adder stringer] () ^
+assert (pipe.__pipeline_id > 0) "pipeline has ID"
+
+agent.pipeline_send pipe 5 ^
+result = agent.pipeline_collect pipe ^
+dbg result
+assert (result == "20") "5*2+10=20 as string"
+
+results = agent.pipeline_batch pipe [1 2 3] ^
+assert (len results == 3) "batch returns 3 results"
+assert (results.0 == "12") "1*2+10=12"
+assert (results.1 == "14") "2*2+10=14"
+assert (results.2 == "16") "3*2+10=16"
+
+stats = agent.pipeline_stats pipe
+assert (stats.total_processed == 4) "4 items processed"
+assert (stats.total_dropped == 0) "no drops"
+assert (len stats.stages == 3) "3 stages"
+assert (stats.stages.0.name == "doubler") "stage 0 name"
+assert (stats.stages.0.processed == 4) "stage 0 processed 4"
+
+agent.pipeline_pause pipe ^
+agent.pipeline_resume pipe ^
+
+agent.pipeline_send pipe 7 ^
+agent.pipeline_drain pipe ^
+
+pipe2 = agent.pipeline [doubler adder] {buffer: 5 overflow: "drop_newest"} ^
+results2 = agent.pipeline_batch pipe2 [10 20 30] ^
+assert (len results2 == 3) "batch with config"
+assert (results2.0 == 30) "10*2+10=30"
+assert (results2.1 == 50) "20*2+10=50"
+assert (results2.2 == 70) "30*2+10=70"
+
+pipe3 = agent.pipeline [doubler adder] () ^
+doubler2 = {name: "doubler" handler: (msg) { msg * 2 }}
+agent.pipeline_add_worker pipe3 "doubler" doubler2 ^
+results3 = agent.pipeline_batch pipe3 [5 10] ^
+assert (len results3 == 2) "with extra worker"
+
+agent.pipeline_close pipe ^
+agent.pipeline_close pipe2 ^
+agent.pipeline_close pipe3 ^

@@ -9,18 +9,18 @@ use crate::record;
 use crate::span::Span;
 use crate::value::Value;
 
-struct Subscription {
+pub(super) struct Subscription {
     agent: Value,
     filter: Option<Value>,
 }
 
-struct Topic {
-    subscribers: Vec<Subscription>,
+pub(super) struct Topic {
+    pub(super) subscribers: Vec<Subscription>,
 }
 
 type DeliveryResults = Vec<(String, Result<Value, LxError>)>;
 
-static TOPICS: LazyLock<DashMap<String, Topic>> = LazyLock::new(DashMap::new);
+pub(super) static TOPICS: LazyLock<DashMap<String, Topic>> = LazyLock::new(DashMap::new);
 
 pub fn mk_topic() -> Value {
     mk("agent.topic", 1, bi_topic)

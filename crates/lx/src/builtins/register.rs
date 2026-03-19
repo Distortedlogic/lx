@@ -183,4 +183,43 @@ pub fn register(env: &mut Env) {
     env.bind("log".into(), Value::Record(Arc::new(log_fields)));
     super::hof::register(env);
     env.bind("Store".into(), crate::stdlib::build_constructor());
+    env.bind("method_of".into(), mk("method_of", 2, bi_method_of));
+    env.bind("methods_of".into(), mk("methods_of", 1, bi_methods_of));
+}
+
+fn bi_method_of(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+    let name = match &args[1] {
+        Value::Str(s) => s.as_ref(),
+        _ => return Ok(Value::None),
+    };
+    match &args[0] {
+        Value::Object { methods, .. } | Value::Class { methods, .. } => match methods.get(name) {
+            Some(method) => Ok(inject_self_for_method(method, &args[0])),
+            None => Ok(Value::None),
+        },
+        _ => Ok(Value::None),
+    }
+}
+
+fn inject_self_for_method(method: &Value, self_val: &Value) -> Value {
+    if let Value::Func(lf) = method {
+        let mut env = lf.closure.child();
+        env.bind("self".to_string(), self_val.clone());
+        let mut lf = lf.clone();
+        lf.closure = env.into_arc();
+        Value::Func(lf)
+    } else {
+        method.clone()
+    }
+}
+
+fn bi_methods_of(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+    let names = match &args[0] {
+        Value::Object { methods, .. } | Value::Class { methods, .. } => methods
+            .keys()
+            .map(|k| Value::Str(Arc::from(k.as_str())))
+            .collect(),
+        _ => vec![],
+    };
+    Ok(Value::List(Arc::new(names)))
 }

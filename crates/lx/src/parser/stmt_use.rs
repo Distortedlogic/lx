@@ -51,6 +51,10 @@ impl super::Parser {
                         self.advance();
                         names.push(name);
                     }
+                    TokenKind::AgentKw => {
+                        self.advance();
+                        names.push("Agent".into());
+                    }
                     _ => {
                         return Err(LxError::parse(
                             "expected name in selective import",
