@@ -35,12 +35,7 @@ pub enum Stmt {
         variants: Vec<(String, usize)>,
         exported: bool,
     },
-    Protocol {
-        name: String,
-        entries: Vec<ProtocolEntry>,
-        exported: bool,
-    },
-    ProtocolUnion(ProtocolUnionDef),
+    TraitUnion(TraitUnionDef),
     McpDecl {
         name: String,
         tools: Vec<McpToolDecl>,
@@ -48,6 +43,7 @@ pub enum Stmt {
     },
     TraitDecl {
         name: String,
+        entries: Vec<TraitEntry>,
         methods: Vec<TraitMethodDecl>,
         defaults: Vec<AgentMethod>,
         requires: Vec<String>,

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::ast::{McpOutputType, McpToolDecl};
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::{BuiltinKind, McpOutputDef, McpToolDef, ProtoFieldDef, Value};
+use crate::value::{BuiltinKind, McpOutputDef, McpToolDef, FieldDef, Value};
 
 use super::Interpreter;
 
@@ -22,7 +22,7 @@ impl Interpreter {
                     Some(e) => Some(self.eval(e).await?),
                     None => None,
                 };
-                input.push(ProtoFieldDef {
+                input.push(FieldDef {
                     name: f.name.clone(),
                     type_name: f.type_name.clone(),
                     default,
@@ -61,7 +61,7 @@ impl Interpreter {
             McpOutputType::Record(fields) => {
                 let defs = fields
                     .iter()
-                    .map(|f| ProtoFieldDef {
+                    .map(|f| FieldDef {
                         name: f.name.clone(),
                         type_name: f.type_name.clone(),
                         default: None,
@@ -73,16 +73,16 @@ impl Interpreter {
         }
     }
 
-    pub(super) async fn apply_protocol(
+    pub(super) async fn apply_trait_fields(
         &mut self,
         name: &str,
-        fields: &Arc<Vec<ProtoFieldDef>>,
+        fields: &Arc<Vec<FieldDef>>,
         arg: &Value,
         _span: Span,
     ) -> Result<Value, LxError> {
         let Value::Record(rec) = arg else {
             return Ok(Value::Err(Box::new(Value::Str(Arc::from(format!(
-                "Protocol {name}: expected Record, got {}",
+                "Trait {name}: expected Record, got {}",
                 arg.type_name()
             ))))));
         };
@@ -92,7 +92,7 @@ impl Interpreter {
                 Some(val) => {
                     if field.type_name != "Any" && val.type_name() != field.type_name {
                         return Ok(Value::Err(Box::new(Value::Str(Arc::from(format!(
-                            "Protocol {name}: field '{}' expected {}, got {}",
+                            "Trait {name}: field '{}' expected {}, got {}",
                             field.name,
                             field.type_name,
                             val.type_name()
@@ -104,7 +104,7 @@ impl Interpreter {
                         result.insert(field.name.clone(), default.clone());
                     } else {
                         return Ok(Value::Err(Box::new(Value::Str(Arc::from(format!(
-                            "Protocol {name}: missing required field '{}'",
+                            "Trait {name}: missing required field '{}'",
                             field.name
                         ))))));
                     }
@@ -124,7 +124,7 @@ impl Interpreter {
                     Some(true) => {}
                     _ => {
                         return Ok(Value::Err(Box::new(Value::Str(Arc::from(format!(
-                            "Protocol {name}: field '{}' constraint violated",
+                            "Trait {name}: field '{}' constraint violated",
                             field.name
                         ))))));
                     }
@@ -134,7 +134,7 @@ impl Interpreter {
         Ok(Value::Record(Arc::new(result)))
     }
 
-    pub(super) async fn apply_protocol_union(
+    pub(super) async fn apply_trait_union(
         &mut self,
         name: &str,
         variants: &Arc<Vec<Arc<str>>>,
@@ -143,7 +143,7 @@ impl Interpreter {
     ) -> Result<Value, LxError> {
         let Value::Record(rec) = arg else {
             return Ok(Value::Err(Box::new(Value::Str(Arc::from(format!(
-                "Protocol union {name}: expected Record, got {}",
+                "Trait union {name}: expected Record, got {}",
                 arg.type_name()
             ))))));
         };
@@ -176,14 +176,14 @@ impl Interpreter {
         }
         let variant_names: Vec<&str> = variants.iter().map(|v| v.as_ref()).collect();
         Ok(Value::Err(Box::new(Value::Str(Arc::from(format!(
-            "Protocol union {name}: no variant matched. Tried: {}",
+            "Trait union {name}: no variant matched. Tried: {}",
             variant_names.join(", ")
         ))))))
     }
 
     fn try_match_variant(
         &mut self,
-        fields: &Arc<Vec<ProtoFieldDef>>,
+        fields: &Arc<Vec<FieldDef>>,
         rec: &Arc<indexmap::IndexMap<String, Value>>,
         span: Span,
     ) -> Result<(), LxError> {

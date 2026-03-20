@@ -17,7 +17,7 @@ use ../mcps/uptime_kuma
 use ../lib/report
 use ../lib/workflow
 
-Protocol SetupConfig = {name: Str  lang: Str  db: Bool  monitoring: Bool}
+Trait SetupConfig = {name: Str  lang: Str  db: Bool  monitoring: Bool}
 
 +main = () {
   config = SetupConfig {

@@ -1,7 +1,7 @@
 -- Prompt templates for the dev loop.
 -- Each function takes structured data, returns a prompt string.
 -- Prompts start at column 0 (dedent not yet implemented in multi-line strings).
--- JSON schema injection and validation handled by ai.prompt_structured via Protocols.
+-- JSON schema injection and validation handled by ai.prompt_structured via Traits.
 
 +pick_task = (truth ctx) {
 "Pick the single highest-leverage task for lx development.

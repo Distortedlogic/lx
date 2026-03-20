@@ -1,6 +1,6 @@
 -- 50_agent_gate.lx
 -- Tests: spec/agents-gates.md (agent.gate approval gates)
--- Phase: agent.gate, GateResult Protocol
+-- Phase: agent.gate, GateResult Trait
 -- Note: Uses yield backend for gate communication. Default stdin/stdout backend
 --       auto-approves in non-interactive mode (returns unit from yield).
 --       Tests focus on timeout policies and structure.
@@ -8,7 +8,7 @@
 use std/agent {GateResult}
 use std/agent
 
--- GateResult Protocol validates
+-- GateResult Trait validates
 gr = GateResult {approved: true  approver: "admin"  timestamp: "2024-01-01T00:00:00Z"}
 assert (gr.approved == true) "gate result approved field"
 assert (gr.approver == "admin") "gate result approver field"

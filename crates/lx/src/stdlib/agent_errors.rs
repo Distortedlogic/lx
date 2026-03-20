@@ -94,7 +94,7 @@ pub fn tagged_ctors() -> Vec<(&'static str, Value)> {
         ("Incompetent", ctor("Incompetent")),
         ("Upstream", ctor("Upstream")),
         ("PermissionDenied", ctor("PermissionDenied")),
-        ("ProtocolViolation", ctor("ProtocolViolation")),
+        ("TraitViolation", ctor("TraitViolation")),
         ("Unavailable", ctor("Unavailable")),
         ("Cancelled", ctor("Cancelled")),
         ("Internal", ctor("Internal")),

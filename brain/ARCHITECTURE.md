@@ -74,7 +74,7 @@ Context transfer between stages uses Handoff protocol + agent.as_context.
 
 ## Key lx Patterns in Use
 
-Protocols with `where` constraints, protocol composition via `{..Base}`.
+Traits with `where` constraints, trait composition via `{..Base}`.
 Traits with MCP-style method signatures. Agent declarations conforming to traits.
 agent.spawn + ~>? messaging. agent.advertise + agent.capabilities for routing.
 agent.intercept middleware for tracing. agent.gate + user.confirm for safety.

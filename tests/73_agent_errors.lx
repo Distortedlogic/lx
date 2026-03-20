@@ -1,7 +1,7 @@
 -- 73_agent_errors.lx
 -- Tests: AgentErr structured error variants (spec/agents-errors.md)
 
-use std/agent {Timeout RateLimited BudgetExhausted ContextOverflow Incompetent Upstream PermissionDenied ProtocolViolation Unavailable Cancelled Internal}
+use std/agent {Timeout RateLimited BudgetExhausted ContextOverflow Incompetent Upstream PermissionDenied TraitViolation Unavailable Cancelled Internal}
 
 -- === Construct variants ===
 
@@ -26,8 +26,8 @@ assert (up == Upstream {service: "api.example.com" code: 503 message: "Service U
 pd = PermissionDenied {action: "write" resource: "/etc/passwd"}
 assert (pd == PermissionDenied {action: "write" resource: "/etc/passwd"}) "permission denied"
 
-pv = ProtocolViolation {expected: "ReviewResult" got: "Str" message: "bad response"}
-assert (pv == ProtocolViolation {expected: "ReviewResult" got: "Str" message: "bad response"}) "protocol violation"
+pv = TraitViolation {expected: "ReviewResult" got: "Str" message: "bad response"}
+assert (pv == TraitViolation {expected: "ReviewResult" got: "Str" message: "bad response"}) "trait violation"
 
 ua = Unavailable {agent: "worker-3" reason: "process exited"}
 assert (ua == Unavailable {agent: "worker-3" reason: "process exited"}) "unavailable"

@@ -105,10 +105,10 @@ impl Interpreter {
                 }
             }
             Value::Trait { name, fields, .. } if !fields.is_empty() => {
-                self.apply_protocol(&name, &fields, &arg, span).await
+                self.apply_trait_fields(&name, &fields, &arg, span).await
             }
-            Value::ProtocolUnion { name, variants } => {
-                self.apply_protocol_union(&name, &variants, &arg, span)
+            Value::TraitUnion { name, variants } => {
+                self.apply_trait_union(&name, &variants, &arg, span)
                     .await
             }
             Value::McpDecl { name, tools } => self.apply_mcp_decl(&name, &tools, &arg, span),

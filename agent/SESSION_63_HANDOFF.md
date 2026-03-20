@@ -360,7 +360,7 @@ static NEXT_DICT_ID: AtomicU64 = AtomicU64::new(1);
 ```
 
 ### Constructor
-`Dict` should be a TypeName keyword (like `Agent`, `Class`, `Protocol`). When called as `Dict ()`, it creates a new empty dict. Implementation in `apply.rs` — add a match arm for `Value::Dict` construction, or register `Dict` as a builtin function.
+`Dict` should be a TypeName keyword (like `Agent`, `Class`, `Trait`). When called as `Dict ()`, it creates a new empty dict. Implementation in `apply.rs` — add a match arm for `Value::Dict` construction, or register `Dict` as a builtin function.
 
 Simpler approach: register `Dict` as a builtin function in a stdlib module or in the builtins. `Dict ()` returns `Value::Dict { id }` with a fresh empty IndexMap in DICTS.
 

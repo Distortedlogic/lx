@@ -1,37 +1,37 @@
--- 55_protocol_ext.lx
--- Tests: spec/agents-protocol-ext.md (composition, unions, field constraints)
--- Phase: Protocol extensions
+-- 55_trait_ext.lx
+-- Tests: spec/agents-trait-ext.md (composition, unions, field constraints)
+-- Phase: Trait extensions
 
 -- ============================================================
--- Protocol composition: {..Base extra: Str}
+-- Trait composition: {..Base extra: Str}
 -- ============================================================
 
-Protocol Base = {name: Str  severity: Str  source: Str}
+Trait Base = {name: Str  severity: Str  source: Str}
 
 -- basic spread
-Protocol PerfFinding = {..Base  location: Str  issue: Str  fix: Str}
+Trait PerfFinding = {..Base  location: Str  issue: Str  fix: Str}
 
 pf = PerfFinding {name: "slow-query"  severity: "high"  source: "profiler"  location: "db.rs"  issue: "N+1"  fix: "batch"}
 assert (pf.name == "slow-query") "spread inherits base fields"
 assert (pf.location == "db.rs") "spread includes own fields"
 
 -- spread with default override
-Protocol DefaultBase = {name: Str  severity: Str = "low"}
-Protocol Critical = {..DefaultBase  severity: Str = "critical"}
+Trait DefaultBase = {name: Str  severity: Str = "low"}
+Trait Critical = {..DefaultBase  severity: Str = "critical"}
 
 c = Critical {name: "vuln"}
 assert (c.severity == "critical") "spread overrides default"
 
 -- spread with default inheritance
-Protocol Inherited = {..DefaultBase  extra: Str}
+Trait Inherited = {..DefaultBase  extra: Str}
 ih = Inherited {name: "test"  extra: "data"}
 assert (ih.severity == "low") "spread inherits defaults from base"
 assert (ih.extra == "data") "own fields work"
 
 -- multiple bases
-Protocol Named = {name: Str  description: Str}
-Protocol Scored = {score: Float  confidence: Float}
-Protocol ScoredCandidate = {..Named  ..Scored  url: Str}
+Trait Named = {name: Str  description: Str}
+Trait Scored = {score: Float  confidence: Float}
+Trait ScoredCandidate = {..Named  ..Scored  url: Str}
 
 sc = ScoredCandidate {name: "result"  description: "good"  score: 0.9  confidence: 0.8  url: "https://x"}
 assert (sc.name == "result") "multiple bases: first base field"
@@ -39,19 +39,19 @@ assert (sc.score == 0.9) "multiple bases: second base field"
 assert (sc.url == "https://x") "multiple bases: own field"
 
 -- later fields override spread fields
-Protocol Override = {..Base  severity: Str = "override_default"  extra: Int}
+Trait Override = {..Base  severity: Str = "override_default"  extra: Int}
 ov = Override {name: "test"  source: "me"  extra: 42}
 assert (ov.severity == "override_default") "own field overrides spread"
 
 -- ============================================================
--- Protocol unions: Protocol Msg = A | B | C
+-- Trait unions: Trait Msg = A | B | C
 -- ============================================================
 
-Protocol ReviewRequest = {task: Str  path: Str}
-Protocol AuditRequest = {severity: Str  scope: Str}
-Protocol CanHandle = {task: Any}
+Trait ReviewRequest = {task: Str  path: Str}
+Trait AuditRequest = {severity: Str  scope: Str}
+Trait CanHandle = {task: Any}
 
-Protocol AgentMessage = ReviewRequest | AuditRequest | CanHandle
+Trait AgentMessage = ReviewRequest | AuditRequest | CanHandle
 
 -- match ReviewRequest (has task + path)
 m1 = AgentMessage {task: "review"  path: "src/"}
@@ -80,10 +80,10 @@ assert ((handle m2) == "auditing") "variant dispatch second"
 assert ((handle m3) == "can_handle") "variant dispatch third"
 
 -- ============================================================
--- Protocol field constraints: where clauses
+-- Trait field constraints: where clauses
 -- ============================================================
 
-Protocol AuditFinding = {
+Trait AuditFinding = {
   severity: Str where severity == "low" || severity == "medium" || severity == "high" || severity == "critical"
   score: Float where score >= 0.0 && score <= 1.0
   name: Str where (len name) > 0
@@ -101,7 +101,7 @@ af3 = AuditFinding {severity: "critical"  score: 1.0  name: "urgent"}
 assert (af3.score == 1.0) "constraint passes boundary score 1.0"
 
 -- constraint with default: field gets default, constraint on other fields still checked
-Protocol Constrained = {
+Trait Constrained = {
   level: Int where level > 0 && level <= 10
   label: Str = "default"
 }
@@ -113,11 +113,11 @@ assert (cv.label == "default") "default filled alongside constraint"
 -- Composition + union combined
 -- ============================================================
 
-Protocol FindingBase = {name: Str  severity: Str = "medium"}
-Protocol SecurityFinding = {..FindingBase  cve: Str}
-Protocol PerfIssue = {..FindingBase  latency_ms: Int}
+Trait FindingBase = {name: Str  severity: Str = "medium"}
+Trait SecurityFinding = {..FindingBase  cve: Str}
+Trait PerfIssue = {..FindingBase  latency_ms: Int}
 
-Protocol Finding = SecurityFinding | PerfIssue
+Trait Finding = SecurityFinding | PerfIssue
 
 f1 = Finding {name: "xss"  cve: "CVE-2024-1234"}
 assert (f1._variant == "SecurityFinding") "composition + union: security variant"

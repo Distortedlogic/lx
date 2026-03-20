@@ -11,10 +11,7 @@ use std::collections::HashMap;
 
 use std::collections::HashSet;
 
-use crate::ast::{
-    BindTarget, Binding, Expr, McpToolDecl, Program, ProtocolEntry, ProtocolUnionDef, SStmt, Stmt,
-    UseStmt,
-};
+use crate::ast::{BindTarget, Binding, Expr, McpToolDecl, Program, SStmt, Stmt, UseStmt};
 use crate::span::Span;
 use crate::visitor::{AgentDeclCtx, AstVisitor, TraitDeclCtx, walk_program};
 
@@ -213,24 +210,6 @@ impl AstVisitor for Walker {
         _span: Span,
     ) {
         self.add_node("type", name.to_string(), "type");
-    }
-
-    fn visit_protocol(
-        &mut self,
-        name: &str,
-        entries: &[ProtocolEntry],
-        _exported: bool,
-        span: Span,
-    ) {
-        let id = self.add_node("type", name.to_string(), "type");
-        let saved = self.context.clone();
-        self.context = id;
-        crate::visitor::walk_protocol(self, entries, span);
-        self.context = saved;
-    }
-
-    fn visit_protocol_union(&mut self, def: &ProtocolUnionDef, _span: Span) {
-        self.add_node("type", def.name.clone(), "type");
     }
 
     fn visit_trait_decl(&mut self, ctx: &TraitDeclCtx<'_>, _span: Span) {

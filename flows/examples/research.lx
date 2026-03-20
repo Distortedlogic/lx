@@ -15,7 +15,7 @@ use ../agents/github_search
 use ../lib/report
 use ../lib/workflow
 
-Protocol ResearchRequest = {topic: Str  compare_to: Str  find_oss: Bool}
+Trait ResearchRequest = {topic: Str  compare_to: Str  find_oss: Bool}
 
 +main = () {
   request = ResearchRequest {

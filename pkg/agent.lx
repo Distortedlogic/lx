@@ -32,7 +32,7 @@ use std/ai
 
   think = (prompt) { ai.prompt prompt }
   think_with = (config) { ai.prompt_with config }
-  think_structured = (protocol prompt) { ai.prompt_structured protocol prompt }
+  think_structured = (schema prompt) { ai.prompt_structured schema prompt }
 
   use_tool = (name input) { Err "no tools configured" }
   tools = () { [] }

@@ -65,17 +65,17 @@ smart_worker = agent.intercept worker (msg next) {
 }
 ```
 
-Or define a `Clarify` protocol for structured clarification:
+Or define a `Clarify` trait for structured clarification:
 
 ```
-Protocol Clarify = {
+Trait Clarify = {
   type: Str = "clarify"
   question: Str
   options: [Str] = []
   default: Str = ""
 }
 
-Protocol ClarifyResponse = {
+Trait ClarifyResponse = {
   choice: Str
   reasoning: Str = ""
 }
@@ -103,5 +103,5 @@ When `caller` is used with `~>?`, the message is sent back through the same tran
 - Agent handlers: [agents.md](agents.md)
 - Message interceptors: [agents-intercept.md](agents-intercept.md)
 - Multi-turn dialogue: [agents-dialogue.md](agents-dialogue.md)
-- Protocol validation: [agents-protocol.md](agents-protocol.md)
+- Trait validation: [agents-protocol.md](agents-protocol.md)
 - `it` binding precedent: [runtime.md](runtime.md) (`it` in `sel` blocks)

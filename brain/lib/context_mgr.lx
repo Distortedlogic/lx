@@ -5,7 +5,7 @@ use pkg/context {ContextWindow}
 use pkg/prompt
 use std/ai
 use std/time
-use ../protocols {ContextItem CognitiveState}
+use ../contracts {ContextItem CognitiveState}
 
 +init = (capacity: Int) -> Any {
   ContextWindow {capacity: capacity}
@@ -108,7 +108,7 @@ compress_item = (item: Any) -> Str {
     | prompt.section "Content" item.content
     | prompt.instruction "Compress to ~25% of original length. Keep all facts."
 
-  resp = ai.prompt (prompt.render p) ^
+  resp = ai.prompt (prompt.render p) ?? {text: item.content}
   resp.text
 }
 

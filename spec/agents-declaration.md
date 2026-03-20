@@ -168,7 +168,7 @@ result = agent ~>? {_method: "search" topic: "auth"} ^
 1. Starts a subprocess running the Agent's message loop
 2. Validates trait conformance via capabilities probe
 3. Connects `uses` MCPs in the subprocess
-4. Routes incoming messages to methods by `_method` field or Protocol matching
+4. Routes incoming messages to methods by `_method` field or Trait matching
 
 ### Spawn by Module Path
 
@@ -186,7 +186,7 @@ For spawning agents defined in other modules. The runtime resolves the module pa
 When a message arrives via `~>?`, routing follows this order:
 
 1. **Explicit method** — if `msg._method` is set, route to that method
-2. **Protocol match** — if the Trait declares a method with a Protocol input type, and the message validates against that Protocol, route to that method
+2. **Trait match** — if the Trait declares a method with a Trait input type, and the message validates against that Trait, route to that method
 3. **Single method** — if the Agent has exactly one method, route there
 4. **No match** — return `Err {type: "no_route" message: msg}`
 

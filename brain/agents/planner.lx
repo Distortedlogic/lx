@@ -5,9 +5,9 @@ use std/ai
 use pkg/prompt
 use std/plan
 use ../traits {Planner}
-use ../protocols {ActionPlan}
+use ../contracts {ActionPlan}
 
-Protocol PlanStep = {
+Trait PlanStep = {
   id: Str
   description: Str
   action: Str
@@ -17,7 +17,7 @@ Protocol PlanStep = {
   can_parallelize: Bool
 }
 
-Protocol PlanResult = {
+Trait PlanResult = {
   steps: [PlanStep]
   total_estimated_tokens: Int
   parallel_groups: [[Str]]
@@ -36,7 +36,7 @@ Agent TaskPlanner: Planner = {
       | prompt.instruction "Create 10 or fewer steps. Each step: ID, description, tool, dependencies."
       | prompt.constraint "Minimize steps. Identify parallelizable ones. No circular deps."
 
-    resp = ai.prompt (prompt.render p) ^
+    resp = ai.prompt (prompt.render p) ?? {text: msg.goal}
 
     steps = resp.text | lines
       | filter (l) trim l | not empty?
@@ -70,7 +70,7 @@ Agent TaskPlanner: Planner = {
       | prompt.section "Remaining Steps" (remaining | map (.action) | join "\n")
       | prompt.instruction "Create an alternative plan that works around the failure."
 
-    resp = ai.prompt (prompt.render p) ^
+    resp = ai.prompt (prompt.render p) ?? {text: ""}
     new_steps = resp.text | lines
       | filter (l) trim l | not empty?
       | enumerate

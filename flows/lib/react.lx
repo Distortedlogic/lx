@@ -8,7 +8,7 @@ use std/agent
 use pkg/circuit {CircuitBreaker}
 use pkg/introspect {Inspector}
 
-Protocol +ReactConfig = {
+Trait +ReactConfig = {
   script: Str
   task: Str
   max_turns: Int

@@ -1,4 +1,4 @@
-use crate::ast::{AgentMethod, ProtocolField, SStmt, Stmt, TraitMethodDecl};
+use crate::ast::{AgentMethod, FieldDecl, SStmt, Stmt, TraitEntry, TraitMethodDecl, TraitUnionDef};
 use crate::error::LxError;
 use crate::span::Span;
 use crate::token::TokenKind;
@@ -16,7 +16,11 @@ impl super::Parser {
         }
         let name = self.expect_type_name("Trait declaration")?;
         self.expect_kind(&TokenKind::Assign)?;
+        if matches!(self.peek(), TokenKind::TypeName(_)) {
+            return self.parse_trait_union(name, exported, start);
+        }
         self.expect_kind(&TokenKind::LBrace)?;
+        let mut entries = Vec::new();
         let mut methods = Vec::new();
         let mut defaults = Vec::new();
         let mut requires = Vec::new();
@@ -24,6 +28,13 @@ impl super::Parser {
         let mut tags = Vec::new();
         self.skip_semis();
         while *self.peek() != TokenKind::RBrace {
+            if *self.peek() == TokenKind::DotDot {
+                self.advance();
+                let base = self.expect_type_name("Trait spread")?;
+                entries.push(TraitEntry::Spread(base));
+                self.skip_semis();
+                continue;
+            }
             let field = self.expect_ident("Trait field")?;
             if *self.peek() == TokenKind::Assign {
                 self.advance();
@@ -34,19 +45,38 @@ impl super::Parser {
                 });
             } else {
                 self.expect_kind(&TokenKind::Colon)?;
-                match field.as_str() {
-                    "requires" => {
-                        requires = self.parse_trait_symbol_list()?;
+                let is_meta_keyword = matches!(
+                    field.as_str(),
+                    "requires" | "description" | "tags"
+                ) && !matches!(self.peek(), TokenKind::TypeName(_));
+                if is_meta_keyword {
+                    match field.as_str() {
+                        "requires" => requires = self.parse_trait_symbol_list()?,
+                        "description" => description = Some(self.parse_trait_string()?),
+                        "tags" => tags = self.parse_trait_string_list()?,
+                        _ => unreachable!(),
                     }
-                    "description" => {
-                        description = Some(self.parse_trait_string()?);
-                    }
-                    "tags" => {
-                        tags = self.parse_trait_string_list()?;
-                    }
-                    _ => {
-                        let method = self.parse_trait_method(field)?;
-                        methods.push(method);
+                } else if *self.peek() == TokenKind::LBrace {
+                    let method = self.parse_trait_method_braced(field)?;
+                    methods.push(method);
+                } else {
+                    let type_name = self.expect_type_name("Trait field/method type")?;
+                    if *self.peek() == TokenKind::Arrow {
+                        self.advance();
+                        let output = self.parse_mcp_output_type()?;
+                        methods.push(TraitMethodDecl {
+                            name: field,
+                            input: vec![FieldDecl {
+                                name: "_input".into(),
+                                type_name,
+                                default: None,
+                                constraint: None,
+                            }],
+                            output,
+                        });
+                    } else {
+                        let entry = self.parse_field_rest(field, type_name)?;
+                        entries.push(TraitEntry::Field(Box::new(entry)));
                     }
                 }
             }
@@ -56,6 +86,7 @@ impl super::Parser {
         Ok(SStmt::new(
             Stmt::TraitDecl {
                 name,
+                entries,
                 methods,
                 defaults,
                 requires,
@@ -67,34 +98,67 @@ impl super::Parser {
         ))
     }
 
-    fn parse_trait_method(&mut self, name: String) -> Result<TraitMethodDecl, LxError> {
-        if *self.peek() == TokenKind::LBrace {
-            let input = self.parse_trait_method_input()?;
-            self.expect_kind(&TokenKind::Arrow)?;
-            let output = self.parse_mcp_output_type()?;
-            Ok(TraitMethodDecl {
-                name,
-                input,
-                output,
-            })
+    fn parse_field_rest(
+        &mut self,
+        field_name: String,
+        type_name: String,
+    ) -> Result<FieldDecl, LxError> {
+        let default = if *self.peek() == TokenKind::Assign {
+            self.advance();
+            Some(self.parse_expr(0)?)
         } else {
-            let input_type = self.expect_type_name("Trait method input type")?;
-            self.expect_kind(&TokenKind::Arrow)?;
-            let output = self.parse_mcp_output_type()?;
-            Ok(TraitMethodDecl {
-                name,
-                input: vec![ProtocolField {
-                    name: "_input".into(),
-                    type_name: input_type,
-                    default: None,
-                    constraint: None,
-                }],
-                output,
-            })
-        }
+            None
+        };
+        let constraint = if let TokenKind::Ident(kw) = self.peek().clone()
+            && kw == "where"
+        {
+            self.advance();
+            Some(self.parse_expr(0)?)
+        } else {
+            None
+        };
+        Ok(FieldDecl {
+            name: field_name,
+            type_name,
+            default,
+            constraint,
+        })
     }
 
-    fn parse_trait_method_input(&mut self) -> Result<Vec<ProtocolField>, LxError> {
+    fn parse_trait_union(
+        &mut self,
+        name: String,
+        exported: bool,
+        start: u32,
+    ) -> Result<SStmt, LxError> {
+        let mut variants = Vec::new();
+        variants.push(self.expect_type_name("Trait union variant")?);
+        while *self.peek() == TokenKind::Pipe {
+            self.advance();
+            variants.push(self.expect_type_name("Trait union variant")?);
+        }
+        let end = self.tokens[self.pos.saturating_sub(1)].span.end();
+        Ok(SStmt::new(
+            Stmt::TraitUnion(TraitUnionDef {
+                name,
+                variants,
+                exported,
+            }),
+            Span::from_range(start, end),
+        ))
+    }
+
+    fn parse_trait_method_braced(
+        &mut self,
+        name: String,
+    ) -> Result<TraitMethodDecl, LxError> {
+        let input = self.parse_trait_method_input()?;
+        self.expect_kind(&TokenKind::Arrow)?;
+        let output = self.parse_mcp_output_type()?;
+        Ok(TraitMethodDecl { name, input, output })
+    }
+
+    fn parse_trait_method_input(&mut self) -> Result<Vec<FieldDecl>, LxError> {
         self.expect_kind(&TokenKind::LBrace)?;
         let mut fields = Vec::new();
         self.skip_semis();
@@ -108,7 +172,7 @@ impl super::Parser {
             } else {
                 None
             };
-            fields.push(ProtocolField {
+            fields.push(FieldDecl {
                 name: field_name,
                 type_name,
                 default,

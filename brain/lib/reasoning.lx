@@ -5,7 +5,7 @@ use std/ai
 use pkg/prompt
 use std/json
 use pkg/trace {TraceStore}
-use ../protocols {Thought ReasoningChain Hypothesis}
+use ../contracts {Thought ReasoningChain Hypothesis}
 
 +reason = (goal: Str  context: Str  constraints: [Str]) -> ReasoningChain {
   strategy = select_strategy goal constraints
@@ -39,7 +39,7 @@ reason_direct = (goal: Str  context: Str) -> ReasoningChain {
     | prompt.instruction `Produce a chain of reasoning. Each step should build on the last.`
     | prompt.constraint `Be specific. Cite evidence. State confidence 0.0-1.0.`
 
-  resp = ai.prompt (prompt.render p) ^
+  resp = ai.prompt (prompt.render p) ?? {text: goal}
   thoughts = parse_thoughts resp.text
 
   ReasoningChain {
@@ -55,7 +55,7 @@ reason_decompose = (goal: Str  context: Str) -> ReasoningChain {
   sub_problems = decompose goal
   sub_chains = sub_problems | map (sub) reason_direct sub context
 
-  synthesis = synthesize sub_chains goal ^
+  synthesis = synthesize sub_chains goal
 
   ReasoningChain {
     goal
@@ -73,7 +73,7 @@ reason_analogical = (goal: Str  context: Str) -> ReasoningChain {
     | prompt.section "Context" context
     | prompt.instruction `1) Find an analogous problem. 2) Describe the mapping. 3) Apply the solution.`
 
-  resp = ai.prompt (prompt.render p) ^
+  resp = ai.prompt (prompt.render p) ?? {text: goal}
   thoughts = parse_thoughts resp.text
 
   ReasoningChain {
@@ -97,7 +97,7 @@ reason_adversarial = (goal: Str  context: Str) -> ReasoningChain {
     | prompt.section "Arguments Against" con_chain.conclusion
     | prompt.instruction `Weigh both sides and reach a balanced conclusion.`
 
-  resp = ai.prompt (prompt.render p) ^
+  resp = ai.prompt (prompt.render p) ?? {text: pro_chain.conclusion}
 
   ReasoningChain {
     goal
@@ -115,7 +115,7 @@ reason_adversarial = (goal: Str  context: Str) -> ReasoningChain {
     | prompt.instruction `Break into 2-5 independent sub-problems. One per line.`
     | prompt.constraint `Each sub-problem should be solvable independently.`
 
-  resp = ai.prompt (prompt.render p) ^
+  resp = ai.prompt (prompt.render p) ?? {text: problem}
   resp.text | lines | map trim | filter (not empty?)
 }
 
@@ -126,7 +126,7 @@ reason_adversarial = (goal: Str  context: Str) -> ReasoningChain {
     | prompt.section "Context" context
     | prompt.instruction `Form a hypothesis. List evidence for and against. Suggest a test.`
 
-  resp = ai.prompt (prompt.render p) ^
+  resp = ai.prompt (prompt.render p) ?? {text: ""}
 
   Hypothesis {
     claim: resp.text | lines | first ?? ""
@@ -162,7 +162,7 @@ synthesize = (chains: [ReasoningChain]  goal: Str) -> Thought {
     | prompt.section "Original Goal" goal
     | prompt.instruction `Synthesize into a single coherent conclusion.`
 
-  resp = ai.prompt (prompt.render p) ^
+  resp = ai.prompt (prompt.render p) ?? {text: chains | map (.conclusion) | join " / "}
   Thought {
     id: "synthesis"
     content: resp.text

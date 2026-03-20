@@ -21,14 +21,14 @@ use std/env
 use std/time
 use ./prompts/dev_prompts
 
-Protocol TaskPick = {
+Trait TaskPick = {
   task: Str
   category: Str
   acceptance: Str
   key_files: Str
 }
 
-Protocol ContextUpdate = {
+Trait ContextUpdate = {
   continue_md: Str
   devlog_append: Str
 }

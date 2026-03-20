@@ -7,8 +7,7 @@ assert (reg != ()) "start returns handle"
 -- register agents
 registry.register reg {
   name: "reviewer"
-  traits: ["Reviewer" "SecurityAuditor"]
-  protocols: ["ReviewRequest"]
+  traits: ["Reviewer" "SecurityAuditor" "ReviewRequest"]
   domains: ["rust" "python"]
   capacity: 5
   metadata: {version: "1.0"}
@@ -16,8 +15,7 @@ registry.register reg {
 
 registry.register reg {
   name: "coder"
-  traits: ["Coder"]
-  protocols: ["CodeRequest"]
+  traits: ["Coder" "CodeRequest"]
   domains: ["rust"]
   capacity: 10
 } ^
@@ -39,11 +37,11 @@ assert (names == ["reviewer" "tester"]) "correct reviewer names"
 rust_agents = registry.find reg {domain: "rust"} ^
 assert (len rust_agents == 3) "all 3 agents handle rust"
 
--- find by protocol
-proto_agents = registry.find reg {protocol: "ReviewRequest"} ^
-assert (len proto_agents == 1) "1 agent handles ReviewRequest"
+-- find by trait (ReviewRequest)
+proto_agents = registry.find reg {trait: "ReviewRequest"} ^
+assert (len proto_agents == 1) "1 agent has ReviewRequest trait"
 proto_name = (first proto_agents ^).name
-assert (proto_name == "reviewer") "correct protocol agent"
+assert (proto_name == "reviewer") "correct ReviewRequest agent"
 
 -- find with multiple filters
 rust_reviewers = registry.find reg {trait: "Reviewer"  domain: "rust"} ^
@@ -76,7 +74,7 @@ ref = first (registry.find reg {trait: "Coder"} ^) ^
 assert (ref.name == "coder") "ref has name"
 assert (ref.healthy == true) "ref has healthy"
 assert (ref.capacity == 10) "ref has capacity"
-assert (len ref.traits == 1) "ref has traits list"
+assert (len ref.traits == 2) "ref has traits list"
 assert (len ref.domains == 1) "ref has domains list"
 
 -- watch

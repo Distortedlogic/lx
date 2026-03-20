@@ -60,16 +60,16 @@ required_sections = ["Goal" "Why" "What changes" "Files affected" "Task List" "C
   emit "output: work_items/{name}.md\n"
 
   findings = investigate audit_content root ^
-  session.record {name: "investigate"  input: audit_path  output: findings} ^
+  session.record {name: "investigate"  input: audit_path  output: findings} ?? ()
 
   draft = compose audit_content rules_content findings ^
-  session.record {name: "compose"  input: "findings"  output: draft} ^
+  session.record {name: "compose"  input: "findings"  output: draft} ?? ()
 
   out_path = write_draft name draft ^
 
   final = verify_and_revise session out_path draft name ^
   fs.write out_path final ^
-  session.record {name: "complete"  input: name  output: out_path} ^
+  session.record {name: "complete"  input: name  output: out_path} ?? ()
 
   emit "\n=== complete: {out_path} ==="
   Ok {path: out_path  name: name}
@@ -187,7 +187,7 @@ verify_and_revise = (session path draft name) {
 
   loop {
     grade_result = grade_draft current name prev_grades
-    session.record {name: "progress"  score: grade_result.score  output: "round"} ^
+    session.record {name: "progress"  score: grade_result.score  output: "round"} ?? ()
     emit "  score {grade_result.score} passed={grade_result.passed}"
 
     grade_result.passed ? break ()

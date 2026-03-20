@@ -176,7 +176,7 @@ grader: (output scenario) {
 grader: (output scenario) {
   llm_score: ai.prompt_structured {
     prompt: "Score this output 0-1 on: {scenario.rubric | join ", "}\nOutput: {output | to_str}"
-    schema: Protocol JudgeScore = {score: Float where score >= 0.0 && score <= 1.0}
+    schema: Trait JudgeScore = {score: Float where score >= 0.0 && score <= 1.0}
   } ^ | (.score)
   format: audit.has_diff output
 }

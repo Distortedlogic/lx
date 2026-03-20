@@ -219,12 +219,7 @@ fn collect_exports(program: &Program, interp: &Interpreter) -> ModuleExports {
                     }
                 }
             }
-            Stmt::Protocol {
-                exported: true,
-                name,
-                ..
-            }
-            | Stmt::McpDecl {
+            Stmt::McpDecl {
                 exported: true,
                 name,
                 ..
@@ -248,7 +243,7 @@ fn collect_exports(program: &Program, interp: &Interpreter) -> ModuleExports {
                     bindings.insert(name.clone(), val);
                 }
             }
-            Stmt::ProtocolUnion(def) if def.exported => {
+            Stmt::TraitUnion(def) if def.exported => {
                 if let Some(val) = interp.env.get(&def.name) {
                     bindings.insert(def.name.clone(), val);
                 }

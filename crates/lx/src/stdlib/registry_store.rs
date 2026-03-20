@@ -14,7 +14,6 @@ use crate::value::Value;
 pub struct AgentEntry {
     pub name: String,
     pub traits: Vec<String>,
-    pub protocols: Vec<String>,
     pub domains: Vec<String>,
     pub capacity: u64,
     pub metadata: Value,
@@ -31,7 +30,6 @@ pub struct Watcher {
 
 pub struct WatchQuery {
     pub trait_filter: Option<String>,
-    pub protocol_filter: Option<String>,
     pub domain_filter: Option<String>,
 }
 
@@ -92,12 +90,6 @@ pub fn entry_matches(entry: &AgentEntry, query: &Value) -> bool {
     {
         return false;
     }
-    if q.get("protocol")
-        .and_then(|v| v.as_str())
-        .is_some_and(|p| !entry.protocols.iter().any(|ep| ep == p))
-    {
-        return false;
-    }
     if q.get("domain")
         .and_then(|v| v.as_str())
         .is_some_and(|d| !entry.domains.iter().any(|ed| ed == d))
@@ -113,11 +105,6 @@ pub fn entry_to_agent_ref(entry: &AgentEntry) -> Value {
         .iter()
         .map(|t| Value::Str(Arc::from(t.as_str())))
         .collect();
-    let protocols: Vec<Value> = entry
-        .protocols
-        .iter()
-        .map(|p| Value::Str(Arc::from(p.as_str())))
-        .collect();
     let domains: Vec<Value> = entry
         .domains
         .iter()
@@ -131,7 +118,6 @@ pub fn entry_to_agent_ref(entry: &AgentEntry) -> Value {
         Value::Str(Arc::from(format!("local://{}", entry.name).as_str())),
     );
     rec.insert("traits".into(), Value::List(Arc::new(traits)));
-    rec.insert("protocols".into(), Value::List(Arc::new(protocols)));
     rec.insert("domains".into(), Value::List(Arc::new(domains)));
     rec.insert("capacity".into(), Value::Int(BigInt::from(entry.capacity)));
     rec.insert("load".into(), Value::Int(BigInt::from(load)));
@@ -149,13 +135,6 @@ pub fn watcher_matches(wq: &WatchQuery, entry: &AgentEntry) -> bool {
         return false;
     }
     if wq
-        .protocol_filter
-        .as_ref()
-        .is_some_and(|p| !entry.protocols.iter().any(|ep| ep == p))
-    {
-        return false;
-    }
-    if wq
         .domain_filter
         .as_ref()
         .is_some_and(|d| !entry.domains.iter().any(|ed| ed == d))
@@ -168,15 +147,11 @@ pub fn watcher_matches(wq: &WatchQuery, entry: &AgentEntry) -> bool {
 pub fn parse_watch_query(query: &Value) -> WatchQuery {
     let mut wq = WatchQuery {
         trait_filter: None,
-        protocol_filter: None,
         domain_filter: None,
     };
     if let Value::Record(q) = query {
         if let Some(Value::Str(t)) = q.get("trait") {
             wq.trait_filter = Some(t.to_string());
-        }
-        if let Some(Value::Str(p)) = q.get("protocol") {
-            wq.protocol_filter = Some(p.to_string());
         }
         if let Some(Value::Str(d)) = q.get("domain") {
             wq.domain_filter = Some(d.to_string());

@@ -1,17 +1,17 @@
 -- 49_agent_capability.lx
--- Tests: spec/agents-capability.md (Capabilities Protocol + agent.capabilities + agent.advertise)
--- Phase: agent.capabilities, agent.advertise, Capabilities Protocol
+-- Tests: spec/agents-capability.md (Capabilities Trait + agent.capabilities + agent.advertise)
+-- Phase: agent.capabilities, agent.advertise, Capabilities Trait
 
 use std/agent {Capabilities}
 use std/agent
 
--- Capabilities Protocol validates and fills defaults
+-- Capabilities Trait validates and fills defaults
 caps = Capabilities {
-  protocols: ["ReviewRequest" "AuditRequest"]
+  traits: ["ReviewRequest" "AuditRequest"]
   tools: ["read_file" "grep"]
   domains: ["rust" "security"]
 }
-assert (caps.protocols | len == 2) "caps protocols populated"
+assert (caps.traits | len == 2) "caps traits populated"
 assert (caps.tools | len == 2) "caps tools populated"
 assert (caps.domains | len == 2) "caps domains populated"
 assert (caps.budget_remaining == -1) "caps budget_remaining defaults to -1"
@@ -20,7 +20,7 @@ assert (caps.status == "ready") "caps status defaults to ready"
 
 -- Capabilities with explicit optional fields
 caps2 = Capabilities {
-  protocols: []
+  traits: []
   tools: ["search"]
   domains: ["general"]
   budget_remaining: 5000
@@ -35,7 +35,7 @@ assert (caps2.accepts | len == 2) "caps explicit accepts"
 cap_agent = {handler: (msg) {
   msg.type ? {
     "capabilities" -> Capabilities {
-      protocols: ["ReviewRequest"]
+      traits: ["ReviewRequest"]
       tools: ["grep" "read_file"]
       domains: ["rust"]
       status: "ready"
@@ -44,7 +44,7 @@ cap_agent = {handler: (msg) {
   }
 }}
 result = agent.capabilities cap_agent ^
-assert (result.protocols == ["ReviewRequest"]) "capabilities query returns protocols"
+assert (result.traits == ["ReviewRequest"]) "capabilities query returns traits"
 assert (result.tools | len == 2) "capabilities query returns tools"
 assert (result.status == "ready") "capabilities query returns status"
 
@@ -56,13 +56,13 @@ assert true "advertise succeeds"
 workers = [
   {name: "rust_expert" handler: (msg) {
     msg.type ? {
-      "capabilities" -> Capabilities {protocols: [] tools: [] domains: ["rust"]}
+      "capabilities" -> Capabilities {traits: [] tools: [] domains: ["rust"]}
       _ -> {result: "rust handled"}
     }
   }}
   {name: "go_expert" handler: (msg) {
     msg.type ? {
-      "capabilities" -> Capabilities {protocols: [] tools: [] domains: ["go"]}
+      "capabilities" -> Capabilities {traits: [] tools: [] domains: ["go"]}
       _ -> {result: "go handled"}
     }
   }}

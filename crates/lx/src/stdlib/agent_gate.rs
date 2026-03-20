@@ -6,29 +6,29 @@ use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::{ProtoFieldDef, Value};
+use crate::value::{FieldDef, Value};
 
-pub fn mk_gate_result_protocol() -> Value {
+pub fn mk_gate_result_trait() -> Value {
     let fields = vec![
-        ProtoFieldDef {
+        FieldDef {
             name: "approved".into(),
             type_name: "Bool".into(),
             default: None,
             constraint: None,
         },
-        ProtoFieldDef {
+        FieldDef {
             name: "approver".into(),
             type_name: "Str".into(),
             default: None,
             constraint: None,
         },
-        ProtoFieldDef {
+        FieldDef {
             name: "reason".into(),
             type_name: "Str".into(),
             default: Some(Value::Str(Arc::from(""))),
             constraint: None,
         },
-        ProtoFieldDef {
+        FieldDef {
             name: "timestamp".into(),
             type_name: "Str".into(),
             default: None,

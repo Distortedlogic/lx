@@ -21,9 +21,8 @@ pub(super) fn ident_or_keyword(text: &str) -> TokenKind {
 
 pub(super) fn type_name_or_keyword(text: &str) -> TokenKind {
     match text {
-        "Protocol" => TokenKind::Protocol,
-        "MCP" => TokenKind::Mcp,
         "Trait" => TokenKind::Trait,
+        "MCP" => TokenKind::Mcp,
         "Agent" => TokenKind::AgentKw,
         "Class" => TokenKind::ClassKw,
         _ => TokenKind::TypeName(text.to_string()),

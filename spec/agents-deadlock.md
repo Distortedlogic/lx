@@ -55,7 +55,7 @@ result = agent_b ~>? msg
 ### Error Type
 
 ```
-Protocol DeadlockErr = {
+Trait DeadlockErr = {
   type: Str = "deadlock"
   cycle: [Str]
   initiator: Str

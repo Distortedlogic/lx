@@ -6,7 +6,7 @@
 use std/fs
 use std/json
 
-Protocol +TraceEntry = {type: Str  name: Str  input: Any  output: Any  success: Bool}
+Trait +TraceEntry = {type: Str  name: Str  input: Any  output: Any  success: Bool}
 
 +read_recent = (dir mins) {
   $^find {dir} -name "*.jsonl" -mmin -{mins}

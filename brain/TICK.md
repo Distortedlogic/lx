@@ -25,7 +25,7 @@ See `TICK_PROTOCOL.md` for cross-read guidance.
 ## State
 
 71/71 tests pass (2026-03-18). `just diagnose` clean. All brain files under 300 lines.
-22 lx files: protocols.lx, traits.lx, main.lx, orchestrator.lx, 6 agents, 12 lib modules.
+22 lx files: contracts.lx, traits.lx, main.lx, orchestrator.lx, 6 agents, 12 lib modules.
 Two sessions closed 26 gaps. No test infrastructure yet (brain/tests/ doesn't exist).
 **Workspace system shipped (Sessions 53-54).** `brain/lx.toml` exists but has no `[test]`
 section — add one when you create brain/tests/ (see `tests/lx.toml` for example).
@@ -40,7 +40,7 @@ Also `trace.filter` renamed to `trace.query`. All brain files already updated.
 from save/load calls. `remove key ^` also returns the value directly, not Result. Store is now
 a first-class value type (`Store ()` constructor, dot-access methods). Agent is now a Trait
 defined in `pkg/agent.lx` with real defaults (handle, run, think, describe, etc.) — the
-`Agent` keyword auto-imports it. Protocol is a Trait with fields. Brain agents now inherit
+`Agent` keyword auto-imports it. Trait with fields acts as data contract. Brain agents now inherit
 Agent Trait defaults (init, handle, run, perceive, reason, act, reflect, think, describe,
 ask, tell, use_tool, tools). See `agent/SESSION_64_HANDOFF.md` if needed.
 **Session 71b (agent/):** Five structural fixes landed. (1) `par`/`sel`/`pmap`/`pmap_n` are now
@@ -70,7 +70,7 @@ Use `agent.mock` for faking agent responses. Use `describe`/`it` test blocks.
 4. `tests/70_describe.lx` — describe/it test patterns
 5. `brain/main.lx` — pipeline under test (imports 6 lib modules — scan their `use` lines)
 6. `brain/lib/perception.lx` + `brain/lib/reasoning.lx` — modules under test
-7. `brain/protocols.lx` — data shapes flowing through the pipeline
+7. `brain/contracts.lx` — data shapes flowing through the pipeline
 
 ## Context Files
 

@@ -2,26 +2,26 @@
 -- Tests: spec/agents-structured-output.md (ai.prompt_structured)
 -- Phase: ai.prompt_structured, ai.prompt_structured_with
 -- Note: Does not call AI backend (would invoke Claude CLI).
---       Tests Protocol validation and function existence only.
+--       Tests Trait validation and function existence only.
 
 use std/ai
 
--- Define test Protocols for structured output
-Protocol AnalysisResult = {
+-- Define test Traits for structured output
+Trait AnalysisResult = {
   findings: List
   severity: Str
   confidence: Float = 0.0
 }
 
--- Protocol used for structured output validates correctly
+-- Trait used for structured output validates correctly
 a = AnalysisResult {findings: ["bug1" "bug2"] severity: "high" confidence: 0.95}
-assert (a.findings | len == 2) "protocol findings populated"
-assert (a.severity == "high") "protocol severity"
-assert (a.confidence == 0.95) "protocol confidence"
+assert (a.findings | len == 2) "trait findings populated"
+assert (a.severity == "high") "trait severity"
+assert (a.confidence == 0.95) "trait confidence"
 
--- Protocol fills defaults
+-- Trait fills defaults
 b = AnalysisResult {findings: [] severity: "low"}
-assert (b.confidence == 0.0) "protocol default confidence"
+assert (b.confidence == 0.0) "trait default confidence"
 
 -- ai.prompt_structured is a callable (verify existence)
 assert (type_of ai.prompt_structured == "Func") "prompt_structured is a function"

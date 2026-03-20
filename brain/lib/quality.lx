@@ -7,7 +7,7 @@ use std/audit
 use pkg/trace {TraceStore}
 use std/agents/grader
 use std/agents/auditor
-use ../protocols {QualityGrade Response}
+use ../contracts {QualityGrade Response}
 
 +response_rubric = () -> Any {
   audit.rubric [
@@ -59,11 +59,11 @@ grade_to_quality = (result: Any) -> QualityGrade {
 }
 
 +refine_response = (initial_response: Str  task: Str) -> Str {
-  with TraceStore {path: "/tmp/brain_quality_trace.json"} ^ as quality_trace {
+  with TraceStore {path: "/tmp/brain_quality_trace.json"} ?? TraceStore () as quality_trace {
     result = refine initial_response {
       grade: (work) {
         g = grade_response work task
-        quality_trace.record {name: "quality_grade" input: task output: g.feedback score: g.score / 100.0} ^
+        quality_trace.record {name: "quality_grade" input: task output: g.feedback score: g.score / 100.0} ?? ()
         {score: to_int g.score  feedback: g.feedback}
       }
       revise: (work feedback) {
@@ -83,7 +83,7 @@ grade_to_quality = (result: Any) -> QualityGrade {
             | prompt.instruction `Improve the response addressing the feedback.`
             | prompt.constraint `Keep what's good, fix what's not.`
 
-          resp = ai.prompt (prompt.render p) ^
+          resp = ai.prompt (prompt.render p) ?? {text: work}
           resp.text
         }
       }
@@ -103,11 +103,11 @@ grade_to_quality = (result: Any) -> QualityGrade {
 }
 
 +refine_code = (initial_code: Str  task: Str) -> Str {
-  with TraceStore {path: "/tmp/brain_code_trace.json"} ^ as code_trace {
+  with TraceStore {path: "/tmp/brain_code_trace.json"} ?? TraceStore () as code_trace {
     result = refine initial_code {
       grade: (work) {
         g = grade_code work task
-        code_trace.record {name: "code_grade" input: task output: g.feedback score: g.score / 100.0} ^
+        code_trace.record {name: "code_grade" input: task output: g.feedback score: g.score / 100.0} ?? ()
         {score: to_int g.score  feedback: g.feedback}
       }
       revise: (work feedback) {
@@ -119,7 +119,7 @@ grade_to_quality = (result: Any) -> QualityGrade {
             | prompt.section "Issues" feedback
             | prompt.instruction `Fix the issues. Return only the corrected code.`
 
-          resp = ai.prompt (prompt.render p) ^
+          resp = ai.prompt (prompt.render p) ?? {text: work}
           resp.text
         }
       }

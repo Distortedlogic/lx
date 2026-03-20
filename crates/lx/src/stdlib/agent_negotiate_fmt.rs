@@ -21,16 +21,16 @@ fn bi_negotiate_format(
     let consumer = &args[1];
     let producer_caps = get_capabilities(producer, span, ctx)?;
     let consumer_caps = get_capabilities(consumer, span, ctx)?;
-    let producer_protos = extract_protocols(&producer_caps);
-    let consumer_protos = extract_protocols(&consumer_caps);
+    let producer_protos = extract_traits(&producer_caps);
+    let consumer_protos = extract_traits(&consumer_caps);
     if producer_protos.is_empty() {
         return Ok(Value::Err(Box::new(Value::Str(Arc::from(
-            "producer has no advertised protocols",
+            "producer has no advertised traits",
         )))));
     }
     if consumer_protos.is_empty() {
         return Ok(Value::Err(Box::new(Value::Str(Arc::from(
-            "consumer has no advertised protocols",
+            "consumer has no advertised traits",
         )))));
     }
     for pp in &producer_protos {
@@ -88,7 +88,7 @@ fn get_capabilities(agent: &Value, span: Span, ctx: &Arc<RuntimeCtx>) -> Result<
     ))
 }
 
-fn extract_protocols(caps: &Value) -> Vec<Value> {
+fn extract_traits(caps: &Value) -> Vec<Value> {
     let rec = match caps {
         Value::Ok(inner) => match inner.as_ref() {
             Value::Record(r) => r,
@@ -97,7 +97,7 @@ fn extract_protocols(caps: &Value) -> Vec<Value> {
         Value::Record(r) => r,
         _ => return vec![],
     };
-    rec.get("protocols")
+    rec.get("traits")
         .and_then(|v| v.as_list())
         .map(|list| {
             list.iter()
@@ -209,7 +209,7 @@ fn collect_conflicts(producer_protos: &[Value], consumer_protos: &[Value]) -> St
             }
         }
         conflicts.push(format!(
-            "consumer expects '{cn}' (fields: {}) — closest producer protocol: '{best_match}'",
+            "consumer expects '{cn}' (fields: {}) — closest producer trait: '{best_match}'",
             required.join(", ")
         ));
     }

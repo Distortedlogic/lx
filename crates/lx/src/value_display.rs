@@ -157,15 +157,9 @@ impl fmt::Display for Value {
                     write!(f, "{start}..{end}")
                 }
             }
-            Value::ProtocolUnion { name, .. } => write!(f, "<Protocol {name}>"),
+            Value::TraitUnion { name, .. } => write!(f, "<Trait {name}>"),
             Value::McpDecl { name, .. } => write!(f, "<MCP {name}>"),
-            Value::Trait { name, fields, .. } => {
-                if !fields.is_empty() {
-                    write!(f, "<Protocol {name}>")
-                } else {
-                    write!(f, "<Trait {name}>")
-                }
-            }
+            Value::Trait { name, .. } => write!(f, "<Trait {name}>"),
             Value::Class { name, traits, .. } => {
                 if traits.iter().any(|t| t.as_ref() == "Agent") {
                     write!(f, "<Agent {name}>")

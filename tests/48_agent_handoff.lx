@@ -1,11 +1,11 @@
 -- 48_agent_handoff.lx
--- Tests: spec/agents-handoff.md (Handoff Protocol + agent.as_context)
--- Phase: agent.Handoff Protocol, agent.as_context formatting helper
+-- Tests: spec/agents-handoff.md (Handoff Trait + agent.as_context)
+-- Phase: agent.Handoff Trait, agent.as_context formatting helper
 
 use std/agent {Handoff}
 use std/agent
 
--- Handoff Protocol validates and fills defaults
+-- Handoff Trait validates and fills defaults
 h = Handoff {result: "auth review complete"}
 assert (h.result == "auth review complete") "handoff result preserved"
 assert (h.tried == []) "handoff tried defaults to empty"

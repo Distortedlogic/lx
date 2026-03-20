@@ -144,7 +144,7 @@ Currently checks:
 Planned but not yet implemented:
 - Exhaustiveness of pattern matches
 - Mutable captures in concurrent contexts (`par`/`sel`/`pmap`)
-- Protocol field types ↔ function param annotations
+- Trait field types ↔ function param annotations
 - Import conflict detection
 - `lx check --strict` for warnings-as-errors
 

@@ -3,8 +3,8 @@
 use std/agent
 use std/trait
 
-Protocol ReviewRequest = {task: Str  path: Str}
-Protocol AuditRequest = {severity: Str  scope: Str}
+Trait ReviewRequest = {task: Str  path: Str}
+Trait AuditRequest = {severity: Str  scope: Str}
 
 -- basic trait with typed methods
 Trait Reviewer = {
@@ -93,7 +93,7 @@ input_field = sm.input.0
 assert (input_field.name == "query") "input field named query"
 assert (input_field.type == "Str") "input field type is Str"
 
--- method with Protocol-named input type
+-- method with Trait-named input type
 Trait WithProto = {
   handle: ReviewRequest -> {ok: Bool}
 }

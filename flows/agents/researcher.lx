@@ -14,7 +14,7 @@ use std/agent
 }
 
 +breakdown = (msg) {
-  ai.prompt "Break down the following research into actionable tasks:\n{msg.research}" ^
+  ai.prompt "Break down the following research into actionable tasks:\n{msg.research}" ?? ""
 }
 
 +handlers = %{"search": search  "research": research  "breakdown": breakdown}

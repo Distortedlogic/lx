@@ -7,17 +7,17 @@ use std/profile
 use std/time
 use std/json
 use std/fs
-use ../protocols {MemoryEntry}
+use ../contracts {MemoryEntry}
 
 brain_dir = "{env.home ()}/.lx/brain"
 
 +init = () -> Any {
   fs.exists brain_dir ? () : fs.mkdir brain_dir ^
 
-  working = MemoryStore {path: "{brain_dir}/working.json"} ^
-  episodic = MemoryStore {path: "{brain_dir}/episodic.json"} ^
-  semantic = KnowledgeBase {path: "{brain_dir}/semantic.json"} ^
-  persona = profile.load {name: "claude" create: true} ^
+  working = MemoryStore {path: "{brain_dir}/working.json"} ?? MemoryStore ()
+  episodic = MemoryStore {path: "{brain_dir}/episodic.json"} ?? MemoryStore ()
+  semantic = KnowledgeBase {path: "{brain_dir}/semantic.json"} ?? KnowledgeBase ()
+  persona = profile.load {name: "claude" create: true} ?? {name: "claude"}
 
   {working  episodic  semantic  persona}
 }
@@ -31,14 +31,14 @@ brain_dir = "{env.home ()}/.lx/brain"
       tier: 2
       confidence: tagged.confidence
       tags: tagged.tags
-    } ^
+    } ?? ()
   } : {
     store.working.store {
       content: tagged.content
       tier: 1
       confidence: tagged.confidence
       tags: tagged.tags
-    } ^
+    } ?? ()
   }
 
   tagged.domain | len > 0 ? {
@@ -50,7 +50,7 @@ brain_dir = "{env.home ()}/.lx/brain"
       source: tagged.source
       confidence: tagged.confidence
       tags: tagged.tags
-    } ^
+    } ?? ()
   } : ()
 
   true
@@ -76,7 +76,7 @@ brain_dir = "{env.home ()}/.lx/brain"
 }
 
 +learn_preference = (store: Any  key: Str  value: Any) -> Any {
-  profile.preference store.persona key value ^
+  profile.preference store.persona key value ?? ()
 }
 
 +get_preference = (store: Any  key: Str) -> Any {
@@ -84,7 +84,7 @@ brain_dir = "{env.home ()}/.lx/brain"
 }
 
 +learn_skill = (store: Any  domain: Str  knowledge_data: Any) -> Any {
-  profile.learn store.persona domain knowledge_data ^
+  profile.learn store.persona domain knowledge_data ?? ()
 }
 
 +recall_skill = (store: Any  domain: Str) -> Any {
@@ -97,21 +97,21 @@ brain_dir = "{env.home ()}/.lx/brain"
 
 +consolidate = (store: Any) -> Any {
   (promoted promoted_episodic) = par {
-    store.working.consolidate () ^
-    store.episodic.consolidate () ^
+    store.working.consolidate () ?? 0
+    store.episodic.consolidate () ?? 0
   }
 
   high_confidence = store.working.tier 1
     | filter (m) m.confidence >= 0.85
 
-  high_confidence | each (m) store.working.promote m ^
+  high_confidence | each (m) store.working.promote m ?? ()
 
   {promoted  promoted_episodic  elevated: len high_confidence}
 }
 
 +forget_stale = (store: Any  max_age_seconds: Int) -> Int {
-  profile.decay store.persona max_age_seconds ^
-  store.working.consolidate () ^
+  profile.decay store.persona max_age_seconds ?? ()
+  store.working.consolidate () ?? 0
 }
 
 +working_load = (store: Any) -> Int {
@@ -119,7 +119,7 @@ brain_dir = "{env.home ()}/.lx/brain"
 }
 
 +save = (store: Any) -> Any {
-  profile.save store.persona ^
+  profile.save store.persona ?? ()
 }
 
 +merge_context = (store: Any  items: [Any]) -> Any {

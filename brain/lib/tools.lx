@@ -8,7 +8,7 @@ use std/budget
 use std/retry
 use pkg/circuit {CircuitBreaker}
 use std/time
-use ../protocols {ToolRequest ToolResult ActionPlan ActionResult}
+use ../contracts {ToolRequest ToolResult ActionPlan ActionResult}
 
 MCP CognitiveTools = {
   Read {path: Str} -> {content: Str}
@@ -41,7 +41,7 @@ tool_costs = %{
     | prompt.instruction "List only the tool names needed, one per line."
     | prompt.constraint "Prefer cheaper tools. Only include what's strictly necessary."
 
-  resp = ai.prompt (prompt.render p) ^
+  resp = ai.prompt (prompt.render p) ?? {text: ""}
   selected_names = resp.text | lines | map trim | filter (not empty?)
 
   tools | filter (t) selected_names | contains? t.name
@@ -59,7 +59,7 @@ tool_costs = %{
     | prompt.instruction "Create ordered steps. Each step: tool name + arguments + what it achieves."
     | prompt.constraint "Minimize steps. Parallelize when dependencies allow."
 
-  resp = ai.prompt (prompt.render p) ^
+  resp = ai.prompt (prompt.render p) ?? {text: goal}
 
   steps = resp.text | lines
     | filter (l) trim l | not empty?
@@ -136,7 +136,7 @@ execute_single = (request: ToolRequest) -> ToolResult {
     | prompt.instruction "Synthesize these results into a clear, direct answer."
     | prompt.constraint "Don't mention the tools themselves. Just present the answer."
 
-  resp = ai.prompt (prompt.render p) ^
+  resp = ai.prompt (prompt.render p) ?? {text: outputs}
   resp.text
 }
 

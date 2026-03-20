@@ -5,7 +5,7 @@ use std/ai
 use pkg/prompt
 use pkg/trace {TraceStore}
 use pkg/knowledge {KnowledgeBase}
-use ../protocols {Reflection FeedbackSignal}
+use ../contracts {Reflection FeedbackSignal}
 
 +reflect = (action: Str  outcome: Str  expectation: Str) -> Reflection {
   quality = assess_quality outcome expectation
@@ -18,7 +18,7 @@ use ../protocols {Reflection FeedbackSignal}
     | prompt.instruction "1) Did it achieve its goal? 2) What worked? 3) What didn't? 4) Lesson?"
     | prompt.constraint "One sentence per answer. No fluff."
 
-  lesson = ai.prompt (prompt.render p) ^
+  lesson = ai.prompt (prompt.render p) ?? {text: ""}
     | (.text) | lines | filter (l) trim l | not empty?
     | last ?? "no lesson extracted"
 
@@ -107,9 +107,9 @@ assess_quality = (outcome: Str  expectation: Str) -> Float {
       reflection.strategy_worked ? "success" : "failure"
       reflection.should_remember ? "memorable" : "routine"
     ]
-  } ^
+  } ?? ()
 
-  reflection.quality | (q) session.score "reflection" q ^
+  reflection.quality | (q) session.score "reflection" q ?? ()
 }
 
 +improvement_suggestions = (patterns: Any) -> [Str] {
@@ -123,6 +123,6 @@ assess_quality = (outcome: Str  expectation: Str) -> Float {
       | prompt.section "Actions that work" winning
       | prompt.instruction "Suggest 2-3 concrete changes to improve success rate."
 
-    ai.prompt (prompt.render p) ^ | (.text) | lines | filter (l) trim l | not empty?
+    ai.prompt (prompt.render p) ?? {text: "continue current approach"} | (.text) | lines | filter (l) trim l | not empty?
   }
 }

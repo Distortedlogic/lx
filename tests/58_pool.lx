@@ -48,7 +48,7 @@ assert (m0.result == "processed-analyze")
 assert (m0.source == "a")
 
 -- pool with trait constraint
-Protocol ReviewRequest = {task: Str  path: Str}
+Trait ReviewRequest = {task: Str  path: Str}
 Trait Reviewer = {
   review: ReviewRequest -> Str
 }

@@ -9,7 +9,7 @@ use std/agent
 }
 
 +revise = (msg) {
-  ai.prompt "Revise the following work based on feedback.\nWork: {msg.work}\nFeedback: {msg.feedback}" ^
+  ai.prompt "Revise the following work based on feedback.\nWork: {msg.work}\nFeedback: {msg.feedback}" ?? msg.work
 }
 
 +handlers = %{"task": task  "revise": revise}

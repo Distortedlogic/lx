@@ -50,7 +50,6 @@ fn bi_register(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Val
         RoutingEntry::new(
             agent.clone(),
             str_list_from(opts.get("traits")),
-            str_list_from(opts.get("protocols")),
             str_list_from(opts.get("domains")),
             max_concurrent,
         ),
@@ -69,14 +68,10 @@ fn bi_unregister(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<
 }
 
 fn bi_registered(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let (trait_f, proto_f, domain_f) = match &args[0] {
+    let (trait_f, domain_f) = match &args[0] {
         Value::Record(filter) => (
             filter
                 .get("trait")
-                .and_then(|v| v.as_str())
-                .map(String::from),
-            filter
-                .get("protocol")
                 .and_then(|v| v.as_str())
                 .map(String::from),
             filter
@@ -84,16 +79,15 @@ fn bi_registered(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<
                 .and_then(|v| v.as_str())
                 .map(String::from),
         ),
-        _ => (None, None, None),
+        _ => (None, None),
     };
     let matched: Vec<Value> = ROUTE_TABLE
         .iter()
         .filter(|e| {
             let entry = e.value();
             let t_ok = trait_f.as_deref().is_none_or(|t| entry.has_trait(t));
-            let p_ok = proto_f.as_deref().is_none_or(|p| entry.has_protocol(p));
             let d_ok = domain_f.as_deref().is_none_or(|d| entry.has_domain(d));
-            t_ok && p_ok && d_ok
+            t_ok && d_ok
         })
         .map(|e| e.value().agent.clone())
         .collect();

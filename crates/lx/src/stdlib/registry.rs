@@ -101,10 +101,6 @@ fn bi_register(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Valu
         .to_string();
 
     let traits = info.get("traits").map(extract_str_list).unwrap_or_default();
-    let protocols = info
-        .get("protocols")
-        .map(extract_str_list)
-        .unwrap_or_default();
     let domains = info
         .get("domains")
         .map(extract_str_list)
@@ -123,7 +119,6 @@ fn bi_register(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Valu
     let entry = AgentEntry {
         name: name.clone(),
         traits,
-        protocols,
         domains,
         capacity,
         metadata,

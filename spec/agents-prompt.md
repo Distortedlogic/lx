@@ -2,7 +2,7 @@
 
 `std/prompt` provides typed, composable prompt assembly. Agents construct prompts from named sections, few-shot examples, constraints, and templates — then render to a final string or budget-trim to fit a token limit. Replaces ad-hoc string concatenation for LLM input construction.
 
-Distinct from `ai.prompt_structured` (which validates LLM *output* against a Protocol). This structures the *input* side.
+Distinct from `ai.prompt_structured` (which validates LLM *output* against a Trait). This structures the *input* side.
 
 ## Problem
 

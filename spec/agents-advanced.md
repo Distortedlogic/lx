@@ -46,14 +46,14 @@ emit {type: "done" count: results | len}
 
 `emit` does not compose with `^` or `|` because its return type is always `()`.
 
-### With Protocol Validation
+### With Trait Validation
 
 ```
-Protocol StatusUpdate = {type: Str  msg: Str  severity: Str = "info"}
+Trait StatusUpdate = {type: Str  msg: Str  severity: Str = "info"}
 emit StatusUpdate {type: "status" msg: "grading complete"}
 ```
 
-The Protocol validates the record before emitting. Missing fields or type mismatches are caught at the emit boundary.
+The Trait validates the record before emitting. Missing fields or type mismatches are caught at the emit boundary.
 
 ### `emit` vs Other Output
 
@@ -167,7 +167,7 @@ Output types can be:
 - A type name: `-> Int` (validates output is Int)
 - A record shape: `-> {result: Int  confidence: Float}`
 - A list: `-> [Str]`
-- `Protocol` names are resolved at eval time
+- `Trait` names are resolved at eval time
 
 ### Exports
 

@@ -6,7 +6,7 @@ use crate::backends::RuntimeCtx;
 use crate::error::LxError;
 use crate::span::Span;
 use crate::stdlib::json_conv;
-use crate::value::{McpOutputDef, ProtoFieldDef, Value};
+use crate::value::{McpOutputDef, FieldDef, Value};
 
 use super::{extract_text, get_tool_def, mcp_rpc};
 
@@ -54,7 +54,7 @@ pub(crate) fn typed_call(
 
 fn validate_input(
     input: &Value,
-    fields: &[ProtoFieldDef],
+    fields: &[FieldDef],
     tool_name: &str,
 ) -> Result<Value, String> {
     let empty_rec;

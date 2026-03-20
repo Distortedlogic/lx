@@ -7,14 +7,14 @@ use std/fs
 use std/re
 use ../traits {Researcher}
 
-Protocol Finding = {
+Trait Finding = {
   source: Str
   content: Str
   relevance: Float
   confidence: Float
 }
 
-Protocol ResearchResult = {
+Trait ResearchResult = {
   question: Str
   findings: [Finding]
   answer: Str
@@ -111,12 +111,12 @@ synthesize_findings = (findings: [Finding]  question: Str) -> Str {
     | prompt.instruction "Answer the question based on the findings. Cite sources by number."
     | prompt.constraint "If findings are insufficient, say what's missing."
 
-  ai.prompt (prompt.render p) ^ | (.text)
+  ai.prompt (prompt.render p) ?? {text: findings_text} | (.text)
 }
 
 +main = () {
   agent.advertise {
-    protocols: ["ResearchResult" "Finding"]
+    traits: ["ResearchResult" "Finding"]
     domains: ["researcher" "research" "search" "information"]
     tools: ["ai" "fs"]
   }

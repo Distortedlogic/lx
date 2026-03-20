@@ -6,7 +6,7 @@ use pkg/prompt
 use std/re
 use std/json
 use std/git
-use ../protocols {Perception}
+use ../contracts {Perception}
 
 +perceive = (raw: Str  history: [Any]) -> Perception {
   (intent complexity entities domain) = par {
@@ -35,7 +35,7 @@ use ../protocols {Perception}
     | prompt.instruction `Classify into: question, task, debug, explain, refactor, create, review, discuss, clarify`
     | prompt.constraint `Reply with a single word — the category`
     | prompt.section "Input" raw
-  resp = ai.prompt (prompt.render p) ^
+  resp = ai.prompt (prompt.render p) ?? {text: "question"}
   resp.text | trim | lower
 }
 
@@ -45,7 +45,7 @@ use ../protocols {Perception}
     | prompt.instruction `List files, functions, types, concepts mentioned. One per line.`
     | prompt.constraint `Only concrete entities, no filler words`
     | prompt.section "Input" raw
-  resp = ai.prompt (prompt.render p) ^
+  resp = ai.prompt (prompt.render p) ?? {text: ""}
   resp.text | lines | map trim | filter (not empty?)
 }
 

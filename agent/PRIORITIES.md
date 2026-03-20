@@ -41,10 +41,10 @@ then identified `std/store` as the missing primitive enabling module→package m
 - [x] `Value::Store { id }` first-class type (dot-access methods, constructor, reference semantics)
 - [x] `Collection` Trait (`pkg/collection.lx`) — get/keys/values/remove/query/len/has/save/load defaults
 - [x] 5 collection packages rewritten (knowledge, tasks, memory, trace, context) using `entries: Store ()` + Collection
-- [x] Type hierarchy refactor: OBJECTS DashMap eliminated, `Value::Agent` removed, `Value::Protocol` → `Value::Trait` with fields
+- [x] Type hierarchy refactor: OBJECTS DashMap eliminated, `Value::Agent` removed, `Value::Trait` → `Value::Trait` with fields
 - [x] Agent is now a Trait in `pkg/agent.lx` — `Agent` keyword auto-imports it, auto-adds "Agent" to traits list. `Value::Class` has 4 fields: name, traits, defaults, methods. No `ClassKind` enum. Two new builtins: `method_of(obj, name)`, `methods_of(obj)`
 - [x] `is_func_def()` parser bug fix — `application_depth` tracking for `(expr) {record}` disambiguation
-- [x] Boxed `LxFunc`/`ProtocolField`, visitor context structs, type alias for pubsub return
+- [x] Boxed `LxFunc`/`FieldDecl`, visitor context structs, type alias for pubsub return
 
 ## Tier 1 — Infrastructure (multiplicative improvement to every tick)
 
@@ -66,7 +66,7 @@ Tier 1 completed: `std/retry` (Session 44), `std/user` + `std/profile` (Session 
 
 8. ~~**`std/deadline` time propagation**~~ — SHIPPED Session 59. 8 functions: `create`, `create_at`, `scope`, `remaining`, `expired`, `check`, `slice`, `extend`. Thread-local scope stack, auto `_deadline_ms` injection on `~>?`/`~>`.
 
-9. ~~**`agent.route`/`register` capability routing**~~ — SHIPPED Session 60. 5 functions: `register`, `unregister`, `registered`, `route`, `route_multi`. Trait/protocol/domain filtering, selection strategies (least_busy, round_robin, random, custom), load tracking, reconcile integration.
+9. ~~**`agent.route`/`register` capability routing**~~ — SHIPPED Session 60. 5 functions: `register`, `unregister`, `registered`, `route`, `route_multi`. Trait/trait/domain filtering, selection strategies (least_busy, round_robin, random, custom), load tracking, reconcile integration.
 
 10. ~~**`introspect.system` live observation**~~ — SHIPPED Session 65. `std/introspect` module: 5 functions (`system`, `agents`, `agent`, `messages`, `bottleneck`). Aggregates from REGISTRY, SESSIONS, SUPERVISORS, TOPICS, ROUTE_TABLE. `introspect.watch` deferred (needs async).
 
@@ -80,15 +80,15 @@ Tier 1 completed: `std/retry` (Session 44), `std/user` + `std/profile` (Session 
 
 14. ~~**`std/workspace` collaborative editing**~~ — SHIPPED Session 69. 12 functions: `create`, `claim`, `claim_pattern`, `edit`, `append`, `release`, `snapshot`, `regions`, `conflicts`, `resolve`, `history`, `watch`. Line-based region claiming, overlap detection, bound auto-adjustment, regex pattern claiming, watcher callbacks. 2 Rust files (workspace.rs + workspace_edit.rs).
 
-15. ~~**`std/registry` cross-process discovery**~~ — SHIPPED Session 70. 10 functions: `start`, `stop`, `connect`, `register`, `deregister`, `find`, `find_one`, `health`, `load`, `watch`. In-memory registry with trait/protocol/domain filtering, 4 selection strategies (first, least_loaded, round_robin, random), health/load tracking, watcher callbacks. 3 Rust files (registry.rs + registry_query.rs + registry_store.rs).
+15. ~~**`std/registry` cross-process discovery**~~ — SHIPPED Session 70. 10 functions: `start`, `stop`, `connect`, `register`, `deregister`, `find`, `find_one`, `health`, `load`, `watch`. In-memory registry with trait/trait/domain filtering, 4 selection strategies (first, least_loaded, round_robin, random), health/load tracking, watcher callbacks. 3 Rust files (registry.rs + registry_query.rs + registry_store.rs).
 
 16. ~~**`agent.dialogue_fork`/`compare`/`merge`**~~ — SHIPPED Session 71. 4 functions: `dialogue_fork`, `dialogue_compare`, `dialogue_merge`, `dialogue_branches`. Fork shares parent history, parent suspended while forks active, compare grades via user function, merge picks winner and resumes parent. Recursive fork tree cleanup. 1 Rust file (agent_dialogue_branch.rs).
 
 17. ~~**`agent.adapter`/`negotiate_format`**~~ — SHIPPED Session 72. 3 functions: `adapter` (static field mapping), `negotiate_format` (runtime negotiation via capabilities), `coerce` (one-shot transform). Levenshtein heuristic for fuzzy field matching. 2 Rust files (agent_adapter.rs + agent_negotiate_fmt.rs).
 
-18. **`agent.reload`/`evolve`** (`spec/agents-hot-reload.md`) — Hot-swap agent handlers without restart. `agent.evolve` for self-update from within handler. Preserves dialogues, interceptors, identity. Enables adaptive long-lived agents.
+18. ~~**`agent.reload`/`evolve`**~~ — SHIPPED Session 73. 3 functions: `reload` (external handler replacement via ID-based mutable store), `evolve` (self-update from within handler via thread-local pending flag), `update_traits` (add/remove traits). Subprocess agents return Err. Interceptors preserved. 1 Rust file (agent_reload.rs).
 
-19. **`agent.dialogue_save/load`** (`spec/agents-dialogue-persist.md`) — Persist dialogue sessions across process restarts.
+19. ~~**`agent.dialogue_save/load`**~~ — SHIPPED Session 74. 4 functions: `dialogue_save`, `dialogue_load`, `dialogue_list`, `dialogue_delete`. File-backed persistence at `.lx/dialogues/{id}.json` with atomic writes. JSON serialization via `json_conv`. 1 Rust file (agent_dialogue_persist.rs).
 
 20. **`with context` ambient propagation** (`spec/agents-ambient.md`) — Scoped ambient state flowing through call chains. Now includes cross-process constraint propagation at `agent.spawn` boundaries (absorbs `spec/agents-constraint-propagation.md`).
 

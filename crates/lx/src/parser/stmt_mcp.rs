@@ -1,4 +1,4 @@
-use crate::ast::{McpOutputType, McpToolDecl, ProtocolField, SStmt, Stmt};
+use crate::ast::{McpOutputType, McpToolDecl, FieldDecl, SStmt, Stmt};
 use crate::error::LxError;
 use crate::span::Span;
 use crate::token::TokenKind;
@@ -35,7 +35,7 @@ impl super::Parser {
                 } else {
                     None
                 };
-                input.push(ProtocolField {
+                input.push(FieldDecl {
                     name: field_name,
                     type_name,
                     default,
@@ -79,7 +79,7 @@ impl super::Parser {
                 let field_name = self.expect_ident("MCP output field")?;
                 self.expect_kind(&TokenKind::Colon)?;
                 let type_name = self.expect_type_name("MCP output field type")?;
-                fields.push(ProtocolField {
+                fields.push(FieldDecl {
                     name: field_name,
                     type_name,
                     default: None,

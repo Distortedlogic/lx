@@ -1,14 +1,13 @@
 use std::sync::Arc;
 use std::sync::mpsc;
 
-use indexmap::IndexMap;
 use num_bigint::BigInt;
 use parking_lot::Mutex;
 
-use crate::ast::{ProtocolEntry, ProtocolField, SExpr};
+use crate::ast::{TraitEntry, FieldDecl, SExpr};
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::{ProtoFieldDef, Value};
+use crate::value::{FieldDef, Value};
 
 use super::Interpreter;
 
@@ -40,10 +39,17 @@ fn extract_pid(agent: &Value, span: Span) -> Result<u32, LxError> {
 impl Interpreter {
     fn get_agent_handler(&self, target: &Value, span: Span) -> Result<Value, LxError> {
         match target {
-            Value::Record(fields) => fields
-                .get("handler")
-                .cloned()
-                .ok_or_else(|| LxError::runtime("agent has no 'handler' field", span)),
+            Value::Record(fields) => {
+                if let Some(handler) = crate::stdlib::agent_reload::handler_id_from_agent(target)
+                    .and_then(crate::stdlib::agent_reload::lookup_handler)
+                {
+                    return Ok(handler);
+                }
+                fields
+                    .get("handler")
+                    .cloned()
+                    .ok_or_else(|| LxError::runtime("agent has no 'handler' field", span))
+            }
             other => Err(LxError::type_err(
                 format!(
                     "~> target must be an agent (Record with handler), got {}",
@@ -71,8 +77,14 @@ impl Interpreter {
             crate::stdlib::agent::send_subprocess(pid, &msg, span)?;
             return Ok(Value::Unit);
         }
+        let handler_id = crate::stdlib::agent_reload::handler_id_from_agent(&target);
         let handler = self.get_agent_handler(&target, span)?;
+        crate::stdlib::agent_reload::set_current_handler_id(handler_id);
         self.apply_func(handler, msg, span).await?;
+        crate::stdlib::agent_reload::set_current_handler_id(None);
+        if let Some(hid) = handler_id {
+            crate::stdlib::agent_reload::apply_pending_evolve(hid);
+        }
         Ok(Value::Unit)
     }
 
@@ -88,8 +100,15 @@ impl Interpreter {
             let pid = extract_pid(&target, span)?;
             return crate::stdlib::agent::ask_subprocess(pid, &msg, span);
         }
+        let handler_id = crate::stdlib::agent_reload::handler_id_from_agent(&target);
         let handler = self.get_agent_handler(&target, span)?;
-        self.apply_func(handler, msg, span).await
+        crate::stdlib::agent_reload::set_current_handler_id(handler_id);
+        let result = self.apply_func(handler, msg, span).await;
+        crate::stdlib::agent_reload::set_current_handler_id(None);
+        if let Some(hid) = handler_id {
+            crate::stdlib::agent_reload::apply_pending_evolve(hid);
+        }
+        result
     }
 
     pub(super) async fn eval_stream_ask(
@@ -125,77 +144,64 @@ impl Interpreter {
         })
     }
 
-    pub(super) async fn eval_protocol_def(
+    pub(super) async fn eval_trait_fields(
         &mut self,
         name: &str,
-        entries: &[ProtocolEntry],
+        entries: &[TraitEntry],
         span: Span,
-    ) -> Result<Value, LxError> {
-        let mut proto_fields = Vec::new();
+    ) -> Result<Vec<FieldDef>, LxError> {
+        let mut fields = Vec::new();
         for entry in entries {
             match entry {
-                ProtocolEntry::Spread(base_name) => {
+                TraitEntry::Spread(base_name) => {
                     let base = self.env.get(base_name).ok_or_else(|| {
                         LxError::runtime(
-                            format!("Protocol {name}: spread base '{base_name}' not found"),
+                            format!("Trait {name}: spread base '{base_name}' not found"),
                             span,
                         )
                     })?;
-                    let Value::Trait { fields, .. } = &base else {
+                    let Value::Trait {
+                        fields: base_fields,
+                        ..
+                    } = &base
+                    else {
                         return Err(LxError::runtime(
                             format!(
-                                "Protocol {name}: '{base_name}' is not a Protocol, got {}",
+                                "Trait {name}: '{base_name}' is not a Trait, got {}",
                                 base.type_name()
                             ),
                             span,
                         ));
                     };
-                    for f in fields.iter() {
-                        if let Some(pos) = proto_fields
-                            .iter()
-                            .position(|pf: &ProtoFieldDef| pf.name == f.name)
+                    for f in base_fields.iter() {
+                        if let Some(pos) = fields.iter().position(|pf: &FieldDef| pf.name == f.name)
                         {
-                            proto_fields[pos] = f.clone();
+                            fields[pos] = f.clone();
                         } else {
-                            proto_fields.push(f.clone());
+                            fields.push(f.clone());
                         }
                     }
                 }
-                ProtocolEntry::Field(f) => {
-                    let def = self.eval_proto_field(f).await?;
-                    if let Some(pos) = proto_fields
-                        .iter()
-                        .position(|pf: &ProtoFieldDef| pf.name == def.name)
-                    {
-                        proto_fields[pos] = def;
+                TraitEntry::Field(f) => {
+                    let def = self.eval_field_decl(f).await?;
+                    if let Some(pos) = fields.iter().position(|pf: &FieldDef| pf.name == def.name) {
+                        fields[pos] = def;
                     } else {
-                        proto_fields.push(def);
+                        fields.push(def);
                     }
                 }
             }
         }
-        let val = Value::Trait {
-            name: Arc::from(name),
-            fields: Arc::new(proto_fields),
-            methods: Arc::new(Vec::new()),
-            defaults: Arc::new(IndexMap::new()),
-            requires: Arc::new(Vec::new()),
-            description: None,
-            tags: Arc::new(Vec::new()),
-        };
-        let mut env = self.env.child();
-        env.bind(name.to_string(), val);
-        self.env = env.into_arc();
-        Ok(Value::Unit)
+        Ok(fields)
     }
 
-    async fn eval_proto_field(&mut self, f: &ProtocolField) -> Result<ProtoFieldDef, LxError> {
+    async fn eval_field_decl(&mut self, f: &FieldDecl) -> Result<FieldDef, LxError> {
         let default = match &f.default {
             Some(e) => Some(self.eval(e).await?),
             None => None,
         };
         let constraint = f.constraint.as_ref().map(|e| Arc::new(e.clone()));
-        Ok(ProtoFieldDef {
+        Ok(FieldDef {
             name: f.name.clone(),
             type_name: f.type_name.clone(),
             default,
@@ -203,7 +209,7 @@ impl Interpreter {
         })
     }
 
-    pub(super) fn eval_protocol_union(
+    pub(super) fn eval_trait_union(
         &mut self,
         name: &str,
         variants: &[String],
@@ -212,14 +218,14 @@ impl Interpreter {
         for v in variants {
             let val = self.env.get(v).ok_or_else(|| {
                 LxError::runtime(
-                    format!("Protocol union {name}: variant '{v}' not found"),
+                    format!("Trait union {name}: variant '{v}' not found"),
                     span,
                 )
             })?;
             if !matches!(val, Value::Trait { .. }) {
                 return Err(LxError::runtime(
                     format!(
-                        "Protocol union {name}: variant '{v}' is not a Protocol, got {}",
+                        "Trait union {name}: variant '{v}' is not a Trait, got {}",
                         val.type_name()
                     ),
                     span,
@@ -227,7 +233,7 @@ impl Interpreter {
             }
         }
         let variant_arcs: Vec<Arc<str>> = variants.iter().map(|v| Arc::from(v.as_str())).collect();
-        let val = Value::ProtocolUnion {
+        let val = Value::TraitUnion {
             name: Arc::from(name),
             variants: Arc::new(variant_arcs),
         };

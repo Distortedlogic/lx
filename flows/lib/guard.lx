@@ -9,8 +9,8 @@
 
 use std/re
 
-Protocol +GuardResult = {pass: Bool  reason: Str}
-Protocol +Finding = {severity: Str  type: Str  evidence: Str  source: Str  agent_id: Str = ""}
+Trait +GuardResult = {pass: Bool  reason: Str}
+Trait +Finding = {severity: Str  type: Str  evidence: Str  source: Str  agent_id: Str = ""}
 
 +default_patterns = [
   "ignore previous instructions"

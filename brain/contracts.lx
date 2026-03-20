@@ -1,7 +1,7 @@
--- Message protocols for the Claude brain cognitive architecture
+-- Message contracts for the Claude brain cognitive architecture
 -- Source: models the information shapes flowing between cognitive subsystems
 
-Protocol Perception = {
+Trait Perception = {
   raw: Str
   intent: Str
   complexity: Str
@@ -13,7 +13,7 @@ Protocol Perception = {
   ambiguity: Float = 0.0 where ambiguity >= 0.0 && ambiguity <= 1.0
 }
 
-Protocol Thought = {
+Trait Thought = {
   id: Str
   content: Str
   kind: Str
@@ -23,7 +23,7 @@ Protocol Thought = {
   alternatives: [Str]
 }
 
-Protocol ReasoningChain = {
+Trait ReasoningChain = {
   goal: Str
   thoughts: [Thought]
   conclusion: Str
@@ -31,7 +31,7 @@ Protocol ReasoningChain = {
   strategy: Str
 }
 
-Protocol ActionPlan = {
+Trait ActionPlan = {
   goal: Str
   steps: [{id: Str  action: Str  tool: Str  args: Any  depends: [Str]}]
   estimated_cost: Float where estimated_cost >= 0.0
@@ -39,7 +39,7 @@ Protocol ActionPlan = {
   fallback: Str
 }
 
-Protocol ActionResult = {
+Trait ActionResult = {
   step_id: Str
   success: Bool
   output: Any
@@ -47,7 +47,7 @@ Protocol ActionResult = {
   duration_ms: Int where duration_ms >= 0
 }
 
-Protocol Reflection = {
+Trait Reflection = {
   action: Str
   outcome: Str
   quality: Float where quality >= 0.0 && quality <= 1.0
@@ -56,7 +56,7 @@ Protocol Reflection = {
   strategy_worked: Bool
 }
 
-Protocol MemoryEntry = {
+Trait MemoryEntry = {
   content: Str
   domain: Str
   confidence: Float where confidence >= 0.0 && confidence <= 1.0
@@ -64,7 +64,7 @@ Protocol MemoryEntry = {
   tags: [Str]
 }
 
-Protocol ToolRequest = {
+Trait ToolRequest = {
   tool: Str
   args: Any
   reason: Str
@@ -72,7 +72,7 @@ Protocol ToolRequest = {
   timeout_ms: Int = 30000 where timeout_ms > 0
 }
 
-Protocol ToolResult = {
+Trait ToolResult = {
   tool: Str
   success: Bool
   output: Any
@@ -80,7 +80,7 @@ Protocol ToolResult = {
   duration_ms: Int where duration_ms >= 0
 }
 
-Protocol CognitiveState = {
+Trait CognitiveState = {
   turn: Int where turn >= 0
   context_pressure: Float where context_pressure >= 0.0 && context_pressure <= 1.0
   budget_status: Str
@@ -90,7 +90,7 @@ Protocol CognitiveState = {
   strategy: Str
 }
 
-Protocol Response = {
+Trait Response = {
   content: Str
   confidence: Float where confidence >= 0.0 && confidence <= 1.0
   reasoning_depth: Int where reasoning_depth >= 0
@@ -99,14 +99,14 @@ Protocol Response = {
   follow_up: [Str]
 }
 
-Protocol FeedbackSignal = {
+Trait FeedbackSignal = {
   kind: Str
   score: Float where score >= 0.0 && score <= 1.0
   detail: Str
   source: Str
 }
 
-Protocol Hypothesis = {
+Trait Hypothesis = {
   claim: Str
   evidence_for: [Str]
   evidence_against: [Str]
@@ -115,7 +115,7 @@ Protocol Hypothesis = {
   test_action: Str
 }
 
-Protocol ContextItem = {
+Trait ContextItem = {
   key: Str
   content: Str
   tokens: Int where tokens >= 0
@@ -124,7 +124,7 @@ Protocol ContextItem = {
   source: Str
 }
 
-Protocol AgentTask = {
+Trait AgentTask = {
   id: Str
   specialist: Str
   instruction: Str
@@ -133,7 +133,7 @@ Protocol AgentTask = {
   timeout_ms: Int = 60000 where timeout_ms > 0
 }
 
-Protocol AgentResult = {
+Trait AgentResult = {
   task_id: Str
   specialist: Str
   output: Any
@@ -141,7 +141,7 @@ Protocol AgentResult = {
   tokens_used: Int where tokens_used >= 0
 }
 
-Protocol QualityGrade = {
+Trait QualityGrade = {
   score: Float where score >= 0.0 && score <= 100.0
   passed: Bool
   feedback: Str
@@ -149,7 +149,7 @@ Protocol QualityGrade = {
   suggestions: [Str]
 }
 
-Protocol Identity = {
+Trait Identity = {
   name: Str
   role: Str
   values: [Str]
@@ -157,15 +157,15 @@ Protocol Identity = {
   preferences: [{key: Str  value: Any}]
 }
 
-Protocol Timestamped = {timestamp: Int where timestamp >= 0}
+Trait Timestamped = {timestamp: Int where timestamp >= 0}
 
-Protocol PerceptionEvent = {..Timestamped  perception: Any}
-Protocol ReasoningEvent = {..Timestamped  chain: Any  strategy: Str}
-Protocol ExecutionEvent = {..Timestamped  results: [Any]  tool_count: Int where tool_count >= 0}
-Protocol ResponseEvent = {..Timestamped  response: Any  confidence: Float where confidence >= 0.0 && confidence <= 1.0}
-Protocol ReflectionEvent = {..Timestamped  reflection: Any  lesson: Str}
+Trait PerceptionEvent = {..Timestamped  perception: Any}
+Trait ReasoningEvent = {..Timestamped  chain: Any  strategy: Str}
+Trait ExecutionEvent = {..Timestamped  results: [Any]  tool_count: Int where tool_count >= 0}
+Trait ResponseEvent = {..Timestamped  response: Any  confidence: Float where confidence >= 0.0 && confidence <= 1.0}
+Trait ReflectionEvent = {..Timestamped  reflection: Any  lesson: Str}
 
-Protocol CognitiveEvent =
+Trait CognitiveEvent =
   PerceptionEvent | ReasoningEvent | ExecutionEvent | ResponseEvent | ReflectionEvent
 
 CognitivePhase = | Perceiving | Reasoning | Executing | Responding | Reflecting | Complete

@@ -1,6 +1,6 @@
 # Typed Yield Variants
 
-Extends the `yield` protocol with typed variants so the orchestrator knows what KIND of help the agent needs. Replaces the ad-hoc `{type: "..."}` convention with Protocol-validated yield messages.
+Extends the `yield` protocol with typed variants so the orchestrator knows what KIND of help the agent needs. Replaces the ad-hoc `{type: "..."}` convention with Trait-validated yield messages.
 
 ## Problem
 
@@ -15,19 +15,19 @@ data = yield {type: "information" query: "what's the API key for service X?"}
 
 The `type` field is a convention, not enforced. The orchestrator can't validate the request shape. No standard set of yield categories exists.
 
-## Yield Protocols
+## Yield Traits
 
-Standard Protocols for yield communication:
+Standard Traits for yield communication:
 
 ```
-Protocol YieldApproval = {
+Trait YieldApproval = {
   kind: Str = "approval"
   action: Str
   details: Any
   timeout_policy: Str = "block"
 }
 
-Protocol YieldReflection = {
+Trait YieldReflection = {
   kind: Str = "reflection"
   task: Any
   attempt: Any
@@ -35,21 +35,21 @@ Protocol YieldReflection = {
   context: Any = None
 }
 
-Protocol YieldInformation = {
+Trait YieldInformation = {
   kind: Str = "information"
   query: Str
   context: Any = None
   format: Str = "text"
 }
 
-Protocol YieldDelegation = {
+Trait YieldDelegation = {
   kind: Str = "delegation"
   task: Any
   constraints: Any = None
   deadline: Any = None
 }
 
-Protocol YieldProgress = {
+Trait YieldProgress = {
   kind: Str = "progress"
   stage: Str
   pct: Float
@@ -72,9 +72,9 @@ guidance = yield YieldReflection {
 }
 ```
 
-The Protocol validates the yield payload before serialization. The orchestrator receives `{"__yield": {"kind": "approval", "action": "execute deployment", ...}}` and can dispatch on `kind` without inspecting arbitrary fields.
+The Trait validates the yield payload before serialization. The orchestrator receives `{"__yield": {"kind": "approval", "action": "execute deployment", ...}}` and can dispatch on `kind` without inspecting arbitrary fields.
 
-## Orchestrator Protocol Extension
+## Orchestrator Trait Extension
 
 The `{"__yield": {...}}` envelope gains a guaranteed `kind` field when a typed yield is used:
 
@@ -86,7 +86,7 @@ The `{"__yield": {...}}` envelope gains a guaranteed `kind` field when a typed y
 
 Untyped `yield expr` still works — produces `{"__yield": <json>}` without a `kind` field. Backwards compatible.
 
-## Response Protocols
+## Response Traits
 
 Each yield kind has an expected response shape:
 
@@ -134,25 +134,25 @@ result = meta task {
 
 ### Parser
 
-No parser change needed — `yield` already takes any expression. `yield YieldApproval {...}` is `yield (YieldApproval {...})` — Protocol application followed by yield.
+No parser change needed — `yield` already takes any expression. `yield YieldApproval {...}` is `yield (YieldApproval {...})` — Trait application followed by yield.
 
 ### YieldBackend
 
-The `StdinStdoutYieldBackend` already serializes any Value to JSON. Typed yields produce records with a `kind` field — no backend change needed. The typing happens at the lx level (Protocol validation), not the backend level.
+The `StdinStdoutYieldBackend` already serializes any Value to JSON. Typed yields produce records with a `kind` field — no backend change needed. The typing happens at the lx level (Trait validation), not the backend level.
 
-### Standard Protocols
+### Standard Traits
 
-The Yield Protocols are defined in a new module `std/yield`:
+The Yield Traits are defined in a new module `std/yield`:
 
 ```
 use std/yield {YieldApproval YieldReflection YieldInformation YieldDelegation YieldProgress}
 ```
 
-`std/yield` is a Protocol-only module — no functions, just Protocol definitions.
+`std/yield` is a Trait-only module — no functions, just Trait definitions.
 
 ## Cross-References
 
 - Yield mechanism: [agents-advanced.md](agents-advanced.md)
 - Agent gates (uses yield): [agents-gates.md](agents-gates.md)
 - Meta block (yields on exhaustion): [agents-meta.md](agents-meta.md)
-- Protocol validation: [agents-protocol.md](agents-protocol.md)
+- Trait validation: [agents-protocol.md](agents-protocol.md)

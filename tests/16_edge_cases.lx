@@ -190,15 +190,15 @@ assert (validate 50 == Ok 50)
 assert (validate (-1) == Err "negative")
 assert (validate 200 == Err "too large")
 
--- Protocol +Name export syntax (+ between keyword and name)
-Protocol +ExportedProto = {value: Int}
+-- Trait +Name export syntax (+ between keyword and name)
+Trait +ExportedProto = {value: Int}
 ep = ExportedProto {value: 42}
-assert (ep.value == 42) "Protocol +Name creates usable protocol"
+assert (ep.value == 42) "Trait +Name creates usable trait"
 
 -- both syntaxes are equivalent
-Protocol PlainProto = {x: Str}
+Trait PlainProto = {x: Str}
 pp = PlainProto {x: "hi"}
-assert (pp.x == "hi") "Protocol without + works"
+assert (pp.x == "hi") "Trait without + works"
 
 -- record field values with function calls and pipes
 r_pipe = {x: [1 2 3] | sum}

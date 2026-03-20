@@ -12,7 +12,7 @@
 - Type checker: `lx check` — bidirectional inference, unification, structural subtyping, import resolution (imported names bound as Unknown)
 - Concurrency: `par`, `sel`, `pmap`, `pmap_n`, `timeout` — async interpreter (`async fn eval` with `#[async_recursion(?Send)]`). `par` → `futures::join_all`, `sel` → `futures::select_all`, `pmap`/`pmap_n` → `join_all`. I/O operations yield naturally at `.await` points
 - Shell: `$cmd`, `$^cmd`, `${...}` with interpolation
-- Error handling: `^` propagation, `??` coalescing, `(?? default)` sections. Structured error tags: `Err Timeout "msg"` with pattern matching. Uniform `None` on miss for Record, Map, and Agent field access. `AgentErr` structured errors: 11 tagged variants (Timeout, RateLimited, BudgetExhausted, ContextOverflow, Incompetent, Upstream, PermissionDenied, ProtocolViolation, Unavailable, Cancelled, Internal) via `use std/agent {Timeout ...}`
+- Error handling: `^` propagation, `??` coalescing, `(?? default)` sections. Structured error tags: `Err Timeout "msg"` with pattern matching. Uniform `None` on miss for Record, Map, and Agent field access. `AgentErr` structured errors: 11 tagged variants (Timeout, RateLimited, BudgetExhausted, ContextOverflow, Incompetent, Upstream, PermissionDenied, TraitViolation, Unavailable, Cancelled, Internal) via `use std/agent {Timeout ...}`
 - Arithmetic: `/` always returns Float (Python 3 semantics), `//` for integer division, mixed Int/Float auto-promotion
 - Modules: `use ./path`, aliasing, selective imports, `+` exports (non-forward-declared — builtins not shadowed), workspace member resolution (`use brain/protocols`), dependency resolution (`use dep-name/module` via `.lx/deps/`)
 - **`Class` keyword** — generic stateful objects with `self` method dispatch. `Class Name : [Traits] = { field: default; method = (params) { body } }`. Constructor: `Name {field_overrides}`. Interior mutability: `self.field <- val` mutates via global STORES (no reassign needed). Reference semantics: `a = b` shares same object. `Class Worker : [Agent] = { ... }` also works — explicitly adding Agent to traits list
@@ -24,9 +24,9 @@
 - `Agent Name: TraitList = { methods }` — first-class agent declarations. `Agent` keyword auto-imports `pkg/agent {Agent}` Trait and auto-adds "Agent" to traits list. Runtime representation: `Value::Class { name, traits, defaults, methods }`. Agent Trait (`pkg/agent.lx`) provides defaults: init, perceive, reason, act, reflect, handle, run, think/think_with/think_structured, use_tool/tools, describe, ask/tell. Method access via `.`
 - `receive { action -> handler }` — agent message loop sugar, desugars to yield/loop/match
 - `~>` send, `~>?` ask, `~>>?` streaming ask — infix operators, subprocess-transparent. `~>>?` returns `Value::Stream` (mpsc channel-backed lazy sequence). Streams work with all HOFs (`map`, `filter`, `each`, `take`, `fold`, `flat_map`, etc.) and `collect`. Subprocess protocol: JSON-line `stream`/`stream_end`/`stream_error` types with background reader thread and cancellation
-- `Protocol Name = {field: Type}` — message contracts with runtime validation (returns `Err` on validation failure, catchable with `??`)
-- Protocol composition (`{..Base extra: Str}`), unions (`A | B | C` with `_variant`), field constraints (`where`)
-- `Trait Name = { method: {input} -> output }` — agent behavioral contracts with default method implementations. Traits with non-empty `fields` act as Protocols (callable as constructor, runtime validation). Behavioral Traits have empty `fields`.
+- `Trait Name = {field: Type}` — message contracts with runtime validation (returns `Err` on validation failure, catchable with `??`)
+- Trait composition (`{..Base extra: Str}`), unions (`A | B | C` with `_variant`), field constraints (`where`)
+- `Trait Name = { method: {input} -> output }` — agent behavioral contracts with default method implementations. Traits with non-empty `fields` act as Traits (callable as constructor, runtime validation). Behavioral Traits have empty `fields`.
 - `agent.implements` — runtime trait checking for routing/filtering (works for Class/Agent, Object, Record). Checks traits list for "Agent" to distinguish Agents from plain Classes
 - Two new builtins: `method_of(obj, name)` — returns a method by name or None; `methods_of(obj)` — returns list of method names
 - `MCP` declarations — typed tool contracts, input/output validation, wrapper generation
@@ -36,7 +36,7 @@
 - `emit` — agent-to-human fire-and-forget output via EmitBackend
 - `with name = expr { body }` — scoped bindings + record field update (`name.field <- value`)
 
-## Stdlib (39 Rust modules + 6 standard agents + 11 lx packages)
+## Stdlib (40 Rust modules + 6 standard agents + 11 lx packages)
 
 - Data: `std/json`, `std/md`, `std/re`, `std/math`, `std/time`
 - System: `std/fs`, `std/env`, `std/http`
@@ -48,7 +48,7 @@
 - Scheduling: `std/cron`
 - Orchestration: `std/ctx`, `std/audit`, `std/plan`, `std/saga`, `std/pipeline`, `std/taskgraph`, `std/workspace`
 - Collaboration: `std/workspace` — concurrent multi-agent editing: `create`, `claim`, `claim_pattern`, `edit`, `append`, `release`, `snapshot`, `regions`, `conflicts`, `resolve`, `history`, `watch`. Line-based region claiming with overlap detection, auto-bound adjustment, regex pattern claiming, watcher callbacks
-- Discovery: `std/registry` — cross-process agent discovery: `start`, `stop`, `connect`, `register`, `deregister`, `find`, `find_one`, `health`, `load`, `watch`. In-memory registry with trait/protocol/domain filtering, 4 selection strategies (first, least_loaded, round_robin, random), health/load tracking, watcher callbacks for join/leave events
+- Discovery: `std/registry` — cross-process agent discovery: `start`, `stop`, `connect`, `register`, `deregister`, `find`, `find_one`, `health`, `load`, `watch`. In-memory registry with trait/trait/domain filtering, 4 selection strategies (first, least_loaded, round_robin, random), health/load tracking, watcher callbacks for join/leave events
 - Persistence: `std/durable` — Temporal-style workflow persistence: `workflow`, `run`, `step` (idempotent with caching), `sleep`, `signal`, `send_signal`, `status`, `list`. File-backed at `.lx/durable/`
 - Cost management: `std/budget`
 - Standard agents: `std/agents/auditor`, `std/agents/router`, `std/agents/grader`, `std/agents/planner`, `std/agents/monitor`, `std/agents/reviewer`
@@ -74,14 +74,14 @@ Class-based packages using `entries: Store ()` + Collection Trait:
 - Flow composition: `std/flow` — `load`, `run`, `pipe`, `parallel`, `branch`, `with_retry`, `with_timeout`, `with_fallback`. Flows as first-class composable values with isolated interpreter execution
 - Task graphs: `std/taskgraph` — `create`, `add`, `remove`, `run`, `run_with`, `validate`, `topo`, `status`, `dot`. DAG-aware subtask decomposition with topological execution, dependency result threading (`input_from`), per-task retry/timeout/on_fail policy, wave-based parallel scheduling, DOT export
 
-## Agent Extensions (15 sub-modules of `std/agent`)
+## Agent Extensions (17 sub-modules of `std/agent`)
 
 - `agent.reconcile` — 6 merge strategies (union, intersection, vote, highest_confidence, max_score, merge_fields) + custom Fn
 - `agent.dialogue` — multi-turn stateful sessions with config `{role? context? max_turns?}`. Branching: `dialogue_fork` (N forks sharing parent history), `dialogue_compare` (grade + rank forks), `dialogue_merge` (pick winner, resume parent), `dialogue_branches` (list active forks). Parent suspended while forks active. Recursive nested fork support
 - `agent.intercept` — composable message middleware with short-circuit
-- `Handoff` Protocol + `agent.as_context` — structured context transfer for LLM consumption
-- `Capabilities` Protocol + `agent.capabilities` + `agent.advertise` — runtime capability discovery
-- `GateResult` Protocol + `agent.gate` — human-in-the-loop approval gates via yield
+- `Handoff` Trait + `agent.as_context` — structured context transfer for LLM consumption
+- `Capabilities` Trait + `agent.capabilities` + `agent.advertise` — runtime capability discovery
+- `GateResult` Trait + `agent.gate` — human-in-the-loop approval gates via yield
 - `agent.supervise` — Erlang-style supervision: one_for_one/one_for_all/rest_for_one
 - `agent.mock` — mock agents with call tracking for testing
 - `agent.dispatch` — pattern-based message routing without LLM
@@ -90,12 +90,14 @@ Class-based packages using `entries: Store ()` + Collection Trait:
 - `agent.route` / `agent.register` — capability-based routing: register agents with traits/protocols/domains, route by filter with selection strategies (least_busy, round_robin, random, custom), fan-out with reconcile via `route_multi`
 - `agent.pipeline` — consumer-driven flow control with backpressure: 11 functions (`pipeline`, `pipeline_send`, `pipeline_collect`, `pipeline_batch`, `pipeline_stats`, `pipeline_on_pressure`, `pipeline_pause`, `pipeline_resume`, `pipeline_drain`, `pipeline_close`, `pipeline_add_worker`). Bounded buffers, 4 overflow policies (block, drop_oldest, drop_newest, sample), tail-first pump for backpressure, round-robin worker dispatch, pressure callbacks with level thresholds, per-stage stats with bottleneck detection
 - `agent.emit_stream` / `agent.end_stream` — agent-side streaming API for `~>>?`. `emit_stream` writes `{"type":"stream","value":...}` JSON-line, `end_stream` writes `{"type":"stream_end"}`
-- `agent.adapter` / `agent.negotiate_format` / `agent.coerce` — Protocol format negotiation: `adapter` creates reusable field-mapping interceptors from source→target Protocol with explicit mapping record, `negotiate_format` auto-discovers compatible Protocol mappings via agent capabilities (exact/structural/subset matching with Levenshtein heuristics), `coerce` does one-shot message transform with validation. Adapters return `Value::Err` on missing required fields (catchable with `??`)
+- `agent.adapter` / `agent.negotiate_format` / `agent.coerce` — Trait format negotiation: `adapter` creates reusable field-mapping interceptors from source→target Trait with explicit mapping record, `negotiate_format` auto-discovers compatible Trait mappings via agent capabilities (exact/structural/subset matching with Levenshtein heuristics), `coerce` does one-shot message transform with validation. Adapters return `Value::Err` on missing required fields (catchable with `??`)
+- `agent.reload` / `agent.evolve` / `agent.update_traits` — Hot-swap agent handlers: `reload` replaces handler externally (returns new agent Record with `__handler_id` referencing global mutable handler store), `evolve` self-updates from within handler (thread-local pending flag applied by interpreter after handler returns, takes effect on NEXT message), `update_traits` adds/removes traits on agent Records. Subprocess agents return `Err` on reload. Interceptors preserved — interceptor `next` dynamically resolves handler via store
+- `agent.dialogue_save` / `agent.dialogue_load` / `agent.dialogue_list` / `agent.dialogue_delete` — Dialogue persistence: `dialogue_save` persists session state (config + turn history) to `.lx/dialogues/{id}.json`. `dialogue_load` restores session from file and binds to a (possibly different) agent. `dialogue_list` enumerates saved dialogues with metadata (id, role, turns, created, updated, context_preview). `dialogue_delete` removes saved dialogue. Atomic writes (tmp+rename). JSON serialization via `json_conv`
 
 ## Other Extensions
 
-- `ai.prompt_structured` — Protocol-validated LLM output with auto-retry
-- `ai.prompt_json` — lightweight structured output from inline record shape (no Protocol needed)
+- `ai.prompt_structured` — Trait-validated LLM output with auto-retry
+- `ai.prompt_json` — lightweight structured output from inline record shape (no Trait needed)
 
 ## Runtime
 
@@ -118,4 +120,4 @@ Class-based packages using `entries: Store ()` + Collection Trait:
 
 ## Test Coverage
 
-91 test suites (89 .lx files + 87_export_shadow dir + 11_modules dir) in `tests/`. Fixtures in `tests/fixtures/`. 91/91 passing.
+93 test suites (91 .lx files + 87_export_shadow dir + 11_modules dir) in `tests/`. Fixtures in `tests/fixtures/`. 93/93 passing.

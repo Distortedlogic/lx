@@ -8,7 +8,7 @@ use std/time
 use pkg/trace {TraceStore}
 use std/agent
 
-use ./protocols {Perception ReasoningChain Response CognitiveState FeedbackSignal PerceptionEvent ReasoningEvent}
+use ./contracts {Perception ReasoningChain Response CognitiveState FeedbackSignal PerceptionEvent ReasoningEvent}
 use ./lib/perception : perceive_mod
 use ./lib/reasoning : reason_mod
 use ./lib/memory_mgr : mem
@@ -25,8 +25,8 @@ use ./lib/monitor : mon
 
   ctx.pin_identity context_win identity
 
-  with TraceStore {path: "/tmp/brain_trace.json"} ^ as trace_session {
-    with mem.init () ^ as memory_store {
+  with TraceStore {path: "/tmp/brain_trace.json"} ?? TraceStore () as trace_session {
+    with mem.init () ?? {working: MemoryStore ()  episodic: MemoryStore ()  semantic: KnowledgeBase ()  persona: {name: "claude"}} as memory_store {
       perception_topic = agent.topic "perception"
       reasoning_topic = agent.topic "reasoning"
 
@@ -34,7 +34,7 @@ use ./lib/monitor : mon
       perception = perceive_mod.perceive input history ^
       ctx.add_perception context_win perception
       state <- mon.record_action state "perceive" perception.intent
-      trace_session.record {name: "perception" input: input output: perception.intent} ^
+      trace_session.record {name: "perception" input: input output: perception.intent} ?? ()
 
       agent.publish perception_topic PerceptionEvent {
         perception: perception
@@ -46,7 +46,7 @@ use ./lib/monitor : mon
       chain = race_reasoning perception state memory_store context_win ^
       ctx.add_reasoning context_win chain
       state <- mon.record_action state "reason" chain.strategy
-      trace_session.record {name: "reasoning" input: perception.intent output: chain.conclusion} ^
+      trace_session.record {name: "reasoning" input: perception.intent output: chain.conclusion} ?? ()
 
       agent.publish reasoning_topic ReasoningEvent {
         chain: chain
@@ -67,14 +67,14 @@ use ./lib/monitor : mon
       mon.checkpoint state "executed"
 
       response = assemble_response chain tool_results perception identity state ^
-      trace_session.record {name: "response" input: chain.conclusion output: response.content} ^
+      trace_session.record {name: "response" input: chain.conclusion output: response.content} ?? ()
 
-      (response quality_result) = ensure_quality response perception.raw state ^
+      (response quality_result) = ensure_quality response perception.raw state ?? (response  quality.quick_check response.content perception.raw)
 
-      reflect_and_learn response perception memory_store state ^
+      reflect_and_learn response perception memory_store state ?? ()
 
       ctx.manage_pressure context_win
-      mem.save memory_store ^
+      mem.save memory_store ?? ()
 
       emit response.content
 
@@ -155,7 +155,7 @@ ensure_quality = (response: Response  task: Str  state: Any) -> (Response Any) {
 
     grade.passed ? (response grade) : {
       log.info "below threshold ({grade.score}), refining..."
-      refined_content = quality.refine_response response.content task ^
+      refined_content = quality.refine_response response.content task ?? response.content
       ({..response  content: refined_content}  quality.grade_response refined_content task)
     }
   }
@@ -169,7 +169,7 @@ reflect_and_learn = (response: Response  perception: Perception  memory_store: A
       confidence: response.confidence
       source: "self_reflection"
       tags: [perception.intent perception.domain]
-    } ^
+    } ?? ()
   } : ()
 
   state <- mon.record_action state "reflect" "confidence:{response.confidence}"

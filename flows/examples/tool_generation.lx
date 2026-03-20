@@ -16,7 +16,7 @@ use ../agents/tool_maker
 use ../lib/report
 use ../lib/workflow
 
-Protocol ToolGap = {signal: Str  tool: Str  context: Str}
+Trait ToolGap = {signal: Str  tool: Str  context: Str}
 
 +main = () {
   gap = ToolGap {

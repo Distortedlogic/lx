@@ -13,7 +13,6 @@ use crate::value::Value;
 pub(super) struct RoutingEntry {
     pub(super) agent: Value,
     traits: Vec<String>,
-    protocols: Vec<String>,
     domains: Vec<String>,
     pub(super) max_concurrent: usize,
     pub(super) load: AtomicU64,
@@ -23,14 +22,12 @@ impl RoutingEntry {
     pub(super) fn new(
         agent: Value,
         traits: Vec<String>,
-        protocols: Vec<String>,
         domains: Vec<String>,
         max_concurrent: usize,
     ) -> Self {
         Self {
             agent,
             traits,
-            protocols,
             domains,
             max_concurrent,
             load: AtomicU64::new(0),
@@ -39,10 +36,6 @@ impl RoutingEntry {
 
     pub(super) fn has_trait(&self, t: &str) -> bool {
         self.traits.iter().any(|et| et == t)
-    }
-
-    pub(super) fn has_protocol(&self, p: &str) -> bool {
-        self.protocols.iter().any(|ep| ep == p)
     }
 
     pub(super) fn has_domain(&self, d: &str) -> bool {
@@ -87,16 +80,10 @@ pub(super) fn str_list_from(val: Option<&Value>) -> Vec<String> {
 fn matches_entry(
     entry: &RoutingEntry,
     trait_f: Option<&str>,
-    proto_f: Option<&str>,
     domain_f: Option<&str>,
 ) -> bool {
     if let Some(t) = trait_f
         && !entry.traits.iter().any(|et| et == t)
-    {
-        return false;
-    }
-    if let Some(p) = proto_f
-        && !entry.protocols.iter().any(|ep| ep == p)
     {
         return false;
     }
@@ -120,11 +107,10 @@ pub(super) fn find_candidates(
     check_capacity: bool,
 ) -> Vec<Candidate> {
     let trait_f = opts.get("trait").and_then(|v| v.as_str());
-    let proto_f = opts.get("protocol").and_then(|v| v.as_str());
     let domain_f = opts.get("domain").and_then(|v| v.as_str());
     ROUTE_TABLE
         .iter()
-        .filter(|e| matches_entry(e.value(), trait_f, proto_f, domain_f))
+        .filter(|e| matches_entry(e.value(), trait_f, domain_f))
         .filter(|e| !exclude.contains(e.key()))
         .filter(|e| {
             !check_capacity

@@ -66,7 +66,7 @@ fn keyword_hint(name: &str) -> Option<&'static str> {
             Some("lx uses `None` for absence and `()` for unit")
         }
         "class" | "struct" | "new" | "interface" => Some(
-            "lx uses Records `{field: value}` for data, `Protocol` for contracts, `Trait` for behavior",
+            "lx uses Records `{field: value}` for data, `Trait` for contracts and behavior",
         ),
         "async" | "await" => Some("lx uses `par`, `sel`, `pmap` for concurrency"),
         "self" | "this" => Some("lx has no `self` — use record fields or closures"),

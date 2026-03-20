@@ -29,7 +29,7 @@ Finds an agent implementing `Trait Reviewer` from the current process's known ag
 ```lx
 result = agent.route msg {
   trait: "Reviewer"             -- match by Trait name
-  protocol: "ReviewRequest"     -- OR match by Protocol name
+  trait: "ReviewRequest"     -- OR match by Trait name
   domain: "security"            -- OR match by advertised domain
   prefer: "least_busy"          -- selection strategy (default)
   fallback: backup_agent        -- explicit fallback if no match

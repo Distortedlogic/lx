@@ -95,9 +95,9 @@ Uses: `std/blackboard` for cross-agent awareness during parallel execution, `par
 ```
 use std/agent
 
-Protocol Offer = {task: Str  constraints: Rec  budget: Int}
-Protocol Accept = {commitment: Str  estimated_cost: Int}
-Protocol Reject = {reason: Str  counter_offer: Any}
+Trait Offer = {task: Str  constraints: Rec  budget: Int}
+Trait Accept = {commitment: Str  estimated_cost: Int}
+Trait Reject = {reason: Str  counter_offer: Any}
 
 negotiate = (agent offer) {
   response = agent ~>? Offer offer ^
@@ -120,7 +120,7 @@ negotiate = (agent offer) {
 }
 ```
 
-Uses: Protocol-based negotiation pattern with recursive counter-offers, pattern matching on agent responses.
+Uses: Trait-based negotiation pattern with recursive counter-offers, pattern matching on agent responses.
 
 ## Reactive Event-Driven Pipeline
 

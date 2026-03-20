@@ -15,7 +15,7 @@ use std/agent
     "network"   -> "network issues: connection reuse, payload sizes, timeout handling, retry storms"
     _           -> "general performance issues"
   }
-  findings = ai.prompt "Analyze for {focus}.\nPath: {msg.path}\nConcern: {msg.concern}" ^
+  findings = ai.prompt "Analyze for {focus}.\nPath: {msg.path}\nConcern: {msg.concern}" ?? ""
   {findings  domain}
 }
 

@@ -4,7 +4,7 @@
 use std/ai
 use pkg/prompt
 use std/md
-use ../protocols {Response ReasoningChain Identity}
+use ../contracts {Response ReasoningChain Identity}
 use ../traits {Synthesizer}
 
 Agent ResponseSynth: Synthesizer = {
@@ -21,7 +21,7 @@ Agent ResponseSynth: Synthesizer = {
       | prompt.constraint "Be direct. Lead with the answer. No filler."
       | prompt.constraint "If uncertain, say so with your confidence level."
 
-    resp = ai.prompt (prompt.render p) ^
+    resp = ai.prompt (prompt.render p) ?? {text: msg.reasoning.conclusion ?? msg.task}
 
     sources = msg.tool_results | map (r) "{r.tool ?? "tool"}" | uniq
 
@@ -97,7 +97,7 @@ suggest_follow_ups = (task: Str  response: Str) -> [Str] {
 
 +main = () {
   agent.advertise {
-    protocols: ["Response"]
+    traits: ["Response"]
     domains: ["synthesizer" "response" "formatting" "composition"]
     tools: ["ai"]
   }

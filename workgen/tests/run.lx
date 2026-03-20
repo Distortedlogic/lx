@@ -61,7 +61,7 @@ run_scenario = (scenario) {
   results = scenarios | pmap_n 4 run_scenario
 
   results | each (r) {
-    session.record {name: r.name  output: "{r.score}"  score: r.score} ^
+    session.record {name: r.name  output: "{r.score}"  score: r.score} ?? ()
   }
 
   passed_count = results | filter (.passed) | len

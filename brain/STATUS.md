@@ -15,11 +15,11 @@ Applied 10 lx language fixes driven by brain code analysis. Swept brain code to 
 |---|--------|-----------------|
 | 1 | `/` returns Float for Int/Int | Removed all 14 `to_float` calls across 8 files |
 | 2 | Map/Agent field miss → None | Uniform `??` fallback works everywhere |
-| 3 | Protocol validation → Err values | Defensive code can now catch bad data |
+| 3 | Trait validation → Err values | Defensive code can now catch bad data |
 | 4 | Record spread allows fn calls | `{..mk () ...}` works |
 | 5 | Agent `uses`/`on` wired to runtime | Metadata accessible via Agent.on |
 | 6 | `receive` keyword | Converted all 5 agent main() from 10-line boilerplate to 4-line receive blocks |
-| 7 | `ai.prompt_json` | Lightweight structured AI output without named Protocols |
+| 7 | `ai.prompt_json` | Lightweight structured AI output without named Traits |
 
 ### Session: 2026-03-18 (2) — Deepen features, close 15 gaps
 
@@ -27,14 +27,14 @@ Worked through high and medium priority gaps from the initial audit. Changes acr
 
 | # | Gap | Status | What was done |
 |---|-----|--------|---------------|
-| 1 | Protocol field constraints | DONE | Added `where` clauses to 20+ fields across 14 protocols (confidence 0-1, scores 0-100, tokens >= 0, durations >= 0, costs >= 0) |
-| 2 | Protocol composition | DONE | Created `Timestamped` base protocol, composed into all 5 cognitive event protocols via `{..Timestamped}` |
+| 1 | Trait field constraints | DONE | Added `where` clauses to 20+ fields across 14 traits (confidence 0-1, scores 0-100, tokens >= 0, durations >= 0, costs >= 0) |
+| 2 | Trait composition | DONE | Created `Timestamped` base trait, composed into all 5 cognitive event traits via `{..Timestamped}` |
 | 3 | MCP declarations | DONE | Added `MCP CognitiveTools` declaration with 9 typed tools in tools.lx; `available_tools` now derives from tool names |
 | 4 | trace.improvement_rate/should_stop | DONE | Both refine loops (response + code) in quality.lx now use `with trace.create` sessions, `trace.should_stop` for diminishing returns, `trace.improvement_rate` for logging |
 | 5 | pmap_n rate limiting | DONE | dispatcher.fan_out switched from `pmap` to `pmap_n 3` |
 | 6 | introspect.strategy_shift | DONE | monitor.suggest_strategy now calls `introspect.strategy_shift` when suggestion != "continue" |
 | 7 | agent.capabilities/advertise | DONE | All 4 specialist agents (analyst, critic, researcher, synthesizer) call `agent.advertise` at startup; dispatcher.route_to_worker queries `agent.capabilities` for dynamic routing with hardcoded fallback |
-| 8 | Handoff + agent.as_context | DONE | cognitive_saga.lx uses `Handoff` protocol and `agent.as_context` for perception→reasoning and execution→response transitions |
+| 8 | Handoff + agent.as_context | DONE | cognitive_saga.lx uses `Handoff` trait and `agent.as_context` for perception→reasoning and execution→response transitions |
 | 9 | std/user interactive gates | DONE | identity.gate_destructive now calls `user.confirm` before `agent.gate` |
 | 10 | std/md structured responses | DONE | synthesizer.lx format/compose_parts use `md.parse`, `md.heading`, `md.paragraph`, `md.list`, `md.render` |
 | 11 | std/git awareness | DONE | perception.lx adds `git_context` function that reads branch/modified files for code-related domains |

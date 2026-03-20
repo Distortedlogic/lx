@@ -5,7 +5,7 @@ use std/ai
 use pkg/prompt
 use ../traits {Critic}
 
-Protocol Critique = {
+Trait Critique = {
   flaws: [Str]
   risks: [Str]
   missing: [Str]
@@ -85,7 +85,7 @@ check_safety = (code: Str  language: Str) -> {ok: Bool  issues: [Str]} {
 
 +main = () {
   agent.advertise {
-    protocols: ["Critique"]
+    traits: ["Critique"]
     domains: ["critic" "review" "verification" "quality"]
     tools: ["ai"]
   }

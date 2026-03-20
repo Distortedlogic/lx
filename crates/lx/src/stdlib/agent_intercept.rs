@@ -23,6 +23,7 @@ fn bi_intercept(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Va
     let handler = make_intercepted_handler(middleware, &next_fn);
     let mut new_agent = original.as_ref().clone();
     new_agent.shift_remove("__pid");
+    new_agent.shift_remove("__handler_id");
     new_agent.insert("handler".into(), handler);
     Ok(Value::Record(Arc::new(new_agent)))
 }
@@ -73,11 +74,14 @@ fn bi_next(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, L
             .ok_or_else(|| LxError::type_err("agent.intercept.next: invalid __pid", span))?;
         return super::agent::ask_subprocess(pid, msg, span);
     }
-    let handler = r.get("handler").ok_or_else(|| {
-        LxError::runtime(
-            "agent.intercept.next: agent has no 'handler' or '__pid'",
-            span,
-        )
-    })?;
-    call_value_sync(handler, msg.clone(), span, ctx)
+    let handler = super::agent_reload::handler_id_from_agent(agent)
+        .and_then(super::agent_reload::lookup_handler)
+        .or_else(|| r.get("handler").cloned())
+        .ok_or_else(|| {
+            LxError::runtime(
+                "agent.intercept.next: agent has no 'handler' or '__pid'",
+                span,
+            )
+        })?;
+    call_value_sync(&handler, msg.clone(), span, ctx)
 }

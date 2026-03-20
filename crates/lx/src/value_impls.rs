@@ -82,7 +82,7 @@ impl Value {
                     inclusive: i2,
                 },
             ) => s1 == s2 && e1 == e2 && i1 == i2,
-            (Value::ProtocolUnion { name: n1, .. }, Value::ProtocolUnion { name: n2, .. }) => {
+            (Value::TraitUnion { name: n1, .. }, Value::TraitUnion { name: n2, .. }) => {
                 n1 == n2
             }
             (Value::McpDecl { name: n1, .. }, Value::McpDecl { name: n2, .. }) => n1 == n2,
@@ -145,7 +145,7 @@ impl Value {
                 end.hash(state);
                 inclusive.hash(state);
             }
-            Value::ProtocolUnion { name, .. } => name.hash(state),
+            Value::TraitUnion { name, .. } => name.hash(state),
             Value::McpDecl { name, .. } => name.hash(state),
             Value::Trait { name, .. } => name.hash(state),
             Value::Class { name, .. } => name.hash(state),

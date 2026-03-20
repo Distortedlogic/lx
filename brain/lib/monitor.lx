@@ -5,7 +5,7 @@ use pkg/introspect {Inspector}
 use pkg/circuit {CircuitBreaker}
 use std/budget
 use std/time
-use ../protocols {CognitiveState}
+use ../contracts {CognitiveState}
 
 +init = () -> Any {
   {
@@ -28,7 +28,7 @@ use ../protocols {CognitiveState}
 }
 
 +spend = (state: Any  tokens: Int  api_calls: Int) -> Any {
-  b = budget.spend state.budget {tokens: tokens  api_calls: api_calls} ^
+  b = budget.spend state.budget {tokens: tokens  api_calls: api_calls} ?? state.budget
   {..state  budget: b}
 }
 

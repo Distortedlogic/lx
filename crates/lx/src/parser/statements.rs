@@ -15,9 +15,6 @@ impl super::Parser {
         } else {
             false
         };
-        if *self.peek() == TokenKind::Protocol {
-            return self.parse_protocol(exported, start);
-        }
         if *self.peek() == TokenKind::Mcp {
             return self.parse_mcp_decl(exported, start);
         }

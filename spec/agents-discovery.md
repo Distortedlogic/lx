@@ -54,7 +54,7 @@ Registration includes a heartbeat. If the agent stops heartbeating, the registry
 
 ```
 agents = registry.find conn {trait: "Reviewer"} ^
-agents = registry.find conn {protocol: "ReviewRequest"} ^
+agents = registry.find conn {trait: "ReviewRequest"} ^
 agents = registry.find conn {domain: "rust"} ^
 agents = registry.find conn {trait: "Reviewer"  domain: "rust"} ^
 ```

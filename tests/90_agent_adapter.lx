@@ -1,7 +1,7 @@
 use std/agent
 
-Protocol ReviewOutput = {score: Float  label: Str  details: Str}
-Protocol AnalysisInput = {confidence: Float  category: Str  context: Str}
+Trait ReviewOutput = {score: Float  label: Str  details: Str}
+Trait AnalysisInput = {confidence: Float  category: Str  context: Str}
 
 -- agent.adapter: static field mapping
 adapter = agent.adapter ReviewOutput AnalysisInput {
@@ -17,8 +17,8 @@ assert (transformed.category == "good") "maps label -> category"
 assert (transformed.context == "looks fine") "maps details -> context"
 
 -- agent.adapter: pass-through unmapped fields
-Protocol Source = {a: Str  b: Str  c: Str}
-Protocol Target = {x: Str  b: Str  c: Str}
+Trait Source = {a: Str  b: Str  c: Str}
+Trait Target = {x: Str  b: Str  c: Str}
 adapter2 = agent.adapter Source Target {a: "x"}
 msg2 = Source {a: "alpha"  b: "beta"  c: "gamma"}
 t2 = adapter2 msg2
@@ -27,8 +27,8 @@ assert (t2.b == "beta") "b passes through"
 assert (t2.c == "gamma") "c passes through"
 
 -- agent.adapter: missing required field produces Err
-Protocol Small = {x: Str}
-Protocol Big = {a: Str  b: Str}
+Trait Small = {x: Str}
+Trait Big = {a: Str  b: Str}
 adapter3 = agent.adapter Small Big {x: "a"}
 result3 = adapter3 (Small {x: "hello"}) ?? "caught"
 assert (result3 == "caught") "errors on missing required field"
@@ -46,9 +46,9 @@ assert (inner.category == "fair") "coerces label -> category"
 assert (inner.context == "ok") "coerces details -> context"
 
 -- agent.negotiate_format: exact match returns identity adapter
-Protocol TaskReq = {task: Str  priority: Int}
+Trait TaskReq = {task: Str  priority: Int}
 
-caps_with_task_req = {protocols: [TaskReq]  tools: []  domains: []}
+caps_with_task_req = {traits: [TaskReq]  tools: []  domains: []}
 
 same_p = {handler: (msg) {
   msg.type == "capabilities" ? (caps_with_task_req) : {result: "ok"}
@@ -66,8 +66,8 @@ assert (adapted.task == "deploy") "identity adapter passes through"
 assert (adapted.priority == 5) "identity adapter passes through (int)"
 
 -- agent.negotiate_format: structural match with same field names
-Protocol WorkItem = {task: Str  priority: Int}
-caps_with_work_item = {protocols: [WorkItem]  tools: []  domains: []}
+Trait WorkItem = {task: Str  priority: Int}
+caps_with_work_item = {traits: [WorkItem]  tools: []  domains: []}
 
 struct_p = {handler: (msg) {
   msg.type == "capabilities" ? (caps_with_task_req) : {result: "ok"}
@@ -84,10 +84,10 @@ struct_adapted = struct_adapter struct_msg
 assert (struct_adapted.task == "build") "structural adapter preserves fields"
 
 -- agent.negotiate_format: incompatible returns Err
-Protocol Foo = {x: Int  y: Int}
-Protocol Bar = {completely_different: Str  also_unrelated: Str}
-caps_foo = {protocols: [Foo]  tools: []  domains: []}
-caps_bar = {protocols: [Bar]  tools: []  domains: []}
+Trait Foo = {x: Int  y: Int}
+Trait Bar = {completely_different: Str  also_unrelated: Str}
+caps_foo = {traits: [Foo]  tools: []  domains: []}
+caps_bar = {traits: [Bar]  tools: []  domains: []}
 
 incompat_p = {handler: (msg) {
   msg.type == "capabilities" ? (caps_foo) : ()

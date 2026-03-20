@@ -36,13 +36,13 @@ pub enum Pattern {
 }
 
 #[derive(Debug, Clone)]
-pub enum ProtocolEntry {
-    Field(Box<ProtocolField>),
+pub enum TraitEntry {
+    Field(Box<FieldDecl>),
     Spread(String),
 }
 
 #[derive(Debug, Clone)]
-pub struct ProtocolField {
+pub struct FieldDecl {
     pub name: String,
     pub type_name: String,
     pub default: Option<SExpr>,
@@ -50,7 +50,7 @@ pub struct ProtocolField {
 }
 
 #[derive(Debug, Clone)]
-pub struct ProtocolUnionDef {
+pub struct TraitUnionDef {
     pub name: String,
     pub variants: Vec<String>,
     pub exported: bool,
@@ -59,7 +59,7 @@ pub struct ProtocolUnionDef {
 #[derive(Debug, Clone)]
 pub struct McpToolDecl {
     pub name: String,
-    pub input: Vec<ProtocolField>,
+    pub input: Vec<FieldDecl>,
     pub output: McpOutputType,
 }
 
@@ -67,13 +67,13 @@ pub struct McpToolDecl {
 pub enum McpOutputType {
     Named(String),
     List(Box<McpOutputType>),
-    Record(Vec<ProtocolField>),
+    Record(Vec<FieldDecl>),
 }
 
 #[derive(Debug, Clone)]
 pub struct TraitMethodDecl {
     pub name: String,
-    pub input: Vec<ProtocolField>,
+    pub input: Vec<FieldDecl>,
     pub output: McpOutputType,
 }
 

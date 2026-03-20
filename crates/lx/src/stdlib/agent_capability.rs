@@ -7,44 +7,44 @@ use crate::backends::RuntimeCtx;
 use crate::builtins::{call_value_sync, mk};
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::{ProtoFieldDef, Value};
+use crate::value::{FieldDef, Value};
 
 static ADVERTISED: std::sync::LazyLock<DashMap<String, Value>> =
     std::sync::LazyLock::new(DashMap::new);
 
-pub fn mk_capabilities_protocol() -> Value {
+pub fn mk_capabilities_trait() -> Value {
     let fields = vec![
-        ProtoFieldDef {
-            name: "protocols".into(),
+        FieldDef {
+            name: "traits".into(),
             type_name: "List".into(),
             default: None,
             constraint: None,
         },
-        ProtoFieldDef {
+        FieldDef {
             name: "tools".into(),
             type_name: "List".into(),
             default: None,
             constraint: None,
         },
-        ProtoFieldDef {
+        FieldDef {
             name: "domains".into(),
             type_name: "List".into(),
             default: None,
             constraint: None,
         },
-        ProtoFieldDef {
+        FieldDef {
             name: "budget_remaining".into(),
             type_name: "Int".into(),
             default: Some(Value::Int((-1).into())),
             constraint: None,
         },
-        ProtoFieldDef {
+        FieldDef {
             name: "accepts".into(),
             type_name: "List".into(),
             default: Some(Value::List(Arc::new(vec![]))),
             constraint: None,
         },
-        ProtoFieldDef {
+        FieldDef {
             name: "status".into(),
             type_name: "Str".into(),
             default: Some(Value::Str(Arc::from("ready"))),

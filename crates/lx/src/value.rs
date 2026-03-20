@@ -50,7 +50,7 @@ pub enum Value {
         end: i64,
         inclusive: bool,
     },
-    ProtocolUnion {
+    TraitUnion {
         name: Arc<str>,
         variants: Arc<Vec<Arc<str>>>,
     },
@@ -60,7 +60,7 @@ pub enum Value {
     },
     Trait {
         name: Arc<str>,
-        fields: Arc<Vec<ProtoFieldDef>>,
+        fields: Arc<Vec<FieldDef>>,
         methods: Arc<Vec<TraitMethodDef>>,
         defaults: Arc<IndexMap<String, Value>>,
         requires: Arc<Vec<Arc<str>>>,
@@ -230,7 +230,7 @@ pub struct BuiltinFunc {
 }
 
 #[derive(Debug, Clone)]
-pub struct ProtoFieldDef {
+pub struct FieldDef {
     pub name: String,
     pub type_name: String,
     pub default: Option<Value>,
@@ -240,20 +240,20 @@ pub struct ProtoFieldDef {
 #[derive(Debug, Clone)]
 pub struct McpToolDef {
     pub name: String,
-    pub input: Vec<ProtoFieldDef>,
+    pub input: Vec<FieldDef>,
     pub output: McpOutputDef,
 }
 
 #[derive(Debug, Clone)]
 pub enum McpOutputDef {
     Simple(String),
-    Record(Vec<ProtoFieldDef>),
+    Record(Vec<FieldDef>),
     List(Box<McpOutputDef>),
 }
 
 #[derive(Debug, Clone)]
 pub struct TraitMethodDef {
     pub name: String,
-    pub input: Vec<ProtoFieldDef>,
+    pub input: Vec<FieldDef>,
     pub output: McpOutputDef,
 }

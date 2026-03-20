@@ -52,12 +52,12 @@ pub fn build() -> IndexMap<String, Value> {
     m.insert("intercept".into(), super::agent_intercept::mk_intercept());
     m.insert(
         "Handoff".into(),
-        super::agent_handoff::mk_handoff_protocol(),
+        super::agent_handoff::mk_handoff_trait(),
     );
     m.insert("as_context".into(), super::agent_handoff::mk_as_context());
     m.insert(
         "Capabilities".into(),
-        super::agent_capability::mk_capabilities_protocol(),
+        super::agent_capability::mk_capabilities_trait(),
     );
     m.insert(
         "capabilities".into(),
@@ -66,7 +66,7 @@ pub fn build() -> IndexMap<String, Value> {
     m.insert("advertise".into(), super::agent_capability::mk_advertise());
     m.insert(
         "GateResult".into(),
-        super::agent_gate::mk_gate_result_protocol(),
+        super::agent_gate::mk_gate_result_trait(),
     );
     m.insert("gate".into(), super::agent_gate::mk_gate());
     m.insert("dispatch".into(), super::agent_dispatch::mk_dispatch());
@@ -94,6 +94,9 @@ pub fn build() -> IndexMap<String, Value> {
         m.insert(name.into(), val);
     }
     for (name, val) in super::agent_dialogue_branch::builtins() {
+        m.insert(name.into(), val);
+    }
+    for (name, val) in super::agent_dialogue_persist::builtins() {
         m.insert(name.into(), val);
     }
     m.insert("negotiate".into(), super::agent_negotiate::mk_negotiate());
@@ -166,6 +169,12 @@ pub fn build() -> IndexMap<String, Value> {
         super::agent_negotiate_fmt::mk_negotiate_format(),
     );
     m.insert("coerce".into(), super::agent_adapter::mk_coerce());
+    m.insert("reload".into(), super::agent_reload::mk_reload());
+    m.insert("evolve".into(), super::agent_reload::mk_evolve());
+    m.insert(
+        "update_traits".into(),
+        super::agent_reload::mk_update_traits(),
+    );
     for (name, val) in super::agent_stream::builtins() {
         m.insert(name.into(), val);
     }

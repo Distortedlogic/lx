@@ -19,7 +19,7 @@ use std/agent
 
 consensus = agent.negotiate [architect security perf] {
   proposal: design_doc
-  protocol: ArchDecision
+  trait: ArchDecision
   max_rounds: 5
   converge: (responses) {
     all_approved = responses | all? (.approved)
@@ -34,7 +34,7 @@ consensus = agent.negotiate [architect security perf] {
 |-------|------|----------|-------------|
 | `agents` | [Agent] | Yes | Agents participating in negotiation (first arg) |
 | `proposal` | Any | Yes | Initial proposal sent to all agents |
-| `protocol` | Protocol | No | Validates all messages |
+| `protocol` | Trait | No | Validates all messages |
 | `max_rounds` | Int | No | Maximum negotiation rounds (default: 3) |
 | `converge` | Fn | Yes | `(responses) -> Ok result \| :continue` |
 | `on_round` | Fn | No | `(round responses) -> ()` callback per round |
@@ -76,7 +76,7 @@ Err {
 Agents participating in negotiation handle a standard message shape:
 
 ```
-Protocol NegotiationMsg = {
+Trait NegotiationMsg = {
   round: Int
   proposal: Any
   positions: List
@@ -123,7 +123,7 @@ score_bar = (threshold) (responses) {
 | `agent.dialogue` | 2 agents, multi-turn | Sequential conversation |
 | `agent.negotiate` | N agents, iterative | Agents see each other's positions, revise |
 
-`negotiate` fills the gap between "merge independently-produced results" and "have a conversation." It's the multi-party consensus protocol.
+`negotiate` fills the gap between "merge independently-produced results" and "have a conversation." It's the multi-party consensus mechanism.
 
 ## Implementation
 
@@ -135,5 +135,5 @@ The negotiation loop is synchronous (like all current concurrency): agents are q
 
 - Agent reconciliation (post-hoc merging): [agents-reconcile.md](agents-reconcile.md)
 - Agent dialogue (two-party sessions): [agents-dialogue.md](agents-dialogue.md)
-- Protocol validation: [agents-protocol.md](agents-protocol.md)
+- Trait validation: [agents-protocol.md](agents-protocol.md)
 - Agent pools (negotiate across pool workers): [agents-pool.md](agents-pool.md)

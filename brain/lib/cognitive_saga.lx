@@ -4,7 +4,7 @@
 use pkg/trace {TraceStore}
 use std/ctx
 use std/agent {Handoff}
-use ../protocols {Response}
+use ../contracts {Response}
 use ../lib/perception : perceive
 use ../lib/reasoning : reason
 use ../lib/memory_mgr : mem
@@ -17,7 +17,7 @@ use ../lib/context_mgr : ctx_mgr
       id: "perceive"
       do: (prev) {
         p = perceive.perceive input [] ^
-        trace_session.record {name: "perceive" input: input output: p.intent} ^
+        trace_session.record {name: "perceive" input: input output: p.intent} ?? ()
         ctx_mgr.add_perception context_win p
         ctx.set "perception_key" "perception_{p.intent}" saga_ctx
         p
@@ -34,7 +34,7 @@ use ../lib/context_mgr : ctx_mgr
       do: (prev) {
         perception = prev.perceive
         recalled = mem.recall memory_store perception.raw perception.domain
-        trace_session.record {name: "recall" input: perception.domain output: "found {len recalled}"} ^
+        trace_session.record {name: "recall" input: perception.domain output: "found {len recalled}"} ?? ()
         ctx.set "recall_count" (len recalled) saga_ctx
         recalled | take 10
       }
@@ -59,7 +59,7 @@ use ../lib/context_mgr : ctx_mgr
         chain = reason.reason handoff.task handoff.context [] ^
         ctx_mgr.add_reasoning context_win chain
         ctx.set "reasoning_key" "reasoning_{chain.goal | take 20}" saga_ctx
-        trace_session.record {name: "reason" input: perception.intent output: chain.strategy} ^
+        trace_session.record {name: "reason" input: perception.intent output: chain.strategy} ?? ()
         chain
       }
       undo: (result) {

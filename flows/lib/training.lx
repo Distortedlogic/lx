@@ -4,7 +4,7 @@
 use std/json
 use std/fs
 
-Protocol +TraceData = {input: Str  output: Str  model: Str  score: Float}
+Trait +TraceData = {input: Str  output: Str  model: Str  score: Float}
 
 +harvest = (lf agent_name min_count) {
   raw = lf.list_traces {name: agent_name  limit: 10000} ^

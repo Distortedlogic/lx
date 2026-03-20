@@ -57,7 +57,7 @@ durable "unique-workflow-id" { ... }
 ### Return Value
 
 ```
-Protocol DurableResult = {
+Trait DurableResult = {
   value: Any
   workflow_id: Str
   resumed: Bool

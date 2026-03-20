@@ -11,7 +11,7 @@ use ../agents/perf_specialist
 use ../lib/report
 use ../lib/workflow
 
-Protocol PerfFinding = {domain: Str  severity: Str  location: Str  issue: Str  fix: Str}
+Trait PerfFinding = {domain: Str  severity: Str  location: Str  issue: Str  fix: Str}
 
 domains = ["db" "memory" "compute" "threading" "network"]
 

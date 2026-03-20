@@ -3,24 +3,24 @@
 
 # lx Agent System
 
-## Protocols (Message Contracts)
+## Traits (Message Contracts)
 
-Protocols are `Value::Trait` with non-empty `fields`. Callable as constructor, runtime validation. Display as `<Protocol X>`. Returns Err on validation failure (catchable with `??`).
+Traits are `Value::Trait` with non-empty `fields`. Callable as constructor, runtime validation. Display as `<Trait X>`. Returns Err on validation failure (catchable with `??`).
 
 ```lx
-Protocol ReviewRequest = {file: Str  depth: Str = "standard"}
-Protocol ReviewResult = {approved: Bool  findings: [Str]}
-Protocol AgentMsg = ReviewRequest | ReviewResult   -- union (auto-injects _variant)
-Protocol Score = {
+Trait ReviewRequest = {file: Str  depth: Str = "standard"}
+Trait ReviewResult = {approved: Bool  findings: [Str]}
+Trait AgentMsg = ReviewRequest | ReviewResult   -- union (auto-injects _variant)
+Trait Score = {
   value: Float where value >= 0.0 && value <= 1.0  -- field constraint
 }
 ```
 
-Composition: `Protocol Extended = {..Base  extra: Str}`.
+Composition: `Trait Extended = {..Base  extra: Str}`.
 
 ## Traits (Behavioral Contracts)
 
-Typed method signatures using MCP syntax (`{input} -> output`), plus default method implementations. Behavioral Traits have empty `fields` and display as `<Trait X>`. Traits with non-empty `fields` are Protocols (see above).
+Typed method signatures using MCP syntax (`{input} -> output`), plus default method implementations. Behavioral Traits have empty `fields` and display as `<Trait X>`. Traits with non-empty `fields` are Traits (see above).
 
 ```lx
 Trait Reviewer = {
@@ -33,7 +33,7 @@ Trait Reviewer = {
 }
 ```
 
-Methods can reference named Protocols as input: `review: ReviewRequest -> {findings: List}`.
+Methods can reference named Traits as input: `review: ReviewRequest -> {findings: List}`.
 Default methods (with `=`) are auto-injected into conforming Agent/Class if not overridden.
 
 ## Classes (Stateful Objects)
@@ -277,10 +277,61 @@ Selection: `"least_busy"` (default), `"round_robin"`, `"random"`, or custom `(ag
 
 `agent.adapter SourceProto TargetProto {src_field: "tgt_field"}` — reusable field-mapping function. Unmapped fields pass through. Missing required target fields → `Err` (catchable with `??`). `agent.coerce msg TargetProto {mapping}` — one-shot transform, returns `Ok record` or `Err`. `agent.negotiate_format producer consumer` — inspects capabilities, finds compatible mapping (exact name → identity, structural/Levenshtein → mapping adapter, incompatible → `Err`).
 
+### Hot Reload
+
+```lx
+worker = {name: "w" handler: old_fn}
+worker = agent.reload worker {handler: new_fn} ^
+worker = agent.reload worker {
+  handler: better_fn
+  on_reload: (old_h new_h) { log.info "reloaded" }
+} ^
+```
+
+`agent.reload` returns `Ok(agent)` with `__handler_id` referencing a global mutable handler store. Subsequent `~>?`/`~>` calls resolve the handler from the store (not the `handler` field), enabling hot-swap without rebinding at every call site. Subprocess agents return `Err "cannot reload subprocess agent"`.
+
+```lx
+handler = (msg) {
+  result = approach msg
+  score = evaluate result
+  (score < 0.7) ? {
+    true -> agent.evolve {handler: better_approach} ^
+    false -> ()
+  }
+  result
+}
+worker = agent.reload worker {handler: handler} ^
+```
+
+`agent.evolve` is callable from within a handler — sets a thread-local pending flag. The interpreter applies the evolve after the current message completes. Takes effect on the NEXT message.
+
+```lx
+worker = agent.update_traits worker {add: ["Reviewer"] remove: ["Basic"]} ^
+```
+
+`agent.update_traits` adds/removes traits on agent Records. Interceptors are preserved — the interceptor chain's `next` function dynamically resolves the current handler from the store, so a reload automatically updates what interceptors delegate to.
+
+### Dialogue Persistence
+
+```lx
+session = agent.dialogue worker {role: "reviewer" context: "auth module"} ^
+agent.dialogue_turn session "check error handling" ^
+
+agent.dialogue_save session "review-auth-2026-03" ^
+
+session = agent.dialogue_load "review-auth-2026-03" worker ^
+agent.dialogue_turn session "any final concerns?" ^
+
+saved = agent.dialogue_list () ^
+agent.dialogue_delete "review-auth-2026-03" ^
+```
+
+`dialogue_save` persists session state (config + turn history) to `.lx/dialogues/{id}.json`. Overwrites if id exists. `dialogue_load` restores and binds to a (possibly different) agent — only conversation state transfers, not process handle. `dialogue_list` returns `[{id role turns created updated context_preview}]`. `dialogue_delete` removes saved file, returns `Err` if not found.
+
 ### Other Extensions
 
 `agent.capabilities worker ^` / `agent.advertise {protocols: [...]}` — capability discovery. `agent.gate "deploy" {show: data}` — human-in-the-loop approval. `agent.as_context handoff` — context transfer. `agent.negotiate agents {topic: ... max_rounds: 5}` — multi-party consensus. `agent.mock [{match: {task: "review"} respond: {approved: true}}]` — mock agents with call tracking.
 
 ## AgentErr (Structured Error Variants)
 
-11 tagged error variants: Timeout, RateLimited, BudgetExhausted, ContextOverflow, Incompetent, Upstream, PermissionDenied, ProtocolViolation, Unavailable, Cancelled, Internal. Import: `use std/agent {Timeout Upstream ...}`. Match: `Err e -> e ? { Timeout info -> ... ; Upstream info -> ... }`
+11 tagged error variants: Timeout, RateLimited, BudgetExhausted, ContextOverflow, Incompetent, Upstream, PermissionDenied, TraitViolation, Unavailable, Cancelled, Internal. Import: `use std/agent {Timeout Upstream ...}`. Match: `Err e -> e ? { Timeout info -> ... ; Upstream info -> ... }`

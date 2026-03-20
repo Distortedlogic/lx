@@ -124,7 +124,7 @@ use std/agent
 }
 ```
 
-Uses: `Handoff` Protocol for structured context transfer. The implementer receives not just the research results, but everything the researcher tried, assumed, and recommends.
+Uses: `Handoff` Trait for structured context transfer. The implementer receives not just the research results, but everything the researcher tried, assumed, and recommends.
 
 ## Introspection: Budget-Aware Processing
 

@@ -1,6 +1,6 @@
 use crate::ast::{
     AgentMethod, BinOp, Binding, ClassField, Expr, FieldKind, FieldPattern, ListElem, Literal,
-    MapEntry, MatchArm, McpToolDecl, Param, Pattern, Program, ProtocolEntry, ProtocolUnionDef,
+    MapEntry, MatchArm, McpToolDecl, Param, Pattern, Program, TraitEntry,
     RecordField, SExpr, SPattern, SType, Section, SelArm, ShellMode, Stmt, StrPart,
     TraitMethodDecl, TypeExpr, TypeField, UnaryOp, UseStmt,
 };
@@ -11,6 +11,7 @@ pub use walk::*;
 
 pub struct TraitDeclCtx<'a> {
     pub name: &'a str,
+    pub entries: &'a [TraitEntry],
     pub methods: &'a [TraitMethodDecl],
     pub requires: &'a [String],
     pub description: Option<&'a str>,
@@ -53,16 +54,6 @@ pub trait AstVisitor {
         _span: Span,
     ) {
     }
-    fn visit_protocol(
-        &mut self,
-        _name: &str,
-        entries: &[ProtocolEntry],
-        _exported: bool,
-        span: Span,
-    ) {
-        walk_protocol(self, entries, span);
-    }
-    fn visit_protocol_union(&mut self, _def: &ProtocolUnionDef, _span: Span) {}
     fn visit_mcp_decl(
         &mut self,
         _name: &str,

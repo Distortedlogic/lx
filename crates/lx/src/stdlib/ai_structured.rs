@@ -9,7 +9,7 @@ use crate::error::LxError;
 use crate::record;
 use crate::span::Span;
 use crate::stdlib::json_conv;
-use crate::value::{ProtoFieldDef, Value};
+use crate::value::{FieldDef, Value};
 
 pub fn mk_prompt_structured() -> Value {
     mk("ai.prompt_structured", 2, bi_prompt_structured)
@@ -38,14 +38,14 @@ fn bi_prompt_json(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<V
     run_structured(ctx, &augmented, &AiOpts::default(), &fields, 2, span)
 }
 
-fn record_to_fields(rec: &IndexMap<String, Value>) -> Vec<ProtoFieldDef> {
+fn record_to_fields(rec: &IndexMap<String, Value>) -> Vec<FieldDef> {
     rec.iter()
         .map(|(name, val)| {
             let type_name = match val {
                 Value::List(_) => "List".to_string(),
                 _ => val.type_name().to_string(),
             };
-            ProtoFieldDef {
+            FieldDef {
                 name: name.clone(),
                 type_name,
                 default: None,
@@ -60,7 +60,7 @@ fn bi_prompt_structured(
     span: Span,
     ctx: &Arc<RuntimeCtx>,
 ) -> Result<Value, LxError> {
-    let (proto_name, fields) = extract_protocol(&args[0], span)?;
+    let (proto_name, fields) = extract_trait(&args[0], span)?;
     let prompt = args[1].as_str().ok_or_else(|| {
         LxError::type_err("ai.prompt_structured: second arg must be prompt Str", span)
     })?;
@@ -73,7 +73,7 @@ fn bi_prompt_structured_with(
     span: Span,
     ctx: &Arc<RuntimeCtx>,
 ) -> Result<Value, LxError> {
-    let (proto_name, fields) = extract_protocol(&args[0], span)?;
+    let (proto_name, fields) = extract_trait(&args[0], span)?;
     let Value::Record(opts) = &args[1] else {
         return Err(LxError::type_err(
             "ai.prompt_structured_with: second arg must be options Record",
@@ -96,19 +96,19 @@ fn bi_prompt_structured_with(
     run_structured(ctx, &augmented, &ai_opts, &fields, max_retries, span)
 }
 
-fn extract_protocol(val: &Value, span: Span) -> Result<(String, Arc<Vec<ProtoFieldDef>>), LxError> {
+fn extract_trait(val: &Value, span: Span) -> Result<(String, Arc<Vec<FieldDef>>), LxError> {
     match val {
         Value::Trait { name, fields, .. } if !fields.is_empty() => {
             Ok((name.to_string(), Arc::clone(fields)))
         }
         _ => Err(LxError::type_err(
-            "ai.prompt_structured: first arg must be a Protocol",
+            "ai.prompt_structured: first arg must be a Trait with fields",
             span,
         )),
     }
 }
 
-fn augment_prompt(prompt: &str, _name: &str, fields: &[ProtoFieldDef]) -> String {
+fn augment_prompt(prompt: &str, _name: &str, fields: &[FieldDef]) -> String {
     let mut schema = String::from("{\n");
     for f in fields {
         let ts = type_to_schema(&f.type_name);
@@ -138,7 +138,7 @@ fn run_structured(
     ctx: &Arc<RuntimeCtx>,
     prompt: &str,
     opts: &AiOpts,
-    fields: &[ProtoFieldDef],
+    fields: &[FieldDef],
     max_retries: usize,
     span: Span,
 ) -> Result<Value, LxError> {
@@ -167,7 +167,7 @@ fn run_structured(
 
 fn try_parse_and_validate(
     response: &Value,
-    fields: &[ProtoFieldDef],
+    fields: &[FieldDef],
     span: Span,
 ) -> Result<Value, String> {
     let text = super::ai::extract_llm_text(response)?;
@@ -184,7 +184,7 @@ fn try_parse_and_validate(
 
 fn validate_fields(
     rec: &IndexMap<String, Value>,
-    fields: &[ProtoFieldDef],
+    fields: &[FieldDef],
     _span: Span,
 ) -> Result<(), String> {
     for f in fields {

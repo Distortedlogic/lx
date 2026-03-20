@@ -16,7 +16,7 @@ use ../lib/memory
 use ../lib/report
 use ../lib/specialists
 
-Protocol AgentDef = {name: Str  purpose: Str  domain: Str}
+Trait AgentDef = {name: Str  purpose: Str  domain: Str}
 
 +main = () {
   def = AgentDef {name: "code-reviewer"  purpose: "review PRs"  domain: "code-quality"}

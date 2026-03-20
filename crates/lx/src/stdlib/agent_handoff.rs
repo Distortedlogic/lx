@@ -4,11 +4,11 @@ use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::{ProtoFieldDef, Value};
+use crate::value::{FieldDef, Value};
 
-pub fn mk_handoff_protocol() -> Value {
+pub fn mk_handoff_trait() -> Value {
     let fields = vec![
-        ProtoFieldDef {
+        FieldDef {
             name: "result".into(),
             type_name: "Any".into(),
             default: None,
@@ -20,7 +20,7 @@ pub fn mk_handoff_protocol() -> Value {
         proto_list_field("recommendations"),
         proto_list_field("files_read"),
         proto_list_field("tools_used"),
-        ProtoFieldDef {
+        FieldDef {
             name: "duration_ms".into(),
             type_name: "Int".into(),
             default: Some(Value::Int(0.into())),
@@ -38,8 +38,8 @@ pub fn mk_handoff_protocol() -> Value {
     }
 }
 
-fn proto_list_field(name: &str) -> ProtoFieldDef {
-    ProtoFieldDef {
+fn proto_list_field(name: &str) -> FieldDef {
+    FieldDef {
         name: name.into(),
         type_name: "List".into(),
         default: Some(Value::List(Arc::new(vec![]))),

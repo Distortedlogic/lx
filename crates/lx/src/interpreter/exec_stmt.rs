@@ -114,15 +114,13 @@ impl Interpreter {
                 self.env = env.into_arc();
                 Ok(Value::Unit)
             }
-            Stmt::Protocol { name, entries, .. } => {
-                self.eval_protocol_def(name, entries, stmt.span).await
-            }
-            Stmt::ProtocolUnion(def) => {
-                self.eval_protocol_union(&def.name, &def.variants, stmt.span)
+            Stmt::TraitUnion(def) => {
+                self.eval_trait_union(&def.name, &def.variants, stmt.span)
             }
             Stmt::McpDecl { name, tools, .. } => self.eval_mcp_decl(name, tools, stmt.span).await,
             Stmt::TraitDecl {
                 name,
+                entries,
                 methods,
                 defaults,
                 requires,
@@ -130,6 +128,7 @@ impl Interpreter {
                 tags,
                 ..
             } => {
+                let trait_fields = self.eval_trait_fields(name, entries, stmt.span).await?;
                 let mut method_defs = Vec::new();
                 for m in methods {
                     let mut input = Vec::new();
@@ -138,7 +137,7 @@ impl Interpreter {
                             Some(e) => Some(self.eval(e).await?),
                             None => None,
                         };
-                        input.push(crate::value::ProtoFieldDef {
+                        input.push(crate::value::FieldDef {
                             name: f.name.clone(),
                             type_name: f.type_name.clone(),
                             default,
@@ -159,7 +158,7 @@ impl Interpreter {
                 }
                 let val = Value::Trait {
                     name: Arc::from(name.as_str()),
-                    fields: Arc::new(Vec::new()),
+                    fields: Arc::new(trait_fields),
                     methods: Arc::new(method_defs),
                     defaults: Arc::new(default_impls),
                     requires: Arc::new(requires.iter().map(|s| Arc::from(s.as_str())).collect()),

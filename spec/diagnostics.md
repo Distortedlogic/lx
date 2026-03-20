@@ -273,14 +273,14 @@ warning[lint]: src/main.lx:3:5
 
 ### Uppercase Field Access
 
-`.Uppercase` after a dot is ambiguous with Protocol names. Protocols need selective import:
+`.Uppercase` after a dot is ambiguous with Trait names. Traits need selective import:
 
 ```
 warning[lint]: src/main.lx:6:8
   |
  6|   agent.Handoff
   |         ^^^^^^^
-  uppercase after `.` — Protocol names require selective import
+  uppercase after `.` — Trait names require selective import
   fix:      `use std/agent {Handoff}` then use `Handoff` directly
 ```
 

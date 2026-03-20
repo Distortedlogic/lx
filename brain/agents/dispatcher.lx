@@ -5,7 +5,7 @@
 use std/agent
 use pkg/pool {Pool}
 use pkg/trace {TraceStore}
-use ../protocols {AgentTask AgentResult}
+use ../contracts {AgentTask AgentResult}
 
 +create_workforce = () -> Any {
   (analyst critic researcher) = par {
@@ -19,7 +19,7 @@ use ../protocols {AgentTask AgentResult}
 
 +setup_tracing = (workforce: Any  session: Any) -> Any {
   trace_wrap = (worker name) agent.intercept worker (msg next) {
-    session.record {name: "{name}_msg" input: msg.action ?? "unknown"} ^
+    session.record {name: "{name}_msg" input: msg.action ?? "unknown"} ?? ()
     next msg
   }
 

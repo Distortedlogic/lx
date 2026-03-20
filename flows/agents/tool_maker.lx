@@ -23,7 +23,7 @@ use std/agent
 }
 
 +fix_compile = (msg) {
-  ai.prompt "Fix these compilation errors in {msg.workspace}:\n{msg.errors}" ^
+  ai.prompt "Fix these compilation errors in {msg.workspace}:\n{msg.errors}" ?? ""
 }
 
 +handlers = %{"analyze": analyze  "design": design  "scaffold": scaffold  "codegen": codegen  "fix_compile": fix_compile}

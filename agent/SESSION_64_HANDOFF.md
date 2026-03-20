@@ -39,11 +39,11 @@
 - Shared `inject_traits` helper in `interpreter/traits.rs`
 - Display: checks traits list for "Agent" → `<Agent X>` if present, `<Class X>` otherwise
 
-**Value::Protocol removed:**
-- Protocol declarations produce `Value::Trait` with non-empty `fields: Arc<Vec<ProtoFieldDef>>`
+**Value::Trait removed:**
+- Trait declarations produce `Value::Trait` with non-empty `fields: Arc<Vec<ProtoFieldDef>>`
 - Behavioral Traits have empty `fields` vec
 - Trait-with-fields is callable as constructor (guard: `!fields.is_empty()`)
-- Display: `<Protocol X>` for Traits with fields, `<Trait X>` for behavioral
+- Display: `<Trait X>` for Traits with fields, `<Trait X>` for behavioral
 
 ### Parser Bug Fix
 - `is_func_def()` in `parser/func.rs` had ambiguity: `(to_str counter) {name: name}` parsed as a function literal instead of expression + record
@@ -63,7 +63,7 @@
 
 1. **Store IS the primitive** — no separate Dict type. Store already had the DashMap. Just gave it dot-access and a first-class Value type.
 2. **Agent IS a Trait** — defined in `pkg/agent.lx`, not a ClassKind enum. `Agent` keyword auto-imports the Trait. `Value::Class` has 4 fields (name, traits, defaults, methods), no init/on/uses fields.
-3. **Protocol IS a Trait** — with field requirements instead of method requirements. Same conformance concept applied to data vs behavior.
+3. **Protocol was merged into Trait** — with field requirements instead of method requirements. Same conformance concept applied to data vs behavior.
 4. **One DashMap** — STORES backs everything. Objects and Stores share one global store.
 
 ## API Changes That Affect Callers

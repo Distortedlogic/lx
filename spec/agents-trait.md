@@ -65,12 +65,12 @@ These names are trait metadata, not methods:
 
 Everything else in the trait body is a method declaration.
 
-### Protocol Inputs
+### Trait Inputs
 
-Method inputs can reference named Protocols instead of inline record types:
+Method inputs can reference named Traits instead of inline record types:
 
 ```
-Protocol ReviewRequest = {task: Str  path: Str}
+Trait ReviewRequest = {task: Str  path: Str}
 
 Trait Reviewable = {
   review: ReviewRequest -> {findings: List  score: Float}
@@ -163,15 +163,15 @@ route_by_trait = (task agents trait) {
 }
 ```
 
-### Message Routing via Protocol Matching
+### Message Routing via Trait Matching
 
-When a method's input type is a named Protocol, the runtime can auto-route incoming messages:
+When a method's input type is a named Trait, the runtime can auto-route incoming messages:
 
 ```
 reviewer ~>? ReviewRequest {task: "audit" path: "src/"}
 ```
 
-The runtime checks which method accepts `ReviewRequest` and dispatches to it. If multiple methods accept the same Protocol, the first match wins.
+The runtime checks which method accepts `ReviewRequest` and dispatches to it. If multiple methods accept the same Trait, the first match wins.
 
 ### Direct Method Calls
 
@@ -235,13 +235,13 @@ Reuses `McpInputDef` and `McpOutputDef` from MCP declarations — same type repr
 
 ### Migration from Current Traits
 
-Current `handles`/`provides` syntax continues to parse but is deprecated. The `handles` list is derivable from methods with Protocol-typed inputs. The `provides` name list is replaced by actual method declarations.
+Current `handles`/`provides` syntax continues to parse but is deprecated. The `handles` list is derivable from methods with Trait-typed inputs. The `provides` name list is replaced by actual method declarations.
 
 ## Cross-References
 
 - Agent declarations: [agents-declaration.md](agents-declaration.md) — Traits are enforced on Agent definitions
 - MCP declarations: [agents-advanced.md](agents-advanced.md) — method syntax mirrors MCP tool syntax
-- Protocol system: [agents-protocol.md](agents-protocol.md) — Protocol-typed inputs enable message routing
+- Trait system: [agents-protocol.md](agents-protocol.md) — Trait-typed inputs enable message routing
 - Agent pools: [agents-pool.md](agents-pool.md) — Trait-constrained worker pools
 - Cross-process discovery: [agents-discovery.md](agents-discovery.md) — registry queries by Trait
 - Eliminated: [agents-skill.md](agents-skill.md) — Skill functionality merged into Traits

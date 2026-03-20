@@ -3,15 +3,15 @@
 
 # Design Health
 
-Updated after Session 72 (2026-03-19).
+Updated after Session 74 (2026-03-19).
 
 ## What Works
 
 **Pipes + `^` + `??` compose beautifully.** `analyzer ~>? {task: "review"} ^ | (.findings) | filter (.critical)` — five operations, zero boilerplate, left-to-right. This composability is the language's strongest design choice.
 
-**Boundary validation covers both directions.** `Protocol` validates agent-to-agent. `MCP` declarations validate agent-to-tool. `Trait` declarations validate agent behavioral contracts at definition time. No unvalidated boundary.
+**Boundary validation covers both directions.** `Trait` validates agent-to-agent. `MCP` declarations validate agent-to-tool. `Trait` declarations validate agent behavioral contracts at definition time. No unvalidated boundary.
 
-**Type hierarchy is clean: Store → Class → Agent.** Store is a first-class `Value::Store { id }` with dot-access methods. Class and Agent both produce `Value::Class { name, traits, defaults, methods }` — Agent is a Trait in `pkg/agent.lx`, not a separate kind. The `Agent` keyword auto-imports the Trait and auto-adds "Agent" to traits list. Display checks traits for "Agent" to distinguish. Protocol declarations produce `Value::Trait` with non-empty fields. No separate `Value::Agent` or `Value::Protocol` — fewer variants, shared trait injection logic. Object fields live in STORES (same backing as Store values), eliminating the separate OBJECTS DashMap.
+**Type hierarchy is clean: Store → Class → Agent.** Store is a first-class `Value::Store { id }` with dot-access methods. Class and Agent both produce `Value::Class { name, traits, defaults, methods }` — Agent is a Trait in `pkg/agent.lx`, not a separate kind. The `Agent` keyword auto-imports the Trait and auto-adds "Agent" to traits list. Display checks traits for "Agent" to distinguish. Trait declarations produce `Value::Trait` with non-empty fields. No separate `Value::Agent` or `Value::Trait` — fewer variants, shared trait injection logic. Object fields live in STORES (same backing as Store values), eliminating the separate OBJECTS DashMap.
 
 **Collection Trait proves the composability thesis.** `pkg/collection.lx` provides 9 methods as Trait defaults delegating to `self.entries`. Any Class with `entries: Store ()` conforming to Collection gets get/keys/values/remove/query/len/has/save/load for free. 5 packages (knowledge, tasks, memory, trace, context) rewritten — domain-only methods remain, generic operations come from Collection.
 
@@ -25,4 +25,4 @@ See `agent/PRIORITIES.md` for the full ordered work queue.
 
 ## Bottom Line
 
-Session 72: Protocol format negotiation shipped (`agent.adapter`/`negotiate_format`/`coerce`). 15 agent extensions now. Async interpreter stable. 91/91 tests pass. 0 errors, 0 warnings.
+Session 74: Dialogue persistence shipped (`agent.dialogue_save/load/list/delete`). 17 agent extensions now. Async interpreter stable. 93/93 tests pass. 0 errors, 0 warnings.

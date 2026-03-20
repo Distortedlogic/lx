@@ -5,7 +5,7 @@
 
 use std/audit
 
-Protocol +Signal = {proceed: Bool  feedback: Str  source: Str}
+Trait +Signal = {proceed: Bool  feedback: Str  source: Str}
 
 +check_build = (path) {
   result = $cargo check --manifest-path {path}/Cargo.toml

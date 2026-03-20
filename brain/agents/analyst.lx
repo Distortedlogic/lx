@@ -5,7 +5,7 @@ use std/ai
 use pkg/prompt
 use ../traits {Analyst}
 
-Protocol AnalysisResult = {
+Trait AnalysisResult = {
   summary: Str
   findings: [Str]
   confidence: Float
@@ -29,7 +29,7 @@ Agent DeepAnalyst: Analyst = {
       | prompt.instruction depth_instruction
       | prompt.constraint "Structure: Summary, Findings (bulleted), Gaps, Recommendations"
 
-    resp = ai.prompt (prompt.render p) ^
+    resp = ai.prompt (prompt.render p) ?? {text: "analysis unavailable"}
     sections = resp.text | lines | partition (starts? "- ")
     findings = sections.0 | map (drop 2) | map trim
 
@@ -55,7 +55,7 @@ Agent DeepAnalyst: Analyst = {
       | prompt.section "Context" msg.context
       | prompt.instruction "Evaluate each option against each criterion. Pick a winner."
 
-    resp = ai.prompt (prompt.render p) ^
+    resp = ai.prompt (prompt.render p) ?? {text: "comparison unavailable"}
     {comparison: resp.text  winner_index: 0}
   }
 
@@ -66,7 +66,7 @@ Agent DeepAnalyst: Analyst = {
       | prompt.section "Available Tools" (msg.tools | join ", ")
       | prompt.instruction "1) Form a hypothesis. 2) List evidence needed. 3) Suggest tool calls."
 
-    resp = ai.prompt (prompt.render p) ^
+    resp = ai.prompt (prompt.render p) ?? {text: "investigation unavailable"}
     {
       hypothesis: resp.text | lines | first ?? ""
       evidence_needed: resp.text | lines | filter (starts? "- ") | map (drop 2)
@@ -76,7 +76,7 @@ Agent DeepAnalyst: Analyst = {
 
 +main = () {
   agent.advertise {
-    protocols: ["AnalysisResult"]
+    traits: ["AnalysisResult"]
     domains: ["analyst" "analysis" "investigation" "comparison"]
     tools: ["ai"]
   }

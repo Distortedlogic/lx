@@ -6,7 +6,7 @@
 
 use std/re
 
-Protocol +Specialist = {name: Str  domain: Str  script: Str  terminal: Bool}
+Trait +Specialist = {name: Str  domain: Str  script: Str  terminal: Bool}
 
 +create = (entries keywords) {entries  keywords}
 

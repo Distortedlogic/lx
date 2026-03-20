@@ -57,21 +57,21 @@ fn apply_mapping(msg: &Value, mapping: &[(String, String)], target_proto: Option
         }
     }
     if let Some(proto) = target_proto
-        && let Some(err_msg) = validate_against_protocol(&result, proto)
+        && let Some(err_msg) = validate_against_trait(&result, proto)
     {
         return Value::Err(Box::new(Value::Str(Arc::from(err_msg.as_str()))));
     }
     Value::Record(Arc::new(result))
 }
 
-fn validate_against_protocol(rec: &IndexMap<String, Value>, proto: &Value) -> Option<String> {
+fn validate_against_trait(rec: &IndexMap<String, Value>, proto: &Value) -> Option<String> {
     let Value::Trait { name, fields, .. } = proto else {
         return None;
     };
     for field in fields.iter() {
         if field.default.is_none() && !rec.contains_key(&field.name) {
             return Some(format!(
-                "target Protocol '{name}' requires field '{}' but it is missing",
+                "target Trait '{name}' requires field '{}' but it is missing",
                 field.name
             ));
         }
@@ -85,13 +85,13 @@ fn bi_adapter(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Valu
     let mapping_val = &args[2];
     if !matches!(source_proto, Value::Trait { .. }) {
         return Err(LxError::type_err(
-            "agent.adapter: first arg must be a Protocol (Trait with fields)",
+            "agent.adapter: first arg must be a Trait with fields",
             span,
         ));
     }
     if !matches!(target_proto, Value::Trait { .. }) {
         return Err(LxError::type_err(
-            "agent.adapter: second arg must be a Protocol (Trait with fields)",
+            "agent.adapter: second arg must be a Trait with fields",
             span,
         ));
     }
@@ -123,7 +123,7 @@ fn bi_coerce(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
     let mapping_val = &args[2];
     if !matches!(target_proto, Value::Trait { .. }) {
         return Err(LxError::type_err(
-            "agent.coerce: second arg must be a Protocol",
+            "agent.coerce: second arg must be a Trait with fields",
             span,
         ));
     }

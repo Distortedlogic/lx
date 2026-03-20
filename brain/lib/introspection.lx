@@ -6,7 +6,7 @@ use pkg/trace {TraceStore}
 use std/time
 use pkg/prompt
 use std/ai
-use ../protocols {CognitiveState}
+use ../contracts {CognitiveState}
 
 +self_assess = () -> Any {
   ins = Inspector ()
@@ -134,6 +134,6 @@ use ../protocols {CognitiveState}
       | prompt.section "Recommendation" strategy.recommendation
       | prompt.instruction "Suggest 2 concrete alternative approaches."
 
-    ai.prompt (prompt.render p) ^ | (.text) | lines | filter (l) trim l | not empty?
+    ai.prompt (prompt.render p) ?? {text: "try a different approach"} | (.text) | lines | filter (l) trim l | not empty?
   }
 }

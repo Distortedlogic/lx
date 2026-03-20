@@ -55,7 +55,7 @@ Reference semantics: `a = b` shares the same Store. Store cloning in Class const
 - **Cognitive pipeline:** `init`, `perceive`, `reason`, `act`, `reflect` — override the phases you need
 - **Dispatch:** `handle(msg)` — auto-dispatches by `msg.action` via `method_of`, falls back to perceive→reason→act→reflect
 - **Message loop:** `run()` — init, then yield/loop: yield ready, handle msg, yield result
-- **AI:** `think(prompt)`, `think_with(config)`, `think_structured(protocol, prompt)`
+- **AI:** `think(prompt)`, `think_with(config)`, `think_structured(schema, prompt)`
 - **Tools:** `use_tool(name, input)`, `tools()` — override to wire tool execution
 - **Communication:** `ask(agent, msg)` wraps `~>?`, `tell(agent, msg)` wraps `~>`
 - **Self-description:** `describe()` — returns `{name, actions: methods_of self, tools}` via `methods_of` builtin
@@ -228,7 +228,7 @@ all = pipeline.list ()
 | `std/flow`        | Flow composition: `load`, `run`, `pipe`, `parallel`, `branch`, `with_retry`, `with_timeout`, `with_fallback` |
 | `std/taskgraph`   | DAG execution: `create`, `add`, `remove`, `run`, `run_with`, `validate`, `topo`, `status`, `dot` |
 | `std/workspace`   | Collaborative editing: `create`, `claim`, `claim_pattern`, `edit`, `append`, `release`, `snapshot`, `regions`, `conflicts`, `resolve`, `history`, `watch`. Line-based region claiming with overlap detection, auto-bound adjustment, regex pattern claiming, watchers. DashMap-backed for `par`/`pmap` safety |
-| `std/registry`    | Cross-process discovery: `start`, `stop`, `connect`, `register`, `deregister`, `find`, `find_one`, `health`, `load`, `watch`. In-memory registry with trait/protocol/domain filtering, selection strategies (first, least_loaded, round_robin, random), health/load tracking, watcher callbacks |
+| `std/registry`    | Cross-process discovery: `start`, `stop`, `connect`, `register`, `deregister`, `find`, `find_one`, `health`, `load`, `watch`. In-memory registry with trait/trait/domain filtering, selection strategies (first, least_loaded, round_robin, random), health/load tracking, watcher callbacks |
 
 ## Flow Composition (std/flow)
 

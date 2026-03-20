@@ -17,7 +17,7 @@ use std/agent
       } ^
     }
     "clarify": (msg) {
-      ai.prompt "Given this context:\n{msg.specs}\n\nAnswer: {msg.question}" ^
+      ai.prompt "Given this context:\n{msg.specs}\n\nAnswer: {msg.question}" ?? ""
     }
   }
 }

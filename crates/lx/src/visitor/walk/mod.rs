@@ -4,7 +4,7 @@ mod walk_pattern;
 pub use walk_helpers::*;
 pub use walk_pattern::*;
 
-use crate::ast::{AgentMethod, Binding, ClassField, Expr, Program, ProtocolEntry, SExpr, Stmt};
+use crate::ast::{AgentMethod, Binding, ClassField, Expr, Program, SExpr, Stmt};
 use crate::span::Span;
 
 use super::{AgentDeclCtx, AstVisitor, RefineCtx, TraitDeclCtx};
@@ -25,14 +25,7 @@ pub fn walk_stmt<V: AstVisitor + ?Sized>(v: &mut V, stmt: &Stmt, span: Span) {
         } => {
             v.visit_type_def(name, variants, *exported, span);
         }
-        Stmt::Protocol {
-            name,
-            entries,
-            exported,
-        } => {
-            v.visit_protocol(name, entries, *exported, span);
-        }
-        Stmt::ProtocolUnion(def) => v.visit_protocol_union(def, span),
+        Stmt::TraitUnion(_def) => {},
         Stmt::McpDecl {
             name,
             tools,
@@ -42,6 +35,7 @@ pub fn walk_stmt<V: AstVisitor + ?Sized>(v: &mut V, stmt: &Stmt, span: Span) {
         }
         Stmt::TraitDecl {
             name,
+            entries,
             methods,
             defaults: _,
             requires,
@@ -51,6 +45,7 @@ pub fn walk_stmt<V: AstVisitor + ?Sized>(v: &mut V, stmt: &Stmt, span: Span) {
         } => {
             let ctx = TraitDeclCtx {
                 name,
+                entries,
                 methods,
                 requires,
                 description: description.as_deref(),
@@ -103,19 +98,6 @@ pub fn walk_binding<V: AstVisitor + ?Sized>(v: &mut V, binding: &Binding, _span:
         v.visit_type_expr(&ty.node, ty.span);
     }
     v.visit_expr(&binding.value.node, binding.value.span);
-}
-
-pub fn walk_protocol<V: AstVisitor + ?Sized>(v: &mut V, entries: &[ProtocolEntry], _span: Span) {
-    for entry in entries {
-        if let ProtocolEntry::Field(f) = entry {
-            if let Some(ref d) = f.default {
-                v.visit_expr(&d.node, d.span);
-            }
-            if let Some(ref c) = f.constraint {
-                v.visit_expr(&c.node, c.span);
-            }
-        }
-    }
 }
 
 pub fn walk_agent_decl<V: AstVisitor + ?Sized>(v: &mut V, ctx: &AgentDeclCtx<'_>, _span: Span) {

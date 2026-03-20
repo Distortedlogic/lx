@@ -198,6 +198,6 @@ Four new functions in `agent.rs`: `dialogue_save`, `dialogue_load`, `dialogue_li
 
 - Dialogue system: `agent.dialogue` / `agent.dialogue_turn` / `agent.dialogue_history` in [stdlib-agents.md](stdlib-agents.md)
 - Workflow persistence: [agents-durable.md](agents-durable.md) — workflow state vs conversation state
-- Handoff: `agent.as_context` + `Handoff` Protocol
+- Handoff: `agent.as_context` + `Handoff` trait
 - Context: [agents-context-capacity.md](agents-context-capacity.md) — dialogue history as context pressure
 - Package manifest: [package-manifest.md](package-manifest.md) — storage location relative to project root

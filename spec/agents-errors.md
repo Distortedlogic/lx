@@ -16,7 +16,7 @@ Every agent failure is currently `Err "some string"`. But agents fail in categor
 | Upstream down | `Err "connection refused"` | Circuit break |
 | Timeout | `Err "timeout"` | Retry with longer deadline |
 | Permission denied | `Err "denied"` | Escalate to human |
-| Protocol violation | `Err "invalid message"` | Log and reject |
+| Trait violation | `Err "invalid message"` | Log and reject |
 
 With string errors, recovery code is fragile regex matching. With structured errors, recovery is pattern matching:
 
@@ -41,7 +41,7 @@ AgentErr = | Timeout {elapsed_ms: Int  deadline_ms: Int}
            | Incompetent {agent: Str  task: Str  score: Float  threshold: Float}
            | Upstream {service: Str  code: Int  message: Str}
            | PermissionDenied {action: Str  resource: Str}
-           | ProtocolViolation {expected: Str  got: Str  message: Str}
+           | TraitViolation {expected: Str  got: Str  message: Str}
            | Unavailable {agent: Str  reason: Str}
            | Cancelled {reason: Str}
            | Internal {message: Str}
@@ -63,7 +63,7 @@ AgentErr = | Timeout {elapsed_ms: Int  deadline_ms: Int}
 
 **`PermissionDenied`** — operation not permitted. From sandbox restrictions or insufficient access. Recovery: escalate to human, request permission.
 
-**`ProtocolViolation`** — message doesn't match expected Protocol shape. Recovery: log, reject, notify sender.
+**`TraitViolation`** — message doesn't match expected Trait shape. Recovery: log, reject, notify sender.
 
 **`Unavailable`** — target agent is not running, not registered, or unhealthy. Recovery: wait and retry, or find alternative agent via registry.
 
@@ -137,7 +137,7 @@ The `??` operator and `^` propagation work with both string errors and `AgentErr
 | Module | Current error | Migrates to |
 | --- | --- | --- |
 | `std/http` | `Err {status code message}` | `Upstream` or `RateLimited` |
-| `std/agent` | `Err "string"` | `Timeout`, `Unavailable`, `ProtocolViolation` |
+| `std/agent` | `Err "string"` | `Timeout`, `Unavailable`, `TraitViolation` |
 | `std/mcp` | `Err "string"` | `Upstream`, `Timeout` |
 | `std/budget` | `Err "exceeded"` | `BudgetExhausted` |
 | `std/context` | `Err "overflow"` | `ContextOverflow` |
