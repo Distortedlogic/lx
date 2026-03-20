@@ -21,13 +21,13 @@ stuck_threshold = 3
 status_file = ".lx/work_runner_status.json"
 
 work_items = [
-  "work_items/STD_DIFF.md"
-  "work_items/STD_WS.md"
-  "work_items/PANE_BACKEND.md"
-  "work_items/EMBED_BACKEND.md"
+  -- "work_items/STD_DIFF.md"
+  -- "work_items/STD_WS.md"
+  -- "work_items/PANE_BACKEND.md"
+  -- "work_items/EMBED_BACKEND.md"
   "work_items/STD_SANDBOX.md"
-  "work_items/PKG_SEARCH.md"
-  "work_items/PKG_NOTIFY.md"
+  -- "work_items/PKG_SEARCH.md"
+  -- "work_items/PKG_NOTIFY.md"
   "work_items/PKG_TEMPLATE.md"
   "work_items/PKG_CDP.md"
   "work_items/PKG_VECTORS.md"
@@ -54,10 +54,8 @@ log_ts = (msg) {
 
 load_status = () {
   exists = fs.exists status_file
-  exists ? (
-    text = fs.read status_file ^
-    json.parse text ^
-  ) : {results: []  completed: []}
+  empty = {results: []  completed: []}
+  not exists ? empty : (fs.read status_file ^ | json.parse ^)
 }
 
 save_status = (status) {
@@ -159,7 +157,7 @@ grade_report = (report work_item_path) {
 
 fix_issues = (work_item_path feedback failed_cats) {
   wi_content = fs.read work_item_path ^
-  failed_text = failed_cats | map (f) f | to_str | join "\n- "
+  failed_text = failed_cats | map to_str | join "\n- "
   log_ts "  > claude: fix ({failed_cats | len} failed categories)..."
 
   p = prompt.create ()
@@ -229,21 +227,21 @@ start = time.now ()
 
 work_items | enumerate | each (idx_path) {
   (idx path) = idx_path
+  skip = is_completed status path
+  skip ? log_ts "=== [{idx + 1}/{work_items | len}] {path} === SKIP"
+  not skip ? run_item idx path
+}
 
-  (is_completed status path) ? (
-    log_ts ""
-    log_ts "=== [{idx + 1}/{work_items | len}] {path} === SKIP (already completed)"
-  ) : (
-    result = run_work_item_loop path idx status ^
-    status_icon = result.status == "pass" ? "PASS" : "FAIL"
-    log_ts "  >>> {status_icon} {path} — {result.score}/100 in {result.rounds} rounds"
+run_item = (idx path) {
+  result = run_work_item_loop path idx status ^
+  status_icon = result.status == "pass" ? "PASS" : "FAIL"
+  log_ts "  >>> {status_icon} {path} — {result.score}/100 in {result.rounds} rounds"
 
-    new_results = [..status.results result]
-    new_completed = result.status == "pass" ? [..status.completed path] : status.completed
-    status <- {results: new_results  completed: new_completed}
-    save_status status ^
-    log_ts "  status saved ({status.completed | len} completed)"
-  )
+  new_results = [..status.results result]
+  new_completed = result.status == "pass" ? [..status.completed path] : status.completed
+  status <- {results: new_results  completed: new_completed}
+  save_status status ^
+  log_ts "  status saved ({status.completed | len} completed)"
 }
 
 elapsed = time.now().ms - start.ms

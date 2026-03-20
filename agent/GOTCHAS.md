@@ -20,6 +20,7 @@
 
 - **`? {record}` is parsed as match, not ternary returning a record.** `expr ? {field: val  field2: val2} : other` — the `? {` triggers match-arm parsing, so `field:` is expected to be `pattern ->`. **Fix:** bind the record first: `result = {field: val  field2: val2}` then `expr ? result : other`.
 - **`? { stmt }` where stmt uses `<-` or `:=` fails.** `cond ? { x <- [...] }` — the `? {` triggers match parsing, and reassignment/mutable bindings aren't match patterns. **Fix:** restructure functionally or reverse the condition: `not cond ? () : { x <- [...] }`. For conditional mutation, prefer functional style: `x = cond ? [...] : []`.
+- **Multi-branch conditionals with `{ }` bodies all fail.** `done ? { emit "pass"; break val } : maxed ? { emit "max"; break val2 } : { emit "fix"; fix () }` — every `? {` triggers match parsing. **Fix:** use sequential single-arm ternary guards (no braces): `done ? break val` / `maxed ? break val2` / `fallthrough_code`. Or bind all branch bodies to variables before the conditional.
 
 ## Record Shorthand Ambiguity
 
@@ -29,6 +30,7 @@
 ## Operator Precedence
 
 - **`??` binds looser than `|` pipe.** `entry.field ?? "" | lower | split " "` parses as `entry.field ?? ("" | lower | split " ")`, not `(entry.field ?? "") | lower | split " "`. If `entry.field` is not None, the pipe chain never runs. **Fix:** parenthesize: `(entry.field ?? "") | lower | split " "`.
+- **`|` binds looser than `+`.** `x | len + y | len` parses as `x | (len + y) | len`, not `(x | len) + (y | len)`. **Fix:** parenthesize each pipe expression: `(x | len) + (y | len)`. Or bind to variables first: `a = x | len; b = y | len; a + b`.
 
 ## HOF + Enumerate
 
@@ -42,10 +44,27 @@
 
 - **Trait conformance halts execution.** If an Agent declares a Trait but is missing a required method, it's a hard `LxError` — not `Value::Err`. `??` cannot catch it. This is by design but surprising if you expect defensive coding to work.
 
+## Parens Are Not Blocks
+
+- **`( )` is grouping, not a block scope.** `cond ? ( x = compute; use x )` fails with "expected RParen, found Assign" — parens don't create blocks, only `{ }` does. But `? { }` triggers match parsing (see above). **Fix:** restructure to avoid multi-statement branches. Use pipe chains: `cond ? (compute | use)`. Or bind before the ternary: `val = compute; cond ? val : other`. Or use sequential single-arm guards: `cond ? break val`.
+
+## Sections Limitation
+
+- **Sections don't support `==` or `!=`.** `filter (.status == "pass")` fails — the section parser can't handle comparison operators. **Fix:** use a lambda: `filter (r) r.status == "pass"`.
+
+## Computed Tuple Access
+
+- **`tuple.[0]` doesn't work.** Computed field access on tuples fails with "unsupported types Tuple / Int". **Fix:** use destructuring: `(a b) = tuple` then access `a` and `b` directly.
+
+## time.format Argument Order
+
+- **`time.format` takes format string first, time record second.** `time.format t "%H:%M:%S"` fails because `t` (Record) is in the format-string position. **Fix:** use pipe: `t | time.format "%H:%M:%S"`. This is pipe-last design — the data argument goes last.
+
 ## lx Package Traps
 
 - **Self-recursive `+` exports need two-step pattern.** `+f = (n) { f (n-1) }` — `+` exports are excluded from forward declarations so builtins aren't shadowed. This means `+f` can't call itself directly. **Fix:** `f = (n) { f (n-1) }; +f = f`.
 - **Adjacent string interpolation blocks fail.** `"{head}{tail}"` — the first `{head}` evaluates to a Str, then `{tail}` tries to call the Str as a function. **Fix:** use `++` concatenation: `head ++ tail`. Or use a single interpolation with the full expression.
+- **String interpolation parses `{key: val}` as lx code.** `"Return JSON: {score: Int, issues: [Str]}"` — the `{score: Int}` is parsed as a record literal, causing parse errors (e.g., "unexpected token: Colon"). **Fix:** use backtick raw strings for text containing literal braces: `` `Return JSON: {score: Int}` ``.
 - **Multi-line ternary chains don't parse.** `cond1 ? val1\n: cond2 ? val2\n: default` — the `:` on a new line is parsed as something else. **Fix:** keep the entire ternary chain on one line, or extract conditions into named bindings and nest: `cond1 ? val1 : (cond2 ? val2 : default)`.
 - **`{}` is Unit, not empty Record.** `f x {}` passes Unit as the second arg, not an empty record. This breaks functions expecting a Record (e.g., `tasks.list store {}`). **Fix:** use `()` explicitly for Unit, or handle Unit in the function: `filter_rec == () ? defaults : filter_rec.field`.
 
