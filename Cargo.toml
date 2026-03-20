@@ -2,6 +2,7 @@
 members = [
   "crates/lx",
   "crates/lx-cli",
+  "crates/lx-dx",
 ]
 resolver = "2"
 
