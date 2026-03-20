@@ -1,11 +1,13 @@
 mod defaults;
 mod embed;
 mod pane;
+mod restricted;
 mod user;
 
 pub use defaults::*;
 pub use embed::*;
 pub use pane::*;
+pub use restricted::*;
 pub use user::*;
 
 use std::collections::HashMap;

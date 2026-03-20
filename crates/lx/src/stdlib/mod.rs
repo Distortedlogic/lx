@@ -82,6 +82,10 @@ mod repo_lock;
 mod repo_worktree;
 pub(crate) mod retry;
 mod saga;
+mod sandbox;
+mod sandbox_exec;
+mod sandbox_policy;
+mod sandbox_scope;
 mod step_deps;
 mod store;
 mod store_dispatch;
@@ -145,6 +149,7 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
             "plan" => plan::build(),
             "retry" => retry::build(),
             "saga" => saga::build(),
+            "sandbox" => sandbox::build(),
             "store" => store::build(),
             "taskgraph" => taskgraph::build(),
             "test" => test::build(),
@@ -205,6 +210,7 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
             | "plan"
             | "retry"
             | "saga"
+            | "sandbox"
             | "store"
             | "taskgraph"
             | "test"

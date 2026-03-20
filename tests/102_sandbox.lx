@@ -1,0 +1,47 @@
+use std/sandbox
+
+pure = sandbox.policy :pure
+readonly = sandbox.policy :readonly
+local = sandbox.policy :local
+full = sandbox.policy :full
+
+desc = sandbox.describe pure
+assert (desc.ai == false) "pure denies ai"
+assert (desc.shell == false) "pure denies shell"
+
+desc_full = sandbox.describe full
+assert (desc_full.ai == true) "full allows ai"
+assert (desc_full.shell == true) "full allows shell"
+
+assert (sandbox.permits readonly :fs_read ".") "readonly permits fs_read"
+assert (not (sandbox.permits readonly :fs_write ".")) "readonly denies fs_write"
+assert (not (sandbox.permits pure :shell "ls")) "pure denies shell"
+
+result = sandbox.scope pure () {
+  $echo "should not run"
+}
+assert (type_of result == "Err") "pure scope blocks shell"
+
+result2 = sandbox.scope local () {
+  $^echo "hello"
+}
+assert (result2 | trim == "hello") "local scope allows shell"
+
+custom = sandbox.policy {
+  shell: {allow: ["echo" "cat"]}
+  ai: false
+}
+result3 = sandbox.scope custom () {
+  $^echo "allowed"
+}
+assert (result3 | trim == "allowed") "allowlist permits echo"
+
+merged = sandbox.merge [local full]
+desc_merged = sandbox.describe merged
+assert (desc_merged.ai == false) "merge intersects — local has no ai"
+
+narrow = sandbox.attenuate full {ai: false}
+desc_narrow = sandbox.describe narrow
+assert (desc_narrow.ai == false) "attenuate narrows"
+
+log.info "102_sandbox: all passed"

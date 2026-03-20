@@ -1,11 +1,10 @@
 -- Agentic Work Runner -- Orchestrates work item execution with grading loops.
 --
--- Persists status to .lx/work_runner_status.json. On rerun, skips completed
--- items (grade >= 93). Kill and restart safely — progress is saved after
--- each work item completes.
+-- Persists status to .lx/work_runner/status.json. On rerun, skips completed items.
+-- Debug logs per work item per round in .lx/work_runner/logs/<item>/<round>/
 --
 -- Usage: lx run flows/agentic_work_runner.lx
--- Reset: rm .lx/work_runner_status.json
+-- Reset: rm -rf .lx/work_runner/
 
 use std/ai
 use std/fs
@@ -18,7 +17,8 @@ use pkg/core/prompt
 target_grade = 93
 max_fix_rounds = 5
 stuck_threshold = 3
-status_file = ".lx/work_runner_status.json"
+runner_dir = ".lx/work_runner"
+status_file = "{runner_dir}/status.json"
 
 work_items = [
   -- "work_items/STD_DIFF.md"
@@ -52,6 +52,16 @@ log_ts = (msg) {
   emit "[{ts}] {msg}"
 }
 
+item_slug = (path) {
+  path | replace "work_items/" "" | replace ".md" "" | lower
+}
+
+save_debug = (slug round_num name content) {
+  dir = "{runner_dir}/logs/{slug}/round_{round_num}"
+  $^mkdir -p {dir}
+  fs.write "{dir}/{name}" content ^
+}
+
 load_status = () {
   exists = fs.exists status_file
   empty = {results: []  completed: []}
@@ -59,7 +69,7 @@ load_status = () {
 }
 
 save_status = (status) {
-  $^mkdir -p .lx
+  $^mkdir -p {runner_dir}
   fs.write status_file (json.encode_pretty status) ^
 }
 
@@ -90,7 +100,7 @@ bootstrap_context = "
 {stdlib_ref}
 "
 
-implement_work_item = (work_item_path) {
+implement_work_item = (work_item_path slug) {
   wi_content = fs.read work_item_path ^
   log_ts "  > claude: implement (max 50 turns)..."
 
@@ -103,29 +113,32 @@ implement_work_item = (work_item_path) {
     | prompt.constraint "Do not add code comments or doc strings"
     | prompt.constraint "No #[allow()] macros"
 
+  rendered = prompt.render p
+  save_debug slug 0 "implement_prompt.md" rendered
   result = ai.prompt_with {
-    prompt: prompt.render p
+    prompt: rendered
     tools: ["Read" "Edit" "Write" "Bash" "Glob" "Grep"]
     max_turns: 50
   } ^
 
+  save_debug slug 0 "implement_response.md" (result.text ?? "")
   log_ts "  < implement done ({result.turns ?? 0} turns, ${result.cost ?? 0})"
   result
 }
 
-investigate_work_item = (work_item_path) {
+investigate_work_item = (work_item_path slug round_num) {
   wi_content = fs.read work_item_path ^
   log_ts "  > claude: investigate (max 20 turns)..."
 
   p = prompt.create ()
     | prompt.system "You are investigating whether a work item has been implemented. Read code, check registrations, run diagnostics. Produce a detailed text report."
     | prompt.section "Work Item" wi_content
-    | prompt.instruction "For each file in Files Affected, read it and confirm it exists with the expected content"
-    | prompt.instruction "Check mod.rs registrations (get_std_module, std_module_exists)"
-    | prompt.instruction "Run `just diagnose` and include the full output"
-    | prompt.instruction "Run `just test` and include the full output"
-    | prompt.instruction "For each task in the Task List, state whether it is done or not and why"
-    | prompt.instruction "End with a summary: which tasks are done, which are missing, what compilation/test issues exist"
+    | prompt.instruction "For each file in Files Affected, check it exists (use Glob) and has the expected exports (use Grep)"
+    | prompt.instruction "Check mod.rs registrations — grep for the module name in get_std_module and std_module_exists"
+    | prompt.instruction "Run `just diagnose` — report ONLY errors and warnings, not the full output"
+    | prompt.instruction "Run `just test` — report ONLY failures, not the full passing list"
+    | prompt.instruction "For each task, state DONE or MISSING with one line of evidence"
+    | prompt.instruction "Keep the report under 2000 characters. Be terse. No full file contents."
 
   result = ai.prompt_with {
     prompt: prompt.render p
@@ -133,12 +146,14 @@ investigate_work_item = (work_item_path) {
     max_turns: 20
   } ^
 
-  log_ts "  < investigate done ({result.turns ?? 0} turns, ${result.cost ?? 0})"
-  result.text
+  report = result.text ?? ""
+  save_debug slug round_num "investigate_response.md" report
+  log_ts "  < investigate done ({result.turns ?? 0} turns, {report | len} chars)"
+  report
 }
 
-grade_report = (report work_item_path) {
-  log_ts "  > grader: scoring report..."
+grade_report = (report work_item_path slug round_num) {
+  log_ts "  > grader: scoring report ({report | len} chars)..."
 
   grade = grader.grade {
     work: report
@@ -146,6 +161,9 @@ grade_report = (report work_item_path) {
     rubric: rubric
     threshold: target_grade
   }
+
+  grade_json = json.encode_pretty grade
+  save_debug slug round_num "grade_result.json" grade_json
 
   log_ts "  GRADE: {grade.score}/100 | passed: {grade.passed} | feedback: {grade.feedback}"
   grade.categories | each (cat) {
@@ -155,7 +173,7 @@ grade_report = (report work_item_path) {
   grade
 }
 
-fix_issues = (work_item_path feedback failed_cats) {
+fix_issues = (work_item_path feedback failed_cats slug round_num) {
   wi_content = fs.read work_item_path ^
   failed_text = failed_cats | map to_str | join "\n- "
   log_ts "  > claude: fix ({failed_cats | len} failed categories)..."
@@ -178,6 +196,7 @@ fix_issues = (work_item_path feedback failed_cats) {
     max_turns: 30
   } ^
 
+  save_debug slug round_num "fix_response.md" (result.text ?? "")
   log_ts "  < fix done ({result.turns ?? 0} turns, ${result.cost ?? 0})"
   result
 }
@@ -190,11 +209,12 @@ is_stuck = (grade_history) {
 }
 
 run_work_item_loop = (work_item_path idx status) {
+  slug = item_slug work_item_path
   log_ts ""
   log_ts "=== [{idx + 1}/{work_items | len}] {work_item_path} ==="
 
   log_ts "  PHASE: implement"
-  implement_work_item work_item_path
+  implement_work_item work_item_path slug
 
   grade_history := []
   round := 0
@@ -202,8 +222,8 @@ run_work_item_loop = (work_item_path idx status) {
   loop {
     round <- round + 1
     log_ts "  PHASE: investigate + grade (round {round}/{max_fix_rounds})"
-    report = investigate_work_item work_item_path
-    grade = grade_report report work_item_path
+    report = investigate_work_item work_item_path slug round
+    grade = grade_report report work_item_path slug round
     score = grade.score ?? 0
     grade_history <- [..grade_history score]
 
@@ -211,8 +231,10 @@ run_work_item_loop = (work_item_path idx status) {
     round >= max_fix_rounds ? break {status: "max_rounds"  score: score  rounds: round  path: work_item_path  feedback: grade.feedback}
     (is_stuck grade_history) ? break {status: "stuck"  score: score  rounds: round  path: work_item_path  feedback: grade.feedback}
 
-    log_ts "  PHASE: fix (round {round})"
-    fix_issues work_item_path grade.feedback grade.failed ^
+    failed_list = grade.failed ?? []
+    has_failed = failed_list | len > 0
+    has_failed ? fix_issues work_item_path grade.feedback failed_list slug round ^
+    not has_failed ? log_ts "  grader returned no actionable failures — retrying grade"
   }
 }
 
@@ -221,16 +243,8 @@ completed_count = status.completed | len
 log_ts "Agentic Work Runner — {work_items | len} work items ({completed_count} already completed)"
 log_ts "Target grade: {target_grade}/100 | Max fix rounds: {max_fix_rounds}"
 log_ts "Status file: {status_file}"
+log_ts "Debug logs: {runner_dir}/logs/"
 completed_count > 0 ? log_ts "Skipping: {status.completed | join ", "}"
-
-start = time.now ()
-
-work_items | enumerate | each (idx_path) {
-  (idx path) = idx_path
-  skip = is_completed status path
-  skip ? log_ts "=== [{idx + 1}/{work_items | len}] {path} === SKIP"
-  not skip ? run_item idx path
-}
 
 run_item = (idx path) {
   result = run_work_item_loop path idx status ^
@@ -242,6 +256,15 @@ run_item = (idx path) {
   status <- {results: new_results  completed: new_completed}
   save_status status ^
   log_ts "  status saved ({status.completed | len} completed)"
+}
+
+start = time.now ()
+
+work_items | enumerate | each (idx_path) {
+  (idx path) = idx_path
+  skip = is_completed status path
+  skip ? log_ts "=== [{idx + 1}/{work_items | len}] {path} === SKIP"
+  not skip ? run_item idx path
 }
 
 elapsed = time.now().ms - start.ms

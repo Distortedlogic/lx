@@ -93,6 +93,18 @@ test-flows:
 test-flows-tagged tag:
   LX_TEST_TAG={{tag}} cargo run -p lx-cli -- test flows/tests/
 
+# run lx-tui with a .lx file
+tui file:
+  cargo run -p lx-tui -- {{file}}
+
+# run lx-desktop app
+desktop:
+  cargo run -p lx-desktop
+
+# run lx-mobile app
+mobile:
+  cargo run -p lx-mobile
+
 # build vscode extension vsix (install via VS Code UI: Ctrl+Shift+P > Install from VSIX)
 package-vscode:
   cd editors/vscode && pnpm install --frozen-lockfile && pnpm package
