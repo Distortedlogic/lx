@@ -22,31 +22,21 @@ ConversationState = {
 }
 
 +add_turn = (state: ConversationState  role: Str  content: Str) -> ConversationState {
-  new_turn = {role: role  content: content  timestamp: time.now ()}
-
-  topics = role == "user" ? detect_topic_shift state content : state.topics
-  user_style = role == "user" && state.user_style == "unknown" ?
-    detect_style content : state.user_style
-
   {
-    turns: [..state.turns  new_turn]
-    topics: topics
-    user_style: user_style
+    turns: [..state.turns  {role  content  timestamp: time.now ()}]
+    topics: role == "user" ? detect_topic_shift state content : state.topics
+    user_style: role == "user" && state.user_style == "unknown" ? detect_style content : state.user_style
     rapport: update_rapport state.rapport role content
     context_established: state.turns | len >= 2
   }
 }
 
-+recent_context = (state: ConversationState  n: Int) -> Str {
-  state.turns | rev | take n | rev
-    | map (t) "{t.role}: {t.content}"
-    | join "\n"
++recent_context = (state: ConversationState  n: Int = 6) -> Str {
+  state.turns | rev | take n | rev | map (t) "{t.role}: {t.content}" | join "\n"
 }
 
 +conversation_summary = (state: ConversationState) -> Str {
-  turn_count = state.turns | len
-  topic_list = state.topics | uniq | join ", "
-  "Conversation: {turn_count} turns. Topics: {topic_list}. Style: {state.user_style}. Rapport: {state.rapport}"
+  "Conversation: {state.turns | len} turns. Topics: {state.topics | uniq | join ", "}. Style: {state.user_style}. Rapport: {state.rapport}"
 }
 
 +should_ask_clarification = (state: ConversationState  perception: Perception) -> Bool {
@@ -54,13 +44,10 @@ ConversationState = {
 }
 
 +build_contextual_prompt = (state: ConversationState  current_input: Str  identity: Identity) -> Any {
-  recent = recent_context state 6
-  summary = conversation_summary state
-
   p = prompt.create ()
-    | prompt.system "You are {identity.name}. {summary}"
+    | prompt.system "You are {identity.name}. {conversation_summary state}"
 
-  p = state.context_established ? p | prompt.section "Recent Conversation" recent : p
+  p = state.context_established ? p | prompt.section "Recent Conversation" (recent_context state) : p
   p | prompt.section "Current Input" current_input
 }
 
@@ -79,10 +66,10 @@ detect_topic_shift = (state: ConversationState  content: Str) -> [Str] {
 }
 
 detect_style = (content: Str) -> Str {
-  word_count = content | split " " | len
-  has_greeting = content | lower | starts? "hi" || content | lower | starts? "hey" || content | lower | starts? "hello"
+  cl = content | lower
+  is_terse = content | split " " | len < 10 && not (cl | starts? "hi" || cl | starts? "hey" || cl | starts? "hello")
   is_formal = content | contains? "please" || content | contains? "would you"
-  is_terse = word_count < 10 && not has_greeting
+  has_greeting = cl | starts? "hi" || cl | starts? "hey" || cl | starts? "hello"
 
   is_terse ? "terse" : is_formal ? "formal" : has_greeting ? "friendly" : "neutral"
 }

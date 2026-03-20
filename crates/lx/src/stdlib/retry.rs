@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use num_bigint::BigInt;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::call_value;
+use crate::builtins::call_value_sync;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
@@ -132,7 +132,7 @@ fn should_retry(
     match retry_on {
         None => Ok(true),
         Some(pred) => {
-            let result = call_value(pred, err_val.clone(), span, ctx)?;
+            let result = call_value_sync(pred, err_val.clone(), span, ctx)?;
             match result {
                 Value::Bool(b) => Ok(b),
                 _ => Err(LxError::type_err("retry: retry_on must return Bool", span)),
@@ -156,7 +156,7 @@ fn run_retry_loop(
             std::thread::sleep(std::time::Duration::from_millis(delay));
         }
 
-        match call_value(f, Value::Unit, span, ctx) {
+        match call_value_sync(f, Value::Unit, span, ctx) {
             Ok(Value::Ok(v)) => return Ok(Value::Ok(Box::new(*v))),
             Ok(Value::Err(e)) => {
                 last_err = *e;

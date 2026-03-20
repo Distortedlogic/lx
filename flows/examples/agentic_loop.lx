@@ -24,7 +24,7 @@ use ../lib/workflow
     } ^
 
     kb = KnowledgeBase {path: "react-results"}
-    kb.store task (to_str r) {source: "react"  confidence: 0.8}
+    kb.store task "{r}" {source: "react"  confidence: 0.8}
 
     report.write "react_report.md" "ReAct Session" [
       ..report.text "Task: {task}"

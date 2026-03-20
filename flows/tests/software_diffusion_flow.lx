@@ -22,8 +22,7 @@ use std/json
       true -> {
         completed <- completed + 1
         final_output <- output
-        fixes = get "type_errors_fixed" stage ?? 0
-        type_errors_fixed <- type_errors_fixed + fixes
+        type_errors_fixed <- type_errors_fixed + (get "type_errors_fixed" stage ?? 0)
       }
       false -> {
         no_fail_yet = failed_at == ""
@@ -36,15 +35,11 @@ use std/json
   }
 
   total = stages | len
-  all_succeeded = completed == total
 
   Ok {
     stages_completed: completed
     final_output: final_output
     type_errors_fixed: type_errors_fixed
-    implementation: all_succeeded ? {
-      true -> "complete"
-      false -> "failed at {failed_at}"
-    }
+    implementation: completed == total ? "complete" : "failed at {failed_at}"
   }
 }

@@ -43,10 +43,10 @@ reason_direct = (goal: Str  context: Str) -> ReasoningChain {
   thoughts = parse_thoughts resp.text
 
   ReasoningChain {
-    goal: goal
-    thoughts: thoughts
+    goal
+    thoughts
     conclusion: thoughts | last | (.content) ?? "no conclusion"
-    confidence: thoughts | map (.confidence) | fold 0.0 (acc c) acc + c / (len thoughts)
+    confidence: thoughts | map (.confidence) | fold 0.0 (+) / (len thoughts)
     strategy: "direct"
   }
 }
@@ -55,16 +55,13 @@ reason_decompose = (goal: Str  context: Str) -> ReasoningChain {
   sub_problems = decompose goal
   sub_chains = sub_problems | map (sub) reason_direct sub context
 
-  all_thoughts = sub_chains | flat_map (.thoughts)
-  avg_confidence = sub_chains | map (.confidence) | fold 0.0 (+) / (len sub_chains)
-
   synthesis = synthesize sub_chains goal ^
 
   ReasoningChain {
-    goal: goal
-    thoughts: [..all_thoughts  synthesis]
+    goal
+    thoughts: [..sub_chains | flat_map (.thoughts)  synthesis]
     conclusion: synthesis.content
-    confidence: avg_confidence
+    confidence: sub_chains | map (.confidence) | fold 0.0 (+) / (len sub_chains)
     strategy: "decompose"
   }
 }
@@ -80,8 +77,8 @@ reason_analogical = (goal: Str  context: Str) -> ReasoningChain {
   thoughts = parse_thoughts resp.text
 
   ReasoningChain {
-    goal: goal
-    thoughts: thoughts
+    goal
+    thoughts
     conclusion: thoughts | last | (.content) ?? "no conclusion"
     confidence: 0.6
     strategy: "analogical"
@@ -103,7 +100,7 @@ reason_adversarial = (goal: Str  context: Str) -> ReasoningChain {
   resp = ai.prompt (prompt.render p) ^
 
   ReasoningChain {
-    goal: goal
+    goal
     thoughts: [..pro_chain.thoughts  ..con_chain.thoughts]
     conclusion: resp.text
     confidence: (pro_chain.confidence + con_chain.confidence) / 2.0
@@ -119,7 +116,7 @@ reason_adversarial = (goal: Str  context: Str) -> ReasoningChain {
     | prompt.constraint `Each sub-problem should be solvable independently.`
 
   resp = ai.prompt (prompt.render p) ^
-  resp.text | lines | map trim | filter (l) len l > 0
+  resp.text | lines | map trim | filter (not empty?)
 }
 
 +hypothesize = (observation: Str  context: Str) -> Hypothesis {
@@ -179,7 +176,7 @@ synthesize = (chains: [ReasoningChain]  goal: Str) -> Thought {
 
 parse_thoughts = (text: Str) -> [Thought] {
   text | lines
-    | filter (l) len (trim l) > 0
+    | filter (l) trim l | not empty?
     | enumerate
     | map (i line) Thought {
         id: "t{i}"

@@ -7,7 +7,7 @@ use indexmap::IndexMap;
 use num_bigint::BigInt;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::{call_value, mk};
+use crate::builtins::{call_value_sync, mk};
 use crate::error::LxError;
 use crate::record;
 use crate::span::Span;
@@ -130,7 +130,7 @@ pub(super) fn bi_update(
         .get_mut(&id)
         .ok_or_else(|| LxError::runtime("store: not found", span))?;
     let old = s.data.get(key).cloned().unwrap_or(Value::None);
-    let new_val = call_value(f, old, span, ctx)?;
+    let new_val = call_value_sync(f, old, span, ctx)?;
     if let Value::Err(_) = &new_val {
         return Ok(new_val);
     }
@@ -213,7 +213,7 @@ pub(super) fn bi_query(
             "key" => Value::Str(Arc::from(k.as_str())),
             "value" => v,
         };
-        let result = call_value(pred, entry.clone(), span, ctx)?;
+        let result = call_value_sync(pred, entry.clone(), span, ctx)?;
         if matches!(result, Value::Bool(true)) {
             matched.push(entry);
         }

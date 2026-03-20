@@ -14,6 +14,8 @@
 
 - **`(expr) {record}` in application context no longer misparses.** Previously, `(to_str counter) {name: name}` was parsed as a 2-param function literal instead of a parenthesized expression + record. Fixed via `application_depth` tracking in the parser. In application context with 2+ bare-ident params and no strong signals, the parser rejects func-def when body is a record literal or an identifier not matching any param name.
 
+- **Lambda body with `==`/`!=` in pipe chains breaks.** `list | keep (x) x.name == val | sort_by (.id)` — the lambda body extends through `| sort_by (.id)`, so `sort_by` receives `val` from the inner pipe, not the filtered list. **Fix:** use block syntax: `list | keep (x) { x.name == val } | sort_by (.id)`. Or break into two statements: `matched = list | keep (x) { x.name == val }` then `matched | sort_by (.id)`.
+
 ## Keyword Field Names
 
 - **`par` is a keyword — can't use as record field via dot access.** `module.par` fails to parse because `par` is consumed as the `par { }` keyword. `std/flow` uses `flow.parallel` instead. Same applies to other keywords: `sel`, `match`, `if`, `use`, `emit`, `yield`, `refine`, `receive`, `Agent`, `Protocol`, `Trait`, `MCP`.
@@ -24,7 +26,7 @@
 
 ## lx Package Traps
 
-- **Export names shadow builtins inside the module.** `+filter = (criteria s) { ... all | filter pred ... }` — the internal `filter` call recursively calls the export, not the builtin HOF. **Fix:** capture the builtin before the export: `keep = filter` at top of file, then use `keep` internally. Or rename the export to avoid collision (`trace.query` instead of `trace.filter`).
+- **Self-recursive `+` exports need two-step pattern.** `+f = (n) { f (n-1) }` — `+` exports are excluded from forward declarations so builtins aren't shadowed. This means `+f` can't call itself directly. **Fix:** `f = (n) { f (n-1) }; +f = f`.
 - **Adjacent string interpolation blocks fail.** `"{head}{tail}"` — the first `{head}` evaluates to a Str, then `{tail}` tries to call the Str as a function. **Fix:** use `++` concatenation: `head ++ tail`. Or use a single interpolation with the full expression.
 - **Multi-line ternary chains don't parse.** `cond1 ? val1\n: cond2 ? val2\n: default` — the `:` on a new line is parsed as something else. **Fix:** keep the entire ternary chain on one line, or extract conditions into named bindings and nest: `cond1 ? val1 : (cond2 ? val2 : default)`.
 - **`{}` is Unit, not empty Record.** `f x {}` passes Unit as the second arg, not an empty record. This breaks functions expecting a Record (e.g., `tasks.list store {}`). **Fix:** use `()` explicitly for Unit, or handle Unit in the function: `filter_rec == () ? defaults : filter_rec.field`.

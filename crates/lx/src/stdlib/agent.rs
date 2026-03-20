@@ -90,19 +90,12 @@ pub fn build() -> IndexMap<String, Value> {
         "supervise_stop".into(),
         super::agent_supervise::mk_supervise_stop(),
     );
-    m.insert("dialogue".into(), super::agent_dialogue::mk_dialogue());
-    m.insert(
-        "dialogue_turn".into(),
-        super::agent_dialogue::mk_dialogue_turn(),
-    );
-    m.insert(
-        "dialogue_history".into(),
-        super::agent_dialogue::mk_dialogue_history(),
-    );
-    m.insert(
-        "dialogue_end".into(),
-        super::agent_dialogue::mk_dialogue_end(),
-    );
+    for (name, val) in super::agent_dialogue::builtins() {
+        m.insert(name.into(), val);
+    }
+    for (name, val) in super::agent_dialogue_branch::builtins() {
+        m.insert(name.into(), val);
+    }
     m.insert("negotiate".into(), super::agent_negotiate::mk_negotiate());
     m.insert("register".into(), super::agent_route::mk_register());
     m.insert("unregister".into(), super::agent_route::mk_unregister());
@@ -167,6 +160,15 @@ pub fn build() -> IndexMap<String, Value> {
     );
     m.insert("subscribers".into(), super::agent_pubsub::mk_subscribers());
     m.insert("topics".into(), super::agent_pubsub::mk_topics());
+    m.insert("adapter".into(), super::agent_adapter::mk_adapter());
+    m.insert(
+        "negotiate_format".into(),
+        super::agent_negotiate_fmt::mk_negotiate_format(),
+    );
+    m.insert("coerce".into(), super::agent_adapter::mk_coerce());
+    for (name, val) in super::agent_stream::builtins() {
+        m.insert(name.into(), val);
+    }
     for (name, val) in super::agent_errors::tagged_ctors() {
         m.insert(name.into(), val);
     }

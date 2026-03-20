@@ -43,6 +43,12 @@ defined in `pkg/agent.lx` with real defaults (handle, run, think, describe, etc.
 `Agent` keyword auto-imports it. Protocol is a Trait with fields. Brain agents now inherit
 Agent Trait defaults (init, handle, run, perceive, reason, act, reflect, think, describe,
 ask, tell, use_tool, tools). See `agent/SESSION_64_HANDOFF.md` if needed.
+**Session 71b (agent/):** Five structural fixes landed. (1) `par`/`sel`/`pmap`/`pmap_n` are now
+truly parallel (OS threads). (2) `lx check` resolves imports — far fewer false positives.
+(3) `+` exports no longer shadow builtins — `+filter` inside a module can use builtin `filter`.
+Self-recursive exports need two-step: `f = ...; +f = f`. (4) `std/durable` ships: Temporal-style
+workflow persistence. (5) `lx install`/`lx update` for git+path dependency management.
+Brain files modernized: record shorthand, string interpolation, eliminated intermediates in 18 files.
 
 ## This Tick
 

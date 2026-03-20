@@ -1,0 +1,80 @@
+-- 83_trace_provenance.lx
+-- Tests: TraceStore provenance tracking and reputation scoring
+
+use pkg/trace {TraceStore}
+
+t = TraceStore ()
+
+t.enable_provenance () ^
+assert (t.provenance_enabled == true) "enable_provenance: sets flag"
+
+t.record {name: "search" input: "query" output: "results" score: 0.9 agent: "researcher"} ^
+t.record {name: "analyze" input: "data" output: "report" score: 0.8 agent: "analyst" duration_ms: 3000} ^
+t.record {name: "summarize" input: "report" output: "summary" score: 0.95 agent: "researcher"} ^
+t.record {name: "review" input: "summary" output: "approved" agent: "reviewer"} ^
+
+by_agent = t.query {agent: "researcher"}
+assert (len by_agent == 2) "query: filter by agent"
+assert (by_agent.0.name == "search") "query: agent filter first"
+assert (by_agent.1.name == "summarize") "query: agent filter second"
+
+by_agent_and_score = t.query {agent: "researcher" min_score: 0.91}
+assert (len by_agent_and_score == 1) "query: agent + min_score"
+
+t.record_hop {msg_id: "req-1" from: "user" to: "researcher" action: "search"} ^
+t.record_hop {msg_id: "req-1" from: "researcher" to: "analyst" action: "analyze"} ^
+t.record_hop {msg_id: "req-1" from: "analyst" to: "reviewer" action: "review"} ^
+
+path = t.message_path "req-1"
+assert (len path == 3) "message_path: 3 hops"
+assert (path.0.from == "user") "message_path: starts at user"
+assert (path.0.to == "researcher") "message_path: first hop to researcher"
+assert (path.1.from == "researcher") "message_path: second hop from researcher"
+assert (path.1.to == "analyst") "message_path: second hop to analyst"
+assert (path.2.from == "analyst") "message_path: third hop from analyst"
+assert (path.2.to == "reviewer") "message_path: third hop to reviewer"
+
+hops = t.message_hops "req-1"
+assert (hops == 3) "message_hops: count is 3"
+
+hops_none = t.message_hops "nonexistent"
+assert (hops_none == 0) "message_hops: 0 for unknown msg_id"
+
+t.record_hop {msg_id: "req-2" from: "user" to: "researcher"} ^
+path2 = t.message_path "req-2"
+assert (len path2 == 1) "message_path: single hop"
+
+rs = t.agent_score "researcher"
+assert (rs.agent == "researcher") "agent_score: name"
+assert (rs.span_count == 2) "agent_score: 2 spans"
+assert (rs.scored_count == 2) "agent_score: 2 scored"
+assert (rs.avg_score > 0.9) "agent_score: avg above 0.9"
+assert (rs.hop_count == 3) "agent_score: 3 hops (1 from + 2 to)"
+
+as = t.agent_score "analyst"
+assert (as.span_count == 1) "agent_score analyst: 1 span"
+assert (as.hop_count == 2) "agent_score analyst: 2 hops"
+assert (as.avg_duration_ms == 3000) "agent_score analyst: duration"
+
+vs = t.agent_score "reviewer"
+assert (vs.span_count == 1) "agent_score reviewer: 1 span"
+assert (vs.scored_count == 0) "agent_score reviewer: 0 scored (no score on span)"
+assert (vs.avg_score == 0.0) "agent_score reviewer: 0 avg when unscored"
+
+unknown = t.agent_score "nobody"
+assert (unknown.span_count == 0) "agent_score: 0 for unknown agent"
+assert (unknown.hop_count == 0) "agent_score: 0 hops for unknown"
+
+ranking = t.agent_rank ()
+assert (len ranking >= 3) "agent_rank: at least 3 agents"
+assert (ranking.0.agent == "researcher") "agent_rank: researcher first (highest avg_score)"
+assert (ranking.0.avg_score >= ranking.1.avg_score) "agent_rank: sorted descending"
+
+t2 = TraceStore ()
+empty_rank = t2.agent_rank ()
+assert (len empty_rank == 0) "agent_rank: empty on fresh store"
+
+empty_score = t2.agent_score "anyone"
+assert (empty_score.span_count == 0) "agent_score: 0 on fresh store"
+
+log.info "83_trace_provenance: all passed"

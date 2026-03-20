@@ -7,21 +7,23 @@ use lx::backends::RuntimeCtx;
 pub fn run(
     source: &str,
     filename: &str,
-    ctx: Arc<RuntimeCtx>,
+    ctx: &Arc<RuntimeCtx>,
 ) -> Result<(), Vec<lx::error::LxError>> {
     let tokens = lx::lexer::lex(source).map_err(|e| vec![e])?;
     let program = lx::parser::parse(tokens).map_err(|e| vec![e])?;
     let source_dir = Path::new(filename).parent().map(|p| p.to_path_buf());
-    let mut interp = lx::interpreter::Interpreter::new(source, source_dir, ctx);
-    match interp.exec(&program) {
-        Ok(val) => {
-            if !matches!(val, lx::value::Value::Unit) {
-                println!("{val}");
+    let mut interp = lx::interpreter::Interpreter::new(source, source_dir, Arc::clone(ctx));
+    ctx.tokio_runtime.block_on(async {
+        match interp.exec(&program).await {
+            Ok(val) => {
+                if !matches!(val, lx::value::Value::Unit) {
+                    println!("{val}");
+                }
+                Ok(())
             }
-            Ok(())
+            Err(e) => Err(vec![e]),
         }
-        Err(e) => Err(vec![e]),
-    }
+    })
 }
 
 pub fn read_and_parse(path: &str) -> Result<(String, lx::ast::Program), ExitCode> {

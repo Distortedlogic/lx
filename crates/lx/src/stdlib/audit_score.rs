@@ -3,7 +3,7 @@ use std::sync::Arc;
 use num_bigint::BigInt;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::call_value;
+use crate::builtins::call_value_sync;
 use crate::error::LxError;
 use crate::record;
 use crate::span::Span;
@@ -50,7 +50,7 @@ pub(super) fn bi_evaluate(
                 span,
             )
         })?;
-        let result = call_value(check_fn, data.clone(), span, ctx)?;
+        let result = call_value_sync(check_fn, data.clone(), span, ctx)?;
         let passed = matches!(result, Value::Bool(true));
         let score: i64 = if passed { 100 } else { 0 };
         total_score += score * weight;

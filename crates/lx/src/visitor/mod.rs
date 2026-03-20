@@ -179,6 +179,9 @@ pub trait AstVisitor {
     fn visit_agent_ask(&mut self, target: &SExpr, msg: &SExpr, span: Span) {
         walk_agent_ask(self, target, msg, span);
     }
+    fn visit_stream_ask(&mut self, target: &SExpr, msg: &SExpr, span: Span) {
+        walk_agent_ask(self, target, msg, span);
+    }
     fn visit_emit(&mut self, value: &SExpr, span: Span) {
         walk_emit(self, value, span);
     }

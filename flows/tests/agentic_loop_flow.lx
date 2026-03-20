@@ -23,8 +23,7 @@ use pkg/circuit {CircuitBreaker}
         breaker.record action_name
         turn_count <- turn_count + 1
 
-        is_done = turn.done ?? false
-        is_done ? {
+        (turn.done ?? false) ? {
           true -> {
             completed <- true
             last_thought <- turn.thought ?? ""

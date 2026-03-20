@@ -22,7 +22,7 @@ BUGS.md says "fix bugs before new features." 60 sessions of feature work have ac
 - Named-arg `:` vs ternary `:` — inherent parser ambiguity, workaround (parenthesize) is fine
 - `is_func_def` heuristic ambiguity — fixed in Session 64 (`application_depth` tracking)
 - Keyword field names — fundamental to how keywords work, `flow.parallel` pattern is fine
-- par/sel/pmap sequential — needs tokio, architectural change
+- par/sel/pmap sequential — FIXED Session 71d (async interpreter, futures::join_all/select_all)
 - Trait conformance uncatchable — by design (hard error at definition time)
 
 **Session 62: Feature consolidation audit (collaborative with user)** ✓ DONE
@@ -72,19 +72,19 @@ Tier 1 completed: `std/retry` (Session 44), `std/user` + `std/profile` (Session 
 
 11. ~~**`agent.pipeline`**~~ — SHIPPED Session 66. 11 functions: `pipeline`, `pipeline_send`, `pipeline_collect`, `pipeline_batch`, `pipeline_stats`, `pipeline_on_pressure`, `pipeline_pause`, `pipeline_resume`, `pipeline_drain`, `pipeline_close`, `pipeline_add_worker`. Bounded buffers, 4 overflow policies, pressure callbacks, round-robin workers.
 
-12. **`~>>?` streaming ask** (`spec/agents-streaming.md`) — Stream partial results from long-running agents. Token already lexed (Session 31).
+12. ~~**`~>>?` streaming ask**~~ — SHIPPED Session 67. `Value::Stream` (mpsc channel), `Expr::StreamAsk`, `TildeArrowArrowQ` token. Local + subprocess streaming. HOFs work on streams. `agent.emit_stream`/`agent.end_stream`. 1 Rust file (agent_stream.rs).
 
 ## Tier 3 — Multi-agent infrastructure, adaptive intelligence
 
-13. **`pkg/trace` extensions** — Provenance (message flow tracking as trace spans: `trace.enable_provenance`, `trace.message_path`, `trace.message_hops`) + reputation (agent scoring from trace data: `trace.agent_score`, `trace.agent_rank`). One observability system instead of three separate modules. Absorbs `spec/agents-provenance.md` and `spec/agents-reputation.md`.
+13. ~~**`pkg/trace` extensions**~~ — SHIPPED Session 68. Provenance: `enable_provenance`, `record_hop`, `message_path`, `message_hops`. Reputation: `agent_score`, `agent_rank`. New fields: `provenance: Store ()`, `provenance_enabled`. `record` captures `agent` field, `query` supports `agent` filter. Pure lx.
 
-14. **`std/workspace` collaborative editing** (`spec/agents-workspace.md`) — Multiple agents editing the same artifact concurrently with region claiming and conflict resolution.
+14. ~~**`std/workspace` collaborative editing**~~ — SHIPPED Session 69. 12 functions: `create`, `claim`, `claim_pattern`, `edit`, `append`, `release`, `snapshot`, `regions`, `conflicts`, `resolve`, `history`, `watch`. Line-based region claiming, overlap detection, bound auto-adjustment, regex pattern claiming, watcher callbacks. 2 Rust files (workspace.rs + workspace_edit.rs).
 
-15. **`std/registry` cross-process discovery** (`spec/agents-discovery.md`) — Discovery by trait/protocol/domain, health checking, load-balanced dispatch.
+15. ~~**`std/registry` cross-process discovery**~~ — SHIPPED Session 70. 10 functions: `start`, `stop`, `connect`, `register`, `deregister`, `find`, `find_one`, `health`, `load`, `watch`. In-memory registry with trait/protocol/domain filtering, 4 selection strategies (first, least_loaded, round_robin, random), health/load tracking, watcher callbacks. 3 Rust files (registry.rs + registry_query.rs + registry_store.rs).
 
-16. **`agent.dialogue_fork`/`compare`/`merge`** (`spec/agents-dialogue-branch.md`) — Fork dialogues for tree-of-thought / best-of-N exploration. Fork shares parent history, branches execute in parallel, compare grades them, merge picks the winner.
+16. ~~**`agent.dialogue_fork`/`compare`/`merge`**~~ — SHIPPED Session 71. 4 functions: `dialogue_fork`, `dialogue_compare`, `dialogue_merge`, `dialogue_branches`. Fork shares parent history, parent suspended while forks active, compare grades via user function, merge picks winner and resumes parent. Recursive fork tree cleanup. 1 Rust file (agent_dialogue_branch.rs).
 
-17. **`agent.adapter`/`negotiate_format`** (`spec/agents-format-negotiate.md`) — Runtime Protocol format negotiation. Static field mapping adapters, dynamic capability-based format discovery, one-shot coercion. Enables plug-and-play agent composition across Protocol boundaries.
+17. ~~**`agent.adapter`/`negotiate_format`**~~ — SHIPPED Session 72. 3 functions: `adapter` (static field mapping), `negotiate_format` (runtime negotiation via capabilities), `coerce` (one-shot transform). Levenshtein heuristic for fuzzy field matching. 2 Rust files (agent_adapter.rs + agent_negotiate_fmt.rs).
 
 18. **`agent.reload`/`evolve`** (`spec/agents-hot-reload.md`) — Hot-swap agent handlers without restart. `agent.evolve` for self-update from within handler. Preserves dialogues, interceptors, identity. Enables adaptive long-lived agents.
 
@@ -92,7 +92,7 @@ Tier 1 completed: `std/retry` (Session 44), `std/user` + `std/profile` (Session 
 
 20. **`with context` ambient propagation** (`spec/agents-ambient.md`) — Scoped ambient state flowing through call chains. Now includes cross-process constraint propagation at `agent.spawn` boundaries (absorbs `spec/agents-constraint-propagation.md`).
 
-21. **`lx install/update`** (`spec/package-manifest.md`) — Dependency resolution and lock file management.
+21. ~~**`lx install/update`**~~ — SHIPPED Session 71b. `lx install`/`lx update` with git+path deps, `lx.lock`, `.lx/deps/` module resolution. 4 new CLI files (install.rs, install_ops.rs, lockfile.rs, check.rs).
 
 22. **`meta` block** (`spec/agents-meta.md`) — Strategy-level iteration. `refine` iterates within one approach; `meta` tries fundamentally different approaches.
 
@@ -102,11 +102,14 @@ Tier 1 completed: `std/retry` (Session 44), `std/user` + `std/profile` (Session 
 
 24. **`agent.on` lifecycle hooks** (`spec/agents-lifecycle.md`) — Dynamic hook registration for standalone agents (Agent declarations have `on:` for static hooks). Now includes `:signal` event for reactive interrupt handling.
 
-25. **`std/durable`** (`spec/agents-durable.md`) — Full Temporal-style workflow persistence. When this ships, `std/pipeline` becomes a convenience layer on top.
+25. ~~**`std/durable`**~~ — SHIPPED Session 71b. 8 functions: `workflow`, `run`, `step`, `sleep`, `signal`, `send_signal`, `status`, `list`. File-backed persistence with atomic writes. 3 Rust files (durable.rs + durable_run.rs + durable_io.rs).
 
-## Tier 5 — Parser-heavy, speculative
+## Tier 5 — Architectural
+
+26. ~~**Async interpreter**~~ — SHIPPED Session 71d. `async fn eval()` with `#[async_recursion(?Send)]`. `par`/`sel`/`pmap` → `futures::join_all`/`select_all`. `BuiltinKind::Sync`/`Async` split. `call_value_sync` bridge for 31 stdlib files. Follow-up: remove rayon dep, convert backend traits to async, migrate remaining sync stdlib callers to async builtins.
+
+## Tier 6 — Parser-heavy, speculative
 
 - `|>>` streaming pipe (`spec/concurrency-reactive.md`)
 - `caller` implicit binding (`spec/agents-clarify.md`)
-- `durable` expression (`spec/agents-durable.md`)
 - Deadlock detection (`spec/agents-deadlock.md`)

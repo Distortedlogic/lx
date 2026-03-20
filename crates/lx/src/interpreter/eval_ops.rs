@@ -44,12 +44,16 @@ fn dedent_string(s: &str) -> String {
 }
 
 impl Interpreter {
-    pub(super) fn eval_literal(&mut self, lit: &Literal, span: Span) -> Result<Value, LxError> {
+    pub(super) async fn eval_literal(
+        &mut self,
+        lit: &Literal,
+        span: Span,
+    ) -> Result<Value, LxError> {
         match lit {
             Literal::Int(n) => Ok(Value::Int(n.clone())),
             Literal::Float(f) => Ok(Value::Float(*f)),
             Literal::Bool(b) => Ok(Value::Bool(*b)),
-            Literal::Str(parts) => self.eval_string_parts(parts),
+            Literal::Str(parts) => self.eval_string_parts(parts).await,
             Literal::RawStr(s) => Ok(Value::Str(Arc::from(s.as_str()))),
             Literal::Regex(s) => {
                 let re = regex::Regex::new(s)
@@ -212,13 +216,13 @@ impl Interpreter {
         }
     }
 
-    pub(super) fn eval_unary(
+    pub(super) async fn eval_unary(
         &mut self,
         op: &UnaryOp,
         operand: &SExpr,
         span: Span,
     ) -> Result<Value, LxError> {
-        let v = self.eval(operand)?;
+        let v = self.eval(operand).await?;
         match (op, &v) {
             (UnaryOp::Neg, Value::Int(n)) => Ok(Value::Int(-n)),
             (UnaryOp::Neg, Value::Float(f)) => Ok(Value::Float(-f)),
@@ -230,14 +234,14 @@ impl Interpreter {
         }
     }
 
-    pub(super) fn eval_string_parts(&mut self, parts: &[StrPart]) -> Result<Value, LxError> {
+    pub(super) async fn eval_string_parts(&mut self, parts: &[StrPart]) -> Result<Value, LxError> {
         let mut buf = String::new();
         for part in parts {
             match part {
                 StrPart::Text(t) => buf.push_str(t),
                 StrPart::Interp(e) => {
-                    let v = self.eval(e)?;
-                    let v = self.force_defaults(v, e.span)?;
+                    let v = self.eval(e).await?;
+                    let v = self.force_defaults(v, e.span).await?;
                     buf.push_str(&format!("{v}"));
                 }
             }
@@ -248,22 +252,22 @@ impl Interpreter {
         Ok(Value::Str(Arc::from(buf)))
     }
 
-    pub(super) fn eval_short_circuit(
+    pub(super) async fn eval_short_circuit(
         &mut self,
         left: &SExpr,
         right: &SExpr,
         is_and: bool,
         span: Span,
     ) -> Result<Value, LxError> {
-        let l = self.eval(left)?;
-        let l = self.force_defaults(l, span)?;
+        let l = self.eval(left).await?;
+        let l = self.force_defaults(l, span).await?;
         let short_circuit_on = !is_and;
         let op_name = if is_and { "&&" } else { "||" };
         match l.as_bool() {
             Some(b) if b == short_circuit_on => Ok(Value::Bool(short_circuit_on)),
             Some(_) => {
-                let r = self.eval(right)?;
-                self.force_defaults(r, span)
+                let r = self.eval(right).await?;
+                self.force_defaults(r, span).await
             }
             _ => Err(LxError::type_err(
                 format!("{op_name} requires Bool operands, got {}", l.type_name()),
@@ -272,10 +276,11 @@ impl Interpreter {
         }
     }
 
-    pub(super) fn close_resource(&mut self, val: &Value, span: Span) {
+    pub(super) async fn close_resource(&mut self, val: &Value, span: Span) {
         if let Value::Record(fields) = val
             && let Some(close_fn) = fields.get("close")
-            && let Err(e) = crate::builtins::call_value(close_fn, Value::Unit, span, &self.ctx)
+            && let Err(e) =
+                crate::builtins::call_value(close_fn, Value::Unit, span, &self.ctx).await
         {
             eprintln!("close_resource: close callback failed: {e}");
         }

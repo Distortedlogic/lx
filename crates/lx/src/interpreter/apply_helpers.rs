@@ -68,13 +68,13 @@ impl Interpreter {
         }
     }
 
-    pub(super) fn eval_field_access(
+    pub(super) async fn eval_field_access(
         &mut self,
         expr: &SExpr,
         field: &FieldKind,
         span: Span,
     ) -> Result<Value, LxError> {
-        let val = self.eval(expr)?;
+        let val = self.eval(expr).await?;
         match field {
             FieldKind::Named(name) => match &val {
                 Value::Record(r) => Ok(r.get(name).cloned().unwrap_or(Value::None)),
@@ -122,7 +122,7 @@ impl Interpreter {
                     .ok_or_else(|| LxError::runtime(format!("index {idx} out of bounds"), span))
             }
             FieldKind::Computed(key_expr) => {
-                let key = self.eval(key_expr)?;
+                let key = self.eval(key_expr).await?;
                 match (&val, &key) {
                     (Value::Record(r), Value::Str(s)) => {
                         Ok(r.get(s.as_ref()).cloned().unwrap_or(Value::None))
@@ -168,18 +168,18 @@ impl Interpreter {
         }
     }
 
-    pub(super) fn eval_ternary(
+    pub(super) async fn eval_ternary(
         &mut self,
         cond: &SExpr,
         then_: &SExpr,
         else_: &Option<Box<SExpr>>,
         span: Span,
     ) -> Result<Value, LxError> {
-        let cv = self.eval(cond)?;
+        let cv = self.eval(cond).await?;
         match cv.as_bool() {
-            Some(true) => self.eval(then_),
+            Some(true) => self.eval(then_).await,
             Some(false) => match else_ {
-                Some(e) => self.eval(e),
+                Some(e) => self.eval(e).await,
                 None => Ok(Value::Unit),
             },
             _ => Err(LxError::type_err(

@@ -5,7 +5,7 @@ use dashmap::DashMap;
 use indexmap::IndexMap;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::call_value;
+use crate::builtins::call_value_sync;
 use crate::error::LxError;
 use crate::span::Span;
 use crate::value::Value;
@@ -165,7 +165,7 @@ pub(super) fn select_agent(
         _ => {
             if let Some(f @ (Value::Func(_) | Value::BuiltinFunc(_))) = prefer {
                 let agents: Vec<Value> = candidates.iter().map(|c| c.agent.clone()).collect();
-                let selected = call_value(f, Value::List(Arc::new(agents)), span, ctx)?;
+                let selected = call_value_sync(f, Value::List(Arc::new(agents)), span, ctx)?;
                 let sel_key = agent_key(&selected);
                 Ok(candidates
                     .iter()
@@ -191,7 +191,7 @@ pub(super) fn send_to_agent(
     match agent {
         Value::Record(r) => {
             if let Some(handler) = r.get("handler") {
-                let result = call_value(handler, msg.clone(), span, ctx)?;
+                let result = call_value_sync(handler, msg.clone(), span, ctx)?;
                 return Ok(Value::Ok(Box::new(result)));
             }
             if let Some(pid_val) = r.get("__pid") {

@@ -50,7 +50,7 @@ Protocol +ReactConfig = {
 
     !observation.success ? {
       true -> {
-        verify = worker ~>? {action: "verify" observation: observation} ^
+        verify = worker ~>? {action: "verify" observation} ^
         !verify.should_continue ? break (Err "verification failed: {verify.reason}")
       }
       false -> ()

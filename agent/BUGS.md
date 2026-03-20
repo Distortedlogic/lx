@@ -24,8 +24,4 @@ When you fix a bug, delete its entry. When you discover a bug, add it here.
 - **Root cause:** `call_value` tuple-splatting doesn't propagate through deep HOF chains
 - **Workaround:** Avoid chained tuple-destructuring lambdas in test flows
 
-### par/sel/pmap are sequential
-- **Root cause:** No async runtime. All three execute arms sequentially.
-- **Impact:** Programs work but don't get parallelism. `sel` doesn't actually race.
-- **Fix requires:** tokio integration — architectural change, not a quick fix
 

@@ -1,7 +1,9 @@
 use std::sync::Arc;
+use std::sync::mpsc;
 
 use indexmap::IndexMap;
 use num_bigint::BigInt;
+use parking_lot::Mutex;
 use strum::IntoStaticStr;
 
 use crate::ast::SExpr;
@@ -79,6 +81,10 @@ pub enum Value {
     },
     Store {
         id: u64,
+    },
+    Stream {
+        rx: Arc<Mutex<mpsc::Receiver<Value>>>,
+        cancel_tx: Arc<Mutex<Option<mpsc::Sender<()>>>>,
     },
 }
 
@@ -199,14 +205,27 @@ pub struct LxFunc {
     pub source_name: Arc<str>,
 }
 
-pub type BuiltinFn =
+pub type SyncBuiltinFn =
     fn(&[Value], Span, &std::sync::Arc<crate::backends::RuntimeCtx>) -> Result<Value, LxError>;
+
+pub type AsyncBuiltinFn =
+    fn(
+        Vec<Value>,
+        Span,
+        std::sync::Arc<crate::backends::RuntimeCtx>,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Value, LxError>>>>;
+
+#[derive(Clone, Copy)]
+pub enum BuiltinKind {
+    Sync(SyncBuiltinFn),
+    Async(AsyncBuiltinFn),
+}
 
 #[derive(Clone)]
 pub struct BuiltinFunc {
     pub name: &'static str,
     pub arity: usize,
-    pub func: BuiltinFn,
+    pub kind: BuiltinKind,
     pub applied: Vec<Value>,
 }
 

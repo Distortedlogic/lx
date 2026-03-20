@@ -3,7 +3,7 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::call_value;
+use crate::builtins::call_value_sync;
 use crate::error::LxError;
 use crate::span::Span;
 use crate::value::Value;
@@ -63,7 +63,7 @@ pub(crate) fn bi_run_with(
             match execute_task(task_id, handler, &input, &node.opts, span, ctx) {
                 Ok(result) => {
                     if let Some(cb) = on_complete {
-                        let _ = call_value(
+                        let _ = call_value_sync(
                             cb,
                             Value::Tuple(Arc::new(vec![
                                 Value::Str(Arc::from(task_id.as_str())),
@@ -78,7 +78,7 @@ pub(crate) fn bi_run_with(
                 Err(e) => {
                     let err_str = format!("{e}");
                     if let Some(cb) = on_fail {
-                        let _ = call_value(
+                        let _ = call_value_sync(
                             cb,
                             Value::Tuple(Arc::new(vec![
                                 Value::Str(Arc::from(task_id.as_str())),
@@ -119,7 +119,7 @@ pub(crate) fn bi_run_with(
                 let handler = node.opts.get("handler");
                 let result = execute_task(task_id, handler, &input, &node.opts, span, ctx)?;
                 if let Some(cb) = on_complete {
-                    let _ = call_value(
+                    let _ = call_value_sync(
                         cb,
                         Value::Tuple(Arc::new(vec![
                             Value::Str(Arc::from(task_id.as_str())),
@@ -144,7 +144,7 @@ fn resolve_input(
 ) -> Result<Value, LxError> {
     if let Some(input_from) = opts.get("input_from") {
         let results_rec = Value::Record(Arc::new(results.clone()));
-        return call_value(input_from, results_rec, span, ctx);
+        return call_value_sync(input_from, results_rec, span, ctx);
     }
     if let Some(input) = opts.get("input") {
         return Ok(input.clone());
@@ -193,7 +193,7 @@ fn execute_task(
     let retry_opts = crate::stdlib::retry::RetryOpts::exponential((retry_count + 1) as u64);
     let mut last_err = None;
     for attempt in 0..=retry_count {
-        match call_value(handler, input.clone(), span, ctx) {
+        match call_value_sync(handler, input.clone(), span, ctx) {
             Ok(result) => {
                 if let Some(ref g) = _guard
                     && g.is_expired()

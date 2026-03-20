@@ -3,12 +3,17 @@ use std::sync::Arc;
 use crate::ast::{Param, SExpr};
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::{LxFunc, Value};
+use crate::value::{BuiltinKind, LxFunc, Value};
 
 use super::Interpreter;
 
 impl Interpreter {
-    pub fn apply_func(&mut self, func: Value, arg: Value, span: Span) -> Result<Value, LxError> {
+    pub async fn apply_func(
+        &mut self,
+        func: Value,
+        arg: Value,
+        span: Span,
+    ) -> Result<Value, LxError> {
         match func {
             Value::Func(mut lf) => {
                 if let Value::Unit = &arg
@@ -22,7 +27,7 @@ impl Interpreter {
                     let saved_source =
                         std::mem::replace(&mut self.source, lf.source_text.to_string());
                     self.env = Arc::clone(&lf.closure);
-                    let result = self.eval(&lf.body);
+                    let result = self.eval(&lf.body).await;
                     self.env = saved;
                     self.source = saved_source;
                     return match result {
@@ -59,7 +64,7 @@ impl Interpreter {
                     }
                 }
                 self.env = call_env.into_arc();
-                let result = self.eval(&lf.body);
+                let result = self.eval(&lf.body).await;
                 self.env = saved;
                 self.source = saved_source;
                 match result {
@@ -75,7 +80,10 @@ impl Interpreter {
                 if bf.applied.len() < bf.arity {
                     return Ok(Value::BuiltinFunc(bf));
                 }
-                (bf.func)(&bf.applied, span, &self.ctx)
+                match bf.kind {
+                    BuiltinKind::Sync(f) => f(&bf.applied, span, &self.ctx),
+                    BuiltinKind::Async(f) => f(bf.applied, span, Arc::clone(&self.ctx)).await,
+                }
             }
             Value::TaggedCtor {
                 tag,
@@ -97,10 +105,11 @@ impl Interpreter {
                 }
             }
             Value::Trait { name, fields, .. } if !fields.is_empty() => {
-                self.apply_protocol(&name, &fields, &arg, span)
+                self.apply_protocol(&name, &fields, &arg, span).await
             }
             Value::ProtocolUnion { name, variants } => {
                 self.apply_protocol_union(&name, &variants, &arg, span)
+                    .await
             }
             Value::McpDecl { name, tools } => self.apply_mcp_decl(&name, &tools, &arg, span),
             Value::Class {
@@ -146,7 +155,11 @@ impl Interpreter {
         }
     }
 
-    pub(super) fn force_defaults(&mut self, val: Value, _span: Span) -> Result<Value, LxError> {
+    pub(super) async fn force_defaults(
+        &mut self,
+        val: Value,
+        _span: Span,
+    ) -> Result<Value, LxError> {
         match val {
             Value::Func(ref lf)
                 if lf.applied.len() < lf.arity
@@ -165,7 +178,7 @@ impl Interpreter {
                     }
                 }
                 self.env = call_env.into_arc();
-                let result = self.eval(&lf.body);
+                let result = self.eval(&lf.body).await;
                 self.env = saved;
                 self.source = saved_source;
                 match result {
@@ -177,16 +190,16 @@ impl Interpreter {
         }
     }
 
-    pub(super) fn eval_pipe(
+    pub(super) async fn eval_pipe(
         &mut self,
         left: &SExpr,
         right: &SExpr,
         span: Span,
     ) -> Result<Value, LxError> {
-        let val = self.eval(left)?;
-        let val = self.force_defaults(val, span)?;
-        let func = self.eval(right)?;
-        self.apply_func(func, val, span)
+        let val = self.eval(left).await?;
+        let val = self.force_defaults(val, span).await?;
+        let func = self.eval(right).await?;
+        self.apply_func(func, val, span).await
     }
 
     fn apply_named_args(&self, lf: &mut LxFunc, arg: Value) {
@@ -215,27 +228,30 @@ impl Interpreter {
         }
     }
 
-    pub(super) fn eval_func(&mut self, params: &[Param], body: &SExpr) -> Result<Value, LxError> {
+    pub(super) async fn eval_func(
+        &mut self,
+        params: &[Param],
+        body: &SExpr,
+    ) -> Result<Value, LxError> {
         let param_names: Vec<String> = params.iter().map(|p| p.name.clone()).collect();
-        let defaults: Vec<Option<Value>> = params
-            .iter()
-            .map(|p| {
-                p.default
-                    .as_ref()
-                    .map(|d| {
-                        let mut tmp = Interpreter {
-                            env: Arc::clone(&self.env),
-                            source: self.source.clone(),
-                            source_dir: self.source_dir.clone(),
-                            module_cache: Arc::clone(&self.module_cache),
-                            loading: Arc::clone(&self.loading),
-                            ctx: Arc::clone(&self.ctx),
-                        };
-                        tmp.eval(d)
-                    })
-                    .transpose()
-            })
-            .collect::<Result<_, _>>()?;
+        let mut defaults = Vec::new();
+        for p in params {
+            let d = match &p.default {
+                Some(d) => {
+                    let mut tmp = Interpreter {
+                        env: Arc::clone(&self.env),
+                        source: self.source.clone(),
+                        source_dir: self.source_dir.clone(),
+                        module_cache: Arc::clone(&self.module_cache),
+                        loading: Arc::clone(&self.loading),
+                        ctx: Arc::clone(&self.ctx),
+                    };
+                    Some(tmp.eval(d).await?)
+                }
+                None => None,
+            };
+            defaults.push(d);
+        }
         let arity = params.len();
         let source_name = self
             .source_dir

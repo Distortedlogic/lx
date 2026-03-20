@@ -73,6 +73,7 @@ impl Checker {
                 match self.table.resolve(&t) {
                     Type::Result { ok, .. } => *ok,
                     Type::Maybe(inner) => *inner,
+                    Type::Unknown => Type::Unknown,
                     _ => {
                         self.emit("^ requires Result or Maybe".into(), expr.span);
                         Type::Unknown

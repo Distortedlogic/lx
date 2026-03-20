@@ -1,6 +1,8 @@
 -- lx package: TraceStore class for span recording and analysis
 -- Generic operations (keys/values/save/load) come from Collection.
 -- Domain-specific: record, score, summary, query, progress analysis.
+-- Provenance: message flow tracking via record_hop/message_path/message_hops.
+-- Reputation: agent scoring from trace data via agent_score/agent_rank.
 
 use std/time
 use std/json
@@ -14,6 +16,13 @@ span_counter := 0
 next_span_id = () {
   span_counter <- span_counter + 1
   span_counter
+}
+
+hop_counter := 0
+
+next_hop_id = () {
+  hop_counter <- hop_counter + 1
+  hop_counter
 }
 
 has_score = (sp) sp.score != None
@@ -37,6 +46,8 @@ classify_trend = (avg_delta recent_delta) {
 
 +Class TraceStore : [Collection] = {
   entries: Store ()
+  provenance: Store ()
+  provenance_enabled: false
 
   record = (span_rec) {
     id = next_span_id ()
@@ -48,6 +59,7 @@ classify_trend = (avg_delta recent_delta) {
       output: span_rec.output ?? ""
       score: span_rec.score
       duration_ms: span_rec.duration_ms
+      agent: span_rec.agent
       tags: span_rec.tags ?? []
       created_at: t.iso
     }
@@ -92,11 +104,13 @@ classify_trend = (avg_delta recent_delta) {
     name_f = criteria.name
     min_sc = criteria.min_score
     tag_f = criteria.tag
+    agent_f = criteria.agent
     self.entries.values () | keep (sp) {
       name_ok = name_f == None || sp.name == name_f
       score_ok = min_sc == None || (sp.score != None && sp.score >= min_sc)
       tag_ok = tag_f == None || (contains? tag_f sp.tags)
-      name_ok && score_ok && tag_ok
+      agent_ok = agent_f == None || sp.agent == agent_f
+      name_ok && score_ok && tag_ok && agent_ok
     }
   }
 
@@ -131,5 +145,61 @@ classify_trend = (avg_delta recent_delta) {
       above = deltas | keep (> min_delta)
       (len deltas) > 0 && (len above) == 0
     }
+  }
+
+  enable_provenance = () {
+    self.provenance_enabled <- true
+    Ok ()
+  }
+
+  record_hop = (hop_rec) {
+    id = next_hop_id ()
+    t = time.now ()
+    hop = {
+      id: id
+      msg_id: hop_rec.msg_id ?? (to_str id)
+      from: hop_rec.from ?? "unknown"
+      to: hop_rec.to ?? "unknown"
+      action: hop_rec.action ?? ""
+      timestamp: t.iso
+    }
+    self.provenance.set (to_str id) hop
+    Ok id
+  }
+
+  message_path = (msg_id) {
+    mid = to_str msg_id
+    matched = self.provenance.values () | keep (h) { h.msg_id == mid }
+    matched | sort_by (.id)
+  }
+
+  message_hops = (msg_id) {
+    len (self.message_path msg_id)
+  }
+
+  agent_score = (agent_name) {
+    spans = self.entries.values () | keep (sp) { sp.agent == agent_name }
+    hops = self.provenance.values () | keep (h) { h.from == agent_name || h.to == agent_name }
+    span_count = len spans
+    hop_count = len hops
+    scored_spans = spans | keep has_score
+    scored_count = len scored_spans
+    avg_score = scored_count > 0 ? ((scored_spans | map (.score) | fold 0 (+)) / scored_count) : 0.0
+    dur_spans = spans | keep has_duration
+    avg_dur = (len dur_spans) > 0 ? ((dur_spans | map (.duration_ms) | fold 0 (+)) // (len dur_spans)) : 0
+    {agent: agent_name  span_count: span_count  hop_count: hop_count  avg_score: avg_score  avg_duration_ms: avg_dur  scored_count: scored_count}
+  }
+
+  agent_rank = () {
+    seen = Store ()
+    self.entries.values () | keep (sp) { sp.agent != None } | each (sp) seen.set sp.agent true
+    self.provenance.values () | each (h) {
+      seen.set h.from true
+      seen.set h.to true
+    }
+    seen.remove "unknown"
+    names = seen.keys ()
+    scores = names | map (name) self.agent_score name
+    scores | sort_by (s) { 0 - s.avg_score }
   }
 }

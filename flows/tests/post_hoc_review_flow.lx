@@ -18,10 +18,7 @@ use ../lib/transcript
   pattern_summary = good_names | join "; "
   mistake_summary = bad_names | map (n) { "failed {n}" } | join "; "
 
-  recommendations = fail_count > 0 ? {
-    true -> "Review failures: {mistake_summary}"
-    false -> "Session was clean"
-  }
+  recommendations = fail_count > 0 ? "Review failures: {mistake_summary}" : "Session was clean"
 
   Ok {
     patterns: success_count

@@ -137,51 +137,32 @@ execute_tools = (chain: ReasoningChain  perception: Perception  state: Any) -> [
 }
 
 assemble_response = (chain: ReasoningChain  tool_results: [Any]  perception: Perception  identity: Any  state: Any) -> Response {
-  has_tools = tool_results | len > 0
+  content = tool_results | not empty? ? tool_mod.integrate_results tool_results chain.goal ^ : chain.conclusion
 
-  has_tools ? {
-    integrated = tool_mod.integrate_results tool_results chain.goal ^
-    Response {
-      content: integrated
-      confidence: chain.confidence
-      reasoning_depth: chain.thoughts | len
-      tools_used: tool_results | filter (.success) | map (.tool)
-      sources: tool_results | map (.tool) | uniq
-      follow_up: []
-    }
-  } : {
-    Response {
-      content: chain.conclusion
-      confidence: chain.confidence
-      reasoning_depth: chain.thoughts | len
-      tools_used: []
-      sources: ["reasoning"]
-      follow_up: []
-    }
+  Response {
+    content
+    confidence: chain.confidence
+    reasoning_depth: chain.thoughts | len
+    tools_used: tool_results | filter (.success) | map (.tool)
+    sources: tool_results | not empty? ? tool_results | map (.tool) | uniq : ["reasoning"]
+    follow_up: []
   }
 }
 
 ensure_quality = (response: Response  task: Str  state: Any) -> (Response Any) {
-  mon.should_simplify state ? {
-    quick = quality.quick_check response.content task
-    (response quick)
-  } : {
+  mon.should_simplify state ? (response  quality.quick_check response.content task) : {
     grade = quality.grade_response response.content task
 
     grade.passed ? (response grade) : {
       log.info "below threshold ({grade.score}), refining..."
       refined_content = quality.refine_response response.content task ^
-      refined_response = {..response  content: refined_content}
-      refined_grade = quality.grade_response refined_content task
-      (refined_response refined_grade)
+      ({..response  content: refined_content}  quality.grade_response refined_content task)
     }
   }
 }
 
 reflect_and_learn = (response: Response  perception: Perception  memory_store: Any  state: Any) -> Any {
-  should_remember = response.confidence > 0.7 && perception.complexity != "trivial"
-
-  should_remember ? {
+  response.confidence > 0.7 && perception.complexity != "trivial" ? {
     mem.remember memory_store {
       content: "Q: {perception.raw | take 100} → A approach: {perception.intent}/{perception.domain}"
       domain: perception.domain

@@ -51,29 +51,23 @@ Protocol SetupConfig = {name: Str  lang: Str  db: Bool  monitoring: Bool}
         } ^
         compensate: () forge.delete_repo {name: config.name} ^
       }
-      ..config.db ? {
-        true -> [{
-          name: "database"
-          action: () pg.execute {query: "CREATE DATABASE {db_name}"} ^
-          compensate: () pg.execute {query: "DROP DATABASE IF EXISTS {db_name}"} ^
-        }]
-        false -> []
-      }
-      ..config.monitoring ? {
-        true -> [{
-          name: "monitoring"
-          action: () {
-            mon = uptime_kuma.connect ^
-            result = mon.add_monitor {
-              name: config.name  url: "http://{config.name}:8080/health"  interval: 60
-            } ^
-            uptime_kuma.close mon
-            result
-          }
-          compensate: () ()
-        }]
-        false -> []
-      }
+      ..config.db ? [{
+        name: "database"
+        action: () pg.execute {query: "CREATE DATABASE {db_name}"} ^
+        compensate: () pg.execute {query: "DROP DATABASE IF EXISTS {db_name}"} ^
+      }] : []
+      ..config.monitoring ? [{
+        name: "monitoring"
+        action: () {
+          mon = uptime_kuma.connect ^
+          result = mon.add_monitor {
+            name: config.name  url: "http://{config.name}:8080/health"  interval: 60
+          } ^
+          uptime_kuma.close mon
+          result
+        }
+        compensate: () ()
+      }] : []
     ]
 
     saga_result = saga.run steps

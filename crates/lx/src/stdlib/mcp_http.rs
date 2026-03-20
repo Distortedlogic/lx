@@ -12,9 +12,11 @@ pub(super) struct HttpTransport {
 
 impl HttpTransport {
     pub(super) fn new(url: String, span: Span) -> Result<Self, LxError> {
-        let client = Client::builder()
-            .build()
-            .map_err(|e| LxError::runtime(format!("mcp http: client: {e}"), span))?;
+        let client = tokio::task::block_in_place(|| {
+            Client::builder()
+                .build()
+                .map_err(|e| LxError::runtime(format!("mcp http: client: {e}"), span))
+        })?;
         Ok(HttpTransport {
             client,
             url,
@@ -30,9 +32,10 @@ impl HttpTransport {
         let resp = self.post(req, span)?;
         self.capture_session_id(&resp);
         let ct = content_type(&resp);
-        let body = resp
-            .text()
-            .map_err(|e| LxError::runtime(format!("mcp http: body: {e}"), span))?;
+        let body = tokio::task::block_in_place(|| {
+            resp.text()
+                .map_err(|e| LxError::runtime(format!("mcp http: body: {e}"), span))
+        })?;
         if ct.contains("text/event-stream") {
             parse_sse(&body, req, span)
         } else {
@@ -62,16 +65,16 @@ impl HttpTransport {
         let Some(ref sid) = self.session_id else {
             return Ok(());
         };
-        self.client
-            .delete(&self.url)
-            .header(
-                "Mcp-Session-Id",
-                HeaderValue::from_str(sid)
-                    .map_err(|e| LxError::runtime(format!("mcp http: header: {e}"), span))?,
-            )
-            .send()
-            .map_err(|e| LxError::runtime(format!("mcp http: shutdown: {e}"), span))?;
-        Ok(())
+        let header = HeaderValue::from_str(sid)
+            .map_err(|e| LxError::runtime(format!("mcp http: header: {e}"), span))?;
+        tokio::task::block_in_place(|| {
+            self.client
+                .delete(&self.url)
+                .header("Mcp-Session-Id", header)
+                .send()
+                .map_err(|e| LxError::runtime(format!("mcp http: shutdown: {e}"), span))?;
+            Ok(())
+        })
     }
 
     fn post(
@@ -92,9 +95,11 @@ impl HttpTransport {
                     .map_err(|e| LxError::runtime(format!("mcp http: header: {e}"), span))?,
             );
         }
-        builder
-            .send()
-            .map_err(|e| LxError::runtime(format!("mcp http: send: {e}"), span))
+        tokio::task::block_in_place(|| {
+            builder
+                .send()
+                .map_err(|e| LxError::runtime(format!("mcp http: send: {e}"), span))
+        })
     }
 
     fn capture_session_id(&mut self, resp: &reqwest::blocking::Response) {

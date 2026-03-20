@@ -11,18 +11,18 @@ crates/lx/src/
   backends/    RuntimeCtx struct, backend traits (Ai/Emit/Http/Shell/Yield/Log/User), default impls
   lexer/       Tokenizer — mod, numbers, strings, keywords, helpers
   parser/      Recursive descent — mod + split files per feature (func, infix, prefix, pattern, statements, etc.)
-  checker/     Bidirectional type checker — mod, synth, types
+  checker/     Bidirectional type checker — mod (import resolution), synth, types
   interpreter/ Tree-walking evaluator — mod + split files (agents, apply, eval, modules, patterns, etc.)
   builtins/    Built-in functions — mod, call, str, coll, hof, convert, register, etc.
   visitor/     AST visitor/walker infrastructure
-  stdlib/      31 registered Rust modules + 6 standard agents across ~89 .rs files (use `std_module_exists` in mod.rs as source of truth)
+  stdlib/      34 registered Rust modules + 6 standard agents across ~101 .rs files (use `std_module_exists` in mod.rs as source of truth)
   token.rs, value.rs, value_display.rs, value_impls.rs, ast_display.rs, env.rs, error.rs, span.rs, lib.rs
-crates/lx-cli/src/  main.rs, manifest.rs, testing.rs, listing.rs, run.rs, agent_cmd.rs
+crates/lx-cli/src/  main.rs, manifest.rs, testing.rs, listing.rs, run.rs, agent_cmd.rs, install.rs, install_ops.rs, lockfile.rs, check.rs
 doc/           35 quick-reference docs
 spec/          51 spec files
 agent/         Context files (this folder)
 pkg/           11 lx packages — agent (Trait), collection (Trait), 5 Collection-based Classes (KnowledgeBase, TaskStore, TraceStore, MemoryStore, ContextWindow), 3 standalone Classes (CircuitBreaker, Inspector, Pool), prompt (functional)
-tests/         81 test suites (80 .lx files + 11_modules dir)
+tests/         90 test suites (88 .lx files + 87_export_shadow dir + 11_modules dir)
   fixtures/    Test helpers (agent_echo.lx, orchestrators, servers, test flows)
 flows/
   lib/         15 reusable .lx library modules
@@ -36,7 +36,7 @@ flows/
 1. Create `crates/lx/src/stdlib/mymod.rs` with `pub fn build() -> IndexMap<String, Value>` returning functions via `mk("mymod.fn_name", arity, bi_fn)`
 2. Register in `crates/lx/src/stdlib/mod.rs`: add `mod mymod;`, add `"mymod" => mymod::build()` in `get_std_module`, add `| "mymod"` in `std_module_exists`
 3. Write test in `tests/NN_mymod.lx`
-4. Builtins calling lx functions use `crate::builtins::call_value(f, arg, span, ctx)` (see `builtins/hof.rs` for examples, `builtins/call.rs` for implementation)
+4. Sync builtins calling lx functions use `crate::builtins::call_value_sync(f, arg, span, ctx)` (blocking bridge). Async builtins (HOFs) use `crate::builtins::call_value(f, arg, span, ctx).await`. See `builtins/hof.rs` for async pattern (`mk_async` + `BoxFuture`), `builtins/call.rs` for implementation. **Exception**: background `std::thread::spawn` (e.g., cron) must use `ctx.tokio_runtime.block_on(call_value(...))` — not `call_value_sync` (no tokio Handle on bare threads)
 
 ## Adding Agent Extensions
 
@@ -44,7 +44,7 @@ Extensions to `std/agent` follow the split-file pattern:
 1. Create `crates/lx/src/stdlib/agent_feature.rs` with `pub fn mk_feature() -> Value` returning the builtin
 2. Register `mod agent_feature;` in `stdlib/mod.rs`
 3. Insert into agent module map in `agent.rs`'s `build()`: `m.insert("feature".into(), super::agent_feature::mk_feature())`
-4. For `BuiltinFunc` values with pre-applied args: set `arity` = total args (pre-applied + user-supplied), not just user-supplied count
+4. For `BuiltinFunc` values with pre-applied args: use `kind: BuiltinKind::Sync(fn_ptr)` (not `func:`), set `arity` = total args (pre-applied + user-supplied)
 5. Protocols exposed as uppercase keys (e.g., `"Handoff"`) require selective import: `use std/agent {Handoff}`
 
 ## Class/Agent Implementation

@@ -31,8 +31,5 @@ use pkg/memory {MemoryStore}
 +weekly = (mem) {
   l2 = mem.tier tiers.l2
   ready = l2 | filter (e) e.confidence >= thresholds.consolidate
-  ready | empty? ? {
-    false -> { mem.consolidate (); {consolidated: (ready | len)} }
-    true -> {consolidated: 0}
-  }
+  ready | empty? ? {consolidated: 0} : { mem.consolidate (); {consolidated: (ready | len)} }
 }

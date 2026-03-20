@@ -6,13 +6,13 @@ use crate::span::Span;
 use crate::value::Value;
 
 impl super::Interpreter {
-    pub(super) fn eval_match(
+    pub(super) async fn eval_match(
         &mut self,
         scrutinee: &SExpr,
         arms: &[MatchArm],
         span: Span,
     ) -> Result<Value, LxError> {
-        let val = self.eval(scrutinee)?;
+        let val = self.eval(scrutinee).await?;
         for arm in arms {
             if let Some(bindings) = self.try_match_pattern(&arm.pattern.node, &val) {
                 let saved = Arc::clone(&self.env);
@@ -22,7 +22,7 @@ impl super::Interpreter {
                 }
                 self.env = scope.into_arc();
                 if let Some(guard) = &arm.guard {
-                    let gv = self.eval(guard)?;
+                    let gv = self.eval(guard).await?;
                     match gv.as_bool() {
                         Some(false) => {
                             self.env = saved;
@@ -42,7 +42,7 @@ impl super::Interpreter {
                         }
                     }
                 }
-                let result = self.eval(&arm.body);
+                let result = self.eval(&arm.body).await;
                 self.env = saved;
                 return result;
             }

@@ -19,8 +19,8 @@ use std/agent
     "diagnose"  -> $just diagnose
     _           -> Err "unknown tool: {msg.tool}"
   }
-  success = result ? { Ok _ -> true; Err _ -> false }
-  output = result ? { Ok r -> r.out ?? (to_str r); Err e -> to_str e }
+  success = result | ok?
+  output = result ? { Ok r -> r.out ?? "{r}"; Err e -> "{e}" }
   {success  output}
 }
 

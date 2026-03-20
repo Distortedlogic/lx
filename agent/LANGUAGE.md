@@ -236,10 +236,8 @@ winner = sel {
 }
 ```
 
-`par` runs all arms, returns tuple. `sel` races, first wins. `^` in any arm cancels siblings on error.
-
-Mutable bindings (`:=`) cannot be captured in `par`/`sel`/`pmap` bodies.
+`par` runs all arms concurrently (`futures::join_all`), returns tuple. `sel` races arms, first wins (`futures::select_all`). `pmap`/`pmap_n` map concurrently (`join_all`). The interpreter is fully async (`async fn eval`) — I/O operations yield naturally at `.await` points. `^` in any arm cancels siblings on error.
 
 ## Operator Precedence (high to low)
 
-`.` > juxtaposition > unary > `*/%//` > `+-` > `..` > `++ ~> ~>?` > `|` > comparisons > `&&` > `||` > `??` > `^` > `&` > `->` > `?` > `= := <-`
+`.` > juxtaposition > unary > `*/%//` > `+-` > `..` > `++ ~> ~>? ~>>?` > `|` > comparisons > `&&` > `||` > `??` > `^` > `&` > `->` > `?` > `= := <-`

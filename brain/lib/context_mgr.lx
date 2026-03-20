@@ -37,19 +37,14 @@ use ../protocols {ContextItem CognitiveState}
 +add_tool_result = (win: Any  result: Any) -> Any {
   win.add {
     key: "tool_{result.tool}_{time.now ()}"
-    content: to_str result.output
+    content: "{result.output}"
     tokens: result.tokens_used
     priority: "normal"
   }
 }
 
 +pin_identity = (win: Any  identity: Any) -> Any {
-  win.add {
-    key: "identity"
-    content: "I am {identity.name}, a {identity.role}. Values: {identity.values | join ', '}."
-    tokens: 50
-    priority: "high"
-  }
+  win.add {key: "identity"  content: "I am {identity.name}, a {identity.role}. Values: {identity.values | join ", "}."  tokens: 50  priority: "high"}
   win.pin "identity"
 }
 
@@ -60,7 +55,7 @@ use ../protocols {ContextItem CognitiveState}
 }
 
 +pressure = (win: Any) -> Float {
-  win.usage () | (.pressure)
+  win.usage ().pressure
 }
 
 +pressure_level = (win: Any) -> Str {
@@ -120,19 +115,11 @@ compress_item = (item: Any) -> Str {
 +snapshot = (win: Any) -> Any {
   usage = win.usage ()
   items = win.items ()
-  {
-    capacity: usage.capacity
-    used: usage.used
-    available: usage.available
-    pressure: usage.pressure
-    item_count: len items
-    pinned_count: items | filter (.pinned ?? false) | len
-  }
+  {..usage  item_count: len items  pinned_count: items | filter (.pinned ?? false) | len}
 }
 
 +clear_ephemeral = (win: Any) -> Int {
-  items = win.items ()
-  ephemeral = items | filter (i) i.priority == "low"
+  ephemeral = win.items () | filter (i) i.priority == "low"
   ephemeral | each (item) win.remove item.key
   len ephemeral
 }

@@ -6,13 +6,13 @@ use crate::value::Value;
 use super::Interpreter;
 
 impl Interpreter {
-    pub(super) fn eval_shell(
+    pub(super) async fn eval_shell(
         &mut self,
         mode: &ShellMode,
         parts: &[StrPart],
         span: Span,
     ) -> Result<Value, LxError> {
-        let cmd_str = self.build_shell_string(parts)?;
+        let cmd_str = self.build_shell_string(parts).await?;
         let cmd_trimmed = cmd_str.trim();
         match mode {
             ShellMode::Normal | ShellMode::Block => self.ctx.shell.exec(cmd_trimmed, span),
@@ -20,13 +20,13 @@ impl Interpreter {
         }
     }
 
-    fn build_shell_string(&mut self, parts: &[StrPart]) -> Result<String, LxError> {
+    async fn build_shell_string(&mut self, parts: &[StrPart]) -> Result<String, LxError> {
         let mut cmd = String::new();
         for part in parts {
             match part {
                 StrPart::Text(s) => cmd.push_str(s),
                 StrPart::Interp(expr) => {
-                    let val = self.eval_expr(expr)?;
+                    let val = self.eval_expr(expr).await?;
                     cmd.push_str(&format!("{val}"));
                 }
             }

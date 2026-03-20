@@ -50,7 +50,7 @@ fine_tune_candidates = [
         ..report.text "{results | len} candidates, {ready | len} ready, {skipped | len} skipped"
         ..report.conditional (ready | len > 0) "Ready for Training" [
           ..report.table ["Candidate" "Examples" "Output"]
-            (ready | map (r) [r.name (to_str r.count) r.path])
+            (ready | map (r) [r.name "{r.count}" r.path])
         ]
         ..report.conditional (skipped | len > 0) "Skipped (Insufficient Data)" [
           ..report.bullets (skipped | map (r) "{r.name}: {r.reason}")

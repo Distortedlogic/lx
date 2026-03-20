@@ -54,6 +54,7 @@ pub fn build_runtime_ctx(
         user: Arc::new(DxUserBackend::new(bus.clone(), agent_id)),
         source_dir: parking_lot::Mutex::new(None),
         workspace_members: std::collections::HashMap::new(),
+        dep_dirs: std::collections::HashMap::new(),
         on_agent_event: Some(Arc::new(move |event: AgentEvent| match event {
             AgentEvent::Spawned { id, name } => {
                 bus.send(RuntimeEvent::AgentSpawned {
@@ -70,5 +71,8 @@ pub fn build_runtime_ctx(
                 });
             }
         })),
+        tokio_runtime: Arc::new(
+            tokio::runtime::Runtime::new().expect("failed to create tokio runtime"),
+        ),
     })
 }

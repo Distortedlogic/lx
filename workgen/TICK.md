@@ -33,6 +33,9 @@ via workspace member name. Workgen files can import from flows/, brain/, tests/ 
 **Session 64 (agent/):** pkg packages rewritten with Store + Collection Trait. If workgen
 uses save/load/remove from pkg packages, remove `^` after those calls (they return Unit/value
 directly, not Result).
+**Session 71b (agent/):** `par`/`sel`/`pmap` are now truly parallel. `+` exports no longer shadow
+builtins. `std/durable` for workflow persistence. `lx install`/`lx update` for dependencies.
+Workgen files modernized: ternaries, record shorthand, `sum` in 2 files.
 
 ## This Tick
 

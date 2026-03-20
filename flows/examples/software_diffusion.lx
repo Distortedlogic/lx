@@ -78,10 +78,7 @@ use ../lib/workflow
     }
 
     user_signal = guidance.ask_user {stage: "elicit"  specs  questions: specs.questions}
-    !user_signal.proceed ? {
-      true -> specs <- {..specs  constraints: [..specs.constraints user_signal.feedback]}
-      false -> ()
-    }
+    !user_signal.proceed ? (specs <- {..specs  constraints: [..specs.constraints user_signal.feedback]})
 
     specs <- elicitor ~>? {
       action: "elicit"
@@ -105,10 +102,7 @@ use ../lib/workflow
     (specs.requirements | map to_str)
     (module_specs | map (.responsibility))
 
-  !self_signal.proceed ? {
-    true -> emit "scaffold gap: {self_signal.feedback}"
-    false -> ()
-  }
+  !self_signal.proceed ? (emit "scaffold gap: {self_signal.feedback}")
 
   agent.kill structurer ^
   Ok (skeleton, module_specs)

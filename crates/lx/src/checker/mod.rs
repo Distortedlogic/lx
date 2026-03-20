@@ -3,7 +3,9 @@ pub mod types;
 
 use std::collections::HashMap;
 
-use crate::ast::{BindTarget, Binding, McpOutputType, Program, SStmt, SType, Stmt, TypeExpr};
+use crate::ast::{
+    BindTarget, Binding, McpOutputType, Program, SStmt, SType, Stmt, TypeExpr, UseKind, UseStmt,
+};
 use crate::span::Span;
 
 use types::{Type, UnificationTable};
@@ -172,8 +174,29 @@ impl Checker {
                 self.synth(value);
                 Type::Unit
             }
-            Stmt::Use(_) => Type::Unit,
+            Stmt::Use(u) => {
+                self.resolve_use(u);
+                Type::Unit
+            }
             Stmt::Expr(e) => self.synth(e),
+        }
+    }
+
+    fn resolve_use(&mut self, u: &UseStmt) {
+        match &u.kind {
+            UseKind::Whole => {
+                if let Some(name) = u.path.last() {
+                    self.bind(name.clone(), Type::Unknown);
+                }
+            }
+            UseKind::Alias(alias) => {
+                self.bind(alias.clone(), Type::Unknown);
+            }
+            UseKind::Selective(names) => {
+                for name in names {
+                    self.bind(name.clone(), Type::Unknown);
+                }
+            }
         }
     }
 

@@ -24,10 +24,8 @@ Protocol +Specialist = {name: Str  domain: Str  script: Str  terminal: Bool}
   best = scores | sort_by (.score) | rev | first
   best ? {
     Some b -> {
-      d = b.domain
       conf = b.score > 2 ? 0.9 : (b.score > 0 ? 0.6 : 0.1)
-      spec = by_domain d cat
-      {domain: d  confidence: conf  specialist: spec}
+      {domain: b.domain  confidence: conf  specialist: (by_domain b.domain cat)}
     }
     None -> {domain: "general"  confidence: 0.1  specialist: None}
   }

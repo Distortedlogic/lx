@@ -9,7 +9,7 @@ use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::{call_value, mk};
+use crate::builtins::{call_value_sync, mk};
 use crate::error::LxError;
 use crate::span::Span;
 use crate::value::Value;
@@ -164,7 +164,7 @@ fn bi_scope(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, 
         return Err(LxError::runtime("deadline: not found", span));
     }
     SCOPE_STACK.with(|stack| stack.borrow_mut().push(id));
-    let result = call_value(&args[1], Value::Unit, span, ctx);
+    let result = call_value_sync(&args[1], Value::Unit, span, ctx);
     SCOPE_STACK.with(|stack| stack.borrow_mut().pop());
     match result {
         Ok(v) => Ok(Value::Ok(Box::new(v))),

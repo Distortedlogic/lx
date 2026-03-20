@@ -15,7 +15,7 @@ Agent ResponseSynth: Synthesizer = {
     p = prompt.create ()
       | prompt.system "You are {msg.identity.name}, {msg.identity.role}. {style_config.system_note}"
       | prompt.section "Task" msg.task
-      | prompt.section "Reasoning" (msg.reasoning.conclusion ?? to_str msg.reasoning)
+      | prompt.section "Reasoning" (msg.reasoning.conclusion ?? "{msg.reasoning}")
       | prompt.section "Evidence" evidence
       | prompt.instruction style_config.instruction
       | prompt.constraint "Be direct. Lead with the answer. No filler."
@@ -23,9 +23,7 @@ Agent ResponseSynth: Synthesizer = {
 
     resp = ai.prompt (prompt.render p) ^
 
-    sources = [
-      ..msg.tool_results | map (r) to_str (r.tool ?? "tool")
-    ] | uniq
+    sources = msg.tool_results | map (r) "{r.tool ?? "tool"}" | uniq
 
     confidence = msg.reasoning.confidence ?? 0.5
     depth = msg.reasoning.thoughts ?? [] | len
@@ -34,8 +32,8 @@ Agent ResponseSynth: Synthesizer = {
       content: resp.text
       confidence: confidence
       reasoning_depth: depth
-      tools_used: msg.tool_results | map (r) to_str (r.tool ?? "") | filter (len > 0)
-      sources: sources
+      tools_used: msg.tool_results | map (r) "{r.tool ?? ""}" | filter (not empty?)
+      sources
       follow_up: suggest_follow_ups msg.task resp.text
     }
   }
@@ -77,29 +75,24 @@ style_for = (style: Str) -> {system_note: Str  instruction: Str} {
 gather_evidence = (request: Any) -> Str {
   tool_evidence = request.tool_results
     | filter (r) r.success ?? true
-    | map (r) "- [{to_str (r.tool ?? 'tool')}]: {to_str (r.output ?? '') | take 200}"
+    | map (r) "- [{r.tool ?? "tool"}]: {"{r.output ?? ""}" | take 200}"
 
   reasoning_evidence = request.reasoning.thoughts ?? []
-    | map (t) "- {(t.content ?? to_str t) | take 150}"
+    | map (t) "- {(t.content ?? "{t}") | take 150}"
 
   [..tool_evidence  ..reasoning_evidence] | join "\n"
 }
 
 suggest_follow_ups = (task: Str  response: Str) -> [Str] {
-  response_lower = response | lower
-  suggestions := []
-
-  response_lower | contains? "error" ? {
-    suggestions <- [..suggestions  "want me to fix this error?"]
-  } : ()
-  response_lower | contains? "todo" ? {
-    suggestions <- [..suggestions  "want me to implement the TODOs?"]
-  } : ()
-  task | lower | contains? "explain" ? {
-    suggestions <- [..suggestions  "want me to go deeper on any part?"]
-  } : ()
-
-  suggestions | take 3
+  rl = response | lower
+  [
+    ("error" "want me to fix this error?")
+    ("todo" "want me to implement the TODOs?")
+  ]
+    | filter (kw _) rl | contains? kw
+    | map (.1)
+    | (s) task | lower | contains? "explain" ? [..s  "want me to go deeper on any part?"] : s
+    | take 3
 }
 
 +main = () {

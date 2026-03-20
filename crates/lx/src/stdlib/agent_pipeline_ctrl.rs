@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use num_bigint::BigInt;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::{call_value, mk};
+use crate::builtins::{call_value_sync, mk};
 use crate::error::LxError;
 use crate::span::Span;
 use crate::value::Value;
@@ -113,7 +113,7 @@ pub(super) fn fire_pressure_callbacks(
         (matching, build_stats(&pipeline))
     };
     for cb in callbacks {
-        call_value(&cb, stats.clone(), span, ctx)?;
+        call_value_sync(&cb, stats.clone(), span, ctx)?;
     }
     Ok(())
 }

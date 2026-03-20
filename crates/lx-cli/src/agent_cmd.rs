@@ -27,8 +27,8 @@ pub fn run_agent(script_path: &str) -> ExitCode {
     };
     let source_dir = Path::new(script_path).parent().map(|p| p.to_path_buf());
     let ctx = Arc::new(lx::backends::RuntimeCtx::default());
-    let mut interp = lx::interpreter::Interpreter::new(&source, source_dir, ctx);
-    let handler = match interp.exec(&program) {
+    let mut interp = lx::interpreter::Interpreter::new(&source, source_dir, Arc::clone(&ctx));
+    let handler = match ctx.tokio_runtime.block_on(interp.exec(&program)) {
         Ok(val) => val,
         Err(e) => {
             eprintln!("agent error: {e}");
@@ -53,7 +53,10 @@ pub fn run_agent(script_path: &str) -> ExitCode {
             }
         };
         let msg = lx::stdlib::json_conv::json_to_lx(json_val);
-        match interp.call(handler.clone(), msg) {
+        match ctx
+            .tokio_runtime
+            .block_on(interp.call(handler.clone(), msg))
+        {
             Ok(result) => {
                 let result_json =
                     lx::stdlib::json_conv::lx_to_json(&result, lx::span::Span::default());

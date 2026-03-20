@@ -3,12 +3,12 @@ use std::sync::Arc;
 use crate::ast::{McpOutputType, McpToolDecl};
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::{McpOutputDef, McpToolDef, ProtoFieldDef, Value};
+use crate::value::{BuiltinKind, McpOutputDef, McpToolDef, ProtoFieldDef, Value};
 
 use super::Interpreter;
 
 impl Interpreter {
-    pub(super) fn eval_mcp_decl(
+    pub(super) async fn eval_mcp_decl(
         &mut self,
         name: &str,
         tools: &[McpToolDecl],
@@ -19,7 +19,7 @@ impl Interpreter {
             let mut input = Vec::new();
             for f in &t.input {
                 let default = match &f.default {
-                    Some(e) => Some(self.eval(e)?),
+                    Some(e) => Some(self.eval(e).await?),
                     None => None,
                 };
                 input.push(ProtoFieldDef {
@@ -73,7 +73,7 @@ impl Interpreter {
         }
     }
 
-    pub(super) fn apply_protocol(
+    pub(super) async fn apply_protocol(
         &mut self,
         name: &str,
         fields: &Arc<Vec<ProtoFieldDef>>,
@@ -118,7 +118,7 @@ impl Interpreter {
                 let mut scope = self.env.child();
                 scope.bind(field.name.clone(), val);
                 self.env = scope.into_arc();
-                let ok = self.eval(constraint_expr)?;
+                let ok = self.eval(constraint_expr).await?;
                 self.env = saved;
                 match ok.as_bool() {
                     Some(true) => {}
@@ -134,7 +134,7 @@ impl Interpreter {
         Ok(Value::Record(Arc::new(result)))
     }
 
-    pub(super) fn apply_protocol_union(
+    pub(super) async fn apply_protocol_union(
         &mut self,
         name: &str,
         variants: &Arc<Vec<Arc<str>>>,
@@ -248,7 +248,7 @@ impl Interpreter {
             let wrapper = Value::BuiltinFunc(crate::value::BuiltinFunc {
                 name: "mcp.typed_call",
                 arity: 3,
-                func: crate::stdlib::mcp::typed_call,
+                kind: BuiltinKind::Sync(crate::stdlib::mcp::typed_call),
                 applied: vec![client.clone(), Value::Str(Arc::from(tool.name.as_str()))],
             });
             result.insert(tool.name.clone(), wrapper);

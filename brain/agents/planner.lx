@@ -39,7 +39,7 @@ Agent TaskPlanner: Planner = {
     resp = ai.prompt (prompt.render p) ^
 
     steps = resp.text | lines
-      | filter (l) len (trim l) > 0
+      | filter (l) trim l | not empty?
       | enumerate
       | map (i line) {
           id: "s{i}"
@@ -53,7 +53,7 @@ Agent TaskPlanner: Planner = {
 
     ActionPlan {
       goal: msg.goal
-      steps: steps
+      steps
       estimated_cost: estimated
       risk: estimated > 1.0 ? "high" : estimated > 0.3 ? "medium" : "low"
       fallback: "simplify approach and retry with fewer tools"
@@ -72,7 +72,7 @@ Agent TaskPlanner: Planner = {
 
     resp = ai.prompt (prompt.render p) ^
     new_steps = resp.text | lines
-      | filter (l) len (trim l) > 0
+      | filter (l) trim l | not empty?
       | enumerate
       | map (i line) {
           id: "r{i}"

@@ -3,9 +3,9 @@ use std::sync::Arc;
 use crate::backends::RuntimeCtx;
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::{BuiltinKind, Value};
 
-pub(crate) fn call_value(
+pub(crate) async fn call_value(
     f: &Value,
     arg: Value,
     span: Span,
@@ -37,7 +37,7 @@ pub(crate) fn call_value(
                 }
             }
             interp.set_env(call_env);
-            let result = interp.eval_expr(&lf.body);
+            let result = interp.eval_expr(&lf.body).await;
             match result {
                 Err(LxError::Propagate { value, .. }) => Ok(*value),
                 other => other,
@@ -49,7 +49,10 @@ pub(crate) fn call_value(
             if bf.applied.len() < bf.arity {
                 return Ok(Value::BuiltinFunc(bf));
             }
-            (bf.func)(&bf.applied, span, ctx)
+            match bf.kind {
+                BuiltinKind::Sync(f) => f(&bf.applied, span, ctx),
+                BuiltinKind::Async(f) => f(bf.applied, span, Arc::clone(ctx)).await,
+            }
         }
         Value::TaggedCtor {
             tag,

@@ -159,7 +159,15 @@ impl<'src> Lexer<'src> {
             '~' => {
                 if self.peek() == Some('>') {
                     self.advance();
-                    if self.peek() == Some('?') {
+                    if self.peek() == Some('>') {
+                        self.advance();
+                        if self.peek() == Some('?') {
+                            self.advance();
+                            Ok(Some(self.tok2(TokenKind::TildeArrowArrowQ, start)))
+                        } else {
+                            Ok(Some(self.tok2(TokenKind::TildeArrow, start)))
+                        }
+                    } else if self.peek() == Some('?') {
                         self.advance();
                         Ok(Some(self.tok2(TokenKind::TildeArrowQ, start)))
                     } else {

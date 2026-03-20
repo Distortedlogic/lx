@@ -4,7 +4,7 @@ use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::{call_value, mk};
+use crate::builtins::{call_value_sync, mk};
 use crate::error::LxError;
 use crate::record;
 use crate::span::Span;
@@ -170,7 +170,7 @@ pub(super) fn call_key(
     span: Span,
     ctx: &Arc<RuntimeCtx>,
 ) -> Result<String, LxError> {
-    let result = call_value(key_fn, item.clone(), span, ctx)?;
+    let result = call_value_sync(key_fn, item.clone(), span, ctx)?;
     Ok(format!("{result}"))
 }
 
@@ -212,8 +212,8 @@ pub(super) fn resolve_conflict(
 ) -> Result<Value, LxError> {
     match conflict_fn {
         Some(f) => {
-            let partial = call_value(f, a.clone(), span, ctx)?;
-            call_value(&partial, b.clone(), span, ctx)
+            let partial = call_value_sync(f, a.clone(), span, ctx)?;
+            call_value_sync(&partial, b.clone(), span, ctx)
         }
         None => Ok(a.clone()),
     }
@@ -232,7 +232,7 @@ fn bi_reconcile(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Val
         Strategy::MaxScore => score::do_max_score(results, &cfg, span, ctx),
         Strategy::MergeFields => score::do_merge_fields(results, &cfg, span, ctx),
         Strategy::Custom(f) => {
-            let merged = call_value(&f, args[0].clone(), span, ctx)?;
+            let merged = call_value_sync(&f, args[0].clone(), span, ctx)?;
             Ok(make_result(
                 merged,
                 results.len(),

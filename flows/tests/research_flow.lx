@@ -15,40 +15,22 @@ use ../lib/scoring
   all_sources = [..web ..codebase ..github]
   source_count = all_sources | len
 
-  ranked = all_sources | sort_by (s) { 0.0 - (s.relevance ?? 0.0) }
+  ranked = all_sources | sort_by (s) 0.0 - (s.relevance ?? 0.0)
 
-  top_pick = ranked | first
-  top_summary = top_pick ? {
-    Some item -> item.summary ?? "none"
-    None -> "no results"
-  }
+  top_summary = ranked | first ? { Some item -> item.summary ?? "none"; None -> "no results" }
 
-  has_github = github | len > 0
-  has_codebase = codebase | len > 0
-  has_web = web | len > 0
+  confidence = source_count > 3 ? "high" : (source_count > 1 ? "medium" : "low")
 
-  confidence = source_count > 3 ? {
-    true -> "high"
-    false -> source_count > 1 ? {
-      true -> "medium"
-      false -> "low"
-    }
-  }
-
-  recommendation = !has_github ? {
-    true -> "no OSS match found, recommend custom implementation"
-    false -> {
-      top_gh = github | first
-      top_gh ? {
-        Some gh -> "consider {gh.repo ?? gh.summary}: {gh.summary}"
-        None -> "no specific recommendation"
-      }
+  recommendation = github | empty? ? "no OSS match found, recommend custom implementation" : {
+    github | first ? {
+      Some gh -> "consider {gh.repo ?? gh.summary}: {gh.summary}"
+      None -> "no specific recommendation"
     }
   }
 
   Ok {
     sources: source_count
-    findings: all_sources | map (s) { s.summary ?? "unknown" } | join "; "
+    findings: all_sources | map (s) s.summary ?? "unknown" | join "; "
     recommendation: recommendation
     confidence: confidence
     request: request

@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_recursion::async_recursion;
 use indexmap::IndexMap;
 
 use crate::ast::{BindTarget, Stmt};
@@ -24,11 +25,12 @@ fn binding_pattern_hint(pat_str: &str) -> Option<&'static str> {
 }
 
 impl Interpreter {
-    pub(crate) fn eval_stmt(&mut self, stmt: &crate::ast::SStmt) -> Result<Value, LxError> {
+    #[async_recursion(?Send)]
+    pub(crate) async fn eval_stmt(&mut self, stmt: &crate::ast::SStmt) -> Result<Value, LxError> {
         match &stmt.node {
             Stmt::Binding(b) => {
-                let val = self.eval(&b.value)?;
-                let val = self.force_defaults(val, stmt.span)?;
+                let val = self.eval(&b.value).await?;
+                let val = self.force_defaults(val, stmt.span).await?;
                 match &b.target {
                     BindTarget::Name(name) => {
                         if self.env.has_mut(name) {
@@ -83,7 +85,7 @@ impl Interpreter {
                 Ok(Value::Unit)
             }
             Stmt::Use(use_stmt) => {
-                self.eval_use(use_stmt, stmt.span)?;
+                self.eval_use(use_stmt, stmt.span).await?;
                 Ok(Value::Unit)
             }
             Stmt::TypeDef { variants, .. } => {
@@ -113,12 +115,12 @@ impl Interpreter {
                 Ok(Value::Unit)
             }
             Stmt::Protocol { name, entries, .. } => {
-                self.eval_protocol_def(name, entries, stmt.span)
+                self.eval_protocol_def(name, entries, stmt.span).await
             }
             Stmt::ProtocolUnion(def) => {
                 self.eval_protocol_union(&def.name, &def.variants, stmt.span)
             }
-            Stmt::McpDecl { name, tools, .. } => self.eval_mcp_decl(name, tools, stmt.span),
+            Stmt::McpDecl { name, tools, .. } => self.eval_mcp_decl(name, tools, stmt.span).await,
             Stmt::TraitDecl {
                 name,
                 methods,
@@ -133,7 +135,7 @@ impl Interpreter {
                     let mut input = Vec::new();
                     for f in &m.input {
                         let default = match &f.default {
-                            Some(e) => Some(self.eval(e)?),
+                            Some(e) => Some(self.eval(e).await?),
                             None => None,
                         };
                         input.push(crate::value::ProtoFieldDef {
@@ -152,7 +154,7 @@ impl Interpreter {
                 }
                 let mut default_impls = IndexMap::new();
                 for d in defaults {
-                    let handler = self.eval(&d.handler)?;
+                    let handler = self.eval(&d.handler).await?;
                     default_impls.insert(d.name.clone(), handler);
                 }
                 let val = Value::Trait {
@@ -179,21 +181,21 @@ impl Interpreter {
             } => {
                 let mut method_map = IndexMap::new();
                 for m in methods {
-                    let handler = self.eval(&m.handler)?;
+                    let handler = self.eval(&m.handler).await?;
                     method_map.insert(m.name.clone(), handler);
                 }
                 if let Some(expr) = init {
-                    method_map.insert("init".into(), self.eval(expr)?);
+                    method_map.insert("init".into(), self.eval(expr).await?);
                 }
                 if let Some(expr) = on {
-                    method_map.insert("on".into(), self.eval(expr)?);
+                    method_map.insert("on".into(), self.eval(expr).await?);
                 }
                 if self.env.get("Agent").is_none() {
                     let use_stmt = crate::ast::UseStmt {
                         path: vec!["pkg".into(), "agent".into()],
                         kind: crate::ast::UseKind::Selective(vec!["Agent".into()]),
                     };
-                    self.eval_use(&use_stmt, stmt.span)?;
+                    self.eval_use(&use_stmt, stmt.span).await?;
                 }
                 let mut all_traits: Vec<String> = vec!["Agent".into()];
                 for t in traits {
@@ -229,12 +231,12 @@ impl Interpreter {
             } => {
                 let mut defaults_map = IndexMap::new();
                 for f in fields {
-                    let val = self.eval(&f.default)?;
+                    let val = self.eval(&f.default).await?;
                     defaults_map.insert(f.name.clone(), val);
                 }
                 let mut method_map = IndexMap::new();
                 for m in methods {
-                    let handler = self.eval(&m.handler)?;
+                    let handler = self.eval(&m.handler).await?;
                     method_map.insert(m.name.clone(), handler);
                 }
                 Self::inject_traits(&mut method_map, traits, &self.env, "Class", name, stmt.span)?;
@@ -254,7 +256,7 @@ impl Interpreter {
                 fields,
                 value,
             } => {
-                let new_val = self.eval(value)?;
+                let new_val = self.eval(value).await?;
                 let current = self.env.get(name).ok_or_else(|| {
                     LxError::runtime(format!("undefined variable '{name}'"), stmt.span)
                 })?;
@@ -269,7 +271,7 @@ impl Interpreter {
                     .map_err(|e| LxError::runtime(e, stmt.span))?;
                 Ok(Value::Unit)
             }
-            Stmt::Expr(e) => self.eval(e),
+            Stmt::Expr(e) => self.eval(e).await,
         }
     }
 }

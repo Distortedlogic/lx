@@ -52,12 +52,7 @@ use ../lib/context_mgr : ctx_mgr
         handoff = Handoff {
           from: "perception"
           to: "reasoning"
-          context: agent.as_context {
-            intent: perception.intent
-            domain: perception.domain
-            complexity: perception.complexity
-            memories: memories
-          }
+          context: agent.as_context {intent: perception.intent  domain: perception.domain  complexity: perception.complexity  memories}
           task: perception.raw
         }
 
@@ -129,11 +124,11 @@ use ../lib/context_mgr : ctx_mgr
         } : chain.conclusion
 
         Response {
-          content: content
+          content
           confidence: chain.confidence
           reasoning_depth: chain.thoughts | len
-          tools_used: successful | map (r) to_str (r.tool ?? "")
-          sources: successful | map (r) to_str (r.tool ?? "reasoning") | uniq
+          tools_used: successful | map (r) "{r.tool ?? ""}"
+          sources: successful | map (r) "{r.tool ?? "reasoning"}" | uniq
           follow_up: []
         }
       }

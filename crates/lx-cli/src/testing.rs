@@ -155,6 +155,7 @@ fn execute_tests(
     entries: &[TestEntry],
     workspace_members: &HashMap<String, PathBuf>,
 ) -> TestResults {
+    let dep_dirs = crate::manifest::try_load_dep_dirs();
     let mut passed = 0;
     let mut failed = 0;
     let mut fail_details = Vec::new();
@@ -168,10 +169,11 @@ fn execute_tests(
         };
         let ctx = Arc::new(RuntimeCtx {
             workspace_members: workspace_members.clone(),
+            dep_dirs: dep_dirs.clone(),
             ..RuntimeCtx::default()
         });
         let filename = entry.path.to_str().unwrap_or(&entry.name);
-        match crate::run::run(&source, filename, ctx) {
+        match crate::run::run(&source, filename, &ctx) {
             Ok(()) => {
                 println!("PASS {}", entry.name);
                 passed += 1;

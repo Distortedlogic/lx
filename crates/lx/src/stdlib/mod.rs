@@ -1,6 +1,8 @@
 pub(crate) mod agent;
+mod agent_adapter;
 mod agent_capability;
 mod agent_dialogue;
+mod agent_dialogue_branch;
 mod agent_dispatch;
 pub mod agent_errors;
 mod agent_gate;
@@ -9,6 +11,7 @@ mod agent_intercept;
 mod agent_ipc;
 mod agent_mock;
 mod agent_negotiate;
+mod agent_negotiate_fmt;
 mod agent_pipeline;
 mod agent_pipeline_ctrl;
 mod agent_pipeline_io;
@@ -18,6 +21,7 @@ mod agent_reconcile_score;
 mod agent_reconcile_strat;
 mod agent_route;
 mod agent_route_table;
+pub(crate) mod agent_stream;
 mod agent_supervise;
 mod agents_auditor;
 mod agents_grader;
@@ -35,6 +39,9 @@ pub(crate) mod deadline;
 mod describe;
 pub mod diag;
 mod diag_walk;
+mod durable;
+mod durable_io;
+mod durable_run;
 mod env;
 mod flow;
 mod fs;
@@ -60,6 +67,9 @@ mod profile;
 mod profile_io;
 mod profile_strategy;
 mod re;
+mod registry;
+mod registry_query;
+mod registry_store;
 pub(crate) mod retry;
 mod saga;
 mod step_deps;
@@ -75,6 +85,8 @@ mod test;
 mod time;
 mod trait_ops;
 mod user;
+mod workspace;
+mod workspace_edit;
 
 use crate::interpreter::ModuleExports;
 
@@ -115,6 +127,7 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
             "budget" => budget::build(),
             "describe" => describe::build(),
             "diag" => diag::build(),
+            "durable" => durable::build(),
             "pipeline" => pipeline::build(),
             "plan" => plan::build(),
             "retry" => retry::build(),
@@ -123,8 +136,10 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
             "taskgraph" => taskgraph::build(),
             "test" => test::build(),
             "profile" => profile::build(),
+            "registry" => registry::build(),
             "trait" => trait_ops::build(),
             "user" => user::build(),
+            "workspace" => workspace::build(),
             _ => return None,
         }
     };
@@ -167,6 +182,7 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
             | "deadline"
             | "describe"
             | "diag"
+            | "durable"
             | "pipeline"
             | "plan"
             | "retry"
@@ -175,7 +191,9 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
             | "taskgraph"
             | "test"
             | "profile"
+            | "registry"
             | "trait"
             | "user"
+            | "workspace"
     )
 }

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::call_value;
+use crate::builtins::call_value_sync;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
@@ -102,7 +102,7 @@ fn bi_ask_with(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Valu
             .map_err(|e| LxError::runtime(format!("user.ask_with: {e}"), span))?;
         if let Some(pred) = validate {
             let val = Value::Str(Arc::from(result.as_str()));
-            let check = call_value(pred, val, span, ctx)?;
+            let check = call_value_sync(pred, val, span, ctx)?;
             if check == Value::Bool(false) {
                 continue;
             }

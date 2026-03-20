@@ -21,7 +21,7 @@ Agent InnerCritic: Critic = {
       | prompt.system "You are a rigorous critic. Find flaws, gaps, and risks. Be honest, not kind."
       | prompt.section "Content ({msg.content_type})" msg.content
       | prompt.section "Original Task" msg.task
-      | prompt.section "Claimed Confidence" (to_str msg.confidence)
+      | prompt.section "Claimed Confidence" "{msg.confidence}"
       | prompt.instruction "Find: 1) Factual errors 2) Logical gaps 3) Missing edge cases 4) Security risks"
       | prompt.constraint "If the content is actually good, say so briefly. Don't manufacture issues."
 
@@ -32,14 +32,11 @@ Agent InnerCritic: Critic = {
     risks = issues | filter (contains? "risk")
     issue_count = len flaws + len risks
 
-    confidence_penalty = issue_count * 0.1
-    revised = msg.confidence - confidence_penalty | math.max 0.1
-
     {
-      flaws: flaws
-      risks: risks
+      flaws
+      risks
       severity: issue_count > 5 ? "high" : issue_count > 2 ? "medium" : issue_count > 0 ? "low" : "none"
-      revised_confidence: revised
+      revised_confidence: msg.confidence - issue_count * 0.1 | math.max 0.1
     }
   }
 

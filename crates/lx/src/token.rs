@@ -83,6 +83,7 @@ pub enum TokenKind {
 
     TildeArrow,
     TildeArrowQ,
+    TildeArrowArrowQ,
     Protocol,
     Mcp,
     Trait,

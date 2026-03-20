@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use num_bigint::BigInt;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::call_value;
+use crate::builtins::call_value_sync;
 use crate::error::LxError;
 use crate::record;
 use crate::span::Span;
@@ -91,14 +91,14 @@ fn run_one_scenario(scenario_val: &Value, rc: &RunCtx<'_>) -> Result<Value, LxEr
 
     for _ in 0..runs {
         if let Some(setup_fn) = rc.setup {
-            call_value(setup_fn, scenario_val.clone(), span, rc.ctx)?;
+            call_value_sync(setup_fn, scenario_val.clone(), span, rc.ctx)?;
         }
         let start = Instant::now();
         let output = invoke_flow(rc.flow_path, &input, rc.ctx, span)?;
         let elapsed_ms = start.elapsed().as_millis() as i64;
 
         let grader_input = Value::Tuple(Arc::new(vec![output.clone(), scenario_val.clone()]));
-        let scores_val = call_value(rc.grader, grader_input, span, rc.ctx)?;
+        let scores_val = call_value_sync(rc.grader, grader_input, span, rc.ctx)?;
         let scores_map = match &scores_val {
             Value::Record(r) => r.as_ref().clone(),
             _ => {
@@ -121,7 +121,7 @@ fn run_one_scenario(scenario_val: &Value, rc: &RunCtx<'_>) -> Result<Value, LxEr
             "elapsed_ms" => Value::Int(BigInt::from(elapsed_ms)),
         });
         if let Some(teardown_fn) = rc.teardown {
-            call_value(teardown_fn, scenario_val.clone(), span, rc.ctx)?;
+            call_value_sync(teardown_fn, scenario_val.clone(), span, rc.ctx)?;
         }
     }
 

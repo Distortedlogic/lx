@@ -7,7 +7,7 @@ use std/agent
 +main = () {
   agent.dispatch %{
     "implement": (msg) {
-      ai.prompt_structured "Implement the body for function '{msg.function}'.\nSpec: {to_str msg.spec}\nContext: {msg.context}" {
+      ai.prompt_structured "Implement the body for function '{msg.function}'.\nSpec: {msg.spec}\nContext: {msg.context}" {
         code: Str
         tests: Str
       } ^

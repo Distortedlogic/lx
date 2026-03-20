@@ -9,7 +9,7 @@ use indexmap::IndexMap;
 use num_bigint::BigInt;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::{call_value, mk};
+use crate::builtins::{call_value_sync, mk};
 use crate::error::LxError;
 use crate::record;
 use crate::span::Span;
@@ -150,7 +150,7 @@ fn bi_stage(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, 
         return Ok(Value::Ok(Box::new(json_conv::json_to_lx(jv))));
     }
     let started = now_str();
-    let result = call_value(body, input.clone(), span, ctx);
+    let result = call_value_sync(body, input.clone(), span, ctx);
     match result {
         Ok(Value::Err(inner)) => {
             let msg = format!("{}", *inner);

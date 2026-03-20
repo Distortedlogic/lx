@@ -3,7 +3,7 @@
 
 # Design Health
 
-Updated after Session 66 (2026-03-19).
+Updated after Session 72 (2026-03-19).
 
 ## What Works
 
@@ -17,16 +17,12 @@ Updated after Session 66 (2026-03-19).
 
 ## What's Still Wrong
 
-**`lx check` is noisy on files with imports.** The type checker doesn't resolve `use` statements — it only sees the parsed AST of a single file. Any file that imports and uses external names produces false "undefined variable" diagnostics. `lx check` on the workspace reports 122 errors, almost all false positives from unresolved imports. Single-file `lx check tests/01_literals.lx` (no imports) works correctly. Fix requires the checker to either resolve imports or suppress diagnostics for imported names.
+**`? { }` is always parsed as match block.** `cond ? { ... }` after `?` starts a match block, not a regular block. Record spreads like `{..a, b: c}` inside `? { ... }` fail with "unexpected DotDot in pattern." Workaround: use parens `? ({..a, b: c})` or extract to a function.
+
+**`lx check` still has 31 residual errors on workspace.** Import resolution dropped false positives from 122→31. Remaining are real checker limitations (infinite type in reassignment, negation on pattern-bound vars) and parse errors in brain/flows files — not import-related.
 
 See `agent/PRIORITIES.md` for the full ordered work queue.
 
-## What's Still Wrong (continued)
-
-**Export names shadow builtins in lx packages.** `+filter` as an export name shadows the builtin `filter` HOF inside the module. Discovered when converting trace — had to rename `trace.filter` → `trace.query`. Any lx package exporting a name that matches a builtin (filter, map, fold, etc.) will hit this. Not a parser bug — it's environment scoping. Workaround: avoid builtin names in exports, or capture the builtin before the export (`keep = filter`).
-
-**`? { }` is always parsed as match block.** `cond ? { ... }` after `?` starts a match block, not a regular block. Record spreads like `{..a, b: c}` inside `? { ... }` fail with "unexpected DotDot in pattern." Workaround: use parens `? ({..a, b: c})` or extract to a function.
-
 ## Bottom Line
 
-Session 66: `agent.pipeline` ships consumer-driven flow control with backpressure — 11 functions connecting agents into processing pipelines with bounded buffers, overflow policies, pressure monitoring, and round-robin worker scaling. Tail-first pump algorithm ensures downstream stages drain first, creating natural backpressure. Synchronous implementation (real concurrency needs tokio). The agent system now supports both ad-hoc messaging (`~>?`, pub/sub, routing) and structured pipeline processing. 82/82 tests pass.
+Session 72: Protocol format negotiation shipped (`agent.adapter`/`negotiate_format`/`coerce`). 15 agent extensions now. Async interpreter stable. 91/91 tests pass. 0 errors, 0 warnings.

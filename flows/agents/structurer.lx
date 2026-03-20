@@ -7,14 +7,14 @@ use std/agent
 +main = () {
   agent.dispatch %{
     "scaffold": (msg) {
-      ai.prompt_structured "Decompose these requirements into crates/modules with tech stack and boundaries.\n\nRequirements:\n{to_str msg.specs}" {
+      ai.prompt_structured "Decompose these requirements into crates/modules with tech stack and boundaries.\n\nRequirements:\n{msg.specs}" {
         modules: [{name: Str  responsibility: Str  deps: [Str]}]
         tech_stack: [Str]
         boundaries: [Str]
       } ^
     }
     "spec": (msg) {
-      ai.prompt_structured "Generate SPEC.md for module '{msg.module.name}'.\nResponsibility: {msg.module.responsibility}\nDeps: {msg.module.deps | join ", "}\nConstraints: {to_str msg.constraints}" {
+      ai.prompt_structured "Generate SPEC.md for module '{msg.module.name}'.\nResponsibility: {msg.module.responsibility}\nDeps: {msg.module.deps | join ", "}\nConstraints: {msg.constraints}" {
         responsibility: Str
         public_api: [{name: Str  signature: Str}]
         dependencies: [Str]

@@ -6,7 +6,7 @@ use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::call_value;
+use crate::builtins::call_value_sync;
 use crate::error::LxError;
 use crate::span::Span;
 use crate::value::Value;
@@ -137,7 +137,7 @@ pub(super) fn do_vote(
         let vote_val = vote_of(result);
         let w = match &cfg.weight {
             Some(wf) => {
-                let w_val = call_value(wf, Value::Int(BigInt::from(i)), span, ctx)?;
+                let w_val = call_value_sync(wf, Value::Int(BigInt::from(i)), span, ctx)?;
                 w_val
                     .as_float()
                     .or_else(|| w_val.as_int().and_then(|n| n.to_f64()))

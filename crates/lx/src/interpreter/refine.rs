@@ -5,7 +5,6 @@ use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 
 use crate::ast::SExpr;
-use crate::builtins::call_value;
 use crate::error::LxError;
 use crate::span::Span;
 use crate::value::Value;
@@ -76,18 +75,18 @@ fn make_refine_result(
 }
 
 impl Interpreter {
-    pub(super) fn eval_refine(
+    pub(super) async fn eval_refine(
         &mut self,
         args: &RefineArgs<'_>,
         span: Span,
     ) -> Result<Value, LxError> {
-        let mut work = self.eval(args.initial)?;
-        let grade_fn = self.eval(args.grade)?;
-        let revise_fn = self.eval(args.revise)?;
-        let threshold_val = self.eval(args.threshold)?;
-        let max_rounds_val = self.eval(args.max_rounds)?;
+        let mut work = self.eval(args.initial).await?;
+        let grade_fn = self.eval(args.grade).await?;
+        let revise_fn = self.eval(args.revise).await?;
+        let threshold_val = self.eval(args.threshold).await?;
+        let max_rounds_val = self.eval(args.max_rounds).await?;
         let on_round_fn = match args.on_round {
-            Some(e) => Some(self.eval(e)?),
+            Some(e) => Some(self.eval(e).await?),
             None => None,
         };
 
@@ -100,7 +99,8 @@ impl Interpreter {
             .and_then(|n| n.to_i64())
             .ok_or_else(|| LxError::type_err("refine: max_rounds must be Int", span))?;
 
-        let mut grade_result = call_value(&grade_fn, work.clone(), span, &self.ctx)?;
+        let mut grade_result =
+            crate::builtins::call_value(&grade_fn, work.clone(), span, &self.ctx).await?;
         let mut score = extract_score(&grade_result, span)?;
 
         if score >= threshold {
@@ -109,11 +109,13 @@ impl Interpreter {
 
         for round in 1..=max_rounds {
             let feedback = extract_feedback(&grade_result, span)?;
-            let revised = call_value(&revise_fn, work.clone(), span, &self.ctx)?;
-            let revised = call_value(&revised, feedback, span, &self.ctx)?;
+            let revised =
+                crate::builtins::call_value(&revise_fn, work.clone(), span, &self.ctx).await?;
+            let revised = crate::builtins::call_value(&revised, feedback, span, &self.ctx).await?;
             work = revised;
 
-            grade_result = call_value(&grade_fn, work.clone(), span, &self.ctx)?;
+            grade_result =
+                crate::builtins::call_value(&grade_fn, work.clone(), span, &self.ctx).await?;
             score = extract_score(&grade_result, span)?;
 
             if let Some(ref cb) = on_round_fn {
@@ -122,7 +124,7 @@ impl Interpreter {
                     work.clone(),
                     Value::Int(BigInt::from(score)),
                 ]));
-                call_value(cb, arg, span, &self.ctx)?;
+                crate::builtins::call_value(cb, arg, span, &self.ctx).await?;
             }
 
             if score >= threshold {

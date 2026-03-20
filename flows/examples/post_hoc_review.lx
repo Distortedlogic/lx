@@ -62,7 +62,7 @@ use ../lib/workflow
       ..report.text "Entries: {entries | len} ({good | len} good, {bad | len} bad)"
       ..report.section "Patterns ({patterns | len})" [
         ..report.table ["Tool" "Frequency" "Description"]
-          (patterns | map (p) [p.tool (to_str p.count) p.description])
+          (patterns | map (p) [p.tool "{p.count}" p.description])
       ]
       ..report.section "Mistakes ({mistakes | len})" [
         ..report.bullets (mistakes | map (m) "{m.what}: {m.lesson}")

@@ -6,7 +6,7 @@ use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::{call_value, mk};
+use crate::builtins::{call_value_sync, mk};
 use crate::error::LxError;
 use crate::record;
 use crate::span::Span;
@@ -130,7 +130,7 @@ fn parse_child_spec(val: &Value, span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Ch
         .and_then(|v| v.as_str())
         .map(|s| s.trim_start_matches(':').to_string())
         .unwrap_or_else(|| "permanent".into());
-    let current = call_value(&spawn_fn, Value::Unit, span, ctx)?;
+    let current = call_value_sync(&spawn_fn, Value::Unit, span, ctx)?;
     Ok(ChildSpec {
         id,
         spawn_fn,
@@ -199,7 +199,7 @@ fn restart_range(
 ) -> Result<(), LxError> {
     for i in range {
         let spawn_fn = sup.children[i].spawn_fn.clone();
-        let new_agent = call_value(&spawn_fn, Value::Unit, span, ctx)?;
+        let new_agent = call_value_sync(&spawn_fn, Value::Unit, span, ctx)?;
         sup.children[i].current = new_agent;
         sup.restart_counts[i] += 1;
     }

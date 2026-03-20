@@ -1,13 +1,14 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
 pub struct RootManifest {
     pub workspace: Option<WorkspaceSection>,
     pub package: Option<PackageSection>,
     pub test: Option<TestSection>,
+    pub dependencies: Option<HashMap<String, DepSpec>>,
 }
 
 #[derive(Deserialize)]
@@ -27,6 +28,70 @@ pub struct PackageSection {
 pub struct TestSection {
     pub dir: Option<String>,
     pub pattern: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum DepSpec {
+    Git {
+        git: String,
+        branch: Option<String>,
+        tag: Option<String>,
+        rev: Option<String>,
+    },
+    Path {
+        path: String,
+    },
+}
+
+pub fn find_manifest_root(start: &Path) -> Option<PathBuf> {
+    let mut dir = start.to_path_buf();
+    loop {
+        let candidate = dir.join("lx.toml");
+        if candidate.exists() {
+            return Some(dir);
+        }
+        if !dir.pop() {
+            return None;
+        }
+    }
+}
+
+pub fn load_manifest(root: &Path) -> Result<RootManifest, String> {
+    let manifest_path = root.join("lx.toml");
+    let content = std::fs::read_to_string(&manifest_path)
+        .map_err(|e| format!("cannot read {}: {e}", manifest_path.display()))?;
+    toml::from_str(&content).map_err(|e| format!("invalid {}: {e}", manifest_path.display()))
+}
+
+pub fn deps_dir(root: &Path) -> PathBuf {
+    root.join(".lx").join("deps")
+}
+
+pub fn try_load_dep_dirs() -> HashMap<String, PathBuf> {
+    let Ok(cwd) = std::env::current_dir() else {
+        return HashMap::new();
+    };
+    let Some(root) = find_manifest_root(&cwd) else {
+        return HashMap::new();
+    };
+    let deps = deps_dir(&root);
+    if !deps.exists() {
+        return HashMap::new();
+    }
+    let Ok(entries) = std::fs::read_dir(&deps) else {
+        return HashMap::new();
+    };
+    let mut map = HashMap::new();
+    for entry in entries.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if path.is_dir()
+            && let Some(name) = path.file_name().and_then(|n| n.to_str())
+        {
+            map.insert(name.to_string(), path);
+        }
+    }
+    map
 }
 
 pub struct Workspace {

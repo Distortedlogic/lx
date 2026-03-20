@@ -183,6 +183,10 @@ pub enum Expr {
         target: Box<SExpr>,
         msg: Box<SExpr>,
     },
+    StreamAsk {
+        target: Box<SExpr>,
+        msg: Box<SExpr>,
+    },
 
     Emit {
         value: Box<SExpr>,

@@ -8,23 +8,11 @@ use std/time
 use ../protocols {CognitiveState}
 
 +init = () -> Any {
-  breaker = CircuitBreaker {
-    max_turns: 50
-    max_actions: 200
-    max_time_ms: 600000
-    max_repeats: 4
-    repetition_window: 5
+  {
+    breaker: CircuitBreaker {max_turns: 50  max_actions: 200  max_time_ms: 600000  max_repeats: 4  repetition_window: 5}
+    budget: budget.create {tokens: 100000  api_calls: 50  wall_time: 600  tight_at: 50  critical_at: 85}
+    start_time: time.now ()
   }
-
-  b = budget.create {
-    tokens: 100000
-    api_calls: 50
-    wall_time: 600
-    tight_at: 50
-    critical_at: 85
-  }
-
-  {breaker: breaker  budget: b  start_time: time.now ()}
 }
 
 +tick = (state: Any) -> Any {
@@ -46,17 +34,13 @@ use ../protocols {CognitiveState}
 
 +check_health = (state: Any) -> CognitiveState {
   tripped = state.breaker.check ()
-  budget_status = budget.status state.budget
   ins = Inspector ()
-  elapsed = ins.elapsed ()
-  turn = ins.turn_count ()
   stuck = ins.is_stuck ()
-  action_count = ins.actions () | len
 
   CognitiveState {
-    turn: turn
+    turn: ins.turn_count ()
     context_pressure: 0.0
-    budget_status: budget_status
+    budget_status: budget.status state.budget
     active_goal: ""
     memory_load: 0
     stuck_count: stuck ? 1 : 0
@@ -80,24 +64,21 @@ use ../protocols {CognitiveState}
 
 +suggest_strategy = (state: Any) -> Str {
   health = check_health state
-
   ins = Inspector ()
+
   suggestion = health.strategy ? {
     "circuit_tripped" -> "stop"
     "stuck" -> {
-      actions = ins.actions ()
-      repeated = ins.similar_actions actions 3
-      repeated | len > 0 ?
-        "pivot — repeated actions: {repeated | map (.type) | join ', '}"
+      repeated = ins.similar_actions (ins.actions ()) 3
+      repeated | not empty? ?
+        "pivot — repeated actions: {repeated | map (.type) | join ", "}"
         : "simplify — reduce scope and try different approach"
     }
-    _ -> {
-      health.budget_status ? {
-        "critical" -> "economize — budget critical, skip non-essential"
-        "tight" -> "efficient — budget tight, prefer cheap tools"
-        "exceeded" -> "stop — budget exceeded"
-        _ -> "continue"
-      }
+    _ -> health.budget_status ? {
+      "critical" -> "economize — budget critical, skip non-essential"
+      "tight" -> "efficient — budget tight, prefer cheap tools"
+      "exceeded" -> "stop — budget exceeded"
+      _ -> "continue"
     }
   }
 
@@ -127,7 +108,6 @@ use ../protocols {CognitiveState}
 +status_report = (state: Any) -> Any {
   health = check_health state
   remaining = budget.remaining state.budget
-  suggestion = suggest_strategy state
 
   {
     turn: health.turn
@@ -136,7 +116,7 @@ use ../protocols {CognitiveState}
     remaining_api_calls: remaining.api_calls
     stuck: health.stuck_count > 0
     circuit_tripped: health.strategy == "circuit_tripped"
-    suggestion: suggestion
+    suggestion: suggest_strategy state
   }
 }
 

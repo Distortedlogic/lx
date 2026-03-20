@@ -82,10 +82,26 @@ rendered = prompt.render p
 ```lx
 use pkg/trace {TraceStore}
 t = TraceStore ()
-t.record {name: "step1" input: x output: y} ^
+t.record {name: "step1" input: x output: y agent: "researcher"} ^
 sum = t.summary ()
 rate = t.improvement_rate 3
 stop = t.should_stop {min_delta: 2.0 window: 3}
+by_agent = t.query {agent: "researcher"}
+```
+
+Provenance (message flow tracking):
+```lx
+t.enable_provenance () ^
+t.record_hop {msg_id: "req-1" from: "user" to: "researcher" action: "search"} ^
+t.record_hop {msg_id: "req-1" from: "researcher" to: "analyst"} ^
+path = t.message_path "req-1"
+hops = t.message_hops "req-1"
+```
+
+Reputation (agent scoring from trace data):
+```lx
+score = t.agent_score "researcher"
+ranking = t.agent_rank ()
 ```
 
 ## Grading and Auditing
@@ -145,6 +161,22 @@ result = retry.retry flaky_fn
 result = retry.retry_with {max_attempts: 5  base_delay_ms: 200} flaky_fn
 ```
 
+## Durable Workflows (std/durable)
+
+```lx
+use std/durable
+wf = durable.workflow "my-flow" {storage_dir: ".lx/durable/"} (ctx) {
+  a = durable.step ctx "fetch" () { http.get url ^ }
+  b = durable.step ctx "transform" () { process a }
+  b
+}
+result = durable.run wf {url: "..."} ^
+durable.status result.workflow_id
+durable.list ()
+```
+
+8 functions: `workflow`, `run`, `step` (idempotent — cached on replay), `sleep`, `signal`, `send_signal`, `status`, `list`. File-backed at `<storage_dir>/<name>/<run-id>/`.
+
 ## Pipeline (std/pipeline)
 
 ```lx
@@ -195,6 +227,8 @@ all = pipeline.list ()
 | `std/introspect`  | Live observation: `system`, `agents`, `agent`, `messages`, `bottleneck` |
 | `std/flow`        | Flow composition: `load`, `run`, `pipe`, `parallel`, `branch`, `with_retry`, `with_timeout`, `with_fallback` |
 | `std/taskgraph`   | DAG execution: `create`, `add`, `remove`, `run`, `run_with`, `validate`, `topo`, `status`, `dot` |
+| `std/workspace`   | Collaborative editing: `create`, `claim`, `claim_pattern`, `edit`, `append`, `release`, `snapshot`, `regions`, `conflicts`, `resolve`, `history`, `watch`. Line-based region claiming with overlap detection, auto-bound adjustment, regex pattern claiming, watchers. DashMap-backed for `par`/`pmap` safety |
+| `std/registry`    | Cross-process discovery: `start`, `stop`, `connect`, `register`, `deregister`, `find`, `find_one`, `health`, `load`, `watch`. In-memory registry with trait/protocol/domain filtering, selection strategies (first, least_loaded, round_robin, random), health/load tracking, watcher callbacks |
 
 ## Flow Composition (std/flow)
 
@@ -273,6 +307,7 @@ Six pre-built agents under `std/agents/`:
 **Control:** `identity`, `not`, `require`, `timeout`, `step`, `collect`
 **Reflection:** `method_of(obj, name)` — returns a method/field by name or None; `methods_of(obj)` — returns list of method names from Class/Object/Record
 **Logging:** `log.info`, `log.warn`, `log.err`, `log.debug`
+**Streaming:** `collect` materializes Stream→List; HOFs (`map`, `filter`, `each`, `take`, `fold`, `flat_map`) work on streams transparently
 
 ## Idioms
 
@@ -293,8 +328,4 @@ audit_items
 
 **Scoped resources:** Always `with ... as` for connections needing cleanup.
 
-**Fan-out + reconcile:**
-```lx
-results = par { a ~>? msg ^; b ~>? msg ^; c ~>? msg ^ }
-merged = agent.reconcile [results.0 results.1 results.2] {strategy: "merge_fields"}
-```
+**Fan-out + reconcile:** `results = par { a ~>? msg ^; b ~>? msg ^ }` then `agent.reconcile results {strategy: "vote"}`

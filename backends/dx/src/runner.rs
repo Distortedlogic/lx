@@ -46,13 +46,8 @@ impl ProgramRunner {
         let start = Instant::now();
         let source_dir = Path::new(source_path).parent().map(|p| p.to_path_buf());
 
-        let source_clone = source.clone();
-        let result = tokio::task::spawn_blocking(move || {
-            let mut interp = Interpreter::new(&source_clone, source_dir, ctx);
-            interp.exec(&program)
-        })
-        .await
-        .map_err(|e| RunError::Io(format!("task join: {e}")))?;
+        let mut interp = Interpreter::new(&source, source_dir, ctx);
+        let result = interp.exec(&program).await;
 
         let duration_ms = start.elapsed().as_millis() as u64;
 

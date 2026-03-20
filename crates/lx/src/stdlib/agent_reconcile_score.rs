@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use num_traits::ToPrimitive;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::call_value;
+use crate::builtins::call_value_sync;
 use crate::error::LxError;
 use crate::span::Span;
 use crate::value::Value;
@@ -61,7 +61,7 @@ pub(super) fn do_max_score(
     })?;
     let mut best: Option<(f64, Value)> = None;
     for r in results {
-        let score_val = call_value(score_fn, r.clone(), span, ctx)?;
+        let score_val = call_value_sync(score_fn, r.clone(), span, ctx)?;
         let s = score_val
             .as_float()
             .or_else(|| score_val.as_int().and_then(|n| n.to_f64()))

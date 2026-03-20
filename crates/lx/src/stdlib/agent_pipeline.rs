@@ -5,7 +5,7 @@ use std::time::Instant;
 use dashmap::DashMap;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::call_value;
+use crate::builtins::call_value_sync;
 use crate::error::LxError;
 use crate::span::Span;
 use crate::value::Value;
@@ -65,7 +65,7 @@ pub(super) fn ask_pipeline_agent(
             .get("handler")
             .filter(|h| matches!(h, Value::Func(_) | Value::BuiltinFunc(_)))
         {
-            return call_value(handler, msg, span, ctx);
+            return call_value_sync(handler, msg, span, ctx);
         }
         if let Some(pid) = r
             .get("__pid")

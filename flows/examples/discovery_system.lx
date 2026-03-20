@@ -40,19 +40,20 @@ use ../prompts/discovery
     kb.store c.name (json.encode c) {source: "review"  score: c.total}
   }
 
-  ctx.set "candidates_found" (scored | len) state
+  state
+    | ctx.set "candidates_found" (scored | len)
     | ctx.set "auto_integrated" (auto | len)
-    | (s) ctx.save ".discovery-state.json" s ^
+    | ctx.save ".discovery-state.json" ^
 
   report.write "discovery_report.md" "Discovery Run" [
     ..report.text "{scored | len} candidates across {discovery.axes | len} axes"
     ..report.section "Auto-Integrated ({auto | len})" [
       ..report.table ["Name" "Score" "Language" "Stars"]
-        (auto | map (c) [c.name (to_str c.total) c.lang (to_str c.stars)])
+        (auto | map (c) [c.name "{c.total}" c.lang "{c.stars}"])
     ]
     ..report.section "For Review ({review | len})" [
       ..report.table ["Name" "Score" "URL"]
-        (review | map (c) [c.name (to_str c.total) c.url])
+        (review | map (c) [c.name "{c.total}" c.url])
     ]
   ]
 

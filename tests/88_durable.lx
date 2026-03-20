@@ -1,0 +1,94 @@
+-- 82_durable.lx
+-- Tests: std/durable module (Temporal-style workflow persistence)
+
+use std/durable
+use std/fs
+use std/time
+
+test_dir = "/tmp/lx_durable_test_" ++ (to_str (time.now ()).ms) ++ "/"
+
+-- === Workflow definition ===
+wf = durable.workflow "test-wf" {storage_dir: test_dir} (ctx) {
+  a = durable.step ctx "step1" () 10
+  b = durable.step ctx "step2" () 20
+  c = durable.step ctx "step3" () a + b
+  {result: c input: ctx.input}
+}
+assert (wf.name == "test-wf") "workflow returns named handle"
+
+-- === Run workflow with 3 steps ===
+result = durable.run wf "hello"
+assert (result.value.result == 30) "workflow produces correct result"
+assert (result.value.input == "hello") "workflow receives input"
+assert (result.workflow_id == "test-wf") "result has workflow_id"
+assert (result.resumed == false) "fresh run is not resumed"
+
+-- === Status after completion ===
+st = durable.status "test-wf"
+assert (st.status == "completed") "status is completed"
+assert (st.completed_steps == 3) "3 steps completed"
+
+-- === List shows workflows ===
+all = durable.list ()
+assert (len all >= 1) "list returns workflows"
+found = filter (w) w.name == "test-wf" all
+assert (len found >= 1) "list contains test-wf"
+
+-- === Step caching (idempotent replay) ===
+call_count := 0
+wf2 = durable.workflow "test-cache" {storage_dir: test_dir} (ctx) {
+  a = durable.step ctx "s1" () {
+    call_count <- call_count + 1
+    42
+  }
+  b = durable.step ctx "s1" () {
+    call_count <- call_count + 1
+    99
+  }
+  {a: a b: b}
+}
+r2 = durable.run wf2 ()
+assert (r2.value.a == 42) "first step executed"
+assert (r2.value.b == 42) "second call to same step returns cached"
+assert (call_count == 1) "body only executed once"
+
+-- === Workflow with record step results ===
+wf3 = durable.workflow "test-records" {storage_dir: test_dir} (ctx) {
+  user = durable.step ctx "fetch_user" () {name: "Alice" age: 30}
+  greeting = durable.step ctx "greet" () "Hello " ++ user.name
+  {user: user greeting: greeting}
+}
+r3 = durable.run wf3 ()
+assert (r3.value.user.name == "Alice") "record step result preserved"
+assert (r3.value.user.age == 30) "record field preserved"
+assert (r3.value.greeting == "Hello Alice") "step can use previous step result"
+
+-- === Workflow with list step results ===
+wf4 = durable.workflow "test-lists" {storage_dir: test_dir} (ctx) {
+  items = durable.step ctx "items" () [1 2 3 4 5]
+  total = durable.step ctx "sum" () {
+    fold 0 (acc x) { acc + x } items
+  }
+  {items: items total: total}
+}
+r4 = durable.run wf4 ()
+assert (r4.value.total == 15) "list step result and fold work"
+assert (len r4.value.items == 5) "list preserved through durable step"
+
+-- === Status for non-existent workflow ===
+missing = durable.status "nonexistent"
+assert (missing.status == "not_found") "missing workflow reports not_found"
+
+-- === Workflow with separate handler binding ===
+handler5 = (ctx) {
+  durable.step ctx "only" () "separate-handler-works"
+}
+wf5 = durable.workflow "test-handler" {storage_dir: test_dir} handler5
+r5 = durable.run wf5 ()
+assert (r5.value == "separate-handler-works") "handler as separate binding works"
+
+-- cleanup test dir
+test_exists = fs.exists test_dir
+test_exists ? fs.remove test_dir ^ : ()
+
+log.info "82_durable: all passed"

@@ -4,7 +4,7 @@ use dashmap::DashMap;
 use indexmap::IndexMap;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::{call_value, mk};
+use crate::builtins::{call_value_sync, mk};
 use crate::error::LxError;
 use crate::span::Span;
 use crate::value::{ProtoFieldDef, Value};
@@ -94,7 +94,7 @@ fn bi_capabilities(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<
             span,
         )
     })?;
-    let result = call_value(handler, query_val, span, ctx)?;
+    let result = call_value_sync(handler, query_val, span, ctx)?;
     Ok(Value::Ok(Box::new(result)))
 }
 

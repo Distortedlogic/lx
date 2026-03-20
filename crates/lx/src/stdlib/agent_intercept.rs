@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::{call_value, mk};
+use crate::builtins::{call_value_sync, mk};
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::{BuiltinFunc, Value};
+use crate::value::{BuiltinFunc, BuiltinKind, Value};
 
 pub fn mk_intercept() -> Value {
     mk("agent.intercept", 2, bi_intercept)
@@ -31,7 +31,7 @@ fn make_next_fn(agent: &Value) -> Value {
     Value::BuiltinFunc(BuiltinFunc {
         name: "agent.intercept.next",
         arity: 2,
-        func: bi_next,
+        kind: BuiltinKind::Sync(bi_next),
         applied: vec![agent.clone()],
     })
 }
@@ -40,7 +40,7 @@ fn make_intercepted_handler(middleware: &Value, next_fn: &Value) -> Value {
     Value::BuiltinFunc(BuiltinFunc {
         name: "agent.intercept.handler",
         arity: 3,
-        func: bi_intercepted_handler,
+        kind: BuiltinKind::Sync(bi_intercepted_handler),
         applied: vec![middleware.clone(), next_fn.clone()],
     })
 }
@@ -53,8 +53,8 @@ fn bi_intercepted_handler(
     let middleware = &args[0];
     let next_fn = &args[1];
     let msg = &args[2];
-    let partial = call_value(middleware, msg.clone(), span, ctx)?;
-    call_value(&partial, next_fn.clone(), span, ctx)
+    let partial = call_value_sync(middleware, msg.clone(), span, ctx)?;
+    call_value_sync(&partial, next_fn.clone(), span, ctx)
 }
 
 fn bi_next(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
@@ -79,5 +79,5 @@ fn bi_next(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, L
             span,
         )
     })?;
-    call_value(handler, msg.clone(), span, ctx)
+    call_value_sync(handler, msg.clone(), span, ctx)
 }

@@ -5,7 +5,7 @@ use std/ai
 use std/agent
 
 +compose = (msg) {
-  ai.prompt "Compose a solution based on:\nTasks: {to_str msg.tasks}\nResearch: {to_str msg.research}" ^
+  ai.prompt "Compose a solution based on:\nTasks: {msg.tasks}\nResearch: {msg.research}" ^
 }
 
 +revise = (msg) {

@@ -1,3 +1,4 @@
+use std::pin::Pin;
 use std::sync::Arc;
 
 use indexmap::IndexMap;
@@ -9,130 +10,126 @@ use crate::value::Value;
 
 use super::hof::{call, get_list};
 
-pub(super) fn bi_take_while(
-    args: &[Value],
-    sp: Span,
-    ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
-    let items = get_list(&args[1], "take_while", sp)?;
-    let mut out = Vec::new();
-    for v in items.iter() {
-        if call(&args[0], v.clone(), sp, ctx)?.as_bool() != Some(true) {
-            break;
+type BoxFut = Pin<Box<dyn std::future::Future<Output = Result<Value, LxError>>>>;
+
+pub(super) fn bi_take_while(args: Vec<Value>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
+    Box::pin(async move {
+        let items = get_list(&args[1], "take_while", sp)?;
+        let mut out = Vec::new();
+        for v in items.iter() {
+            if call(&args[0], v.clone(), sp, &ctx).await?.as_bool() != Some(true) {
+                break;
+            }
+            out.push(v.clone());
         }
-        out.push(v.clone());
-    }
-    Ok(Value::List(Arc::new(out)))
+        Ok(Value::List(Arc::new(out)))
+    })
 }
 
-pub(super) fn bi_drop_while(
-    args: &[Value],
-    sp: Span,
-    ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
-    let items = get_list(&args[1], "drop_while", sp)?;
-    let mut dropping = true;
-    let mut out = Vec::new();
-    for v in items.iter() {
-        if dropping && call(&args[0], v.clone(), sp, ctx)?.as_bool() == Some(true) {
-            continue;
+pub(super) fn bi_drop_while(args: Vec<Value>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
+    Box::pin(async move {
+        let items = get_list(&args[1], "drop_while", sp)?;
+        let mut dropping = true;
+        let mut out = Vec::new();
+        for v in items.iter() {
+            if dropping && call(&args[0], v.clone(), sp, &ctx).await?.as_bool() == Some(true) {
+                continue;
+            }
+            dropping = false;
+            out.push(v.clone());
         }
-        dropping = false;
-        out.push(v.clone());
-    }
-    Ok(Value::List(Arc::new(out)))
+        Ok(Value::List(Arc::new(out)))
+    })
 }
 
-pub(super) fn bi_sort_by(
-    args: &[Value],
-    sp: Span,
-    ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
-    let items = get_list(&args[1], "sort_by", sp)?;
-    let mut keyed: Vec<(Value, Value)> = Vec::with_capacity(items.len());
-    for v in items.iter() {
-        let k = call(&args[0], v.clone(), sp, ctx)?;
-        keyed.push((k, v.clone()));
-    }
-    keyed.sort_by(|(a, _), (b, _)| super::coll::cmp_values(a, b));
-    Ok(Value::List(Arc::new(
-        keyed.into_iter().map(|(_, v)| v).collect(),
-    )))
-}
-
-pub(super) fn bi_min_by(args: &[Value], sp: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let items = get_list(&args[1], "min_by", sp)?;
-    if items.is_empty() {
-        return Err(LxError::runtime("min_by: empty list", sp));
-    }
-    let mut best = &items[0];
-    let mut best_key = call(&args[0], best.clone(), sp, ctx)?;
-    for v in &items[1..] {
-        let k = call(&args[0], v.clone(), sp, ctx)?;
-        if super::coll::cmp_values(&k, &best_key).is_lt() {
-            best = v;
-            best_key = k;
+pub(super) fn bi_sort_by(args: Vec<Value>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
+    Box::pin(async move {
+        let items = get_list(&args[1], "sort_by", sp)?;
+        let mut keyed: Vec<(Value, Value)> = Vec::with_capacity(items.len());
+        for v in items.iter() {
+            let k = call(&args[0], v.clone(), sp, &ctx).await?;
+            keyed.push((k, v.clone()));
         }
-    }
-    Ok(best.clone())
+        keyed.sort_by(|(a, _), (b, _)| super::coll::cmp_values(a, b));
+        Ok(Value::List(Arc::new(
+            keyed.into_iter().map(|(_, v)| v).collect(),
+        )))
+    })
 }
 
-pub(super) fn bi_max_by(args: &[Value], sp: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let items = get_list(&args[1], "max_by", sp)?;
-    if items.is_empty() {
-        return Err(LxError::runtime("max_by: empty list", sp));
-    }
-    let mut best = &items[0];
-    let mut best_key = call(&args[0], best.clone(), sp, ctx)?;
-    for v in &items[1..] {
-        let k = call(&args[0], v.clone(), sp, ctx)?;
-        if super::coll::cmp_values(&k, &best_key).is_gt() {
-            best = v;
-            best_key = k;
+pub(super) fn bi_min_by(args: Vec<Value>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
+    Box::pin(async move {
+        let items = get_list(&args[1], "min_by", sp)?;
+        if items.is_empty() {
+            return Err(LxError::runtime("min_by: empty list", sp));
         }
-    }
-    Ok(best.clone())
-}
-
-pub(super) fn bi_partition(
-    args: &[Value],
-    sp: Span,
-    ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
-    let items = get_list(&args[1], "partition", sp)?;
-    let (mut yes, mut no) = (Vec::new(), Vec::new());
-    for v in items.iter() {
-        if call(&args[0], v.clone(), sp, ctx)?.as_bool() == Some(true) {
-            yes.push(v.clone());
-        } else {
-            no.push(v.clone());
+        let mut best = items[0].clone();
+        let mut best_key = call(&args[0], best.clone(), sp, &ctx).await?;
+        for v in &items[1..] {
+            let k = call(&args[0], v.clone(), sp, &ctx).await?;
+            if super::coll::cmp_values(&k, &best_key).is_lt() {
+                best = v.clone();
+                best_key = k;
+            }
         }
-    }
-    Ok(Value::Tuple(Arc::new(vec![
-        Value::List(Arc::new(yes)),
-        Value::List(Arc::new(no)),
-    ])))
+        Ok(best)
+    })
 }
 
-pub(super) fn bi_group_by(
-    args: &[Value],
-    sp: Span,
-    ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
-    let items = get_list(&args[1], "group_by", sp)?;
-    let mut groups = IndexMap::new();
-    for v in items.iter() {
-        let key = call(&args[0], v.clone(), sp, ctx)?;
-        groups
-            .entry(crate::value::ValueKey(key))
-            .or_insert_with(Vec::new)
-            .push(v.clone());
-    }
-    let map: indexmap::IndexMap<crate::value::ValueKey, Value> = groups
-        .into_iter()
-        .map(|(k, vs)| (k, Value::List(Arc::new(vs))))
-        .collect();
-    Ok(Value::Map(Arc::new(map)))
+pub(super) fn bi_max_by(args: Vec<Value>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
+    Box::pin(async move {
+        let items = get_list(&args[1], "max_by", sp)?;
+        if items.is_empty() {
+            return Err(LxError::runtime("max_by: empty list", sp));
+        }
+        let mut best = items[0].clone();
+        let mut best_key = call(&args[0], best.clone(), sp, &ctx).await?;
+        for v in &items[1..] {
+            let k = call(&args[0], v.clone(), sp, &ctx).await?;
+            if super::coll::cmp_values(&k, &best_key).is_gt() {
+                best = v.clone();
+                best_key = k;
+            }
+        }
+        Ok(best)
+    })
+}
+
+pub(super) fn bi_partition(args: Vec<Value>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
+    Box::pin(async move {
+        let items = get_list(&args[1], "partition", sp)?;
+        let (mut yes, mut no) = (Vec::new(), Vec::new());
+        for v in items.iter() {
+            if call(&args[0], v.clone(), sp, &ctx).await?.as_bool() == Some(true) {
+                yes.push(v.clone());
+            } else {
+                no.push(v.clone());
+            }
+        }
+        Ok(Value::Tuple(Arc::new(vec![
+            Value::List(Arc::new(yes)),
+            Value::List(Arc::new(no)),
+        ])))
+    })
+}
+
+pub(super) fn bi_group_by(args: Vec<Value>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
+    Box::pin(async move {
+        let items = get_list(&args[1], "group_by", sp)?;
+        let mut groups = IndexMap::new();
+        for v in items.iter() {
+            let key = call(&args[0], v.clone(), sp, &ctx).await?;
+            groups
+                .entry(crate::value::ValueKey(key))
+                .or_insert_with(Vec::new)
+                .push(v.clone());
+        }
+        let map: indexmap::IndexMap<crate::value::ValueKey, Value> = groups
+            .into_iter()
+            .map(|(k, vs)| (k, Value::List(Arc::new(vs))))
+            .collect();
+        Ok(Value::Map(Arc::new(map)))
+    })
 }
 
 pub(super) fn bi_chunks(
@@ -199,55 +196,52 @@ pub(super) fn bi_intersperse(
     Ok(Value::List(Arc::new(out)))
 }
 
-pub(super) fn bi_scan(args: &[Value], sp: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let items = get_list(&args[2], "scan", sp)?;
-    let mut acc = args[0].clone();
-    let f = &args[1];
-    let mut out = Vec::with_capacity(items.len() + 1);
-    out.push(acc.clone());
-    for v in items.iter() {
-        let partial = call(f, acc, sp, ctx)?;
-        acc = call(&partial, v.clone(), sp, ctx)?;
+pub(super) fn bi_scan(args: Vec<Value>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
+    Box::pin(async move {
+        let items = get_list(&args[2], "scan", sp)?;
+        let mut acc = args[0].clone();
+        let f = &args[1];
+        let mut out = Vec::with_capacity(items.len() + 1);
         out.push(acc.clone());
-    }
-    Ok(Value::List(Arc::new(out)))
-}
-
-pub(super) fn bi_tap(args: &[Value], sp: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let val = &args[1];
-    call(&args[0], val.clone(), sp, ctx)?;
-    Ok(val.clone())
-}
-
-pub(super) fn bi_pmap(args: &[Value], sp: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let items = get_list(&args[1], "pmap", sp)?;
-    let mut out = Vec::with_capacity(items.len());
-    for v in items.iter() {
-        out.push(call(&args[0], v.clone(), sp, ctx)?);
-    }
-    Ok(Value::List(Arc::new(out)))
-}
-
-pub(super) fn bi_pmap_n(args: &[Value], sp: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let items = get_list(&args[2], "pmap_n", sp)?;
-    let mut out = Vec::with_capacity(items.len());
-    for v in items.iter() {
-        out.push(call(&args[1], v.clone(), sp, ctx)?);
-    }
-    Ok(Value::List(Arc::new(out)))
-}
-
-pub(super) fn bi_find_index(
-    args: &[Value],
-    sp: Span,
-    ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
-    let items = get_list(&args[1], "find_index", sp)?;
-    for (i, v) in items.iter().enumerate() {
-        let result = call(&args[0], v.clone(), sp, ctx)?;
-        if result.as_bool() == Some(true) {
-            return Ok(Value::Some(Box::new(Value::Int(i.into()))));
+        for v in items.iter() {
+            let partial = call(f, acc, sp, &ctx).await?;
+            acc = call(&partial, v.clone(), sp, &ctx).await?;
+            out.push(acc.clone());
         }
-    }
-    Ok(Value::None)
+        Ok(Value::List(Arc::new(out)))
+    })
+}
+
+pub(super) fn bi_tap(args: Vec<Value>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
+    Box::pin(async move {
+        let val = args[1].clone();
+        call(&args[0], val.clone(), sp, &ctx).await?;
+        Ok(val)
+    })
+}
+
+pub(super) fn bi_find_index(args: Vec<Value>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
+    Box::pin(async move {
+        let items = get_list(&args[1], "find_index", sp)?;
+        for (i, v) in items.iter().enumerate() {
+            let result = call(&args[0], v.clone(), sp, &ctx).await?;
+            if result.as_bool() == Some(true) {
+                return Ok(Value::Some(Box::new(Value::Int(i.into()))));
+            }
+        }
+        Ok(Value::None)
+    })
+}
+
+pub(super) fn bi_count(args: Vec<Value>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
+    Box::pin(async move {
+        let items = get_list(&args[1], "count", sp)?;
+        let mut n = 0usize;
+        for v in items.iter() {
+            if call(&args[0], v.clone(), sp, &ctx).await?.as_bool() == Some(true) {
+                n += 1;
+            }
+        }
+        Ok(Value::Int(n.into()))
+    })
 }

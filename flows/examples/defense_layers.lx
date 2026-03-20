@@ -39,16 +39,13 @@ scan_interval_ms = 300000
       guard.full_scan entries {} | map (f) {..f  agent_id: path}
     }
 
-    all_findings | empty? ? {
-      false -> {
-        critical = all_findings | filter (f) f.severity == "critical"
-        critical | each (f) {
-          session.record {name: "security-finding"  input: f  output: f  success: false}
-          emit "SECURITY [{f.type}] {f.agent_id}: {f.evidence}"
-        }
-        write_scan_report all_findings
+    all_findings | empty? ? () : {
+      critical = all_findings | filter (f) f.severity == "critical"
+      critical | each (f) {
+        session.record {name: "security-finding"  input: f  output: f  success: false}
+        emit "SECURITY [{f.type}] {f.agent_id}: {f.evidence}"
       }
-      true -> ()
+      write_scan_report all_findings
     }
   }
 
@@ -57,10 +54,7 @@ scan_interval_ms = 300000
 
 check_drift = (agent_id) {
   drift = monitor.check {agent: agent_id}
-  drift.index < drift_threshold ? {
-    true -> [{agent: agent_id  drift_type: drift.drift_type  index: drift.index}]
-    false -> []
-  }
+  drift.index < drift_threshold ? [{agent: agent_id  drift_type: drift.drift_type  index: drift.index}] : []
 }
 
 list_active_agents = () {

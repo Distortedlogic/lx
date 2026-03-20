@@ -8,7 +8,7 @@ use crate::value::Value;
 use super::Interpreter;
 
 impl Interpreter {
-    pub(super) fn eval_binary(
+    pub(super) async fn eval_binary(
         &mut self,
         op: &BinOp,
         left: &SExpr,
@@ -16,35 +16,35 @@ impl Interpreter {
         span: Span,
     ) -> Result<Value, LxError> {
         if *op == BinOp::And {
-            return self.eval_short_circuit(left, right, true, span);
+            return self.eval_short_circuit(left, right, true, span).await;
         }
         if *op == BinOp::Or {
-            return self.eval_short_circuit(left, right, false, span);
+            return self.eval_short_circuit(left, right, false, span).await;
         }
-        let lv = self.eval(left)?;
-        let lv = self.force_defaults(lv, span)?;
-        let rv = self.eval(right)?;
-        let rv = self.force_defaults(rv, span)?;
+        let lv = self.eval(left).await?;
+        let lv = self.force_defaults(lv, span).await?;
+        let rv = self.eval(right).await?;
+        let rv = self.force_defaults(rv, span).await?;
         self.binary_op(op, &lv, &rv, span)
     }
 
-    pub(super) fn eval_block(&mut self, stmts: &[SStmt]) -> Result<Value, LxError> {
+    pub(super) async fn eval_block(&mut self, stmts: &[SStmt]) -> Result<Value, LxError> {
         let saved = Arc::clone(&self.env);
         self.env = Arc::new(self.env.child());
         let mut result = Value::Unit;
         for stmt in stmts {
-            result = self.eval_stmt(stmt)?;
+            result = self.eval_stmt(stmt).await?;
         }
         self.env = saved;
         Ok(result)
     }
 
-    pub(super) fn eval_loop(&mut self, stmts: &[SStmt]) -> Result<Value, LxError> {
+    pub(super) async fn eval_loop(&mut self, stmts: &[SStmt]) -> Result<Value, LxError> {
         loop {
             let saved = Arc::clone(&self.env);
             self.env = Arc::new(self.env.child());
             for stmt in stmts {
-                match self.eval_stmt(stmt) {
+                match self.eval_stmt(stmt).await {
                     Ok(_) => {}
                     Err(LxError::BreakSignal { value }) => {
                         self.env = saved;
@@ -60,14 +60,14 @@ impl Interpreter {
         }
     }
 
-    pub(super) fn eval_slice(
+    pub(super) async fn eval_slice(
         &mut self,
         expr: &SExpr,
         start: Option<&SExpr>,
         end: Option<&SExpr>,
         span: Span,
     ) -> Result<Value, LxError> {
-        let val = self.eval(expr)?;
+        let val = self.eval(expr).await?;
         let items = match &val {
             Value::List(l) => l.as_ref(),
             other => {
@@ -80,7 +80,7 @@ impl Interpreter {
         let len = items.len();
         let s = match start {
             Some(e) => {
-                let v = self.eval(e)?;
+                let v = self.eval(e).await?;
                 v.as_int().and_then(|n| n.try_into().ok()).ok_or_else(|| {
                     LxError::type_err(
                         format!("slice start index must be Int, got {} `{v}`", v.type_name()),
@@ -92,7 +92,7 @@ impl Interpreter {
         };
         let en: usize = match end {
             Some(e) => {
-                let v = self.eval(e)?;
+                let v = self.eval(e).await?;
                 v.as_int().and_then(|n| n.try_into().ok()).ok_or_else(|| {
                     LxError::type_err(
                         format!("slice end index must be Int, got {} `{v}`", v.type_name()),
@@ -107,51 +107,96 @@ impl Interpreter {
         Ok(Value::List(Arc::new(items[s..en].to_vec())))
     }
 
-    pub(super) fn eval_par(&mut self, stmts: &[SStmt]) -> Result<Value, LxError> {
-        let saved = Arc::clone(&self.env);
-        self.env = Arc::new(self.env.child());
-        let mut results = Vec::new();
-        for stmt in stmts {
-            let val = self.eval_stmt(stmt)?;
-            results.push(val);
+    pub(super) async fn eval_par(&mut self, stmts: &[SStmt]) -> Result<Value, LxError> {
+        let stmts_owned: Vec<SStmt> = stmts.to_vec();
+        let mut futures = Vec::with_capacity(stmts_owned.len());
+        for stmt in stmts_owned {
+            let env = Arc::clone(&self.env);
+            let ctx = Arc::clone(&self.ctx);
+            let module_cache = Arc::clone(&self.module_cache);
+            let loading = Arc::clone(&self.loading);
+            let source = self.source.clone();
+            let source_dir = self.source_dir.clone();
+            futures.push(async move {
+                let mut interp = Interpreter {
+                    env,
+                    source,
+                    source_dir,
+                    module_cache,
+                    loading,
+                    ctx,
+                };
+                interp.eval_stmt(&stmt).await
+            });
         }
-        self.env = saved;
-        Ok(Value::Tuple(Arc::new(results)))
+        let results = futures::future::join_all(futures).await;
+        let mut vals = Vec::with_capacity(results.len());
+        for r in results {
+            vals.push(r?);
+        }
+        Ok(Value::Tuple(Arc::new(vals)))
     }
 
-    pub(super) fn eval_sel(&mut self, arms: &[SelArm], span: Span) -> Result<Value, LxError> {
+    pub(super) async fn eval_sel(&mut self, arms: &[SelArm], span: Span) -> Result<Value, LxError> {
         if arms.is_empty() {
             return Err(LxError::runtime("sel: no arms", span));
         }
-        let val = self.eval(&arms[0].expr)?;
-        let saved = Arc::clone(&self.env);
-        let mut child = self.env.child();
-        child.bind("it".into(), val);
-        self.env = Arc::new(child);
-        let result = self.eval(&arms[0].handler);
-        self.env = saved;
+        let arms_owned: Vec<SelArm> = arms.to_vec();
+        let mut futures = Vec::with_capacity(arms_owned.len());
+        for arm in &arms_owned {
+            let env = Arc::clone(&self.env);
+            let ctx = Arc::clone(&self.ctx);
+            let module_cache = Arc::clone(&self.module_cache);
+            let loading = Arc::clone(&self.loading);
+            let source = self.source.clone();
+            let source_dir = self.source_dir.clone();
+            let arm_expr = arm.expr.clone();
+            let arm_handler = arm.handler.clone();
+            futures.push(Box::pin(async move {
+                let mut interp = Interpreter {
+                    env,
+                    source,
+                    source_dir,
+                    module_cache,
+                    loading,
+                    ctx,
+                };
+                let val = interp.eval(&arm_expr).await;
+                match val {
+                    Ok(v) => {
+                        let saved = Arc::clone(&interp.env);
+                        let mut child = interp.env.child();
+                        child.bind("it".into(), v);
+                        interp.env = Arc::new(child);
+                        let r = interp.eval(&arm_handler).await;
+                        interp.env = saved;
+                        r
+                    }
+                    Err(e) => Err(e),
+                }
+            }));
+        }
+        let (result, _idx, _remaining) = futures::future::select_all(futures).await;
         result
     }
 
-    pub(super) fn eval_with_resource(
+    pub(super) async fn eval_with_resource(
         &mut self,
         resources: &[(SExpr, String)],
         body: &[SStmt],
         span: Span,
     ) -> Result<Value, LxError> {
         let mut acquired: Vec<(String, Value)> = Vec::new();
-        let setup_result = (|| -> Result<(), LxError> {
-            for (expr, name) in resources {
-                let val = self.eval(expr)?;
-                acquired.push((name.clone(), val));
+        for (expr, name) in resources {
+            match self.eval(expr).await {
+                Ok(val) => acquired.push((name.clone(), val)),
+                Err(e) => {
+                    for (_, val) in acquired.iter().rev() {
+                        self.close_resource(val, span).await;
+                    }
+                    return Err(e);
+                }
             }
-            Ok(())
-        })();
-        if let Err(e) = setup_result {
-            for (_, val) in acquired.iter().rev() {
-                self.close_resource(val, span);
-            }
-            return Err(e);
         }
         let saved = Arc::clone(&self.env);
         let mut child = self.env.child();
@@ -159,34 +204,41 @@ impl Interpreter {
             child.bind(name.clone(), val.clone());
         }
         self.env = child.into_arc();
-        let body_result = (|| -> Result<Value, LxError> {
-            let mut result = Value::Unit;
-            for stmt in body {
-                result = self.eval_stmt(stmt)?;
+        let mut result = Value::Unit;
+        let mut body_err = None;
+        for stmt in body {
+            match self.eval_stmt(stmt).await {
+                Ok(v) => result = v,
+                Err(e) => {
+                    body_err = Some(e);
+                    break;
+                }
             }
-            Ok(result)
-        })();
+        }
         self.env = saved;
         for (_, val) in acquired.iter().rev() {
-            self.close_resource(val, span);
+            self.close_resource(val, span).await;
         }
-        body_result
+        match body_err {
+            Some(e) => Err(e),
+            None => Ok(result),
+        }
     }
 
-    pub(super) fn eval_assert(
+    pub(super) async fn eval_assert(
         &mut self,
         expr: &SExpr,
         msg: &Option<Box<SExpr>>,
         span: Span,
     ) -> Result<Value, LxError> {
-        let val = self.eval(expr)?;
-        let val = self.force_defaults(val, span)?;
+        let val = self.eval(expr).await?;
+        let val = self.force_defaults(val, span).await?;
         match val.as_bool() {
             Some(true) => Ok(Value::Unit),
             Some(false) => {
                 let message = match msg {
                     Some(m) => {
-                        let mv = self.eval(m)?;
+                        let mv = self.eval(m).await?;
                         Some(format!("{mv}"))
                     }
                     None => None,

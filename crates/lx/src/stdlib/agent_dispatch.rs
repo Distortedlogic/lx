@@ -3,11 +3,11 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::{call_value, mk};
+use crate::builtins::{call_value_sync, mk};
 use crate::error::LxError;
 use crate::record;
 use crate::span::Span;
-use crate::value::{BuiltinFunc, Value};
+use crate::value::{BuiltinFunc, BuiltinKind, Value};
 
 pub fn mk_dispatch() -> Value {
     mk("agent.dispatch", 1, bi_dispatch)
@@ -24,7 +24,7 @@ fn bi_dispatch(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Val
     let handler = Value::BuiltinFunc(BuiltinFunc {
         name: "agent.dispatch.handler",
         arity: 2,
-        func: bi_dispatch_handler,
+        kind: BuiltinKind::Sync(bi_dispatch_handler),
         applied: vec![Value::List(Arc::clone(rules))],
     });
     Ok(record! {
@@ -42,7 +42,7 @@ fn bi_dispatch_multi(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Resu
     let handler = Value::BuiltinFunc(BuiltinFunc {
         name: "agent.dispatch_multi.handler",
         arity: 2,
-        func: bi_dispatch_multi_handler,
+        kind: BuiltinKind::Sync(bi_dispatch_multi_handler),
         applied: vec![Value::List(Arc::clone(rules))],
     });
     Ok(record! {
@@ -110,7 +110,7 @@ fn matches_dispatch(
     match pattern {
         Value::Str(s) if s.as_ref() == "default" => Ok(true),
         Value::Func(_) | Value::BuiltinFunc(_) => {
-            let result = call_value(pattern, msg.clone(), span, ctx)?;
+            let result = call_value_sync(pattern, msg.clone(), span, ctx)?;
             Ok(result.as_bool().unwrap_or(false))
         }
         Value::Record(pat) => match msg {
@@ -136,7 +136,9 @@ fn apply_transform(
     ctx: &Arc<RuntimeCtx>,
 ) -> Result<Value, LxError> {
     match rule.get("transform") {
-        Some(f @ (Value::Func(_) | Value::BuiltinFunc(_))) => call_value(f, msg.clone(), span, ctx),
+        Some(f @ (Value::Func(_) | Value::BuiltinFunc(_))) => {
+            call_value_sync(f, msg.clone(), span, ctx)
+        }
         _ => Ok(msg.clone()),
     }
 }
@@ -151,10 +153,10 @@ fn send_to_target(
         .get("to")
         .ok_or_else(|| LxError::runtime("agent.dispatch: rule missing 'to' field", span))?;
     match target {
-        Value::Func(_) | Value::BuiltinFunc(_) => call_value(target, msg.clone(), span, ctx),
+        Value::Func(_) | Value::BuiltinFunc(_) => call_value_sync(target, msg.clone(), span, ctx),
         Value::Record(r) => {
             if let Some(handler) = r.get("handler") {
-                return call_value(handler, msg.clone(), span, ctx);
+                return call_value_sync(handler, msg.clone(), span, ctx);
             }
             if let Some(pid_val) = r.get("__pid") {
                 let pid: u32 = pid_val

@@ -35,7 +35,7 @@ Agent DeepAnalyst: Analyst = {
 
     AnalysisResult {
       summary: sections.1 | join "\n" | lines | first ?? resp.text
-      findings: findings
+      findings
       confidence: 0.7
       gaps: []
       recommendations: findings | take 3
@@ -45,7 +45,7 @@ Agent DeepAnalyst: Analyst = {
   compare = (msg) {
     items_text = msg.items
       | enumerate
-      | map (i item) "### Option {i + 1}\n{to_str item}"
+      | map (i item) "### Option {i + 1}\n{item}"
       | join "\n\n"
 
     p = prompt.create ()

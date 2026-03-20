@@ -1,0 +1,75 @@
+-- 86_dialogue_branch.lx
+-- Tests: spec/agents-dialogue-branch.md (dialogue forking, compare, merge)
+
+use std/agent
+
+echo = {handler: (msg) {response: msg.content ++ " done" turn: (msg.history | len)}}
+
+-- fork creates two branches from a parent session
+session = agent.dialogue echo {role: "tester"} ^
+r1 = agent.dialogue_turn session "setup context" ^
+assert (r1.response == "setup context done") "pre-fork turn works"
+
+(fork_a fork_b) = agent.dialogue_fork session ["approach A" "approach B"] ^
+assert (fork_a.__session_id != fork_b.__session_id) "forks have distinct IDs"
+
+-- parent is suspended — turns fail
+suspended = agent.dialogue_turn session "should fail"
+assert (suspended == Err "session has active forks") "turn on suspended parent returns Err"
+
+-- turns on forks work and carry parent history
+a1 = agent.dialogue_turn fork_a "execute A" ^
+assert (a1.response == "execute A done") "fork A turn works"
+assert (a1.turn > 0) "fork A sees parent history"
+
+b1 = agent.dialogue_turn fork_b "execute B" ^
+assert (b1.response == "execute B done") "fork B turn works"
+
+-- dialogue_branches lists active forks
+branches = agent.dialogue_branches session
+assert (branches | len == 2) "parent has 2 branches"
+
+-- dialogue_compare grades and ranks forks
+comparison = agent.dialogue_compare [fork_a fork_b] {
+  grade: (s) {
+    h = agent.dialogue_history s
+    {score: h | len | to_float  summary: "len {h | len}"}
+  }
+} ^
+assert (comparison.rankings | len == 2) "compare returns 2 rankings"
+assert (comparison.best.__session_id != ()) "compare picks a best session"
+assert (comparison.spread >= 0.0) "spread is non-negative"
+
+-- dialogue_merge picks winner and resumes parent
+agent.dialogue_merge session fork_a ^
+
+-- parent is no longer suspended
+r2 = agent.dialogue_turn session "after merge" ^
+assert (r2.response == "after merge done") "turn after merge works"
+
+-- merged history includes fork A content
+merged_history = agent.dialogue_history session
+assert (merged_history | len > 2) "merged history includes fork entries"
+
+-- branches are cleaned up
+post_branches = agent.dialogue_branches session
+assert (post_branches | len == 0) "no branches after merge"
+
+agent.dialogue_end session
+
+-- double fork returns Err on already-forked session
+s2 = agent.dialogue echo {} ^
+agent.dialogue_fork s2 ["x" "y"] ^
+double = agent.dialogue_fork s2 ["z"]
+assert (double == Err "session already has active forks") "double fork returns Err"
+agent.dialogue_end s2
+
+-- merge with wrong winner returns Err
+s3 = agent.dialogue echo {} ^
+(f1 f2) = agent.dialogue_fork s3 ["a" "b"] ^
+fake = {__session_id: 999999}
+bad_merge = agent.dialogue_merge s3 fake
+assert (bad_merge == Err "winner is not a fork of this parent") "merge with non-fork returns Err"
+agent.dialogue_end s3
+
+emit "agent.dialogue_fork/compare/merge: all passed"

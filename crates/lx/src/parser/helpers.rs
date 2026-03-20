@@ -46,7 +46,10 @@ pub(super) fn infix_bp(kind: &TokenKind) -> Option<(u8, u8)> {
         | TokenKind::LtEq
         | TokenKind::GtEq => Some((17, 18)),
         TokenKind::Pipe => Some((19, 20)),
-        TokenKind::PlusPlus | TokenKind::TildeArrow | TokenKind::TildeArrowQ => Some((21, 22)),
+        TokenKind::PlusPlus
+        | TokenKind::TildeArrow
+        | TokenKind::TildeArrowQ
+        | TokenKind::TildeArrowArrowQ => Some((21, 22)),
         TokenKind::DotDot | TokenKind::DotDotEq => Some((23, 24)),
         TokenKind::Plus | TokenKind::Minus => Some((25, 26)),
         TokenKind::Star | TokenKind::Slash | TokenKind::Percent | TokenKind::IntDiv => {

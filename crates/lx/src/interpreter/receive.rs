@@ -8,7 +8,7 @@ use crate::value::Value;
 use super::Interpreter;
 
 impl Interpreter {
-    pub(super) fn eval_receive(
+    pub(super) async fn eval_receive(
         &mut self,
         arms: &[ReceiveArm],
         span: Span,
@@ -35,8 +35,8 @@ impl Interpreter {
 
             for arm in arms {
                 if arm.action == action || arm.action == "_" {
-                    let handler = self.eval(&arm.handler)?;
-                    result = self.apply_func(handler, msg.clone(), span)?;
+                    let handler = self.eval(&arm.handler).await?;
+                    result = self.apply_func(handler, msg.clone(), span).await?;
                     break;
                 }
             }

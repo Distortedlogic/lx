@@ -33,13 +33,15 @@ run_scenario = (scenario) {
       emit "    score: {grade_result.score}  passed: {grade_result.passed}"
       grade_result.passed | not ? emit "    feedback: {grade_result.feedback}"
 
-      sn = scenario.name
-      {name: sn  passed: grade_result.passed  score: grade_result.score}
+      name = scenario.name
+      passed = grade_result.passed
+      score = grade_result.score
+      {name passed score}
     }
     Err e -> {
       emit "    ERROR: {e}"
-      sn = scenario.name
-      {name: sn  passed: false  score: 0.0}
+      name = scenario.name
+      {name  passed: false  score: 0.0}
     }
   }
 }
@@ -48,10 +50,9 @@ run_scenario = (scenario) {
   session = TraceStore {path: "/tmp/lx_workgen_test_trace.json"}
   tag_filter = env.get "TEST_TAG" ?? ""
 
-  scenarios = tag_filter == "" ? {
-    true -> spec.scenarios
-    false -> spec.scenarios | filter (s) s.tags | contains? tag_filter
-  }
+  scenarios = tag_filter == "" ?
+    spec.scenarios :
+    (spec.scenarios | filter (s) s.tags | contains? tag_filter)
 
   emit "=== workgen satisfaction tests ==="
   emit "scenarios: {scenarios | len}"
@@ -60,13 +61,13 @@ run_scenario = (scenario) {
   results = scenarios | pmap_n 4 run_scenario
 
   results | each (r) {
-    session.record {name: r.name  output: (to_str r.score)  score: r.score} ^
+    session.record {name: r.name  output: "{r.score}"  score: r.score} ^
   }
 
   passed_count = results | filter (.passed) | len
   total = results | len
   scores = results | map (.score)
-  overall = scores | fold 0.0 (+) | (s) s / total
+  overall = (scores | sum) / total
 
   emit "\n=== {spec.name} ==="
   results | each (r) {

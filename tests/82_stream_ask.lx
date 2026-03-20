@@ -1,0 +1,58 @@
+streamer = {name: "streamer" handler: (msg) {
+  msg.items | map (x) x * 2
+}}
+
+stream = streamer ~>>? {items: [1 2 3 4 5]}
+assert (to_str stream == "<Stream>") "stream displays as <Stream>"
+
+results = stream | collect
+assert (len results == 5) "collect materializes all 5 items"
+assert (results.0 == 2) "first item doubled"
+assert (results.4 == 10) "last item doubled"
+
+stream2 = streamer ~>>? {items: [10 20 30]}
+mapped = stream2 | map (x) x + 1
+assert (len mapped == 3) "map over stream"
+assert (mapped.0 == 21) "map first"
+assert (mapped.2 == 61) "map last"
+
+stream3 = streamer ~>>? {items: [1 2 3 4 5 6]}
+filtered = stream3 | filter (x) x > 5
+assert (len filtered == 4) "filter keeps items > 5"
+assert (filtered.0 == 6) "first filtered"
+assert (filtered.3 == 12) "last filtered"
+
+stream4 = streamer ~>>? {items: [10 20 30 40 50]}
+taken = stream4 | take 3
+assert (len taken == 3) "take 3 from stream"
+assert (taken.0 == 20) "take first"
+assert (taken.2 == 60) "take third"
+
+stream5 = streamer ~>>? {items: [1 2 3]}
+sum = stream5 | fold 0 (acc x) acc + x
+assert (sum == 12) "fold over stream: 2+4+6=12"
+
+stream6 = streamer ~>>? {items: [5 10 15]}
+stream6 | each (x) {
+  assert (x > 0) "each processes positive values"
+}
+
+ok_agent = {name: "ok_agent" handler: (msg) {
+  Ok [msg.a msg.b]
+}}
+stream7 = ok_agent ~>>? {a: 1 b: 2}
+results7 = stream7 | collect
+assert (len results7 == 2) "Ok-wrapped list streams items"
+assert (results7.0 == 1) "first ok item"
+
+single_agent = {name: "single" handler: (msg) msg.val}
+stream8 = single_agent ~>>? {val: 42}
+results8 = stream8 | collect
+assert (len results8 == 1) "non-list wraps as single item"
+assert (results8.0 == 42) "single value"
+
+use std/agent
+assert (agent.emit_stream != ()) "emit_stream exists"
+assert (agent.end_stream != ()) "end_stream exists"
+
+emit "[INFO] 82_stream_ask: all passed"

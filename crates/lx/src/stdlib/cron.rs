@@ -57,7 +57,10 @@ fn bi_schedule(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Valu
             if sleep_cancellable(wait, &flag) {
                 break;
             }
-            if let Err(e) = call_value(&callback, Value::Unit, span, &ctx) {
+            if let Err(e) =
+                ctx.tokio_runtime
+                    .block_on(call_value(&callback, Value::Unit, span, &ctx))
+            {
                 eprintln!("[cron] schedule error: {e}");
             }
         }
@@ -81,7 +84,10 @@ fn bi_every(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, 
             if flag.load(Ordering::Relaxed) {
                 break;
             }
-            if let Err(e) = call_value(&callback, Value::Unit, span, &ctx) {
+            if let Err(e) =
+                ctx.tokio_runtime
+                    .block_on(call_value(&callback, Value::Unit, span, &ctx))
+            {
                 eprintln!("[cron] every error: {e}");
             }
         }

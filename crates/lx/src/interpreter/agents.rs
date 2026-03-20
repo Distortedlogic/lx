@@ -1,7 +1,9 @@
 use std::sync::Arc;
+use std::sync::mpsc;
 
 use indexmap::IndexMap;
 use num_bigint::BigInt;
+use parking_lot::Mutex;
 
 use crate::ast::{ProtocolEntry, ProtocolField, SExpr};
 use crate::error::LxError;
@@ -52,45 +54,78 @@ impl Interpreter {
         }
     }
 
-    pub fn call(&mut self, func: Value, arg: Value) -> Result<Value, LxError> {
-        self.apply_func(func, arg, Span::default())
+    pub async fn call(&mut self, func: Value, arg: Value) -> Result<Value, LxError> {
+        self.apply_func(func, arg, Span::default()).await
     }
 
-    pub(super) fn eval_agent_send(
+    pub(super) async fn eval_agent_send(
         &mut self,
         target_expr: &SExpr,
         msg_expr: &SExpr,
         span: Span,
     ) -> Result<Value, LxError> {
-        let target = self.eval(target_expr)?;
-        let msg = inject_deadline(self.eval(msg_expr)?);
+        let target = self.eval(target_expr).await?;
+        let msg = inject_deadline(self.eval(msg_expr).await?);
         if matches!(target, Value::Record(ref f) if f.contains_key("__pid")) {
             let pid = extract_pid(&target, span)?;
             crate::stdlib::agent::send_subprocess(pid, &msg, span)?;
             return Ok(Value::Unit);
         }
         let handler = self.get_agent_handler(&target, span)?;
-        self.apply_func(handler, msg, span)?;
+        self.apply_func(handler, msg, span).await?;
         Ok(Value::Unit)
     }
 
-    pub(super) fn eval_agent_ask(
+    pub(super) async fn eval_agent_ask(
         &mut self,
         target_expr: &SExpr,
         msg_expr: &SExpr,
         span: Span,
     ) -> Result<Value, LxError> {
-        let target = self.eval(target_expr)?;
-        let msg = inject_deadline(self.eval(msg_expr)?);
+        let target = self.eval(target_expr).await?;
+        let msg = inject_deadline(self.eval(msg_expr).await?);
         if matches!(target, Value::Record(ref f) if f.contains_key("__pid")) {
             let pid = extract_pid(&target, span)?;
             return crate::stdlib::agent::ask_subprocess(pid, &msg, span);
         }
         let handler = self.get_agent_handler(&target, span)?;
-        self.apply_func(handler, msg, span)
+        self.apply_func(handler, msg, span).await
     }
 
-    pub(super) fn eval_protocol_def(
+    pub(super) async fn eval_stream_ask(
+        &mut self,
+        target_expr: &SExpr,
+        msg_expr: &SExpr,
+        span: Span,
+    ) -> Result<Value, LxError> {
+        let target = self.eval(target_expr).await?;
+        let msg = inject_deadline(self.eval(msg_expr).await?);
+        if matches!(target, Value::Record(ref f) if f.contains_key("__pid")) {
+            let pid = extract_pid(&target, span)?;
+            return crate::stdlib::agent_stream::stream_ask_subprocess(pid, &msg, span);
+        }
+        let handler = self.get_agent_handler(&target, span)?;
+        let result = self.apply_func(handler, msg, span).await?;
+        let items = match result {
+            Value::List(l) => (*l).clone(),
+            Value::Ok(v) => match *v {
+                Value::List(l) => (*l).clone(),
+                other => vec![Value::Ok(Box::new(other))],
+            },
+            other => vec![other],
+        };
+        let (tx, rx) = mpsc::channel();
+        for item in items {
+            let _ = tx.send(item);
+        }
+        drop(tx);
+        Ok(Value::Stream {
+            rx: Arc::new(Mutex::new(rx)),
+            cancel_tx: Arc::new(Mutex::new(None)),
+        })
+    }
+
+    pub(super) async fn eval_protocol_def(
         &mut self,
         name: &str,
         entries: &[ProtocolEntry],
@@ -127,7 +162,7 @@ impl Interpreter {
                     }
                 }
                 ProtocolEntry::Field(f) => {
-                    let def = self.eval_proto_field(f)?;
+                    let def = self.eval_proto_field(f).await?;
                     if let Some(pos) = proto_fields
                         .iter()
                         .position(|pf: &ProtoFieldDef| pf.name == def.name)
@@ -154,9 +189,9 @@ impl Interpreter {
         Ok(Value::Unit)
     }
 
-    fn eval_proto_field(&mut self, f: &ProtocolField) -> Result<ProtoFieldDef, LxError> {
+    async fn eval_proto_field(&mut self, f: &ProtocolField) -> Result<ProtoFieldDef, LxError> {
         let default = match &f.default {
-            Some(e) => Some(self.eval(e)?),
+            Some(e) => Some(self.eval(e).await?),
             None => None,
         };
         let constraint = f.constraint.as_ref().map(|e| Arc::new(e.clone()));

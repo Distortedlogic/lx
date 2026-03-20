@@ -16,21 +16,16 @@ use ../protocols {Perception}
     detect_domain raw
   }
 
-  urgency = detect_urgency raw
-  requires_tools = needs_tools raw intent
-  requires_agents = needs_agents raw complexity
-  ambiguity = measure_ambiguity raw entities
-
   Perception {
-    raw: raw
-    intent: intent
-    complexity: complexity
-    entities: entities
-    domain: domain
-    urgency: urgency
-    requires_tools: requires_tools
-    requires_agents: requires_agents
-    ambiguity: ambiguity
+    raw
+    intent
+    complexity
+    entities
+    domain
+    urgency: detect_urgency raw
+    requires_tools: needs_tools raw intent
+    requires_agents: needs_agents raw complexity
+    ambiguity: measure_ambiguity raw entities
   }
 }
 
@@ -51,20 +46,17 @@ use ../protocols {Perception}
     | prompt.constraint `Only concrete entities, no filler words`
     | prompt.section "Input" raw
   resp = ai.prompt (prompt.render p) ^
-  resp.text | lines | map trim | filter (l) len l > 0
+  resp.text | lines | map trim | filter (not empty?)
 }
 
 +assess_complexity = (raw: Str) -> Str {
-  word_count = raw | split " " | len
-  has_multiple_questions = raw | re.find_all r/\?/ | len > 1
-  has_code = raw | re.is_match r/```/
-  references_multiple_files = raw | re.find_all r/\w+\.\w{1,4}/ | len > 2
-
-  score := 0
-  word_count > 100 ? { score <- score + 1 }
-  has_multiple_questions ? { score <- score + 1 }
-  has_code ? { score <- score + 1 }
-  references_multiple_files ? { score <- score + 2 }
+  score = [
+    raw | split " " | len > 100
+    raw | re.find_all r/\?/ | len > 1
+    raw | re.is_match r/```/
+    raw | re.find_all r/\w+\.\w{1,4}/ | len > 2
+    raw | re.find_all r/\w+\.\w{1,4}/ | len > 2
+  ] | filter identity | len
 
   score ? {
     0 -> "trivial"
@@ -85,29 +77,23 @@ use ../protocols {Perception}
     ("devops" ["deploy" "ci" "docker" "kubernetes" "pipeline" "build"])
   ]
 
-  scores = domains | map (name keywords) {
-    hits = keywords | filter (kw) raw_lower | contains? kw | len
-    (name hits)
-  }
+  best = domains
+    | map (name keywords) (name  keywords | filter (kw) raw_lower | contains? kw | len)
+    | max_by (.1)
 
-  best = scores | max_by (name hits) hits
   (domain score) = best
   score > 0 ? domain : "general"
 }
 
 detect_urgency = (raw: Str) -> Str {
-  raw_lower = raw | lower
   urgent_signals = ["urgent" "asap" "broken" "crash" "emergency" "fix now" "blocking"]
-  has_urgent = urgent_signals | any? (s) raw_lower | contains? s
-  has_urgent ? "high" : "normal"
+  urgent_signals | any? (s) raw | lower | contains? s ? "high" : "normal"
 }
 
 +git_context = (domain: Str) -> Str {
   ["rust" "lx" "git" "testing"] | contains? domain ? {
-    status = git.status () ?? {branch: "unknown"  modified: []  staged: []}
-    branch = status.branch ?? "unknown"
-    modified = status.modified ?? []
-    "branch: {branch} | {modified | len} modified files"
+    status = git.status () ?? {branch: "unknown"  modified: []}
+    "branch: {status.branch ?? "unknown"} | {status.modified ?? [] | len} modified files"
   } : ""
 }
 

@@ -33,10 +33,7 @@ use ../protocols {QualityGrade Response}
   audit.quick_check {output: output  min_length: 10  no_hedging: true  no_refusal: true  task: task}
 }
 
-+grade_response = (response: Str  task: Str) -> QualityGrade {
-  rubric = response_rubric ()
-  result = audit.evaluate rubric {output: response  threshold: 75  task: task}
-
+grade_to_quality = (result: Any) -> QualityGrade {
   QualityGrade {
     score: result.score
     passed: result.passed
@@ -46,17 +43,12 @@ use ../protocols {QualityGrade Response}
   }
 }
 
-+grade_code = (code: Str  task: Str) -> QualityGrade {
-  rubric = code_rubric ()
-  result = audit.evaluate rubric {output: code  threshold: 80  task: task}
++grade_response = (response: Str  task: Str) -> QualityGrade {
+  audit.evaluate (response_rubric ()) {output: response  threshold: 75  task} | grade_to_quality
+}
 
-  QualityGrade {
-    score: result.score
-    passed: result.passed
-    feedback: result.feedback ?? ""
-    categories: result.scores ?? []
-    suggestions: result.failed_checks ?? []
-  }
++grade_code = (code: Str  task: Str) -> QualityGrade {
+  audit.evaluate (code_rubric ()) {output: code  threshold: 80  task} | grade_to_quality
 }
 
 +should_refine = (grade: QualityGrade  round: Int  max_rounds: Int = 3) -> Bool {
@@ -142,7 +134,7 @@ use ../protocols {QualityGrade Response}
 +final_audit = (response: Str  task: Str) -> Any {
   (quick full) = par {
     quick_check response task
-    auditor.audit {output: response  task: task}
+    auditor.audit {output: response  task}
   }
 
   {

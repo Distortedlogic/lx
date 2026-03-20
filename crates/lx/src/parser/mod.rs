@@ -111,6 +111,7 @@ impl Parser {
                             | TokenKind::Amp
                             | TokenKind::TildeArrow
                             | TokenKind::TildeArrowQ
+                            | TokenKind::TildeArrowArrowQ
                     )
                 {
                     self.advance();

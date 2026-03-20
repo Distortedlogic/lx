@@ -18,14 +18,15 @@ use ../protocols {Reflection FeedbackSignal}
     | prompt.instruction "1) Did it achieve its goal? 2) What worked? 3) What didn't? 4) Lesson?"
     | prompt.constraint "One sentence per answer. No fluff."
 
-  resp = ai.prompt (prompt.render p) ^
-  lessons = resp.text | lines | filter (l) len (trim l) > 0
+  lesson = ai.prompt (prompt.render p) ^
+    | (.text) | lines | filter (l) trim l | not empty?
+    | last ?? "no lesson extracted"
 
   Reflection {
-    action: action
-    outcome: outcome
-    quality: quality
-    lesson: lessons | last ?? "no lesson extracted"
+    action
+    outcome
+    quality
+    lesson
     should_remember: quality < 0.5 || quality > 0.9
     strategy_worked: quality >= 0.7
   }
@@ -78,23 +79,21 @@ assess_quality = (outcome: Str  expectation: Str) -> Float {
   FeedbackSignal {
     kind: feedback.kind ?? "general"
     score: feedback.score ?? 0.5
-    detail: feedback.detail ?? to_str feedback
+    detail: feedback.detail ?? "{feedback}"
     source: feedback.source ?? "user"
   }
 }
 
 +batch_reflect = (actions_and_outcomes: [Any]) -> Any {
-  reflections = actions_and_outcomes | map (pair) {
-    reflect pair.action pair.outcome (pair.expectation ?? "success") ^
-  }
+  reflections = actions_and_outcomes
+    | map (pair) reflect pair.action pair.outcome (pair.expectation ?? "success") ^
 
   patterns = extract_patterns reflections
-  lessons = reflections | filter (.should_remember) | map (.lesson)
 
   {
-    reflections: reflections
-    patterns: patterns
-    lessons: lessons
+    reflections
+    patterns
+    lessons: reflections | filter (.should_remember) | map (.lesson)
     overall_quality: reflections | map (.quality) | fold 0.0 (+) / (len reflections)
   }
 }
@@ -117,14 +116,13 @@ assess_quality = (outcome: Str  expectation: Str) -> Float {
   losing = patterns.losing_patterns | join ", "
   winning = patterns.winning_patterns | join ", "
 
-  losing | len > 0 ? {
+  losing | empty? ? ["current approach is working well"] : {
     p = prompt.create ()
       | prompt.system "You suggest improvements based on action patterns."
       | prompt.section "Actions that keep failing" losing
       | prompt.section "Actions that work" winning
       | prompt.instruction "Suggest 2-3 concrete changes to improve success rate."
 
-    resp = ai.prompt (prompt.render p) ^
-    resp.text | lines | filter (l) len (trim l) > 0
-  } : ["current approach is working well"]
+    ai.prompt (prompt.render p) ^ | (.text) | lines | filter (l) trim l | not empty?
+  }
 }

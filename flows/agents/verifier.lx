@@ -5,8 +5,8 @@ use std/ai
 use std/agent
 
 +verify = (msg) {
-  analysis = ai.prompt "Verify this finding:\n{to_str msg.finding}\nIs this a real issue? Respond with confirmed (bool) and reason." ^
-  {confirmed: analysis.confirmed ?? false  reason: analysis.reason ?? "unverified"}
+  analysis = ai.prompt "Verify this finding:\n{msg.finding}\nIs this a real issue? Respond with confirmed (bool) and reason." ^
+  {confirmed: (analysis.confirmed ?? false)  reason: (analysis.reason ?? "unverified")}
 }
 
 +handlers = %{"verify": verify}

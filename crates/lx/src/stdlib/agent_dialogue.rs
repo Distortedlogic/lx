@@ -13,7 +13,7 @@ use crate::record;
 use crate::span::Span;
 use crate::value::Value;
 
-static NEXT_SESSION_ID: AtomicU64 = AtomicU64::new(1);
+pub(super) static NEXT_SESSION_ID: AtomicU64 = AtomicU64::new(1);
 pub(super) static SESSIONS: std::sync::LazyLock<DashMap<u64, DialogueSession>> =
     std::sync::LazyLock::new(DashMap::new);
 
@@ -21,17 +21,21 @@ pub(super) struct DialogueSession {
     pub(super) agent: Value,
     pub(super) history: Vec<HistoryEntry>,
     pub(super) role: Option<String>,
-    context: Option<String>,
-    max_turns: Option<usize>,
+    pub(super) context: Option<String>,
+    pub(super) max_turns: Option<usize>,
+    pub(super) parent_id: Option<u64>,
+    pub(super) fork_ids: Vec<u64>,
+    pub(super) suspended: bool,
 }
 
+#[derive(Clone)]
 pub(super) struct HistoryEntry {
-    role: String,
-    content: Value,
-    time: String,
+    pub(super) role: String,
+    pub(super) content: Value,
+    pub(super) time: String,
 }
 
-fn session_id_from(val: &Value, span: Span) -> Result<u64, LxError> {
+pub(super) fn session_id_from(val: &Value, span: Span) -> Result<u64, LxError> {
     match val {
         Value::Record(r) => r
             .get("__session_id")
@@ -47,7 +51,7 @@ fn session_id_from(val: &Value, span: Span) -> Result<u64, LxError> {
     }
 }
 
-fn now_iso() -> String {
+pub(super) fn now_iso() -> String {
     chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
 }
 
@@ -73,7 +77,7 @@ fn build_turn_message(
     Value::Record(Arc::new(msg))
 }
 
-fn history_entry_to_value(entry: &HistoryEntry) -> Value {
+pub(super) fn history_entry_to_value(entry: &HistoryEntry) -> Value {
     record! {
         "role" => Value::Str(Arc::from(entry.role.as_str())),
         "content" => entry.content.clone(),
@@ -81,26 +85,25 @@ fn history_entry_to_value(entry: &HistoryEntry) -> Value {
     }
 }
 
-fn make_session_record(session_id: u64) -> Value {
+pub(super) fn make_session_record(session_id: u64) -> Value {
     record! {
         "__session_id" => Value::Int(BigInt::from(session_id)),
     }
 }
 
-pub fn mk_dialogue() -> Value {
-    mk("agent.dialogue", 2, bi_dialogue)
-}
-
-pub fn mk_dialogue_turn() -> Value {
-    mk("agent.dialogue_turn", 2, bi_dialogue_turn)
-}
-
-pub fn mk_dialogue_history() -> Value {
-    mk("agent.dialogue_history", 1, bi_dialogue_history)
-}
-
-pub fn mk_dialogue_end() -> Value {
-    mk("agent.dialogue_end", 1, bi_dialogue_end)
+pub fn builtins() -> Vec<(&'static str, Value)> {
+    vec![
+        ("dialogue", mk("agent.dialogue", 2, bi_dialogue)),
+        (
+            "dialogue_turn",
+            mk("agent.dialogue_turn", 2, bi_dialogue_turn),
+        ),
+        (
+            "dialogue_history",
+            mk("agent.dialogue_history", 1, bi_dialogue_history),
+        ),
+        ("dialogue_end", mk("agent.dialogue_end", 1, bi_dialogue_end)),
+    ]
 }
 
 fn bi_dialogue(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
@@ -116,6 +119,9 @@ fn bi_dialogue(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Val
             role: cfg.role,
             context: cfg.context,
             max_turns: cfg.max_turns,
+            parent_id: None,
+            fork_ids: Vec::new(),
+            suspended: false,
         },
     );
     Ok(Value::Ok(Box::new(make_session_record(session_id))))
@@ -171,7 +177,7 @@ fn ask_agent(
     let handler = r.get("handler").ok_or_else(|| {
         LxError::runtime("agent.dialogue: agent has no 'handler' or '__pid'", span)
     })?;
-    let result = crate::builtins::call_value(handler, msg, span, ctx)?;
+    let result = crate::builtins::call_value_sync(handler, msg, span, ctx)?;
     Ok(result)
 }
 
@@ -182,6 +188,11 @@ fn bi_dialogue_turn(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result
         let session = SESSIONS.get(&sid).ok_or_else(|| {
             LxError::runtime("agent.dialogue_turn: session not found or ended", span)
         })?;
+        if session.suspended {
+            return Ok(Value::Err(Box::new(Value::Str(Arc::from(
+                "session has active forks",
+            )))));
+        }
         if let Some(max) = session.max_turns
             && session.history.len() / 2 >= max
         {

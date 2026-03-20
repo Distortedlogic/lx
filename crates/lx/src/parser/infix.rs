@@ -52,6 +52,12 @@ impl super::Parser {
                 |l, r| Expr::AgentAsk { target: l, msg: r },
                 start,
             ),
+            TokenKind::TildeArrowArrowQ => self.parse_binary_infix(
+                left,
+                rbp,
+                |l, r| Expr::StreamAsk { target: l, msg: r },
+                start,
+            ),
             TokenKind::QQ => self.parse_binary_infix(
                 left,
                 rbp,

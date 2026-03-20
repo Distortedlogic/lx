@@ -48,9 +48,7 @@ grade_opts = {threshold: 95  max_rounds: 5}
     }
     false -> {
       emit "{findings | len} findings, verifying..."
-      results = findings | pmap (f) {
-        verifier.verify {finding: f}
-      }
+      results = findings | pmap (f) verifier.verify {finding: f}
       confirmed = results | filter (.confirmed)
       emit "{confirmed | len}/{findings | len} confirmed"
       Ok {findings: (findings | len)  confirmed: (confirmed | len)}
@@ -75,7 +73,7 @@ run_list = (items) {
   results = items | pmap (item) {
     grading.run "agents/worker.lx" {task: item} item grade_opts
   }
-  passed = results | filter (r) r ? { Ok _ -> true; Err _ -> false }
+  passed = results | filter ok?
   emit "completed {passed | len}/{results | len}"
 
   report.write "pipeline_report.md" "Pipeline: List Mode" [

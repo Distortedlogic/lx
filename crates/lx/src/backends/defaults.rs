@@ -132,44 +132,46 @@ impl HttpBackend for ReqwestHttpBackend {
         opts: &HttpOpts,
         span: Span,
     ) -> Result<Value, LxError> {
-        let c = Client::builder()
-            .build()
-            .map_err(|e| LxError::runtime(format!("http: client: {e}"), span))?;
-        let mut builder = match method {
-            "GET" => c.get(url),
-            "POST" => c.post(url),
-            "PUT" => c.put(url),
-            "DELETE" => c.delete(url),
-            _ => {
-                return Err(LxError::runtime(
-                    format!("http: unknown method '{method}'"),
-                    span,
-                ));
+        tokio::task::block_in_place(|| {
+            let c = Client::builder()
+                .build()
+                .map_err(|e| LxError::runtime(format!("http: client: {e}"), span))?;
+            let mut builder = match method {
+                "GET" => c.get(url),
+                "POST" => c.post(url),
+                "PUT" => c.put(url),
+                "DELETE" => c.delete(url),
+                _ => {
+                    return Err(LxError::runtime(
+                        format!("http: unknown method '{method}'"),
+                        span,
+                    ));
+                }
+            };
+            if let Some(ref hdrs) = opts.headers {
+                for (k, v) in hdrs {
+                    builder = builder.header(k.as_str(), v.as_str());
+                }
             }
-        };
-        if let Some(ref hdrs) = opts.headers {
-            for (k, v) in hdrs {
-                builder = builder.header(k.as_str(), v.as_str());
+            if let Some(ref query) = opts.query {
+                let pairs: Vec<(&str, &str)> = query
+                    .iter()
+                    .map(|(k, v)| (k.as_str(), v.as_str()))
+                    .collect();
+                builder = builder.query(&pairs);
             }
-        }
-        if let Some(ref query) = opts.query {
-            let pairs: Vec<(&str, &str)> = query
-                .iter()
-                .map(|(k, v)| (k.as_str(), v.as_str()))
-                .collect();
-            builder = builder.query(&pairs);
-        }
-        if let Some(ref body) = opts.body {
-            builder = builder.header(CONTENT_TYPE, "application/json").json(body);
-        }
-        match builder.send() {
-            Ok(resp) => response_to_value(resp, span),
-            Err(e) => Ok(Value::Err(Box::new(crate::stdlib::agent_errors::upstream(
-                url,
-                0,
-                &e.to_string(),
-            )))),
-        }
+            if let Some(ref body) = opts.body {
+                builder = builder.header(CONTENT_TYPE, "application/json").json(body);
+            }
+            match builder.send() {
+                Ok(resp) => response_to_value(resp, span),
+                Err(e) => Ok(Value::Err(Box::new(crate::stdlib::agent_errors::upstream(
+                    url,
+                    0,
+                    &e.to_string(),
+                )))),
+            }
+        })
     }
 }
 

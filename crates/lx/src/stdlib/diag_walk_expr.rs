@@ -20,6 +20,11 @@ pub(super) fn visit_expr_diag(w: &mut Walker, expr: &Expr, span: Span) {
             let ctx = w.context.clone();
             w.add_edge(&ctx, &to, extract_msg_label(&msg.node), "solid");
         }
+        Expr::StreamAsk { target, msg } => {
+            let to = resolve_target(w, &target.node);
+            let ctx = w.context.clone();
+            w.add_edge(&ctx, &to, extract_msg_label(&msg.node), "dotted");
+        }
         Expr::Par(stmts) => {
             let fork_id = w.add_node("fork", "par".into(), "fork");
             let ctx = w.context.clone();

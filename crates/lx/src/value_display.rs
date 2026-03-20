@@ -175,6 +175,7 @@ impl fmt::Display for Value {
             }
             Value::Object { class_name, id, .. } => write!(f, "<{class_name}#{id}>"),
             Value::Store { id } => write!(f, "<Store#{id}>"),
+            Value::Stream { .. } => write!(f, "<Stream>"),
         }
     }
 }

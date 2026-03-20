@@ -192,6 +192,7 @@ pub fn walk_expr<V: AstVisitor + ?Sized>(v: &mut V, expr: &Expr, span: Span) {
         Expr::Sel(arms) => v.visit_sel(arms, span),
         Expr::AgentSend { target, msg } => v.visit_agent_send(target, msg, span),
         Expr::AgentAsk { target, msg } => v.visit_agent_ask(target, msg, span),
+        Expr::StreamAsk { target, msg } => v.visit_stream_ask(target, msg, span),
         Expr::Emit { value } => v.visit_emit(value, span),
         Expr::Yield { value } => v.visit_yield(value, span),
         Expr::With {

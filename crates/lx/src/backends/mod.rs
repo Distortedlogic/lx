@@ -30,6 +30,8 @@ pub struct RuntimeCtx {
     pub on_agent_event: Option<Arc<dyn Fn(AgentEvent) + Send + Sync>>,
     pub source_dir: parking_lot::Mutex<Option<PathBuf>>,
     pub workspace_members: HashMap<String, PathBuf>,
+    pub dep_dirs: HashMap<String, PathBuf>,
+    pub tokio_runtime: Arc<tokio::runtime::Runtime>,
 }
 
 impl Default for RuntimeCtx {
@@ -45,6 +47,10 @@ impl Default for RuntimeCtx {
             on_agent_event: None,
             source_dir: parking_lot::Mutex::new(None),
             workspace_members: HashMap::new(),
+            dep_dirs: HashMap::new(),
+            tokio_runtime: Arc::new(
+                tokio::runtime::Runtime::new().expect("failed to create tokio runtime"),
+            ),
         }
     }
 }

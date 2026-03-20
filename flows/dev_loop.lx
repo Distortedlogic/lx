@@ -52,8 +52,8 @@ ground_truth = () {
   tests = $just test
   diag_code = diag ? { Ok r -> r.code; _ -> 1 }
   test_out = tests ? { Ok r -> r.out; _ -> "" }
-  pass_count = test_out | lines | filter (l) { contains? "PASS" l } | len
-  fail_count = test_out | lines | filter (l) { contains? "FAIL" l } | len
+  pass_count = test_out | lines | filter (l) contains? "PASS" l | len
+  fail_count = test_out | lines | filter (l) contains? "FAIL" l | len
   git_status = ($^git status --short) ?? ""
   {
     diag_clean: (diag_code == 0)
@@ -80,10 +80,10 @@ validate = () {
   diag = $just diagnose
   tests = $just test
   diag_code = diag ? { Ok r -> r.code; _ -> 1 }
-  diag_out = diag ? { Ok r -> r.out ++ "\n" ++ r.err; _ -> "failed" }
+  diag_out = diag ? { Ok r -> "{r.out}\n{r.err}"; _ -> "failed" }
   test_out = tests ? { Ok r -> r.out; _ -> "" }
-  pass_count = test_out | lines | filter (l) { contains? "PASS" l } | len
-  fail_count = test_out | lines | filter (l) { contains? "FAIL" l } | len
+  pass_count = test_out | lines | filter (l) contains? "PASS" l | len
+  fail_count = test_out | lines | filter (l) contains? "FAIL" l | len
   {
     ok: (diag_code == 0 && fail_count == 0)
     diag_clean: (diag_code == 0)
@@ -105,10 +105,9 @@ update_context = (ctx task v) {
 
   verified = fs.read "{agent_dir}/CONTINUE.md" ^
   has_count = contains? (to_str v.pass_count) verified
-  has_count ? {
-    true -> emit "context verified: test count {v.pass_count} present"
-    false -> emit "WARNING: updated CONTINUE.md missing test count {v.pass_count}"
-  }
+  emit (has_count
+    ? "context verified: test count {v.pass_count} present"
+    : "WARNING: updated CONTINUE.md missing test count {v.pass_count}")
 }
 
 iteration = (n max_n retries) {
@@ -142,16 +141,14 @@ iteration = (n max_n retries) {
           emit "=== iteration {n} complete ==="
           iteration (n + 1) max_n 0
         }
-        false -> {
-          retries >= 2 ? {
-            true -> {
-              emit "3 attempts failed on this task, skipping"
-              iteration (n + 1) max_n 0
-            }
-            false -> {
-              emit "validation failed, retrying..."
-              iteration n max_n (retries + 1)
-            }
+        false -> retries >= 2 ? {
+          true -> {
+            emit "3 attempts failed on this task, skipping"
+            iteration (n + 1) max_n 0
+          }
+          false -> {
+            emit "validation failed, retrying..."
+            iteration n max_n (retries + 1)
           }
         }
       }
@@ -166,8 +163,7 @@ iteration = (n max_n retries) {
   truth = ground_truth ()
   emit "baseline: {truth.pass_count}P {truth.fail_count}F clean={truth.diag_clean}"
 
-  truth.diag_clean ? {
-    false -> Err "baseline diagnose fails -- fix manually before running dev loop"
-    true -> iteration 1 max 0
-  }
+  truth.diag_clean
+    ? iteration 1 max 0
+    : Err "baseline diagnose fails -- fix manually before running dev loop"
 }

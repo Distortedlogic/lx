@@ -22,8 +22,8 @@ use std/json
   retry_ok = get "retry_success" code ?? false
   final_compile = compile_ok || (fix_applied && retry_ok)
 
-  passed_smoke = smoke_results | filter (r) { r.pass ?? false }
-  all_pass = passed_smoke | len == (smoke_results | len) && (smoke_results | len > 0)
+  passed_smoke = smoke_results | filter (r) r.pass ?? false
+  all_pass = (passed_smoke | len) == (smoke_results | len) && (smoke_results | len > 0)
 
   Ok {
     tool_name: tool_name

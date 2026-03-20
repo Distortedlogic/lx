@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::{call_value, mk};
+use crate::builtins::{call_value_sync, mk};
 use crate::error::LxError;
 use crate::span::Span;
 use crate::value::Value;
@@ -154,8 +154,8 @@ fn bi_route_multi(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<V
     }
     if let Some(reconcile_cfg) = opts.get("reconcile") {
         let reconcile_fn = super::agent_reconcile::mk_reconcile();
-        let partial = call_value(&reconcile_fn, Value::List(Arc::new(results)), span, ctx)?;
-        let reconciled = call_value(&partial, reconcile_cfg.clone(), span, ctx)?;
+        let partial = call_value_sync(&reconcile_fn, Value::List(Arc::new(results)), span, ctx)?;
+        let reconciled = call_value_sync(&partial, reconcile_cfg.clone(), span, ctx)?;
         return Ok(Value::Ok(Box::new(reconciled)));
     }
     Ok(Value::Ok(Box::new(Value::List(Arc::new(results)))))

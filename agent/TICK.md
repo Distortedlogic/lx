@@ -24,21 +24,24 @@ See `TICK_PROTOCOL.md` for cross-read guidance.
 
 ## State
 
-Session 66 (2026-03-19). **82/82 tests pass.** `just diagnose` clean (0 errors, 0 warnings).
-34 Rust stdlib modules + 11 lx packages in `pkg/`. `agent.pipeline` shipped: consumer-driven
-flow control with backpressure (11 functions, 3 Rust files). 13 agent extensions total.
+Session 72 (2026-03-19). **91/91 tests pass.** `just diagnose` clean (0 errors, 0 warnings).
+39 Rust stdlib modules + 11 lx packages in `pkg/`. Async interpreter: `eval`/`exec` are
+`async fn` with `#[async_recursion(?Send)]`. `par`/`sel`/`pmap` use `futures::join_all`/`select_all`.
+Builtin split: `BuiltinKind::Sync`/`Async`. Shipped this session: `agent.adapter`/`negotiate_format`/`coerce`
+(Protocol format negotiation — 2 Rust files, 1 test file).
 
 ## This Tick
 
-**Next priority from PRIORITIES.md: `~>>?` streaming ask.**
+**Next priority from PRIORITIES.md: `agent.reload`/`evolve` Hot-swap agent handlers.**
 
 ## Read These Files
 
 1. `agent/PRIORITIES.md` — feature queue, context for what to build
-2. `spec/agents-streaming.md` — spec for `~>>?` streaming ask
+2. `spec/agents-hot-reload.md` — spec for hot reload/evolve
 3. `agent/INVENTORY.md` — what's implemented
 4. `agent/REFERENCE.md` — codebase layout and how-tos
 5. `agent/GOTCHAS.md` — parser traps
+6. `agent/AGENTS.md` — agent system details
 
 ## Context Files
 

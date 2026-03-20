@@ -7,7 +7,7 @@ use std/agent
 +main = () {
   agent.dispatch %{
     "stub": (msg) {
-      ai.prompt_structured "Generate Rust type stubs for module '{msg.module}'.\nSpec: {to_str msg.spec}\n\nDefine types, traits, fn signatures with todo!() bodies." {
+      ai.prompt_structured "Generate Rust type stubs for module '{msg.module}'.\nSpec: {msg.spec}\n\nDefine types, traits, fn signatures with todo!() bodies." {
         code: Str
         types: [Str]
         traits: [Str]

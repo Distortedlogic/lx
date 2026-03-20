@@ -36,27 +36,13 @@ required_sections = ["Goal" "Why" "What changes" "Files affected" "Task List" "C
   root = env.get "ROOT" ?? "."
 
   missing := false
-  audit_path == "" ? {
-    true -> {
-      emit "error: AUDIT_FILE not set"
-      missing <- true
-    }
-    false -> ()
-  }
-  rules_path == "" ? {
-    true -> {
-      emit "error: RULES_FILE not set"
-      missing <- true
-    }
-    false -> ()
-  }
+  audit_path == "" ? { emit "error: AUDIT_FILE not set"; missing <- true }
+  rules_path == "" ? { emit "error: RULES_FILE not set"; missing <- true }
+
   missing ? {
-    true -> {
-      emit "usage: just -f workgen/justfile audit-rust"
-      Err "required env vars not set"
-    }
-    false -> run audit_path rules_path root
-  }
+    emit "usage: just -f workgen/justfile audit-rust"
+    Err "required env vars not set"
+  } : run audit_path rules_path root
 }
 
 +run = (audit_path rules_path root) {
@@ -91,10 +77,9 @@ required_sections = ["Goal" "Why" "What changes" "Files affected" "Task List" "C
 
 gather_tree = (root) {
   git_files = ($^git -C {root} ls-files 2>/dev/null) ?? ""
-  git_files != "" ? {
-    true -> git_files | lines | take 300 | map (f) { "{root}/{f}" } | join "\n"
-    false -> ($^find {root} -maxdepth 4 -type f -not -path "*/.git/*" -not -path "*/target/*" -not -path "*/node_modules/*" 2>/dev/null) ?? ""
-  }
+  git_files != "" ?
+    (git_files | lines | take 300 | map (f) "{root}/{f}" | join "\n") :
+    (($^find {root} -maxdepth 4 -type f -not -path "*/.git/*" -not -path "*/target/*" -not -path "*/node_modules/*" 2>/dev/null) ?? "")
 }
 
 investigate = (audit_content root) {
@@ -151,18 +136,14 @@ write_draft = (name content) {
 check_sections = (draft) {
   headings = md.parse draft | md.headings
   missing = required_sections | filter (req) {
-    found = headings | any? (h) { contains? req h.text }
-    not found
+    headings | any? (h) contains? req h.text | not
   }
   missing | empty? ? {
-    true -> {
-      emit "  sections: all {required_sections | len} required sections present"
-      true
-    }
-    false -> {
-      emit "  sections: missing {missing | join ", "}"
-      false
-    }
+    emit "  sections: all {required_sections | len} required sections present"
+    true
+  } : {
+    emit "  sections: missing {missing | join ", "}"
+    false
   }
 }
 
@@ -195,10 +176,9 @@ verify_and_revise = (session path draft name) {
   emit "\n--- Phase 6: Verification Loop ---"
 
   structural = audit.quick_check {output: draft  task: "work item for {name}"}
-  structural.passed ? {
-    true -> emit "  structural pre-check: passed"
-    false -> emit "  structural pre-check: {structural.reasons | join ", "}"
-  }
+  structural.passed ?
+    (emit "  structural pre-check: passed") :
+    (emit "  structural pre-check: {structural.reasons | join ", "}")
 
   check_sections draft
 
@@ -212,25 +192,20 @@ verify_and_revise = (session path draft name) {
 
     grade_result.passed ? break ()
 
-    should_stop = session.should_stop {min_delta: 2.0  window: 3}
-    should_stop ? {
-      true -> {
-        emit "  diminishing returns — stopping"
-        break ()
-      }
-      false -> {
-        prev_grades <- grade_result.categories
-        revised = revise_draft current grade_result.feedback ^
-        fs.write path revised ^
-        current <- revised
-      }
+    session.should_stop {min_delta: 2.0  window: 3} ? {
+      emit "  diminishing returns — stopping"
+      break ()
+    } : {
+      prev_grades <- grade_result.categories
+      revised = revise_draft current grade_result.feedback ^
+      fs.write path revised ^
+      current <- revised
     }
   }
 
   final_check = auditor.audit {output: current  task: "work item for {name}"}
-  final_check.passed ? {
-    true -> emit "  auditor: passed (score {final_check.score})"
-    false -> emit "  auditor: failed (score {final_check.score}) — {final_check.feedback}"
-  }
+  final_check.passed ?
+    (emit "  auditor: passed (score {final_check.score})") :
+    (emit "  auditor: failed (score {final_check.score}) — {final_check.feedback}")
   Ok current
 }

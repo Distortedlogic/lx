@@ -3,7 +3,7 @@ use std::sync::Arc;
 use num_bigint::BigInt;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::{call_value, mk};
+use crate::builtins::{call_value_sync, mk};
 use crate::error::LxError;
 use crate::record;
 use crate::span::Span;
@@ -29,7 +29,7 @@ fn ask_agent(
         .get("handler")
         .filter(|h| matches!(h, Value::Func(_) | Value::BuiltinFunc(_)))
     {
-        return call_value(handler, msg.clone(), span, ctx);
+        return call_value_sync(handler, msg.clone(), span, ctx);
     }
     if let Some(pid) = r
         .get("__pid")
@@ -99,8 +99,8 @@ fn bi_negotiate(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Val
             });
         }
         if let Some(cb) = on_round {
-            let partial = call_value(cb, Value::Int(BigInt::from(round)), span, ctx)?;
-            call_value(
+            let partial = call_value_sync(cb, Value::Int(BigInt::from(round)), span, ctx)?;
+            call_value_sync(
                 &partial,
                 Value::List(Arc::new(responses.clone())),
                 span,
@@ -109,7 +109,7 @@ fn bi_negotiate(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Val
         }
         let resp_list = Arc::new(responses.clone());
         let converge_result =
-            call_value(converge_fn, Value::List(Arc::clone(&resp_list)), span, ctx)?;
+            call_value_sync(converge_fn, Value::List(Arc::clone(&resp_list)), span, ctx)?;
         match converge_result {
             Value::Ok(result) => {
                 return Ok(Value::Ok(Box::new(record! {

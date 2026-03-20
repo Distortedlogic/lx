@@ -5,7 +5,7 @@ use std::time::Instant;
 use indexmap::IndexMap;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::{call_value, mk};
+use crate::builtins::{call_value_sync, mk};
 use crate::error::LxError;
 use crate::record;
 use crate::span::Span;
@@ -72,7 +72,7 @@ fn try_step(
     let retry_opts = super::retry::RetryOpts::exponential((retries + 1) as u64);
     for attempt in 0..=retries {
         let last = attempt == retries;
-        match call_value(do_fn, prev.clone(), span, ctx) {
+        match call_value_sync(do_fn, prev.clone(), span, ctx) {
             Ok(Value::Err(e)) if last => return Err(*e),
             Ok(Value::Err(_)) => {}
             Ok(v) => return Ok(v),
@@ -100,13 +100,13 @@ fn compensate(
     for (id, result, undo_fn) in completed.iter().rev() {
         if let Some(ref on_comp) = opts.on_compensate {
             let id_val = Value::Str(Arc::from(id.as_str()));
-            if let Err(e) = call_value(on_comp, id_val, span, ctx)
-                .and_then(|partial| call_value(&partial, result.clone(), span, ctx))
+            if let Err(e) = call_value_sync(on_comp, id_val, span, ctx)
+                .and_then(|partial| call_value_sync(&partial, result.clone(), span, ctx))
             {
                 eprintln!("saga: on_compensate callback failed for step '{id}': {e}");
             }
         }
-        let undo_result = call_value(undo_fn, result.clone(), span, ctx);
+        let undo_result = call_value_sync(undo_fn, result.clone(), span, ctx);
         match undo_result {
             Ok(Value::Err(e)) => {
                 comp_errors.push(record! {

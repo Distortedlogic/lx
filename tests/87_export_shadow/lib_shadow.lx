@@ -1,0 +1,17 @@
+-- lib_shadow.lx
+-- Tests that +exported names don't shadow builtins inside the module
+
++filter = (criteria items) {
+  pred = (x) x.tag == criteria
+  filter pred items
+}
+
++map = (f items) {
+  result = map f items
+  result
+}
+
++fold = (init combine items) {
+  result = fold init combine items
+  result
+}

@@ -10,18 +10,14 @@ use ../protocols {CognitiveState}
 
 +self_assess = () -> Any {
   ins = Inspector ()
-  identity = ins.self ()
-  elapsed = ins.elapsed ()
-  turns = ins.turn_count ()
   actions = ins.actions ()
-  stuck = ins.is_stuck ()
 
   {
-    identity: identity
-    elapsed_ms: elapsed
-    turns: turns
+    identity: ins.self ()
+    elapsed_ms: ins.elapsed ()
+    turns: ins.turn_count ()
     action_count: actions | len
-    is_stuck: stuck
+    is_stuck: ins.is_stuck ()
     action_diversity: actions | map (.type) | uniq | len
     recent_actions: actions | rev | take 5
   }
@@ -53,8 +49,7 @@ use ../protocols {CognitiveState}
 }
 
 +strategy_analysis = () -> Any {
-  ins = Inspector ()
-  actions = ins.actions ()
+  actions = Inspector ().actions ()
 
   actions | len < 5 ? {
     current: "too_early"
@@ -65,7 +60,7 @@ use ../protocols {CognitiveState}
     loop_check = detect_doom_loop actions 10
 
     recommendation = loop_check.is_looping ?
-      "PIVOT — doom loop on: {loop_check.repeated_actions | join ', '}"
+      "PIVOT — doom loop on: {loop_check.repeated_actions | join ", "}"
       : assessment.is_stuck ?
         "CHANGE — agent is stuck, try different approach"
         : assessment.action_diversity < 3 ?
@@ -74,7 +69,7 @@ use ../protocols {CognitiveState}
 
     {
       current: loop_check.is_looping ? "looping" : assessment.is_stuck ? "stuck" : "healthy"
-      recommendation: recommendation
+      recommendation
       actions_analyzed: actions | len
       diversity: assessment.action_diversity
     }
@@ -86,18 +81,13 @@ use ../protocols {CognitiveState}
   elapsed = ins.elapsed ()
   budget_info = ins.budget ()
 
-  elapsed_pct = budget_info.total_ms > 0 ?
-    elapsed / budget_info.total_ms * 100.0
-    : 0.0
+  elapsed_pct = budget_info.total_ms > 0 ? elapsed / budget_info.total_ms * 100.0 : 0.0
 
   {
     elapsed_ms: elapsed
-    elapsed_pct: elapsed_pct
+    elapsed_pct
     remaining_ms: math.max 0 (budget_info.total_ms - elapsed)
-    pressure: elapsed_pct > 80.0 ? "critical"
-      : elapsed_pct > 60.0 ? "high"
-      : elapsed_pct > 40.0 ? "moderate"
-      : "low"
+    pressure: elapsed_pct > 80.0 ? "critical" : elapsed_pct > 60.0 ? "high" : elapsed_pct > 40.0 ? "moderate" : "low"
   }
 }
 
@@ -136,7 +126,7 @@ use ../protocols {CognitiveState}
   assessment = self_assess ()
   strategy = strategy_analysis ()
 
-  strategy.current != "healthy" ? {
+  strategy.current == "healthy" ? ["current approach is working"] : {
     p = prompt.create ()
       | prompt.system "You suggest alternative approaches when current strategy isn't working."
       | prompt.section "Current Strategy" strategy.current
@@ -144,7 +134,6 @@ use ../protocols {CognitiveState}
       | prompt.section "Recommendation" strategy.recommendation
       | prompt.instruction "Suggest 2 concrete alternative approaches."
 
-    resp = ai.prompt (prompt.render p) ^
-    resp.text | lines | filter (l) len (trim l) > 0
-  } : ["current approach is working"]
+    ai.prompt (prompt.render p) ^ | (.text) | lines | filter (l) trim l | not empty?
+  }
 }

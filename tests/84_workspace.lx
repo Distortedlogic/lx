@@ -1,0 +1,89 @@
+use std/workspace
+
+code = "line_a\nline_b\nline_c\nline_d\nline_e\nline_f\nline_g\nline_h\nline_i"
+
+ws = workspace.create "test-ws" {content: code} ^
+
+snap = workspace.snapshot ws ^
+assert (snap == code) "snapshot matches original"
+
+r_top = workspace.claim ws "top" {start: 0 end: 2} ^
+r_mid = workspace.claim ws "mid" {start: 3 end: 5} ^
+
+regs = workspace.regions ws
+assert (len regs == 2) "two regions claimed"
+
+overlap = workspace.claim ws "bad" {start: 1 end: 4}
+assert (err? overlap == true) "overlapping claim returns Err"
+
+oob = workspace.claim ws "oob" {start: 0 end: 999}
+assert (err? oob == true) "out-of-bounds claim returns Err"
+
+workspace.edit ws r_top "new_a\nnew_b\nnew_c\nnew_d" ^
+
+snap2 = workspace.snapshot ws ^
+expected2 = "new_a\nnew_b\nnew_c\nnew_d\nline_d\nline_e\nline_f\nline_g\nline_h\nline_i"
+assert (snap2 == expected2) "edit: content replaced with bound adjustment"
+
+regs2 = workspace.regions ws
+top_reg = (regs2 | filter (r) { r.name == "top" }).0
+assert (top_reg.start == 0) "top start unchanged"
+assert (top_reg.end == 3) "top end grew by 1"
+
+mid_reg = (regs2 | filter (r) { r.name == "mid" }).0
+assert (mid_reg.start == 4) "mid start shifted +1"
+assert (mid_reg.end == 6) "mid end shifted +1"
+
+workspace.append ws r_mid "extra_1\nextra_2" ^
+snap3 = workspace.snapshot ws ^
+expected3 = "new_a\nnew_b\nnew_c\nnew_d\nline_d\nline_e\nline_f\nextra_1\nextra_2\nline_g\nline_h\nline_i"
+assert (snap3 == expected3) "append: content added after region"
+
+regs3a = workspace.regions ws
+mid_after = (regs3a | filter (r) { r.name == "mid" }).0
+assert (mid_after.end == 8) "mid end grew by 2 after append"
+
+workspace.release ws r_top
+regs3 = workspace.regions ws
+assert (len regs3 == 1) "one region after release"
+assert (regs3.0.name == "mid") "remaining region is mid"
+
+hist = workspace.history ws
+assert (len hist >= 2) "at least 2 history entries"
+assert (hist.0.region == "top") "first history is top edit"
+assert (hist.1.region == "mid") "second history is mid append"
+
+conflicts = workspace.conflicts ws
+assert (len conflicts == 0) "no conflicts"
+
+workspace.release ws r_mid
+ws2 = workspace.create "pattern-ws" {content: "aaa\nbbb\nccc\nddd"} ^
+r_pat = workspace.claim_pattern ws2 "found" "bbb\nccc" ^
+regs4 = workspace.regions ws2
+assert (len regs4 == 1) "pattern claim created region"
+assert (regs4.0.start == 1) "pattern claim start"
+assert (regs4.0.end == 2) "pattern claim end"
+
+pat_miss = workspace.claim_pattern ws2 "nope" "zzz_not_here"
+assert (err? pat_miss == true) "pattern miss returns Err"
+
+watch_count := 0
+ws3 = workspace.create "watch-ws" {content: "a\nb\nc"} ^
+workspace.watch ws3 (event) { watch_count <- watch_count + 1 }
+r_w = workspace.claim ws3 "w" {start: 0 end: 0} ^
+workspace.edit ws3 r_w "x" ^
+workspace.edit ws3 r_w "y" ^
+assert (watch_count == 2) "watcher called twice"
+
+ws4 = workspace.create "shrink" {content: "a\nb\nc\nd\ne"} ^
+r_s1 = workspace.claim ws4 "s1" {start: 0 end: 2} ^
+r_s2 = workspace.claim ws4 "s2" {start: 3 end: 4} ^
+workspace.edit ws4 r_s1 "x" ^
+snap4 = workspace.snapshot ws4 ^
+assert (snap4 == "x\nd\ne") "shrink: edit removed lines"
+regs5 = workspace.regions ws4
+s2_reg = (regs5 | filter (r) { r.name == "s2" }).0
+assert (s2_reg.start == 1) "shrink: s2 start shifted down"
+assert (s2_reg.end == 2) "shrink: s2 end shifted down"
+
+log.info "84_workspace: all passed"

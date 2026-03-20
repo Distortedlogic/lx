@@ -3,7 +3,7 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::call_value;
+use crate::builtins::call_value_sync;
 use crate::error::LxError;
 use crate::span::Span;
 use crate::value::Value;
@@ -70,24 +70,28 @@ fn run_single(
         .map_err(|e| LxError::runtime(format!("flow.run: parse error in '{path}': {e}"), span))?;
     let module_dir = std::path::Path::new(path).parent().map(|p| p.to_path_buf());
     let mut interp = crate::interpreter::Interpreter::new(source, module_dir, Arc::clone(ctx));
-    interp
-        .exec(&program)
-        .map_err(|e| LxError::runtime(format!("flow.run: exec error in '{path}': {e}"), span))?;
+    tokio::task::block_in_place(|| {
+        tokio::runtime::Handle::current().block_on(async {
+            interp.exec(&program).await.map_err(|e| {
+                LxError::runtime(format!("flow.run: exec error in '{path}': {e}"), span)
+            })?;
 
-    let entry_name = super::find_entry(&program).ok_or_else(|| {
-        LxError::runtime(
-            format!("flow.run: flow '{path}' must export +run or +main"),
-            span,
-        )
-    })?;
-    let entry = interp.env.get(&entry_name).ok_or_else(|| {
-        LxError::runtime(
-            format!("flow.run: +{entry_name} not found in '{path}'"),
-            span,
-        )
-    })?;
-    let result = interp.apply_func(entry, input.clone(), span)?;
-    Ok(Value::Ok(Box::new(result)))
+            let entry_name = super::find_entry(&program).ok_or_else(|| {
+                LxError::runtime(
+                    format!("flow.run: flow '{path}' must export +run or +main"),
+                    span,
+                )
+            })?;
+            let entry = interp.env.get(&entry_name).ok_or_else(|| {
+                LxError::runtime(
+                    format!("flow.run: +{entry_name} not found in '{path}'"),
+                    span,
+                )
+            })?;
+            let result = interp.apply_func(entry, input.clone(), span).await?;
+            Ok(Value::Ok(Box::new(result)))
+        })
+    })
 }
 
 fn unwrap_ok(v: Value) -> Value {
@@ -144,7 +148,7 @@ fn run_branch(
     let router = r
         .get("router")
         .ok_or_else(|| LxError::runtime("flow.run: branch missing 'router' function", span))?;
-    let chosen = call_value(router, input.clone(), span, ctx)?;
+    let chosen = call_value_sync(router, input.clone(), span, ctx)?;
     run_flow(&chosen, input, span, ctx)
 }
 

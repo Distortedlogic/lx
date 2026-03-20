@@ -17,6 +17,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use async_recursion::async_recursion;
 use parking_lot::Mutex;
 
 use indexmap::IndexMap;
@@ -120,14 +121,15 @@ impl Interpreter {
         self.env = env.into_arc();
     }
 
-    pub fn eval_expr(&mut self, expr: &SExpr) -> Result<Value, LxError> {
-        self.eval(expr)
+    pub async fn eval_expr(&mut self, expr: &SExpr) -> Result<Value, LxError> {
+        self.eval(expr).await
     }
 
-    pub fn exec(&mut self, program: &Program) -> Result<Value, LxError> {
+    pub async fn exec(&mut self, program: &Program) -> Result<Value, LxError> {
         let mut forward_names = Vec::new();
         for stmt in &program.stmts {
             if let Stmt::Binding(b) = &stmt.node
+                && !b.exported
                 && let BindTarget::Name(ref name) = b.target
                 && matches!(b.value.node, Expr::Func { .. })
             {
@@ -143,15 +145,16 @@ impl Interpreter {
         }
         let mut result = Value::Unit;
         for stmt in &program.stmts {
-            result = self.eval_stmt(stmt)?;
+            result = self.eval_stmt(stmt).await?;
         }
         Ok(result)
     }
 
-    pub(crate) fn eval(&mut self, expr: &SExpr) -> Result<Value, LxError> {
+    #[async_recursion(?Send)]
+    pub(crate) async fn eval(&mut self, expr: &SExpr) -> Result<Value, LxError> {
         let span = expr.span;
         match &expr.node {
-            Expr::Literal(lit) => self.eval_literal(lit, span),
+            Expr::Literal(lit) => self.eval_literal(lit, span).await,
             Expr::Ident(name) => self.env.get(name).ok_or_else(|| {
                 let hint = keyword_hint(name);
                 let msg = match hint {
@@ -164,36 +167,38 @@ impl Interpreter {
                 .env
                 .get(name)
                 .ok_or_else(|| LxError::runtime(format!("undefined constructor '{name}'"), span)),
-            Expr::Binary { op, left, right } => self.eval_binary(op, left, right, span),
-            Expr::Unary { op, operand } => self.eval_unary(op, operand, span),
-            Expr::Pipe { left, right } => self.eval_pipe(left, right, span),
+            Expr::Binary { op, left, right } => self.eval_binary(op, left, right, span).await,
+            Expr::Unary { op, operand } => self.eval_unary(op, operand, span).await,
+            Expr::Pipe { left, right } => self.eval_pipe(left, right, span).await,
             Expr::Apply { func, arg } => {
-                let f = self.eval(func)?;
+                let f = self.eval(func).await?;
                 if let Expr::NamedArg { name, value } = &arg.node {
-                    let v = self.eval(value)?;
+                    let v = self.eval(value).await?;
                     let named = Value::Tagged {
                         tag: Arc::from("__named"),
                         values: Arc::new(vec![Value::Str(Arc::from(name.as_str())), v]),
                     };
-                    self.apply_func(f, named, span)
+                    self.apply_func(f, named, span).await
                 } else {
-                    let a = self.eval(arg)?;
-                    self.apply_func(f, a, span)
+                    let a = self.eval(arg).await?;
+                    self.apply_func(f, a, span).await
                 }
             }
             Expr::Section(sec) => self.eval_section(sec, span),
-            Expr::FieldAccess { expr: e, field } => self.eval_field_access(e, field, span),
-            Expr::Block(stmts) => self.eval_block(stmts),
-            Expr::Tuple(elems) => self.eval_tuple(elems),
-            Expr::List(elems) => self.eval_list(elems),
-            Expr::Record(fields) => self.eval_record(fields),
-            Expr::Map(entries) => self.eval_map(entries),
-            Expr::Func { params, body, .. } => self.eval_func(params, body),
-            Expr::Match { scrutinee, arms } => self.eval_match(scrutinee, arms, span),
-            Expr::Ternary { cond, then_, else_ } => self.eval_ternary(cond, then_, else_, span),
-            Expr::Assert { expr: e, msg } => self.eval_assert(e, msg, span),
+            Expr::FieldAccess { expr: e, field } => self.eval_field_access(e, field, span).await,
+            Expr::Block(stmts) => self.eval_block(stmts).await,
+            Expr::Tuple(elems) => self.eval_tuple(elems).await,
+            Expr::List(elems) => self.eval_list(elems).await,
+            Expr::Record(fields) => self.eval_record(fields).await,
+            Expr::Map(entries) => self.eval_map(entries).await,
+            Expr::Func { params, body, .. } => self.eval_func(params, body).await,
+            Expr::Match { scrutinee, arms } => self.eval_match(scrutinee, arms, span).await,
+            Expr::Ternary { cond, then_, else_ } => {
+                self.eval_ternary(cond, then_, else_, span).await
+            }
+            Expr::Assert { expr: e, msg } => self.eval_assert(e, msg, span).await,
             Expr::Propagate(inner) => {
-                let v = self.eval(inner)?;
+                let v = self.eval(inner).await?;
                 match v {
                     Value::Ok(v) => Ok(*v),
                     Value::Err(_) => Err(LxError::propagate(v, span)),
@@ -209,10 +214,10 @@ impl Interpreter {
                 }
             }
             Expr::Coalesce { expr: e, default } => {
-                let v = self.eval(e)?;
+                let v = self.eval(e).await?;
                 match v {
                     Value::Ok(inner) | Value::Some(inner) => Ok(*inner),
-                    Value::Err(_) | Value::None => self.eval(default),
+                    Value::Err(_) | Value::None => self.eval(default).await,
                     other => Ok(other),
                 }
             }
@@ -220,30 +225,31 @@ impl Interpreter {
                 expr: e,
                 start: s,
                 end: en,
-            } => self.eval_slice(e, s.as_deref(), en.as_deref(), span),
+            } => self.eval_slice(e, s.as_deref(), en.as_deref(), span).await,
             Expr::NamedArg { name, value } => {
                 let _ = name;
-                self.eval(value)
+                self.eval(value).await
             }
-            Expr::Loop(stmts) => self.eval_loop(stmts),
+            Expr::Loop(stmts) => self.eval_loop(stmts).await,
             Expr::Break(val) => {
                 let v = match val {
-                    Some(e) => self.eval(e)?,
+                    Some(e) => self.eval(e).await?,
                     None => Value::Unit,
                 };
                 Err(LxError::break_signal(v))
             }
-            Expr::Par(stmts) => self.eval_par(stmts),
-            Expr::Sel(arms) => self.eval_sel(arms, span),
-            Expr::AgentSend { target, msg } => self.eval_agent_send(target, msg, span),
-            Expr::AgentAsk { target, msg } => self.eval_agent_ask(target, msg, span),
+            Expr::Par(stmts) => self.eval_par(stmts).await,
+            Expr::Sel(arms) => self.eval_sel(arms, span).await,
+            Expr::AgentSend { target, msg } => self.eval_agent_send(target, msg, span).await,
+            Expr::AgentAsk { target, msg } => self.eval_agent_ask(target, msg, span).await,
+            Expr::StreamAsk { target, msg } => self.eval_stream_ask(target, msg, span).await,
             Expr::Emit { value } => {
-                let v = self.eval(value)?;
+                let v = self.eval(value).await?;
                 self.ctx.emit.emit(&v, span)?;
                 Ok(Value::Unit)
             }
             Expr::Yield { value } => {
-                let v = self.eval(value)?;
+                let v = self.eval(value).await?;
                 self.ctx.yield_.yield_value(v, span)
             }
             Expr::With {
@@ -252,7 +258,7 @@ impl Interpreter {
                 body,
                 mutable,
             } => {
-                let val = self.eval(value)?;
+                let val = self.eval(value).await?;
                 let saved = Arc::clone(&self.env);
                 let mut child = self.env.child();
                 if *mutable {
@@ -263,13 +269,13 @@ impl Interpreter {
                 self.env = child.into_arc();
                 let mut result = Value::Unit;
                 for stmt in body {
-                    result = self.eval_stmt(stmt)?;
+                    result = self.eval_stmt(stmt).await?;
                 }
                 self.env = saved;
                 Ok(result)
             }
             Expr::WithResource { resources, body } => {
-                self.eval_with_resource(resources, body, span)
+                self.eval_with_resource(resources, body, span).await
             }
             Expr::Refine {
                 initial,
@@ -278,19 +284,22 @@ impl Interpreter {
                 threshold,
                 max_rounds,
                 on_round,
-            } => self.eval_refine(
-                &refine::RefineArgs {
-                    initial,
-                    grade,
-                    revise,
-                    threshold,
-                    max_rounds,
-                    on_round: on_round.as_deref(),
-                },
-                span,
-            ),
-            Expr::Shell { mode, parts } => self.eval_shell(mode, parts, span),
-            Expr::Receive(arms) => self.eval_receive(arms, span),
+            } => {
+                self.eval_refine(
+                    &refine::RefineArgs {
+                        initial,
+                        grade,
+                        revise,
+                        threshold,
+                        max_rounds,
+                        on_round: on_round.as_deref(),
+                    },
+                    span,
+                )
+                .await
+            }
+            Expr::Shell { mode, parts } => self.eval_shell(mode, parts, span).await,
+            Expr::Receive(arms) => self.eval_receive(arms, span).await,
         }
     }
 }

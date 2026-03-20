@@ -20,25 +20,16 @@ severity_rank = (sev) {
   concern = data.concern ?? "unknown"
   results = data.specialist_results ?? []
 
-  significant = results | filter (r) { r.severity != "none" }
-  sorted = significant | sort_by (r) {
-    rank = severity_rank r.severity
-    0 - rank
-  }
+  significant = results | filter (r) r.severity != "none"
+  sorted = significant | sort_by (r) 0 - (severity_rank r.severity)
 
-  all_domains = significant | map (r) { r.domain }
-  categories = all_domains | join ", "
-  top_issue = sorted | first
-
-  top_str = top_issue ? {
-    Some issue -> "{issue.domain}: {issue.finding}"
-    None -> "none"
-  }
+  categories = significant | map (.domain) | join ", "
+  top_issue = sorted | first ? { Some i -> "{i.domain}: {i.finding}"; None -> "none" }
 
   Ok {
     findings: sorted | map (r) { "{r.domain}/{r.severity}: {r.finding}" } | join "; "
     categories: categories
-    top_issue: top_str
+    top_issue: top_issue
     total_findings: significant | len
   }
 }

@@ -1,0 +1,102 @@
+use std/agent
+
+Protocol ReviewOutput = {score: Float  label: Str  details: Str}
+Protocol AnalysisInput = {confidence: Float  category: Str  context: Str}
+
+-- agent.adapter: static field mapping
+adapter = agent.adapter ReviewOutput AnalysisInput {
+  score: "confidence"
+  label: "category"
+  details: "context"
+}
+
+msg = ReviewOutput {score: 0.9  label: "good"  details: "looks fine"}
+transformed = adapter msg
+assert (transformed.confidence == 0.9) "maps score -> confidence"
+assert (transformed.category == "good") "maps label -> category"
+assert (transformed.context == "looks fine") "maps details -> context"
+
+-- agent.adapter: pass-through unmapped fields
+Protocol Source = {a: Str  b: Str  c: Str}
+Protocol Target = {x: Str  b: Str  c: Str}
+adapter2 = agent.adapter Source Target {a: "x"}
+msg2 = Source {a: "alpha"  b: "beta"  c: "gamma"}
+t2 = adapter2 msg2
+assert (t2.x == "alpha") "maps a -> x"
+assert (t2.b == "beta") "b passes through"
+assert (t2.c == "gamma") "c passes through"
+
+-- agent.adapter: missing required field produces Err
+Protocol Small = {x: Str}
+Protocol Big = {a: Str  b: Str}
+adapter3 = agent.adapter Small Big {x: "a"}
+result3 = adapter3 (Small {x: "hello"}) ?? "caught"
+assert (result3 == "caught") "errors on missing required field"
+
+-- agent.coerce: one-shot transform
+msg4 = {score: 0.75  label: "fair"  details: "ok"}
+coerced = agent.coerce msg4 AnalysisInput {
+  score: "confidence"
+  label: "category"
+  details: "context"
+}
+inner = coerced ?? {x: "fail"}
+assert (inner.confidence == 0.75) "coerces score -> confidence"
+assert (inner.category == "fair") "coerces label -> category"
+assert (inner.context == "ok") "coerces details -> context"
+
+-- agent.negotiate_format: exact match returns identity adapter
+Protocol TaskReq = {task: Str  priority: Int}
+
+caps_with_task_req = {protocols: [TaskReq]  tools: []  domains: []}
+
+same_p = {handler: (msg) {
+  msg.type == "capabilities" ? (caps_with_task_req) : {result: "ok"}
+}  name: "same_p"}
+same_c = {handler: (msg) {
+  msg.type == "capabilities" ? (caps_with_task_req) : {result: "ok"}
+}  name: "same_c"}
+
+exact_result = agent.negotiate_format same_p same_c
+assert (exact_result ? {Ok _ -> true; _ -> false}) "exact match succeeds"
+adapter_fn = exact_result ?? (x) x
+test_msg = {task: "deploy"  priority: 5}
+adapted = adapter_fn test_msg
+assert (adapted.task == "deploy") "identity adapter passes through"
+assert (adapted.priority == 5) "identity adapter passes through (int)"
+
+-- agent.negotiate_format: structural match with same field names
+Protocol WorkItem = {task: Str  priority: Int}
+caps_with_work_item = {protocols: [WorkItem]  tools: []  domains: []}
+
+struct_p = {handler: (msg) {
+  msg.type == "capabilities" ? (caps_with_task_req) : {result: "ok"}
+}  name: "sp"}
+struct_c = {handler: (msg) {
+  msg.type == "capabilities" ? (caps_with_work_item) : {result: "ok"}
+}  name: "sc"}
+
+struct_result = agent.negotiate_format struct_p struct_c
+assert (struct_result ? {Ok _ -> true; _ -> false}) "structural match succeeds"
+struct_adapter = struct_result ?? (x) x
+struct_msg = {task: "build"  priority: 1}
+struct_adapted = struct_adapter struct_msg
+assert (struct_adapted.task == "build") "structural adapter preserves fields"
+
+-- agent.negotiate_format: incompatible returns Err
+Protocol Foo = {x: Int  y: Int}
+Protocol Bar = {completely_different: Str  also_unrelated: Str}
+caps_foo = {protocols: [Foo]  tools: []  domains: []}
+caps_bar = {protocols: [Bar]  tools: []  domains: []}
+
+incompat_p = {handler: (msg) {
+  msg.type == "capabilities" ? (caps_foo) : ()
+}  name: "ip"}
+incompat_c = {handler: (msg) {
+  msg.type == "capabilities" ? (caps_bar) : ()
+}  name: "ic"}
+
+incompat_result = agent.negotiate_format incompat_p incompat_c
+assert (incompat_result ? {Err _ -> true; _ -> false}) "incompatible returns Err"
+
+emit "[INFO] 90_agent_adapter: all passed"

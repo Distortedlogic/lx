@@ -12,14 +12,10 @@ use std/json
   grade_scores = data.grade_scores ?? []
   threshold = data.threshold ?? 0.95
 
-  significant = findings | filter (f) { f.severity != "none" }
+  significant = findings | filter (f) f.severity != "none"
   iterations = grade_scores | len
 
-  final_score = grade_scores | rev | first
-  final_val = final_score ? {
-    Some s -> s
-    None -> 0.0
-  }
+  final_val = grade_scores | rev | first ?? 0.0
   passed = final_val >= threshold
 
   Ok {

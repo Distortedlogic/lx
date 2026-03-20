@@ -8,12 +8,10 @@ use ../lib/transcript
   paths | empty? ? {
     true -> Ok {findings: 0  critical: 0  high: 0  report: "no transcripts found"}
     false -> {
-      all_entries = paths | flat_map (p) { transcript.parse p }
-      injection = guard.scan_entries all_entries guard.default_patterns
-      loops = guard.detect_loops all_entries 20
-      findings = [..injection ..loops]
-      critical = findings | filter (x) { x.severity == "critical" }
-      high = findings | filter (x) { x.severity == "high" }
+      all_entries = paths | flat_map (p) transcript.parse p
+      findings = [..(guard.scan_entries all_entries guard.default_patterns) ..(guard.detect_loops all_entries 20)]
+      critical = findings | filter (f) f.severity == "critical"
+      high = findings | filter (f) f.severity == "high"
 
       Ok {
         findings: findings | len

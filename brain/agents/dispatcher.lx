@@ -14,41 +14,34 @@ use ../protocols {AgentTask AgentResult}
     agent.spawn {command: "lx" args: ["run" "brain/agents/researcher.lx"]} ^
   }
 
-  {analyst: analyst  critic: critic  researcher: researcher}
+  {analyst  critic  researcher}
 }
 
 +setup_tracing = (workforce: Any  session: Any) -> Any {
-  traced_analyst = agent.intercept workforce.analyst (msg next) {
-    session.record {name: "analyst_msg" input: msg.action ?? "unknown"} ^
+  trace_wrap = (worker name) agent.intercept worker (msg next) {
+    session.record {name: "{name}_msg" input: msg.action ?? "unknown"} ^
     next msg
   }
-  traced_critic = agent.intercept workforce.critic (msg next) {
-    session.record {name: "critic_msg" input: msg.action ?? "unknown"} ^
-    next msg
+
+  {
+    analyst: trace_wrap workforce.analyst "analyst"
+    critic: trace_wrap workforce.critic "critic"
+    researcher: trace_wrap workforce.researcher "researcher"
   }
-  traced_researcher = agent.intercept workforce.researcher (msg next) {
-    session.record {name: "researcher_msg" input: msg.action ?? "unknown"} ^
-    next msg
-  }
-  {analyst: traced_analyst  critic: traced_critic  researcher: traced_researcher}
 }
 
 +setup_pubsub = (workforce: Any) -> Any {
-  perception_topic = agent.topic "perception"
-  reasoning_topic = agent.topic "reasoning"
-  response_topic = agent.topic "response"
-
-  agent.subscribe_filtered perception_topic workforce.analyst (msg) {
-    msg.complexity ?? "simple" == "complex"
+  topics = {
+    perception: agent.topic "perception"
+    reasoning: agent.topic "reasoning"
+    response: agent.topic "response"
   }
-  agent.subscribe reasoning_topic workforce.critic
-  agent.subscribe response_topic workforce.researcher
 
-  {
-    perception: perception_topic
-    reasoning: reasoning_topic
-    response: response_topic
-  }
+  agent.subscribe_filtered topics.perception workforce.analyst (msg) msg.complexity ?? "simple" == "complex"
+  agent.subscribe topics.reasoning workforce.critic
+  agent.subscribe topics.response workforce.researcher
+
+  topics
 }
 
 +dispatch_task = (workforce: Any  task: AgentTask) -> AgentResult {
@@ -106,8 +99,7 @@ route_to_worker = (workforce: Any  specialist: Str) -> Any {
 }
 
 +fan_out_and_reconcile = (workforce: Any  tasks: [AgentTask]  strategy: Str = "merge_fields") -> Any {
-  results = fan_out workforce tasks ^
-  agent.reconcile results {strategy: strategy}
+  fan_out workforce tasks ^ | (results) agent.reconcile results {strategy}
 }
 
 +parallel_review = (workforce: Any  content: Str  task: Str) -> Any {

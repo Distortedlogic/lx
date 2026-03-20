@@ -108,18 +108,9 @@ dangerous_patterns = ["delete all" "drop table" "rm -rf /" "force push main" "ig
 }
 
 +adapt_to_user = (persona: Any  user_info: Any) -> Any {
-  user_info.role ? {
-    Some role -> profile.preference persona "user_role" role ^
-    None -> ()
-  }
-  user_info.expertise ? {
-    Some exp -> profile.preference persona "user_expertise" exp ^
-    None -> ()
-  }
-  user_info.style ? {
-    Some style -> profile.preference persona "user_style" style ^
-    None -> ()
-  }
+  user_info.role | some? ? profile.preference persona "user_role" user_info.role ^ : ()
+  user_info.expertise | some? ? profile.preference persona "user_expertise" user_info.expertise ^ : ()
+  user_info.style | some? ? profile.preference persona "user_style" user_info.style ^ : ()
 }
 
 +response_style = (persona: Any) -> Any {
@@ -127,14 +118,10 @@ dangerous_patterns = ["delete all" "drop table" "rm -rf /" "force push main" "ig
   expertise = profile.get_preference persona "user_expertise" ?? "unknown"
 
   {
-    verbosity: expertise ? {
-      "beginner" -> "detailed"
-      "expert" -> "terse"
-      _ -> "moderate"
-    }
+    verbosity: expertise ? { "beginner" -> "detailed"; "expert" -> "terse"; _ -> "moderate" }
     show_reasoning: expertise != "expert"
     use_analogies: expertise == "beginner"
-    style: style
+    style
   }
 }
 

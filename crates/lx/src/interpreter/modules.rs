@@ -11,7 +11,7 @@ use crate::value::Value;
 use super::{Interpreter, ModuleExports};
 
 impl Interpreter {
-    pub(super) fn eval_use(&mut self, use_stmt: &UseStmt, span: Span) -> Result<(), LxError> {
+    pub(super) async fn eval_use(&mut self, use_stmt: &UseStmt, span: Span) -> Result<(), LxError> {
         let exports = if crate::stdlib::std_module_exists(&use_stmt.path) {
             crate::stdlib::get_std_module(&use_stmt.path).ok_or_else(|| {
                 LxError::runtime(
@@ -20,7 +20,9 @@ impl Interpreter {
                 )
             })?
         } else if let Some(file_path) = self.resolve_workspace_module(&use_stmt.path) {
-            self.load_module(&file_path, span)?
+            self.load_module(&file_path, span).await?
+        } else if let Some(file_path) = self.resolve_dep_module(&use_stmt.path) {
+            self.load_module(&file_path, span).await?
         } else {
             let source_dir = self
                 .source_dir
@@ -30,7 +32,7 @@ impl Interpreter {
                 })?
                 .clone();
             let file_path = resolve_module_path(&source_dir, &use_stmt.path, span)?;
-            self.load_module(&file_path, span)?
+            self.load_module(&file_path, span).await?
         };
         let mut env = self.env.child();
         for name in &exports.variant_ctors {
@@ -77,7 +79,35 @@ impl Interpreter {
         Some(result)
     }
 
-    fn load_module(&mut self, file_path: &PathBuf, span: Span) -> Result<ModuleExports, LxError> {
+    fn resolve_dep_module(&self, path: &[String]) -> Option<PathBuf> {
+        if path.is_empty() {
+            return None;
+        }
+        let dep_dir = self.ctx.dep_dirs.get(&path[0])?;
+        if path.len() == 1 {
+            let entry = dep_dir.join("main.lx");
+            if entry.exists() {
+                return Some(entry);
+            }
+            let src_entry = dep_dir.join("src").join("main.lx");
+            if src_entry.exists() {
+                return Some(src_entry);
+            }
+            return None;
+        }
+        let mut result = dep_dir.clone();
+        for segment in &path[1..] {
+            result.push(segment);
+        }
+        result.set_extension("lx");
+        if result.exists() { Some(result) } else { None }
+    }
+
+    async fn load_module(
+        &mut self,
+        file_path: &PathBuf,
+        span: Span,
+    ) -> Result<ModuleExports, LxError> {
         let canonical = std::fs::canonicalize(file_path).map_err(|e| {
             LxError::runtime(
                 format!("cannot resolve module '{}': {e}", file_path.display()),
@@ -115,7 +145,7 @@ impl Interpreter {
         let mut mod_interp = Interpreter::new(&source, module_dir, Arc::clone(&self.ctx));
         mod_interp.module_cache = Arc::clone(&self.module_cache);
         mod_interp.loading = Arc::clone(&self.loading);
-        mod_interp.exec(&program).map_err(|e| {
+        mod_interp.exec(&program).await.map_err(|e| {
             LxError::runtime(format!("module '{}': {e}", file_path.display()), span)
         })?;
         let exports = collect_exports(&program, &mod_interp);
@@ -155,7 +185,7 @@ fn resolve_module_path(
     } else {
         return Err(LxError::runtime(
             format!(
-                "unknown module path: {} (use ./relative or std/module)",
+                "unknown module path: {} (use ./relative, std/module, or dep-name/module)",
                 path.join("/")
             ),
             span,

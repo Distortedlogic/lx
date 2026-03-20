@@ -41,15 +41,15 @@ Protocol ServerStatus = {name: Str  status: Str  tool_count: Int  issues: List}
     ]
     ..report.conditional (fail | len > 0) "Failed Servers" [
       ..report.table ["Server" "Tools" "Issues"]
-        (fail | map (r) [r.name (to_str r.tool_count) (r.issues | join ", ")])
+        (fail | map (r) [r.name "{r.tool_count}" (r.issues | join ", ")])
     ]
     ..report.conditional (partial | len > 0) "Partial Servers" [
       ..report.table ["Server" "Tools" "Issues"]
-        (partial | map (r) [r.name (to_str r.tool_count) (r.issues | join ", ")])
+        (partial | map (r) [r.name "{r.tool_count}" (r.issues | join ", ")])
     ]
     ..report.section "Scenario Coverage" [
       ..report.table ["Scenario" "Weight" "% of Total"]
-        (audit.scenarios | map (s) [s.name (to_str s.weight) (to_str (s.weight * 100 / audit.total_weight))])
+        (audit.scenarios | map (s) [s.name "{s.weight}" "{s.weight * 100 / audit.total_weight}"])
     ]
   ]
 
@@ -89,8 +89,8 @@ Protocol ServerStatus = {name: Str  status: Str  tool_count: Int  issues: List}
 assess_tools = (tools) {
   names = tools | map (.name)
   [
-    ..names | empty? ? { true -> ["no tools"]; false -> [] }
-    ..names | filter (t) re.is_match "list|get|read|show|search" t | empty? ? { true -> ["no read tools"]; false -> [] }
-    ..names | filter (t) re.is_match "create|write|update|delete|set" t | empty? ? { true -> ["no write tools"]; false -> [] }
+    ..names | empty? ? ["no tools"] : []
+    ..names | filter (t) re.is_match "list|get|read|show|search" t | empty? ? ["no read tools"] : []
+    ..names | filter (t) re.is_match "create|write|update|delete|set" t | empty? ? ["no write tools"] : []
   ]
 }

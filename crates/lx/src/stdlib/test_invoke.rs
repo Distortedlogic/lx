@@ -34,23 +34,27 @@ pub(super) fn invoke_flow(
     })?;
     let module_dir = path.parent().map(|p| p.to_path_buf());
     let mut interp = crate::interpreter::Interpreter::new(&source, module_dir, Arc::clone(ctx));
-    interp.exec(&program).map_err(|e| {
-        LxError::runtime(format!("test.run: exec error in '{flow_path}': {e}"), span)
-    })?;
+    tokio::task::block_in_place(|| {
+        tokio::runtime::Handle::current().block_on(async {
+            interp.exec(&program).await.map_err(|e| {
+                LxError::runtime(format!("test.run: exec error in '{flow_path}': {e}"), span)
+            })?;
 
-    let entry_name = find_flow_entry_name(&program).ok_or_else(|| {
-        LxError::runtime(
-            format!("test.run: flow '{flow_path}' must export +run or +main"),
-            span,
-        )
-    })?;
-    let entry = interp.env.get(&entry_name).ok_or_else(|| {
-        LxError::runtime(
-            format!("test.run: flow '{flow_path}' exported +{entry_name} not found in env"),
-            span,
-        )
-    })?;
-    interp.apply_func(entry, input.clone(), span)
+            let entry_name = find_flow_entry_name(&program).ok_or_else(|| {
+                LxError::runtime(
+                    format!("test.run: flow '{flow_path}' must export +run or +main"),
+                    span,
+                )
+            })?;
+            let entry = interp.env.get(&entry_name).ok_or_else(|| {
+                LxError::runtime(
+                    format!("test.run: flow '{flow_path}' exported +{entry_name} not found in env"),
+                    span,
+                )
+            })?;
+            interp.apply_func(entry, input.clone(), span).await
+        })
+    })
 }
 
 fn find_flow_entry_name(program: &crate::ast::Program) -> Option<String> {

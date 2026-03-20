@@ -49,7 +49,7 @@ Protocol ResearchRequest = {topic: Str  compare_to: Str  find_oss: Bool}
       ..report.section "OSS Libraries" [
         ..report.table
           ["Name" "Stars" "License" "Fit"]
-          (oss.repos | map (r) [r.name (to_str r.stars) r.license r.fit])
+          (oss.repos | map (r) [r.name "{r.stars}" r.license r.fit])
       ]
       ..report.section "Recommendation" [..report.text recommendation]
     ]

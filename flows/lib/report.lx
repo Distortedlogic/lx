@@ -27,5 +27,5 @@ use std/fs
 +divider = () [md.hr]
 
 +conditional = (show heading blocks) {
-  show ? { true -> section heading blocks; false -> [] }
+  show ? (section heading blocks) : []
 }

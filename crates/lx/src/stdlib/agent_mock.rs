@@ -8,10 +8,10 @@ use num_traits::ToPrimitive;
 use parking_lot::Mutex;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::{call_value, mk};
+use crate::builtins::{call_value_sync, mk};
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::{BuiltinFunc, Value};
+use crate::value::{BuiltinFunc, BuiltinKind, Value};
 
 static NEXT_MOCK_ID: AtomicU64 = AtomicU64::new(1);
 static MOCK_CALLS: std::sync::LazyLock<DashMap<u64, Arc<Mutex<Vec<CallRecord>>>>> =
@@ -47,7 +47,7 @@ fn bi_mock(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, 
     let handler = Value::BuiltinFunc(BuiltinFunc {
         name: "agent.mock.handler",
         arity: 3,
-        func: bi_mock_handler,
+        kind: BuiltinKind::Sync(bi_mock_handler),
         applied: vec![
             Value::Int(BigInt::from(mock_id)),
             Value::List(Arc::clone(rules)),
@@ -107,7 +107,7 @@ fn matches_rule(
     match pattern {
         Value::Str(s) if s.as_ref() == "any" => Ok(true),
         Value::Func(_) | Value::BuiltinFunc(_) => {
-            let result = call_value(pattern, msg.clone(), span, ctx)?;
+            let result = call_value_sync(pattern, msg.clone(), span, ctx)?;
             Ok(result.as_bool().unwrap_or(false))
         }
         Value::Record(pat) => match msg {
@@ -136,7 +136,7 @@ fn get_response(
         return Ok(Value::Unit);
     };
     match respond {
-        Value::Func(_) | Value::BuiltinFunc(_) => call_value(respond, msg.clone(), span, ctx),
+        Value::Func(_) | Value::BuiltinFunc(_) => call_value_sync(respond, msg.clone(), span, ctx),
         _ => Ok(respond.clone()),
     }
 }

@@ -101,6 +101,34 @@ worker ~>? {task: "review"} ^ | (.findings) | filter (.critical)
 agent.kill worker
 ```
 
+## Streaming Ask (`~>>?`)
+
+`~>>?` returns a `Stream` — a lazy sequence of values from a long-running agent:
+
+```lx
+stream = analyzer ~>>? {task: "review" path: "src/"}
+
+stream | each (item) emit "reviewed: {item.file}"
+results = stream | collect
+first_five = stream | take 5
+critical = stream | filter (.severity == "critical")
+sum = stream | fold 0 (acc x) acc + x
+```
+
+All HOFs work on streams: `map`, `filter`, `each`, `take`, `fold`, `flat_map`, etc. `collect` materializes the entire stream into a list.
+
+Agent-side (subprocess): use `agent.emit_stream` and `agent.end_stream`:
+```lx
+use std/agent
+items | each (item) {
+  result = process item ^
+  agent.emit_stream result
+}
+agent.end_stream ()
+```
+
+Subprocess protocol: JSON-lines with `{"type":"stream","value":...}`, `{"type":"stream_end"}`, `{"type":"stream_error","error":"msg"}`.
+
 ## Scoped Resources (with ... as)
 
 Auto-cleanup with LIFO close order:
@@ -127,27 +155,9 @@ MCP Tools = {
 }
 ```
 
-## Yield and Emit
+## Yield, Emit, Receive
 
-```lx
-yield {kind: "approval" data: changes}   -- pause for orchestrator input
-emit "Status update"                      -- fire-and-forget to human (strings → stdout)
-emit {progress: 50 stage: "analyzing"}   -- structured emit (records → JSON)
-```
-
-## Receive (Agent Message Handler)
-
-`receive` replaces the yield/loop/match boilerplate for agent message handlers:
-
-```lx
-receive {
-  analyze -> (msg) analyze_fn msg
-  compare -> (msg) compare_fn msg
-  _ -> (msg) Err "unknown action"
-}
-```
-
-Desugars to: yield `{kind: "ready"}`, enter loop, dispatch on `msg.action`, yield `{kind: "result" data: result}`, break on None.
+`yield {kind: "approval" data: changes}` — pause for orchestrator input. `emit "Status update"` — fire-and-forget to human (strings → stdout, records → JSON). `receive { action -> (msg) handler }` — agent message loop sugar (desugars to yield/loop/match on `msg.action`).
 
 ## Refine (Iterative Improvement)
 
@@ -175,6 +185,21 @@ r1 = agent.dialogue_turn session "review the auth module" ^
 r2 = agent.dialogue_turn session "what about the error handling?" ^
 agent.dialogue_end session
 ```
+
+### Dialogue Branching (Fork/Compare/Merge)
+
+```lx
+(fork_a fork_b) = agent.dialogue_fork session ["Try JWT" "Try sessions"] ^
+a1 = agent.dialogue_turn fork_a "Implement JWT" ^
+b1 = agent.dialogue_turn fork_b "Implement sessions" ^
+comparison = agent.dialogue_compare [fork_a fork_b] {
+  grade: (s) { h = agent.dialogue_history s; {score: 0.9  summary: "..."} }
+} ^
+agent.dialogue_merge session comparison.best ^
+branches = agent.dialogue_branches session
+```
+
+Fork shares parent history. Parent suspended while forks active. Nestable. `dialogue_merge` appends winner's post-fork history, cleans up all forks recursively. `dialogue_compare` returns `{rankings: [{session score summary}] best spread}`.
 
 ### Dispatch (Pattern-Based Routing)
 
@@ -248,52 +273,14 @@ Selection: `"least_busy"` (default), `"round_robin"`, `"random"`, or custom `(ag
 
 ### Pipeline — `agent.pipeline [stages] opts ^`, then `pipeline_send/collect/batch/stats/on_pressure/pause/resume/drain/close/add_worker`. Overflow: block/drop_oldest/drop_newest/sample. Stages: `{name: "x" handler: fn}` or spawned agents.
 
+### Format Negotiation
+
+`agent.adapter SourceProto TargetProto {src_field: "tgt_field"}` — reusable field-mapping function. Unmapped fields pass through. Missing required target fields → `Err` (catchable with `??`). `agent.coerce msg TargetProto {mapping}` — one-shot transform, returns `Ok record` or `Err`. `agent.negotiate_format producer consumer` — inspects capabilities, finds compatible mapping (exact name → identity, structural/Levenshtein → mapping adapter, incompatible → `Err`).
+
 ### Other Extensions
 
-```lx
-caps = agent.capabilities worker ^
-agent.advertise {protocols: [...] domains: [...] tools: [...]}
-gate = agent.gate "deploy" {show: {diff: changes} timeout: 300 on_timeout: "abort"}
-use std/agent {Handoff}
-context_str = agent.as_context handoff_record
-result = agent.negotiate agents {topic: "approach" max_rounds: 5 strategy: "convergence"}
-mock = agent.mock [
-  {match: {task: "review"} respond: {approved: true}}
-  {match: "any" respond: {error: "unexpected"}}
-]
-agent.mock_assert_called mock {task: "review"} ^
-```
+`agent.capabilities worker ^` / `agent.advertise {protocols: [...]}` — capability discovery. `agent.gate "deploy" {show: data}` — human-in-the-loop approval. `agent.as_context handoff` — context transfer. `agent.negotiate agents {topic: ... max_rounds: 5}` — multi-party consensus. `agent.mock [{match: {task: "review"} respond: {approved: true}}]` — mock agents with call tracking.
 
 ## AgentErr (Structured Error Variants)
 
-11 tagged error variants for pattern-matched recovery. Import via selective import:
-
-```lx
-use std/agent {Timeout RateLimited BudgetExhausted Upstream Unavailable}
-```
-
-| Variant | Fields | When |
-|---------|--------|------|
-| `Timeout` | `elapsed_ms deadline_ms` | Operation exceeded deadline |
-| `RateLimited` | `retry_after_ms limit` | Upstream rate limit hit |
-| `BudgetExhausted` | `used limit resource` | Cost budget exceeded |
-| `ContextOverflow` | `size capacity content` | Input exceeds context window |
-| `Incompetent` | `agent task score threshold` | Agent below quality threshold |
-| `Upstream` | `service code message` | External service error |
-| `PermissionDenied` | `action resource` | Operation not permitted |
-| `ProtocolViolation` | `expected got message` | Message shape mismatch |
-| `Unavailable` | `agent reason` | Agent not running/registered |
-| `Cancelled` | `reason` | Operation cancelled |
-| `Internal` | `message` | Catch-all unexpected failure |
-
-Match errors with two-level pattern matching:
-```lx
-result ? {
-  Err e -> e ? {
-    Timeout info -> retry_with_longer_deadline info
-    Upstream info -> info.code >= 500 ? retry : fail
-    _ -> Err e
-  }
-  Ok v -> v
-}
-```
+11 tagged error variants: Timeout, RateLimited, BudgetExhausted, ContextOverflow, Incompetent, Upstream, PermissionDenied, ProtocolViolation, Unavailable, Cancelled, Internal. Import: `use std/agent {Timeout Upstream ...}`. Match: `Err e -> e ? { Timeout info -> ... ; Upstream info -> ... }`

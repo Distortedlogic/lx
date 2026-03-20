@@ -6,8 +6,8 @@ use std/agent
 
 +enhance = (msg) {
   examples_text = msg.examples | map (e) "Input: {e.input}\nOutput: {e.output}" | join "\n---\n"
-  enhanced = ai.prompt "Rewrite this bad response as an ideal one.\nInput: {msg.input}\nBad output: {msg.bad_output}\n\nExamples of good responses:\n{examples_text}" ^
-  {ideal_output: enhanced}
+  ideal_output = ai.prompt "Rewrite this bad response as an ideal one.\nInput: {msg.input}\nBad output: {msg.bad_output}\n\nExamples of good responses:\n{examples_text}" ^
+  {ideal_output}
 }
 
 +handlers = %{"enhance": enhance}

@@ -29,6 +29,10 @@ fn bi_collect(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Val
             };
             Ok(Value::List(Arc::new(items)))
         }
+        Value::Stream { rx, .. } => {
+            let items: Vec<Value> = rx.lock().iter().collect();
+            Ok(Value::List(Arc::new(items)))
+        }
         other => Ok(other.clone()),
     }
 }

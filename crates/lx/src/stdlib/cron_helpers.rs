@@ -97,7 +97,9 @@ pub(super) fn spawn_oneshot(
     JOBS.insert(id, CronJob { cancel });
     thread::spawn(move || {
         if !sleep_cancellable(dur, &flag)
-            && let Err(e) = call_value(&callback, Value::Unit, span, &ctx)
+            && let Err(e) =
+                ctx.tokio_runtime
+                    .block_on(call_value(&callback, Value::Unit, span, &ctx))
         {
             eprintln!("[cron] {label} error: {e}");
         }

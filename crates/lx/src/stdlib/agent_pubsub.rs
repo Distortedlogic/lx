@@ -3,7 +3,7 @@ use std::sync::{Arc, LazyLock};
 use dashmap::DashMap;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::{call_value, mk};
+use crate::builtins::{call_value_sync, mk};
 use crate::error::LxError;
 use crate::record;
 use crate::span::Span;
@@ -86,7 +86,7 @@ fn ask_agent(
             .get("handler")
             .filter(|h| matches!(h, Value::Func(_) | Value::BuiltinFunc(_)))
         {
-            return call_value(handler, msg.clone(), span, ctx);
+            return call_value_sync(handler, msg.clone(), span, ctx);
         }
         if let Some(pid) = r
             .get("__pid")
@@ -165,7 +165,7 @@ fn publish_to_subscribers(
     if let Some(t) = TOPICS.get(topic) {
         for sub in &t.subscribers {
             if let Some(ref filter) = sub.filter {
-                let pass = call_value(filter, msg.clone(), span, ctx)?;
+                let pass = call_value_sync(filter, msg.clone(), span, ctx)?;
                 if pass.as_bool() != Some(true) {
                     continue;
                 }

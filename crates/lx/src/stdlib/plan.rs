@@ -4,7 +4,7 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::{call_value, mk};
+use crate::builtins::{call_value_sync, mk};
 use crate::error::LxError;
 use crate::record;
 use crate::span::Span;
@@ -76,8 +76,8 @@ fn call2(
     span: Span,
     ctx: &Arc<RuntimeCtx>,
 ) -> Result<Value, LxError> {
-    let partial = call_value(f, a, span, ctx)?;
-    call_value(&partial, b, span, ctx)
+    let partial = call_value_sync(f, a, span, ctx)?;
+    call_value_sync(&partial, b, span, ctx)
 }
 
 fn call3(
@@ -88,9 +88,9 @@ fn call3(
     span: Span,
     ctx: &Arc<RuntimeCtx>,
 ) -> Result<Value, LxError> {
-    let p1 = call_value(f, a, span, ctx)?;
-    let p2 = call_value(&p1, b, span, ctx)?;
-    call_value(&p2, c, span, ctx)
+    let p1 = call_value_sync(f, a, span, ctx)?;
+    let p2 = call_value_sync(&p1, b, span, ctx)?;
+    call_value_sync(&p2, c, span, ctx)
 }
 
 fn build_context(completed_results: &[(String, Value)]) -> Value {

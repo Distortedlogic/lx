@@ -19,7 +19,7 @@ brain_dir = "{env.home ()}/.lx/brain"
   semantic = KnowledgeBase {path: "{brain_dir}/semantic.json"} ^
   persona = profile.load {name: "claude" create: true} ^
 
-  {working: working  episodic: episodic  semantic: semantic  persona: persona}
+  {working  episodic  semantic  persona}
 }
 
 +remember = (store: Any  entry: MemoryEntry) -> Bool {
@@ -68,8 +68,7 @@ brain_dir = "{env.home ()}/.lx/brain"
     ..episodic_hits | map (m) {..m  source: "episodic"  recency: 0.7}
     ..semantic_hits | map (m) {..m  source: "semantic"  recency: 0.5}
   ]
-    | sort_by (m) m.confidence * m.recency
-    | rev
+    | sort_by (m) m.confidence * m.recency | rev
 }
 
 +recall_domain = (store: Any  domain: Str) -> [Any] {
@@ -97,15 +96,17 @@ brain_dir = "{env.home ()}/.lx/brain"
 }
 
 +consolidate = (store: Any) -> Any {
-  promoted = store.working.consolidate () ^
-  promoted_episodic = store.episodic.consolidate () ^
+  (promoted promoted_episodic) = par {
+    store.working.consolidate () ^
+    store.episodic.consolidate () ^
+  }
 
   high_confidence = store.working.tier 1
     | filter (m) m.confidence >= 0.85
 
   high_confidence | each (m) store.working.promote m ^
 
-  {promoted: promoted  promoted_episodic: promoted_episodic  elevated: len high_confidence}
+  {promoted  promoted_episodic  elevated: len high_confidence}
 }
 
 +forget_stale = (store: Any  max_age_seconds: Int) -> Int {

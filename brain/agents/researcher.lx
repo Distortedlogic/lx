@@ -25,16 +25,9 @@ Protocol ResearchResult = {
 
 Agent InfoGatherer: Researcher = {
   research = (msg) {
-    findings := []
-    sources_consulted := []
-
-    msg.sources | each (source) {
-      source_findings = investigate_source source msg.question ^
-      findings <- [..findings  ..source_findings]
-      sources_consulted <- [..sources_consulted  source]
-    }
-
-    findings <- findings | sort_by (.relevance) | rev | take 20
+    findings = msg.sources
+      | flat_map (source) investigate_source source msg.question ^
+      | sort_by (.relevance) | rev | take 20
 
     answer = synthesize_findings findings msg.question ^
     confidence = findings | empty? ? 0.1
@@ -42,10 +35,10 @@ Agent InfoGatherer: Researcher = {
 
     ResearchResult {
       question: msg.question
-      findings: findings
-      answer: answer
-      confidence: confidence
-      sources_consulted: sources_consulted
+      findings
+      answer
+      confidence
+      sources_consulted: msg.sources
       gaps: findings | len < 3 ? ["insufficient sources found"] : []
     }
   }
@@ -71,12 +64,12 @@ search_codebase = (question: Str) -> [Finding] {
   keywords = extract_keywords question
   results = keywords | flat_map (kw) {
     grep_result = $^rg --type rust -l "{kw}" . ?? ""
-    grep_result | lines | filter (l) len (trim l) > 0
+    grep_result | lines | filter (l) trim l | not empty?
   } | uniq | take 10
 
-  results | map (file_path) Finding {
-    source: file_path
-    content: fs.read file_path ?? "unreadable" | take 500
+  results | map (path) Finding {
+    source: path
+    content: fs.read path ?? "unreadable" | take 500
     relevance: 0.7
     confidence: 0.8
   }
@@ -86,7 +79,7 @@ search_filesystem = (question: Str) -> [Finding] {
   keywords = extract_keywords question
   results = keywords | flat_map (kw) {
     found = $^find . -name "*{kw}*" -type f 2>/dev/null ?? ""
-    found | lines | filter (l) len (trim l) > 0
+    found | lines | filter (l) trim l | not empty?
   } | uniq | take 10
 
   results | map (path) Finding {
@@ -118,8 +111,7 @@ synthesize_findings = (findings: [Finding]  question: Str) -> Str {
     | prompt.instruction "Answer the question based on the findings. Cite sources by number."
     | prompt.constraint "If findings are insufficient, say what's missing."
 
-  resp = ai.prompt (prompt.render p) ^
-  resp.text
+  ai.prompt (prompt.render p) ^ | (.text)
 }
 
 +main = () {

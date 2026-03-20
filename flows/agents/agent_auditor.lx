@@ -5,11 +5,11 @@ use std/ai
 use std/agent
 
 +audit = (msg) {
-  ai.prompt "Audit this agent's behavior for security issues:\n{to_str msg}" ^
+  ai.prompt "Audit this agent's behavior for security issues:\n{msg}" ^
 }
 
 +verify = (msg) {
-  ai.prompt "Verify this security finding:\n{to_str msg.finding}" ^
+  ai.prompt "Verify this security finding:\n{msg.finding}" ^
 }
 
 +handlers = %{"audit": audit  "verify": verify}

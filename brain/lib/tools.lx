@@ -30,7 +30,7 @@ tool_costs = %{
 
 +available_tools = () -> [Any] {
   ["Read" "Write" "Edit" "Glob" "Grep" "Bash" "Agent" "WebSearch" "WebFetch"]
-    | map (name) {name: name  cost: get name tool_costs ?? 0.01}
+    | map (name) {name  cost: get name tool_costs ?? 0.01}
 }
 
 +select_tools = (task: Str  tools: [Any]) -> [Any] {
@@ -42,7 +42,7 @@ tool_costs = %{
     | prompt.constraint "Prefer cheaper tools. Only include what's strictly necessary."
 
   resp = ai.prompt (prompt.render p) ^
-  selected_names = resp.text | lines | map trim | filter (x) len x > 0
+  selected_names = resp.text | lines | map trim | filter (not empty?)
 
   tools | filter (t) selected_names | contains? t.name
 }
@@ -62,7 +62,7 @@ tool_costs = %{
   resp = ai.prompt (prompt.render p) ^
 
   steps = resp.text | lines
-    | filter (l) len (trim l) > 0
+    | filter (l) trim l | not empty?
     | enumerate
     | map (i line) {
         id: "step_{i}"
@@ -73,8 +73,8 @@ tool_costs = %{
       }
 
   ActionPlan {
-    goal: goal
-    steps: steps
+    goal
+    steps
     estimated_cost: estimated
     risk: estimated > 1.0 ? "high" : estimated > 0.3 ? "medium" : "low"
     fallback: "simplify approach and retry with fewer tools"
@@ -125,9 +125,9 @@ execute_single = (request: ToolRequest) -> ToolResult {
   successful = results | filter (.success)
   failed = results | filter (r) not r.success
 
-  failed | len > 0 ? log.warn "{len failed} tool calls failed" : ()
+  failed | not empty? ? log.warn "{len failed} tool calls failed" : ()
 
-  outputs = successful | map (r) "## {r.tool}\n{to_str r.output}" | join "\n\n"
+  outputs = successful | map (r) "## {r.tool}\n{r.output}" | join "\n\n"
 
   p = prompt.create ()
     | prompt.system "You integrate tool results into a coherent answer."

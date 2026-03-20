@@ -90,6 +90,7 @@ impl Value {
             (Value::Class { name: n1, .. }, Value::Class { name: n2, .. }) => n1 == n2,
             (Value::Object { id: i1, .. }, Value::Object { id: i2, .. }) => i1 == i2,
             (Value::Store { id: i1 }, Value::Store { id: i2 }) => i1 == i2,
+            (Value::Stream { .. }, _) | (_, Value::Stream { .. }) => false,
             (Value::Func(_), _) | (_, Value::Func(_)) => false,
             (Value::BuiltinFunc(_), _) | (_, Value::BuiltinFunc(_)) => false,
             _ => false,
@@ -150,7 +151,10 @@ impl Value {
             Value::Class { name, .. } => name.hash(state),
             Value::Object { id, .. } => id.hash(state),
             Value::Store { id } => id.hash(state),
-            Value::Func(_) | Value::BuiltinFunc(_) | Value::TaggedCtor { .. } => {}
+            Value::Func(_)
+            | Value::BuiltinFunc(_)
+            | Value::TaggedCtor { .. }
+            | Value::Stream { .. } => {}
         }
     }
 }

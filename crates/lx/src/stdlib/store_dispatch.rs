@@ -2,11 +2,11 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
 use crate::backends::RuntimeCtx;
-use crate::builtins::{call_value, mk};
+use crate::builtins::{call_value_sync, mk};
 use crate::error::LxError;
 use crate::record;
 use crate::span::Span;
-use crate::value::{BuiltinFunc, Value};
+use crate::value::{BuiltinFunc, BuiltinKind, Value};
 
 use super::store::{
     NEXT_ID, STORES, StoreState, bi_clear, bi_count, bi_create, bi_entries, bi_get, bi_keys,
@@ -14,7 +14,7 @@ use super::store::{
 };
 
 pub fn store_method(name: &str, store_val: &Value) -> Option<Value> {
-    let method: Option<(&'static str, usize, crate::value::BuiltinFn)> = match name {
+    let method: Option<(&'static str, usize, crate::value::SyncBuiltinFn)> = match name {
         "set" => Some(("store.set", 3, bi_set)),
         "get" => Some(("store.get", 2, bi_get)),
         "keys" => Some(("store.keys", 1, bi_keys)),
@@ -37,7 +37,7 @@ pub fn store_method(name: &str, store_val: &Value) -> Option<Value> {
         Value::BuiltinFunc(BuiltinFunc {
             name: mname,
             arity,
-            func,
+            kind: BuiltinKind::Sync(func),
             applied: vec![store_val.clone()],
         })
     })
@@ -200,7 +200,7 @@ fn bi_map(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, Lx
             "key" => Value::Str(Arc::from(k.as_str())),
             "value" => v,
         };
-        results.push(call_value(f, entry, span, ctx)?);
+        results.push(call_value_sync(f, entry, span, ctx)?);
     }
     Ok(Value::List(Arc::new(results)))
 }

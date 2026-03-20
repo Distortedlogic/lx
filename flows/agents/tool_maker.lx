@@ -9,7 +9,7 @@ use std/agent
 }
 
 +design = (msg) {
-  ai.prompt "Design MCP tool based on analysis:\n{to_str msg.analysis}\nReturn a manifest with tools, types, and endpoints." ^
+  ai.prompt "Design MCP tool based on analysis:\n{msg.analysis}\nReturn a manifest with tools, types, and endpoints." ^
 }
 
 +scaffold = (msg) {
@@ -19,11 +19,11 @@ use std/agent
 }
 
 +codegen = (msg) {
-  ai.prompt "Generate Rust MCP server code for:\n{to_str msg.manifest}\nWorkspace: {msg.workspace}" ^
+  ai.prompt "Generate Rust MCP server code for:\n{msg.manifest}\nWorkspace: {msg.workspace}" ^
 }
 
 +fix_compile = (msg) {
-  ai.prompt "Fix these compilation errors in {msg.workspace}:\n{to_str msg.errors}" ^
+  ai.prompt "Fix these compilation errors in {msg.workspace}:\n{msg.errors}" ^
 }
 
 +handlers = %{"analyze": analyze  "design": design  "scaffold": scaffold  "codegen": codegen  "fix_compile": fix_compile}
