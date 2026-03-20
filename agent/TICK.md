@@ -24,12 +24,13 @@ See `TICK_PROTOCOL.md` for cross-read guidance.
 
 ## State
 
-Session 81 (2026-03-20). **98/98 tests pass.** `just diagnose` clean (0 errors, 0 warnings).
+Session 82 (2026-03-20). **98/98 tests pass.** `just diagnose` clean (0 errors, 0 warnings).
 42 Rust stdlib modules + 42 lx packages in `pkg/` (7 clusters). Async interpreter.
-Shipped this session: MANIFEST_COMPLETION work item (10 tasks) — `lx init` scaffolding,
-`[package]` metadata (authors/license/lx), version validation, `[backends]` parsing + wiring,
-`[test]` threshold/runs, `[deps.dev]` parsing + install + filtering, lockfile version tracking,
-NoopEmitBackend/NoopLogBackend, RuntimeCtx test config propagation.
+Shipped this session: TYPE_CHECKER_COMPLETION work item (14 tasks) — exhaustiveness checking,
+mutable capture detection, import conflict detection, Trait field type validation, `--strict`
+mode, all Expr variants explicitly handled (no Unknown fallback), pattern variable binding in
+match arms, infinite type on reassignment fix, parse vs type error separation in workspace check.
+Checker split into 7 files.
 
 ## This Tick
 
@@ -40,7 +41,7 @@ NoopEmitBackend/NoopLogBackend, RuntimeCtx test config propagation.
 
 Or check `work_items/` for remaining work items:
 - `work_items/REPO_PIPELINING.md`
-- `work_items/TYPE_CHECKER_COMPLETION.md`
+- Various other work items (ls work_items/ to see full list)
 
 Read the specs/work items and pick whichever is most impactful / tractable.
 

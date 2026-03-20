@@ -44,6 +44,8 @@ enum Command {
         file: Option<String>,
         #[arg(short, long)]
         member: Option<String>,
+        #[arg(long)]
+        strict: bool,
     },
     Agent {
         script: String,
@@ -77,11 +79,15 @@ fn main() -> ExitCode {
             let resolved = resolve_run_target(&file);
             run_file(&resolved, json)
         }
-        Command::Check { file, member } => {
+        Command::Check {
+            file,
+            member,
+            strict,
+        } => {
             if let Some(file) = file {
-                check::check_file(&file)
+                check::check_file(&file, strict)
             } else {
-                check::check_workspace(member.as_deref())
+                check::check_workspace(member.as_deref(), strict)
             }
         }
         Command::Test { dir, member } => {

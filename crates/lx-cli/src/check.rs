@@ -4,7 +4,7 @@ use std::process::ExitCode;
 use crate::manifest;
 use crate::run;
 
-pub fn check_file(path: &str) -> ExitCode {
+pub fn check_file(path: &str, strict: bool) -> ExitCode {
     let (source, program) = match run::read_and_parse(path) {
         Ok(sp) => sp,
         Err(code) => return code,
@@ -14,17 +14,34 @@ pub fn check_file(path: &str) -> ExitCode {
         println!("ok: {path}");
         ExitCode::SUCCESS
     } else {
+        let mut errors = 0u32;
+        let mut warnings = 0u32;
         for d in &result.diagnostics {
-            let err = lx::error::LxError::type_err(&d.msg, d.span);
+            let prefix = match d.level {
+                lx::checker::DiagLevel::Error => {
+                    errors += 1;
+                    "error"
+                }
+                lx::checker::DiagLevel::Warning => {
+                    warnings += 1;
+                    "warning"
+                }
+            };
+            let err = lx::error::LxError::type_err(format!("{prefix}: {}", d.msg), d.span);
             let named = miette::NamedSource::new(path, source.clone());
             let report = miette::Report::new(err).with_source_code(named);
             eprintln!("{report:?}");
         }
-        ExitCode::from(1)
+        let fail_count = if strict { errors + warnings } else { errors };
+        if fail_count > 0 {
+            ExitCode::from(1)
+        } else {
+            ExitCode::SUCCESS
+        }
     }
 }
 
-pub fn check_workspace(member_filter: Option<&str>) -> ExitCode {
+pub fn check_workspace(member_filter: Option<&str>, strict: bool) -> ExitCode {
     let cwd = match std::env::current_dir() {
         Ok(d) => d,
         Err(e) => {
@@ -61,23 +78,49 @@ pub fn check_workspace(member_filter: Option<&str>) -> ExitCode {
 
     let mut total_ok = 0u32;
     let mut total_err = 0u32;
+    let mut total_parse_err = 0u32;
     let mut any_failure = false;
 
     for member in &members {
         let files = collect_lx_files(&member.dir);
         let mut member_ok = 0u32;
         let mut member_err = 0u32;
+        let mut member_parse_err = 0u32;
         for file in &files {
             let path_str = file.display().to_string();
             match run::read_and_parse(&path_str) {
                 Ok((source, program)) => {
                     let result = lx::checker::check(&program);
-                    if result.diagnostics.is_empty() {
+                    let file_errors: u32 = result
+                        .diagnostics
+                        .iter()
+                        .filter(|d| {
+                            d.level == lx::checker::DiagLevel::Error
+                                || (strict && d.level == lx::checker::DiagLevel::Warning)
+                        })
+                        .count() as u32;
+                    if file_errors == 0 && result.diagnostics.is_empty() {
                         member_ok += 1;
+                    } else if file_errors == 0 {
+                        member_ok += 1;
+                        for d in &result.diagnostics {
+                            let err =
+                                lx::error::LxError::type_err(format!("warning: {}", d.msg), d.span);
+                            let named = miette::NamedSource::new(path_str.clone(), source.clone());
+                            let report = miette::Report::new(err).with_source_code(named);
+                            eprintln!("{report:?}");
+                        }
                     } else {
                         member_err += 1;
                         for d in &result.diagnostics {
-                            let err = lx::error::LxError::type_err(&d.msg, d.span);
+                            let prefix = match d.level {
+                                lx::checker::DiagLevel::Error => "error",
+                                lx::checker::DiagLevel::Warning => "warning",
+                            };
+                            let err = lx::error::LxError::type_err(
+                                format!("{prefix}: {}", d.msg),
+                                d.span,
+                            );
                             let named = miette::NamedSource::new(path_str.clone(), source.clone());
                             let report = miette::Report::new(err).with_source_code(named);
                             eprintln!("{report:?}");
@@ -85,30 +128,48 @@ pub fn check_workspace(member_filter: Option<&str>) -> ExitCode {
                     }
                 }
                 Err(_) => {
-                    member_err += 1;
+                    member_parse_err += 1;
+                    eprintln!("  parse error: {path_str}");
                 }
             }
         }
         let status = if member_err > 0 { "FAIL" } else { "ok" };
-        println!(
-            "{:<16} {} checked, {} errors — {status}",
-            member.name,
-            member_ok + member_err,
-            member_err
-        );
+        let total_files = member_ok + member_err + member_parse_err;
+        if member_parse_err > 0 {
+            println!(
+                "{:<16} {} checked, {} type errors, {} parse errors — {status}",
+                member.name, total_files, member_err, member_parse_err
+            );
+        } else {
+            println!(
+                "{:<16} {} checked, {} errors — {status}",
+                member.name, total_files, member_err
+            );
+        }
         total_ok += member_ok;
         total_err += member_err;
+        total_parse_err += member_parse_err;
         if member_err > 0 {
             any_failure = true;
         }
     }
 
-    println!(
-        "\nTOTAL: {} files, {} errors, {} members",
-        total_ok + total_err,
-        total_err,
-        members.len()
-    );
+    if total_parse_err > 0 {
+        println!(
+            "\nTOTAL: {} files, {} type errors, {} parse errors, {} members",
+            total_ok + total_err + total_parse_err,
+            total_err,
+            total_parse_err,
+            members.len()
+        );
+    } else {
+        println!(
+            "\nTOTAL: {} files, {} errors, {} members",
+            total_ok + total_err,
+            total_err,
+            members.len()
+        );
+    }
     if any_failure {
         ExitCode::from(1)
     } else {

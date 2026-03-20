@@ -42,6 +42,8 @@ pub(crate) mod deadline;
 mod describe;
 pub mod diag;
 mod diag_walk;
+mod diff;
+mod diff_merge;
 mod durable;
 mod durable_io;
 mod durable_run;
@@ -55,6 +57,7 @@ mod git_diff_parse;
 mod git_log;
 mod git_ops;
 mod git_status;
+mod git_worktree;
 mod http;
 mod introspect;
 mod json;
@@ -63,6 +66,7 @@ mod math;
 pub(crate) mod mcp;
 mod md;
 mod md_build;
+mod pane;
 mod pipeline;
 mod pipeline_io;
 mod plan;
@@ -73,6 +77,9 @@ mod re;
 mod registry;
 mod registry_query;
 mod registry_store;
+mod repo;
+mod repo_lock;
+mod repo_worktree;
 pub(crate) mod retry;
 mod saga;
 mod step_deps;
@@ -90,6 +97,7 @@ mod trait_ops;
 mod user;
 mod workspace;
 mod workspace_edit;
+mod ws;
 mod yield_types;
 
 use crate::interpreter::ModuleExports;
@@ -129,8 +137,10 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
             "audit" => audit::build(),
             "budget" => budget::build(),
             "describe" => describe::build(),
+            "diff" => diff::build(),
             "diag" => diag::build(),
             "durable" => durable::build(),
+            "pane" => pane::build(),
             "pipeline" => pipeline::build(),
             "plan" => plan::build(),
             "retry" => retry::build(),
@@ -140,9 +150,11 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
             "test" => test::build(),
             "profile" => profile::build(),
             "registry" => registry::build(),
+            "repo" => repo::build(),
             "trait" => trait_ops::build(),
             "user" => user::build(),
             "workspace" => workspace::build(),
+            "ws" => ws::build(),
             "yield" => yield_types::build(),
             _ => return None,
         }
@@ -185,8 +197,10 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
             | "budget"
             | "deadline"
             | "describe"
+            | "diff"
             | "diag"
             | "durable"
+            | "pane"
             | "pipeline"
             | "plan"
             | "retry"
@@ -196,9 +210,11 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
             | "test"
             | "profile"
             | "registry"
+            | "repo"
             | "trait"
             | "user"
             | "workspace"
+            | "ws"
             | "yield"
     )
 }

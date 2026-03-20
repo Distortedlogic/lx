@@ -54,7 +54,7 @@ The `run_git_in` helper runs git commands in a specific directory via `git -C <d
 - `crates/lx/src/stdlib/repo_lock.rs` — New file: `scope_overlaps`, `check_conflicts`, `acquire_locks`, `release_locks_for_agent`, `bi_lock`, `bi_unlock`, `bi_try_lock`
 - `crates/lx/src/stdlib/repo_worktree.rs` — New file: `bi_checkout`, `bi_submit`, `bi_rebase`, `bi_abandon`, `notify_watchers`
 - `crates/lx/src/stdlib/mod.rs` — Register `mod git_worktree`, `mod repo`, `mod repo_lock`, `mod repo_worktree`, add `"repo"` to `get_std_module` and `std_module_exists`
-- `tests/97_repo.lx` — New file: integration tests
+- `tests/98_repo.lx` — New file: integration tests
 
 # Task List
 
@@ -204,7 +204,7 @@ In the `std_module_exists` function's match statement, add `| "repo"` to the pat
 
 **Subject:** Write integration tests covering the full repo pipelining lifecycle
 
-**Description:** Create `tests/97_repo.lx`. The test must create a temporary git repo (not modify the real lx repo), exercise the full lifecycle, and clean up.
+**Description:** Create `tests/98_repo.lx`. The test must create a temporary git repo (not modify the real lx repo), exercise the full lifecycle, and clean up.
 
 Structure:
 
@@ -325,7 +325,7 @@ repo.unlock rp "agent-b"
 -- Cleanup temp directory
 $rm -rf {tmp}
 
-log.info "97_repo: all passed"
+log.info "98_repo: all passed"
 ```
 
 Adjust the test to match the exact API as implemented. If `repo.lock` returns `Ok(Value::Unit)` wrapped in `Value::Ok`, then `type_of result` will be `"Ok"`. Use `^` to unwrap Results where needed.

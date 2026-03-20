@@ -1,16 +1,25 @@
+mod capture;
+mod exhaust;
+mod stmts;
 mod synth;
+mod synth_helpers;
 pub mod types;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use crate::ast::{
-    BindTarget, Binding, McpOutputType, Program, SStmt, SType, Stmt, TypeExpr, UseKind, UseStmt,
-};
+use crate::ast::{Program, SType, TypeExpr};
 use crate::span::Span;
 
 use types::{Type, UnificationTable};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiagLevel {
+    Error,
+    Warning,
+}
+
 pub struct Diagnostic {
+    pub level: DiagLevel,
     pub msg: String,
     pub span: Span,
 }
@@ -23,6 +32,10 @@ pub(crate) struct Checker {
     pub(crate) table: UnificationTable,
     scope: Vec<HashMap<String, Type>>,
     pub(crate) diagnostics: Vec<Diagnostic>,
+    pub(crate) type_defs: HashMap<String, Vec<String>>,
+    pub(crate) mutables: HashSet<String>,
+    import_sources: HashMap<String, Span>,
+    pub(crate) trait_fields: HashMap<String, Vec<(String, Type)>>,
 }
 
 impl Checker {
@@ -31,6 +44,10 @@ impl Checker {
             table: UnificationTable::new(),
             scope: vec![HashMap::new()],
             diagnostics: Vec::new(),
+            type_defs: HashMap::new(),
+            mutables: HashSet::new(),
+            import_sources: HashMap::new(),
+            trait_fields: HashMap::new(),
         }
     }
 
@@ -58,7 +75,19 @@ impl Checker {
     }
 
     pub(crate) fn emit(&mut self, msg: String, span: Span) {
-        self.diagnostics.push(Diagnostic { msg, span });
+        self.diagnostics.push(Diagnostic {
+            level: DiagLevel::Error,
+            msg,
+            span,
+        });
+    }
+
+    pub(crate) fn emit_warning(&mut self, msg: String, span: Span) {
+        self.diagnostics.push(Diagnostic {
+            level: DiagLevel::Warning,
+            msg,
+            span,
+        });
     }
 
     pub(crate) fn fresh(&mut self) -> Type {
@@ -110,108 +139,6 @@ impl Checker {
             },
         }
     }
-
-    pub(crate) fn check_stmts(&mut self, stmts: &[SStmt]) -> Type {
-        let mut result = Type::Unit;
-        for stmt in stmts {
-            result = self.check_stmt(stmt);
-        }
-        result
-    }
-
-    fn check_stmt(&mut self, stmt: &SStmt) -> Type {
-        match &stmt.node {
-            Stmt::Binding(b) => {
-                self.check_binding(b);
-                Type::Unit
-            }
-            Stmt::TypeDef { variants, .. } => {
-                for (ctor_name, _) in variants {
-                    self.bind(ctor_name.clone(), Type::Unknown);
-                }
-                Type::Unit
-            }
-            Stmt::TraitUnion(_) => Type::Unit,
-            Stmt::McpDecl { tools, .. } => {
-                for tool in tools {
-                    for f in &tool.input {
-                        let _ = named_to_type(&f.type_name);
-                    }
-                    let _ = resolve_mcp_output(&tool.output);
-                }
-                Type::Unit
-            }
-            Stmt::TraitDecl { .. } => Type::Unit,
-            Stmt::AgentDecl { methods, init, .. } => {
-                for m in methods {
-                    self.synth(&m.handler);
-                }
-                if let Some(expr) = init {
-                    self.synth(expr);
-                }
-                Type::Unit
-            }
-            Stmt::ClassDecl {
-                fields, methods, ..
-            } => {
-                for f in fields {
-                    self.synth(&f.default);
-                }
-                for m in methods {
-                    self.synth(&m.handler);
-                }
-                Type::Unit
-            }
-            Stmt::FieldUpdate { value, .. } => {
-                self.synth(value);
-                Type::Unit
-            }
-            Stmt::Use(u) => {
-                self.resolve_use(u);
-                Type::Unit
-            }
-            Stmt::Expr(e) => self.synth(e),
-        }
-    }
-
-    fn resolve_use(&mut self, u: &UseStmt) {
-        match &u.kind {
-            UseKind::Whole => {
-                if let Some(name) = u.path.last() {
-                    self.bind(name.clone(), Type::Unknown);
-                }
-            }
-            UseKind::Alias(alias) => {
-                self.bind(alias.clone(), Type::Unknown);
-            }
-            UseKind::Selective(names) => {
-                for name in names {
-                    self.bind(name.clone(), Type::Unknown);
-                }
-            }
-        }
-    }
-
-    fn check_binding(&mut self, b: &Binding) {
-        let val_type = self.synth(&b.value);
-        if let Some(ann) = &b.type_ann {
-            let expected = self.resolve_type_ann(ann);
-            if let Err(msg) = self.table.unify(&expected, &val_type) {
-                self.emit(format!("binding type mismatch: {msg}"), b.value.span);
-            }
-        }
-        match &b.target {
-            BindTarget::Name(name) => self.bind(name.clone(), val_type),
-            BindTarget::Reassign(name) => {
-                if let Some(existing) = self.lookup(name)
-                    && let Err(msg) = self.table.unify(&existing, &val_type)
-                {
-                    self.emit(format!("reassignment type mismatch: {msg}"), b.value.span);
-                }
-            }
-            BindTarget::Pattern(_) => {}
-        }
-    }
 }
 
 pub fn check(program: &Program) -> CheckResult {
@@ -234,18 +161,5 @@ fn named_to_type(name: &str) -> Type {
         "Unit" => Type::Unit,
         "Bytes" => Type::Bytes,
         _ => Type::Unknown,
-    }
-}
-
-fn resolve_mcp_output(out: &McpOutputType) -> Type {
-    match out {
-        McpOutputType::Named(n) => named_to_type(n),
-        McpOutputType::List(inner) => Type::List(Box::new(resolve_mcp_output(inner))),
-        McpOutputType::Record(fields) => Type::Record(
-            fields
-                .iter()
-                .map(|f| (f.name.clone(), named_to_type(&f.type_name)))
-                .collect(),
-        ),
     }
 }

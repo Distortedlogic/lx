@@ -1,6 +1,7 @@
-use crate::ast::{BinOp, Expr, Literal, Param, SExpr, SType};
+use crate::ast::{Expr, SExpr};
 
 use super::Checker;
+use super::synth_helpers::synth_literal;
 use super::types::Type;
 
 impl Checker {
@@ -35,14 +36,7 @@ impl Checker {
                 let _ = self.synth(left);
                 self.synth(right)
             }
-            Expr::Apply { func, arg } => {
-                let ft = self.synth(func);
-                let _ = self.synth(arg);
-                match self.table.resolve(&ft) {
-                    Type::Func { ret, .. } => *ret,
-                    _ => Type::Unknown,
-                }
-            }
+            Expr::Apply { func, arg } => self.synth_apply(func, arg),
             Expr::Func {
                 params,
                 ret_type,
@@ -84,17 +78,7 @@ impl Checker {
                 let _ = self.synth(e);
                 self.synth(default)
             }
-            Expr::Match { scrutinee, arms } => {
-                let _ = self.synth(scrutinee);
-                let result = self.fresh();
-                for arm in arms {
-                    let body_t = self.synth(&arm.body);
-                    if let Err(msg) = self.table.unify(&result, &body_t) {
-                        self.emit(format!("match arm type mismatch: {msg}"), arm.body.span);
-                    }
-                }
-                self.table.resolve(&result)
-            }
+            Expr::Match { scrutinee, arms } => self.synth_match(scrutinee, arms, expr.span),
             Expr::Ternary { cond, then_, else_ } => {
                 let ct = self.synth(cond);
                 let resolved = self.table.resolve(&ct);
@@ -142,78 +126,134 @@ impl Checker {
                 self.pop_scope();
                 result
             }
-            Expr::Refine { .. } => Type::Unknown,
-            Expr::Meta { .. } => Type::Unknown,
-            _ => Type::Unknown,
-        }
-    }
-
-    pub(super) fn synth_func(
-        &mut self,
-        params: &[Param],
-        ret_type: &Option<SType>,
-        body: &SExpr,
-    ) -> Type {
-        self.push_scope();
-        let mut param_types = Vec::new();
-        for p in params {
-            let ty = match &p.type_ann {
-                Some(ann) => self.resolve_type_ann(ann),
-                None => self.fresh(),
-            };
-            self.bind(p.name.clone(), ty.clone());
-            param_types.push(ty);
-        }
-        let body_type = self.synth(body);
-        if let Some(ret_ann) = ret_type {
-            let expected = self.resolve_type_ann(ret_ann);
-            if let Err(msg) = self.table.unify(&expected, &body_type) {
-                self.emit(format!("return type mismatch: {msg}"), body.span);
-            }
-        }
-        self.pop_scope();
-        let mut result = match ret_type {
-            Some(ann) => self.resolve_type_ann(ann),
-            None => body_type,
-        };
-        for pt in param_types.into_iter().rev() {
-            result = Type::Func {
-                param: Box::new(pt),
-                ret: Box::new(result),
-            };
-        }
-        result
-    }
-
-    fn synth_binary(&mut self, op: &BinOp, lt: &Type, rt: &Type, span: crate::span::Span) -> Type {
-        let lt = self.table.resolve(lt);
-        let rt = self.table.resolve(rt);
-        match op {
-            BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Mod | BinOp::IntDiv => {
-                self.table.unify(&lt, &rt).unwrap_or(Type::Unknown)
-            }
-            BinOp::Concat => Type::Str,
-            BinOp::Eq | BinOp::NotEq | BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq => {
-                Type::Bool
-            }
-            BinOp::And | BinOp::Or => {
-                if lt != Type::Bool && lt != Type::Unknown {
-                    self.emit("logical operator requires Bool".into(), span);
+            Expr::Receive(arms) => {
+                let result = self.fresh();
+                for arm in arms {
+                    let body_t = self.synth(&arm.handler);
+                    if let Err(msg) = self.table.unify(&result, &body_t) {
+                        self.emit(
+                            format!("receive arm type mismatch: {msg}"),
+                            arm.handler.span,
+                        );
+                    }
                 }
-                Type::Bool
+                self.table.resolve(&result)
             }
-            BinOp::Range | BinOp::RangeInclusive => Type::List(Box::new(Type::Int)),
+            Expr::Yield { .. } => Type::Unknown,
+            Expr::Emit { value } => {
+                self.synth(value);
+                Type::Unit
+            }
+            Expr::Loop(stmts) => {
+                self.check_stmts(stmts);
+                Type::Unit
+            }
+            Expr::Break(val) => {
+                if let Some(v) = val {
+                    self.synth(v);
+                }
+                Type::Unit
+            }
+            Expr::Assert { expr, msg } => {
+                self.synth(expr);
+                if let Some(m) = msg {
+                    self.synth(m);
+                }
+                Type::Unit
+            }
+            Expr::Refine {
+                initial,
+                grade,
+                revise,
+                threshold,
+                max_rounds,
+                on_round,
+            } => {
+                self.synth(initial);
+                self.synth(grade);
+                self.synth(revise);
+                self.synth(threshold);
+                self.synth(max_rounds);
+                if let Some(cb) = on_round {
+                    self.synth(cb);
+                }
+                Type::Unknown
+            }
+            Expr::Meta {
+                task,
+                strategies,
+                attempt,
+                evaluate,
+                select,
+                on_switch,
+            } => {
+                self.synth(task);
+                self.synth(strategies);
+                self.synth(attempt);
+                self.synth(evaluate);
+                if let Some(s) = select {
+                    self.synth(s);
+                }
+                if let Some(cb) = on_switch {
+                    self.synth(cb);
+                }
+                Type::Unknown
+            }
+            Expr::Slice { expr, start, end } => {
+                let t = self.synth(expr);
+                if let Some(s) = start {
+                    self.synth(s);
+                }
+                if let Some(e) = end {
+                    self.synth(e);
+                }
+                t
+            }
+            Expr::Section(_) => Type::Func {
+                param: Box::new(Type::Unknown),
+                ret: Box::new(Type::Unknown),
+            },
+            Expr::Map(entries) => self.synth_map(entries),
+            Expr::FieldAccess { expr, .. } => {
+                self.synth(expr);
+                Type::Unknown
+            }
+            Expr::NamedArg { value, .. } => self.synth(value),
+            Expr::AgentSend { target, msg } => {
+                self.synth(target);
+                self.synth(msg);
+                Type::Unit
+            }
+            Expr::AgentAsk { target, msg } => {
+                self.synth(target);
+                self.synth(msg);
+                Type::Result {
+                    ok: Box::new(Type::Unknown),
+                    err: Box::new(Type::Unknown),
+                }
+            }
+            Expr::StreamAsk { target, msg } => {
+                self.synth(target);
+                self.synth(msg);
+                Type::Unknown
+            }
+            Expr::Shell { .. } => Type::Result {
+                ok: Box::new(Type::Str),
+                err: Box::new(Type::Str),
+            },
+            Expr::Par(stmts) => {
+                self.check_mutable_captures_stmts(stmts, expr.span);
+                let result = self.check_stmts(stmts);
+                Type::List(Box::new(result))
+            }
+            Expr::Sel(arms) => {
+                for arm in arms {
+                    self.check_mutable_captures(&arm.expr, expr.span);
+                    self.synth(&arm.expr);
+                    self.synth(&arm.handler);
+                }
+                Type::Unknown
+            }
         }
-    }
-}
-
-fn synth_literal(lit: &Literal) -> Type {
-    match lit {
-        Literal::Int(_) => Type::Int,
-        Literal::Float(_) => Type::Float,
-        Literal::Str(_) | Literal::RawStr(_) => Type::Str,
-        Literal::Regex(_) => Type::Regex,
-        Literal::Bool(_) => Type::Bool,
-        Literal::Unit => Type::Unit,
     }
 }

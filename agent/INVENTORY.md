@@ -9,7 +9,7 @@
 - Functions, closures, currying, default params, pipes, sections, slicing, named args
 - Type definitions with tagged values and pattern matching
 - Type annotations: `(x: Int y: Str) -> Result Int Str { ... }` on params, return types, bindings
-- Type checker: `lx check` — bidirectional inference, unification, structural subtyping, import resolution (imported names bound as Unknown)
+- Type checker: `lx check` — bidirectional inference, unification, structural subtyping, import resolution (imported names bound as Unknown). Exhaustiveness checking for match on union types (warns on missing variants). Mutable capture detection in `par`/`sel` concurrent contexts. Import conflict detection (warns on duplicate names). Trait constructor field type validation. `--strict` mode (warnings as errors). All `Expr` variants explicitly handled (no Unknown fallback). Pattern variables bound in match arm scopes. Parse vs type error distinction in workspace check
 - Concurrency: `par`, `sel`, `pmap`, `pmap_n`, `timeout` — async interpreter (`async fn eval` with `#[async_recursion(?Send)]`). `par` → `futures::join_all`, `sel` → `futures::select_all`, `pmap`/`pmap_n` → `join_all`. I/O operations yield naturally at `.await` points
 - Shell: `$cmd`, `$^cmd`, `${...}` with interpolation
 - Error handling: `^` propagation, `??` coalescing, `(?? default)` sections. Structured error tags: `Err Timeout "msg"` with pattern matching. Uniform `None` on miss for Record, Map, and Agent field access. `AgentErr` structured errors: 11 tagged variants (Timeout, RateLimited, BudgetExhausted, ContextOverflow, Incompetent, Upstream, PermissionDenied, TraitViolation, Unavailable, Cancelled, Internal) via `use std/agent {Timeout ...}`

@@ -3,7 +3,7 @@
 
 # Design Health
 
-Updated after Session 81 (2026-03-20).
+Updated after Session 82 (2026-03-20).
 
 ## What Works
 
@@ -21,10 +21,10 @@ Updated after Session 81 (2026-03-20).
 
 **Record shorthand fields followed by keyed fields misparse.** `{steps  task  step_count: steps | len}` — `steps task` is parsed as function application, not two shorthand fields. Workaround: always use explicit keys when mixing shorthand and keyed fields. `{..spread  shorthand}` has the same issue.
 
-**`lx check` still has 31 residual errors on workspace.** Import resolution dropped false positives from 122→31. Remaining are real checker limitations (infinite type in reassignment, negation on pattern-bound vars) and parse errors in brain/flows files — not import-related.
+**`lx check` residual errors reduced.** Session 82 fixed infinite type on reassignment (resolve_deep before unify), bound pattern variables in match arm scopes, and now distinguishes parse errors from type errors in workspace check output. All `Expr` variants are explicitly handled (no Unknown fallback). Exhaustiveness, mutable capture, import conflict, and Trait field type checks added. `--strict` mode available for CI.
 
 See `agent/PRIORITIES.md` for the full ordered work queue.
 
 ## Bottom Line
 
-Session 81: Completed MANIFEST_COMPLETION work item (10 tasks). `lx init` scaffolding. Manifest schema: `[package]` gains authors/license/lx, version validated as required, `[backends]` parsed and wired to RuntimeCtx (NoopEmitBackend/NoopLogBackend added), `[test]` gains threshold/runs propagated to RuntimeCtx, `[deps.dev]` parsed with install + filter (dev deps excluded from `lx run`, included in `lx test`). Lockfile tracks resolved version. Package manifest now matches spec/package-manifest.md. 98/98 tests, 0 errors, 0 warnings.
+Session 82: Completed TYPE_CHECKER_COMPLETION work item (14 tasks). Checker gains: exhaustiveness checking, mutable capture detection, import conflict detection, Trait field type validation, `--strict` mode, pattern variable binding in match arms, parse vs type error separation, all Expr variants explicitly handled. Infinite type on reassignment fixed. Checker split into 7 files (all under 300 lines). 98/98 tests, 0 errors, 0 warnings.

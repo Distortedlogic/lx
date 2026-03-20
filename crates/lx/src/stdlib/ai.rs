@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
-use crate::backends::{AiOpts, RuntimeCtx};
+use crate::backends::{AiOpts, EmbedOpts, RuntimeCtx};
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
@@ -24,6 +24,8 @@ pub fn build() -> IndexMap<String, Value> {
         super::ai_structured::mk_prompt_structured_with(),
     );
     m.insert("prompt_json".into(), super::ai_structured::mk_prompt_json());
+    m.insert("embed".into(), mk("ai.embed", 1, bi_embed));
+    m.insert("embed_with".into(), mk("ai.embed_with", 1, bi_embed_with));
     m
 }
 
@@ -142,4 +144,42 @@ fn bi_prompt_with(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<V
             )
         })?;
     ctx.ai.prompt(prompt, &extract_opts(fields), span)
+}
+
+fn bi_embed(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+    let texts = args[0]
+        .as_list()
+        .ok_or_else(|| LxError::type_err("ai.embed expects List of Str", span))?;
+    let strings: Vec<String> = texts
+        .iter()
+        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+        .collect();
+    ctx.embed.embed(&strings, &EmbedOpts::default(), span)
+}
+
+fn bi_embed_with(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+    let Value::Record(fields) = &args[0] else {
+        return Err(LxError::type_err("ai.embed_with expects Record", span));
+    };
+    let texts = fields
+        .get("texts")
+        .and_then(|v| v.as_list())
+        .ok_or_else(|| {
+            LxError::runtime(
+                "ai.embed_with: record must have 'texts' field (List of Str)",
+                span,
+            )
+        })?;
+    let strings: Vec<String> = texts
+        .iter()
+        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+        .collect();
+    let opts = EmbedOpts {
+        model: opt_str(fields, "model"),
+        dimensions: fields
+            .get("dimensions")
+            .and_then(|v| v.as_int())
+            .and_then(|n| usize::try_from(n).ok()),
+    };
+    ctx.embed.embed(&strings, &opts, span)
 }

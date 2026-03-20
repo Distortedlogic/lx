@@ -1,7 +1,11 @@
 mod defaults;
+mod embed;
+mod pane;
 mod user;
 
 pub use defaults::*;
+pub use embed::*;
+pub use pane::*;
 pub use user::*;
 
 use std::collections::HashMap;
@@ -27,6 +31,8 @@ pub struct RuntimeCtx {
     pub yield_: Arc<dyn YieldBackend>,
     pub log: Arc<dyn LogBackend>,
     pub user: Arc<dyn UserBackend>,
+    pub pane: Arc<dyn PaneBackend>,
+    pub embed: Arc<dyn EmbedBackend>,
     pub on_agent_event: Option<Arc<dyn Fn(AgentEvent) + Send + Sync>>,
     pub source_dir: parking_lot::Mutex<Option<PathBuf>>,
     pub workspace_members: HashMap<String, PathBuf>,
@@ -46,6 +52,8 @@ impl Default for RuntimeCtx {
             yield_: Arc::new(StdinStdoutYieldBackend),
             log: Arc::new(StderrLogBackend),
             user: Arc::new(NoopUserBackend),
+            pane: Arc::new(YieldPaneBackend),
+            embed: Arc::new(VoyageEmbedBackend),
             on_agent_event: None,
             source_dir: parking_lot::Mutex::new(None),
             workspace_members: HashMap::new(),
@@ -74,6 +82,12 @@ pub struct HttpOpts {
     pub headers: Option<IndexMap<String, String>>,
     pub query: Option<IndexMap<String, String>>,
     pub body: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct EmbedOpts {
+    pub model: Option<String>,
+    pub dimensions: Option<usize>,
 }
 
 pub trait AiBackend: Send + Sync {
@@ -124,4 +138,15 @@ pub trait UserBackend: Send + Sync {
     fn status(&self, level: &str, message: &str);
     fn table(&self, headers: &[String], rows: &[Vec<String>]);
     fn check_signal(&self) -> Option<Value>;
+}
+
+pub trait PaneBackend: Send + Sync {
+    fn open(&self, kind: &str, config: &Value, span: Span) -> Result<Value, LxError>;
+    fn update(&self, pane_id: &str, content: &Value, span: Span) -> Result<(), LxError>;
+    fn close(&self, pane_id: &str, span: Span) -> Result<(), LxError>;
+    fn list(&self, span: Span) -> Result<Value, LxError>;
+}
+
+pub trait EmbedBackend: Send + Sync {
+    fn embed(&self, texts: &[String], opts: &EmbedOpts, span: Span) -> Result<Value, LxError>;
 }

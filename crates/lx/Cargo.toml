@@ -24,6 +24,8 @@ parking_lot.workspace = true
 tokio = { version = "1", features = ["rt-multi-thread", "time", "sync", "macros"] }
 async-recursion = "1"
 futures = "0.3"
+similar = "2"
+tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
 
 [lints]
 workspace = true

@@ -113,6 +113,26 @@ pub fn build() -> IndexMap<String, Value> {
         "push_with".into(),
         mk("git.push_with", 1, super::git_branch::bi_push_with),
     );
+    m.insert(
+        "worktree_add".into(),
+        mk("git.worktree_add", 2, super::git_worktree::bi_worktree_add),
+    );
+    m.insert(
+        "worktree_remove".into(),
+        mk(
+            "git.worktree_remove",
+            1,
+            super::git_worktree::bi_worktree_remove,
+        ),
+    );
+    m.insert(
+        "worktree_list".into(),
+        mk(
+            "git.worktree_list",
+            1,
+            super::git_worktree::bi_worktree_list,
+        ),
+    );
     m
 }
 

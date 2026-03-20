@@ -11,7 +11,7 @@ crates/lx/src/
   backends/    RuntimeCtx struct, backend traits (Ai/Emit/Http/Shell/Yield/Log/User), default impls
   lexer/       Tokenizer — mod, numbers, strings, keywords, helpers
   parser/      Recursive descent — mod + split files per feature (func, infix, prefix, pattern, statements, etc.)
-  checker/     Bidirectional type checker — mod (import resolution), synth, types
+  checker/     Bidirectional type checker — mod, stmts, synth, synth_helpers, exhaust, capture, types
   interpreter/ Tree-walking evaluator — mod + split files (agents, apply, eval, modules, patterns, etc.)
   builtins/    Built-in functions — mod, call, str, coll, hof, convert, register, etc.
   visitor/     AST visitor/walker infrastructure

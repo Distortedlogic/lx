@@ -1,0 +1,23 @@
+use pkg/kit/notify
+
+notify.info "test info"
+notify.warn "test warning"
+notify.error "test error"
+notify.success "test success"
+notify.action "deploy?" ["approve" "reject"]
+notify.progress "building" 3 10
+notify.clear "building"
+notify.toast "done!" 3000
+notify.badge "errors" 5
+
+assert (type_of (notify.info) == "Func") "info is a function"
+assert (type_of (notify.warn) == "Func") "warn is a function"
+assert (type_of (notify.error) == "Func") "error is a function"
+assert (type_of (notify.success) == "Func") "success is a function"
+assert (type_of (notify.action) == "Func") "action is a function"
+assert (type_of (notify.progress) == "Func") "progress is a function"
+assert (type_of (notify.clear) == "Func") "clear is a function"
+assert (type_of (notify.toast) == "Func") "toast is a function"
+assert (type_of (notify.badge) == "Func") "badge is a function"
+
+log.info "104_notify: all passed"
