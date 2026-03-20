@@ -6,6 +6,7 @@ members = [
   "crates/lx-ui",
   "crates/lx-tui",
   "crates/lx-desktop",
+  "crates/lx-mobile",
 ]
 resolver = "2"
 
