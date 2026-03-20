@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 use num_bigint::BigInt;
-use reqwest::blocking::Client;
+use reqwest::Client;
 use reqwest::header::CONTENT_TYPE;
 
 use crate::error::LxError;
@@ -133,49 +133,51 @@ impl HttpBackend for ReqwestHttpBackend {
         span: Span,
     ) -> Result<Value, LxError> {
         tokio::task::block_in_place(|| {
-            let c = Client::builder()
-                .build()
-                .map_err(|e| LxError::runtime(format!("http: client: {e}"), span))?;
-            let mut builder = match method {
-                "GET" => c.get(url),
-                "POST" => c.post(url),
-                "PUT" => c.put(url),
-                "DELETE" => c.delete(url),
-                _ => {
-                    return Err(LxError::runtime(
-                        format!("http: unknown method '{method}'"),
-                        span,
-                    ));
+            tokio::runtime::Handle::current().block_on(async {
+                let c = Client::builder()
+                    .build()
+                    .map_err(|e| LxError::runtime(format!("http: client: {e}"), span))?;
+                let mut builder = match method {
+                    "GET" => c.get(url),
+                    "POST" => c.post(url),
+                    "PUT" => c.put(url),
+                    "DELETE" => c.delete(url),
+                    _ => {
+                        return Err(LxError::runtime(
+                            format!("http: unknown method '{method}'"),
+                            span,
+                        ));
+                    }
+                };
+                if let Some(ref hdrs) = opts.headers {
+                    for (k, v) in hdrs {
+                        builder = builder.header(k.as_str(), v.as_str());
+                    }
                 }
-            };
-            if let Some(ref hdrs) = opts.headers {
-                for (k, v) in hdrs {
-                    builder = builder.header(k.as_str(), v.as_str());
+                if let Some(ref query) = opts.query {
+                    let pairs: Vec<(&str, &str)> = query
+                        .iter()
+                        .map(|(k, v)| (k.as_str(), v.as_str()))
+                        .collect();
+                    builder = builder.query(&pairs);
                 }
-            }
-            if let Some(ref query) = opts.query {
-                let pairs: Vec<(&str, &str)> = query
-                    .iter()
-                    .map(|(k, v)| (k.as_str(), v.as_str()))
-                    .collect();
-                builder = builder.query(&pairs);
-            }
-            if let Some(ref body) = opts.body {
-                builder = builder.header(CONTENT_TYPE, "application/json").json(body);
-            }
-            match builder.send() {
-                Ok(resp) => response_to_value(resp, span),
-                Err(e) => Ok(Value::Err(Box::new(crate::stdlib::agent_errors::upstream(
-                    url,
-                    0,
-                    &e.to_string(),
-                )))),
-            }
+                if let Some(ref body) = opts.body {
+                    builder = builder.header(CONTENT_TYPE, "application/json").json(body);
+                }
+                match builder.send().await {
+                    Ok(resp) => response_to_value(resp, span).await,
+                    Err(e) => Ok(Value::Err(Box::new(crate::stdlib::agent_errors::upstream(
+                        url,
+                        0,
+                        &e.to_string(),
+                    )))),
+                }
+            })
         })
     }
 }
 
-fn response_to_value(resp: reqwest::blocking::Response, span: Span) -> Result<Value, LxError> {
+async fn response_to_value(resp: reqwest::Response, span: Span) -> Result<Value, LxError> {
     let status = resp.status().as_u16();
     let mut headers = IndexMap::new();
     for (name, value) in resp.headers() {
@@ -184,6 +186,7 @@ fn response_to_value(resp: reqwest::blocking::Response, span: Span) -> Result<Va
     }
     let body_str = resp
         .text()
+        .await
         .map_err(|e| LxError::runtime(format!("http: body: {e}"), span))?;
     let body = if let Ok(jv) = serde_json::from_str::<serde_json::Value>(&body_str) {
         json_to_lx(jv)
