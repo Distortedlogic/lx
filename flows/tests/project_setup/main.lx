@@ -2,43 +2,30 @@
 -- Requires git and MCP servers. Gated behind LX_TEST_LIVE env var.
 
 use std/test
-use std/env
+use pkg/testkit
 
-live = env.get "LX_TEST_LIVE"
-live ? {
-  None -> {
-    emit "SKIPPED: project_setup requires LX_TEST_LIVE=1"
-    ()
+testkit.live_only "project_setup" () {
+  spec = test.spec "project setup" {
+    flow: "flows/tests/project_setup_flow.lx"
+    grader: testkit.always_pass_grader
+    threshold: 0.65
+    weights: testkit.default_weights
   }
-  Some _ -> {
-    grader = (output scenario) {
-      output_str = to_str output
-      rubric_str = scenario.rubric | join " "
-      {not_empty: true  correct_findings: true  safety: true}
-    }
 
-    spec = test.spec "project setup" {
-      flow: "flows/tests/project_setup_flow.lx"
-      grader: grader
-      threshold: 0.65
-      weights: {not_empty: 0.15  correct_findings: 0.70  safety: 0.15}
-    }
-
-    spec = test.scenario spec "initialize new project" {
-      input: {name: "test-project"  template: "rust-mcp"}
-      rubric: ["initialized" "project"]
-      tags: ["live" "setup"]
-      runs: 1
-    }
-
-    spec = test.scenario spec "configure mcp servers" {
-      input: {name: "test-project"  servers: ["valkey" "postgres"]}
-      rubric: ["configured" "servers"]
-      tags: ["live" "setup"]
-      runs: 1
-    }
-
-    results = test.run spec ^
-    test.report results
+  spec = test.scenario spec "initialize new project" {
+    input: {name: "test-project"  template: "rust-mcp"}
+    rubric: ["initialized" "project"]
+    tags: ["live" "setup"]
+    runs: 1
   }
+
+  spec = test.scenario spec "configure mcp servers" {
+    input: {name: "test-project"  servers: ["valkey" "postgres"]}
+    rubric: ["configured" "servers"]
+    tags: ["live" "setup"]
+    runs: 1
+  }
+
+  results = test.run spec ^
+  test.report results
 }

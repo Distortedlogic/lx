@@ -1,12 +1,11 @@
 use std/fs
 use std/json
-use ../lib/scoring
+use pkg/score : scoring
+use pkg/testkit
 
 +run = (input) {
-  data_path = input.data_path
+  data = testkit.load_fixture input
   threshold = get "threshold" input ?? 0.5
-  content = fs.read data_path ^
-  data = json.parse content ^
 
   query = data.query ?? "unknown"
   candidates = data.candidates ?? []

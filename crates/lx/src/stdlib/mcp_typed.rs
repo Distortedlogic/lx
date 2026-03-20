@@ -6,7 +6,7 @@ use crate::backends::RuntimeCtx;
 use crate::error::LxError;
 use crate::span::Span;
 use crate::stdlib::json_conv;
-use crate::value::{McpOutputDef, FieldDef, Value};
+use crate::value::{FieldDef, McpOutputDef, Value};
 
 use super::{extract_text, get_tool_def, mcp_rpc};
 
@@ -52,11 +52,7 @@ pub(crate) fn typed_call(
     }
 }
 
-fn validate_input(
-    input: &Value,
-    fields: &[FieldDef],
-    tool_name: &str,
-) -> Result<Value, String> {
+fn validate_input(input: &Value, fields: &[FieldDef], tool_name: &str) -> Result<Value, String> {
     let empty_rec;
     let rec = match input {
         Value::Record(r) => r,

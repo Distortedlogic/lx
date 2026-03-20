@@ -82,9 +82,7 @@ impl Value {
                     inclusive: i2,
                 },
             ) => s1 == s2 && e1 == e2 && i1 == i2,
-            (Value::TraitUnion { name: n1, .. }, Value::TraitUnion { name: n2, .. }) => {
-                n1 == n2
-            }
+            (Value::TraitUnion { name: n1, .. }, Value::TraitUnion { name: n2, .. }) => n1 == n2,
             (Value::McpDecl { name: n1, .. }, Value::McpDecl { name: n2, .. }) => n1 == n2,
             (Value::Trait { name: n1, .. }, Value::Trait { name: n2, .. }) => n1 == n2,
             (Value::Class { name: n1, .. }, Value::Class { name: n2, .. }) => n1 == n2,

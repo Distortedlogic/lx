@@ -5,7 +5,7 @@ use std/ai
 use pkg/prompt
 use std/json
 use pkg/trace {TraceStore}
-use ../contracts {Thought ReasoningChain Hypothesis}
+use pkg/reasoning {Thought ReasoningChain Hypothesis}
 
 +reason = (goal: Str  context: Str  constraints: [Str]) -> ReasoningChain {
   strategy = select_strategy goal constraints

@@ -1,14 +1,14 @@
 -- ReAct agent loop with session tracing and knowledge persistence.
--- Delegates to lib/react for the core Thought -> Action -> Observation engine.
+-- Delegates to pkg/react for the core Thought -> Action -> Observation engine.
 -- Persists successful results to std/knowledge for cross-session compounding.
 -- Generates markdown report on success.
 -- Demonstrates: workflow.run, react engine composition, knowledge storage.
 -- Source: mcp-toolbelt/arch_diagrams/agentic_loop
 
 use pkg/knowledge {KnowledgeBase}
-use ../lib/react
-use ../lib/report
-use ../lib/workflow
+use pkg/react
+use pkg/report
+use pkg/workflow
 
 +main = () {
   run "fix the failing test in src/parser.rs" {}

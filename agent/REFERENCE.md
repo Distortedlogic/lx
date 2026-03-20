@@ -22,7 +22,7 @@ doc/           35 quick-reference docs
 spec/          51 spec files
 agent/         Context files (this folder)
 pkg/           11 lx packages — agent (Trait), collection (Trait), 5 Collection-based Classes (KnowledgeBase, TaskStore, TraceStore, MemoryStore, ContextWindow), 3 standalone Classes (CircuitBreaker, Inspector, Pool), prompt (functional)
-tests/         91 test suites (89 .lx files + 87_export_shadow dir + 11_modules dir)
+tests/         94 test suites (92 .lx files + 87_export_shadow dir + 11_modules dir)
   fixtures/    Test helpers (agent_echo.lx, orchestrators, servers, test flows)
 flows/
   lib/         15 reusable .lx library modules
@@ -59,7 +59,7 @@ Class and Agent share the same runtime representation: `Value::Class { name, tra
 - Interpreter: `exec_stmt.rs` (ClassDecl/AgentDecl eval + Object FieldUpdate), `apply.rs` (Class/Agent constructor with Store cloning), `apply_helpers.rs` (Object/Store field access with `inject_self`)
 - Trait injection: `interpreter/traits.rs` — `inject_traits` helper shared between Class and Agent. Defaults from `Value::Trait` (including the Agent Trait from `pkg/agent.lx`) injected at definition time. Agent Trait provides: init, perceive, reason, act, reflect, handle, run, think/think_with/think_structured, use_tool/tools, describe, ask/tell
 - Agent Trait dispatch: `handle` auto-dispatches by `msg.action` via `method_of` builtin. `describe` uses `methods_of` builtin for self-description
-- Protocol: `Value::Trait` with non-empty `fields` acts as Trait (callable as constructor, runtime validation). No separate `Value::Trait`.
+- Trait: `Value::Trait` with non-empty `fields` acts as Trait (callable as constructor, runtime validation). No separate `Value::Trait`.
 - Display: checks traits list for "Agent" → `<Agent X>` if present, `<Class X>` otherwise. `<Trait X>` for Traits-with-fields, `<Trait X>` for behavioral Traits
 
 ## Adding Language-Level Features (keywords, AST nodes)

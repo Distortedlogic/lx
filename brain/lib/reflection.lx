@@ -5,7 +5,7 @@ use std/ai
 use pkg/prompt
 use pkg/trace {TraceStore}
 use pkg/knowledge {KnowledgeBase}
-use ../contracts {Reflection FeedbackSignal}
+use pkg/reflect {Reflection FeedbackSignal}
 
 +reflect = (action: Str  outcome: Str  expectation: Str) -> Reflection {
   quality = assess_quality outcome expectation

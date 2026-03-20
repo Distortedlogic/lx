@@ -1,0 +1,24 @@
+-- Composite scoring and tiering -- weighted multi-factor evaluation.
+-- composite: weighted sum of named scores against a record of values.
+-- tier: classify a numeric value into named tiers by threshold.
+-- normalize: scale a value to 0.0-1.0 range.
+
++composite = (weights values) {
+  weights | entries | fold 0.0 (total, name, weight) {
+    val = get name values ?? 0.0
+    total + val * weight
+  }
+}
+
++tier = (thresholds value) {
+  match = thresholds | sort_by (.min) | rev | find (t) value >= t.min
+  match ? { Some t -> t.name; None -> "unranked" }
+}
+
++normalize = (min max value) {
+  max == min ? 0.0 : ((value - min) / (max - min))
+}
+
++average = (values) {
+  values | len == 0 ? 0.0 : (values | fold 0.0 (+)) / (values | len)
+}

@@ -1,7 +1,6 @@
 -- Markdown report generation -- build structured documents and write to file.
 -- Composes std/md into high-level operations: section, bullets, table, quote.
 -- write: render full document to disk, return path for downstream reference.
--- All builder functions return lists of md nodes for spread into write's sections.
 
 use std/md
 use std/fs

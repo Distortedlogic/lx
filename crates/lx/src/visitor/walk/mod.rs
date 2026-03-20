@@ -1,13 +1,15 @@
 mod walk_helpers;
 mod walk_pattern;
+mod walk_type;
 
 pub use walk_helpers::*;
 pub use walk_pattern::*;
+pub use walk_type::*;
 
 use crate::ast::{AgentMethod, Binding, ClassField, Expr, Program, SExpr, Stmt};
 use crate::span::Span;
 
-use super::{AgentDeclCtx, AstVisitor, RefineCtx, TraitDeclCtx};
+use super::{AgentDeclCtx, AstVisitor, MetaCtx, RefineCtx, TraitDeclCtx};
 
 pub fn walk_program<V: AstVisitor + ?Sized>(v: &mut V, program: &Program) {
     for stmt in &program.stmts {
@@ -25,7 +27,7 @@ pub fn walk_stmt<V: AstVisitor + ?Sized>(v: &mut V, stmt: &Stmt, span: Span) {
         } => {
             v.visit_type_def(name, variants, *exported, span);
         }
-        Stmt::TraitUnion(_def) => {},
+        Stmt::TraitUnion(_def) => {}
         Stmt::McpDecl {
             name,
             tools,
@@ -188,6 +190,9 @@ pub fn walk_expr<V: AstVisitor + ?Sized>(v: &mut V, expr: &Expr, span: Span) {
         Expr::WithResource { resources, body } => {
             v.visit_with_resource(resources, body, span);
         }
+        Expr::WithContext { fields, body } => {
+            v.visit_with_context(fields, body, span);
+        }
         Expr::Refine {
             initial,
             grade,
@@ -205,6 +210,24 @@ pub fn walk_expr<V: AstVisitor + ?Sized>(v: &mut V, expr: &Expr, span: Span) {
                 on_round: on_round.as_deref(),
             };
             v.visit_refine(&ctx, span);
+        }
+        Expr::Meta {
+            task,
+            strategies,
+            attempt,
+            evaluate,
+            select,
+            on_switch,
+        } => {
+            let ctx = MetaCtx {
+                task,
+                strategies,
+                attempt,
+                evaluate,
+                select: select.as_deref(),
+                on_switch: on_switch.as_deref(),
+            };
+            v.visit_meta(&ctx, span);
         }
         Expr::Shell { mode, parts } => v.visit_shell(*mode, parts, span),
         Expr::Receive(arms) => {

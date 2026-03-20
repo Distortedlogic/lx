@@ -1,6 +1,6 @@
 -- Security audit of running subagents -- detect stuck loops, injection, resource abuse.
 -- Data source: Claude CLI transcripts (~/.claude/projects/<project>/*.jsonl).
--- Uses lib/guard.full_scan for all detection passes per transcript:
+-- Uses pkg/guard.full_scan for all detection passes per transcript:
 --   Stuck loops (>20 tool calls), prompt injection (regex), resource abuse (>500 entries).
 -- Dedup via agent.reconcile (union, keyed by agent_id:type).
 -- Severity-sorted output with critical/high classification and markdown report.
@@ -8,10 +8,10 @@
 -- Source: mcp-toolbelt/arch_diagrams/scenario_security_audit
 
 use std/agent
-use ../lib/guard
+use pkg/guard
 use ../lib/transcript
-use ../lib/report
-use ../lib/workflow
+use pkg/report
+use pkg/workflow
 
 +main = () {
   project_dir = "{$^echo $HOME | trim}/.claude/projects"

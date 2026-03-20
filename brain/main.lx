@@ -8,14 +8,18 @@ use std/time
 use pkg/trace {TraceStore}
 use std/agent
 
-use ./contracts {Perception ReasoningChain Response CognitiveState FeedbackSignal PerceptionEvent ReasoningEvent}
+use pkg/perception {Perception}
+use pkg/reasoning {ReasoningChain}
+use pkg/monitor {CognitiveState}
+use pkg/reflect {FeedbackSignal}
+use ./contracts {Response PerceptionEvent ReasoningEvent}
 use ./lib/perception : perceive_mod
 use ./lib/reasoning : reason_mod
 use ./lib/memory_mgr : mem
 use ./lib/tools : tool_mod
 use ./lib/context_mgr : ctx
 use ./lib/identity : id
-use ./lib/quality : quality
+use pkg/quality
 use ./lib/monitor : mon
 
 +think = (input: Str  history: [Any]) -> Any {

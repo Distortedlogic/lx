@@ -90,7 +90,7 @@ Tier 1 completed: `std/retry` (Session 44), `std/user` + `std/profile` (Session 
 
 19. ~~**`agent.dialogue_save/load`**~~ — SHIPPED Session 74. 4 functions: `dialogue_save`, `dialogue_load`, `dialogue_list`, `dialogue_delete`. File-backed persistence at `.lx/dialogues/{id}.json` with atomic writes. JSON serialization via `json_conv`. 1 Rust file (agent_dialogue_persist.rs).
 
-20. **`with context` ambient propagation** (`spec/agents-ambient.md`) — Scoped ambient state flowing through call chains. Now includes cross-process constraint propagation at `agent.spawn` boundaries (absorbs `spec/agents-constraint-propagation.md`).
+20. ~~**`with context` ambient propagation**~~ — SHIPPED Session 75. `Expr::WithContext` AST node, `with context key: val { body }` syntax, thread-local ambient snapshot, `context` global binding (current/get + field access). Nesting merges/overrides/restores. 1 Rust file (interpreter/ambient.rs). Cross-process propagation at `agent.spawn` boundaries deferred (requires async subprocess init protocol).
 
 21. ~~**`lx install/update`**~~ — SHIPPED Session 71b. `lx install`/`lx update` with git+path deps, `lx.lock`, `.lx/deps/` module resolution. 4 new CLI files (install.rs, install_ops.rs, lockfile.rs, check.rs).
 

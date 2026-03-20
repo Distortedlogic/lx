@@ -15,6 +15,10 @@ impl super::Parser {
             TokenKind::RawStr(s) => Ok(SExpr::new(Expr::Literal(Literal::RawStr(s)), tok.span)),
             TokenKind::Regex(s) => Ok(SExpr::new(Expr::Literal(Literal::Regex(s)), tok.span)),
             TokenKind::StrStart => self.parse_string(tok.span.offset),
+            TokenKind::Ident(ref name) if name == "meta" && self.looks_like_meta_block() => {
+                let tok = tok.clone();
+                self.parse_meta(tok.span.offset)
+            }
             TokenKind::Ident(name) => Ok(SExpr::new(Expr::Ident(name), tok.span)),
             TokenKind::TypeName(name) => Ok(SExpr::new(Expr::TypeConstructor(name), tok.span)),
             TokenKind::LParen => self.parse_paren(tok.span.offset),

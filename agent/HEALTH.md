@@ -3,7 +3,7 @@
 
 # Design Health
 
-Updated after Session 74 (2026-03-19).
+Updated after Session 75 (2026-03-20).
 
 ## What Works
 
@@ -25,4 +25,4 @@ See `agent/PRIORITIES.md` for the full ordered work queue.
 
 ## Bottom Line
 
-Session 74: Dialogue persistence shipped (`agent.dialogue_save/load/list/delete`). 17 agent extensions now. Async interpreter stable. 93/93 tests pass. 0 errors, 0 warnings.
+Session 75: `with context` ambient propagation shipped — scoped ambient state flowing through call chains. 17 agent extensions + ambient context. Async interpreter stable. 94/94 tests pass. 0 errors, 0 warnings.

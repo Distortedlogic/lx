@@ -108,8 +108,7 @@ impl Interpreter {
                 self.apply_trait_fields(&name, &fields, &arg, span).await
             }
             Value::TraitUnion { name, variants } => {
-                self.apply_trait_union(&name, &variants, &arg, span)
-                    .await
+                self.apply_trait_union(&name, &variants, &arg, span).await
             }
             Value::McpDecl { name, tools } => self.apply_mcp_decl(&name, &tools, &arg, span),
             Value::Class {

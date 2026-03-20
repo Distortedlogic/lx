@@ -82,23 +82,12 @@ fn session_to_json(
     json_conv::lx_to_json(&val, span)
 }
 
-fn load_session_from_file(
-    id: &str,
-    agent: Value,
-    span: Span,
-) -> Result<DialogueSession, LxError> {
+fn load_session_from_file(id: &str, agent: Value, span: Span) -> Result<DialogueSession, LxError> {
     let path = dialogues_dir().join(format!("{id}.json"));
-    let content = std::fs::read_to_string(&path).map_err(|e| {
-        LxError::runtime(
-            format!("dialogue_load: not found: {id} ({e})"),
-            span,
-        )
-    })?;
+    let content = std::fs::read_to_string(&path)
+        .map_err(|e| LxError::runtime(format!("dialogue_load: not found: {id} ({e})"), span))?;
     let jv: serde_json::Value = serde_json::from_str(&content).map_err(|e| {
-        LxError::runtime(
-            format!("dialogue_load: corrupt JSON for {id}: {e}"),
-            span,
-        )
+        LxError::runtime(format!("dialogue_load: corrupt JSON for {id}: {e}"), span)
     })?;
     let val = json_conv::json_to_lx(jv);
     let Value::Record(r) = &val else {
@@ -109,24 +98,21 @@ fn load_session_from_file(
     };
 
     let config = r.get("config");
-    let role = config
-        .and_then(|c| match c {
-            Value::Record(cr) => cr.get("role").and_then(|v| v.as_str()).map(String::from),
-            _ => None,
-        });
-    let context = config
-        .and_then(|c| match c {
-            Value::Record(cr) => cr.get("context").and_then(|v| v.as_str()).map(String::from),
-            _ => None,
-        });
-    let max_turns = config
-        .and_then(|c| match c {
-            Value::Record(cr) => cr
-                .get("max_turns")
-                .and_then(|v| v.as_int())
-                .and_then(|n| n.to_usize()),
-            _ => None,
-        });
+    let role = config.and_then(|c| match c {
+        Value::Record(cr) => cr.get("role").and_then(|v| v.as_str()).map(String::from),
+        _ => None,
+    });
+    let context = config.and_then(|c| match c {
+        Value::Record(cr) => cr.get("context").and_then(|v| v.as_str()).map(String::from),
+        _ => None,
+    });
+    let max_turns = config.and_then(|c| match c {
+        Value::Record(cr) => cr
+            .get("max_turns")
+            .and_then(|v| v.as_int())
+            .and_then(|n| n.to_usize()),
+        _ => None,
+    });
 
     let history = r
         .get("turns")
@@ -151,10 +137,7 @@ fn load_session_from_file(
                     } else {
                         "agent"
                     };
-                    let content = tr
-                        .get("message")
-                        .cloned()
-                        .unwrap_or(Value::None);
+                    let content = tr.get("message").cloned().unwrap_or(Value::None);
                     let time = tr
                         .get("timestamp")
                         .and_then(|v| v.as_str())
@@ -197,9 +180,9 @@ fn bi_save(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, 
         .as_str()
         .ok_or_else(|| LxError::type_err("agent.dialogue_save: id must be Str", span))?;
     let dir = ensure_dir(span)?;
-    let session = SESSIONS.get(&sid).ok_or_else(|| {
-        LxError::runtime("agent.dialogue_save: session not found", span)
-    })?;
+    let session = SESSIONS
+        .get(&sid)
+        .ok_or_else(|| LxError::runtime("agent.dialogue_save: session not found", span))?;
     let jv = session_to_json(id, &session, span)?;
     let json_str = serde_json::to_string_pretty(&jv)
         .map_err(|e| LxError::runtime(format!("dialogue_save: serialize: {e}"), span))?;
@@ -240,8 +223,8 @@ fn bi_list(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, 
         .map_err(|e| LxError::runtime(format!("dialogue_list: readdir: {e}"), span))?;
     let mut results = Vec::new();
     for entry in entries {
-        let entry = entry
-            .map_err(|e| LxError::runtime(format!("dialogue_list: entry: {e}"), span))?;
+        let entry =
+            entry.map_err(|e| LxError::runtime(format!("dialogue_list: entry: {e}"), span))?;
         let path = entry.path();
         let Some(ext) = path.extension() else {
             continue;

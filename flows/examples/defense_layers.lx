@@ -1,5 +1,5 @@
 -- Layered defense system -- guardrails, drift monitoring, and periodic security scans.
--- Layer 1: Input guardrails via lib/guard (parallel or blocking mode).
+-- Layer 1: Input guardrails via pkg/guard (parallel or blocking mode).
 -- Layer 2: Behavioral drift monitoring via Agent Stability Index (ASI).
 -- Layer 3: Periodic transcript security scans via guard.full_scan.
 -- Cron loops: drift check every 60s, full security scan every 5 minutes.
@@ -9,9 +9,9 @@
 use std/agents/monitor
 use std/cron
 use pkg/trace {TraceStore}
-use ../lib/guard
+use pkg/guard
 use ../lib/transcript
-use ../lib/report
+use pkg/report
 
 drift_threshold = 0.7
 scan_interval_ms = 300000

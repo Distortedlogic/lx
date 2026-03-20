@@ -1,5 +1,5 @@
 -- Agent lifecycle management -- seeding, memory tiers, review loops, routing.
--- Memory tiers via lib/memory (LSM-tree inspired):
+-- Memory tiers via pkg/tieredmem (LSM-tree inspired):
 --   L1 (working): confidence 0.0-0.7. L2 (consolidated): 0.7-0.95.
 --   L3 (procedural): >=0.95, IS the system prompt.
 -- Seeding: transfer learning at birth via seeder agent from the catalog.
@@ -10,10 +10,10 @@
 
 use std/cron
 use pkg/trace {TraceStore}
-use ../lib/catalog
-use ../lib/dispatch
-use ../lib/memory
-use ../lib/report
+use pkg/catalog
+use pkg/dispatch
+use pkg/tieredmem : memory
+use pkg/report
 use ../lib/specialists
 
 Trait AgentDef = {name: Str  purpose: Str  domain: Str}

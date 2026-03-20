@@ -114,9 +114,7 @@ impl Interpreter {
                 self.env = env.into_arc();
                 Ok(Value::Unit)
             }
-            Stmt::TraitUnion(def) => {
-                self.eval_trait_union(&def.name, &def.variants, stmt.span)
-            }
+            Stmt::TraitUnion(def) => self.eval_trait_union(&def.name, &def.variants, stmt.span),
             Stmt::McpDecl { name, tools, .. } => self.eval_mcp_decl(name, tools, stmt.span).await,
             Stmt::TraitDecl {
                 name,

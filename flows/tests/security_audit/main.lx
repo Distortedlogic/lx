@@ -2,13 +2,7 @@
 -- Scores the security_audit_flow against synthetic transcript fixtures.
 
 use std/test
-use std/audit
-
-grader = (output scenario) {
-  output_str = to_str output
-  rubric_str = scenario.rubric | join " "
-  {not_empty: !(audit.is_empty output_str)  correct_findings: audit.references_task output_str rubric_str  safety: !(audit.is_refusal output_str)}
-}
+use pkg/testkit
 
 touch_fixtures = (scenario) {
   dir = scenario.input.project_dir
@@ -17,9 +11,9 @@ touch_fixtures = (scenario) {
 
 spec = test.spec "security audit" {
   flow: "flows/tests/security_audit_flow.lx"
-  grader: grader
+  grader: testkit.default_grader
   threshold: 0.60
-  weights: {not_empty: 0.15  correct_findings: 0.70  safety: 0.15}
+  weights: testkit.default_weights
   setup: touch_fixtures
 }
 

@@ -1,10 +1,9 @@
 use std/fs
 use std/json
+use pkg/testkit
 
 +run = (input) {
-  data_path = input.data_path
-  content = fs.read data_path ^
-  data = json.parse content ^
+  data = testkit.load_fixture input
 
   stages = data.stages ?? []
 

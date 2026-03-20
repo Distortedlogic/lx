@@ -4,7 +4,8 @@
 use std/ai
 use pkg/prompt
 use std/md
-use ../contracts {Response ReasoningChain Identity}
+use pkg/reasoning {ReasoningChain}
+use ../contracts {Response Identity}
 use ../traits {Synthesizer}
 
 Agent ResponseSynth: Synthesizer = {

@@ -5,7 +5,9 @@ use pkg/context {ContextWindow}
 use pkg/prompt
 use std/ai
 use std/time
-use ../contracts {ContextItem CognitiveState}
+use ../contracts {ContextItem}
+use pkg/score
+use pkg/monitor {CognitiveState}
 
 +init = (capacity: Int) -> Any {
   ContextWindow {capacity: capacity}
@@ -60,7 +62,7 @@ use ../contracts {ContextItem CognitiveState}
 
 +pressure_level = (win: Any) -> Str {
   p = pressure win
-  p < 0.3 ? "low" : p < 0.6 ? "moderate" : p < 0.85 ? "high" : "critical"
+  score.tier [{min: 0.85  name: "critical"} {min: 0.6  name: "high"} {min: 0.3  name: "moderate"} {min: 0.0  name: "low"}] p
 }
 
 +manage_pressure = (win: Any) -> Any {

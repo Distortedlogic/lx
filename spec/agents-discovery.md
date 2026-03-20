@@ -119,7 +119,7 @@ Strategies:
 - `:random` — random healthy match
 - `:round_robin` — rotate across matches
 
-## Protocol
+## Wire Protocol
 
 ### Registry Wire Protocol
 

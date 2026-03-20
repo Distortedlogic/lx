@@ -185,6 +185,13 @@ pub fn register(env: &mut Env) {
     env.bind("Store".into(), crate::stdlib::build_constructor());
     env.bind("method_of".into(), mk("method_of", 2, bi_method_of));
     env.bind("methods_of".into(), mk("methods_of", 1, bi_methods_of));
+    let mut ctx_fields = IndexMap::new();
+    ctx_fields.insert(
+        "current".into(),
+        mk("context.current", 1, bi_global_context_current),
+    );
+    ctx_fields.insert("get".into(), mk("context.get", 1, bi_global_context_get));
+    env.bind("context".into(), Value::Record(Arc::new(ctx_fields)));
 }
 
 fn bi_method_of(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
@@ -211,6 +218,22 @@ fn inject_self_for_method(method: &Value, self_val: &Value) -> Value {
     } else {
         method.clone()
     }
+}
+
+fn bi_global_context_current(
+    _args: &[Value],
+    _span: Span,
+    _ctx: &Arc<RuntimeCtx>,
+) -> Result<Value, LxError> {
+    crate::interpreter::ambient::global_context_current()
+}
+
+fn bi_global_context_get(
+    args: &[Value],
+    span: Span,
+    _ctx: &Arc<RuntimeCtx>,
+) -> Result<Value, LxError> {
+    crate::interpreter::ambient::global_context_get(&args[0], span)
 }
 
 fn bi_methods_of(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {

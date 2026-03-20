@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::ast::{McpOutputType, McpToolDecl};
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::{BuiltinKind, McpOutputDef, McpToolDef, FieldDef, Value};
+use crate::value::{BuiltinKind, FieldDef, McpOutputDef, McpToolDef, Value};
 
 use super::Interpreter;
 

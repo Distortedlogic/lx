@@ -1,4 +1,4 @@
-use crate::ast::{McpOutputType, McpToolDecl, FieldDecl, SStmt, Stmt};
+use crate::ast::{FieldDecl, McpOutputType, McpToolDecl, SStmt, Stmt};
 use crate::error::LxError;
 use crate::span::Span;
 use crate::token::TokenKind;

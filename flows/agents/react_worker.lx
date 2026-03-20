@@ -1,5 +1,5 @@
 -- ReAct loop worker -- handles think/execute/verify/hint actions.
--- Spawned by lib/react.lx for the multi-turn Thought-Action-Observation loop.
+-- Spawned by pkg/react for the multi-turn Thought-Action-Observation loop.
 -- This agent is typically spawned (not imported) because react needs multi-turn messaging.
 
 use std/ai

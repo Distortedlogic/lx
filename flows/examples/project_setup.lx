@@ -14,8 +14,8 @@ use ../agents/scaffolder
 use ../mcps/forgejo
 use ../mcps/postgresql
 use ../mcps/uptime_kuma
-use ../lib/report
-use ../lib/workflow
+use pkg/report
+use pkg/workflow
 
 Trait SetupConfig = {name: Str  lang: Str  db: Bool  monitoring: Bool}
 

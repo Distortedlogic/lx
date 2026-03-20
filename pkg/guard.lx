@@ -1,9 +1,8 @@
 -- Security toolkit -- injection scanning, loop detection, resource monitoring.
--- Configurable injection patterns with sensible defaults.
 -- scan: test text against pattern list, return Finding list.
 -- detect_loops: flag excessive tool calls.
 -- check_resources: flag oversized transcripts.
--- full_scan: run all passes on trace entries (patterns, thresholds via opts).
+-- full_scan: run all passes on trace entries.
 -- check: fast pass/fail gate for single input using default patterns.
 -- run_parallel/run_blocking: composable guard wrappers for agent execution.
 
@@ -20,6 +19,17 @@ Trait +Finding = {severity: Str  type: Str  evidence: Str  source: Str  agent_id
   "new persona"
   "ignore all prior"
   "disregard your instructions"
+]
+
++safety_patterns = [
+  "eval("
+  "exec("
+  "DROP TABLE"
+  "rm -rf"
+  "__import__"
+  "subprocess.run"
+  "os.system"
+  "child_process"
 ]
 
 +scan = (text patterns) {
@@ -73,6 +83,14 @@ Trait +Finding = {severity: Str  type: Str  evidence: Str  source: Str  agent_id
   }
 }
 
++check_safety = (text) {
+  findings = scan text safety_patterns
+  findings | empty? ? {
+    true -> GuardResult {pass: true  reason: "ok"}
+    false -> GuardResult {pass: false  reason: "safety pattern: {findings.0.evidence}"}
+  }
+}
+
 +run_parallel = (input agent_fn) {
   (guard_result, agent_result) = par { check input; agent_fn input }
   guard_result.pass ? agent_result : Err "blocked: {guard_result.reason}"
@@ -81,4 +99,14 @@ Trait +Finding = {severity: Str  type: Str  evidence: Str  source: Str  agent_id
 +run_blocking = (input agent_fn) {
   result = check input
   result.pass ? (agent_fn input) : Err "blocked: {result.reason}"
+}
+
++by_severity = (findings severity) findings | filter (f) f.severity == severity
+
++severity_summary = (findings) {
+  critical: findings | filter (f) f.severity == "critical" | len
+  high: findings | filter (f) f.severity == "high" | len
+  medium: findings | filter (f) f.severity == "medium" | len
+  low: findings | filter (f) f.severity == "low" | len
+  total: findings | len
 }

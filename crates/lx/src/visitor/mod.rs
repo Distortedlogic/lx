@@ -1,8 +1,8 @@
 use crate::ast::{
     AgentMethod, BinOp, Binding, ClassField, Expr, FieldKind, FieldPattern, ListElem, Literal,
-    MapEntry, MatchArm, McpToolDecl, Param, Pattern, Program, TraitEntry,
-    RecordField, SExpr, SPattern, SType, Section, SelArm, ShellMode, Stmt, StrPart,
-    TraitMethodDecl, TypeExpr, TypeField, UnaryOp, UseStmt,
+    MapEntry, MatchArm, McpToolDecl, Param, Pattern, Program, RecordField, SExpr, SPattern, SType,
+    Section, SelArm, ShellMode, Stmt, StrPart, TraitEntry, TraitMethodDecl, TypeExpr, TypeField,
+    UnaryOp, UseStmt,
 };
 use crate::span::Span;
 
@@ -34,6 +34,15 @@ pub struct RefineCtx<'a> {
     pub threshold: &'a SExpr,
     pub max_rounds: &'a SExpr,
     pub on_round: Option<&'a SExpr>,
+}
+
+pub struct MetaCtx<'a> {
+    pub task: &'a SExpr,
+    pub strategies: &'a SExpr,
+    pub attempt: &'a SExpr,
+    pub evaluate: &'a SExpr,
+    pub select: Option<&'a SExpr>,
+    pub on_switch: Option<&'a SExpr>,
 }
 
 pub trait AstVisitor {
@@ -197,8 +206,19 @@ pub trait AstVisitor {
     ) {
         walk_with_resource(self, resources, body, span);
     }
+    fn visit_with_context(
+        &mut self,
+        fields: &[(String, SExpr)],
+        body: &[crate::ast::SStmt],
+        span: Span,
+    ) {
+        walk_with_context(self, fields, body, span);
+    }
     fn visit_refine(&mut self, ctx: &RefineCtx<'_>, span: Span) {
         walk_refine(self, ctx, span);
+    }
+    fn visit_meta(&mut self, ctx: &MetaCtx<'_>, span: Span) {
+        walk_meta(self, ctx, span);
     }
     fn visit_shell(&mut self, _mode: ShellMode, parts: &[StrPart], span: Span) {
         walk_shell(self, parts, span);

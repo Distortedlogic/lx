@@ -6,7 +6,7 @@ use pkg/prompt
 use std/re
 use std/json
 use std/git
-use ../contracts {Perception}
+use pkg/perception {Perception}
 
 +perceive = (raw: Str  history: [Any]) -> Perception {
   (intent complexity entities domain) = par {

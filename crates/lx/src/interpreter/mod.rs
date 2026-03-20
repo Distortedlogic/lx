@@ -1,13 +1,16 @@
 mod agents;
 mod agents_mcp;
+pub(crate) mod ambient;
 mod apply;
 mod apply_helpers;
 mod collections;
 mod eval;
 mod eval_ops;
 mod exec_stmt;
+mod hints;
 mod modules;
 mod patterns;
+mod meta;
 mod receive;
 mod refine;
 mod shell;
@@ -32,54 +35,6 @@ use crate::value::Value;
 pub(crate) struct ModuleExports {
     pub(crate) bindings: IndexMap<String, Value>,
     pub(crate) variant_ctors: Vec<String>,
-}
-
-fn keyword_hint(name: &str) -> Option<&'static str> {
-    match name {
-        "if" | "else" | "then" | "elif" | "elsif" => {
-            Some("lx uses `cond ? then_expr : else_expr` for conditionals")
-        }
-        "mut" => Some("lx uses `:=` for mutable bindings: `x := 0`"),
-        "let" | "var" | "const" => {
-            Some("lx bindings use `name = value` (or `name := value` for mutable)")
-        }
-        "return" => Some("lx uses implicit returns — last expression in a block is its value"),
-        "fn" | "def" | "func" | "function" => {
-            Some("lx functions use `name = (params) body` or `name = (params) { body }`")
-        }
-        "import" | "from" | "require" | "include" => {
-            Some("lx uses `use std/module` or `use ./relative/path`")
-        }
-        "for" | "while" | "loop" => {
-            Some("lx uses `each`, `map`, `filter` for iteration, or recursion")
-        }
-        "match" | "switch" | "case" => {
-            Some("lx uses `value ? { pattern -> body }` for pattern matching")
-        }
-        "print" | "println" | "console" | "echo" | "printf" => {
-            Some("lx uses `emit` for output or `log.info`/`log.warn`/`log.err` for logging")
-        }
-        "try" | "catch" | "throw" | "raise" | "except" => Some(
-            "lx uses `^` to propagate errors and `??` to coalesce: `expr ^ | process` or `expr ?? default`",
-        ),
-        "null" | "nil" | "undefined" | "void" => {
-            Some("lx uses `None` for absence and `()` for unit")
-        }
-        "class" | "struct" | "new" | "interface" => Some(
-            "lx uses Records `{field: value}` for data, `Trait` for contracts and behavior",
-        ),
-        "async" | "await" => Some("lx uses `par`, `sel`, `pmap` for concurrency"),
-        "self" | "this" => Some("lx has no `self` — use record fields or closures"),
-        "break" | "continue" => {
-            Some("lx uses recursion or higher-order functions for control flow")
-        }
-        "lambda" => Some("lx lambdas use `(params) body` or `(params) { body }`"),
-        "not" => Some("lx uses `!` for negation: `!expr`"),
-        "and" => Some("lx uses `&&` for logical and"),
-        "or" => Some("lx uses `||` for logical or"),
-        "in" => Some("lx uses `contains?` for membership"),
-        _ => None,
-    }
 }
 
 pub struct Interpreter {
@@ -156,7 +111,7 @@ impl Interpreter {
         match &expr.node {
             Expr::Literal(lit) => self.eval_literal(lit, span).await,
             Expr::Ident(name) => self.env.get(name).ok_or_else(|| {
-                let hint = keyword_hint(name);
+                let hint = hints::keyword_hint(name);
                 let msg = match hint {
                     Some(h) => format!("undefined variable '{name}' — {h}"),
                     None => format!("undefined variable '{name}'"),
@@ -277,6 +232,7 @@ impl Interpreter {
             Expr::WithResource { resources, body } => {
                 self.eval_with_resource(resources, body, span).await
             }
+            Expr::WithContext { fields, body } => self.eval_with_context(fields, body, span).await,
             Expr::Refine {
                 initial,
                 grade,
@@ -293,6 +249,27 @@ impl Interpreter {
                         threshold,
                         max_rounds,
                         on_round: on_round.as_deref(),
+                    },
+                    span,
+                )
+                .await
+            }
+            Expr::Meta {
+                task,
+                strategies,
+                attempt,
+                evaluate,
+                select,
+                on_switch,
+            } => {
+                self.eval_meta(
+                    &meta::MetaArgs {
+                        task,
+                        strategies,
+                        attempt,
+                        evaluate,
+                        select: select.as_deref(),
+                        on_switch: on_switch.as_deref(),
                     },
                     span,
                 )

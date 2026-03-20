@@ -1,7 +1,7 @@
 -- Agent execution patterns: spawn -> ask -> kill as single calls.
 -- Eliminates the 3-line spawn/ask/kill ceremony repeated across every flow.
 -- run_one: single agent script, single message. run_many: parallel batch.
--- run_with: custom spawn config (for non-lx agents or special args).
+-- run_with: custom spawn config. run_handler: action-routing dispatch.
 
 use std/agent
 

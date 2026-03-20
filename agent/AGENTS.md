@@ -127,7 +127,7 @@ items | each (item) {
 agent.end_stream ()
 ```
 
-Subprocess protocol: JSON-lines with `{"type":"stream","value":...}`, `{"type":"stream_end"}`, `{"type":"stream_error","error":"msg"}`.
+Subprocess wire protocol: JSON-lines with `{"type":"stream","value":...}`, `{"type":"stream_end"}`, `{"type":"stream_error","error":"msg"}`.
 
 ## Scoped Resources (with ... as)
 
@@ -145,6 +145,47 @@ with conn1 as c1, conn2 as c2 { use_both c1 c2 }
 with x = compute_value (), y = other () { x + y }
 with mut counter = 0 { counter <- counter + 1; counter }
 ```
+
+## Ambient Context (`with context`)
+
+Scoped ambient state that flows through call chains without explicit parameter threading:
+
+```lx
+with context deadline: 30 budget: 500 request_id: "abc-123" {
+  dl = context.deadline         -- 30
+  all = context.current ()      -- {deadline: 30 budget: 500 request_id: "abc-123"}
+  found = context.get "budget"  -- Some 500
+  missing = context.get "nope"  -- None
+}
+```
+
+Nesting merges with outer context — inner values override, outer restored on exit:
+```lx
+with context budget: 1000 deadline: 60 {
+  with context budget: 200 {
+    context.budget     -- 200 (overridden)
+    context.deadline   -- 60 (inherited)
+  }
+  context.budget       -- 1000 (restored)
+}
+```
+
+Empty context clears ambient:
+```lx
+with context {
+  context.current ()   -- {} (empty)
+}
+```
+
+Context is visible in called functions (flows through the thread-local ambient snapshot):
+```lx
+read_ctx = () { context.current () }
+with context env: "staging" {
+  read_ctx ()          -- {env: "staging"}
+}
+```
+
+Outside any `with context` block, `context.current ()` returns `{}` and `context.get key` returns `None`.
 
 ## MCP Declarations (Tool Contracts)
 

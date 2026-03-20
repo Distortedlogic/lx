@@ -86,9 +86,9 @@ stream = timeout 60 (analyzer ~>>?)
 
 Per-element timeout using existing `timeout` builtin. If no element arrives within 60 seconds, the stream yields `Err Timeout`.
 
-## Protocol
+## Wire Protocol
 
-### Subprocess Protocol
+### Subprocess Wire Protocol
 
 Agent-side: the subprocess writes JSON-lines to stdout with a `"stream"` type:
 

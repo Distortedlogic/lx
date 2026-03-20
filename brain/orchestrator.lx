@@ -12,13 +12,14 @@ use pkg/tasks {TaskStore}
 use std/diag
 use std/time
 
-use ./contracts {Response CognitiveState PerceptionEvent ReasoningEvent ResponseEvent}
+use pkg/monitor {CognitiveState}
+use ./contracts {Response PerceptionEvent ReasoningEvent ResponseEvent}
 use ./lib/perception : perceive
 use ./lib/reasoning : reason
 use ./lib/memory_mgr : mem
 use ./lib/context_mgr : ctx_mgr
 use ./lib/identity : identity
-use ./lib/quality : quality
+use pkg/quality
 use ./lib/monitor : monitor
 use ./lib/reflection : reflection
 use ./lib/dialogue : dialogue

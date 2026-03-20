@@ -1,0 +1,171 @@
+-- Tiered memory management: working, episodic, semantic, procedural
+-- Source: merged from brain/lib/memory_mgr.lx + flows/lib/memory.lx
+-- Provides: multi-tier recall, consolidation, decay, preferences, skills, tiered promotion
+
+use pkg/memory {MemoryStore}
+use pkg/knowledge {KnowledgeBase}
+use std/profile
+use std/time
+use std/json
+use std/fs
+
+Trait +MemoryEntry = {content: Str  domain: Str  confidence: Float where confidence >= 0.0 && confidence <= 1.0  source: Str  tags: [Str]}
+
++init = (base_dir: Str  profile_name: Str) -> Any {
+  fs.exists base_dir ? () : fs.mkdir base_dir ^
+
+  working = MemoryStore {path: "{base_dir}/working.json"} ?? MemoryStore ()
+  episodic = MemoryStore {path: "{base_dir}/episodic.json"} ?? MemoryStore ()
+  semantic = KnowledgeBase {path: "{base_dir}/semantic.json"} ?? KnowledgeBase ()
+  persona = profile.load {name: profile_name  create: true} ?? {name: profile_name}
+
+  {working  episodic  semantic  persona}
+}
+
++remember = (store: Any  entry: MemoryEntry) -> Bool {
+  tagged = {..entry  timestamp: time.now ()}
+
+  tagged.confidence >= 0.8 ? {
+    store.episodic.store {
+      content: tagged.content
+      tier: 2
+      confidence: tagged.confidence
+      tags: tagged.tags
+    } ?? ()
+  } : {
+    store.working.store {
+      content: tagged.content
+      tier: 1
+      confidence: tagged.confidence
+      tags: tagged.tags
+    } ?? ()
+  }
+
+  tagged.domain | len > 0 ? {
+    store.semantic.store tagged.domain {
+      content: tagged.content
+      source: tagged.source
+      confidence: tagged.confidence
+    } {
+      source: tagged.source
+      confidence: tagged.confidence
+      tags: tagged.tags
+    } ?? ()
+  } : ()
+
+  true
+}
+
++recall = (store: Any  query: Str  domain: Str) -> [Any] {
+  (working_hits episodic_hits semantic_hits) = par {
+    store.working.recall query
+    store.episodic.recall query
+    store.semantic.query domain query
+  }
+
+  [
+    ..working_hits | map (m) {..m  source: "working"  recency: 1.0}
+    ..episodic_hits | map (m) {..m  source: "episodic"  recency: 0.7}
+    ..semantic_hits | map (m) {..m  source: "semantic"  recency: 0.5}
+  ]
+    | sort_by (m) m.confidence * m.recency | rev
+}
+
++recall_domain = (store: Any  domain: Str) -> [Any] {
+  store.semantic.query domain ""
+}
+
++learn_preference = (store: Any  key: Str  value: Any) -> Any {
+  profile.preference store.persona key value ?? ()
+}
+
++get_preference = (store: Any  key: Str) -> Any {
+  profile.get_preference store.persona key
+}
+
++learn_skill = (store: Any  domain: Str  knowledge_data: Any) -> Any {
+  profile.learn store.persona domain knowledge_data ?? ()
+}
+
++recall_skill = (store: Any  domain: Str) -> Any {
+  profile.recall store.persona domain
+}
+
++best_strategy = (store: Any  domain: Str) -> Any {
+  profile.best_strategy store.persona domain
+}
+
++consolidate = (store: Any) -> Any {
+  (promoted promoted_episodic) = par {
+    store.working.consolidate () ?? 0
+    store.episodic.consolidate () ?? 0
+  }
+
+  high_confidence = store.working.tier 1
+    | filter (m) m.confidence >= 0.85
+
+  high_confidence | each (m) store.working.promote m ?? ()
+
+  {promoted  promoted_episodic  elevated: len high_confidence}
+}
+
++forget_stale = (store: Any  max_age_seconds: Int) -> Int {
+  profile.decay store.persona max_age_seconds ?? ()
+  store.working.consolidate () ?? 0
+}
+
++working_load = (store: Any) -> Int {
+  store.working.tier 1 | len
+}
+
++save = (store: Any) -> Any {
+  profile.save store.persona ?? ()
+}
+
++merge_context = (store: Any  items: [Any]) -> Any {
+  items | each (item) {
+    remember store {
+      content: item.content
+      domain: item.domain ?? "context"
+      confidence: item.confidence ?? 0.5
+      source: item.source ?? "context"
+      tags: item.tags ?? []
+    }
+  }
+}
+
++history = (store: Any) -> Any {
+  profile.history store.persona
+}
+
++adapt_strategy = (store: Any  domain: Str) -> Any {
+  profile.adapt_strategy store.persona domain
+}
+
++tiers = {l1: "L1"  l2: "L2"  l3: "L3"}
+
++thresholds = {promote: 0.7  consolidate: 0.95  demote: 0.1}
+
++create = (name) MemoryStore {path: name}
+
++seed = (mem entries) {
+  entries | each (e) {
+    mem.store {content: e.content  confidence: e.confidence  source: "seeded"  tier: tiers.l1}
+  }
+  entries | len
+}
+
++daily = (mem) {
+  l1 = mem.tier tiers.l1
+  promoted = l1 | filter (e) e.confidence >= thresholds.promote
+  promoted | each (e) mem.promote e.id
+  demoted = l1 | filter (e) e.confidence < thresholds.demote
+  demoted | each (e) mem.demote e.id
+  {promoted: (promoted | len)  demoted: (demoted | len)}
+}
+
++weekly = (mem) {
+  l2 = mem.tier tiers.l2
+  ready = l2 | filter (e) e.confidence >= thresholds.consolidate
+  ready | empty? ? {consolidated: 0} : { mem.consolidate (); {consolidated: (ready | len)} }
+}

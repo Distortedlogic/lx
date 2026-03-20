@@ -2,7 +2,7 @@
 
 Extensions to `std/agent` for cross-agent publish/subscribe messaging. Agents subscribe to named topics and receive broadcasts through their message handlers — no manual forwarding by the orchestrator.
 
-Distinct from `std/events` (in-process event bus with `(msg) -> ()` callbacks). Agent pub/sub routes messages across agent boundaries using the standard `~>` protocol. An agent subscribing to a topic receives messages the same way it receives direct `~>` messages.
+Distinct from `std/events` (in-process event bus with `(msg) -> ()` callbacks). Agent pub/sub routes messages across agent boundaries using the standard `~>` messaging. An agent subscribing to a topic receives messages the same way it receives direct `~>` messages.
 
 ## Problem
 

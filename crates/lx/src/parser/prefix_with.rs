@@ -18,6 +18,9 @@ impl super::Parser {
     }
 
     pub(super) fn parse_with(&mut self, start: u32) -> Result<SExpr, LxError> {
+        if *self.peek() == TokenKind::Ident("context".into()) {
+            return self.parse_with_context(start);
+        }
         if self.is_with_binding() {
             return self.parse_with_binding(start);
         }
@@ -63,6 +66,36 @@ impl super::Parser {
                 body,
                 mutable,
             },
+            Span::from_range(start, end),
+        ))
+    }
+
+    fn parse_with_context(&mut self, start: u32) -> Result<SExpr, LxError> {
+        self.advance();
+        let mut fields = Vec::new();
+        while *self.peek() != TokenKind::LBrace {
+            let name = match self.peek().clone() {
+                TokenKind::Ident(n) => {
+                    self.advance();
+                    n
+                }
+                _ => {
+                    return Err(LxError::parse(
+                        "expected field name in 'with context'",
+                        self.tokens[self.pos].span,
+                        None,
+                    ));
+                }
+            };
+            self.expect_kind(&TokenKind::Colon)?;
+            let value = self.parse_expr(0)?;
+            fields.push((name, value));
+        }
+        self.expect_kind(&TokenKind::LBrace)?;
+        let body = self.parse_stmts_until_rbrace()?;
+        let end = self.expect_kind(&TokenKind::RBrace)?.span.end();
+        Ok(SExpr::new(
+            Expr::WithContext { fields, body },
             Span::from_range(start, end),
         ))
     }

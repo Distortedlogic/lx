@@ -5,7 +5,7 @@ use pkg/introspect {Inspector}
 use pkg/circuit {CircuitBreaker}
 use std/budget
 use std/time
-use ../contracts {CognitiveState}
+use pkg/monitor {CognitiveState}
 
 +init = () -> Any {
   {

@@ -34,7 +34,7 @@ consensus = agent.negotiate [architect security perf] {
 |-------|------|----------|-------------|
 | `agents` | [Agent] | Yes | Agents participating in negotiation (first arg) |
 | `proposal` | Any | Yes | Initial proposal sent to all agents |
-| `protocol` | Trait | No | Validates all messages |
+| `trait` | Trait | No | Validates all messages |
 | `max_rounds` | Int | No | Maximum negotiation rounds (default: 3) |
 | `converge` | Fn | Yes | `(responses) -> Ok result \| :continue` |
 | `on_round` | Fn | No | `(round responses) -> ()` callback per round |
@@ -135,5 +135,5 @@ The negotiation loop is synchronous (like all current concurrency): agents are q
 
 - Agent reconciliation (post-hoc merging): [agents-reconcile.md](agents-reconcile.md)
 - Agent dialogue (two-party sessions): [agents-dialogue.md](agents-dialogue.md)
-- Trait validation: [agents-protocol.md](agents-protocol.md)
+- Trait validation: [agents-trait.md](agents-trait.md)
 - Agent pools (negotiate across pool workers): [agents-pool.md](agents-pool.md)

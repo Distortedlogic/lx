@@ -77,11 +77,7 @@ pub(super) fn str_list_from(val: Option<&Value>) -> Vec<String> {
     }
 }
 
-fn matches_entry(
-    entry: &RoutingEntry,
-    trait_f: Option<&str>,
-    domain_f: Option<&str>,
-) -> bool {
+fn matches_entry(entry: &RoutingEntry, trait_f: Option<&str>, domain_f: Option<&str>) -> bool {
     if let Some(t) = trait_f
         && !entry.traits.iter().any(|et| et == t)
     {

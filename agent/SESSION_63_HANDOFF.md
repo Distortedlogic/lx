@@ -220,7 +220,7 @@ Key caller files: `flows/lib/react.lx`, `flows/lib/memory.lx`, `flows/lib/workfl
 
 Read these context files for full syntax — don't guess:
 - `agent/LANGUAGE.md` — core lx syntax: bindings (`name = val`, `name := val` mutable, `name <- val` reassign), functions (`(params) { body }`), pipes (`x | f`), pattern matching, collections, error handling (`^` propagate, `??` coalesce)
-- `agent/AGENTS.md` — Class/Agent/Trait/Protocol syntax, `self` usage, messaging
+- `agent/AGENTS.md` — Class/Agent/Trait syntax, `self` usage, messaging
 - `agent/REFERENCE.md` — how to add Value variants, stdlib modules, language features (step-by-step checklists)
 - `agent/STDLIB.md` — all stdlib modules and builtins
 

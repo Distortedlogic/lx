@@ -1,5 +1,7 @@
 -- lx package: std/prompt reimplemented as pure record builder
 
+use std/ai
+
 +create = (_) {
   {system: None  sections: []  constraints: []  instructions: []  examples: []}
 }
@@ -134,4 +136,13 @@ trim_to_fit = (p max_tokens) {
 +render_within = (p max_tokens) {
   text = render p
   (len text) // 4 <= max_tokens ? text : (trim_to_fit p max_tokens)
+}
+
++ask = (p fallback) {
+  resp = ai.prompt (render p) ?? {text: fallback}
+  resp.text
+}
+
++ask_lines = (p fallback) {
+  ask p fallback | lines | map trim | filter (not empty?)
 }

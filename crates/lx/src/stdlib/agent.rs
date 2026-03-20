@@ -50,10 +50,7 @@ pub fn build() -> IndexMap<String, Value> {
     }
     m.insert("reconcile".into(), super::agent_reconcile::mk_reconcile());
     m.insert("intercept".into(), super::agent_intercept::mk_intercept());
-    m.insert(
-        "Handoff".into(),
-        super::agent_handoff::mk_handoff_trait(),
-    );
+    m.insert("Handoff".into(), super::agent_handoff::mk_handoff_trait());
     m.insert("as_context".into(), super::agent_handoff::mk_as_context());
     m.insert(
         "Capabilities".into(),

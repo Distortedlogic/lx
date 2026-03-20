@@ -3,6 +3,8 @@
 
 use std/ai
 use pkg/prompt
+use pkg/guard
+use pkg/score
 use ../traits {Critic}
 
 Trait Critique = {
@@ -35,7 +37,7 @@ Agent InnerCritic: Critic = {
     {
       flaws
       risks
-      severity: issue_count > 5 ? "high" : issue_count > 2 ? "medium" : issue_count > 0 ? "low" : "none"
+      severity: score.tier [{min: 6  name: "high"} {min: 3  name: "medium"} {min: 1  name: "low"} {min: 0  name: "none"}] issue_count
       revised_confidence: msg.confidence - issue_count * 0.1 | math.max 0.1
     }
   }
@@ -55,9 +57,9 @@ Agent InnerCritic: Critic = {
   verify_code = (msg) {
     (correctness safety) = par {
       check_correctness msg.code msg.task
-      check_safety msg.code msg.language
+      guard.check_safety msg.code
     }
-    {all_passed: correctness.ok && safety.ok}
+    {all_passed: correctness.ok && safety.pass}
   }
 }
 
@@ -71,16 +73,6 @@ check_correctness = (code: Str  task: Str) -> {ok: Bool  issues: [Str]} {
   resp = ai.prompt (prompt.render p) ^
   bugs = resp.text | lines | filter (starts? "- ") | map (drop 2)
   {ok: bugs | empty?  issues: bugs}
-}
-
-check_safety = (code: Str  language: Str) -> {ok: Bool  issues: [Str]} {
-  dangerous = [
-    "eval(" "exec(" "system(" "subprocess" "__import__"
-    "DROP TABLE" "DELETE FROM" "rm -rf" "chmod 777"
-    "innerHTML" "document.write" ".env"
-  ]
-  found = dangerous | filter (d) code | contains? d
-  {ok: found | empty?  issues: found | map (d) "dangerous pattern: {d}"}
 }
 
 +main = () {

@@ -13,8 +13,8 @@ use std/json
 use std/fs
 use std/re
 use ../agents/tool_maker
-use ../lib/report
-use ../lib/workflow
+use pkg/report
+use pkg/workflow
 
 Trait ToolGap = {signal: Str  tool: Str  context: Str}
 

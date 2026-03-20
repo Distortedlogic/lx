@@ -7,7 +7,8 @@ use std/agent
 use std/ai
 use std/time
 use pkg/trace {TraceStore}
-use ../contracts {Perception Response Identity}
+use pkg/perception {Perception}
+use ../contracts {Response Identity}
 
 ConversationState = {
   turns: [{role: Str  content: Str  timestamp: Int}]

@@ -6,7 +6,7 @@ Supersedes the `Skill` declaration. Skills and Traits covered the same ground �
 
 ## Problem
 
-The current Trait system (`handles: [Protocol]  provides: [skill_name]`) is toothless:
+The current Trait system (`handles: [Trait]  provides: [skill_name]`) is toothless:
 
 - `provides` is a list of strings — no signatures, no enforcement
 - `agent.implements` checks `__traits` string tags, not actual capability
@@ -241,7 +241,7 @@ Current `handles`/`provides` syntax continues to parse but is deprecated. The `h
 
 - Agent declarations: [agents-declaration.md](agents-declaration.md) — Traits are enforced on Agent definitions
 - MCP declarations: [agents-advanced.md](agents-advanced.md) — method syntax mirrors MCP tool syntax
-- Trait system: [agents-protocol.md](agents-protocol.md) — Trait-typed inputs enable message routing
+- Trait system: [agents-trait.md](agents-trait.md) — Trait-typed inputs enable message routing
 - Agent pools: [agents-pool.md](agents-pool.md) — Trait-constrained worker pools
 - Cross-process discovery: [agents-discovery.md](agents-discovery.md) — registry queries by Trait
 - Eliminated: [agents-skill.md](agents-skill.md) — Skill functionality merged into Traits

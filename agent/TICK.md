@@ -24,24 +24,23 @@ See `TICK_PROTOCOL.md` for cross-read guidance.
 
 ## State
 
-Session 74 (2026-03-19). **93/93 tests pass.** `just diagnose` clean (0 errors, 0 warnings).
+Session 75 (2026-03-20). **94/94 tests pass.** `just diagnose` clean (0 errors, 0 warnings).
 40 Rust stdlib modules + 11 lx packages in `pkg/`. Async interpreter: `eval`/`exec` are
-`async fn` with `#[async_recursion(?Send)]`. `par`/`sel`/`pmap` use `futures::join_all`/`select_all`.
-Builtin split: `BuiltinKind::Sync`/`Async`. Shipped this session: `agent.dialogue_save/load/list/delete`
-(Dialogue persistence — 1 Rust file, 1 test file).
+`async fn` with `#[async_recursion(?Send)]`. Shipped this session: `with context` ambient
+propagation (1 Rust file interpreter/ambient.rs, 3 file splits for 300-line compliance).
 
 ## This Tick
 
-**Next priority from PRIORITIES.md: `with context` ambient propagation (`spec/agents-ambient.md`).**
+**Next priority from PRIORITIES.md: `meta` block (`spec/agents-meta.md`).**
 
 ## Read These Files
 
 1. `agent/PRIORITIES.md` — feature queue, context for what to build
-2. `spec/agents-ambient.md` — spec for ambient context propagation
+2. `spec/agents-meta.md` — spec for meta block (strategy-level iteration)
 3. `agent/INVENTORY.md` — what's implemented
 4. `agent/REFERENCE.md` — codebase layout and how-tos
 5. `agent/GOTCHAS.md` — parser traps
-6. `agent/AGENTS.md` — agent system details
+6. `agent/LANGUAGE.md` — core lx syntax (meta is a language-level feature)
 
 ## Context Files
 

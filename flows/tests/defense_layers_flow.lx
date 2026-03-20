@@ -1,4 +1,4 @@
-use ../lib/guard
+use pkg/guard
 use ../lib/transcript
 
 +run = (input) {

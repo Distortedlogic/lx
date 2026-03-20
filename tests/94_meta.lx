@@ -1,0 +1,125 @@
+-- 94_meta.lx
+-- Tests: meta block — strategy-level iteration across approaches
+
+-- === helpers ===
+fast_attempt = (strategy task) {
+  is_fast = strategy == "fast"
+  is_fast ? (
+    {result: "quick_" ++ task  score: 90}
+  ) : (
+    {result: "slow_" ++ task  score: 20}
+  )
+}
+
+-- === Basic: first strategy viable ===
+result = meta "task1" {
+  strategies: ["fast" "slow" "parallel"]
+  attempt: (strategy task) fast_attempt strategy task
+  evaluate: (r s) {
+    viable: r.score > 50
+    quality: r.score
+    reason: s ++ " approach"
+  }
+}
+assert (ok? result) "first viable returns Ok"
+inner = result ?? ()
+assert (inner.strategy == "fast") "winning strategy"
+assert (inner.result.result == "quick_task1") "result value"
+assert (len inner.attempts == 1) "stopped after first viable"
+
+-- === All fail: returns Err ===
+fail_result = meta "hard_task" {
+  strategies: ["a" "b"]
+  attempt: (s t) {result: s ++ t  score: 10}
+  evaluate: (r s) {viable: false  quality: r.score  reason: "too low"}
+}
+assert (err? fail_result) "all fail returns Err"
+
+-- === Skip non-viable, find viable later ===
+good_attempt = (s t) {
+  is_good = s == "good"
+  is_good ? (
+    {out: "success"  score: 85}
+  ) : (
+    {out: "failure"  score: 15}
+  )
+}
+multi = meta "multi_task" {
+  strategies: ["bad" "worse" "good"]
+  attempt: (s t) good_attempt s t
+  evaluate: (r s) {
+    viable: r.score > 50
+    quality: r.score
+    reason: s
+  }
+}
+assert (ok? multi) "finds viable in third"
+m = multi ?? ()
+assert (m.strategy == "good") "good strategy won"
+assert (len m.attempts == 3) "tried all three"
+assert (m.attempts.0.viable == false) "first was not viable"
+assert (m.attempts.2.viable == true) "third was viable"
+
+-- === Sequential select (default) ===
+seq = meta "seq_task" {
+  strategies: ["x" "y"]
+  attempt: (s t) {val: s  score: 99}
+  evaluate: (r s) {viable: true  quality: r.score  reason: "ok"}
+  select: :sequential
+}
+assert (ok? seq) "sequential select works"
+s = seq ?? ()
+assert (s.strategy == "x") "sequential tries first"
+
+-- === on_switch callback ===
+switches := []
+sw_attempt = (s t) {
+  is_gamma = s == "gamma"
+  is_gamma ? (
+    {val: s  score: 80}
+  ) : (
+    {val: s  score: 10}
+  )
+}
+sw_result = meta "sw_task" {
+  strategies: ["alpha" "beta" "gamma"]
+  attempt: (s t) sw_attempt s t
+  evaluate: (r s) {viable: r.score > 50  quality: r.score  reason: s}
+  on_switch: (from to reason) {
+    switches <- [..switches {from: from  to: to}]
+  }
+}
+assert (ok? sw_result) "on_switch result ok"
+assert (len switches == 2) "on_switch called twice"
+assert (switches.0.from == "alpha") "first switch from"
+assert (switches.0.to == "beta") "first switch to"
+assert (switches.1.from == "beta") "second switch from"
+assert (switches.1.to == "gamma") "second switch to"
+
+-- === Err result has best attempt ===
+err_attempt = (s t) {
+  is_medium = s == "medium"
+  is_medium ? (
+    {score: 40}
+  ) : (
+    {score: 5}
+  )
+}
+err_result = meta "err_task" {
+  strategies: ["low" "medium" "lower"]
+  attempt: (s t) err_attempt s t
+  evaluate: (r s) {viable: false  quality: r.score  reason: s}
+}
+assert (err? err_result) "all exhaust returns Err"
+
+-- === meta as identifier still works ===
+meta_val = "metadata"
+assert (meta_val == "metadata") "meta as var prefix ok"
+rec = {meta: "value"}
+assert (rec.meta == "value") "meta as record field ok"
+
+-- === meta as function param ===
+use_meta = (meta) meta ++ "!"
+assert (use_meta "hi" == "hi!") "meta as param ok"
+
+log.info "94_meta: all passed"

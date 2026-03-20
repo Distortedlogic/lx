@@ -1,7 +1,7 @@
 -- Full work-item pipeline with two entry points and refine-based grading.
 -- Entry 1 (audit): GritQL MCP auto-fix -> check -> parallel verification.
 -- Entry 2 (manual): router classification -> run_list (parallel) or run_single (sequential).
--- Grading via lib/grading: wraps refine + std/agents/grader into single calls.
+-- Grading via pkg/quality: wraps refine + std/agents/grader into single calls.
 -- run_list: pmap over classified items, each gets spawn + grade + kill cycle.
 -- run_single: researcher -> breakdown -> composer -> iterative grading on draft.
 -- Demonstrates: workflow.run, MCP tool integration, refine loops, parallel dispatch, routing.
@@ -11,9 +11,9 @@ use std/agent
 use std/agents/router
 use ../agents/verifier
 use ../mcps/gritql
-use ../lib/grading
-use ../lib/report
-use ../lib/workflow
+use pkg/quality
+use pkg/report
+use pkg/workflow
 
 grade_opts = {threshold: 95  max_rounds: 5}
 
@@ -71,7 +71,7 @@ grade_opts = {threshold: 95  max_rounds: 5}
 run_list = (items) {
   emit "processing {items | len} items in parallel..."
   results = items | pmap (item) {
-    grading.run "agents/worker.lx" {task: item} item grade_opts
+    quality.grade_run "agents/worker.lx" {task: item} item grade_opts
   }
   passed = results | filter ok?
   emit "completed {passed | len}/{results | len}"
@@ -97,7 +97,7 @@ run_single = (prompt) {
   tasks_list = researcher ~>? {action: "breakdown" research} ^
   draft = composer ~>? {action: "compose" tasks: tasks_list research} ^
 
-  result = grading.grade_draft composer prompt draft grade_opts
+  result = quality.grade_draft composer prompt draft grade_opts
 
   agent.kill researcher ^
   agent.kill composer ^

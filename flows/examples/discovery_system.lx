@@ -1,6 +1,6 @@
 -- Automated discovery pipeline for finding useful repos, tools, and patterns.
 -- Searches GitHub across 5 research axes, 3 queries per axis.
--- Composite scoring via lib/scoring: language fit, community size, baseline quality.
+-- Composite scoring via pkg/score: language fit, community size, baseline quality.
 -- Tiering: >=8.0 auto-integrate, 6.0-7.9 manual review, <6.0 skip.
 -- Integration: git submodule add + markdown research doc per candidate.
 -- State persistence via std/ctx, long-term storage via std/knowledge.
@@ -11,8 +11,9 @@ use std/ctx
 use pkg/knowledge {KnowledgeBase}
 use std/json
 use ../lib/github
-use ../lib/report
-use ../lib/scoring
+use pkg/report
+use pkg/score : scoring
+use ../lib/scoring {scale_stars}
 use ../prompts/discovery
 
 +main = () {
@@ -62,7 +63,7 @@ use ../prompts/discovery
 
 score_candidate = (c) {
   lang_fit = c.lang ? { "Rust" -> 10.0; "TypeScript" -> 6.0; "Python" -> 4.0; _ -> 2.0 }
-  community = scoring.scale_stars c.stars
+  community = scale_stars c.stars
   scoring.composite %{"lang": 0.10  "community": 0.10  "baseline": 0.80} %{"lang": lang_fit  "community": community  "baseline": 5.0}
 }
 

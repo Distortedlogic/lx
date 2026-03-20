@@ -155,4 +155,4 @@ use std/yield {YieldApproval YieldReflection YieldInformation YieldDelegation Yi
 - Yield mechanism: [agents-advanced.md](agents-advanced.md)
 - Agent gates (uses yield): [agents-gates.md](agents-gates.md)
 - Meta block (yields on exhaustion): [agents-meta.md](agents-meta.md)
-- Trait validation: [agents-protocol.md](agents-protocol.md)
+- Trait validation: [agents-trait.md](agents-trait.md)

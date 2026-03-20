@@ -132,7 +132,18 @@ impl Checker {
                 self.pop_scope();
                 result
             }
+            Expr::WithContext { fields, body } => {
+                self.push_scope();
+                for (_, expr) in fields {
+                    self.synth(expr);
+                }
+                self.bind("context".into(), Type::Unknown);
+                let result = self.check_stmts(body);
+                self.pop_scope();
+                result
+            }
             Expr::Refine { .. } => Type::Unknown,
+            Expr::Meta { .. } => Type::Unknown,
             _ => Type::Unknown,
         }
     }

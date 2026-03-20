@@ -8,7 +8,7 @@ Declarative routing: send a message to the best available agent for a capability
 
 **"Send this to whatever agent handles `Trait Reviewer` with the lowest current load."**
 
-Today every flow manually wires agent references: `reviewer ~>? msg`. If you want capability-based routing, you build it yourself — query all agents' capabilities, filter by trait/protocol, check status, pick one, send. This is 10+ lines of boilerplate repeated in every flow that needs dynamic routing.
+Today every flow manually wires agent references: `reviewer ~>? msg`. If you want capability-based routing, you build it yourself — query all agents' capabilities, filter by trait, check status, pick one, send. This is 10+ lines of boilerplate repeated in every flow that needs dynamic routing.
 
 ## Design
 

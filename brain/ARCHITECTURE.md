@@ -70,7 +70,7 @@ Input
 ```
 
 Orchestrator wraps this in a saga with compensation. Each step has undo logic.
-Context transfer between stages uses Handoff protocol + agent.as_context.
+Context transfer between stages uses Handoff trait + agent.as_context.
 
 ## Key lx Patterns in Use
 

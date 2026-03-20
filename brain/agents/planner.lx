@@ -5,6 +5,7 @@ use std/ai
 use pkg/prompt
 use std/plan
 use ../traits {Planner}
+use pkg/score
 use ../contracts {ActionPlan}
 
 Trait PlanStep = {
@@ -55,7 +56,7 @@ Agent TaskPlanner: Planner = {
       goal: msg.goal
       steps
       estimated_cost: estimated
-      risk: estimated > 1.0 ? "high" : estimated > 0.3 ? "medium" : "low"
+      risk: score.tier [{min: 1.0  name: "high"} {min: 0.3  name: "medium"} {min: 0.0  name: "low"}] estimated
       fallback: "simplify approach and retry with fewer tools"
     }
   }

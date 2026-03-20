@@ -4,7 +4,7 @@ use std::sync::mpsc;
 use num_bigint::BigInt;
 use parking_lot::Mutex;
 
-use crate::ast::{TraitEntry, FieldDecl, SExpr};
+use crate::ast::{FieldDecl, SExpr, TraitEntry};
 use crate::error::LxError;
 use crate::span::Span;
 use crate::value::{FieldDef, Value};
@@ -217,10 +217,7 @@ impl Interpreter {
     ) -> Result<Value, LxError> {
         for v in variants {
             let val = self.env.get(v).ok_or_else(|| {
-                LxError::runtime(
-                    format!("Trait union {name}: variant '{v}' not found"),
-                    span,
-                )
+                LxError::runtime(format!("Trait union {name}: variant '{v}' not found"), span)
             })?;
             if !matches!(val, Value::Trait { .. }) {
                 return Err(LxError::runtime(

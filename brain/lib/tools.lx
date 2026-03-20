@@ -8,6 +8,7 @@ use std/budget
 use std/retry
 use pkg/circuit {CircuitBreaker}
 use std/time
+use pkg/score
 use ../contracts {ToolRequest ToolResult ActionPlan ActionResult}
 
 MCP CognitiveTools = {
@@ -76,7 +77,7 @@ tool_costs = %{
     goal
     steps
     estimated_cost: estimated
-    risk: estimated > 1.0 ? "high" : estimated > 0.3 ? "medium" : "low"
+    risk: score.tier [{min: 1.0  name: "high"} {min: 0.3  name: "medium"} {min: 0.0  name: "low"}] estimated
     fallback: "simplify approach and retry with fewer tools"
   }
 }

@@ -10,9 +10,9 @@
 use std/fs
 use ../agents/teacher
 use ../mcps/langfuse
-use ../lib/report
+use pkg/report
 use ../lib/training
-use ../lib/workflow
+use pkg/workflow
 
 fine_tune_candidates = [
   {name: "audit-verifier"  min_traces: 5000}

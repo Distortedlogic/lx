@@ -28,7 +28,7 @@ Three modes depending on execution context:
 
 1. **Standalone** (`lx run`) — writes to stdout. Strings print directly. Records/lists are JSON-encoded.
 2. **Orchestrated** — calls an `EmitHandler` callback set by the host. The orchestrator decides how to render, route, or store the message.
-3. **Subprocess agent** — writes a JSON-line to stdout: `{"type":"emit","value":"seeding code-reviewer..."}`. The parent reads it alongside other protocol messages.
+3. **Subprocess agent** — writes a JSON-line to stdout: `{"type":"emit","value":"seeding code-reviewer..."}`. The parent reads it alongside other trait messages.
 
 ### Backend-Based
 
@@ -63,7 +63,7 @@ The Trait validates the record before emitting. Missing fields or type mismatche
 | `$echo` | agent → shell stdout | no | no | Shell-level side effects |
 | `log.*` | agent → stderr | prefix only | no | Diagnostics, traces |
 | `yield` | agent ↔ orchestrator | yes | yes | Interactive plans |
-| `~>`/`~>?` | agent → agent | yes (Protocol) | `~>?` yes | Inter-agent messaging |
+| `~>`/`~>?` | agent → agent | yes (Trait) | `~>?` yes | Inter-agent messaging |
 
 ### Use Case: Progress Reporting
 

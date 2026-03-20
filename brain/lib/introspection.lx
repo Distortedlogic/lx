@@ -6,7 +6,8 @@ use pkg/trace {TraceStore}
 use std/time
 use pkg/prompt
 use std/ai
-use ../contracts {CognitiveState}
+use pkg/score
+use pkg/monitor {CognitiveState}
 
 +self_assess = () -> Any {
   ins = Inspector ()
@@ -87,7 +88,7 @@ use ../contracts {CognitiveState}
     elapsed_ms: elapsed
     elapsed_pct
     remaining_ms: math.max 0 (budget_info.total_ms - elapsed)
-    pressure: elapsed_pct > 80.0 ? "critical" : elapsed_pct > 60.0 ? "high" : elapsed_pct > 40.0 ? "moderate" : "low"
+    pressure: score.tier [{min: 80.0  name: "critical"} {min: 60.0  name: "high"} {min: 40.0  name: "moderate"} {min: 0.0  name: "low"}] elapsed_pct
   }
 }
 

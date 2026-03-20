@@ -11,8 +11,8 @@
 use pkg/knowledge {KnowledgeBase}
 use std/agents/reviewer
 use ../lib/transcript
-use ../lib/report
-use ../lib/workflow
+use pkg/report
+use pkg/workflow
 
 +main = () {
   transcript_path = $^ls -t ~/.claude/projects/*/*.jsonl | trim | lines | first

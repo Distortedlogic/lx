@@ -1,0 +1,192 @@
+-- Reasoning engine: structured thinking toward a goal
+-- Source: extracted from brain/lib/reasoning.lx
+-- Provides: multi-strategy reasoning, decomposition, hypothesis formation and evaluation
+
+use std/ai
+use pkg/prompt
+
+Trait +Thought = {id: Str  content: Str  kind: Str  confidence: Float where confidence >= 0.0 && confidence <= 1.0  evidence: [Str]  depends_on: [Str]  alternatives: [Str]}
+Trait +ReasoningChain = {goal: Str  thoughts: [Thought]  conclusion: Str  confidence: Float where confidence >= 0.0 && confidence <= 1.0  strategy: Str}
+Trait +Hypothesis = {claim: Str  evidence_for: [Str]  evidence_against: [Str]  confidence: Float where confidence >= 0.0 && confidence <= 1.0  testable: Bool  test_action: Str}
+
++reason = (goal: Str  context: Str  constraints: [Str]) -> ReasoningChain {
+  strategy = select_strategy goal constraints
+  strategy ? {
+    "direct" -> reason_direct goal context
+    "decompose" -> reason_decompose goal context
+    "analogical" -> reason_analogical goal context
+    "adversarial" -> reason_adversarial goal context
+    _ -> reason_direct goal context
+  }
+}
+
++select_strategy = (goal: Str  constraints: [Str]) -> Str {
+  word_count = goal | split " " | len
+  has_comparison = goal | lower | contains? "compare"
+  has_why = goal | lower | contains? "why"
+  has_how = goal | lower | starts? "how"
+
+  has_comparison ? "adversarial"
+    : has_why ? "decompose"
+    : has_how ? "decompose"
+    : word_count > 30 ? "decompose"
+    : "direct"
+}
+
+reason_direct = (goal: Str  context: Str) -> ReasoningChain {
+  p = prompt.create ()
+    | prompt.system `You are a precise analytical thinker. Think step by step.`
+    | prompt.section "Goal" goal
+    | prompt.section "Context" context
+    | prompt.instruction `Produce a chain of reasoning. Each step should build on the last.`
+    | prompt.constraint `Be specific. Cite evidence. State confidence 0.0-1.0.`
+
+  resp = ai.prompt (prompt.render p) ?? {text: goal}
+  thoughts = parse_thoughts resp.text
+
+  ReasoningChain {
+    goal
+    thoughts
+    conclusion: thoughts | last | (.content) ?? "no conclusion"
+    confidence: thoughts | map (.confidence) | fold 0.0 (+) / (len thoughts)
+    strategy: "direct"
+  }
+}
+
+reason_decompose = (goal: Str  context: Str) -> ReasoningChain {
+  sub_problems = decompose goal
+  sub_chains = sub_problems | map (sub) reason_direct sub context
+
+  synthesis = synthesize sub_chains goal
+
+  ReasoningChain {
+    goal
+    thoughts: [..sub_chains | flat_map (.thoughts)  synthesis]
+    conclusion: synthesis.content
+    confidence: sub_chains | map (.confidence) | fold 0.0 (+) / (len sub_chains)
+    strategy: "decompose"
+  }
+}
+
+reason_analogical = (goal: Str  context: Str) -> ReasoningChain {
+  p = prompt.create ()
+    | prompt.system `You reason by analogy. Find similar solved problems and map solutions.`
+    | prompt.section "Problem" goal
+    | prompt.section "Context" context
+    | prompt.instruction `1) Find an analogous problem. 2) Describe the mapping. 3) Apply the solution.`
+
+  resp = ai.prompt (prompt.render p) ?? {text: goal}
+  thoughts = parse_thoughts resp.text
+
+  ReasoningChain {
+    goal
+    thoughts
+    conclusion: thoughts | last | (.content) ?? "no conclusion"
+    confidence: 0.6
+    strategy: "analogical"
+  }
+}
+
+reason_adversarial = (goal: Str  context: Str) -> ReasoningChain {
+  (pro_chain con_chain) = par {
+    reason_direct "Argue FOR: {goal}" context
+    reason_direct "Argue AGAINST: {goal}" context
+  }
+
+  p = prompt.create ()
+    | prompt.system `You are a fair judge weighing both sides.`
+    | prompt.section "Arguments For" pro_chain.conclusion
+    | prompt.section "Arguments Against" con_chain.conclusion
+    | prompt.instruction `Weigh both sides and reach a balanced conclusion.`
+
+  resp = ai.prompt (prompt.render p) ?? {text: pro_chain.conclusion}
+
+  ReasoningChain {
+    goal
+    thoughts: [..pro_chain.thoughts  ..con_chain.thoughts]
+    conclusion: resp.text
+    confidence: (pro_chain.confidence + con_chain.confidence) / 2.0
+    strategy: "adversarial"
+  }
+}
+
++decompose = (problem: Str) -> [Str] {
+  p = prompt.create ()
+    | prompt.system `You decompose complex problems into sub-problems.`
+    | prompt.section "Problem" problem
+    | prompt.instruction `Break into 2-5 independent sub-problems. One per line.`
+    | prompt.constraint `Each sub-problem should be solvable independently.`
+
+  resp = ai.prompt (prompt.render p) ?? {text: problem}
+  resp.text | lines | map trim | filter (not empty?)
+}
+
++hypothesize = (observation: Str  context: Str) -> Hypothesis {
+  p = prompt.create ()
+    | prompt.system `You form testable hypotheses from observations.`
+    | prompt.section "Observation" observation
+    | prompt.section "Context" context
+    | prompt.instruction `Form a hypothesis. List evidence for and against. Suggest a test.`
+
+  resp = ai.prompt (prompt.render p) ?? {text: ""}
+
+  Hypothesis {
+    claim: resp.text | lines | first ?? ""
+    evidence_for: [observation]
+    evidence_against: []
+    confidence: 0.5
+    testable: true
+    test_action: resp.text | lines | last ?? ""
+  }
+}
+
++evaluate_hypothesis = (hypothesis: Hypothesis  new_evidence: [Any]) -> Hypothesis {
+  supports = new_evidence | filter (.supports) | map (.detail)
+  contradicts = new_evidence | filter (e) not e.supports | map (.detail)
+
+  new_confidence = hypothesis.confidence
+    + ((len supports) * 0.1)
+    - ((len contradicts) * 0.15)
+    | math.min 1.0 | math.max 0.0
+
+  {..hypothesis
+    evidence_for: [..hypothesis.evidence_for  ..supports]
+    evidence_against: [..hypothesis.evidence_against  ..contradicts]
+    confidence: new_confidence
+  }
+}
+
+synthesize = (chains: [ReasoningChain]  goal: Str) -> Thought {
+  conclusions = chains | map (.conclusion) | join "\n---\n"
+  p = prompt.create ()
+    | prompt.system `You synthesize multiple reasoning threads into one conclusion.`
+    | prompt.section "Sub-conclusions" conclusions
+    | prompt.section "Original Goal" goal
+    | prompt.instruction `Synthesize into a single coherent conclusion.`
+
+  resp = ai.prompt (prompt.render p) ?? {text: chains | map (.conclusion) | join " / "}
+  Thought {
+    id: "synthesis"
+    content: resp.text
+    kind: "synthesis"
+    confidence: chains | map (.confidence) | fold 0.0 (+) / (len chains)
+    evidence: chains | map (.conclusion)
+    depends_on: []
+    alternatives: []
+  }
+}
+
+parse_thoughts = (text: Str) -> [Thought] {
+  text | lines
+    | filter (l) trim l | not empty?
+    | enumerate
+    | map (i line) Thought {
+        id: "t{i}"
+        content: trim line
+        kind: "step"
+        confidence: 0.7
+        evidence: []
+        depends_on: i > 0 ? ["t{i - 1}"] : []
+        alternatives: []
+      }
+}

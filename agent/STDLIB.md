@@ -308,6 +308,7 @@ Six pre-built agents under `std/agents/`:
 **Reflection:** `method_of(obj, name)` — returns a method/field by name or None; `methods_of(obj)` — returns list of method names from Class/Object/Record
 **Logging:** `log.info`, `log.warn`, `log.err`, `log.debug`
 **Streaming:** `collect` materializes Stream→List; HOFs (`map`, `filter`, `each`, `take`, `fold`, `flat_map`) work on streams transparently
+**Ambient context:** `context.current ()` — returns ambient context record (empty `{}` outside any scope); `context.get "key"` — returns `Some val` or `None`. Field access: `context.field` inside `with context`. See AGENTS.md for `with context` syntax
 
 ## Idioms
 

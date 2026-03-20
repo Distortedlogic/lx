@@ -45,10 +45,8 @@ impl super::Parser {
                 });
             } else {
                 self.expect_kind(&TokenKind::Colon)?;
-                let is_meta_keyword = matches!(
-                    field.as_str(),
-                    "requires" | "description" | "tags"
-                ) && !matches!(self.peek(), TokenKind::TypeName(_));
+                let is_meta_keyword = matches!(field.as_str(), "requires" | "description" | "tags")
+                    && !matches!(self.peek(), TokenKind::TypeName(_));
                 if is_meta_keyword {
                     match field.as_str() {
                         "requires" => requires = self.parse_trait_symbol_list()?,
@@ -148,14 +146,15 @@ impl super::Parser {
         ))
     }
 
-    fn parse_trait_method_braced(
-        &mut self,
-        name: String,
-    ) -> Result<TraitMethodDecl, LxError> {
+    fn parse_trait_method_braced(&mut self, name: String) -> Result<TraitMethodDecl, LxError> {
         let input = self.parse_trait_method_input()?;
         self.expect_kind(&TokenKind::Arrow)?;
         let output = self.parse_mcp_output_type()?;
-        Ok(TraitMethodDecl { name, input, output })
+        Ok(TraitMethodDecl {
+            name,
+            input,
+            output,
+        })
     }
 
     fn parse_trait_method_input(&mut self) -> Result<Vec<FieldDecl>, LxError> {

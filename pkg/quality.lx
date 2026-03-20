@@ -1,5 +1,6 @@
--- Quality assurance: self-grading, refinement loops, response auditing
--- Source: metacognitive quality gate — catch errors before they reach the user
+-- Quality assurance: grading, refinement loops, safety checks, response auditing
+-- Source: merged from brain/lib/quality.lx + flows/lib/grading.lx + critic.lx check_safety
+-- Provides: rubrics, grading, refinement, safety scanning, draft grading workflows
 
 use std/ai
 use pkg/prompt
@@ -7,7 +8,16 @@ use std/audit
 use pkg/trace {TraceStore}
 use std/agents/grader
 use std/agents/auditor
-use ../contracts {QualityGrade Response}
+use std/agent
+use pkg/guard
+
+Trait +QualityGrade = {
+  score: Float where score >= 0.0 && score <= 100.0
+  passed: Bool
+  feedback: Str
+  categories: [{name: Str  score: Float  weight: Float}]
+  suggestions: [Str]
+}
 
 +response_rubric = () -> Any {
   audit.rubric [
@@ -144,4 +154,26 @@ grade_to_quality = (result: Any) -> QualityGrade {
     feedback: full.feedback
     reasons: quick.reasons ?? []
   }
+}
+
++grading_defaults = {threshold: 95  max_rounds: 5}
+
++grade_draft = (worker task draft opts) {
+  threshold = opts.threshold ?? grading_defaults.threshold
+  max_rounds = opts.max_rounds ?? grading_defaults.max_rounds
+
+  refine draft {
+    grade: (work) grader.grade {work: work  task: task}
+    revise: (work feedback) worker ~>? {action: "revise"  work: work  feedback: feedback} ^
+    threshold: threshold
+    max_rounds: max_rounds
+  }
+}
+
++grade_run = (script init_msg task opts) {
+  worker = agent.spawn {command: "lx" args: ["run" script]} ^
+  draft = worker ~>? init_msg ^
+  result = grade_draft worker task draft opts
+  agent.kill worker ^
+  result
 }
