@@ -31,7 +31,7 @@ regex = { version = "1" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 pulldown-cmark = "0.12"
-reqwest = { version = "0.12", features = ["blocking", "json"] }
+reqwest = { version = "0.12", features = ["json"] }
 chrono = "0.4"
 strum = { version = "0.26", features = ["derive"] }
 cron = { version = "0.15" }
