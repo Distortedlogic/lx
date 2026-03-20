@@ -1,24 +1,12 @@
-use pkg/guard
-use ../lib/transcript
+use pkg/kit/security_scan
 
 +run = (input) {
-  dir = input.project_dir
-  paths = $^find {dir} -name "*.jsonl" | lines | filter (!= "")
-
-  paths | empty? ? {
-    true -> Ok {findings: 0  critical: 0  high: 0  report: "no transcripts found"}
-    false -> {
-      all_entries = paths | flat_map (p) transcript.parse p
-      findings = [..(guard.scan_entries all_entries guard.default_patterns) ..(guard.detect_loops all_entries 20)]
-      critical = findings | filter (f) f.severity == "critical"
-      high = findings | filter (f) f.severity == "high"
-
-      Ok {
-        findings: findings | len
-        critical: critical | len
-        high: high | len
-        report: "{findings | len} findings ({critical | len} critical, {high | len} high)"
-      }
-    }
+  result = security_scan.scan_transcripts input.project_dir {}
+  Ok {
+    findings: result.findings | len
+    critical: result.critical | len
+    high: result.high | len
+    agents: result.paths | len
+    report: "{result.findings | len} findings ({result.critical | len} critical, {result.high | len} high) across {result.paths | len} agents"
   }
 }

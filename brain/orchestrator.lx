@@ -4,39 +4,38 @@
 
 use std/agent
 use std/saga
-use pkg/trace {TraceStore}
 use std/budget
 use std/cron
-use std/ctx
-use pkg/tasks {TaskStore}
+use pkg/infra/workflow
+use pkg/data/tasks {TaskStore}
 use std/diag
 use std/time
 
-use pkg/monitor {CognitiveState}
+use pkg/agents/monitor {CognitiveState}
 use ./contracts {Response PerceptionEvent ReasoningEvent ResponseEvent}
-use ./lib/perception : perceive
-use ./lib/reasoning : reason
-use ./lib/memory_mgr : mem
+use pkg/ai/perception : perceive
+use pkg/ai/reasoning : reason
+use pkg/data/tieredmem : mem
 use ./lib/context_mgr : ctx_mgr
 use ./lib/identity : identity
-use pkg/quality
-use ./lib/monitor : monitor
-use ./lib/reflection : reflection
-use ./lib/dialogue : dialogue
+use pkg/ai/quality
+use pkg/agents/monitor : monitor
+use pkg/ai/reflect : reflection
+use pkg/agents/dialogue : dialogue
 use ./lib/cognitive_saga : cognitive_saga
 use ./agents/dispatcher : dispatch
 
 +run = (input: Str) -> Any {
   state = monitor.init ()
   conversation = dialogue.init_conversation ()
-  memory_store = mem.init () ?? {working: MemoryStore ()  episodic: MemoryStore ()  semantic: KnowledgeBase ()  persona: {name: "claude"}}
+  memory_store = mem.init "{env.home ()}/.lx/brain" "claude"
   context_win = ctx_mgr.init 128000
   id = identity.core ()
-  saga_ctx = ctx.empty ()
+  saga_ctx = Store ()
 
   ctx_mgr.pin_identity context_win id
 
-  with TraceStore {path: "/tmp/brain_orchestrator.json"} ?? TraceStore () as trace_session {
+  workflow.run "brain-orchestrator" input (trace_session) {
     workforce = dispatch.create_workforce ()
     traced_workforce = dispatch.setup_tracing workforce trace_session
     topics = dispatch.setup_pubsub traced_workforce
@@ -118,7 +117,7 @@ handle_failure = (failure: Any  input: Str  conversation: Any  trace_session: An
   emit "Claude brain orchestrator ready"
 
   cron.every 300000 () () {
-    store = mem.init () ?? {working: MemoryStore ()  episodic: MemoryStore ()  semantic: KnowledgeBase ()  persona: {name: "claude"}}
+    store = mem.init "{env.home ()}/.lx/brain" "claude"
     consolidated = mem.consolidate store
     log.info "memory consolidation: {consolidated.promoted} promoted"
     mem.save store ?? ()

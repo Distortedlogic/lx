@@ -1,7 +1,7 @@
 -- 29_circuit.lx
 -- Tests: pkg/circuit CircuitBreaker class (circuit breakers for agentic loops)
 
-use pkg/circuit {CircuitBreaker}
+use pkg/core/circuit {CircuitBreaker}
 
 -- === Create ===
 b = CircuitBreaker {max_turns: 5 max_actions: 10 repetition_window: 3}

@@ -49,6 +49,13 @@ truly parallel (OS threads). (2) `lx check` resolves imports — far fewer false
 Self-recursive exports need two-step: `f = ...; +f = f`. (4) `std/durable` ships: Temporal-style
 workflow persistence. (5) `lx install`/`lx update` for git+path dependency management.
 Brain files modernized: record shorthand, string interpolation, eliminated intermediates in 18 files.
+**Session 80 (agent/):** PKG_API_MINIMIZATION completed. Changes affecting brain/:
+(1) `std/ctx` deprecated — brain/orchestrator.lx and brain/lib/cognitive_saga.lx already migrated to `Store()` + dot methods.
+(2) `brain/lib/context_mgr.lx`: `pressure` renamed to `pressure_pct`, `pressure_level` removed (use `win.pressure()` directly).
+(3) `pkg/agents/guard.check_safety` merged into `guard.check` — pass `guard.safety_patterns` as 2nd arg. brain/agents/critic.lx already updated.
+(4) `pkg/agents/monitor` introspection functions (self_assess, detect_doom_loop, etc.) moved to `pkg/core/introspect`.
+(5) `Store.merge` added — merge another Store or Record into a Store.
+(6) `std/agents/planner`/`router`/`reviewer` now emit deprecation warnings — use `pkg/ai/` equivalents.
 
 ## This Tick
 

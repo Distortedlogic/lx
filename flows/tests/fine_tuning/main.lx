@@ -1,31 +1,6 @@
--- Fine-tuning satisfaction tests (LIVE-ONLY)
--- Requires langfuse and vLLM servers. Gated behind LX_TEST_LIVE env var.
+use pkg/infra/testkit
 
-use std/test
-use pkg/testkit
-
-testkit.live_only "fine_tuning" () {
-  spec = test.spec "fine tuning" {
-    flow: "flows/tests/fine_tuning_flow.lx"
-    grader: testkit.always_pass_grader
-    threshold: 0.65
-    weights: testkit.default_weights
-  }
-
-  spec = test.scenario spec "harvest traces" {
-    input: {agent: "classifier"  min_traces: 100}
-    rubric: ["traces" "harvested"]
-    tags: ["live" "training"]
-    runs: 1
-  }
-
-  spec = test.scenario spec "train specialist" {
-    input: {agent: "auditor"  epochs: 1}
-    rubric: ["training" "complete"]
-    tags: ["live" "training"]
-    runs: 1
-  }
-
-  results = test.run spec ^
-  test.report results
-}
+testkit.run_spec_live "fine_tuning" "flows/tests/fine_tuning_flow.lx" [
+  {name: "harvest traces"  input: {agent: "classifier"  min_traces: 100}  rubric: ["traces" "harvested"]  tags: ["live" "training"]}
+  {name: "train specialist"  input: {agent: "auditor"  epochs: 1}  rubric: ["training" "complete"]  tags: ["live" "training"]}
+] {}

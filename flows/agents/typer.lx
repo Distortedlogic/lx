@@ -1,18 +1,6 @@
 -- Typing agent -- generates type stubs with todo!() bodies from module specs.
--- Used by software_diffusion stage 2 to define the type system.
 
-use std/ai
-use std/agent
+use pkg/ai/agent_factory
+use flows/lib/agent_catalog as catalog
 
-+main = () {
-  agent.dispatch %{
-    "stub": (msg) {
-      ai.prompt_structured "Generate Rust type stubs for module '{msg.module}'.\nSpec: {msg.spec}\n\nDefine types, traits, fn signatures with todo!() bodies." {
-        code: Str
-        types: [Str]
-        traits: [Str]
-        functions: [{name: Str  signature: Str}]
-      } ^
-    }
-  }
-}
++main = agent_factory.from_config catalog.typer

@@ -1,0 +1,15 @@
+-- Agent catalog -- parameterized registry with keyword routing.
+-- create: build a catalog from specialist entries and a domain keyword map.
+-- by_name/by_domain: direct lookup into catalog entries.
+-- add: append a specialist entry to an existing catalog.
+
+Trait +Specialist = {name: Str  domain: Str  script: Str  terminal: Bool}
+
++create = (entries keywords) {entries  keywords}
+
++by_domain = (domain cat) cat.entries | find (s) s.domain == domain
+
++by_name = (name cat) cat.entries | find (s) s.name == name
+
++add = (entry cat) {..cat  entries: [..cat.entries entry]}
+

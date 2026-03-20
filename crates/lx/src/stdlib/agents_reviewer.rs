@@ -169,6 +169,10 @@ fn parse_llm_result(llm_response: &Value, span: Span) -> Result<Value, LxError> 
 }
 
 fn bi_review(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+    static WARNED: std::sync::Once = std::sync::Once::new();
+    WARNED.call_once(|| {
+        eprintln!("[DEPRECATED] std/agents/reviewer is deprecated — use pkg/ai/reviewer instead");
+    });
     let fields = extract_fields(args, span)?;
     if fields.transcript.trim().is_empty() {
         return Ok(build_result(vec![], vec![], vec![], "Empty transcript"));
@@ -237,6 +241,10 @@ fn extract_structural(transcript: &str) -> (Vec<Value>, Vec<Value>, Vec<Value>) 
 }
 
 fn bi_quick_review(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+    static WARNED: std::sync::Once = std::sync::Once::new();
+    WARNED.call_once(|| {
+        eprintln!("[DEPRECATED] std/agents/reviewer is deprecated — use pkg/ai/reviewer instead");
+    });
     let fields = extract_fields(args, span)?;
     if fields.transcript.trim().is_empty() {
         return Ok(build_result(vec![], vec![], vec![], "Empty transcript"));

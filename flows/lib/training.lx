@@ -1,5 +1,5 @@
 -- Training data pipeline -- harvest traces, enhance via teacher, write JSONL.
--- Used by: fine_tuning for building QLoRA training datasets from agent traces.
+-- Generic training data operations for building fine-tuning datasets.
 
 use std/json
 use std/fs

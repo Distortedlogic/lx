@@ -16,10 +16,10 @@ use std/ai
 use std/env
 use std/md
 use std/audit
-use pkg/trace {TraceStore}
-use pkg/prompt
-use std/agents/grader
-use std/agents/auditor
+use pkg/kit/investigate
+use pkg/core/prompt
+use pkg/ai/quality
+use pkg/infra/workflow
 
 rubric = audit.rubric [
   {name: "coverage"     description: "every audit item has a finding and task"  weight: 25}
@@ -52,55 +52,42 @@ required_sections = ["Goal" "Why" "What changes" "Files affected" "Task List" "C
   base = raw_name | split "." | first ^
   name = base | replace "-" "_" | upper
 
-  session = TraceStore {path: "/tmp/lx_workgen_trace.json"}
+  workflow.run "workgen" audit_path (session) {
+    emit "=== Work Item Generator ==="
+    emit "audit: {audit_path}"
+    emit "root: {root}"
+    emit "output: work_items/{name}.md\n"
 
-  emit "=== Work Item Generator ==="
-  emit "audit: {audit_path}"
-  emit "root: {root}"
-  emit "output: work_items/{name}.md\n"
+    findings = investigate_audit audit_content root ^
+    session.record {name: "investigate"  input: audit_path  output: findings} ?? ()
 
-  findings = investigate audit_content root ^
-  session.record {name: "investigate"  input: audit_path  output: findings} ?? ()
+    draft = compose audit_content rules_content findings ^
+    session.record {name: "compose"  input: "findings"  output: draft} ?? ()
 
-  draft = compose audit_content rules_content findings ^
-  session.record {name: "compose"  input: "findings"  output: draft} ?? ()
+    out_path = write_draft name draft ^
 
-  out_path = write_draft name draft ^
+    final = verify_and_revise out_path draft name ^
+    fs.write out_path final ^
 
-  final = verify_and_revise session out_path draft name ^
-  fs.write out_path final ^
-  session.record {name: "complete"  input: name  output: out_path} ?? ()
-
-  emit "\n=== complete: {out_path} ==="
-  Ok {path: out_path  name: name}
+    emit "\n=== complete: {out_path} ==="
+    Ok {path: out_path  name: name}
+  }
 }
 
-gather_tree = (root) {
-  git_files = ($^git -C {root} ls-files 2>/dev/null) ?? ""
-  git_files != "" ?
-    (git_files | lines | take 300 | map (f) "{root}/{f}" | join "\n") :
-    (($^find {root} -maxdepth 4 -type f -not -path "*/.git/*" -not -path "*/target/*" -not -path "*/node_modules/*" 2>/dev/null) ?? "")
-}
-
-investigate = (audit_content root) {
+investigate_audit = (audit_content root) {
   emit "--- Phase 1-2: Investigation & Findings ---"
-  tree = gather_tree root
-  p = prompt.create ()
-    | prompt.section "Audit Checklist" audit_content
-    | prompt.section "Codebase Root" root
-    | prompt.section "File Tree" tree
-    | prompt.instruction "For each audit item, search the codebase under '{root}/' to determine if it is violated"
-    | prompt.instruction "Read every relevant file — do not guess from filenames alone"
-    | prompt.instruction "Return a numbered list of findings: concrete problem, root cause, single best fix, affected files"
-    | prompt.constraint "Report ONLY problems — do not list things that are correct"
-    | prompt.constraint "One fix per finding, verbal only, no code snippets"
-  resp = ai.prompt_with {
-    prompt: (prompt.render p)
-    append_system: "You are a code auditor. Investigate the codebase thoroughly — read files, search for patterns. Produce a numbered findings list. No conversation."
-    tools: ["Read" "Glob" "Grep" "Bash"]
-    max_turns: 15
-  } ^
-  out = resp.text
+  out = investigate.run audit_content root {
+    system: "You are a code auditor. Investigate the codebase thoroughly — read files, search for patterns. Produce a numbered findings list. No conversation."
+    instructions: [
+      "For each audit item, search the codebase under '{root}/' to determine if it is violated"
+      "Read every relevant file — do not guess from filenames alone"
+      "Return a numbered list of findings: concrete problem, root cause, single best fix, affected files"
+    ]
+    constraints: [
+      "Report ONLY problems — do not list things that are correct"
+      "One fix per finding, verbal only, no code snippets"
+    ]
+  }
   emit "investigation complete ({out | lines | len} lines)"
   Ok out
 }
@@ -115,12 +102,10 @@ compose = (audit_content rules_content findings) {
     | prompt.instruction "Required sections: # Goal, # Why, # What changes, # Files affected, # Task List, # CRITICAL REMINDERS"
     | prompt.constraint "Output ONLY the raw markdown — no preamble, no commentary"
     | prompt.constraint "Start with '# Goal' — nothing before it"
-  resp = ai.prompt_with {
-    prompt: (prompt.render p)
+  out = prompt.ask_with p {
     append_system: "You are a markdown document generator. Output the document directly. Start with '# Goal'. No conversation."
     tools: []
-  } ^
-  out = resp.text
+  } ""
   emit "composition complete ({out | lines | len} lines)"
   Ok out
 }
@@ -147,65 +132,47 @@ check_sections = (draft) {
   }
 }
 
-grade_draft = (draft name prev_grades) {
-  grader.grade {
-    work: draft
-    task: "work item document for {name}"
-    rubric: rubric
-    threshold: 75
-    previous_grades: prev_grades
-  }
-}
-
-revise_draft = (draft feedback) {
-  p = prompt.create ()
-    | prompt.section "Current Document" draft
-    | prompt.section "Feedback to Fix" feedback
-    | prompt.instruction "Fix ALL feedback items. Return the complete revised markdown document."
-    | prompt.constraint "Do not remove content to avoid checks — fix issues properly"
-    | prompt.constraint "Start with '# Goal' — nothing before it"
-  resp = ai.prompt_with {
-    prompt: (prompt.render p)
-    append_system: "You are revising a work item document. Fix every feedback item. Output the complete revised document."
-    tools: []
-  } ^
-  Ok resp.text
-}
-
-verify_and_revise = (session path draft name) {
+verify_and_revise = (path draft name) {
   emit "\n--- Phase 6: Verification Loop ---"
 
-  structural = audit.quick_check {output: draft  task: "work item for {name}"}
+  structural = quality.quick_check draft "work item for {name}"
   structural.passed ?
     (emit "  structural pre-check: passed") :
     (emit "  structural pre-check: {structural.reasons | join ", "}")
 
   check_sections draft
 
-  current := draft
-  prev_grades := []
-
-  loop {
-    grade_result = grade_draft current name prev_grades
-    session.record {name: "progress"  score: grade_result.score  output: "round"} ?? ()
-    emit "  score {grade_result.score} passed={grade_result.passed}"
-
-    grade_result.passed ? break ()
-
-    session.should_stop {min_delta: 2.0  window: 3} ? {
-      emit "  diminishing returns — stopping"
-      break ()
-    } : {
-      prev_grades <- grade_result.categories
-      revised = revise_draft current grade_result.feedback ^
-      fs.write path revised ^
-      current <- revised
+  result = refine draft {
+    grade: (work) {
+      use std/agents/grader
+      g = grader.grade {work  task: "work item document for {name}"  rubric  threshold: 75}
+      emit "  score {g.score} passed={g.passed}"
+      {score: to_int g.score  feedback: g.feedback}
     }
+    revise: (work feedback) {
+      p = prompt.create ()
+        | prompt.section "Current Document" work
+        | prompt.section "Feedback to Fix" feedback
+        | prompt.instruction "Fix ALL feedback items. Return the complete revised markdown document."
+        | prompt.constraint "Do not remove content to avoid checks — fix issues properly"
+        | prompt.constraint "Start with '# Goal' — nothing before it"
+      revised = prompt.ask_with p {
+        append_system: "You are revising a work item document. Fix every feedback item. Output the complete revised document."
+        tools: []
+      } work
+      fs.write path revised ^
+      revised
+    }
+    threshold: 75
+    max_rounds: 3
+    on_round: (round work score) emit "  refinement round {round}: {score}"
   }
 
-  final_check = auditor.audit {output: current  task: "work item for {name}"}
-  final_check.passed ?
-    (emit "  auditor: passed (score {final_check.score})") :
-    (emit "  auditor: failed (score {final_check.score}) — {final_check.feedback}")
-  Ok current
+  final = result ? { Ok r -> r.work; Err r -> r.work }
+
+  audit_result = quality.final_audit final "work item for {name}"
+  audit_result.full_passed ?
+    (emit "  auditor: passed (score {audit_result.score})") :
+    (emit "  auditor: failed (score {audit_result.score}) — {audit_result.feedback}")
+  Ok final
 }

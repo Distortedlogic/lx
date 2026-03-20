@@ -1,36 +1,7 @@
--- Tool generation satisfaction tests
--- Tests the analyze-design-scaffold-codegen pipeline.
+use pkg/infra/testkit
 
-use std/test
-use pkg/testkit
-
-spec = test.spec "tool generation" {
-  flow: "flows/tests/tool_generation_flow.lx"
-  grader: testkit.default_grader
-  threshold: 0.65
-  weights: testkit.default_weights
-}
-
-spec = test.scenario spec "simple 2-function tool" {
-  input: {data_path: "flows/tests/tool_generation/fixtures/simple_tool/data.json"}
-  rubric: ["docker" "passed_smoke" "true" "2 tools"]
-  tags: ["toolgen" "smoke"]
-  runs: 1
-}
-
-spec = test.scenario spec "complex 5-function tool" {
-  input: {data_path: "flows/tests/tool_generation/fixtures/complex_tool/data.json"}
-  rubric: ["forgejo" "5 tools" "passed_smoke" "true"]
-  tags: ["toolgen" "smoke"]
-  runs: 1
-}
-
-spec = test.scenario spec "compile error fix loop" {
-  input: {data_path: "flows/tests/tool_generation/fixtures/compile_error/data.json"}
-  rubric: ["prometheus" "fix_loop" "true" "compile_success" "true"]
-  tags: ["toolgen"]
-  runs: 1
-}
-
-results = test.run spec ^
-test.report results
+testkit.run_spec "tool generation" "flows/tests/tool_generation_flow.lx" [
+  {name: "simple 2-function tool"  input: {data_path: "flows/tests/tool_generation/fixtures/simple_tool/data.json"}  rubric: ["docker" "passed_smoke" "true" "2 tools"]  tags: ["toolgen" "smoke"]}
+  {name: "complex 5-function tool"  input: {data_path: "flows/tests/tool_generation/fixtures/complex_tool/data.json"}  rubric: ["forgejo" "5 tools" "passed_smoke" "true"]  tags: ["toolgen" "smoke"]}
+  {name: "compile error fix loop"  input: {data_path: "flows/tests/tool_generation/fixtures/compile_error/data.json"}  rubric: ["prometheus" "fix_loop" "true" "compile_success" "true"]  tags: ["toolgen"]}
+] {}

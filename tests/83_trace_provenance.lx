@@ -1,7 +1,7 @@
 -- 83_trace_provenance.lx
 -- Tests: TraceStore provenance tracking and reputation scoring
 
-use pkg/trace {TraceStore}
+use pkg/data/trace {TraceStore}
 
 t = TraceStore ()
 

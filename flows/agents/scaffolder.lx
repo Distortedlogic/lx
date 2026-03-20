@@ -1,19 +1,6 @@
 -- Project scaffolder -- generates project structures from templates.
--- Import and call directly, or spawn as subprocess via main.
 
-use std/ai
-use std/fs
-use std/agent
+use pkg/ai/agent_factory
+use flows/lib/agent_catalog as catalog
 
-+scaffold = (msg) {
-  path = "{msg.name}"
-  $^mkdir -p {path}/src
-  template = msg.template ?? "service"
-  lang = msg.lang ?? "rust"
-  ai.prompt "Generate a {lang} {template} project scaffold for '{msg.name}'. Create the necessary files." ^
-  {path  name: msg.name  lang  template}
-}
-
-+handlers = %{"scaffold": scaffold}
-
-+main = () { agent.dispatch handlers }
++main = agent_factory.from_config catalog.scaffolder

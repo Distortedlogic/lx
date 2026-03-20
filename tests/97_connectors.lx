@@ -1,0 +1,40 @@
+-- Connector abstraction: Trait conformance, CliConnector, McpConnector
+
+use std/agent
+use pkg/core/connector {Connector}
+use pkg/connectors/cli {CliConnector}
+use pkg/connectors/mcp {McpConnector}
+
+echo_conn = CliConnector {
+  command: "echo"
+  tool_defs: [
+    {name: "hello"  subcommand: ""  description: "Echo hello"}
+    {name: "greet"  subcommand: ""  description: "Echo a greeting"}
+  ]
+}
+
+r1 = echo_conn.connect ()
+assert r1 == Ok ()
+
+tools = echo_conn.tools ()
+assert (tools | len) == 2
+first_tool = (tools | first) ?? {name: "FAIL"}
+assert first_tool.name == "hello"
+
+result = echo_conn.call {tool: "hello"  args: {}}
+assert result != None
+
+err = echo_conn.call {tool: "nonexistent"  args: {}}
+assert err == Err "unknown tool: nonexistent"
+
+r2 = echo_conn.disconnect ()
+assert r2 == Ok ()
+
+assert (agent.implements echo_conn Connector)
+
+mcp_conn = McpConnector {command: "fake-mcp"}
+assert (agent.implements mcp_conn Connector)
+assert mcp_conn.session == None
+
+tools2 = mcp_conn.tools ()
+assert tools2 == []

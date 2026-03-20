@@ -1,5 +1,6 @@
 mod agent_cmd;
 mod check;
+mod init;
 mod install;
 mod install_ops;
 mod listing;
@@ -12,7 +13,9 @@ use std::io::IsTerminal;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use lx::backends::{RuntimeCtx, StdinStdoutUserBackend};
+use lx::backends::{
+    NoopEmitBackend, NoopLogBackend, NoopUserBackend, RuntimeCtx, StdinStdoutUserBackend,
+};
 
 use clap::{Parser, Subcommand};
 
@@ -51,6 +54,12 @@ enum Command {
         output: Option<String>,
     },
     List,
+    Init {
+        #[arg()]
+        name: Option<String>,
+        #[arg(long)]
+        flow: bool,
+    },
     Install {
         #[arg()]
         package: Option<String>,
@@ -85,6 +94,7 @@ fn main() -> ExitCode {
         Command::Agent { script } => agent_cmd::run_agent(&script),
         Command::Diagram { file, output } => run_diagram(&file, output.as_deref()),
         Command::List => listing::list_workspace(),
+        Command::Init { name, flow } => init::run_init(name.as_deref(), flow),
         Command::Install { package } => install::run_install(package.as_deref()),
         Command::Update { package } => install::run_update(package.as_deref()),
     }
@@ -122,7 +132,7 @@ fn run_file(path: &str, _json: bool) -> ExitCode {
         }
     };
     let ws_members = manifest::try_load_workspace_members();
-    let dep_dirs = manifest::try_load_dep_dirs();
+    let dep_dirs = manifest::try_load_dep_dirs_no_dev();
     let mut ctx_val = if std::io::stdin().is_terminal() {
         RuntimeCtx {
             user: Arc::new(StdinStdoutUserBackend),
@@ -133,6 +143,7 @@ fn run_file(path: &str, _json: bool) -> ExitCode {
     };
     ctx_val.workspace_members = ws_members;
     ctx_val.dep_dirs = dep_dirs;
+    apply_manifest_backends(&mut ctx_val);
     let ctx = Arc::new(ctx_val);
     match run::run(&source, path, &ctx) {
         Ok(()) => ExitCode::SUCCESS,
@@ -154,6 +165,66 @@ fn run_file(path: &str, _json: bool) -> ExitCode {
                 }
             }
             ExitCode::from(1)
+        }
+    }
+}
+
+fn apply_manifest_backends(ctx: &mut RuntimeCtx) {
+    let Ok(cwd) = std::env::current_dir() else {
+        return;
+    };
+    let Some(root) = manifest::find_manifest_root(&cwd) else {
+        return;
+    };
+    let Ok(m) = manifest::load_manifest(&root) else {
+        return;
+    };
+    let Some(backends) = m.backends else {
+        return;
+    };
+    if let Some(ref name) = backends.emit {
+        match name.as_str() {
+            "noop" => ctx.emit = Arc::new(NoopEmitBackend),
+            "stdout" => {}
+            other => eprintln!("warning: unknown emit backend '{other}'"),
+        }
+    }
+    if let Some(ref name) = backends.log {
+        match name.as_str() {
+            "noop" => ctx.log = Arc::new(NoopLogBackend),
+            "stderr" => {}
+            other => eprintln!("warning: unknown log backend '{other}'"),
+        }
+    }
+    if let Some(ref name) = backends.user {
+        match name.as_str() {
+            "noop" => ctx.user = Arc::new(NoopUserBackend),
+            "stdin-stdout" => ctx.user = Arc::new(StdinStdoutUserBackend),
+            other => eprintln!("warning: unknown user backend '{other}'"),
+        }
+    }
+    if let Some(ref name) = backends.ai {
+        match name.as_str() {
+            "claude-code" => {}
+            other => eprintln!("warning: unknown ai backend '{other}'"),
+        }
+    }
+    if let Some(ref name) = backends.shell {
+        match name.as_str() {
+            "process" => {}
+            other => eprintln!("warning: unknown shell backend '{other}'"),
+        }
+    }
+    if let Some(ref name) = backends.http {
+        match name.as_str() {
+            "reqwest" => {}
+            other => eprintln!("warning: unknown http backend '{other}'"),
+        }
+    }
+    if let Some(ref name) = backends.yield_backend {
+        match name.as_str() {
+            "stdin-stdout" => {}
+            other => eprintln!("warning: unknown yield backend '{other}'"),
         }
     }
 }

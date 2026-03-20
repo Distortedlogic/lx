@@ -21,7 +21,7 @@ result = meta "task1" {
     reason: s ++ " approach"
   }
 }
-assert (ok? result) "first viable returns Ok"
+assert (ok? result == true) "first viable returns Ok"
 inner = result ?? ()
 assert (inner.strategy == "fast") "winning strategy"
 assert (inner.result.result == "quick_task1") "result value"
@@ -33,7 +33,7 @@ fail_result = meta "hard_task" {
   attempt: (s t) {result: s ++ t  score: 10}
   evaluate: (r s) {viable: false  quality: r.score  reason: "too low"}
 }
-assert (err? fail_result) "all fail returns Err"
+assert (err? fail_result == true) "all fail returns Err"
 
 -- === Skip non-viable, find viable later ===
 good_attempt = (s t) {
@@ -53,7 +53,7 @@ multi = meta "multi_task" {
     reason: s
   }
 }
-assert (ok? multi) "finds viable in third"
+assert (ok? multi == true) "finds viable in third"
 m = multi ?? ()
 assert (m.strategy == "good") "good strategy won"
 assert (len m.attempts == 3) "tried all three"
@@ -65,9 +65,9 @@ seq = meta "seq_task" {
   strategies: ["x" "y"]
   attempt: (s t) {val: s  score: 99}
   evaluate: (r s) {viable: true  quality: r.score  reason: "ok"}
-  select: :sequential
+  select: "sequential"
 }
-assert (ok? seq) "sequential select works"
+assert (ok? seq == true) "sequential select works"
 s = seq ?? ()
 assert (s.strategy == "x") "sequential tries first"
 
@@ -89,7 +89,7 @@ sw_result = meta "sw_task" {
     switches <- [..switches {from: from  to: to}]
   }
 }
-assert (ok? sw_result) "on_switch result ok"
+assert (ok? sw_result == true) "on_switch result ok"
 assert (len switches == 2) "on_switch called twice"
 assert (switches.0.from == "alpha") "first switch from"
 assert (switches.0.to == "beta") "first switch to"
@@ -110,7 +110,7 @@ err_result = meta "err_task" {
   attempt: (s t) err_attempt s t
   evaluate: (r s) {viable: false  quality: r.score  reason: s}
 }
-assert (err? err_result) "all exhaust returns Err"
+assert (err? err_result == true) "all exhaust returns Err"
 
 -- === meta as identifier still works ===
 meta_val = "metadata"

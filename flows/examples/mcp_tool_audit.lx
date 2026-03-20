@@ -9,7 +9,7 @@ use std/mcp
 use std/json
 use std/fs
 use std/re
-use pkg/report
+use pkg/infra/report
 use ../prompts/audit
 
 Trait ServerStatus = {name: Str  status: Str  tool_count: Int  issues: List}

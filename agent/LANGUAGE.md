@@ -36,6 +36,7 @@ s.filter (k v) condition     -- filtered entries
 s.query {field: "value"}     -- record-pattern matching
 s.map (k v) transform        -- transform values
 s.update "key" (v) v + 1     -- update in place
+s.merge other_store          -- copy all entries from Store or Record
 s.save "path.json"           -- persist to file
 s.load "path.json"           -- load from file
 s.clear ()                   -- remove all entries

@@ -1,7 +1,7 @@
 -- 27_tasks.lx
 -- Tests: pkg/tasks TaskStore class (task state machine + persistence)
 
-use pkg/tasks {TaskStore}
+use pkg/data/tasks {TaskStore}
 use std/fs
 
 -- === Store creation ===

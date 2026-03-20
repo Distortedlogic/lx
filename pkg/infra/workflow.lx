@@ -1,0 +1,32 @@
+-- Traced workflow runner -- session tracing and outcome recording.
+-- run: create trace session, execute work function, record final outcome.
+-- work_fn receives the session handle (for intermediate span recording)
+-- and must return Ok result or Err reason.
+-- Returns the work function's Result unchanged after recording outcome.
+
+use pkg/data/trace {TraceStore}
+
++run = (name source work_fn) {
+  session = TraceStore {path: name}
+  result = work_fn session
+  result ? {
+    Ok r -> session.record {name: "complete"  input: source  output: r  success: true} ?? ()
+    Err e -> session.record {name: "failed"  input: source  output: e  success: false} ?? ()
+  }
+  result
+}
+
++run_with_report = (name source report_path report_title work_fn) {
+  use pkg/infra/report
+  run name source (session) {
+    result = work_fn session
+    result ? {
+      Ok r -> {
+        sections = r.report_sections ?? []
+        sections | not empty? ? report.write report_path report_title sections : ()
+        Ok r
+      }
+      Err e -> Err e
+    }
+  }
+}

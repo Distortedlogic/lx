@@ -1,17 +1,6 @@
 -- Generic task worker -- handles task execution and revision.
--- Spawned for grading loops (multi-turn), importable for single calls.
 
-use std/ai
-use std/agent
+use pkg/ai/agent_factory
+use flows/lib/agent_catalog as catalog
 
-+task = (msg) {
-  ai.prompt "Execute this task:\n{msg.task}" ^
-}
-
-+revise = (msg) {
-  ai.prompt "Revise the following work based on feedback.\nWork: {msg.work}\nFeedback: {msg.feedback}" ?? msg.work
-}
-
-+handlers = %{"task": task  "revise": revise}
-
-+main = () { agent.dispatch handlers }
++main = agent_factory.from_config catalog.worker

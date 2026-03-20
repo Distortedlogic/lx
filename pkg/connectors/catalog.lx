@@ -1,0 +1,41 @@
+-- Connector catalog -- MCP and CLI connectors for external tools.
+-- Import individual connectors: use pkg/connectors/catalog {gritql gh ...}
+
+use pkg/connectors/mcp {McpConnector}
+use pkg/connectors/cli {CliConnector}
+
++context_engine = McpConnector {command: "context-engine-mcp"}
+
++forgejo = McpConnector {command: "forgejo-mcp"}
+
++gritql = McpConnector {command: "grit-mcp"}
+
++langfuse = McpConnector {command: "langfuse-mcp"}
+
++postgresql = McpConnector {command: "postgresql-mcp"}
+
++uptime_kuma = McpConnector {command: "uptime-kuma-mcp"}
+
++gh = CliConnector {
+  command: "gh"
+  tool_defs: [
+    {name: "pr_list"  subcommand: "pr list"  description: "List pull requests"}
+    {name: "pr_create"  subcommand: "pr create"  description: "Create a pull request"}
+    {name: "issue_list"  subcommand: "issue list"  description: "List issues"}
+  ]
+}
+
++jq_tool = CliConnector {
+  command: "jq"
+  tool_defs: [
+    {name: "query"  subcommand: ""  description: "Run a jq filter on JSON input"}
+  ]
+}
+
++curl = CliConnector {
+  command: "curl"
+  tool_defs: [
+    {name: "get"  subcommand: ""  description: "HTTP GET request"}
+    {name: "post"  subcommand: ""  description: "HTTP POST request"}
+  ]
+}

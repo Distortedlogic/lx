@@ -9,11 +9,11 @@
 -- Source: mcp-toolbelt/arch_diagrams/scenario_research
 
 use std/agent
-use ../agents/researcher
-use ../agents/context_engine
+use flows/lib/agent_catalog {search_handler}
+use pkg/connectors/catalog {context_engine}
 use ../agents/github_search
-use pkg/report
-use pkg/workflow
+use pkg/infra/report
+use pkg/infra/workflow
 
 Trait ResearchRequest = {topic: Str  compare_to: Str  find_oss: Bool}
 
@@ -29,11 +29,13 @@ Trait ResearchRequest = {topic: Str  compare_to: Str  find_oss: Bool}
 
 +research = (request) {
   workflow.run "research" request.topic (_) {
+    context_engine.connect () ^
     (external, internal, oss) = par {
-      researcher.search {topic: request.topic}
-      context_engine.search {path: request.compare_to  topic: request.topic}
+      search_handler {topic: request.topic}
+      context_engine.call {tool: "search"  args: {path: request.compare_to  topic: request.topic}}
       github_search.search {query: request.topic  lang: "rust"}
     }
+    context_engine.disconnect ()
 
     merged = agent.reconcile [external internal oss] {strategy: "merge_fields"}
     recommendation = synthesize external oss

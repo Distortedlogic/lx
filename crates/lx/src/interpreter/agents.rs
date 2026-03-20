@@ -1,15 +1,13 @@
-use std::sync::Arc;
-use std::sync::mpsc;
+use std::sync::{Arc, mpsc};
 
 use num_bigint::BigInt;
 use parking_lot::Mutex;
 
+use super::Interpreter;
 use crate::ast::{FieldDecl, SExpr, TraitEntry};
 use crate::error::LxError;
 use crate::span::Span;
 use crate::value::{FieldDef, Value};
-
-use super::Interpreter;
 
 fn inject_deadline(msg: Value) -> Value {
     let Some(ms) = crate::stdlib::deadline::current_remaining_ms() else {
@@ -63,7 +61,6 @@ impl Interpreter {
     pub async fn call(&mut self, func: Value, arg: Value) -> Result<Value, LxError> {
         self.apply_func(func, arg, Span::default()).await
     }
-
     pub(super) async fn eval_agent_send(
         &mut self,
         target_expr: &SExpr,
@@ -77,17 +74,34 @@ impl Interpreter {
             crate::stdlib::agent::send_subprocess(pid, &msg, span)?;
             return Ok(Value::Unit);
         }
+        if let Some(rejection) =
+            crate::stdlib::agent_lifecycle_run::run_message_hooks(&target, &msg, span, &self.ctx)?
+        {
+            return Ok(rejection);
+        }
         let handler_id = crate::stdlib::agent_reload::handler_id_from_agent(&target);
         let handler = self.get_agent_handler(&target, span)?;
         crate::stdlib::agent_reload::set_current_handler_id(handler_id);
-        self.apply_func(handler, msg, span).await?;
+        let result = self.apply_func(handler.clone(), msg.clone(), span).await;
         crate::stdlib::agent_reload::set_current_handler_id(None);
         if let Some(hid) = handler_id {
             crate::stdlib::agent_reload::apply_pending_evolve(hid);
         }
-        Ok(Value::Unit)
+        match result {
+            Ok(_) => Ok(Value::Unit),
+            Err(e) => {
+                let err_val = Value::Str(Arc::from(e.to_string()));
+                if crate::stdlib::agent_lifecycle_run::run_error_hooks(
+                    &target, &err_val, &msg, span, &self.ctx,
+                )?
+                .is_some()
+                {
+                    return Ok(Value::Unit);
+                }
+                Err(e)
+            }
+        }
     }
-
     pub(super) async fn eval_agent_ask(
         &mut self,
         target_expr: &SExpr,
@@ -100,15 +114,31 @@ impl Interpreter {
             let pid = extract_pid(&target, span)?;
             return crate::stdlib::agent::ask_subprocess(pid, &msg, span);
         }
+        if let Some(rejection) =
+            crate::stdlib::agent_lifecycle_run::run_message_hooks(&target, &msg, span, &self.ctx)?
+        {
+            return Ok(rejection);
+        }
         let handler_id = crate::stdlib::agent_reload::handler_id_from_agent(&target);
         let handler = self.get_agent_handler(&target, span)?;
         crate::stdlib::agent_reload::set_current_handler_id(handler_id);
-        let result = self.apply_func(handler, msg, span).await;
+        let result = self.apply_func(handler.clone(), msg.clone(), span).await;
         crate::stdlib::agent_reload::set_current_handler_id(None);
         if let Some(hid) = handler_id {
             crate::stdlib::agent_reload::apply_pending_evolve(hid);
         }
-        result
+        match &result {
+            Err(e) => {
+                let err_val = Value::Str(Arc::from(e.to_string()));
+                if let Some(handled) = crate::stdlib::agent_lifecycle_run::run_error_hooks(
+                    &target, &err_val, &msg, span, &self.ctx,
+                )? {
+                    return Ok(handled);
+                }
+                result
+            }
+            _ => result,
+        }
     }
 
     pub(super) async fn eval_stream_ask(

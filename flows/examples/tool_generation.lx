@@ -12,11 +12,17 @@ use std/mcp
 use std/json
 use std/fs
 use std/re
-use ../agents/tool_maker
-use pkg/report
-use pkg/workflow
+use pkg/ai/ai_agent
+use flows/lib/agent_catalog {tool_scaffold_handler}
+use pkg/infra/report
+use pkg/infra/workflow
 
 Trait ToolGap = {signal: Str  tool: Str  context: Str}
+
+tm_analyze = ai_agent.simple (msg) "Analyze the need for MCP tool '{msg.target}'. What capabilities should it expose?"
+tm_design = ai_agent.simple (msg) "Design MCP tool based on analysis:\n{msg.analysis}\nReturn a manifest with tools, types, and endpoints."
+tm_codegen = ai_agent.simple (msg) "Generate Rust MCP server code for:\n{msg.manifest}\nWorkspace: {msg.workspace}"
+tm_fix_compile = ai_agent.with_fallback (msg) "Fix these compilation errors in {msg.workspace}:\n{msg.errors}" (msg) ""
 
 +main = () {
   gap = ToolGap {
@@ -51,10 +57,10 @@ Trait ToolGap = {signal: Str  tool: Str  context: Str}
 +generate = (gap) {
   workflow.run "tool-generation" gap.tool (session) {
     steps = [
-      {id: "analyze"   deps: []            run: (ctx) tool_maker.analyze {target: gap.tool}}
-      {id: "design"    deps: ["analyze"]   run: (ctx) tool_maker.design {analysis: ctx.analyze}}
-      {id: "scaffold"  deps: ["design"]    run: (ctx) tool_maker.scaffold {manifest: ctx.design}}
-      {id: "codegen"   deps: ["scaffold"]  run: (ctx) tool_maker.codegen {workspace: ctx.scaffold.path  manifest: ctx.design}}
+      {id: "analyze"   deps: []            run: (ctx) tm_analyze {target: gap.tool}}
+      {id: "design"    deps: ["analyze"]   run: (ctx) tm_design {analysis: ctx.analyze}}
+      {id: "scaffold"  deps: ["design"]    run: (ctx) tool_scaffold_handler {manifest: ctx.design}}
+      {id: "codegen"   deps: ["scaffold"]  run: (ctx) tm_codegen {workspace: ctx.scaffold.path  manifest: ctx.design}}
       {id: "compile"   deps: ["codegen"]   run: (ctx) compile_gate ctx.scaffold.path}
       {id: "register"  deps: ["compile"]   run: (ctx) register gap.tool ctx.scaffold.path}
       {id: "test"      deps: ["register"]  run: (ctx) smoke_test gap.tool ctx.scaffold.path}
@@ -71,7 +77,7 @@ compile_gate = (workspace) {
   check ? {
     Ok {code: 0 ..} -> ()
     _ -> {
-      tool_maker.fix_compile {workspace  errors: check}
+      tm_fix_compile {workspace: workspace  errors: check}
       recheck = $cargo check --manifest-path {workspace}/Cargo.toml 2>&1
       recheck ? {
         Ok {code: 0 ..} -> ()

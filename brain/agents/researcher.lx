@@ -2,7 +2,7 @@
 -- Source: dispatched when the brain needs facts before reasoning
 
 use std/ai
-use pkg/prompt
+use pkg/core/prompt
 use std/fs
 use std/re
 use ../traits {Researcher}
@@ -111,7 +111,7 @@ synthesize_findings = (findings: [Finding]  question: Str) -> Str {
     | prompt.instruction "Answer the question based on the findings. Cite sources by number."
     | prompt.constraint "If findings are insufficient, say what's missing."
 
-  ai.prompt (prompt.render p) ?? {text: findings_text} | (.text)
+  prompt.ask p findings_text
 }
 
 +main = () {

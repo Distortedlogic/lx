@@ -2,9 +2,9 @@
 -- Source: final stage — assembles everything into a coherent response for the human
 
 use std/ai
-use pkg/prompt
+use pkg/core/prompt
 use std/md
-use pkg/reasoning {ReasoningChain}
+use pkg/ai/reasoning {ReasoningChain}
 use ../contracts {Response Identity}
 use ../traits {Synthesizer}
 
@@ -22,7 +22,7 @@ Agent ResponseSynth: Synthesizer = {
       | prompt.constraint "Be direct. Lead with the answer. No filler."
       | prompt.constraint "If uncertain, say so with your confidence level."
 
-    resp = ai.prompt (prompt.render p) ?? {text: msg.reasoning.conclusion ?? msg.task}
+    content = prompt.ask p (msg.reasoning.conclusion ?? msg.task)
 
     sources = msg.tool_results | map (r) "{r.tool ?? "tool"}" | uniq
 
@@ -30,12 +30,12 @@ Agent ResponseSynth: Synthesizer = {
     depth = msg.reasoning.thoughts ?? [] | len
 
     Response {
-      content: resp.text
+      content: content
       confidence: confidence
       reasoning_depth: depth
       tools_used: msg.tool_results | map (r) "{r.tool ?? ""}" | filter (not empty?)
       sources
-      follow_up: suggest_follow_ups msg.task resp.text
+      follow_up: suggest_follow_ups msg.task content
     }
   }
 

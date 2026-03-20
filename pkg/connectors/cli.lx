@@ -1,0 +1,35 @@
+-- CliConnector -- wraps shell execution in the Connector interface.
+-- Stateless connect/disconnect. call builds CLI commands from tool_defs.
+-- Each tool_def maps a tool name to a subcommand + flag pattern.
+
+use pkg/core/connector {Connector}
+
+build_cli_args = (tool_def args) {
+  base = tool_def.subcommand ?? ""
+  has_args = args != ()
+  flags = has_args ? (args.keys () | map (k) { "--{k} {args.get k}" } | join " ") : ""
+  base != "" ? (flags != "" ? "{base} {flags}" : base) : flags
+}
+
+Class +CliConnector : [Connector] = {
+  command: ""
+  tool_defs: []
+  env: {}
+
+  connect = () Ok ()
+  disconnect = () Ok ()
+
+  call = (req) {
+    tool = self.tool_defs | find (t) { t.name == req.tool }
+    tool ? {
+      None -> Err "unknown tool: {req.tool}"
+      Some t -> {
+        cli_args = build_cli_args t req.args
+        cmd_str = "{self.command} {cli_args}"
+        $^{cmd_str} ^
+      }
+    }
+  }
+
+  tools = () self.tool_defs
+}

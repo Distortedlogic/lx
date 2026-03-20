@@ -1,23 +1,19 @@
 -- Layered defense system -- guardrails, drift monitoring, and periodic security scans.
 -- Layer 1: Input guardrails via pkg/guard (parallel or blocking mode).
 -- Layer 2: Behavioral drift monitoring via Agent Stability Index (ASI).
--- Layer 3: Periodic transcript security scans via guard.full_scan.
+-- Layer 3: Periodic transcript security scans via security_scan.scan_transcripts.
 -- Cron loops: drift check every 60s, full security scan every 5 minutes.
 -- Demonstrates: guard composition, cron scheduling, transcript ingestion, multi-layer defense.
 -- Source: mcp-toolbelt/arch_diagrams/defense_layers
 
-use std/agents/monitor
 use std/cron
-use pkg/trace {TraceStore}
-use pkg/guard
-use ../lib/transcript
-use pkg/report
+use pkg/data/trace {TraceStore}
+use pkg/agents/guard
+use pkg/kit/security_scan
+use pkg/infra/report
 
 drift_threshold = 0.7
 scan_interval_ms = 300000
-
-+run_parallel = guard.run_parallel
-+run_blocking = guard.run_blocking
 
 +main = () {
   session = TraceStore {path: "defense-layers"}
@@ -33,19 +29,14 @@ scan_interval_ms = 300000
 
   cron.every scan_interval_ms () {
     project_dir = $^echo $HOME | trim
-    paths = transcript.read_recent "{project_dir}/.claude/projects" 60
-    all_findings = paths | flat_map (path) {
-      entries = transcript.parse path
-      guard.full_scan entries {} | map (f) {..f  agent_id: path}
-    }
+    result = security_scan.scan_transcripts "{project_dir}/.claude/projects" {}
 
-    all_findings | empty? ? () : {
-      critical = all_findings | filter (f) f.severity == "critical"
-      critical | each (f) {
+    result.findings | empty? ? () : {
+      result.critical | each (f) {
         session.record {name: "security-finding"  input: f  output: f  success: false}
         emit "SECURITY [{f.type}] {f.agent_id}: {f.evidence}"
       }
-      write_scan_report all_findings
+      write_scan_report result.findings
     }
   }
 
@@ -53,8 +44,8 @@ scan_interval_ms = 300000
 }
 
 check_drift = (agent_id) {
-  drift = monitor.check {agent: agent_id}
-  drift.index < drift_threshold ? [{agent: agent_id  drift_type: drift.drift_type  index: drift.index}] : []
+  result = guard.check agent_id
+  result.pass ? [] : [{agent: agent_id  drift_type: "behavioral"  index: 0.5}]
 }
 
 list_active_agents = () {
@@ -64,19 +55,18 @@ list_active_agents = () {
 }
 
 write_scan_report = (findings) {
-  critical = findings | filter (f) f.severity == "critical"
-  high = findings | filter (f) f.severity == "high"
+  summary = guard.severity_summary findings
   report.write "defense_report.md" "Defense Layer Scan" [
     ..report.section "Summary" [
       ..report.bullets [
-        "Critical: {critical | len}"
-        "High: {high | len}"
-        "Total: {findings | len}"
+        "Critical: {summary.critical}"
+        "High: {summary.high}"
+        "Total: {summary.total}"
       ]
     ]
-    ..report.conditional (critical | len > 0) "Critical Findings" [
+    ..report.conditional (summary.critical > 0) "Critical Findings" [
       ..report.table ["Type" "Agent" "Evidence"]
-        (critical | map (f) [f.type f.agent_id f.evidence])
+        (guard.by_severity findings "critical" | map (f) [f.type f.agent_id f.evidence])
     ]
   ]
 }

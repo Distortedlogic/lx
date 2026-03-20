@@ -1,7 +1,7 @@
 use std/fs
 use std/json
-use pkg/score : scoring
-use pkg/testkit
+use pkg/core/score : scoring
+use pkg/infra/testkit
 
 +run = (input) {
   data = testkit.load_fixture input

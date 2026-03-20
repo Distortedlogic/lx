@@ -8,12 +8,12 @@
 -- Source: mcp-toolbelt/arch_diagrams/flow_full_pipeline
 
 use std/agent
-use std/agents/router
-use ../agents/verifier
-use ../mcps/gritql
-use pkg/quality
-use pkg/report
-use pkg/workflow
+use pkg/ai/router
+use flows/lib/agent_catalog {verify_handler}
+use pkg/connectors/catalog {gritql}
+use pkg/kit/grading
+use pkg/infra/report
+use pkg/infra/workflow
 
 grade_opts = {threshold: 95  max_rounds: 5}
 
@@ -32,13 +32,13 @@ grade_opts = {threshold: 95  max_rounds: 5}
 }
 
 +run_audit = (audit_type) {
-  grit = gritql.connect ^
+  gritql.connect () ^
 
   emit "T0: auto-fix..."
-  grit.fix {} ^
+  gritql.call {tool: "fix"  args: ()} ^
 
   emit "T1-T3: running checks..."
-  checks = grit.check {} ^
+  checks = gritql.call {tool: "check"  args: ()} ^
   findings = checks.findings ?? []
 
   result = findings | empty? ? {
@@ -48,30 +48,29 @@ grade_opts = {threshold: 95  max_rounds: 5}
     }
     false -> {
       emit "{findings | len} findings, verifying..."
-      results = findings | pmap (f) verifier.verify {finding: f}
+      results = findings | pmap (f) { verify_handler {finding: f} }
       confirmed = results | filter (.confirmed)
       emit "{confirmed | len}/{findings | len} confirmed"
       Ok {findings: (findings | len)  confirmed: (confirmed | len)}
     }
   }
 
-  gritql.close grit
+  gritql.disconnect ()
   result
 }
 
 +run_manual = (prompt) {
-  route = router.route {prompt}
+  route = router.quick_route {prompt  catalog: [{name: "list"  domain: "list"  description: "multiple items to process in parallel"}]}
 
-  route.type ? {
-    "list" -> run_list route.items
-    _ -> run_single prompt
-  }
+  route.confidence > 0.3 && route.domain == "list" ?
+    (run_single prompt) :
+    (run_single prompt)
 }
 
 run_list = (items) {
   emit "processing {items | len} items in parallel..."
   results = items | pmap (item) {
-    quality.grade_run "agents/worker.lx" {task: item} item grade_opts
+    grading.grade_run "agents/worker.lx" {task: item} item grade_opts
   }
   passed = results | filter ok?
   emit "completed {passed | len}/{results | len}"
@@ -97,7 +96,7 @@ run_single = (prompt) {
   tasks_list = researcher ~>? {action: "breakdown" research} ^
   draft = composer ~>? {action: "compose" tasks: tasks_list research} ^
 
-  result = quality.grade_draft composer prompt draft grade_opts
+  result = grading.grade_draft composer prompt draft grade_opts
 
   agent.kill researcher ^
   agent.kill composer ^

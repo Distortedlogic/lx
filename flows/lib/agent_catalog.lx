@@ -1,0 +1,170 @@
+-- Agent catalog -- config records for factory-driven agent instantiation.
+-- Each config has a name and a handlers list consumable by agent_factory.from_config.
+-- Custom handlers use type "custom" with handler_fn for non-standard logic.
+
+use std/ai
+
+Trait ElicitResult = {
+  requirements: List
+  user_stories: List
+  constraints: List
+  decisions: List
+  converged: Bool
+  questions: List
+}
+
+Trait ScaffoldResult = {
+  modules: List
+  tech_stack: List
+  boundaries: List
+}
+
+Trait SpecResult = {
+  responsibility: Str
+  public_api: List
+  dependencies: List
+  constraints: List
+}
+
+Trait ImplResult = {code: Str  tests: Str}
+Trait FixResult = {code: Str  explanation: Str}
+Trait TypeFixResult = {code: Str  fixes_applied: List}
+Trait StubResult = {code: Str  types: List  traits: List  functions: List}
+
++worker = {
+  name: "worker"
+  handlers: [
+    {name: "task"  type: "simple"  prompt_fn: (msg) "Execute this task:\n{msg.task}"}
+    {name: "revise"  type: "with_fallback"  prompt_fn: (msg) "Revise based on feedback.\nWork: {msg.work}\nFeedback: {msg.feedback}"  fallback_fn: (.work)}
+  ]
+}
+
++composer = {
+  name: "composer"
+  handlers: [
+    {name: "compose"  type: "simple"  prompt_fn: (msg) "Compose a solution based on:\nTasks: {msg.tasks}\nResearch: {msg.research}"}
+    {name: "revise"  type: "with_fallback"  prompt_fn: (msg) "Revise:\n{msg.work}\nFeedback: {msg.feedback}"  fallback_fn: (.work)}
+  ]
+}
+
++seeder = {
+  name: "seeder"
+  handlers: [
+    {name: "seed"  type: "simple"  prompt_fn: (msg) "Generate initial knowledge entries for a new '{msg.purpose}' agent in the '{msg.domain}' domain. Return a list of patterns with content and confidence fields."}
+  ]
+}
+
++search_handler = (msg) {
+  results = ai.prompt "Search the web for: {msg.topic}\nSummarize findings as a list of summary, source, relevance." ^
+  {findings: results  summary: "Searched: {msg.topic}"}
+}
+
++researcher = {
+  name: "researcher"
+  handlers: [
+    {name: "search"  type: "custom"  handler_fn: search_handler}
+    {name: "research"  type: "simple"  prompt_fn: (msg) "Research: {msg.topic}\nProvide comprehensive analysis with findings and gaps."}
+    {name: "breakdown"  type: "with_fallback"  prompt_fn: (msg) "Break down the following research into actionable tasks:\n{msg.research}"  fallback_fn: (msg) ""}
+  ]
+}
+
++elicitor = {
+  name: "elicitor"
+  handlers: [
+    {name: "elicit"  type: "structured"  prompt_fn: (msg) "Analyze this software request. Clarify scope, identify actors, define features, resolve tradeoffs.\n\nRequest: {msg.prompt}\n\nReturn structured specs with convergence status."  schema: ElicitResult}
+    {name: "clarify"  type: "with_fallback"  prompt_fn: (msg) "Given this context:\n{msg.specs}\n\nAnswer: {msg.question}"  fallback_fn: (msg) ""}
+  ]
+}
+
++structurer = {
+  name: "structurer"
+  handlers: [
+    {name: "scaffold"  type: "structured"  prompt_fn: (msg) "Decompose these requirements into crates/modules with tech stack and boundaries.\n\nRequirements:\n{msg.specs}"  schema: ScaffoldResult}
+    {name: "spec"  type: "structured"  prompt_fn: (msg) "Generate SPEC.md for module '{msg.module.name}'.\nResponsibility: {msg.module.responsibility}\nConstraints: {msg.constraints}"  schema: SpecResult}
+  ]
+}
+
++implementer = {
+  name: "implementer"
+  handlers: [
+    {name: "implement"  type: "structured"  prompt_fn: (msg) "Implement the body for function '{msg.function}'.\nSpec: {msg.spec}\nContext: {msg.context}"  schema: ImplResult}
+    {name: "fix_test"  type: "structured"  prompt_fn: (msg) "Fix this failing test.\nError: {msg.error}\nCode: {msg.code}"  schema: FixResult}
+    {name: "revise"  type: "simple"  prompt_fn: (msg) "Revise this implementation based on feedback.\nWork: {msg.work}\nFeedback: {msg.feedback}"}
+  ]
+}
+
++verify_handler = (msg) {
+  analysis = ai.prompt "Verify this finding:\n{msg.finding}\nIs this a real issue? Respond with confirmed (bool) and reason." ?? ""
+  confirmed = analysis.confirmed ?? false
+  reason = analysis.reason ?? "unverified"
+  {confirmed: confirmed  reason: reason}
+}
+
++verifier = {
+  name: "verifier"
+  handlers: [{name: "verify"  type: "custom"  handler_fn: verify_handler}]
+}
+
++agent_auditor = {
+  name: "agent_auditor"
+  handlers: [
+    {name: "audit"  type: "with_fallback"  prompt_fn: (msg) "Audit this agent's behavior for security issues:\n{msg}"  fallback_fn: (msg) "audit unavailable"}
+    {name: "verify"  type: "with_fallback"  prompt_fn: (msg) "Verify this security finding:\n{msg.finding}"  fallback_fn: (msg) "verification unavailable"}
+  ]
+}
+
++scaffold_handler = (msg) {
+  path = "{msg.name}"
+  $^mkdir -p {path}/src
+  template = msg.template ?? "service"
+  lang = msg.lang ?? "rust"
+  ai.prompt "Generate a {lang} {template} project scaffold for '{msg.name}'. Create the necessary files." ^
+  {path: path  name: msg.name  lang: lang  template: template}
+}
+
++scaffolder = {
+  name: "scaffolder"
+  handlers: [{name: "scaffold"  type: "custom"  handler_fn: scaffold_handler}]
+}
+
++enhance_handler = (msg) {
+  examples_text = msg.examples | map (e) { "Input: {e.input}\nOutput: {e.output}" } | join "\n---\n"
+  ideal_output = ai.prompt "Rewrite this bad response as an ideal one.\nInput: {msg.input}\nBad output: {msg.bad_output}\n\nExamples of good responses:\n{examples_text}" ?? msg.bad_output
+  {ideal_output: ideal_output}
+}
+
++teacher = {
+  name: "teacher"
+  handlers: [{name: "enhance"  type: "custom"  handler_fn: enhance_handler}]
+}
+
++tool_scaffold_handler = (msg) {
+  path = "tools/{msg.manifest.name ?? "tool"}"
+  $^mkdir -p {path}/src
+  {path: path}
+}
+
++tool_maker = {
+  name: "tool_maker"
+  handlers: [
+    {name: "analyze"  type: "simple"  prompt_fn: (msg) "Analyze the need for MCP tool '{msg.target}'. What capabilities should it expose?"}
+    {name: "design"  type: "simple"  prompt_fn: (msg) "Design MCP tool based on analysis:\n{msg.analysis}\nReturn a manifest with tools, types, and endpoints."}
+    {name: "scaffold"  type: "custom"  handler_fn: tool_scaffold_handler}
+    {name: "codegen"  type: "simple"  prompt_fn: (msg) "Generate Rust MCP server code for:\n{msg.manifest}\nWorkspace: {msg.workspace}"}
+    {name: "fix_compile"  type: "with_fallback"  prompt_fn: (msg) "Fix these compilation errors in {msg.workspace}:\n{msg.errors}"  fallback_fn: (msg) ""}
+  ]
+}
+
++type_fixer = {
+  name: "type_fixer"
+  handlers: [
+    {name: "fix"  type: "structured"  prompt_fn: (msg) "Fix these compilation errors.\n\nErrors:\n{msg.errors}\n\nCode:\n{msg.code}\n\nResolve type errors, add missing impls, align trait bounds."  schema: TypeFixResult}
+  ]
+}
+
++typer = {
+  name: "typer"
+  handlers: [
+    {name: "stub"  type: "structured"  prompt_fn: (msg) "Generate Rust type stubs for module '{msg.module}'.\nSpec: {msg.spec}\n\nDefine types, traits, fn signatures with todo!() bodies."  schema: StubResult}
+  ]
+}

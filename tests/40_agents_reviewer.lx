@@ -43,4 +43,14 @@ focus_result = reviewer.quick_review {
 }
 assert (focus_result.summary != "") "quick_review: focus accepted"
 
+-- === pkg/ai/reviewer equivalents ===
+
+use pkg/ai/reviewer : pkg_reviewer
+
+pkg_result = pkg_reviewer.quick_review {transcript: transcript task: "fix config loading"}
+assert (pkg_result.summary != "") "pkg quick_review: has summary"
+
+pkg_empty_review = pkg_reviewer.review {transcript: "" task: "test"}
+assert (pkg_empty_review.summary == "Empty transcript") "pkg review: empty short-circuits"
+
 log.info "40_agents_reviewer: all passed"

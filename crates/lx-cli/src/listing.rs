@@ -31,9 +31,21 @@ pub fn list_workspace() -> ExitCode {
             0
         };
         let desc = member.description.as_deref().unwrap_or("");
+        let mut extra = String::new();
+        if let Some(ref lic) = member.license {
+            extra.push_str(&format!(" [{lic}]"));
+        }
+        if let Some(ref lx_ver) = member.lx {
+            extra.push_str(&format!(" lx{lx_ver}"));
+        }
+        if let Some(ref authors) = member.authors
+            && !authors.is_empty()
+        {
+            extra.push_str(&format!(" by {}", authors.join(", ")));
+        }
         println!(
-            "  {:<12} {:<7} {:>3} files  {:<14} {:>3} tests  {}",
-            member.name, version, file_count, entry_display, test_count, desc
+            "  {:<12} {:<7} {:>3} files  {:<14} {:>3} tests  {desc}{extra}",
+            member.name, version, file_count, entry_display, test_count,
         );
     }
     ExitCode::SUCCESS

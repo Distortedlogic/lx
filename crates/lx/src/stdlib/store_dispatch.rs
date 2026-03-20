@@ -10,7 +10,7 @@ use crate::value::{BuiltinFunc, BuiltinKind, Value};
 
 use super::store::{
     NEXT_ID, STORES, StoreState, bi_clear, bi_count, bi_create, bi_entries, bi_get, bi_keys,
-    bi_load, bi_persist, bi_query, bi_remove, bi_set, bi_update, store_id,
+    bi_load, bi_persist, bi_query, bi_remove, bi_set, bi_update, persist, store_id,
 };
 
 pub fn store_method(name: &str, store_val: &Value) -> Option<Value> {
@@ -26,6 +26,7 @@ pub fn store_method(name: &str, store_val: &Value) -> Option<Value> {
         "clear" => Some(("store.clear", 1, bi_clear)),
         "filter" | "query" => Some(("store.query", 2, bi_query)),
         "map" => Some(("store.map", 2, bi_map)),
+        "merge" => Some(("store.merge", 2, bi_merge)),
         "update" => Some(("store.update", 3, bi_update)),
         "save" => Some(("store.save", 2, bi_save_to)),
         "load" => Some(("store.load", 2, bi_load_from)),
@@ -183,6 +184,39 @@ fn bi_load_from(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Va
         .get_mut(&id)
         .ok_or_else(|| LxError::runtime("store: not found", span))?;
     s.data = data;
+    Ok(Value::Unit)
+}
+
+fn bi_merge(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+    let id = store_id(&args[0], span)?;
+    let entries: Vec<(String, Value)> = match &args[1] {
+        Value::Store { id: src_id } => {
+            let src = STORES
+                .get(src_id)
+                .ok_or_else(|| LxError::runtime("store.merge: source store not found", span))?;
+            src.data
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect()
+        }
+        Value::Record(r) => r.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+        other => {
+            return Err(LxError::type_err(
+                format!(
+                    "store.merge: expected Store or Record, got {}",
+                    other.type_name()
+                ),
+                span,
+            ));
+        }
+    };
+    let mut s = STORES
+        .get_mut(&id)
+        .ok_or_else(|| LxError::runtime("store: not found", span))?;
+    for (k, v) in entries {
+        s.data.insert(k, v);
+    }
+    persist(&s);
     Ok(Value::Unit)
 }
 

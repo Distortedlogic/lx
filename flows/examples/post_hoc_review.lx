@@ -1,5 +1,5 @@
 -- Post-task reflection -- review transcripts and extract learnings.
--- Phase 1: Ingest transcript via lib/transcript, split by type.
+-- Phase 1: Ingest transcript via pkg/transcript, split by type.
 -- Phase 2: Record spans into std/trace session for structured analysis.
 -- Phase 3: Extract patterns (tools used >=2x successfully) and mistakes (all failures).
 -- Phase 4: Send to std/agents/reviewer for AI-powered review summary.
@@ -8,11 +8,11 @@
 -- Demonstrates: workflow.run, transcript ingestion, pattern extraction, knowledge persistence.
 -- Source: mcp-toolbelt/arch_diagrams/scenario_post_hoc_review
 
-use pkg/knowledge {KnowledgeBase}
-use std/agents/reviewer
-use ../lib/transcript
-use pkg/report
-use pkg/workflow
+use pkg/data/knowledge {KnowledgeBase}
+use pkg/ai/reviewer
+use pkg/data/transcript
+use pkg/infra/report
+use pkg/infra/workflow
 
 +main = () {
   transcript_path = $^ls -t ~/.claude/projects/*/*.jsonl | trim | lines | first
@@ -49,8 +49,7 @@ use pkg/workflow
 
     review_result = reviewer.review {
       transcript: path
-      patterns: patterns
-      mistakes: mistakes
+      task: "Review session for patterns and mistakes"
     }
 
     kb = KnowledgeBase {path: "experience"}

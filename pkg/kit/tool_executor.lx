@@ -1,0 +1,90 @@
+-- Tool executor -- AI-powered tool selection, retry execution, result integration.
+-- Composes pkg/core/prompt + pkg/core/circuit + std/retry into a reusable pipeline.
+
+use std/ai
+use pkg/core/prompt
+use std/retry
+use pkg/core/circuit {CircuitBreaker}
+use std/time
+use pkg/core/score
+use pkg/core/contracts {ToolRequest ToolResult}
+
++select = (task tools) {
+  p = prompt.create ()
+    | prompt.system "You select the minimal set of tools needed for a task."
+    | prompt.section "Task" task
+    | prompt.section "Available Tools" (tools | map (t) "{t.name}: {t.description ?? t.name}" | join "\n")
+    | prompt.instruction "List only the tool names needed, one per line."
+    | prompt.constraint "Prefer cheaper tools. Only include what's strictly necessary."
+
+  selected_names = prompt.ask_lines p ""
+  tools | filter (t) selected_names | contains? t.name
+}
+
+default_dispatch = (req) Err "tool {req.tool} requires MCP dispatch"
+
++execute = (request breaker dispatch_fn = default_dispatch) {
+  breaker.check () ? Err "circuit breaker tripped" : {
+    result = retry.retry_with {
+      max_attempts: 3
+      base_delay_ms: 500
+      backoff: "exponential"
+    } () {
+      execute_single request dispatch_fn ^
+    }
+
+    result ? {
+      Ok r -> { breaker.record true; Ok r }
+      Err e -> { breaker.record false; Err e }
+    }
+  }
+}
+
+execute_single = (request dispatch_fn) {
+  start = time.now ()
+
+  output = request.tool ? {
+    "Bash" -> $^{request.args} ? { Ok out -> Ok out; Err e -> Err "shell error: {e}" }
+    "Read" -> { use std/fs; fs.read request.args ^ }
+    _ -> dispatch_fn request
+  }
+
+  elapsed = time.now () - start
+
+  output ? {
+    Ok out -> Ok (ToolResult {
+      tool: request.tool
+      success: true
+      output: out
+      tokens_used: len (to_str out) / 4
+      duration_ms: elapsed
+    })
+    Err e -> Err e
+  }
+}
+
++integrate = (results goal) {
+  successful = results | filter (.success)
+  failed = results | filter (r) not r.success
+
+  failed | not empty? ? log.warn "{len failed} tool calls failed" : ()
+
+  outputs = successful | map (r) "## {r.tool}\n{r.output}" | join "\n\n"
+
+  p = prompt.create ()
+    | prompt.system "You integrate tool results into a coherent answer."
+    | prompt.section "Goal" goal
+    | prompt.section "Tool Outputs" outputs
+    | prompt.instruction "Synthesize these results into a clear, direct answer."
+    | prompt.constraint "Don't mention the tools themselves. Just present the answer."
+
+  prompt.ask p outputs
+}
+
++total_cost = (results) {
+  results | map (.tokens_used) | sum * 0.001
+}
+
++make_executor = (breaker) (request) {
+  execute request breaker
+}

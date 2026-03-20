@@ -1,31 +1,6 @@
--- Project setup satisfaction tests (LIVE-ONLY)
--- Requires git and MCP servers. Gated behind LX_TEST_LIVE env var.
+use pkg/infra/testkit
 
-use std/test
-use pkg/testkit
-
-testkit.live_only "project_setup" () {
-  spec = test.spec "project setup" {
-    flow: "flows/tests/project_setup_flow.lx"
-    grader: testkit.always_pass_grader
-    threshold: 0.65
-    weights: testkit.default_weights
-  }
-
-  spec = test.scenario spec "initialize new project" {
-    input: {name: "test-project"  template: "rust-mcp"}
-    rubric: ["initialized" "project"]
-    tags: ["live" "setup"]
-    runs: 1
-  }
-
-  spec = test.scenario spec "configure mcp servers" {
-    input: {name: "test-project"  servers: ["valkey" "postgres"]}
-    rubric: ["configured" "servers"]
-    tags: ["live" "setup"]
-    runs: 1
-  }
-
-  results = test.run spec ^
-  test.report results
-}
+testkit.run_spec_live "project_setup" "flows/tests/project_setup_flow.lx" [
+  {name: "initialize new project"  input: {name: "test-project"  template: "rust-mcp"}  rubric: ["initialized" "project"]  tags: ["live" "setup"]}
+  {name: "configure mcp servers"  input: {name: "test-project"  servers: ["valkey" "postgres"]}  rubric: ["configured" "servers"]  tags: ["live" "setup"]}
+] {}

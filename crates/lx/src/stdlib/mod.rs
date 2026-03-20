@@ -10,6 +10,8 @@ mod agent_gate;
 mod agent_handoff;
 mod agent_intercept;
 mod agent_ipc;
+pub(crate) mod agent_lifecycle;
+pub(crate) mod agent_lifecycle_run;
 mod agent_mock;
 mod agent_negotiate;
 mod agent_negotiate_fmt;
@@ -27,7 +29,6 @@ pub(crate) mod agent_stream;
 mod agent_supervise;
 mod agents_auditor;
 mod agents_grader;
-mod agents_monitor;
 mod agents_planner;
 mod agents_reviewer;
 mod agents_router;
@@ -89,6 +90,7 @@ mod trait_ops;
 mod user;
 mod workspace;
 mod workspace_edit;
+mod yield_types;
 
 use crate::interpreter::ModuleExports;
 
@@ -100,7 +102,6 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
         match path[2].as_str() {
             "auditor" => agents_auditor::build(),
             "grader" => agents_grader::build(),
-            "monitor" => agents_monitor::build(),
             "planner" => agents_planner::build(),
             "reviewer" => agents_reviewer::build(),
             "router" => agents_router::build(),
@@ -142,6 +143,7 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
             "trait" => trait_ops::build(),
             "user" => user::build(),
             "workspace" => workspace::build(),
+            "yield" => yield_types::build(),
             _ => return None,
         }
     };
@@ -158,7 +160,7 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
     if path[1] == "agents" && path.len() >= 3 {
         return matches!(
             path[2].as_str(),
-            "auditor" | "grader" | "monitor" | "planner" | "reviewer" | "router"
+            "auditor" | "grader" | "planner" | "reviewer" | "router"
         );
     }
     matches!(
@@ -197,5 +199,6 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
             | "trait"
             | "user"
             | "workspace"
+            | "yield"
     )
 }

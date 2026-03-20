@@ -1,36 +1,7 @@
--- Full pipeline satisfaction tests
--- Tests audit/manual entry, grading loop convergence.
+use pkg/infra/testkit
 
-use std/test
-use pkg/testkit
-
-spec = test.spec "full pipeline" {
-  flow: "flows/tests/full_pipeline_flow.lx"
-  grader: testkit.default_grader
-  threshold: 0.65
-  weights: testkit.default_weights
-}
-
-spec = test.scenario spec "audit passes first grade" {
-  input: {data_path: "flows/tests/full_pipeline/fixtures/audit_pass/data.json"}
-  rubric: ["audit" "passed" "true" "iterations" "1"]
-  tags: ["pipeline" "smoke"]
-  runs: 1
-}
-
-spec = test.scenario spec "manual 3-item list" {
-  input: {data_path: "flows/tests/full_pipeline/fixtures/manual_list/data.json"}
-  rubric: ["manual" "passed" "true" "findings" "injection"]
-  tags: ["pipeline" "smoke"]
-  runs: 1
-}
-
-spec = test.scenario spec "grading loop converges" {
-  input: {data_path: "flows/tests/full_pipeline/fixtures/grading_loop/data.json"}
-  rubric: ["iterations" "2" "passed" "true" "grade_score"]
-  tags: ["pipeline"]
-  runs: 1
-}
-
-results = test.run spec ^
-test.report results
+testkit.run_spec "full pipeline" "flows/tests/full_pipeline_flow.lx" [
+  {name: "audit passes first grade"  input: {data_path: "flows/tests/full_pipeline/fixtures/audit_pass/data.json"}  rubric: ["audit" "passed" "true" "iterations" "1"]  tags: ["pipeline" "smoke"]}
+  {name: "manual 3-item list"  input: {data_path: "flows/tests/full_pipeline/fixtures/manual_list/data.json"}  rubric: ["manual" "passed" "true" "findings" "injection"]  tags: ["pipeline" "smoke"]}
+  {name: "grading loop converges"  input: {data_path: "flows/tests/full_pipeline/fixtures/grading_loop/data.json"}  rubric: ["iterations" "2" "passed" "true" "grade_score"]  tags: ["pipeline"]}
+] {}

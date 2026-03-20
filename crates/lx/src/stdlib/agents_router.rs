@@ -139,6 +139,10 @@ fn parse_llm_result(
 }
 
 fn bi_route(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+    static WARNED: std::sync::Once = std::sync::Once::new();
+    WARNED.call_once(|| {
+        eprintln!("[DEPRECATED] std/agents/router is deprecated — use pkg/ai/router instead");
+    });
     let fields = extract_fields(args, span)?;
     if fields.catalog.is_empty() {
         return Ok(no_match());
@@ -184,6 +188,10 @@ fn keyword_score(prompt: &str, entry: &CatalogEntry) -> f64 {
 }
 
 fn bi_quick_route(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+    static WARNED: std::sync::Once = std::sync::Once::new();
+    WARNED.call_once(|| {
+        eprintln!("[DEPRECATED] std/agents/router is deprecated — use pkg/ai/router instead");
+    });
     let fields = extract_fields(args, span)?;
     if fields.catalog.is_empty() {
         return Ok(no_match());

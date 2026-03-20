@@ -153,6 +153,30 @@ d3.set "y" 2
 mapped = d3.map (e) e.value * 10
 assert (len mapped == 2) "dot map"
 
+-- merge from Record
+d_merge = Store ()
+d_merge.set "a" 1
+d_merge.merge {b: 2  c: 3}
+assert (d_merge.len () == 3) "merge record: 3 keys"
+assert (d_merge.get "b" == 2) "merge record: got b"
+assert (d_merge.get "c" == 3) "merge record: got c"
+
+-- merge from Store
+src = Store ()
+src.set "x" 10
+src.set "y" 20
+dst = Store ()
+dst.set "z" 30
+dst.merge src
+assert (dst.len () == 3) "merge store: 3 keys"
+assert (dst.get "x" == 10) "merge store: got x"
+
+-- merge overwrites existing keys
+over = Store ()
+over.set "k" "old"
+over.merge {k: "new"}
+assert (over.get "k" == "new") "merge overwrites"
+
 -- reference semantics
 d4 = Store ()
 d4.set "k" "v"

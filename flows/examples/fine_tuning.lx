@@ -8,11 +8,11 @@
 -- Source: mcp-toolbelt/arch_diagrams/subagent_fine_tuning
 
 use std/fs
-use ../agents/teacher
-use ../mcps/langfuse
-use pkg/report
+use flows/lib/agent_catalog {enhance_handler}
+use pkg/connectors/catalog {langfuse}
+use pkg/infra/report
 use ../lib/training
-use pkg/workflow
+use pkg/infra/workflow
 
 fine_tune_candidates = [
   {name: "audit-verifier"  min_traces: 5000}
@@ -22,11 +22,11 @@ fine_tune_candidates = [
 ]
 
 +main = () {
-  lf = langfuse.connect ^
+  langfuse.connect () ^
   workflow.run "fine-tuning" "pipeline" (session) {
     results = fine_tune_candidates | map (candidate) {
       emit "\n=== {candidate.name} ==="
-      traces = training.harvest lf candidate.name candidate.min_traces
+      traces = training.harvest langfuse candidate.name candidate.min_traces
         traces ? {
           Err e -> {
             emit "  not ready: {e}"
@@ -34,7 +34,7 @@ fine_tune_candidates = [
           }
           Ok data -> {
             emit "  harvested {data | len} traces"
-            enhanced = training.enhance data teacher.enhance
+            enhanced = training.enhance data enhance_handler
             system_prompt = fs.read "agents/{candidate.name}/system_prompt.md" ?? ""
             path = training.write_jsonl candidate.name enhanced system_prompt
             emit "  training file: {path} ({enhanced | len} examples)"
@@ -67,5 +67,5 @@ fine_tune_candidates = [
       emit "\n{ready | len}/{results | len} candidates ready for training"
       Ok results
   }
-  langfuse.close lf
+  langfuse.disconnect ()
 }

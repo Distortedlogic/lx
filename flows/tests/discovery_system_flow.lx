@@ -1,7 +1,7 @@
 use std/fs
 use std/json
-use pkg/score : scoring
-use pkg/testkit
+use pkg/core/score : scoring
+use pkg/infra/testkit
 
 +run = (input) {
   data = testkit.load_fixture input
@@ -11,13 +11,10 @@ use pkg/testkit
   candidates = data.candidates ?? []
 
   scored = candidates | map (c) {
-    relevance = c.relevance ?? 0.0
-    quality = c.quality ?? 0.0
-    activity = c.activity ?? 0.0
     stars = c.stars ?? 0
     star_score = scoring.normalize 0.0 10000.0 (to_float stars)
-    score = relevance * 0.4 + quality * 0.3 + activity * 0.2 + star_score * 0.1
-    {name: c.name  score: score  language: (c.language ?? "unknown")  stars: stars}
+    score = scoring.composite %{relevance: 0.4  quality: 0.3  activity: 0.2  stars: 0.1} %{relevance: (c.relevance ?? 0.0)  quality: (c.quality ?? 0.0)  activity: (c.activity ?? 0.0)  stars: star_score}
+    {name: c.name  score  language: (c.language ?? "unknown")  stars}
   }
 
   ranked = scored | sort_by (c) 0.0 - c.score

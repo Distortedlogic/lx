@@ -1,55 +1,40 @@
 -- Satisfaction test runner for workgen.
--- Runs workgen for real against each scenario's fixture codebase,
--- uses std/agents/grader for AI-backed scoring of the output.
--- Scenarios run in parallel via pmap_n with per-scenario timeouts.
---
+-- Runs workgen for real against each scenario's fixture codebase.
 -- Usage: lx run workgen/tests/run.lx
 -- Filter: TEST_TAG=smoke lx run workgen/tests/run.lx
 
-use std/fs
 use std/env
-use pkg/trace {TraceStore}
+use std/fs
 use std/agents/grader
-use std/audit
+use pkg/core/score
 use ../main : workgen
 use ./spec
 
 run_scenario = (scenario) {
   emit "\n  --- {scenario.name} ---"
-
   result = workgen.run scenario.audit "workgen/rules/work-item.md" scenario.root
-
   result ? {
     Ok r -> {
       output = fs.read r.path ?? ""
-
       grade_result = grader.grade {
         work: output
         task: "work item for {scenario.name} covering: {scenario.expected_findings | join ", "}"
         rubric: spec.rubric
         threshold: spec.threshold_pct
       }
-
       emit "    score: {grade_result.score}  passed: {grade_result.passed}"
       grade_result.passed | not ? emit "    feedback: {grade_result.feedback}"
-
-      name = scenario.name
-      passed = grade_result.passed
-      score = grade_result.score
-      {name passed score}
+      {name: scenario.name  passed: grade_result.passed  score: grade_result.score}
     }
     Err e -> {
       emit "    ERROR: {e}"
-      name = scenario.name
-      {name  passed: false  score: 0.0}
+      {name: scenario.name  passed: false  score: 0.0}
     }
   }
 }
 
 +main = () {
-  session = TraceStore {path: "/tmp/lx_workgen_test_trace.json"}
   tag_filter = env.get "TEST_TAG" ?? ""
-
   scenarios = tag_filter == "" ?
     spec.scenarios :
     (spec.scenarios | filter (s) s.tags | contains? tag_filter)
@@ -60,14 +45,9 @@ run_scenario = (scenario) {
 
   results = scenarios | pmap_n 4 run_scenario
 
-  results | each (r) {
-    session.record {name: r.name  output: "{r.score}"  score: r.score} ?? ()
-  }
-
   passed_count = results | filter (.passed) | len
   total = results | len
-  scores = results | map (.score)
-  overall = (scores | sum) / total
+  overall = score.average (results | map (.score))
 
   emit "\n=== {spec.name} ==="
   results | each (r) {

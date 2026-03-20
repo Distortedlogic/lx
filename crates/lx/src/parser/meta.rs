@@ -5,38 +5,57 @@ use crate::token::TokenKind;
 
 impl super::Parser {
     pub(crate) fn looks_like_meta_block(&self) -> bool {
-        let i = self.pos;
+        let j = self.skip_meta_task_expr(self.pos);
+        if j == self.pos {
+            return false;
+        }
+        matches!(self.tokens.get(j).map(|t| &t.kind), Some(TokenKind::LBrace))
+    }
+
+    fn skip_meta_task_expr(&self, i: usize) -> usize {
         match self.tokens.get(i).map(|t| &t.kind) {
-            Some(TokenKind::Ident(_)) => {
-                matches!(
-                    self.tokens.get(i + 1).map(|t| &t.kind),
-                    Some(TokenKind::LBrace)
-                )
-            }
-            Some(TokenKind::LParen) => {
+            Some(TokenKind::Ident(_)) | Some(TokenKind::TypeName(_)) => i + 1,
+            Some(TokenKind::Int(_))
+            | Some(TokenKind::Float(_))
+            | Some(TokenKind::True)
+            | Some(TokenKind::False)
+            | Some(TokenKind::Unit)
+            | Some(TokenKind::RawStr(_))
+            | Some(TokenKind::Regex(_)) => i + 1,
+            Some(TokenKind::StrStart) => {
                 let mut j = i + 1;
-                let mut depth = 1u32;
-                while depth > 0 {
+                loop {
                     match self.tokens.get(j).map(|t| &t.kind) {
-                        Some(TokenKind::LParen) => {
-                            depth += 1;
-                            j += 1;
-                        }
-                        Some(TokenKind::RParen) => {
-                            depth -= 1;
-                            j += 1;
-                        }
-                        None | Some(TokenKind::Eof) => return false,
+                        Some(TokenKind::StrEnd) => return j + 1,
+                        None | Some(TokenKind::Eof) => return i,
                         _ => j += 1,
                     }
                 }
-                matches!(
-                    self.tokens.get(j).map(|t| &t.kind),
-                    Some(TokenKind::LBrace)
-                )
             }
-            _ => false,
+            Some(TokenKind::LParen) => self.skip_balanced(i, &TokenKind::RParen),
+            Some(TokenKind::LBracket) => self.skip_balanced(i, &TokenKind::RBracket),
+            _ => i,
         }
+    }
+
+    fn skip_balanced(&self, start: usize, close: &TokenKind) -> usize {
+        let mut j = start + 1;
+        let mut depth = 1u32;
+        while depth > 0 {
+            match self.tokens.get(j).map(|t| &t.kind) {
+                None | Some(TokenKind::Eof) => return start,
+                Some(k) if std::mem::discriminant(k) == std::mem::discriminant(close) => {
+                    depth -= 1;
+                    j += 1;
+                }
+                Some(TokenKind::LParen | TokenKind::LBracket) => {
+                    depth += 1;
+                    j += 1;
+                }
+                _ => j += 1,
+            }
+        }
+        j
     }
 
     pub(crate) fn parse_meta(&mut self, start: u32) -> Result<SExpr, LxError> {
@@ -84,8 +103,8 @@ impl super::Parser {
             .ok_or_else(|| LxError::parse("meta requires 'strategies' field", span, None))?;
         let attempt =
             attempt.ok_or_else(|| LxError::parse("meta requires 'attempt' field", span, None))?;
-        let evaluate = evaluate
-            .ok_or_else(|| LxError::parse("meta requires 'evaluate' field", span, None))?;
+        let evaluate =
+            evaluate.ok_or_else(|| LxError::parse("meta requires 'evaluate' field", span, None))?;
         Ok(SExpr::new(
             Expr::Meta {
                 task: Box::new(task),

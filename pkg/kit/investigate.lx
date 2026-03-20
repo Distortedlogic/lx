@@ -1,0 +1,43 @@
+-- Investigation pipeline -- AI-powered codebase investigation with tool access.
+-- Give an AI agent tools + a question + file context, get structured findings.
+
+use pkg/core/prompt
+
++gather_tree = (root) {
+  git_files = ($^git -C {root} ls-files 2>/dev/null) ?? ""
+  git_files != "" ?
+    (git_files | lines | take 300 | map (f) "{root}/{f}" | join "\n") :
+    (($^find {root} -maxdepth 4 -type f -not -path "*/.git/*" -not -path "*/target/*" -not -path "*/node_modules/*" 2>/dev/null) ?? "")
+}
+
++run = (question root opts) {
+  tree = gather_tree root
+  tools = opts.tools ?? ["Read" "Glob" "Grep" "Bash"]
+  max_turns = opts.max_turns ?? 15
+  system = opts.system ?? "You are a code investigator. Search the codebase thoroughly — read files, search for patterns. Produce a numbered findings list."
+
+  p = prompt.create ()
+    | prompt.section "Question" question
+    | prompt.section "Codebase Root" root
+    | prompt.section "File Tree" tree
+
+  instructions = opts.instructions ?? [
+    "For each item, search the codebase under '{root}/' to determine findings"
+    "Read every relevant file — do not guess from filenames alone"
+    "Return a numbered list of findings"
+  ]
+
+  p = instructions | fold p (p instr) prompt.instruction instr p
+
+  constraints = opts.constraints ?? [
+    "Report ONLY problems — do not list things that are correct"
+  ]
+
+  p = constraints | fold p (p c) prompt.constraint c p
+
+  prompt.ask_with p {
+    append_system: system
+    tools
+    max_turns
+  } ""
+}

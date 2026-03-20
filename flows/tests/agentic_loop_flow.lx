@@ -1,6 +1,6 @@
 use std/fs
 use std/json
-use pkg/circuit {CircuitBreaker}
+use pkg/core/circuit {CircuitBreaker}
 
 +run = (input) {
   actions_path = input.actions_path

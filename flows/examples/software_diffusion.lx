@@ -13,10 +13,10 @@
 -- Source: mcp-toolbelt/arch_diagrams/software_diffusion
 
 use std/agent
-use pkg/dispatch
-use ../lib/guidance
-use pkg/report
-use pkg/workflow
+use pkg/agents/dispatch
+use pkg/infra/guidance
+use pkg/infra/report
+use pkg/infra/workflow
 
 +main = () {
   prompt = "I want a collaborative task manager with real-time updates"

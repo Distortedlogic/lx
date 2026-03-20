@@ -4,16 +4,17 @@
 --   L3 (procedural): >=0.95, IS the system prompt.
 -- Seeding: transfer learning at birth via seeder agent from the catalog.
 -- Review loops: daily (L1 promote/demote), weekly (L2 -> L3 consolidation).
--- Routing: catalog.route for domain classification, dispatch.run_one for execution.
+-- Routing: router.quick_route for domain classification, dispatch.run_one for execution.
 -- Demonstrates: cron scheduling, catalog routing, tiered memory, transfer learning.
 -- Source: mcp-toolbelt/arch_diagrams/agent_lifecycle + subagent_lifecycle
 
 use std/cron
-use pkg/trace {TraceStore}
-use pkg/catalog
-use pkg/dispatch
-use pkg/tieredmem : memory
-use pkg/report
+use pkg/data/trace {TraceStore}
+use pkg/agents/catalog
+use pkg/agents/dispatch
+use pkg/ai/router
+use pkg/data/memory
+use pkg/infra/report
 use ../lib/specialists
 
 Trait AgentDef = {name: Str  purpose: Str  domain: Str}
@@ -81,10 +82,11 @@ Trait AgentDef = {name: Str  purpose: Str  domain: Str}
 }
 
 +route_and_dispatch = (prompt) {
-  route = catalog.route prompt specialists.default
+  route = router.quick_route {prompt  catalog: specialists.default.entries}
   emit "routed to: {route.domain} (confidence: {route.confidence})"
 
-  route.specialist ? {
+  specialist = catalog.by_domain route.domain specialists.default
+  specialist ? {
     Some s -> dispatch.run_one s.script {task: prompt  max_turns: 30}
     None -> Err "no specialist for '{route.domain}'"
   }

@@ -5,10 +5,10 @@
 -- Demonstrates: workflow.run, react engine composition, knowledge storage.
 -- Source: mcp-toolbelt/arch_diagrams/agentic_loop
 
-use pkg/knowledge {KnowledgeBase}
-use pkg/react
-use pkg/report
-use pkg/workflow
+use pkg/data/knowledge {KnowledgeBase}
+use pkg/agents/react
+use pkg/infra/report
+use pkg/infra/workflow
 
 +main = () {
   run "fix the failing test in src/parser.rs" {}

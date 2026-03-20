@@ -1,43 +1,8 @@
--- Agentic loop satisfaction tests
--- Tests ReAct loop patterns: completion, doom loop detection, stagnation, circuit breaker.
+use pkg/infra/testkit
 
-use std/test
-use pkg/testkit
-
-spec = test.spec "agentic loop" {
-  flow: "flows/tests/agentic_loop_flow.lx"
-  grader: testkit.default_grader
-  threshold: 0.70
-  weights: testkit.default_weights
-}
-
-spec = test.scenario spec "simple task completion" {
-  input: {actions_path: "flows/tests/agentic_loop/fixtures/simple_completion/actions.json"}
-  rubric: ["completed" "true" "turns" "3"]
-  tags: ["agentic" "smoke"]
-  runs: 1
-}
-
-spec = test.scenario spec "doom loop detection" {
-  input: {actions_path: "flows/tests/agentic_loop/fixtures/doom_loop/actions.json"  repetition_window: 3}
-  rubric: ["doom_loop_detected" "true"]
-  tags: ["agentic" "smoke"]
-  runs: 1
-}
-
-spec = test.scenario spec "stagnating oscillation" {
-  input: {actions_path: "flows/tests/agentic_loop/fixtures/stagnating/actions.json"  repetition_window: 3}
-  rubric: ["turns" "completed" "false"]
-  tags: ["agentic"]
-  runs: 1
-}
-
-spec = test.scenario spec "circuit breaker max turns" {
-  input: {actions_path: "flows/tests/agentic_loop/fixtures/circuit_breaker/actions.json"  max_turns: 25}
-  rubric: ["circuit_breaker_fired" "true" "completed" "false"]
-  tags: ["agentic"]
-  runs: 1
-}
-
-results = test.run spec ^
-test.report results
+testkit.run_spec "agentic loop" "flows/tests/agentic_loop_flow.lx" [
+  {name: "simple task completion"  input: {actions_path: "flows/tests/agentic_loop/fixtures/simple_completion/actions.json"}  rubric: ["completed" "true" "turns" "3"]  tags: ["agentic" "smoke"]}
+  {name: "doom loop detection"  input: {actions_path: "flows/tests/agentic_loop/fixtures/doom_loop/actions.json"  repetition_window: 3}  rubric: ["doom_loop_detected" "true"]  tags: ["agentic" "smoke"]}
+  {name: "stagnating oscillation"  input: {actions_path: "flows/tests/agentic_loop/fixtures/stagnating/actions.json"  repetition_window: 3}  rubric: ["turns" "completed" "false"]  tags: ["agentic"]}
+  {name: "circuit breaker max turns"  input: {actions_path: "flows/tests/agentic_loop/fixtures/circuit_breaker/actions.json"  max_turns: 25}  rubric: ["circuit_breaker_fired" "true" "completed" "false"]  tags: ["agentic"]}
+] {threshold: 0.70}

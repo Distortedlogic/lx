@@ -11,6 +11,10 @@ use crate::value::Value;
 use super::json_conv::{json_to_lx, lx_to_json};
 
 pub fn build() -> IndexMap<String, Value> {
+    static WARNED: std::sync::Once = std::sync::Once::new();
+    WARNED.call_once(|| {
+        eprintln!("[DEPRECATED] std/ctx is deprecated — use Store() with dot methods (.set, .get, .keys, .merge, .remove, .save, .load) instead");
+    });
     let mut m = IndexMap::new();
     m.insert("empty".into(), mk("ctx.empty", 1, bi_empty));
     m.insert("load".into(), mk("ctx.load", 1, bi_load));

@@ -3,7 +3,7 @@
 
 # Design Health
 
-Updated after Session 75 (2026-03-20).
+Updated after Session 81 (2026-03-20).
 
 ## What Works
 
@@ -17,7 +17,9 @@ Updated after Session 75 (2026-03-20).
 
 ## What's Still Wrong
 
-**`? { }` is always parsed as match block.** `cond ? { ... }` after `?` starts a match block, not a regular block. Record spreads like `{..a, b: c}` inside `? { ... }` fail with "unexpected DotDot in pattern." Workaround: use parens `? ({..a, b: c})` or extract to a function.
+**`? { }` is always parsed as match block.** `cond ? { ... }` after `?` starts a match block, not a regular block. Record spreads like `{..a, b: c}` inside `? { ... }` fail with "unexpected DotDot in pattern." Workaround: bind the record first (`result = {..a, b: c}; cond ? result : other`). Also affects reassignment statements inside `? { x <- val }` (parsed as match pattern). Session 80: documented 7 new gotchas from this family of ambiguities (see GOTCHAS.md).
+
+**Record shorthand fields followed by keyed fields misparse.** `{steps  task  step_count: steps | len}` — `steps task` is parsed as function application, not two shorthand fields. Workaround: always use explicit keys when mixing shorthand and keyed fields. `{..spread  shorthand}` has the same issue.
 
 **`lx check` still has 31 residual errors on workspace.** Import resolution dropped false positives from 122→31. Remaining are real checker limitations (infinite type in reassignment, negation on pattern-bound vars) and parse errors in brain/flows files — not import-related.
 
@@ -25,4 +27,4 @@ See `agent/PRIORITIES.md` for the full ordered work queue.
 
 ## Bottom Line
 
-Session 75: `with context` ambient propagation shipped — scoped ambient state flowing through call chains. 17 agent extensions + ambient context. Async interpreter stable. 94/94 tests pass. 0 errors, 0 warnings.
+Session 81: Completed MANIFEST_COMPLETION work item (10 tasks). `lx init` scaffolding. Manifest schema: `[package]` gains authors/license/lx, version validated as required, `[backends]` parsed and wired to RuntimeCtx (NoopEmitBackend/NoopLogBackend added), `[test]` gains threshold/runs propagated to RuntimeCtx, `[deps.dev]` parsed with install + filter (dev deps excluded from `lx run`, included in `lx test`). Lockfile tracks resolved version. Package manifest now matches spec/package-manifest.md. 98/98 tests, 0 errors, 0 warnings.

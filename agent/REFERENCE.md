@@ -15,20 +15,31 @@ crates/lx/src/
   interpreter/ Tree-walking evaluator — mod + split files (agents, apply, eval, modules, patterns, etc.)
   builtins/    Built-in functions — mod, call, str, coll, hof, convert, register, etc.
   visitor/     AST visitor/walker infrastructure
-  stdlib/      34 registered Rust modules + 6 standard agents across ~102 .rs files (use `std_module_exists` in mod.rs as source of truth)
+  stdlib/      35 registered Rust modules + 5 standard agents across ~103 .rs files (use `std_module_exists` in mod.rs as source of truth)
   token.rs, value.rs, value_display.rs, value_impls.rs, ast_display.rs, env.rs, error.rs, span.rs, lib.rs
-crates/lx-cli/src/  main.rs, manifest.rs, testing.rs, listing.rs, run.rs, agent_cmd.rs, install.rs, install_ops.rs, lockfile.rs, check.rs
+crates/lx-cli/src/  main.rs, manifest.rs, testing.rs, listing.rs, run.rs, agent_cmd.rs, init.rs, install.rs, install_ops.rs, lockfile.rs, check.rs
 doc/           35 quick-reference docs
 spec/          51 spec files
 agent/         Context files (this folder)
-pkg/           11 lx packages — agent (Trait), collection (Trait), 5 Collection-based Classes (KnowledgeBase, TaskStore, TraceStore, MemoryStore, ContextWindow), 3 standalone Classes (CircuitBreaker, Inspector, Pool), prompt (functional)
-tests/         94 test suites (92 .lx files + 87_export_shadow dir + 11_modules dir)
-  fixtures/    Test helpers (agent_echo.lx, orchestrators, servers, test flows)
+pkg/           42 lx packages in 7 clusters:
+  core/        circuit, collection, connector, contracts, introspect, pool, prompt, score
+  connectors/  mcp (McpConnector), cli (CliConnector), catalog (connector instances)
+  ai/          ai_agent, agent_factory, perception, planner, quality, reasoning, reflect, reviewer, router
+  data/        context, knowledge, memory, tasks, tieredmem, trace, transcript
+  agents/      catalog, dialogue, dispatch, guard, monitor, react
+  infra/       guidance, mcp_session (deprecated), report, testkit, workflow
+  kit/         context_manager, grading, investigate, security_scan, tool_executor
+tests/         98 test suites
+  fixtures/    Test helpers
+brain/
+  lib/         4 brain-specific files (cognitive_saga, context_mgr, identity, tools)
+  agents/      6 brain specialist agents
 flows/
-  lib/         15 reusable .lx library modules
-  examples/    14 .lx programs translating arch_diagrams
-  specs/       14 target goal + scenario specs
+  agents/      19 spawnable agent scripts (14 collapsed to factory pattern via agent_catalog)
+  examples/    14 .lx programs
+  lib/         4 files (specialists.lx, github.lx, training.lx, agent_catalog.lx)
   tests/       Flow satisfaction test suites
+  prompts/     3 prompt template files
 ```
 
 ## Adding a Stdlib Module
@@ -138,18 +149,6 @@ variables across all curried positions.
 
 | Library (lib/)      | Purpose                                                                      |
 | ------------------- | ---------------------------------------------------------------------------- |
-| catalog             | Tool/capability catalog management                                           |
-| dispatch            | Message dispatch helpers                                                     |
-| github              | GitHub API interaction patterns                                              |
-| grading             | Output grading utilities                                                     |
-| guard               | Guard/validation patterns                                                    |
-| guidance            | Guidance/instruction patterns                                                |
-| mcp_session         | MCP session management                                                       |
-| memory              | Memory management patterns                                                   |
-| react               | ReAct loop implementation                                                    |
-| report              | Report generation utilities                                                  |
-| scoring             | Scoring/ranking helpers                                                      |
-| specialists         | Specialist agent patterns                                                    |
-| training            | Training/fine-tuning patterns                                                |
-| transcript          | Conversation transcript handling                                             |
-| workflow            | Workflow composition patterns                                                |
+| github              | GitHub API: search_repos, search_axes, scale_stars (moved from pkg/infra/)   |
+| specialists         | Specialist agent catalog + keyword map                                       |
+| training            | Training data pipeline: harvest, enhance, write_jsonl (moved from pkg/data/) |

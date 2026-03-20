@@ -175,6 +175,9 @@ pub fn build() -> IndexMap<String, Value> {
     for (name, val) in super::agent_stream::builtins() {
         m.insert(name.into(), val);
     }
+    for (name, val) in super::agent_lifecycle::builtins() {
+        m.insert(name.into(), val);
+    }
     for (name, val) in super::agent_errors::tagged_ctors() {
         m.insert(name.into(), val);
     }
@@ -269,6 +272,7 @@ fn bi_spawn(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, 
 }
 
 fn bi_kill(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+    super::agent_lifecycle_run::run_shutdown_hooks(&args[0], "killed", span, ctx)?;
     let pid = get_pid(&args[0], span)?;
     match REGISTRY.remove(&pid) {
         Some((_, mut agent)) => {

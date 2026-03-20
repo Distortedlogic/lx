@@ -1,0 +1,85 @@
+-- lx package: TaskStore class for task management with state machine
+-- Generic operations (keys/values/save/load) come from Collection.
+-- Domain-specific: create, get (wraps in Ok/Err), state machine transitions.
+
+use std/time
+use pkg/core/collection {Collection}
+
+task_counter := 0
+
+next_id = () {
+  task_counter <- task_counter + 1
+  "task_{task_counter}"
+}
+
+now_iso = () { (time.now ()).iso }
+
++Class TaskStore : [Collection] = {
+  entries: Store ()
+
+  create = (opts) {
+    id = next_id ()
+    task = {
+      id: id
+      title: opts.title ?? "untitled"
+      status: "todo"
+      parent: opts.parent ?? ""
+      tags: opts.tags ?? []
+      notes: ""
+      output: ""
+      feedback: ""
+      result: ""
+      created_at: now_iso ()
+      updated_at: now_iso ()
+    }
+    self.entries.set id task
+    Ok id
+  }
+
+  get = (id) {
+    task = self.entries.get id
+    task == None ? (Err "task not found: {id}") : (Ok task)
+  }
+
+  children = (parent_id) {
+    self.entries.values () | filter (t) t.parent == parent_id
+  }
+
+  list = (filter_rec) {
+    status = filter_rec == () ? None : filter_rec.status
+    tag = filter_rec == () ? None : filter_rec.tag
+    self.entries.values () | filter (t) {
+      status_ok = status == None || t.status == status
+      tag_ok = tag == None || (contains? tag t.tags)
+      status_ok && tag_ok
+    }
+  }
+
+  update = (id fields) {
+    task = self.entries.get id
+    task == None ? (Err "task not found") : {
+      self.entries.set id {..task ..fields, updated_at: (now_iso ())}
+      Ok ()
+    }
+  }
+
+  apply_transition = (task id new_status extra) {
+    base = {..task, status: new_status, updated_at: (now_iso ())}
+    merged = extra == () ? base : ({..base ..extra})
+    self.entries.set id merged
+    Ok ()
+  }
+
+  transition = (id allowed_from new_status extra) {
+    task = self.entries.get id
+    task == None ? (Err "not found") : (not (contains? task.status allowed_from) ? (Err "invalid transition from {task.status}") : (self.apply_transition task id new_status extra))
+  }
+
+  start = (id) { self.transition id ["todo" "revision"] "in_progress" () }
+  submit = (id extra) { self.transition id ["in_progress" "revision"] "submitted" extra }
+  audit = (id) { self.transition id ["submitted"] "pending_audit" () }
+  pass = (id) { self.transition id ["pending_audit"] "passed" () }
+  fail = (id extra) { self.transition id ["pending_audit"] "failed" extra }
+  revise = (id) { self.transition id ["failed"] "revision" () }
+  complete = (id extra) { self.transition id ["passed"] "complete" extra }
+}

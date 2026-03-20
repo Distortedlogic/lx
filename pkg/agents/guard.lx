@@ -1,0 +1,104 @@
+-- Security toolkit -- injection scanning, loop detection, resource monitoring.
+-- scan: test text against pattern list, return Finding list.
+-- detect_loops: flag excessive tool calls.
+-- check_resources: flag oversized transcripts.
+-- full_scan: run all passes on trace entries.
+-- check: fast pass/fail gate for single input using default patterns.
+-- run_parallel/run_blocking: composable guard wrappers for agent execution.
+
+use std/re
+
+Trait +GuardResult = {pass: Bool  reason: Str}
+Trait +Finding = {severity: Str  type: Str  evidence: Str  source: Str  agent_id: Str = ""}
+
++default_patterns = [
+  "ignore previous instructions"
+  "you are now"
+  "system prompt override"
+  "forget everything"
+  "new persona"
+  "ignore all prior"
+  "disregard your instructions"
+]
+
++safety_patterns = [
+  "eval\\("
+  "exec\\("
+  "DROP TABLE"
+  "rm -rf"
+  "__import__"
+  "subprocess.run"
+  "os.system"
+  "child_process"
+]
+
++scan = (text patterns) {
+  lowered = lower text
+  patterns | flat_map (p) {
+    matched = re.is_match (lower p) lowered
+    matched ? {
+      true -> [Finding {severity: "critical"  type: "prompt_injection"  evidence: p  source: "guard"}]
+      false -> []
+    }
+  }
+}
+
++scan_entries = (entries patterns) {
+  entries | flat_map (e) {
+    hits = scan (to_str e.input) patterns
+    hits | map (finding) {..finding  agent_id: (e.name ?? "")}
+  }
+}
+
++detect_loops = (entries threshold) {
+  calls = entries | filter (e) { e.type == "tool_use" }
+  count = calls | len
+  count > threshold ? {
+    true -> [Finding {severity: "high"  type: "stuck_loop"  evidence: "{count} tool calls (threshold: {threshold})"  source: "guard"}]
+    false -> []
+  }
+}
+
++check_resources = (entries threshold) {
+  size = entries | len
+  size > threshold ? {
+    true -> [Finding {severity: "high"  type: "resource_excessive"  evidence: "{size} entries (threshold: {threshold})"  source: "guard"}]
+    false -> []
+  }
+}
+
++full_scan = (entries opts) {
+  pats = opts.patterns ?? default_patterns
+  loop_threshold = opts.loop_threshold ?? 20
+  resource_threshold = opts.resource_threshold ?? 500
+  [..(scan_entries entries pats) ..(detect_loops entries loop_threshold) ..(check_resources entries resource_threshold)]
+}
+
++check = (input patterns = default_patterns) {
+  text = input ? { {content: c ..} -> c; _ -> to_str input }
+  findings = scan text patterns
+  findings | empty? ? {
+    true -> GuardResult {pass: true  reason: "ok"}
+    false -> GuardResult {pass: false  reason: "pattern match: {findings.0.evidence}"}
+  }
+}
+
++run_parallel = (input agent_fn) {
+  (guard_result, agent_result) = par { check input; agent_fn input }
+  guard_result.pass ? agent_result : Err "blocked: {guard_result.reason}"
+}
+
++run_blocking = (input agent_fn) {
+  result = check input
+  result.pass ? (agent_fn input) : Err "blocked: {result.reason}"
+}
+
++by_severity = (findings severity) findings | filter (f) f.severity == severity
+
++severity_summary = (findings) {
+  critical: findings | filter (f) { f.severity == "critical" } | len
+  high: findings | filter (f) { f.severity == "high" } | len
+  medium: findings | filter (f) { f.severity == "medium" } | len
+  low: findings | filter (f) { f.severity == "low" } | len
+  total: findings | len
+}

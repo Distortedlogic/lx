@@ -2,12 +2,12 @@
 -- Source: the persistent self — who I am, what I value, how I adapt
 
 use std/profile
-use pkg/knowledge {KnowledgeBase}
+use pkg/data/knowledge {KnowledgeBase}
 use std/agent
 use std/user
 use std/fs
 use ../contracts {Identity}
-use pkg/reflect {FeedbackSignal}
+use pkg/ai/reflect {FeedbackSignal}
 
 dangerous_patterns = ["delete all" "drop table" "rm -rf /" "force push main" "ignore error"]
 

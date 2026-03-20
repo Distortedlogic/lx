@@ -1,7 +1,7 @@
 -- 37_memory.lx
 -- Tests: pkg/memory MemoryStore class (tiered memory with promotion/demotion)
 
-use pkg/memory {MemoryStore}
+use pkg/data/memory {MemoryStore}
 use std/fs
 
 path = "/tmp/lx_memory_test.json"

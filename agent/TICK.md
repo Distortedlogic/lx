@@ -24,23 +24,35 @@ See `TICK_PROTOCOL.md` for cross-read guidance.
 
 ## State
 
-Session 75 (2026-03-20). **94/94 tests pass.** `just diagnose` clean (0 errors, 0 warnings).
-40 Rust stdlib modules + 11 lx packages in `pkg/`. Async interpreter: `eval`/`exec` are
-`async fn` with `#[async_recursion(?Send)]`. Shipped this session: `with context` ambient
-propagation (1 Rust file interpreter/ambient.rs, 3 file splits for 300-line compliance).
+Session 81 (2026-03-20). **98/98 tests pass.** `just diagnose` clean (0 errors, 0 warnings).
+42 Rust stdlib modules + 42 lx packages in `pkg/` (7 clusters). Async interpreter.
+Shipped this session: MANIFEST_COMPLETION work item (10 tasks) — `lx init` scaffolding,
+`[package]` metadata (authors/license/lx), version validation, `[backends]` parsing + wiring,
+`[test]` threshold/runs, `[deps.dev]` parsing + install + filtering, lockfile version tracking,
+NoopEmitBackend/NoopLogBackend, RuntimeCtx test config propagation.
 
 ## This Tick
 
-**Next priority from PRIORITIES.md: `meta` block (`spec/agents-meta.md`).**
+**Next priority from PRIORITIES.md: Tier 6 parser-heavy features. Pick from:**
+- `|>>` streaming pipe (`spec/concurrency-reactive.md`)
+- `caller` implicit binding (`spec/agents-clarify.md`)
+- Deadlock detection (`spec/agents-deadlock.md`)
+
+Or check `work_items/` for remaining work items:
+- `work_items/REPO_PIPELINING.md`
+- `work_items/TYPE_CHECKER_COMPLETION.md`
+
+Read the specs/work items and pick whichever is most impactful / tractable.
 
 ## Read These Files
 
 1. `agent/PRIORITIES.md` — feature queue, context for what to build
-2. `spec/agents-meta.md` — spec for meta block (strategy-level iteration)
-3. `agent/INVENTORY.md` — what's implemented
-4. `agent/REFERENCE.md` — codebase layout and how-tos
-5. `agent/GOTCHAS.md` — parser traps
-6. `agent/LANGUAGE.md` — core lx syntax (meta is a language-level feature)
+2. `spec/concurrency-reactive.md` — streaming pipe spec
+3. `spec/agents-clarify.md` — caller binding spec
+4. `spec/agents-deadlock.md` — deadlock detection spec
+5. `agent/INVENTORY.md` — what's implemented
+6. `agent/REFERENCE.md` — codebase layout and how-tos
+7. `agent/GOTCHAS.md` — parser traps (7 new gotchas added Session 80)
 
 ## Context Files
 

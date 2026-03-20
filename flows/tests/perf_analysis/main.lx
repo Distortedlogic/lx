@@ -1,36 +1,7 @@
--- Perf analysis satisfaction tests
--- Tests specialist aggregation, sorting by severity, and category dedup.
+use pkg/infra/testkit
 
-use std/test
-use pkg/testkit
-
-spec = test.spec "perf analysis" {
-  flow: "flows/tests/perf_analysis_flow.lx"
-  grader: testkit.default_grader
-  threshold: 0.65
-  weights: testkit.default_weights
-}
-
-spec = test.scenario spec "memory leak detected" {
-  input: {data_path: "flows/tests/perf_analysis/fixtures/memory_leak/data.json"}
-  rubric: ["memory" "critical" "cache" "findings"]
-  tags: ["perf" "smoke"]
-  runs: 1
-}
-
-spec = test.scenario spec "clean system" {
-  input: {data_path: "flows/tests/perf_analysis/fixtures/clean/data.json"}
-  rubric: ["total_findings" "0"]
-  tags: ["perf"]
-  runs: 1
-}
-
-spec = test.scenario spec "multi category findings" {
-  input: {data_path: "flows/tests/perf_analysis/fixtures/multi_category/data.json"}
-  rubric: ["threading" "memory" "critical" "categories"]
-  tags: ["perf" "smoke"]
-  runs: 1
-}
-
-results = test.run spec ^
-test.report results
+testkit.run_spec "perf analysis" "flows/tests/perf_analysis_flow.lx" [
+  {name: "memory leak detected"  input: {data_path: "flows/tests/perf_analysis/fixtures/memory_leak/data.json"}  rubric: ["memory" "critical" "cache" "findings"]  tags: ["perf" "smoke"]}
+  {name: "clean system"  input: {data_path: "flows/tests/perf_analysis/fixtures/clean/data.json"}  rubric: ["total_findings" "0"]  tags: ["perf"]}
+  {name: "multi category findings"  input: {data_path: "flows/tests/perf_analysis/fixtures/multi_category/data.json"}  rubric: ["threading" "memory" "critical" "categories"]  tags: ["perf" "smoke"]}
+] {}

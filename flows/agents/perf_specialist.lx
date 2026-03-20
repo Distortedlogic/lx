@@ -1,9 +1,8 @@
 -- Performance analysis specialist -- domain-parameterized analysis.
--- Handles: db, memory, compute, threading, network domains.
--- Import and call directly, or spawn as subprocess via main.
 
 use std/ai
 use std/agent
+use pkg/ai/ai_agent
 
 +analyze = (msg) {
   domain = msg.domain ?? "general"
@@ -20,5 +19,4 @@ use std/agent
 }
 
 +handlers = %{"analyze": analyze}
-
-+main = () { agent.dispatch handlers }
++main = () { ai_agent.serve handlers }

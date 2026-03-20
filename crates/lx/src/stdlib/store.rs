@@ -45,7 +45,7 @@ pub(super) fn store_id(v: &Value, span: Span) -> Result<u64, LxError> {
     }
 }
 
-fn persist(state: &StoreState) {
+pub(super) fn persist(state: &StoreState) {
     let Some(ref path) = state.path else { return };
     let dummy_span = Span::default();
     let Ok(json_val) =

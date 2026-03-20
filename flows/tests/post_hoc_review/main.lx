@@ -1,42 +1,12 @@
--- Post-hoc review satisfaction tests
--- Tests transcript parsing, pattern extraction, and mistake identification.
+use pkg/infra/testkit
 
-use std/test
-use pkg/testkit
-
-touch_fixtures = (scenario) {
+touch_transcript = (scenario) {
   path = scenario.input.transcript_path
   $^touch {path}
 }
 
-spec = test.spec "post hoc review" {
-  flow: "flows/tests/post_hoc_review_flow.lx"
-  grader: testkit.default_grader
-  threshold: 0.65
-  weights: testkit.default_weights
-  setup: touch_fixtures
-}
-
-spec = test.scenario spec "successful session patterns" {
-  input: {transcript_path: "flows/tests/post_hoc_review/fixtures/successful_session/transcript.jsonl"}
-  rubric: ["patterns" "successes" "clean"]
-  tags: ["review" "smoke"]
-  runs: 1
-}
-
-spec = test.scenario spec "failed session mistakes" {
-  input: {transcript_path: "flows/tests/post_hoc_review/fixtures/failed_session/transcript.jsonl"}
-  rubric: ["mistakes" "failures" "Review"]
-  tags: ["review" "smoke"]
-  runs: 1
-}
-
-spec = test.scenario spec "mixed session" {
-  input: {transcript_path: "flows/tests/post_hoc_review/fixtures/mixed_session/transcript.jsonl"}
-  rubric: ["patterns" "mistakes" "successes" "failures"]
-  tags: ["review"]
-  runs: 1
-}
-
-results = test.run spec ^
-test.report results
+testkit.run_spec "post hoc review" "flows/tests/post_hoc_review_flow.lx" [
+  {name: "successful session patterns"  input: {transcript_path: "flows/tests/post_hoc_review/fixtures/successful_session/transcript.jsonl"}  rubric: ["patterns" "successes" "clean"]  tags: ["review" "smoke"]}
+  {name: "failed session mistakes"  input: {transcript_path: "flows/tests/post_hoc_review/fixtures/failed_session/transcript.jsonl"}  rubric: ["mistakes" "failures" "Review"]  tags: ["review" "smoke"]}
+  {name: "mixed session"  input: {transcript_path: "flows/tests/post_hoc_review/fixtures/mixed_session/transcript.jsonl"}  rubric: ["patterns" "mistakes" "successes" "failures"]  tags: ["review"]}
+] {setup: touch_transcript}

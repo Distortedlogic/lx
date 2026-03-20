@@ -2,9 +2,9 @@
 -- Source: adversarial self-review before committing to a response
 
 use std/ai
-use pkg/prompt
-use pkg/guard
-use pkg/score
+use pkg/core/prompt
+use pkg/agents/guard
+use pkg/core/score
 use ../traits {Critic}
 
 Trait Critique = {
@@ -57,7 +57,7 @@ Agent InnerCritic: Critic = {
   verify_code = (msg) {
     (correctness safety) = par {
       check_correctness msg.code msg.task
-      guard.check_safety msg.code
+      guard.check msg.code guard.safety_patterns
     }
     {all_passed: correctness.ok && safety.pass}
   }

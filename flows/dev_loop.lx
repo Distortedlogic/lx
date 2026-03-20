@@ -47,22 +47,28 @@ read_context = () {
   }
 }
 
-ground_truth = () {
+run_checks = () {
   diag = $just diagnose
   tests = $just test
   diag_code = diag ? { Ok r -> r.code; _ -> 1 }
+  diag_out = diag ? { Ok r -> "{r.out}\n{r.err}"; _ -> "failed" }
   test_out = tests ? { Ok r -> r.out; _ -> "" }
   pass_count = test_out | lines | filter (l) contains? "PASS" l | len
   fail_count = test_out | lines | filter (l) contains? "FAIL" l | len
   git_status = ($^git status --short) ?? ""
   {
+    ok: (diag_code == 0 && fail_count == 0)
     diag_clean: (diag_code == 0)
     pass_count
     fail_count
+    diag_out
     test_out
     git_status
   }
 }
+
+ground_truth = run_checks
+validate = run_checks
 
 pick_task = (ctx truth) {
   prompt = dev_prompts.pick_task truth ctx
@@ -74,24 +80,6 @@ run_worker = (prompt) {
   emit "worker prompt written to /tmp/lx_dev_prompt.md"
   result = $cat /tmp/lx_dev_prompt.md | claude --dangerously-skip-permissions --output-format text
   result ? { Ok r -> r.out; Err e -> "worker error: {e.msg}" }
-}
-
-validate = () {
-  diag = $just diagnose
-  tests = $just test
-  diag_code = diag ? { Ok r -> r.code; _ -> 1 }
-  diag_out = diag ? { Ok r -> "{r.out}\n{r.err}"; _ -> "failed" }
-  test_out = tests ? { Ok r -> r.out; _ -> "" }
-  pass_count = test_out | lines | filter (l) contains? "PASS" l | len
-  fail_count = test_out | lines | filter (l) contains? "FAIL" l | len
-  {
-    ok: (diag_code == 0 && fail_count == 0)
-    diag_clean: (diag_code == 0)
-    pass_count
-    fail_count
-    diag_out
-    test_out
-  }
 }
 
 update_context = (ctx task v) {

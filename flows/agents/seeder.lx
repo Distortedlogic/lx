@@ -1,14 +1,6 @@
 -- Transfer learning seeder -- bootstraps new agents with domain knowledge.
--- Import and call directly, or spawn as subprocess via main.
 
-use std/ai
-use std/agent
+use pkg/ai/agent_factory
+use flows/lib/agent_catalog as catalog
 
-+seed = (msg) {
-  patterns = ai.prompt "Generate initial knowledge entries for a new '{msg.purpose}' agent in the '{msg.domain}' domain. Return a list of patterns with content and confidence fields." ^
-  {patterns}
-}
-
-+handlers = %{"seed": seed}
-
-+main = () { agent.dispatch handlers }
++main = agent_factory.from_config catalog.seeder

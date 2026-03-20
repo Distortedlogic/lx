@@ -1,0 +1,79 @@
+-- Context manager -- pressure monitoring, eviction, and AI compression for ContextWindow.
+-- Composes pkg/data/context + pkg/core/prompt + pkg/core/score into reusable policies.
+
+use pkg/data/context {ContextWindow}
+use pkg/core/prompt
+
++init = (capacity) ContextWindow {capacity}
+
++add = (win item) {
+  win.add {key: item.key  content: item.content  tokens: item.tokens  priority: item.priority}
+}
+
++pin = (win key content) {
+  tokens = len content / 4
+  win.add {key  content  tokens  priority: "high"}
+  win.pin key
+}
+
++pressure_pct = (win) win.usage ().pct
+
++manage_pressure = (win) {
+  level = win.pressure ()
+  level ? {
+    "critical" -> {
+      win.evict_until "lowest_priority" {target_pct: 0.6}
+      log.warn "context pressure critical — evicted to 60%"
+      win
+    }
+    "high" -> {
+      win.evict "largest"
+      log.info "context pressure high — evicted largest item"
+      win
+    }
+    _ -> win
+  }
+}
+
++compress = (win) {
+  items = win.items ()
+  unpinned = items | filter (i) not (win.is_pinned i.key ?? false)
+
+  unpinned | len < 3 ? win : {
+    to_compress = unpinned | sort_by (.tokens) | rev | take 3
+
+    to_compress | each (item) {
+      compressed = compress_item item
+      win.remove item.key
+      win.add {
+        key: item.key
+        content: compressed
+        tokens: len compressed / 4
+        priority: item.priority
+      }
+    }
+
+    win
+  }
+}
+
+compress_item = (item) {
+  p = prompt.create ()
+    | prompt.system "You compress text to its essential meaning."
+    | prompt.section "Content" item.content
+    | prompt.instruction "Compress to ~25% of original length. Keep all facts."
+
+  prompt.ask p item.content
+}
+
++snapshot = (win) {
+  usage = win.usage ()
+  items = win.items ()
+  {..usage  item_count: len items  pinned_count: items | filter (.pinned ?? false) | len}
+}
+
++clear_ephemeral = (win) {
+  ephemeral = win.items () | filter (i) i.priority == "low"
+  ephemeral | each (item) win.remove item.key
+  len ephemeral
+}

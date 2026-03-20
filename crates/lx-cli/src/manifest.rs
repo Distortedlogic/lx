@@ -8,7 +8,10 @@ pub struct RootManifest {
     pub workspace: Option<WorkspaceSection>,
     pub package: Option<PackageSection>,
     pub test: Option<TestSection>,
+    pub backends: Option<BackendsSection>,
     pub dependencies: Option<HashMap<String, DepSpec>>,
+    #[serde(rename = "deps")]
+    pub deps_table: Option<DepsTable>,
 }
 
 #[derive(Deserialize)]
@@ -22,12 +25,34 @@ pub struct PackageSection {
     pub version: Option<String>,
     pub entry: Option<String>,
     pub description: Option<String>,
+    pub authors: Option<Vec<String>>,
+    pub license: Option<String>,
+    pub lx: Option<String>,
 }
 
 #[derive(Deserialize)]
 pub struct TestSection {
     pub dir: Option<String>,
     pub pattern: Option<String>,
+    pub threshold: Option<f64>,
+    pub runs: Option<u32>,
+}
+
+#[derive(Deserialize)]
+pub struct BackendsSection {
+    pub ai: Option<String>,
+    pub shell: Option<String>,
+    pub http: Option<String>,
+    pub emit: Option<String>,
+    #[serde(rename = "yield")]
+    pub yield_backend: Option<String>,
+    pub log: Option<String>,
+    pub user: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct DepsTable {
+    pub dev: Option<HashMap<String, DepSpec>>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -61,7 +86,31 @@ pub fn load_manifest(root: &Path) -> Result<RootManifest, String> {
     let manifest_path = root.join("lx.toml");
     let content = std::fs::read_to_string(&manifest_path)
         .map_err(|e| format!("cannot read {}: {e}", manifest_path.display()))?;
-    toml::from_str(&content).map_err(|e| format!("invalid {}: {e}", manifest_path.display()))
+    let manifest: RootManifest = toml::from_str(&content)
+        .map_err(|e| format!("invalid {}: {e}", manifest_path.display()))?;
+    validate_manifest(&manifest, &manifest_path)?;
+    Ok(manifest)
+}
+
+fn validate_manifest(manifest: &RootManifest, path: &Path) -> Result<(), String> {
+    if let Some(ref pkg) = manifest.package {
+        match &pkg.version {
+            None => {
+                return Err(format!(
+                    "{}: [package] requires a 'version' field",
+                    path.display()
+                ));
+            }
+            Some(v) if v.is_empty() => {
+                return Err(format!(
+                    "{}: [package].version must not be empty",
+                    path.display()
+                ));
+            }
+            _ => {}
+        }
+    }
+    Ok(())
 }
 
 pub fn deps_dir(root: &Path) -> PathBuf {
@@ -69,6 +118,14 @@ pub fn deps_dir(root: &Path) -> PathBuf {
 }
 
 pub fn try_load_dep_dirs() -> HashMap<String, PathBuf> {
+    load_dep_dirs_filtered(true)
+}
+
+pub fn try_load_dep_dirs_no_dev() -> HashMap<String, PathBuf> {
+    load_dep_dirs_filtered(false)
+}
+
+fn load_dep_dirs_filtered(include_dev: bool) -> HashMap<String, PathBuf> {
     let Ok(cwd) = std::env::current_dir() else {
         return HashMap::new();
     };
@@ -79,6 +136,17 @@ pub fn try_load_dep_dirs() -> HashMap<String, PathBuf> {
     if !deps.exists() {
         return HashMap::new();
     }
+    let dev_names: Vec<String> = if !include_dev {
+        let marker = deps.join(".dev-deps");
+        std::fs::read_to_string(marker)
+            .unwrap_or_default()
+            .lines()
+            .filter(|l| !l.is_empty())
+            .map(|l| l.to_string())
+            .collect()
+    } else {
+        Vec::new()
+    };
     let Ok(entries) = std::fs::read_dir(&deps) else {
         return HashMap::new();
     };
@@ -88,6 +156,9 @@ pub fn try_load_dep_dirs() -> HashMap<String, PathBuf> {
         if path.is_dir()
             && let Some(name) = path.file_name().and_then(|n| n.to_str())
         {
+            if !include_dev && dev_names.iter().any(|d| d == name) {
+                continue;
+            }
             map.insert(name.to_string(), path);
         }
     }
@@ -104,6 +175,9 @@ pub struct Member {
     pub dir: PathBuf,
     pub entry: Option<String>,
     pub description: Option<String>,
+    pub license: Option<String>,
+    pub authors: Option<Vec<String>>,
+    pub lx: Option<String>,
     pub test_dir: String,
     pub test_pattern: String,
 }
@@ -150,6 +224,7 @@ pub fn load_workspace(root: &Path) -> Result<Workspace, String> {
             .map_err(|e| format!("cannot read {}: {e}", member_manifest_path.display()))?;
         let member_manifest: RootManifest = toml::from_str(&member_content)
             .map_err(|e| format!("invalid {}: {e}", member_manifest_path.display()))?;
+        validate_manifest(&member_manifest, &member_manifest_path)?;
         let pkg = member_manifest.package.ok_or_else(|| {
             format!(
                 "{} has no [package] section",
@@ -159,6 +234,8 @@ pub fn load_workspace(root: &Path) -> Result<Workspace, String> {
         let test = member_manifest.test.unwrap_or(TestSection {
             dir: None,
             pattern: None,
+            threshold: None,
+            runs: None,
         });
         members.push(Member {
             name: pkg.name,
@@ -166,6 +243,9 @@ pub fn load_workspace(root: &Path) -> Result<Workspace, String> {
             dir: member_dir,
             entry: pkg.entry,
             description: pkg.description,
+            license: pkg.license,
+            authors: pkg.authors,
+            lx: pkg.lx,
             test_dir: test.dir.unwrap_or_else(|| "tests/".into()),
             test_pattern: test.pattern.unwrap_or_else(|| "*.lx".into()),
         });

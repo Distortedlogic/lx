@@ -200,6 +200,33 @@ MCP Tools = {
 
 `yield {kind: "approval" data: changes}` — pause for orchestrator input. `emit "Status update"` — fire-and-forget to human (strings → stdout, records → JSON). `receive { action -> (msg) handler }` — agent message loop sugar (desugars to yield/loop/match on `msg.action`).
 
+### Typed Yield Variants (std/yield)
+
+5 Traits for structured orchestrator communication:
+
+```lx
+use std/yield {YieldApproval YieldReflection YieldInformation YieldDelegation YieldProgress}
+
+plan = yield YieldApproval {
+  action: "deploy"
+  details: {env: "prod"  risk: "low"}
+}
+
+guidance = yield YieldReflection {
+  task: "analyze"
+  attempt: {score: 15}
+  question: "What should I change?"
+}
+
+data = yield YieldInformation {query: "API key for service X"}
+
+yield YieldDelegation {task: {name: "review"  files: ["a.rs"]}}
+
+yield YieldProgress {stage: "parsing"  pct: 0.45}
+```
+
+Each Trait has a `kind` field with a default ("approval", "reflection", "information", "delegation", "progress"). The orchestrator receives `{"__yield": {"kind": "approval", ...}}` and dispatches on `kind`. Untyped `yield expr` still works — backwards compatible. Response shapes are conventions, not enforced.
+
 ## Refine (Iterative Improvement)
 
 ```lx
@@ -213,6 +240,26 @@ result = refine initial_draft {
 ```
 
 Returns Ok {work rounds final_score} or Err {work rounds final_score reason}.
+
+## Meta (Strategy-Level Iteration)
+
+```lx
+result = meta task {
+  strategies: ["bottom_up" "top_down" "decompose"]
+  attempt: (strategy task) execute_with strategy task
+  evaluate: (result strategy) {
+    viable: result.score > 30
+    quality: result.score
+    reason: result.feedback
+  }
+  select: "sequential"
+  on_switch: (from to reason) log.info "switching from {from} to {to}"
+}
+```
+
+Returns Ok {result strategy attempts} on first viable attempt, or Err {reason attempts best} if all strategies exhausted. Fields: `strategies` (list), `attempt` (curried fn: strategy -> task -> result), `evaluate` (curried fn: result -> strategy -> {viable quality reason}), optional `select` ("sequential" default, "random"), optional `on_switch` (callback: from -> to -> reason -> ()).
+
+`meta` is a contextual keyword — `Ident("meta")` in the lexer, detected by lookahead in the parser. `meta` can still be used as an identifier (variable name, record field, parameter name).
 
 ## Agent Communication Extensions
 
@@ -368,6 +415,26 @@ agent.dialogue_delete "review-auth-2026-03" ^
 ```
 
 `dialogue_save` persists session state (config + turn history) to `.lx/dialogues/{id}.json`. Overwrites if id exists. `dialogue_load` restores and binds to a (possibly different) agent — only conversation state transfers, not process handle. `dialogue_list` returns `[{id role turns created updated context_preview}]`. `dialogue_delete` removes saved file, returns `Err` if not found.
+
+### Lifecycle Hooks
+
+```lx
+me = {name: "worker" handler: (msg) msg}
+me = agent.on me "startup" () { log.info "started" } ^
+me = agent.on me "shutdown" (reason) { flush_state () } ^
+me = agent.on me "error" (err) (msg) { log.err "error: {err}" } ^
+me = agent.on me "idle" 30 () { memory.compact () } ^
+me = agent.on me "message" (msg) { trace.record "incoming" msg } ^
+me = agent.on me "signal" (s) { s.action == "stop" ? should_stop <- true } ^
+
+agent.startup me ^
+agent.shutdown me "done" ^
+agent.signal me {action: "pause"} ^
+agent.on_remove me "idle" ^
+hooks = agent.idle_hooks me
+```
+
+6 events: startup (before first message), shutdown (on kill/exit), error (unhandled handler error, curried `err -> msg`), idle (after N seconds silence), message (pre-handler hook, Err rejects), signal (user interrupt). Multiple hooks per event fire in registration order. `agent.on_remove` clears all hooks for an event. `agent.kill` auto-fires shutdown hooks. Global `HOOKS` DashMap keyed by auto-assigned `__lifecycle_id`.
 
 ### Other Extensions
 

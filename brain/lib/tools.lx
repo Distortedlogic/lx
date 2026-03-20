@@ -1,15 +1,12 @@
 -- Tool orchestration: selection, execution, result integration
 -- Source: bridges cognitive intent to concrete actions via MCP/shell/AI
+-- Delegates generic tool operations to pkg/kit/tool_executor.
 
-use std/ai
-use pkg/prompt
-use std/mcp
 use std/budget
-use std/retry
-use pkg/circuit {CircuitBreaker}
-use std/time
-use pkg/score
-use ../contracts {ToolRequest ToolResult ActionPlan ActionResult}
+use pkg/kit/tool_executor : executor
+use pkg/core/contracts {ToolRequest ToolResult ActionPlan}
+use pkg/core/prompt
+use pkg/core/score
 
 MCP CognitiveTools = {
   Read {path: Str} -> {content: Str}
@@ -34,19 +31,10 @@ tool_costs = %{
     | map (name) {name  cost: get name tool_costs ?? 0.01}
 }
 
-+select_tools = (task: Str  tools: [Any]) -> [Any] {
-  p = prompt.create ()
-    | prompt.system "You select the minimal set of tools needed for a task."
-    | prompt.section "Task" task
-    | prompt.section "Available Tools" (tools | map (t) "{t.name}: {t.description}" | join "\n")
-    | prompt.instruction "List only the tool names needed, one per line."
-    | prompt.constraint "Prefer cheaper tools. Only include what's strictly necessary."
-
-  resp = ai.prompt (prompt.render p) ?? {text: ""}
-  selected_names = resp.text | lines | map trim | filter (not empty?)
-
-  tools | filter (t) selected_names | contains? t.name
-}
++select_tools = executor.select
++execute_with_retry = executor.execute
++integrate_results = executor.integrate
++total_cost = executor.total_cost
 
 +plan_execution = (goal: Str  selected_tools: [Any]  b: Any) -> ActionPlan {
   estimated = selected_tools | map (.cost) | sum
@@ -60,9 +48,9 @@ tool_costs = %{
     | prompt.instruction "Create ordered steps. Each step: tool name + arguments + what it achieves."
     | prompt.constraint "Minimize steps. Parallelize when dependencies allow."
 
-  resp = ai.prompt (prompt.render p) ?? {text: goal}
+  text = prompt.ask p goal
 
-  steps = resp.text | lines
+  steps = text | lines
     | filter (l) trim l | not empty?
     | enumerate
     | map (i line) {
@@ -80,79 +68,4 @@ tool_costs = %{
     risk: score.tier [{min: 1.0  name: "high"} {min: 0.3  name: "medium"} {min: 0.0  name: "low"}] estimated
     fallback: "simplify approach and retry with fewer tools"
   }
-}
-
-+execute_with_retry = (request: ToolRequest  breaker: Any) -> Any {
-  breaker.check () ? Err "circuit breaker tripped" : {
-    result = retry.retry_with {
-      max_attempts: 3
-      base_delay_ms: 500
-      backoff: "exponential"
-    } () {
-      execute_single request ^
-    }
-
-    result ? {
-      Ok r -> { breaker.record true; Ok r }
-      Err e -> { breaker.record false; Err e }
-    }
-  }
-}
-
-execute_single = (request: ToolRequest) -> ToolResult {
-  start = time.now ()
-
-  output = request.tool ? {
-    "Bash" -> $^{request.args} ? { Ok out -> Ok out; Err e -> Err "shell error: {e}" }
-    "Read" -> { use std/fs; fs.read request.args ^ }
-    _ -> Err "tool {request.tool} requires MCP dispatch"
-  }
-
-  elapsed = time.now () - start
-
-  output ? {
-    Ok out -> Ok (ToolResult {
-      tool: request.tool
-      success: true
-      output: out
-      tokens_used: len (to_str out) / 4
-      duration_ms: elapsed
-    })
-    Err e -> Err e
-  }
-}
-
-+integrate_results = (results: [ToolResult]  goal: Str) -> Str {
-  successful = results | filter (.success)
-  failed = results | filter (r) not r.success
-
-  failed | not empty? ? log.warn "{len failed} tool calls failed" : ()
-
-  outputs = successful | map (r) "## {r.tool}\n{r.output}" | join "\n\n"
-
-  p = prompt.create ()
-    | prompt.system "You integrate tool results into a coherent answer."
-    | prompt.section "Goal" goal
-    | prompt.section "Tool Outputs" outputs
-    | prompt.instruction "Synthesize these results into a clear, direct answer."
-    | prompt.constraint "Don't mention the tools themselves. Just present the answer."
-
-  resp = ai.prompt (prompt.render p) ?? {text: outputs}
-  resp.text
-}
-
-+total_cost = (results: [ToolResult]) -> Float {
-  results | map (.tokens_used) | sum * 0.001
-}
-
-make_tool_filter = (category: Str) (tools: [Any]) -> [Any] {
-  tools | filter (t) t.category ?? "" == category
-}
-
-fs_tools = make_tool_filter "fs"
-search_tools = make_tool_filter "search"
-web_tools = make_tool_filter "web"
-
-make_executor = (breaker: Any) (request: ToolRequest) -> Any {
-  execute_with_retry request breaker
 }

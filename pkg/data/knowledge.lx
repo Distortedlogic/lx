@@ -1,0 +1,31 @@
+-- lx package: KnowledgeBase class for shared discovery cache
+-- Stores key-value entries with metadata and timestamps.
+-- Generic operations (get/keys/query/remove/save/load) come from Collection.
+
+use std/time
+use pkg/core/collection {Collection}
+
++Class KnowledgeBase : [Collection] = {
+  entries: Store ()
+
+  store = (key val meta) {
+    now = time.now ()
+    self.entries.set key {key: key  val: val  meta: meta  stored_at: now.iso}
+    Ok ()
+  }
+
+  merge = (other) {
+    other.values () | each (e) {
+      self.entries.set e.key e
+    }
+    Ok ()
+  }
+
+  expire = (before) {
+    self.keys () | each (k) {
+      entry = self.get k
+      (entry != None && entry.stored_at < before) ? (self.entries.remove k) : ()
+    }
+    Ok ()
+  }
+}

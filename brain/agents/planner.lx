@@ -2,11 +2,11 @@
 -- Source: breaks down complex goals into executable step sequences
 
 use std/ai
-use pkg/prompt
+use pkg/core/prompt
 use std/plan
 use ../traits {Planner}
-use pkg/score
-use ../contracts {ActionPlan}
+use pkg/core/score
+use pkg/core/contracts {ActionPlan}
 
 Trait PlanStep = {
   id: Str
@@ -37,9 +37,9 @@ Agent TaskPlanner: Planner = {
       | prompt.instruction "Create 10 or fewer steps. Each step: ID, description, tool, dependencies."
       | prompt.constraint "Minimize steps. Identify parallelizable ones. No circular deps."
 
-    resp = ai.prompt (prompt.render p) ?? {text: msg.goal}
+    text = prompt.ask p msg.goal
 
-    steps = resp.text | lines
+    steps = text | lines
       | filter (l) trim l | not empty?
       | enumerate
       | map (i line) {
@@ -71,8 +71,8 @@ Agent TaskPlanner: Planner = {
       | prompt.section "Remaining Steps" (remaining | map (.action) | join "\n")
       | prompt.instruction "Create an alternative plan that works around the failure."
 
-    resp = ai.prompt (prompt.render p) ?? {text: ""}
-    new_steps = resp.text | lines
+    text = prompt.ask p ""
+    new_steps = text | lines
       | filter (l) trim l | not empty?
       | enumerate
       | map (i line) {

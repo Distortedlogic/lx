@@ -1,24 +1,19 @@
 -- Context window management: pressure monitoring, eviction, prioritization
 -- Source: manages the finite attention window — what to keep, what to evict
+-- Delegates generic operations to pkg/kit/context_manager, adds brain-specific typed wrappers.
 
-use pkg/context {ContextWindow}
-use pkg/prompt
-use std/ai
+use pkg/kit/context_manager : cm
+use pkg/core/contracts {ContextItem}
 use std/time
-use ../contracts {ContextItem}
-use pkg/score
-use pkg/monitor {CognitiveState}
 
-+init = (capacity: Int) -> Any {
-  ContextWindow {capacity: capacity}
-}
++init = (capacity: Int) -> Any { cm.init capacity }
 
 +add_item = (win: Any  item: ContextItem) -> Any {
-  win.add {key: item.key  content: item.content  tokens: item.tokens  priority: item.priority}
+  cm.add win {key: item.key  content: item.content  tokens: item.tokens  priority: item.priority}
 }
 
 +add_perception = (win: Any  perception: Any) -> Any {
-  win.add {
+  cm.add win {
     key: "perception_{perception.intent}"
     content: "Intent: {perception.intent} | Domain: {perception.domain} | Input: {perception.raw}"
     tokens: len perception.raw / 4 + 20
@@ -28,7 +23,7 @@ use pkg/monitor {CognitiveState}
 
 +add_reasoning = (win: Any  chain: Any) -> Any {
   summary = chain.thoughts | map (.content) | join " → "
-  win.add {
+  cm.add win {
     key: "reasoning_{chain.goal | take 20}"
     content: "Goal: {chain.goal}\nChain: {summary}\nConclusion: {chain.conclusion}"
     tokens: len summary / 4 + 30
@@ -37,7 +32,7 @@ use pkg/monitor {CognitiveState}
 }
 
 +add_tool_result = (win: Any  result: Any) -> Any {
-  win.add {
+  cm.add win {
     key: "tool_{result.tool}_{time.now ()}"
     content: "{result.output}"
     tokens: result.tokens_used
@@ -46,82 +41,12 @@ use pkg/monitor {CognitiveState}
 }
 
 +pin_identity = (win: Any  identity: Any) -> Any {
-  win.add {key: "identity"  content: "I am {identity.name}, a {identity.role}. Values: {identity.values | join ", "}."  tokens: 50  priority: "high"}
-  win.pin "identity"
+  cm.pin win "identity" "I am {identity.name}, a {identity.role}. Values: {identity.values | join ", "}."
 }
 
-+pin_user_context = (win: Any  key: Str  content: Str) -> Any {
-  tokens = len content / 4
-  win.add {key: key  content: content  tokens: tokens  priority: "high"}
-  win.pin key
-}
-
-+pressure = (win: Any) -> Float {
-  win.usage ().pressure
-}
-
-+pressure_level = (win: Any) -> Str {
-  p = pressure win
-  score.tier [{min: 0.85  name: "critical"} {min: 0.6  name: "high"} {min: 0.3  name: "moderate"} {min: 0.0  name: "low"}] p
-}
-
-+manage_pressure = (win: Any) -> Any {
-  level = pressure_level win
-  level ? {
-    "critical" -> {
-      win.evict_until "lowest_priority" {target_pct: 0.6}
-      log.warn "context pressure critical — evicted to 60%"
-      win
-    }
-    "high" -> {
-      win.evict "largest"
-      log.info "context pressure high — evicted largest item"
-      win
-    }
-    _ -> win
-  }
-}
-
-+summarize_and_compress = (win: Any) -> Any {
-  items = win.items ()
-  unpinned = items | filter (i) not (win.is_pinned i.key ?? false)
-
-  unpinned | len < 3 ? win : {
-    to_compress = unpinned | sort_by (.tokens) | rev | take 3
-
-    to_compress | each (item) {
-      compressed = compress_item item ^
-      win.remove item.key
-      win.add {
-        key: item.key
-        content: compressed
-        tokens: len compressed / 4
-        priority: item.priority
-      }
-    }
-
-    win
-  }
-}
-
-compress_item = (item: Any) -> Str {
-  p = prompt.create ()
-    | prompt.system "You compress text to its essential meaning."
-    | prompt.section "Content" item.content
-    | prompt.instruction "Compress to ~25% of original length. Keep all facts."
-
-  resp = ai.prompt (prompt.render p) ?? {text: item.content}
-  resp.text
-}
-
-+snapshot = (win: Any) -> Any {
-  usage = win.usage ()
-  items = win.items ()
-  {..usage  item_count: len items  pinned_count: items | filter (.pinned ?? false) | len}
-}
-
-+clear_ephemeral = (win: Any) -> Int {
-  ephemeral = win.items () | filter (i) i.priority == "low"
-  ephemeral | each (item) win.remove item.key
-  len ephemeral
-}
++pin_user_context = cm.pin
++pressure_pct = cm.pressure_pct
++manage_pressure = cm.manage_pressure
++summarize_and_compress = cm.compress
++snapshot = cm.snapshot
++clear_ephemeral = cm.clear_ephemeral

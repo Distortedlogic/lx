@@ -50,4 +50,14 @@ empty_route = router.route {prompt: "do something" catalog: []}
 assert (empty_route.domain == "none") "route: empty catalog short-circuits"
 assert (empty_route.confidence == 0.0) "route: empty catalog confidence 0"
 
+-- === pkg/ai/router equivalents ===
+
+use pkg/ai/router : pkg_router
+
+pkg_cr = pkg_router.quick_route {prompt: "review the pull request changes" catalog: catalog}
+assert (pkg_cr.domain == "code_review") "pkg quick_route: code review"
+
+pkg_empty = pkg_router.quick_route {prompt: "anything" catalog: []}
+assert (pkg_empty.domain == "none") "pkg quick_route: empty catalog"
+
 log.info "34_agents_router: all passed"

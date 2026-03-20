@@ -1,6 +1,6 @@
 use std/fs
 use std/json
-use pkg/testkit
+use pkg/infra/testkit
 
 +run = (input) {
   data = testkit.load_fixture input

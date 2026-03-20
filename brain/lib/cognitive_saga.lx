@@ -1,13 +1,12 @@
 -- Saga step definitions for the cognitive pipeline with real compensations
 -- Source: each step has a do/undo pair — undo actually reverses side effects
 
-use pkg/trace {TraceStore}
-use std/ctx
+use pkg/data/trace {TraceStore}
 use std/agent {Handoff}
 use ../contracts {Response}
-use ../lib/perception : perceive
-use ../lib/reasoning : reason
-use ../lib/memory_mgr : mem
+use pkg/ai/perception : perceive
+use pkg/ai/reasoning : reason
+use pkg/data/tieredmem : mem
 use ../lib/tools : tools
 use ../lib/context_mgr : ctx_mgr
 
@@ -19,13 +18,13 @@ use ../lib/context_mgr : ctx_mgr
         p = perceive.perceive input [] ^
         trace_session.record {name: "perceive" input: input output: p.intent} ?? ()
         ctx_mgr.add_perception context_win p
-        ctx.set "perception_key" "perception_{p.intent}" saga_ctx
+        saga_ctx.set "perception_key" "perception_{p.intent}"
         p
       }
       undo: (result) {
-        key = ctx.get "perception_key" saga_ctx ?? "perception_unknown"
+        key = saga_ctx.get "perception_key" ?? "perception_unknown"
         ctx_mgr.clear_ephemeral context_win
-        ctx.set "perception_key" "" saga_ctx
+        saga_ctx.set "perception_key" ""
         log.info "perception compensated — cleared context entry {key}"
       }
     }
@@ -35,11 +34,11 @@ use ../lib/context_mgr : ctx_mgr
         perception = prev.perceive
         recalled = mem.recall memory_store perception.raw perception.domain
         trace_session.record {name: "recall" input: perception.domain output: "found {len recalled}"} ?? ()
-        ctx.set "recall_count" (len recalled) saga_ctx
+        saga_ctx.set "recall_count" (len recalled)
         recalled | take 10
       }
       undo: (result) {
-        ctx.set "recall_count" 0 saga_ctx
+        saga_ctx.set "recall_count" 0
       }
       depends: ["perceive"]
     }
@@ -58,14 +57,14 @@ use ../lib/context_mgr : ctx_mgr
 
         chain = reason.reason handoff.task handoff.context [] ^
         ctx_mgr.add_reasoning context_win chain
-        ctx.set "reasoning_key" "reasoning_{chain.goal | take 20}" saga_ctx
+        saga_ctx.set "reasoning_key" "reasoning_{chain.goal | take 20}"
         trace_session.record {name: "reason" input: perception.intent output: chain.strategy} ?? ()
         chain
       }
       undo: (result) {
-        key = ctx.get "reasoning_key" saga_ctx ?? "reasoning_unknown"
+        key = saga_ctx.get "reasoning_key" ?? "reasoning_unknown"
         ctx_mgr.clear_ephemeral context_win
-        ctx.set "reasoning_key" "" saga_ctx
+        saga_ctx.set "reasoning_key" ""
         log.info "reasoning compensated — cleared context entry {key}"
       }
       depends: ["perceive" "recall"]

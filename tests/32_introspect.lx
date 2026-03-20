@@ -1,7 +1,7 @@
 -- 32_introspect.lx
 -- Tests: pkg/introspect Inspector class (agent self-awareness)
 
-use pkg/introspect {Inspector}
+use pkg/core/introspect {Inspector}
 
 ins = Inspector ()
 

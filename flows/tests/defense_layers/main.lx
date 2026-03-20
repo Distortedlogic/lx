@@ -1,46 +1,8 @@
-use std/test
-use pkg/testkit
+use pkg/infra/testkit
 
-touch_fixtures = (scenario) {
-  dir = scenario.input.project_dir
-  $^find {dir} -name "*.jsonl" -exec touch {} +
-}
-
-spec = test.spec "defense layers" {
-  flow: "flows/tests/defense_layers_flow.lx"
-  grader: testkit.default_grader
-  threshold: 0.60
-  weights: testkit.default_weights
-  setup: touch_fixtures
-}
-
-spec = test.scenario spec "parallel guardrail clean" {
-  input: {project_dir: "flows/tests/defense_layers/fixtures/parallel_clean"}
-  rubric: ["findings" "0"]
-  tags: ["defense" "smoke"]
-  runs: 1
-}
-
-spec = test.scenario spec "parallel guardrail injection" {
-  input: {project_dir: "flows/tests/defense_layers/fixtures/parallel_injection"}
-  rubric: ["findings" "critical" "injection"]
-  tags: ["defense" "smoke"]
-  runs: 1
-}
-
-spec = test.scenario spec "multi agent scan" {
-  input: {project_dir: "flows/tests/defense_layers/fixtures/multi_agent"}
-  rubric: ["findings" "agents" "critical" "high"]
-  tags: ["defense"]
-  runs: 1
-}
-
-spec = test.scenario spec "clean system" {
-  input: {project_dir: "flows/tests/defense_layers/fixtures/clean"}
-  rubric: ["findings" "0"]
-  tags: ["defense"]
-  runs: 1
-}
-
-results = test.run spec ^
-test.report results
+testkit.run_spec "defense layers" "flows/tests/security_audit_flow.lx" [
+  {name: "parallel guardrail clean"  input: {project_dir: "flows/tests/defense_layers/fixtures/parallel_clean"}  rubric: ["findings" "0"]  tags: ["defense" "smoke"]}
+  {name: "parallel guardrail injection"  input: {project_dir: "flows/tests/defense_layers/fixtures/parallel_injection"}  rubric: ["findings" "critical" "injection"]  tags: ["defense" "smoke"]}
+  {name: "multi agent scan"  input: {project_dir: "flows/tests/defense_layers/fixtures/multi_agent"}  rubric: ["findings" "agents" "critical" "high"]  tags: ["defense"]}
+  {name: "clean system"  input: {project_dir: "flows/tests/defense_layers/fixtures/clean"}  rubric: ["findings" "0"]  tags: ["defense"]}
+] {threshold: 0.60  setup: testkit.touch_jsonl}

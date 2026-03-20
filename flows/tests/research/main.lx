@@ -1,36 +1,7 @@
--- Research satisfaction tests
--- Tests multi-source research synthesis with scoring and ranking.
+use pkg/infra/testkit
 
-use std/test
-use pkg/testkit
-
-spec = test.spec "research" {
-  flow: "flows/tests/research_flow.lx"
-  grader: testkit.default_grader
-  threshold: 0.65
-  weights: testkit.default_weights
-}
-
-spec = test.scenario spec "rate limiting sources agree" {
-  input: {data_path: "flows/tests/research/fixtures/rate_limiting/data.json"}
-  rubric: ["sources" "4" "governor" "rate" "confidence"]
-  tags: ["research" "smoke"]
-  runs: 1
-}
-
-spec = test.scenario spec "no oss match" {
-  input: {data_path: "flows/tests/research/fixtures/no_oss_match/data.json"}
-  rubric: ["no OSS" "custom" "confidence"]
-  tags: ["research" "smoke"]
-  runs: 1
-}
-
-spec = test.scenario spec "conflicting sources" {
-  input: {data_path: "flows/tests/research/fixtures/conflicting/data.json"}
-  rubric: ["sources" "reversible" "irreversible" "migration"]
-  tags: ["research"]
-  runs: 1
-}
-
-results = test.run spec ^
-test.report results
+testkit.run_spec "research" "flows/tests/research_flow.lx" [
+  {name: "rate limiting sources agree"  input: {data_path: "flows/tests/research/fixtures/rate_limiting/data.json"}  rubric: ["sources" "4" "governor" "rate" "confidence"]  tags: ["research" "smoke"]}
+  {name: "no oss match"  input: {data_path: "flows/tests/research/fixtures/no_oss_match/data.json"}  rubric: ["no OSS" "custom" "confidence"]  tags: ["research" "smoke"]}
+  {name: "conflicting sources"  input: {data_path: "flows/tests/research/fixtures/conflicting/data.json"}  rubric: ["sources" "reversible" "irreversible" "migration"]  tags: ["research"]}
+] {}

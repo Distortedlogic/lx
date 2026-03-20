@@ -1,7 +1,7 @@
 -- 61_context.lx
 -- Tests: ContextWindow class (context window capacity management)
 
-use pkg/context {ContextWindow estimate}
+use pkg/data/context {ContextWindow estimate}
 
 -- === Create window ===
 win = ContextWindow {capacity: 1000}

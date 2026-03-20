@@ -1,6 +1,6 @@
 -- std/pool: agent worker pools
 
-use pkg/pool {Pool}
+use pkg/core/pool {Pool}
 
 -- create pool with handler
 p = Pool {

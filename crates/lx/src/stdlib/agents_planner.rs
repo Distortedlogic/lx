@@ -149,6 +149,10 @@ fn parse_llm_result(llm_response: &Value, task: &str, span: Span) -> Result<Valu
 }
 
 fn bi_plan(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+    static WARNED: std::sync::Once = std::sync::Once::new();
+    WARNED.call_once(|| {
+        eprintln!("[DEPRECATED] std/agents/planner is deprecated — use pkg/ai/planner instead");
+    });
     let fields = extract_fields(args, span)?;
     if fields.task.trim().is_empty() {
         return Ok(build_result(vec![], ""));
@@ -173,6 +177,10 @@ fn split_sentences(text: &str) -> Vec<String> {
 }
 
 fn bi_quick_plan(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+    static WARNED: std::sync::Once = std::sync::Once::new();
+    WARNED.call_once(|| {
+        eprintln!("[DEPRECATED] std/agents/planner is deprecated — use pkg/ai/planner instead");
+    });
     let fields = extract_fields(args, span)?;
     if fields.task.trim().is_empty() {
         return Ok(build_result(vec![], ""));

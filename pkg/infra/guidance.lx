@@ -1,0 +1,41 @@
+-- Stage gate signals -- build/test/clippy checks and approval gates.
+-- check_cargo: parameterized cargo command runner returning Signal.
+-- gate: combine multiple signals into pass/fail decision.
+
+use std/audit
+
+Trait +Signal = {proceed: Bool  feedback: Str  source: Str}
+
++check_cargo = (subcommand flags path) {
+  cmd = flags | empty? ? "cargo {subcommand} --manifest-path {path}/Cargo.toml" : "cargo {subcommand} --manifest-path {path}/Cargo.toml {flags}"
+  result = $^{cmd}
+  result ? {
+    Ok out -> Signal {proceed: true  feedback: "{subcommand} clean"  source: "compiler"}
+    Err e -> Signal {proceed: false  feedback: e  source: "compiler"}
+  }
+}
+
++check_build = (path) check_cargo "check" "" path
++check_tests = (path) check_cargo "test" "" path
++check_clippy = (path) check_cargo "clippy" "-- -D warnings" path
+
++check_self = (specs artifacts) {
+  coverage = audit.rubric specs artifacts
+  coverage.score >= 0.8 ? {
+    true -> Signal {proceed: true  feedback: "coverage {coverage.score}"  source: "self-check"}
+    false -> Signal {proceed: false  feedback: coverage.gaps | join ", "  source: "self-check"}
+  }
+}
+
++ask_user = (summary) {
+  response = yield {kind: "approval"  data: summary}
+  Signal {proceed: response.approved  feedback: response.feedback ?? ""  source: "user"}
+}
+
++gate = (signals) {
+  failed = signals | filter (s) !s.proceed
+  failed | empty? ? {
+    true -> {proceed: true  feedback: "all signals green"}
+    false -> {proceed: false  feedback: failed | map (.feedback) | join "; "}
+  }
+}

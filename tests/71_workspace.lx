@@ -1,5 +1,5 @@
-use pkg/score {normalize}
-use flows/lib/scoring {scale_stars}
+use pkg/core/score {normalize}
+use flows/lib/github {scale_stars}
 
 n = normalize 0.0 10.0 5.0
 assert (n == 0.5) "normalize from workspace member"
@@ -16,6 +16,6 @@ assert (s2 == 4.0) "scale_stars medium"
 s3 = scale_stars 5
 assert (s3 == 1.0) "scale_stars low"
 
-use flows/lib/scoring
-s4 = scoring.scale_stars 500
+use flows/lib/github
+s4 = github.scale_stars 500
 assert (s4 == 7.0) "whole-module workspace import"

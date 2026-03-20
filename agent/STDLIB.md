@@ -41,9 +41,9 @@ s.entries ()                   s.has "key"
 s.len ()                       s.remove "key"
 s.clear ()                     s.update "key" (v) v + 1
 s.filter (k v) condition       s.query {field: "value"}
-s.map (k v) transform          s.save "path.json"
-s.load "path.json"             s.persist "path.json"
-s.reload "path.json"
+s.map (k v) transform          s.merge other_store_or_record
+s.save "path.json"             s.load "path.json"
+s.persist "path.json"          s.reload "path.json"
 ```
 
 Reference semantics: `a = b` shares the same Store. Store cloning in Class constructors ensures each instance gets its own copy.
@@ -215,7 +215,7 @@ all = pipeline.list ()
 | `std/math`        | `abs`, `ceil`, `floor`, `round`, `pow`, `sqrt`, `min`, `max`         |
 | `std/time`        | `now`, `sleep`, `format`, `parse`                                    |
 | `std/git`         | 36 functions: status, log, diff, blame, grep, commit, branch, etc.   |
-| `std/ctx`         | Key-value context: `empty`, `set`, `get`, `merge`, `save`, `load`    |
+| `std/ctx`         | **DEPRECATED** — use `Store()` with dot methods instead               |
 | `std/deadline`    | Time budgets: `create`, `create_at`, `scope`, `remaining`, `expired`, `check`, `slice`, `extend` |
 | `std/pipeline`    | Stage caching: `create`, `stage`, `complete`, `status`, `invalidate`, `clean`, `list` |
 | `std/plan`        | Plan execution: `run` with `on_step` callback, `replan`, `skip`      |
@@ -229,6 +229,7 @@ all = pipeline.list ()
 | `std/taskgraph`   | DAG execution: `create`, `add`, `remove`, `run`, `run_with`, `validate`, `topo`, `status`, `dot` |
 | `std/workspace`   | Collaborative editing: `create`, `claim`, `claim_pattern`, `edit`, `append`, `release`, `snapshot`, `regions`, `conflicts`, `resolve`, `history`, `watch`. Line-based region claiming with overlap detection, auto-bound adjustment, regex pattern claiming, watchers. DashMap-backed for `par`/`pmap` safety |
 | `std/registry`    | Cross-process discovery: `start`, `stop`, `connect`, `register`, `deregister`, `find`, `find_one`, `health`, `load`, `watch`. In-memory registry with trait/trait/domain filtering, selection strategies (first, least_loaded, round_robin, random), health/load tracking, watcher callbacks |
+| `std/yield`       | Typed yield Traits: `YieldApproval`, `YieldReflection`, `YieldInformation`, `YieldDelegation`, `YieldProgress`. Trait-only module (no functions). Auto-injected `kind` field for orchestrator dispatch |
 
 ## Flow Composition (std/flow)
 
@@ -279,16 +280,19 @@ Task options: `handler` (function), `input` (static), `depends` (task ID list), 
 
 ## Standard Agents
 
-Six pre-built agents under `std/agents/`:
+Two Rust-backed agents under `std/agents/` (require internal APIs):
 
 | Module                | Functions                | Use for                          |
 |-----------------------|--------------------------|----------------------------------|
 | `std/agents/auditor`  | `quick_audit`, `audit`   | Output quality checking          |
 | `std/agents/grader`   | `quick_grade`, `grade`   | Rubric-based scoring             |
-| `std/agents/router`   | `quick_route`, `route`   | Message routing decisions        |
-| `std/agents/planner`  | `quick_plan`, `plan`     | Task decomposition               |
-| `std/agents/reviewer` | `quick_review`, `review` | Code/document review             |
-| `std/agents/monitor`  | `scan_actions`, `check`  | Behavioral monitoring            |
+
+Three deprecated agents (use pkg/ai/ equivalents instead):
+- `std/agents/planner` → use `pkg/ai/planner`
+- `std/agents/router` → use `pkg/ai/router`
+- `std/agents/reviewer` → use `pkg/ai/reviewer`
+
+Removed: `std/agents/monitor` — use `pkg/agents/guard` instead.
 
 ## Built-in Functions (No Import Needed)
 

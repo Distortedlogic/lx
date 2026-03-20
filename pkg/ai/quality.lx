@@ -1,0 +1,120 @@
+-- Quality assurance: grading, refinement loops, safety checks, response auditing
+-- Source: merged from brain/lib/quality.lx + flows/lib/grading.lx + critic.lx check_safety
+-- Provides: rubrics, grading, refinement, safety scanning, draft grading workflows
+
+use std/ai
+use pkg/core/prompt
+use std/audit
+use pkg/data/trace {TraceStore}
+use std/agents/grader
+use std/agents/auditor
+
+Trait +QualityGrade = {
+  score: Float where score >= 0.0 && score <= 100.0
+  passed: Bool
+  feedback: Str
+  categories: [{name: Str  score: Float  weight: Float}]
+  suggestions: [Str]
+}
+
++response_rubric = () -> Any {
+  audit.rubric [
+    {name: "accuracy" description: "factually correct, no hallucinations" weight: 30}
+    {name: "relevance" description: "directly answers what was asked" weight: 25}
+    {name: "completeness" description: "covers all aspects of the question" weight: 20}
+    {name: "clarity" description: "clear, well-structured, easy to follow" weight: 15}
+    {name: "conciseness" description: "no unnecessary filler or repetition" weight: 10}
+  ]
+}
+
++code_rubric = () -> Any {
+  audit.rubric [
+    {name: "correctness" description: "code works as intended" weight: 35}
+    {name: "safety" description: "no security vulnerabilities" weight: 25}
+    {name: "style" description: "clean, idiomatic, no unnecessary complexity" weight: 15}
+    {name: "completeness" description: "handles edge cases, error paths" weight: 15}
+    {name: "scope" description: "only changes what was asked, nothing extra" weight: 10}
+  ]
+}
+
++quick_check = (output: Str  task: Str) -> Any {
+  audit.quick_check {output: output  min_length: 10  no_hedging: true  no_refusal: true  task: task}
+}
+
+grade_to_quality = (result: Any) -> QualityGrade {
+  QualityGrade {
+    score: result.score
+    passed: result.passed
+    feedback: result.feedback ?? ""
+    categories: result.scores ?? []
+    suggestions: result.failed_checks ?? []
+  }
+}
+
++grade_response = (response: Str  task: Str) -> QualityGrade {
+  audit.evaluate (response_rubric ()) {output: response  threshold: 75  task} | grade_to_quality
+}
+
++grade_code = (code: Str  task: Str) -> QualityGrade {
+  audit.evaluate (code_rubric ()) {output: code  threshold: 80  task} | grade_to_quality
+}
+
++should_refine = (grade: QualityGrade  round: Int  max_rounds: Int = 3) -> Bool {
+  round >= max_rounds ? false
+    : grade.passed ? false
+    : grade.score < 30 ? false
+    : true
+}
+
++refine_work = (initial: Str  task: Str  grader_fn: Any  revise_system: Str  threshold: Int = 80) -> Str {
+  with TraceStore () as trace {
+    result = refine initial {
+      grade: (work) {
+        g = grader_fn work task
+        trace.record {name: "refine_grade" input: task output: g.feedback score: g.score / 100.0} ?? ()
+        {score: to_int g.score  feedback: g.feedback}
+      }
+      revise: (work feedback) {
+        stop = trace.should_stop {min_delta: 2.0  window: 3}
+        stop ? work : {
+          p = prompt.create ()
+            | prompt.system revise_system
+            | prompt.section "Work" work
+            | prompt.section "Feedback" feedback
+            | prompt.section "Task" task
+            | prompt.instruction `Improve the work addressing the feedback.`
+
+          prompt.ask p work
+        }
+      }
+      threshold
+      max_rounds: 3
+    }
+
+    result ? { Ok r -> r.work; Err r -> r.work }
+  }
+}
+
++refine_response = (initial_response: Str  task: Str) -> Str {
+  refine_work initial_response task grade_response `You improve responses based on feedback.` 80
+}
+
++refine_code = (initial_code: Str  task: Str) -> Str {
+  refine_work initial_code task grade_code `You fix code based on review feedback.` 85
+}
+
++final_audit = (response: Str  task: Str) -> Any {
+  (quick full) = par {
+    quick_check response task
+    auditor.audit {output: response  task}
+  }
+
+  {
+    quick_passed: quick.passed
+    full_passed: full.passed
+    score: full.score
+    feedback: full.feedback
+    reasons: quick.reasons ?? []
+  }
+}
+

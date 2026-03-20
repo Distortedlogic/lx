@@ -1,17 +1,15 @@
 -- Security audit of running subagents -- detect stuck loops, injection, resource abuse.
 -- Data source: Claude CLI transcripts (~/.claude/projects/<project>/*.jsonl).
--- Uses pkg/guard.full_scan for all detection passes per transcript:
---   Stuck loops (>20 tool calls), prompt injection (regex), resource abuse (>500 entries).
--- Dedup via agent.reconcile (union, keyed by agent_id:type).
+-- Uses pkg/security_scan.scan_transcripts for detection, agent.reconcile for dedup.
 -- Severity-sorted output with critical/high classification and markdown report.
 -- Demonstrates: workflow.run, guard composition, reconciliation, transcript ingestion.
 -- Source: mcp-toolbelt/arch_diagrams/scenario_security_audit
 
 use std/agent
-use pkg/guard
-use ../lib/transcript
-use pkg/report
-use pkg/workflow
+use pkg/agents/guard
+use pkg/kit/security_scan
+use pkg/infra/report
+use pkg/infra/workflow
 
 +main = () {
   project_dir = "{$^echo $HOME | trim}/.claude/projects"
@@ -20,48 +18,42 @@ use pkg/workflow
 
 +audit = (project_dir opts) {
   workflow.run "security-audit" project_dir (_) {
-    paths = transcript.read_recent project_dir 60
+    result = security_scan.scan_transcripts project_dir opts
 
-    paths | empty? ? {
+    result.findings | empty? ? {
       true -> {
         emit "no recent transcripts to audit"
         Ok {findings: 0  critical: 0  high: 0}
       }
       false -> {
-        all_findings = paths | flat_map (path) {
-          entries = transcript.parse path
-          guard.full_scan entries opts | map (f) {..f  agent_id: path}
-        }
-
-        merged = agent.reconcile all_findings {
+        merged = agent.reconcile result.findings {
           strategy: "union"
           key: (f) "{f.agent_id}:{f.type}"
         }
 
         findings = merged.merged | sort_by (.severity) | rev
-        critical = findings | filter (f) f.severity == "critical"
-        high = findings | filter (f) f.severity == "high"
+        summary = guard.severity_summary findings
 
-        critical | each (f) emit "CRITICAL [{f.type}] agent={f.agent_id}: {f.evidence}"
-        high | each (f) emit "HIGH [{f.type}] agent={f.agent_id}: {f.evidence}"
+        guard.by_severity findings "critical" | each (f) emit "CRITICAL [{f.type}] agent={f.agent_id}: {f.evidence}"
+        guard.by_severity findings "high" | each (f) emit "HIGH [{f.type}] agent={f.agent_id}: {f.evidence}"
 
         report.write "security_audit.md" "Security Audit" [
-          ..report.text "{paths | len} transcripts scanned, {findings | len} findings"
+          ..report.text "{result.paths | len} transcripts scanned, {summary.total} findings"
           ..report.section "Summary" [
             ..report.bullets [
-              "Critical: {critical | len}"
-              "High: {high | len}"
-              "Total: {findings | len}"
+              "Critical: {summary.critical}"
+              "High: {summary.high}"
+              "Total: {summary.total}"
             ]
           ]
-          ..report.conditional (findings | len > 0) "Findings" [
+          ..report.conditional (summary.total > 0) "Findings" [
             ..report.table ["Severity" "Type" "Agent" "Evidence"]
               (findings | map (f) [f.severity f.type f.agent_id f.evidence])
           ]
         ]
 
-        emit "\naudit: {findings | len} findings ({critical | len} critical, {high | len} high)"
-        Ok {findings: (findings | len)  critical: (critical | len)  high: (high | len)}
+        emit "\naudit: {summary.total} findings ({summary.critical} critical, {summary.high} high)"
+        Ok {findings: summary.total  critical: summary.critical  high: summary.high}
       }
     }
   }

@@ -24,10 +24,7 @@ fn make_attempt_record(strategy: &Value, quality: i64, viable: bool, reason: Val
     let mut fields = IndexMap::new();
     fields.insert("strategy".into(), strategy.clone());
     fields.insert("quality".into(), Value::Int(BigInt::from(quality)));
-    fields.insert(
-        "viable".into(),
-        Value::Bool(viable),
-    );
+    fields.insert("viable".into(), Value::Bool(viable));
     fields.insert("reason".into(), reason);
     Value::Record(Arc::new(fields))
 }
@@ -37,16 +34,28 @@ fn extract_eval_fields(val: &Value, span: Span) -> Result<(bool, i64, Value), Lx
         Value::Record(fields) => {
             let viable = fields
                 .get("viable")
-                .and_then(|v| if let Value::Bool(b) = v { Some(*b) } else { None })
+                .and_then(|v| {
+                    if let Value::Bool(b) = v {
+                        Some(*b)
+                    } else {
+                        None
+                    }
+                })
                 .ok_or_else(|| {
-                    LxError::type_err("meta: evaluate must return record with Bool 'viable' field", span)
+                    LxError::type_err(
+                        "meta: evaluate must return record with Bool 'viable' field",
+                        span,
+                    )
                 })?;
             let quality = fields
                 .get("quality")
                 .and_then(|v| v.as_int())
                 .and_then(|n| n.to_i64())
                 .ok_or_else(|| {
-                    LxError::type_err("meta: evaluate must return record with Int 'quality' field", span)
+                    LxError::type_err(
+                        "meta: evaluate must return record with Int 'quality' field",
+                        span,
+                    )
                 })?;
             let reason = fields
                 .get("reason")
@@ -83,10 +92,7 @@ impl Interpreter {
         let strategy_list = match &strategies_val {
             Value::List(items) => items.as_ref().clone(),
             _ => {
-                return Err(LxError::type_err(
-                    "meta: strategies must be a list",
-                    span,
-                ));
+                return Err(LxError::type_err("meta: strategies must be a list", span));
             }
         };
 
@@ -114,17 +120,12 @@ impl Interpreter {
                     Value::Record(f) => f.get("reason").cloned().unwrap_or(Value::Unit),
                     _ => Value::Unit,
                 };
-                let arg = Value::Tuple(Arc::new(vec![
-                    prev_strat,
-                    strategy.clone(),
-                    reason_val,
-                ]));
+                let arg = Value::Tuple(Arc::new(vec![prev_strat, strategy.clone(), reason_val]));
                 crate::builtins::call_value(cb, arg, span, &self.ctx).await?;
             }
 
             let partial =
-                crate::builtins::call_value(&attempt_fn, strategy.clone(), span, &self.ctx)
-                    .await?;
+                crate::builtins::call_value(&attempt_fn, strategy.clone(), span, &self.ctx).await?;
             let result =
                 crate::builtins::call_value(&partial, task_val.clone(), span, &self.ctx).await?;
 
@@ -152,42 +153,44 @@ impl Interpreter {
     }
 }
 
+fn select_mode_name(val: &Value) -> Option<&str> {
+    match val {
+        Value::Tagged { tag, .. } => Some(tag.as_ref()),
+        Value::Str(s) => Some(s.as_ref()),
+        _ => None,
+    }
+}
+
 fn build_order(
     strategies: &[Value],
     select: &Option<Value>,
     span: Span,
 ) -> Result<Vec<usize>, LxError> {
     let n = strategies.len();
-    match select {
-        None => Ok((0..n).collect()),
-        Some(Value::Tagged { tag, .. }) => {
-            let sym = tag.as_ref();
-            match sym {
-                "sequential" => Ok((0..n).collect()),
-                "random" => {
-                    use std::collections::hash_map::DefaultHasher;
-                    use std::hash::{Hash, Hasher};
-                    let mut indices: Vec<usize> = (0..n).collect();
-                    let mut hasher = DefaultHasher::new();
-                    std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_nanos()
-                        .hash(&mut hasher);
-                    let seed = hasher.finish();
-                    for i in (1..n).rev() {
-                        let j = ((seed.wrapping_mul(i as u64 + 1)) >> 32) as usize % (i + 1);
-                        indices.swap(i, j);
-                    }
-                    Ok(indices)
-                }
-                _ => Err(LxError::runtime(
-                    format!("meta: unknown select mode :{sym}"),
-                    span,
-                )),
+    let mode = select.as_ref().and_then(select_mode_name);
+    match mode {
+        None | Some("sequential") => Ok((0..n).collect()),
+        Some("random") => {
+            use std::collections::hash_map::DefaultHasher;
+            use std::hash::{Hash, Hasher};
+            let mut indices: Vec<usize> = (0..n).collect();
+            let mut hasher = DefaultHasher::new();
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+                .hash(&mut hasher);
+            let seed = hasher.finish();
+            for i in (1..n).rev() {
+                let j = ((seed.wrapping_mul(i as u64 + 1)) >> 32) as usize % (i + 1);
+                indices.swap(i, j);
             }
+            Ok(indices)
         }
-        _ => Ok((0..n).collect()),
+        Some(name) => Err(LxError::runtime(
+            format!("meta: unknown select mode '{name}'"),
+            span,
+        )),
     }
 }
 
@@ -195,10 +198,7 @@ fn make_ok_result(result: Value, strategy: &Value, attempts: &[Value]) -> Value 
     let mut fields = IndexMap::new();
     fields.insert("result".into(), result);
     fields.insert("strategy".into(), strategy.clone());
-    fields.insert(
-        "attempts".into(),
-        Value::List(Arc::new(attempts.to_vec())),
-    );
+    fields.insert("attempts".into(), Value::List(Arc::new(attempts.to_vec())));
     Value::Ok(Box::new(Value::Record(Arc::new(fields))))
 }
 
@@ -208,17 +208,8 @@ fn make_err_result(attempts: &[Value], best_strategy: &Value, best_quality: i64)
     best_fields.insert("quality".into(), Value::Int(BigInt::from(best_quality)));
 
     let mut fields = IndexMap::new();
-    fields.insert(
-        "reason".into(),
-        Value::Str(Arc::from("all_exhausted")),
-    );
-    fields.insert(
-        "attempts".into(),
-        Value::List(Arc::new(attempts.to_vec())),
-    );
-    fields.insert(
-        "best".into(),
-        Value::Record(Arc::new(best_fields)),
-    );
+    fields.insert("reason".into(), Value::Str(Arc::from("all_exhausted")));
+    fields.insert("attempts".into(), Value::List(Arc::new(attempts.to_vec())));
+    fields.insert("best".into(), Value::Record(Arc::new(best_fields)));
     Value::Err(Box::new(Value::Record(Arc::new(fields))))
 }

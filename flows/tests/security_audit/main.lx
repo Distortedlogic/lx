@@ -1,42 +1,7 @@
--- Security audit satisfaction tests
--- Scores the security_audit_flow against synthetic transcript fixtures.
+use pkg/infra/testkit
 
-use std/test
-use pkg/testkit
-
-touch_fixtures = (scenario) {
-  dir = scenario.input.project_dir
-  $^find {dir} -name "*.jsonl" -exec touch {} +
-}
-
-spec = test.spec "security audit" {
-  flow: "flows/tests/security_audit_flow.lx"
-  grader: testkit.default_grader
-  threshold: 0.60
-  weights: testkit.default_weights
-  setup: touch_fixtures
-}
-
-spec = test.scenario spec "stuck loop detection" {
-  input: {project_dir: "flows/tests/security_audit/fixtures/stuck_loop"}
-  rubric: ["findings" "high" "tool calls"]
-  tags: ["security" "smoke"]
-  runs: 1
-}
-
-spec = test.scenario spec "prompt injection" {
-  input: {project_dir: "flows/tests/security_audit/fixtures/injection"}
-  rubric: ["findings" "critical" "ignore"]
-  tags: ["security" "smoke"]
-  runs: 1
-}
-
-spec = test.scenario spec "clean audit" {
-  input: {project_dir: "flows/tests/security_audit/fixtures/clean"}
-  rubric: ["findings"]
-  tags: ["security"]
-  runs: 1
-}
-
-results = test.run spec ^
-test.report results
+testkit.run_spec "security audit" "flows/tests/security_audit_flow.lx" [
+  {name: "stuck loop detection"  input: {project_dir: "flows/tests/security_audit/fixtures/stuck_loop"}  rubric: ["findings" "high" "tool calls"]  tags: ["security" "smoke"]}
+  {name: "prompt injection"  input: {project_dir: "flows/tests/security_audit/fixtures/injection"}  rubric: ["findings" "critical" "ignore"]  tags: ["security" "smoke"]}
+  {name: "clean audit"  input: {project_dir: "flows/tests/security_audit/fixtures/clean"}  rubric: ["findings"]  tags: ["security"]}
+] {threshold: 0.60  setup: testkit.touch_jsonl}

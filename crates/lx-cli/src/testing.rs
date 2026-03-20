@@ -13,9 +13,10 @@ struct TestEntry {
 }
 
 pub fn run_tests_dir(dir: &str) -> ExitCode {
+    let (threshold, runs) = load_test_config();
     let entries = discover_tests(dir);
     let ws_members = manifest::try_load_workspace_members();
-    let result = execute_tests(&entries, &ws_members);
+    let result = execute_tests(&entries, &ws_members, threshold, runs);
     print_results(&result);
     if result.failed > 0 {
         ExitCode::from(1)
@@ -25,6 +26,7 @@ pub fn run_tests_dir(dir: &str) -> ExitCode {
 }
 
 pub fn run_workspace_tests(member_filter: Option<&str>) -> ExitCode {
+    let (threshold, runs) = load_test_config();
     let cwd = match std::env::current_dir() {
         Ok(d) => d,
         Err(e) => {
@@ -74,7 +76,7 @@ pub fn run_workspace_tests(member_filter: Option<&str>) -> ExitCode {
         }
         let entries =
             discover_tests_with_pattern(test_base.to_str().unwrap_or("."), &member.test_pattern);
-        let result = execute_tests(&entries, &ws_members);
+        let result = execute_tests(&entries, &ws_members, threshold, runs);
         total_passed += result.passed;
         total_failed += result.failed;
         if result.failed > 0 {
@@ -154,6 +156,8 @@ struct TestResults {
 fn execute_tests(
     entries: &[TestEntry],
     workspace_members: &HashMap<String, PathBuf>,
+    threshold: Option<f64>,
+    runs: Option<u32>,
 ) -> TestResults {
     let dep_dirs = crate::manifest::try_load_dep_dirs();
     let mut passed = 0;
@@ -170,6 +174,8 @@ fn execute_tests(
         let ctx = Arc::new(RuntimeCtx {
             workspace_members: workspace_members.clone(),
             dep_dirs: dep_dirs.clone(),
+            test_threshold: threshold,
+            test_runs: runs,
             ..RuntimeCtx::default()
         });
         let filename = entry.path.to_str().unwrap_or(&entry.name);
@@ -211,6 +217,22 @@ fn print_results(results: &TestResults) {
                 eprintln!("{report:?}");
             }
         }
+    }
+}
+
+fn load_test_config() -> (Option<f64>, Option<u32>) {
+    let Ok(cwd) = std::env::current_dir() else {
+        return (None, None);
+    };
+    let Some(root) = manifest::find_manifest_root(&cwd) else {
+        return (None, None);
+    };
+    let Ok(m) = manifest::load_manifest(&root) else {
+        return (None, None);
+    };
+    match m.test {
+        Some(test) => (test.threshold, test.runs),
+        None => (None, None),
     }
 }
 

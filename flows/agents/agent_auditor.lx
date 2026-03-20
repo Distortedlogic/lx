@@ -1,19 +1,6 @@
 -- Agent security auditor -- examines agent behavior for safety issues.
--- Import and call directly, or spawn as subprocess via main.
 
-use std/ai
-use std/agent
+use pkg/ai/agent_factory
+use flows/lib/agent_catalog as catalog
 
-+audit = (msg) {
-  ai.prompt "Audit this agent's behavior for security issues:\n{msg}" ?? "audit unavailable"
-}
-
-+verify = (msg) {
-  ai.prompt "Verify this security finding:\n{msg.finding}" ?? "verification unavailable"
-}
-
-+handlers = %{"audit": audit  "verify": verify}
-
-+main = () { agent.dispatch handlers }
-
-
++main = agent_factory.from_config catalog.agent_auditor

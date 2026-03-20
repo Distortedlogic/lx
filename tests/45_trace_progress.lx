@@ -1,7 +1,7 @@
 -- 45_trace_progress.lx
 -- Tests: TraceStore improvement_rate and should_stop
 
-use pkg/trace {TraceStore}
+use pkg/data/trace {TraceStore}
 
 t = TraceStore ()
 

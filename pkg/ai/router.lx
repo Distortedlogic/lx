@@ -1,0 +1,56 @@
+-- Prompt router -- AI-powered classification of prompts to specialist agents.
+-- route: uses AI to match prompt to catalog entry.
+-- quick_route: keyword overlap heuristic, no AI call.
+
+use std/ai
+use std/json
+use pkg/core/prompt
+
+no_match = {domain: "none"  agent: ""  confidence: 0.0  terminal: false}
+
++route = (opts) {
+  prompt_text = opts.prompt ?? ""
+  catalog = opts.catalog ?? []
+
+  catalog | empty? ? no_match : {
+    catalog_text = catalog | enumerate | map (i entry) "{i + 1}. name={entry.name} domain={entry.domain} description={entry.description ?? ""}" | join "\n"
+
+    p = prompt.create ()
+      | prompt.system "You are a prompt router. Given a user prompt and a catalog of specialist agents, classify which agent should handle the prompt.\n\nRespond with ONLY a JSON object, no markdown fences:\n{`{\"domain\": \"...\", \"agent\": \"...\", \"confidence\": 0.0-1.0}`}\n\nIf no agent matches well, respond: {`{\"domain\": \"none\", \"agent\": \"\", \"confidence\": 0.0}`}\nConfidence 0.8+ means strong match. 0.5-0.8 partial. Below 0.5 means no good match."
+      | prompt.section "Catalog" catalog_text
+      | prompt.section "Prompt to Route" prompt_text
+
+    text = prompt.ask p ""
+    parsed = text | json.parse ?? {domain: "none"  agent: ""  confidence: 0.0}
+
+    domain = parsed.domain ?? "none"
+    agent_name = parsed.agent ?? ""
+    confidence = parsed.confidence ?? 0.0
+    terminal = catalog | find (e) e.name == agent_name || e.domain == domain | (.terminal) ?? false
+
+    {domain  agent: agent_name  confidence  terminal}
+  }
+}
+
++quick_route = (opts) {
+  prompt_text = opts.prompt ?? ""
+  catalog = opts.catalog ?? []
+
+  catalog | empty? ? no_match : {
+    scored = catalog | map (entry) {
+      desc_words = (entry.description ?? "") | lower | split " " | filter (w) { len w > 3 }
+      dom_words = (entry.domain ?? "") | lower | split " " | filter (w) { len w > 2 }
+      name_words = (entry.name ?? "") | lower | split " " | filter (w) { len w > 2 }
+      words = [..desc_words ..dom_words ..name_words]
+      hits = words | filter (w) { prompt_text | lower | contains? w } | len
+      score = words | len == 0 ? 0.0 : hits / (words | len)
+      {..entry  score: score}
+    }
+
+    best = scored | sort_by (.score) | rev | first
+    best ? {
+      Some b -> b.score < 0.1 ? no_match : {domain: b.domain ?? "none"  agent: b.name ?? ""  confidence: b.score  terminal: b.terminal ?? false}
+      None -> no_match
+    }
+  }
+}

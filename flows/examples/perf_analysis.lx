@@ -8,8 +8,8 @@
 
 use std/agent
 use ../agents/perf_specialist
-use pkg/report
-use pkg/workflow
+use pkg/infra/report
+use pkg/infra/workflow
 
 Trait PerfFinding = {domain: Str  severity: Str  location: Str  issue: Str  fix: Str}
 

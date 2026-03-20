@@ -23,11 +23,20 @@ impl super::Parser {
             path.push(".".to_string());
             self.expect_kind(&TokenKind::Slash)?;
         }
-        while let TokenKind::Ident(name) = self.peek().clone() {
-            self.advance();
-            path.push(name);
-            if *self.peek() == TokenKind::Slash {
+        loop {
+            let seg = match self.peek().clone() {
+                TokenKind::Ident(name) => Some(name),
+                TokenKind::Yield => Some("yield".to_string()),
+                _ => None,
+            };
+            if let Some(name) = seg {
                 self.advance();
+                path.push(name);
+                if *self.peek() == TokenKind::Slash {
+                    self.advance();
+                } else {
+                    break;
+                }
             } else {
                 break;
             }

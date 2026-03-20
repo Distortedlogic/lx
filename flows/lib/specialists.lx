@@ -2,8 +2,8 @@
 -- Defines the standard set of specialist agents and their domain keywords.
 -- Used by: agent_lifecycle, any flow that needs domain-based routing.
 
-use pkg/catalog {Specialist}
-use pkg/catalog
+use pkg/agents/catalog {Specialist}
+use pkg/agents/catalog
 
 +default = catalog.create [
   Specialist {name: "researcher"       domain: "research"     script: "agents/researcher.lx"       terminal: true}

@@ -288,3 +288,17 @@ impl LogBackend for StderrLogBackend {
         eprintln!("[{tag}] {msg}");
     }
 }
+
+pub struct NoopEmitBackend;
+
+impl EmitBackend for NoopEmitBackend {
+    fn emit(&self, _value: &Value, _span: Span) -> Result<(), LxError> {
+        Ok(())
+    }
+}
+
+pub struct NoopLogBackend;
+
+impl LogBackend for NoopLogBackend {
+    fn log(&self, _level: LogLevel, _msg: &str) {}
+}

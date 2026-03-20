@@ -94,13 +94,13 @@ Tier 1 completed: `std/retry` (Session 44), `std/user` + `std/profile` (Session 
 
 21. ~~**`lx install/update`**~~ — SHIPPED Session 71b. `lx install`/`lx update` with git+path deps, `lx.lock`, `.lx/deps/` module resolution. 4 new CLI files (install.rs, install_ops.rs, lockfile.rs, check.rs).
 
-22. **`meta` block** (`spec/agents-meta.md`) — Strategy-level iteration. `refine` iterates within one approach; `meta` tries fundamentally different approaches.
+22. ~~**`meta` block**~~ — SHIPPED Session 76. `Expr::Meta` AST node, contextual keyword (Ident lookahead, not reserved token — `meta` usable as identifier/field/param). 3 required fields (strategies, attempt, evaluate) + 2 optional (select, on_switch). Returns `Ok {result strategy attempts}` or `Err {reason attempts best}`. Sequential/random selection modes. 2 new Rust files (parser/meta.rs, interpreter/meta.rs).
 
-23. **Typed yield variants** (`spec/agents-yield-typed.md`) — Structured orchestrator communication.
+23. ~~**Typed yield variants**~~ — SHIPPED Session 77. 5 Traits (YieldApproval, YieldReflection, YieldInformation, YieldDelegation, YieldProgress) in `std/yield`. Rust-backed `Value::Trait` with `kind` defaults. Parser fix: `Yield` keyword accepted as module path segment. 1 new Rust file (stdlib/yield_types.rs).
 
 ## Tier 4 — Remaining
 
-24. **`agent.on` lifecycle hooks** (`spec/agents-lifecycle.md`) — Dynamic hook registration for standalone agents (Agent declarations have `on:` for static hooks). Now includes `:signal` event for reactive interrupt handling.
+24. ~~**`agent.on` lifecycle hooks**~~ — SHIPPED Session 78. 6 events (startup, shutdown, error, idle, message, signal). `agent.on`/`agent.on_remove`/`agent.startup`/`agent.shutdown`/`agent.signal`/`agent.idle_hooks`. 2 new Rust files (agent_lifecycle.rs + agent_lifecycle_run.rs).
 
 25. ~~**`std/durable`**~~ — SHIPPED Session 71b. 8 functions: `workflow`, `run`, `step`, `sleep`, `signal`, `send_signal`, `status`, `list`. File-backed persistence with atomic writes. 3 Rust files (durable.rs + durable_run.rs + durable_io.rs).
 

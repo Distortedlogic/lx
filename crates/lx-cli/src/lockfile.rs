@@ -12,6 +12,7 @@ pub struct LockFile {
 pub struct LockedPackage {
     pub name: String,
     pub source: String,
+    pub version: Option<String>,
 }
 
 impl LockFile {
@@ -34,13 +35,15 @@ impl LockFile {
         std::fs::write(&path, content).map_err(|e| format!("cannot write lx.lock: {e}"))
     }
 
-    pub fn upsert(&mut self, name: &str, source: &str) {
+    pub fn upsert(&mut self, name: &str, source: &str, version: Option<&str>) {
         if let Some(pkg) = self.package.iter_mut().find(|p| p.name == name) {
             pkg.source = source.to_string();
+            pkg.version = version.map(|v| v.to_string());
         } else {
             self.package.push(LockedPackage {
                 name: name.to_string(),
                 source: source.to_string(),
+                version: version.map(|v| v.to_string()),
             });
         }
         self.package.sort_by(|a, b| a.name.cmp(&b.name));

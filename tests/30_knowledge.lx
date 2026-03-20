@@ -1,7 +1,7 @@
 -- 30_knowledge.lx
 -- Tests: pkg/knowledge KnowledgeBase class (shared discovery cache)
 
-use pkg/knowledge {KnowledgeBase}
+use pkg/data/knowledge {KnowledgeBase}
 use std/fs
 
 kb_path = "/tmp/lx_knowledge_test.json"

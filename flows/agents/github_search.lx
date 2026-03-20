@@ -1,23 +1,13 @@
 -- GitHub code search specialist -- find OSS implementations.
--- Import and call functions directly, or spawn as subprocess via main.
 
-use std/http
-use std/json
 use std/agent
+use ../lib/github
+use pkg/ai/ai_agent
 
 +search = (msg) {
-  query = "{msg.query} language:{msg.lang ?? "rust"}"
-  resp = http.get "https://api.github.com/search/repositories?q={query}&sort=stars&per_page=10" ^
-  items = resp.body | json.parse ^ | (.items) ?? []
-  repos = items | map (item) {
-    name: (item."full_name" ?? "unknown")
-    stars: (item."stargazers_count" ?? 0)
-    license: (item."license"."spdx_id" ?? "unknown")
-    fit: (item."stargazers_count" > 100 ? "high" : "low")
-  }
+  repos = github.search msg.query (msg.lang ?? "rust")
   {repos}
 }
 
 +handlers = %{"search": search}
-
-+main = () { agent.dispatch handlers }
++main = () { ai_agent.serve handlers }

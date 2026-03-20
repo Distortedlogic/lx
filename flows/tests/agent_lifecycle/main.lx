@@ -1,36 +1,7 @@
--- Agent lifecycle satisfaction tests
--- Tests seeding, confidence updates, promotion, and drift detection.
+use pkg/infra/testkit
 
-use std/test
-use pkg/testkit
-
-spec = test.spec "agent lifecycle" {
-  flow: "flows/tests/agent_lifecycle_flow.lx"
-  grader: testkit.default_grader
-  threshold: 0.65
-  weights: testkit.default_weights
-}
-
-spec = test.scenario spec "full lifecycle" {
-  input: {data_path: "flows/tests/agent_lifecycle/fixtures/full_lifecycle/data.json"}
-  rubric: ["seeded" "promoted" "maintained" "confidence"]
-  tags: ["lifecycle" "smoke"]
-  runs: 1
-}
-
-spec = test.scenario spec "seed failure" {
-  input: {data_path: "flows/tests/agent_lifecycle/fixtures/seed_failure/data.json"}
-  rubric: ["seeded" "0" "empty" "memory_entries"]
-  tags: ["lifecycle"]
-  runs: 1
-}
-
-spec = test.scenario spec "maintenance drift" {
-  input: {data_path: "flows/tests/agent_lifecycle/fixtures/maintenance_drift/data.json"}
-  rubric: ["drifted" "contradictions" "drift"]
-  tags: ["lifecycle" "smoke"]
-  runs: 1
-}
-
-results = test.run spec ^
-test.report results
+testkit.run_spec "agent lifecycle" "flows/tests/agent_lifecycle_flow.lx" [
+  {name: "full lifecycle"  input: {data_path: "flows/tests/agent_lifecycle/fixtures/full_lifecycle/data.json"}  rubric: ["seeded" "promoted" "maintained" "confidence"]  tags: ["lifecycle" "smoke"]}
+  {name: "seed failure"  input: {data_path: "flows/tests/agent_lifecycle/fixtures/seed_failure/data.json"}  rubric: ["seeded" "0" "empty" "memory_entries"]  tags: ["lifecycle"]}
+  {name: "maintenance drift"  input: {data_path: "flows/tests/agent_lifecycle/fixtures/maintenance_drift/data.json"}  rubric: ["drifted" "contradictions" "drift"]  tags: ["lifecycle" "smoke"]}
+] {}

@@ -1,14 +1,6 @@
 -- Finding verifier -- confirms or rejects automated findings.
--- Import and call directly, or spawn as subprocess via main.
 
-use std/ai
-use std/agent
+use pkg/ai/agent_factory
+use flows/lib/agent_catalog as catalog
 
-+verify = (msg) {
-  analysis = ai.prompt "Verify this finding:\n{msg.finding}\nIs this a real issue? Respond with confirmed (bool) and reason." ?? ""
-  {confirmed: (analysis.confirmed ?? false)  reason: (analysis.reason ?? "unverified")}
-}
-
-+handlers = %{"verify": verify}
-
-+main = () { agent.dispatch handlers }
++main = agent_factory.from_config catalog.verifier

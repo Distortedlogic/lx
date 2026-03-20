@@ -1,5 +1,0 @@
-use pkg/score {composite tier normalize}
-
-+scale_stars = (stars) {
-  stars > 1000 ? 10.0 : (stars > 100 ? 7.0 : (stars > 10 ? 4.0 : 1.0))
-}

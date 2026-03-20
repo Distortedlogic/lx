@@ -1,5 +1,4 @@
 -- GitHub API operations -- search repositories and normalize results.
--- Used by: discovery_system for repo discovery across research axes.
 
 use std/http
 use std/json
@@ -21,5 +20,20 @@ Trait +Candidate = {name: Str  url: Str  description: Str  stars: Int  lang: Str
 +search_axes = (axes) {
   axes | flat_map (axis) {
     axis.queries | flat_map search_repos
+  }
+}
+
++scale_stars = (stars) {
+  stars > 1000 ? 10.0 : (stars > 100 ? 7.0 : (stars > 10 ? 4.0 : 1.0))
+}
+
++search = (query lang) {
+  full_query = "{query} language:{lang ?? "rust"}"
+  repos = search_repos full_query
+  repos | map (r) {
+    name: r.name
+    stars: r.stars
+    license: r.lang
+    fit: r.stars > 100 ? "high" : "low"
   }
 }

@@ -66,4 +66,17 @@ assert (s.description != "") "step: has description"
 assert (s.complexity == "medium") "step: has complexity"
 assert (s.status == "pending") "step: has status"
 
+-- === pkg/ai/planner equivalents ===
+
+use pkg/ai/planner : pkg_planner
+
+pkg_single = pkg_planner.quick_plan {task: "Fix the authentication bug"}
+assert (pkg_single.step_count == 1) "pkg quick_plan: single step"
+
+pkg_multi = pkg_planner.quick_plan {task: "Read the logs. Find the bug. Fix the issue. Run the tests."}
+assert (pkg_multi.step_count == 4) "pkg quick_plan: 4 steps"
+
+pkg_empty = pkg_planner.plan {task: ""}
+assert (pkg_empty.step_count == 0) "pkg plan: empty task"
+
 log.info "36_agents_planner: all passed"

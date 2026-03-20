@@ -2,7 +2,7 @@
 -- Source: dispatched when perception flags a complex or ambiguous input
 
 use std/ai
-use pkg/prompt
+use pkg/core/prompt
 use ../traits {Analyst}
 
 Trait AnalysisResult = {
@@ -29,12 +29,12 @@ Agent DeepAnalyst: Analyst = {
       | prompt.instruction depth_instruction
       | prompt.constraint "Structure: Summary, Findings (bulleted), Gaps, Recommendations"
 
-    resp = ai.prompt (prompt.render p) ?? {text: "analysis unavailable"}
-    sections = resp.text | lines | partition (starts? "- ")
+    text = prompt.ask p "analysis unavailable"
+    sections = text | lines | partition (starts? "- ")
     findings = sections.0 | map (drop 2) | map trim
 
     AnalysisResult {
-      summary: sections.1 | join "\n" | lines | first ?? resp.text
+      summary: sections.1 | join "\n" | lines | first ?? text
       findings
       confidence: 0.7
       gaps: []
@@ -55,8 +55,8 @@ Agent DeepAnalyst: Analyst = {
       | prompt.section "Context" msg.context
       | prompt.instruction "Evaluate each option against each criterion. Pick a winner."
 
-    resp = ai.prompt (prompt.render p) ?? {text: "comparison unavailable"}
-    {comparison: resp.text  winner_index: 0}
+    text = prompt.ask p "comparison unavailable"
+    {comparison: text  winner_index: 0}
   }
 
   investigate = (msg) {
@@ -66,10 +66,10 @@ Agent DeepAnalyst: Analyst = {
       | prompt.section "Available Tools" (msg.tools | join ", ")
       | prompt.instruction "1) Form a hypothesis. 2) List evidence needed. 3) Suggest tool calls."
 
-    resp = ai.prompt (prompt.render p) ?? {text: "investigation unavailable"}
+    text = prompt.ask p "investigation unavailable"
     {
-      hypothesis: resp.text | lines | first ?? ""
-      evidence_needed: resp.text | lines | filter (starts? "- ") | map (drop 2)
+      hypothesis: text | lines | first ?? ""
+      evidence_needed: text | lines | filter (starts? "- ") | map (drop 2)
     }
   }
 }

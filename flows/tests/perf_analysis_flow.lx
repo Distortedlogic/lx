@@ -1,15 +1,9 @@
 use std/fs
 use std/json
-use pkg/testkit
+use pkg/infra/testkit
 
 severity_rank = (sev) {
-  sev ? {
-    "critical" -> 4
-    "high" -> 3
-    "medium" -> 2
-    "low" -> 1
-    _ -> 0
-  }
+  sev ? { "critical" -> 4; "high" -> 3; "medium" -> 2; "low" -> 1; _ -> 0 }
 }
 
 +run = (input) {

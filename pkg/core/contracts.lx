@@ -1,0 +1,60 @@
+-- Shared contract types for tool orchestration and agent tasks.
+-- Generic types used across brain/, flows/, and workgen/.
+
+Trait +ToolRequest = {
+  tool: Str
+  args: Any
+  reason: Str
+  priority: Str = "normal"
+  timeout_ms: Int = 30000 where timeout_ms > 0
+}
+
+Trait +ToolResult = {
+  tool: Str
+  success: Bool
+  output: Any
+  tokens_used: Int where tokens_used >= 0
+  duration_ms: Int where duration_ms >= 0
+}
+
+Trait +ActionPlan = {
+  goal: Str
+  steps: [{id: Str  action: Str  tool: Str  args: Any  depends: [Str]}]
+  estimated_cost: Float where estimated_cost >= 0.0
+  risk: Str
+  fallback: Str
+}
+
+Trait +ActionResult = {
+  step_id: Str
+  success: Bool
+  output: Any
+  cost: Float where cost >= 0.0
+  duration_ms: Int where duration_ms >= 0
+}
+
+Trait +AgentTask = {
+  id: Str
+  specialist: Str
+  instruction: Str
+  context: Str
+  constraints: [Str]
+  timeout_ms: Int = 60000 where timeout_ms > 0
+}
+
+Trait +AgentResult = {
+  task_id: Str
+  specialist: Str
+  output: Any
+  confidence: Float where confidence >= 0.0 && confidence <= 1.0
+  tokens_used: Int where tokens_used >= 0
+}
+
+Trait +ContextItem = {
+  key: Str
+  content: Str
+  tokens: Int where tokens >= 0
+  priority: Str
+  pinned: Bool
+  source: Str
+}

@@ -32,6 +32,8 @@ pub struct RuntimeCtx {
     pub workspace_members: HashMap<String, PathBuf>,
     pub dep_dirs: HashMap<String, PathBuf>,
     pub tokio_runtime: Arc<tokio::runtime::Runtime>,
+    pub test_threshold: Option<f64>,
+    pub test_runs: Option<u32>,
 }
 
 impl Default for RuntimeCtx {
@@ -51,6 +53,8 @@ impl Default for RuntimeCtx {
             tokio_runtime: Arc::new(
                 tokio::runtime::Runtime::new().expect("failed to create tokio runtime"),
             ),
+            test_threshold: None,
+            test_runs: None,
         }
     }
 }

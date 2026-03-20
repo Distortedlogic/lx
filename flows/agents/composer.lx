@@ -1,17 +1,6 @@
 -- Content composer -- drafts and revises structured content.
--- Spawned for grading loops (multi-turn), importable for single calls.
 
-use std/ai
-use std/agent
+use pkg/ai/agent_factory
+use flows/lib/agent_catalog as catalog
 
-+compose = (msg) {
-  ai.prompt "Compose a solution based on:\nTasks: {msg.tasks}\nResearch: {msg.research}" ^
-}
-
-+revise = (msg) {
-  ai.prompt "Revise:\n{msg.work}\nFeedback: {msg.feedback}" ?? msg.work
-}
-
-+handlers = %{"compose": compose  "revise": revise}
-
-+main = () { agent.dispatch handlers }
++main = agent_factory.from_config catalog.composer

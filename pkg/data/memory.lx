@@ -1,0 +1,151 @@
+-- lx package: MemoryStore class for tiered memory with recall
+-- Generic operations (keys/values/save/load) come from Collection.
+-- Domain-specific: store, recall, promote/demote, consolidate, tier filtering.
+
+use std/time
+use pkg/core/collection {Collection}
+
+keep = (pred list) filter pred list
+
+entry_counter := 0
+
+next_entry_id = () {
+  entry_counter <- entry_counter + 1
+  "e_{entry_counter}"
+}
+
+count_word_hits = (words qw) words | keep (== qw) | len
+
+score_keywords = (content query_words) {
+  words = lower content | split " "
+  total_words = len words
+  total_words == 0 ? 0.0 : {
+    hit_counts = query_words | map (count_word_hits words)
+    hits = hit_counts | fold 0 (+)
+    hits / (total_words + 1)
+  }
+}
+
+has_positive_score = (e) e.score > 0.0
+
++Class MemoryStore : [Collection] = {
+  entries: Store ()
+
+  store = (entry_rec) {
+    id = next_entry_id ()
+    t = time.now ()
+    entry = {
+      id: id
+      content: entry_rec.content ?? ""
+      tier: entry_rec.tier ?? 0
+      confidence: entry_rec.confidence ?? 0.3
+      tags: entry_rec.tags ?? []
+      created_at: t.iso
+      confirmed: 0
+      contradicted: 0
+    }
+    self.entries.set id entry
+    Ok id
+  }
+
+  recall = (query) {
+    query_words = lower query | split " "
+    scored = self.entries.values () | map (e) {
+      score_base = score_keywords e.content query_words
+      total = score_base > 0.0 ? (score_base + e.tier * 0.1 + e.confidence * 0.1) : 0.0
+      {..e, score: total}
+    }
+    scored | keep has_positive_score | sort_by (e) 0.0 - e.score
+  }
+
+  find_by_id = (id) { self.entries.get id }
+
+  promote = (id) {
+    entry = self.find_by_id id
+    entry == None ? (Err "not found") : {
+      raw_conf = entry.confidence + 0.15
+      new_conf = raw_conf > 1.0 ? 1.0 : raw_conf
+      new_tier = new_conf >= 0.7 && entry.tier < 3 ? (entry.tier + 1) : entry.tier
+      self.entries.set id {..entry, confidence: new_conf, confirmed: entry.confirmed + 1, tier: new_tier}
+      Ok ()
+    }
+  }
+
+  demote = (id) {
+    entry = self.find_by_id id
+    entry == None ? (Err "not found") : {
+      raw_conf = entry.confidence - 0.2
+      new_conf = raw_conf < 0.0 ? 0.0 : raw_conf
+      new_tier = new_conf < 0.3 && entry.tier > 0 ? (entry.tier - 1) : entry.tier
+      self.entries.set id {..entry, confidence: new_conf, contradicted: entry.contradicted + 1, tier: new_tier}
+      Ok ()
+    }
+  }
+
+  forget = (id) {
+    self.entries.remove id
+    Ok ()
+  }
+
+  consolidate = () {
+    ids = self.entries.keys ()
+    to_remove = ids | filter (id) {
+      v = self.entries.get id
+      v == None ? false : (v.confidence <= 0.0 && v.contradicted > v.confirmed)
+    }
+    to_remove | each (id) { self.entries.remove id }
+    remaining = self.entries.keys ()
+    to_promote = remaining | filter (id) {
+      v = self.entries.get id
+      v == None ? false : (v.confirmed >= 3 && v.tier < 3)
+    }
+    to_promote | each (id) {
+      v = self.entries.get id
+      v != None ? (self.entries.set id {..v, tier: v.tier + 1}) : ()
+    }
+    to_demote = remaining | filter (id) {
+      v = self.entries.get id
+      v == None ? false : (v.contradicted >= 2 && v.tier > 0)
+    }
+    to_demote | each (id) {
+      v = self.entries.get id
+      v != None ? (self.entries.set id {..v, tier: v.tier - 1}) : ()
+    }
+    {promoted: len to_promote  demoted: len to_demote  removed: len to_remove}
+  }
+
+  tier = (level) {
+    self.entries.values () | keep (e) e.tier == level
+  }
+
+  all = () { self.entries.values () }
+}
+
++tiers = {l1: "L1"  l2: "L2"  l3: "L3"}
+
++thresholds = {promote: 0.7  consolidate: 0.95  demote: 0.1}
+
++create = (name) MemoryStore {path: name}
+
++seed = (mem entries) {
+  entries | each (e) {
+    mem.store {content: e.content  confidence: e.confidence  source: "seeded"  tier: tiers.l1}
+  }
+  entries | len
+}
+
++daily = (mem) {
+  l1 = mem.tier tiers.l1
+  promoted = l1 | filter (e) e.confidence >= thresholds.promote
+  promoted | each (e) mem.promote e.id
+  demoted = l1 | filter (e) e.confidence < thresholds.demote
+  demoted | each (e) mem.demote e.id
+  {promoted: (promoted | len)  demoted: (demoted | len)}
+}
+
++weekly = (mem) {
+  l2 = mem.tier tiers.l2
+  ready = l2 | filter (e) e.confidence >= thresholds.consolidate
+  none_consolidated = {consolidated: 0}
+  ready | empty? ? none_consolidated : { mem.consolidate (); {consolidated: (ready | len)} }
+}

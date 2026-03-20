@@ -1,0 +1,236 @@
+-- lx package: Inspector class for agent self-awareness (turns, actions, markers, elapsed)
+-- Module-level exports: self_assess, detect_doom_loop, strategy_analysis, time_pressure,
+-- generate_status, should_pivot, narrate_thinking, suggest_pivot
+use std/store : kv
+use std/time
+use pkg/core/score
+use pkg/core/prompt
+
+keep = (pred list) filter pred list
+
+is_action = (a) a.type != "__marker" && a.type != "strategy_shift"
+
+pid_result = $^cat /proc/self/stat
+pid_val = pid_result | split " " | first ^ | to_int ?? 1
+
++Class Inspector = {
+  turns: 0
+  actions: []
+  start_ms: 0
+  markers: None
+
+  init_markers = () {
+    self.markers <- kv.create {}
+  }
+
+  ensure_markers = () {
+    self.markers == None ? (self.init_markers ()) : ()
+  }
+
+  identity = () {
+    {name: "main"  role: "main"  pid: pid_val}
+  }
+
+  init_elapsed = () {
+    t = time.now ()
+    self.start_ms <- t.ms
+    0.0
+  }
+
+  calc_elapsed = () {
+    t = time.now ()
+    (t.ms - self.start_ms) / 1000.0
+  }
+
+  elapsed = () {
+    self.start_ms == 0 ? (self.init_elapsed ()) : (self.calc_elapsed ())
+  }
+
+  turn_count = () {
+    self.turns
+  }
+
+  tick_turn = () {
+    self.turns <- self.turns + 1
+    self.turns
+  }
+
+  budget = () {
+    {total: 0 - 1  spent: 0  remaining: 0 - 1}
+  }
+
+  get_actions = () {
+    self.actions | keep is_action
+  }
+
+  actions_since = (marker_name) {
+    self.ensure_markers ()
+    idx_val = kv.get self.markers marker_name
+    idx = idx_val == None ? 0 : idx_val
+    drop idx self.actions | keep is_action
+  }
+
+  mark = (name) {
+    self.ensure_markers ()
+    t = time.now ()
+    new_acts = [..self.actions {type: "__marker", target: name, time: t.iso}]
+    self.actions <- new_acts
+    kv.set self.markers name (len new_acts)
+    ()
+  }
+
+  record = (entry) {
+    t = time.now ()
+    new_acts = [..self.actions {type: entry.type ?? "", target: entry.target ?? "", time: t.iso}]
+    trimmed = (len new_acts) > 1000 ? (drop ((len new_acts) - 1000) new_acts) : new_acts
+    self.actions <- trimmed
+    ()
+  }
+
+  is_stuck = () {
+    acts = self.actions | keep is_action
+    n = len acts
+    n < 5 ? false : {
+      window = drop (n - 5) acts
+      last_act = last window ^
+      same = window | keep (a) a.type == last_act.type && a.target == last_act.target
+      (len same) == 5
+    }
+  }
+
+  strategy_shift = (reason) {
+    t = time.now ()
+    self.actions <- [..self.actions {type: "strategy_shift", target: reason, time: t.iso}]
+    ()
+  }
+
+  similar_actions = (window_size) {
+    acts = self.actions | keep is_action
+    n = len acts
+    n == 0 ? 0 : {
+      last_act = last acts ^
+      window = (window_size < n) ? (drop (n - window_size) acts) : acts
+      same = window | keep (a) a.type == last_act.type && a.target == last_act.target
+      len same
+    }
+  }
+}
+
++self_assess = (state) {
+  ins = state.inspector
+  actions = ins.actions ()
+
+  {
+    identity: ins.self ()
+    elapsed_ms: ins.elapsed ()
+    turns: ins.turn_count ()
+    action_count: actions | len
+    is_stuck: ins.is_stuck ()
+    action_diversity: actions | map (.type) | uniq | len
+    recent_actions: actions | rev | take 5
+  }
+}
+
++detect_doom_loop = (actions window) {
+  recent = actions | rev | take window
+  types = recent | map (.type)
+  targets = recent | map (.target)
+
+  type_groups = types | group_by identity
+  repeated_types = type_groups | entries
+    | filter (type occurrences) len occurrences > window / 2
+    | map (.0)
+
+  target_groups = targets | group_by identity
+  repeated_targets = target_groups | entries
+    | filter (target occurrences) len occurrences > window / 2
+    | map (.0)
+
+  {
+    is_looping: repeated_types | len > 0
+    repeated_actions: repeated_types
+    repeated_targets: repeated_targets
+    severity: repeated_types | len > 2 ? "critical" : (repeated_types | len > 0 ? "warning" : "ok")
+  }
+}
+
++strategy_analysis = (state) {
+  actions = state.inspector.actions ()
+  count = actions | len
+
+  early = {current: "too_early"  recommendation: "continue — not enough data"  actions_analyzed: count}
+  count < 5 ? early : {
+    assessment = self_assess state
+    loop_check = detect_doom_loop actions 10
+
+    recommendation = loop_check.is_looping ? "PIVOT — doom loop on: {loop_check.repeated_actions | join ", "}" : (assessment.is_stuck ? "CHANGE — agent is stuck, try different approach" : (assessment.action_diversity < 3 ? "DIVERSIFY — too narrow, explore more angles" : "CONTINUE — healthy progress"))
+
+    {
+      current: loop_check.is_looping ? "looping" : (assessment.is_stuck ? "stuck" : "healthy")
+      recommendation
+      actions_analyzed: count
+      diversity: assessment.action_diversity
+    }
+  }
+}
+
++time_pressure = (state) {
+  elapsed = state.inspector.elapsed ()
+  budget_info = state.inspector.budget ()
+
+  elapsed_pct = budget_info.total_ms > 0 ? elapsed / budget_info.total_ms * 100.0 : 0.0
+
+  {
+    elapsed_ms: elapsed
+    elapsed_pct
+    remaining_ms: math.max 0 (budget_info.total_ms - elapsed)
+    pressure: score.tier [{min: 80.0  name: "critical"} {min: 60.0  name: "high"} {min: 40.0  name: "moderate"} {min: 0.0  name: "low"}] elapsed_pct
+  }
+}
+
++generate_status = (state) {
+  assessment = self_assess state
+  strategy = strategy_analysis state
+  time_info = time_pressure state
+
+  status_text = [
+    "Turn {assessment.turns} | {assessment.action_count} actions | {assessment.action_diversity} unique types"
+    "Strategy: {strategy.current} — {strategy.recommendation}"
+    "Time: {time_info.pressure} ({time_info.elapsed_ms}ms elapsed)"
+  ] | join "\n"
+
+  {
+    text: status_text
+    assessment
+    strategy
+    time: time_info
+    healthy: strategy.current == "healthy" && time_info.pressure != "critical"
+  }
+}
+
++should_pivot = (state) {
+  strategy = strategy_analysis state
+  strategy.current == "looping" || strategy.current == "stuck"
+}
+
++narrate_thinking = (state goal current_step) {
+  assessment = self_assess state
+  action_list = assessment.recent_actions | map (a) "{a.type}: {a.target}" | join " → "
+  "Pursuing: {goal}\nCurrent: {current_step}\nPath: {action_list}\nTurn: {assessment.turns}"
+}
+
++suggest_pivot = (state) {
+  assessment = self_assess state
+  strategy = strategy_analysis state
+
+  strategy.current == "healthy" ? ["current approach is working"] : {
+    p = prompt.create ()
+      | prompt.system "You suggest alternative approaches when current strategy isn't working."
+      | prompt.section "Current Strategy" strategy.current
+      | prompt.section "Recent Actions" (assessment.recent_actions | map (.type) | join ", ")
+      | prompt.section "Recommendation" strategy.recommendation
+      | prompt.instruction "Suggest 2 concrete alternative approaches."
+
+    prompt.ask_lines p "try a different approach"
+  }
+}

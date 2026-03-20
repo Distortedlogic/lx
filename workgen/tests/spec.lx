@@ -6,7 +6,7 @@ use std/audit
 
 +name = "workgen"
 +threshold = 0.75
-+threshold_pct = 75
++threshold_pct = to_int (threshold * 100)
 
 +rubric = audit.rubric [
   {name: "structure"   description: "has Goal, Why, What changes, Files affected, Task List, CRITICAL REMINDERS sections"  weight: 25}

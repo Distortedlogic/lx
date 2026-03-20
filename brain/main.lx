@@ -5,22 +5,22 @@
 use std/ai
 use std/json
 use std/time
-use pkg/trace {TraceStore}
 use std/agent
+use pkg/infra/workflow
 
-use pkg/perception {Perception}
-use pkg/reasoning {ReasoningChain}
-use pkg/monitor {CognitiveState}
-use pkg/reflect {FeedbackSignal}
+use pkg/ai/perception {Perception}
+use pkg/ai/reasoning {ReasoningChain}
+use pkg/agents/monitor {CognitiveState}
+use pkg/ai/reflect {FeedbackSignal}
 use ./contracts {Response PerceptionEvent ReasoningEvent}
-use ./lib/perception : perceive_mod
-use ./lib/reasoning : reason_mod
-use ./lib/memory_mgr : mem
+use pkg/ai/perception : perceive_mod
+use pkg/ai/reasoning : reason_mod
+use pkg/data/tieredmem : mem
 use ./lib/tools : tool_mod
 use ./lib/context_mgr : ctx
 use ./lib/identity : id
-use pkg/quality
-use ./lib/monitor : mon
+use pkg/ai/quality
+use pkg/agents/monitor : mon
 
 +think = (input: Str  history: [Any]) -> Any {
   state := mon.init ()
@@ -29,8 +29,8 @@ use ./lib/monitor : mon
 
   ctx.pin_identity context_win identity
 
-  with TraceStore {path: "/tmp/brain_trace.json"} ?? TraceStore () as trace_session {
-    with mem.init () ?? {working: MemoryStore ()  episodic: MemoryStore ()  semantic: KnowledgeBase ()  persona: {name: "claude"}} as memory_store {
+  workflow.run "brain" input (trace_session) {
+    memory_store = mem.init "{env.home ()}/.lx/brain" "claude"
       perception_topic = agent.topic "perception"
       reasoning_topic = agent.topic "reasoning"
 
@@ -82,13 +82,12 @@ use ./lib/monitor : mon
 
       emit response.content
 
-      {
+      Ok {
         response: response
         quality: quality_result
         state: mon.status_report state
         trace: trace_session
       }
-    }
   }
 }
 

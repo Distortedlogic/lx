@@ -3,9 +3,8 @@
 -- Architecture: agents spawned as subprocesses, communicate via ~>?, pub/sub for events
 
 use std/agent
-use pkg/pool {Pool}
-use pkg/trace {TraceStore}
-use ../contracts {AgentTask AgentResult}
+use pkg/data/trace {TraceStore}
+use pkg/core/contracts {AgentTask AgentResult}
 
 +create_workforce = () -> Any {
   (analyst critic researcher) = par {

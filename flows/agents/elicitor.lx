@@ -1,23 +1,6 @@
 -- Elicitation agent -- clarifies user intent into structured specs.
--- Used by software_diffusion stage 0 to converge on requirements.
 
-use std/ai
-use std/agent
+use pkg/ai/agent_factory
+use flows/lib/agent_catalog as catalog
 
-+main = () {
-  agent.dispatch %{
-    "elicit": (msg) {
-      ai.prompt_structured "Analyze this software request. Clarify scope, identify actors, define features, resolve tradeoffs.\n\nRequest: {msg.prompt}\n\nReturn structured specs with convergence status." {
-        requirements: [Str]
-        user_stories: [Str]
-        constraints: [Str]
-        decisions: [Str]
-        converged: Bool
-        questions: [Str]
-      } ^
-    }
-    "clarify": (msg) {
-      ai.prompt "Given this context:\n{msg.specs}\n\nAnswer: {msg.question}" ?? ""
-    }
-  }
-}
++main = agent_factory.from_config catalog.elicitor
