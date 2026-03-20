@@ -1,0 +1,17 @@
+[package]
+name = "lx-tui"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+
+[[bin]]
+name = "lx-tui"
+path = "src/main.rs"
+
+[dependencies]
+lx = { path = "../lx" }
+lx-dx = { path = "../lx-dx" }
+ratatui = "0.29"
+crossterm = "0.28"
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "macros"] }
+clap = { version = "4", features = ["derive"] }
