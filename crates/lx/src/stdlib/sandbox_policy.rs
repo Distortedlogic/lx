@@ -162,9 +162,7 @@ pub(super) fn intersect_policies(policies: &[Policy]) -> Policy {
         result.ai = result.ai && p.ai;
         result.embed = result.embed && p.embed;
         result.pane = result.pane && p.pane;
-        if p.max_time_ms > 0
-            && (result.max_time_ms == 0 || p.max_time_ms < result.max_time_ms)
-        {
+        if p.max_time_ms > 0 && (result.max_time_ms == 0 || p.max_time_ms < result.max_time_ms) {
             result.max_time_ms = p.max_time_ms;
         }
     }

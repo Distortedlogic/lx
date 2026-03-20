@@ -36,11 +36,19 @@ impl AiBackend for ClaudeCodeAiBackend {
         if let Some(ref id) = opts.resume {
             cmd.arg("--resume").arg(id);
         }
-        if let Some(ref t) = opts.tools {
+        if let Some(ref t) = opts.tools
+            && !t.is_empty()
+        {
             cmd.arg("--allowedTools").arg(t.join(","));
         }
         if let Some(ref s) = opts.append_system {
             cmd.arg("--append-system-prompt").arg(s);
+        }
+        if opts.disable_tools {
+            cmd.arg("--tools").arg("");
+        }
+        if let Some(ref schema) = opts.json_schema {
+            cmd.arg("--json-schema").arg(schema);
         }
         cmd.stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -84,17 +92,24 @@ fn parse_ai_response(jv: &serde_json::Value) -> Result<Value, LxError> {
         .get("is_error")
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
-    let result_text = jv.get("result").and_then(|v| v.as_str()).unwrap_or("");
+    let result_text = if let Some(structured) = jv.get("structured_output") {
+        structured.to_string()
+    } else {
+        jv.get("result")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string()
+    };
     if is_error {
         let mut fields = IndexMap::new();
-        fields.insert("msg".into(), Value::Str(Arc::from(result_text)));
+        fields.insert("msg".into(), Value::Str(Arc::from(result_text.as_str())));
         if let Some(sub) = jv.get("subtype").and_then(|v| v.as_str()) {
             fields.insert("subtype".into(), Value::Str(Arc::from(sub)));
         }
         return Ok(Value::Err(Box::new(Value::Record(Arc::new(fields)))));
     }
     let mut fields = IndexMap::new();
-    fields.insert("text".into(), Value::Str(Arc::from(result_text)));
+    fields.insert("text".into(), Value::Str(Arc::from(result_text.as_str())));
     if let Some(sid) = jv.get("session_id").and_then(|v| v.as_str()) {
         fields.insert("session_id".into(), Value::Str(Arc::from(sid)));
     }

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use lx_dx::event::EventBus;
@@ -32,11 +32,16 @@ impl LxRunState {
     }
 }
 
-pub fn start_run(state: &mut LxRunState, source_path: String) {
-    let bus = state.bus.clone();
-    state.source_path = Some(source_path.clone());
-    state.status = RunStatus::Running;
-    state.started_at = Some(Instant::now());
+pub fn start_run(shared: Arc<Mutex<LxRunState>>, source_path: String) {
+    {
+        let mut state = shared.lock().expect("lock poisoned");
+        state.source_path = Some(source_path.clone());
+        state.status = RunStatus::Running;
+        state.started_at = Some(Instant::now());
+    }
+
+    let bus = shared.lock().expect("lock poisoned").bus.clone();
+    let shared_clone = Arc::clone(&shared);
 
     std::thread::Builder::new()
         .name("lx-desktop-run".into())
@@ -45,8 +50,22 @@ pub fn start_run(state: &mut LxRunState, source_path: String) {
             rt.block_on(async move {
                 let langfuse = Arc::new(LangfuseClient::from_env());
                 let runner = ProgramRunner::new(bus, langfuse);
-                if let Err(e) = runner.run(&source_path).await {
-                    eprintln!("lx run error: {e}");
+                let result = runner.run(&source_path).await;
+                let mut state = shared_clone.lock().expect("lock poisoned");
+                let duration_ms = state
+                    .started_at
+                    .map(|s| s.elapsed().as_millis() as u64)
+                    .unwrap_or(0);
+                match result {
+                    Ok(_) => {
+                        state.status = RunStatus::Completed { duration_ms };
+                    }
+                    Err(e) => {
+                        state.status = RunStatus::Failed {
+                            error: e.to_string(),
+                            duration_ms,
+                        };
+                    }
                 }
             });
         })

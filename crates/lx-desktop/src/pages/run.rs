@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use dioxus::prelude::*;
 use lx_dx::event::EventBus;
@@ -9,10 +9,15 @@ use crate::server::lx::{LxRunState, RunStatus, start_run};
 #[component]
 pub fn Run() -> Element {
     let bus: Signal<Arc<EventBus>> = use_context();
+    let run_state = use_signal(|| Arc::new(Mutex::new(LxRunState::new(bus.read().clone()))));
     let mut file_path = use_signal(String::new);
-    let mut run_state = use_signal(|| LxRunState::new(bus.read().clone()));
 
-    let status = run_state.read().status.clone();
+    let status = run_state
+        .read()
+        .lock()
+        .expect("lock poisoned")
+        .status
+        .clone();
     let status_text = match &status {
         RunStatus::Idle => "idle".to_string(),
         RunStatus::Running => "running".to_string(),
@@ -38,8 +43,8 @@ pub fn Run() -> Element {
                     disabled: is_running || file_path.read().is_empty(),
                     onclick: move |_| {
                         let path = file_path.read().clone();
-                        let mut state = run_state.write();
-                        start_run(&mut state, path);
+                        let shared = run_state.read().clone();
+                        start_run(shared, path);
                     },
                     "Run"
                 }

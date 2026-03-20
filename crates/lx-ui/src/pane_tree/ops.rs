@@ -84,11 +84,11 @@ impl PaneNode {
 
     pub fn first_terminal_id(&self) -> Option<String> {
         match self {
-            Self::Terminal { id, .. }
-            | Self::Browser { id, .. }
-            | Self::Editor { id, .. }
-            | Self::Agent { id, .. }
-            | Self::Canvas { id, .. } => Some(id.clone()),
+            Self::Terminal { id, .. } => Some(id.clone()),
+            Self::Browser { .. }
+            | Self::Editor { .. }
+            | Self::Agent { .. }
+            | Self::Canvas { .. } => None,
             Self::Split { first, second, .. } => first
                 .first_terminal_id()
                 .or_else(|| second.first_terminal_id()),

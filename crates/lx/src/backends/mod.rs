@@ -77,6 +77,8 @@ pub struct AiOpts {
     pub resume: Option<String>,
     pub tools: Option<Vec<String>>,
     pub append_system: Option<String>,
+    pub disable_tools: bool,
+    pub json_schema: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]

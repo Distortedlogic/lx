@@ -1,0 +1,9 @@
+[application]
+name = "lx-mobile"
+default_platform = "mobile"
+
+[application.mobile]
+bundle_identifier = "com.lx.mobile"
+
+[mobile.permissions]
+microphone = false

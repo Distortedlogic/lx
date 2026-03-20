@@ -10,6 +10,7 @@ use std/ai
 use std/fs
 use std/json
 use std/time
+use std/cron
 use std/audit
 use std/agents/grader
 use pkg/core/prompt
@@ -259,6 +260,14 @@ run_item = (idx path) {
 }
 
 start = time.now ()
+start_ms = start.ms
+
+heartbeat = cron.every 60000 () {
+  t = time.now ()
+  ts = t | time.format "%H:%M:%S"
+  mins = ((t.ms - start_ms) // 1000) // 60
+  emit "[{ts}] heartbeat — {mins}m elapsed"
+}
 
 work_items | enumerate | each (idx_path) {
   (idx path) = idx_path

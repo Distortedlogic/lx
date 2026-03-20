@@ -40,6 +40,7 @@ pub struct App {
     pub program_status: Option<Result<String, String>>,
     pub source_path: String,
     pub should_quit: bool,
+    pub program_started: bool,
 }
 
 const MAX_EVENTS: usize = 10_000;
@@ -57,6 +58,7 @@ impl App {
             program_status: None,
             source_path,
             should_quit: false,
+            program_started: false,
         }
     }
 
@@ -98,6 +100,9 @@ impl App {
                 if !self.agents.contains(agent_id) {
                     self.agents.push(agent_id.clone());
                 }
+            }
+            RuntimeEvent::ProgramStarted { .. } => {
+                self.program_started = true;
             }
             RuntimeEvent::ProgramFinished {
                 result,

@@ -1,9 +1,32 @@
 use dioxus::prelude::*;
 
+use crate::api_client::LxClient;
+use crate::ws_client::EventWsClient;
+
 #[component]
 pub fn Events() -> Element {
-    let events: Signal<Vec<serde_json::Value>> = use_signal(Vec::new);
+    let client: Signal<LxClient> = use_context();
+    let mut events: Signal<Vec<serde_json::Value>> = use_signal(Vec::new);
     let mut filter = use_signal(|| "all".to_string());
+    let expanded: Signal<std::collections::HashSet<usize>> = use_signal(Default::default);
+
+    use_future(move || {
+        let base_url = client.read().base_url_for_spawn();
+        async move {
+            let ws_client = EventWsClient::new(&base_url);
+            let (tx, mut rx) = tokio::sync::mpsc::channel::<serde_json::Value>(256);
+            tokio::spawn(async move {
+                ws_client.connect_and_stream(tx).await;
+            });
+            while let Some(val) = rx.recv().await {
+                let mut evts = events.write();
+                evts.push(val);
+                if evts.len() > 10_000 {
+                    evts.remove(0);
+                }
+            }
+        }
+    });
 
     let current_filter = filter.read().clone();
     let visible: Vec<_> = events
@@ -40,8 +63,8 @@ pub fn Events() -> Element {
                 }
             }
             div { class: "space-y-1",
-                for event in visible.iter().rev().take(100) {
-                    {render_mobile_event(event)}
+                for (idx, event) in visible.iter().enumerate().rev().take(100) {
+                    {render_mobile_event(idx, event, &expanded)}
                 }
                 if visible.is_empty() {
                     p { class: "text-gray-500 text-sm", "No events yet" }
@@ -71,13 +94,18 @@ fn event_type_matches(event_type: &str, filter: &str) -> bool {
             event_type == "progress"
                 || event_type == "program_started"
                 || event_type == "program_finished"
+                || event_type == "trace_span_recorded"
         }
         "errors" => event_type == "error",
         _ => true,
     }
 }
 
-fn render_mobile_event(event: &serde_json::Value) -> Element {
+fn render_mobile_event(
+    idx: usize,
+    event: &serde_json::Value,
+    expanded: &Signal<std::collections::HashSet<usize>>,
+) -> Element {
     let event_type = event
         .get("type")
         .and_then(|t| t.as_str())
@@ -86,10 +114,27 @@ fn render_mobile_event(event: &serde_json::Value) -> Element {
         .get("agent_id")
         .and_then(|a| a.as_str())
         .unwrap_or("system");
+    let is_expanded = expanded.read().contains(&idx);
+    let detail = serde_json::to_string_pretty(event).unwrap_or_default();
+    let mut expanded = *expanded;
     rsx! {
-        div { class: "p-2 bg-gray-800 rounded text-xs",
-            span { class: "text-gray-500", "[{agent}] " }
-            span { class: "text-gray-300", "{event_type}" }
+        div {
+            class: "p-2 bg-gray-800 rounded text-xs cursor-pointer",
+            onclick: move |_| {
+                let mut set = expanded.write();
+                if set.contains(&idx) {
+                    set.remove(&idx);
+                } else {
+                    set.insert(idx);
+                }
+            },
+            div {
+                span { class: "text-gray-500", "[{agent}] " }
+                span { class: "text-gray-300", "{event_type}" }
+            }
+            if is_expanded {
+                pre { class: "mt-1 text-gray-400 whitespace-pre-wrap break-all", "{detail}" }
+            }
         }
     }
 }

@@ -173,27 +173,34 @@ impl PaneNode {
         }
     }
 
-    pub fn set_ratio_by_split_id(&mut self, split_id: &str, new_ratio: f64) {
+    pub fn set_ratio_by_split_id(self, split_id: &str, new_ratio: f64) -> Self {
         match self {
             Self::Split {
-                id,
+                id: sid,
+                direction,
                 ratio,
                 first,
                 second,
-                ..
             } => {
-                if id == split_id {
-                    *ratio = new_ratio.clamp(0.1, 0.9);
+                if sid == split_id {
+                    Self::Split {
+                        id: sid,
+                        direction,
+                        ratio: new_ratio.clamp(0.1, 0.9),
+                        first,
+                        second,
+                    }
                 } else {
-                    first.set_ratio_by_split_id(split_id, new_ratio);
-                    second.set_ratio_by_split_id(split_id, new_ratio);
+                    Self::Split {
+                        id: sid,
+                        direction,
+                        ratio,
+                        first: Box::new(first.set_ratio_by_split_id(split_id, new_ratio)),
+                        second: Box::new(second.set_ratio_by_split_id(split_id, new_ratio)),
+                    }
                 }
             }
-            Self::Terminal { .. }
-            | Self::Browser { .. }
-            | Self::Editor { .. }
-            | Self::Agent { .. }
-            | Self::Canvas { .. } => {}
+            other => other,
         }
     }
 }

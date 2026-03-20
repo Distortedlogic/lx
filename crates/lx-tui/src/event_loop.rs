@@ -40,12 +40,16 @@ pub async fn run(app: &mut App, terminal: &mut Terminal<impl Backend>, bus: Arc<
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
                 }
             }
-            _ = poll_crossterm() => {
-                if let Ok(true) = crossterm::event::poll(std::time::Duration::ZERO)
-                    && let Ok(crossterm::event::Event::Key(key)) = crossterm::event::read()
-                {
-                    crate::input::handle_key(app, key);
-                    let _ = terminal.draw(|f| crate::ui::render(app, f));
+            _ = poll_crossterm_ready() => {
+                match crossterm::event::read() {
+                    Ok(crossterm::event::Event::Key(key)) => {
+                        crate::input::handle_key(app, key);
+                        let _ = terminal.draw(|f| crate::ui::render(app, f));
+                    }
+                    Ok(crossterm::event::Event::Resize(_, _)) => {
+                        let _ = terminal.draw(|f| crate::ui::render(app, f));
+                    }
+                    _ => {}
                 }
             }
         }
@@ -56,6 +60,15 @@ pub async fn run(app: &mut App, terminal: &mut Terminal<impl Backend>, bus: Arc<
     }
 }
 
-async fn poll_crossterm() {
-    tokio::time::sleep(std::time::Duration::from_millis(16)).await;
+async fn poll_crossterm_ready() {
+    loop {
+        let ready = tokio::task::spawn_blocking(|| {
+            crossterm::event::poll(std::time::Duration::from_millis(16)).unwrap_or(false)
+        })
+        .await
+        .unwrap_or(false);
+        if ready {
+            return;
+        }
+    }
 }

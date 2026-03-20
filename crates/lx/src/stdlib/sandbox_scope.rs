@@ -2,9 +2,8 @@ use std::cell::RefCell;
 use std::sync::Arc;
 
 use crate::backends::{
-    AiBackend, DenyAiBackend, DenyEmbedBackend, DenyHttpBackend, DenyPaneBackend,
-    DenyShellBackend, EmbedBackend, HttpBackend, PaneBackend, RestrictedShellBackend, RuntimeCtx,
-    ShellBackend,
+    AiBackend, DenyAiBackend, DenyEmbedBackend, DenyHttpBackend, DenyPaneBackend, DenyShellBackend,
+    EmbedBackend, HttpBackend, PaneBackend, RestrictedShellBackend, RuntimeCtx, ShellBackend,
 };
 use crate::builtins::call_value_sync;
 use crate::error::LxError;

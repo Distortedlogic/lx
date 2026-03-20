@@ -11,7 +11,7 @@ path = "src/main.rs"
 [dependencies]
 lx-dx = { path = "../lx-dx" }
 lx-ui = { path = "../lx-ui" }
-dioxus = { version = "0.7", features = ["desktop", "router"] }
+dioxus = { version = "0.7", features = ["mobile", "router"] }
 reqwest = { version = "0.12", features = ["json"] }
 tokio = { version = "1", features = ["rt-multi-thread", "sync"] }
 tokio-tungstenite = "0.24"

@@ -5,7 +5,22 @@ use crate::api_client::LxClient;
 #[component]
 pub fn Approvals() -> Element {
     let client: Signal<LxClient> = use_context();
-    let prompts: Signal<Vec<PendingPrompt>> = use_signal(Vec::new);
+    let mut prompts: Signal<Vec<PendingPrompt>> = use_signal(Vec::new);
+
+    use_future(move || async move {
+        loop {
+            let c = client.read();
+            if let Ok(raw) = c.fetch_pending_prompts().await {
+                let parsed: Vec<PendingPrompt> = raw
+                    .into_iter()
+                    .filter_map(|v| parse_pending_prompt(&v))
+                    .collect();
+                prompts.set(parsed);
+            }
+            drop(c);
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        }
+    });
 
     rsx! {
         div { class: "space-y-4",
@@ -86,12 +101,60 @@ fn render_prompt(prompt: &PendingPrompt, client: Signal<LxClient>) -> Element {
             }
         }
         PromptKind::Ask { message } => {
+            let pid = prompt.prompt_id;
+            let mut input_text = use_signal(String::new);
             rsx! {
                 div { class: "p-3 bg-gray-800 rounded space-y-2",
                     p { class: "text-sm", "{message}" }
-                    p { class: "text-xs text-gray-500", "Text input pending" }
+                    div { class: "flex gap-2",
+                        input {
+                            r#type: "text",
+                            class: "flex-1 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-100",
+                            placeholder: "Type your response...",
+                            value: "{input_text}",
+                            oninput: move |e| input_text.set(e.value()),
+                        }
+                        button {
+                            class: "px-3 py-1 bg-blue-600 rounded text-sm",
+                            disabled: input_text.read().is_empty(),
+                            onclick: move |_| {
+                                let val = input_text.read().clone();
+                                send_response(client, pid, serde_json::json!(val));
+                                input_text.set(String::new());
+                            },
+                            "Send"
+                        }
+                    }
                 }
             }
         }
     }
+}
+
+fn parse_pending_prompt(v: &serde_json::Value) -> Option<PendingPrompt> {
+    let prompt_id = v.get("prompt_id")?.as_u64()?;
+    let kind_str = v.get("kind")?.as_str()?;
+    let message = v
+        .get("message")
+        .and_then(|m| m.as_str())
+        .unwrap_or("")
+        .to_string();
+    let kind = match kind_str {
+        "confirm" => PromptKind::Confirm { message },
+        "choose" => {
+            let options = v
+                .get("options")
+                .and_then(|o| o.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|x| x.as_str().map(String::from))
+                        .collect()
+                })
+                .unwrap_or_default();
+            PromptKind::Choose { message, options }
+        }
+        "ask" => PromptKind::Ask { message },
+        _ => return None,
+    };
+    Some(PendingPrompt { prompt_id, kind })
 }

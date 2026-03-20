@@ -88,6 +88,11 @@
 
 - **`split` returns the string itself (not a 1-element list) when delimiter is absent.** `"hello" | split "\n"` returns `"hello"` (Str), not `["hello"]` (List). This breaks `flat_map` chains: `items | flat_map (s) { s | split "\n" }` iterates over individual characters when no delimiter is found. **Fix:** break the chain into separate steps and avoid `flat_map` with `split` on optional delimiters.
 
+## Cron Traps
+
+- **`cron.every` takes milliseconds, not seconds.** `cron.every 60 fn` fires every 60ms (16 times/second), not every minute. **Fix:** `cron.every 60000 fn` for once per minute.
+- **Cron closures capture scope at definition time.** `cron.every 1000 () { x }` where `x` is defined AFTER the cron call → "undefined variable" error on the background thread. **Fix:** define all variables the closure needs before the `cron.every` call.
+
 ## Incomplete Wiring
 
 - **`uses` bindings are dropped.** The `Agent` keyword parses `uses` declarations but they are not stored on the Class value. MCP servers must be connected manually in method bodies or `init`.

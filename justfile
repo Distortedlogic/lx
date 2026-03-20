@@ -99,11 +99,11 @@ tui file:
 
 # run lx-desktop app
 desktop:
-  cargo run -p lx-desktop
+  dx serve --bin lx-desktop
 
 # run lx-mobile app
 mobile:
-  cargo run -p lx-mobile
+  dx serve --bin lx-mobile --platform mobile
 
 # build vscode extension vsix (install via VS Code UI: Ctrl+Shift+P > Install from VSIX)
 package-vscode:

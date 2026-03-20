@@ -106,6 +106,11 @@ pub(crate) fn extract_opts(fields: &IndexMap<String, Value>) -> AiOpts {
                 .collect()
         }),
         append_system: opt_str(fields, "append_system"),
+        disable_tools: fields
+            .get("disable_tools")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        json_schema: opt_str(fields, "json_schema"),
     }
 }
 

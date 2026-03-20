@@ -103,6 +103,7 @@ fn matches_filter(event: &RuntimeEvent, filter: &str) -> bool {
             RuntimeEvent::Progress { .. }
                 | RuntimeEvent::ProgramStarted { .. }
                 | RuntimeEvent::ProgramFinished { .. }
+                | RuntimeEvent::TraceSpanRecorded { .. }
         ),
         "errors" => matches!(event, RuntimeEvent::Error { .. }),
         _ => true,

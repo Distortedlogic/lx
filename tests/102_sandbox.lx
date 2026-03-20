@@ -1,9 +1,9 @@
 use std/sandbox
 
-pure = sandbox.policy :pure
-readonly = sandbox.policy :readonly
-local = sandbox.policy :local
-full = sandbox.policy :full
+pure = sandbox.policy "pure"
+readonly = sandbox.policy "readonly"
+local = sandbox.policy "local"
+full = sandbox.policy "full"
 
 desc = sandbox.describe pure
 assert (desc.ai == false) "pure denies ai"
@@ -13,9 +13,12 @@ desc_full = sandbox.describe full
 assert (desc_full.ai == true) "full allows ai"
 assert (desc_full.shell == true) "full allows shell"
 
-assert (sandbox.permits readonly :fs_read ".") "readonly permits fs_read"
-assert (not (sandbox.permits readonly :fs_write ".")) "readonly denies fs_write"
-assert (not (sandbox.permits pure :shell "ls")) "pure denies shell"
+p1 = sandbox.permits readonly "fs_read" "."
+assert (p1 == true) "readonly permits fs_read"
+p2 = sandbox.permits readonly "fs_write" "."
+assert (p2 == false) "readonly denies fs_write"
+p3 = sandbox.permits pure "shell" "ls"
+assert (p3 == false) "pure denies shell"
 
 result = sandbox.scope pure () {
   $echo "should not run"

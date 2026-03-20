@@ -4,7 +4,7 @@ use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph};
+use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, StatefulWidget};
 
 use crate::app::{App, EventCategory};
 
@@ -23,6 +23,7 @@ pub fn render(app: &App, frame: &mut Frame) {
 
 fn render_header(app: &App, frame: &mut Frame, area: ratatui::layout::Rect) {
     let status_str = match &app.program_status {
+        None if app.program_started => "running",
         None => "starting",
         Some(Ok(_)) => "ok",
         Some(Err(_)) => "failed",
@@ -31,6 +32,7 @@ fn render_header(app: &App, frame: &mut Frame, area: ratatui::layout::Rect) {
         "ok" => Color::Green,
         "failed" => Color::Red,
         "starting" => Color::DarkGray,
+        "running" => Color::Yellow,
         _ => Color::Yellow,
     };
 
@@ -71,7 +73,8 @@ fn render_events(app: &App, frame: &mut Frame, area: ratatui::layout::Rect) {
         .title(format!("Events ({visible_count}/{total})"));
 
     let list = List::new(items).block(block);
-    frame.render_widget(list, area);
+    let mut list_state = ListState::default().with_offset(scroll_offset);
+    StatefulWidget::render(list, area, frame.buffer_mut(), &mut list_state);
 
     let inner_height = area.height.saturating_sub(2) as usize;
     if visible_count > inner_height && scroll_offset + inner_height < visible_count {

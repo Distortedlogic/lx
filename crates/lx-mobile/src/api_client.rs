@@ -39,6 +39,18 @@ impl LxClient {
         self.base_url.clone()
     }
 
+    pub async fn fetch_pending_prompts(&self) -> Result<Vec<serde_json::Value>, String> {
+        let url = format!("{}/api/run/prompts", self.base_url);
+        self.http
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?
+            .json::<Vec<serde_json::Value>>()
+            .await
+            .map_err(|e| e.to_string())
+    }
+
     pub async fn post_user_response(
         &self,
         prompt_id: u64,

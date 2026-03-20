@@ -121,10 +121,28 @@ pub(super) fn bi_grade(
     }
     let system = build_system_prompt(&to_eval);
     let user = build_user_prompt(&fields);
+    let schema = serde_json::json!({
+        "type": "object",
+        "properties": {
+            "categories": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string"},
+                        "score": {"type": "integer", "minimum": 0, "maximum": 100},
+                        "feedback": {"type": "string"}
+                    },
+                    "required": ["name", "score", "feedback"]
+                }
+            }
+        },
+        "required": ["categories"]
+    });
     let opts = AiOpts {
         append_system: Some(system),
-        max_turns: Some(1),
-        tools: Some(vec![]),
+        disable_tools: true,
+        json_schema: Some(schema.to_string()),
         ..AiOpts::default()
     };
     let llm_result = ctx.ai.prompt(&user, &opts, span)?;
