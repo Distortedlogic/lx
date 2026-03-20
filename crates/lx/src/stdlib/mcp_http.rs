@@ -1,4 +1,4 @@
-use reqwest::blocking::Client;
+use reqwest::Client;
 use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderValue};
 
 use crate::error::LxError;
@@ -12,11 +12,9 @@ pub(super) struct HttpTransport {
 
 impl HttpTransport {
     pub(super) fn new(url: String, span: Span) -> Result<Self, LxError> {
-        let client = tokio::task::block_in_place(|| {
-            Client::builder()
-                .build()
-                .map_err(|e| LxError::runtime(format!("mcp http: client: {e}"), span))
-        })?;
+        let client = Client::builder()
+            .build()
+            .map_err(|e| LxError::runtime(format!("mcp http: client: {e}"), span))?;
         Ok(HttpTransport {
             client,
             url,
@@ -30,10 +28,11 @@ impl HttpTransport {
         span: Span,
     ) -> Result<serde_json::Value, LxError> {
         let resp = self.post(req, span)?;
-        self.capture_session_id(&resp);
         let ct = content_type(&resp);
+        self.capture_session_id(&resp);
         let body = tokio::task::block_in_place(|| {
-            resp.text()
+            tokio::runtime::Handle::current()
+                .block_on(resp.text())
                 .map_err(|e| LxError::runtime(format!("mcp http: body: {e}"), span))
         })?;
         if ct.contains("text/event-stream") {
@@ -68,20 +67,19 @@ impl HttpTransport {
         let header = HeaderValue::from_str(sid)
             .map_err(|e| LxError::runtime(format!("mcp http: header: {e}"), span))?;
         tokio::task::block_in_place(|| {
-            self.client
-                .delete(&self.url)
-                .header("Mcp-Session-Id", header)
-                .send()
-                .map_err(|e| LxError::runtime(format!("mcp http: shutdown: {e}"), span))?;
-            Ok(())
+            tokio::runtime::Handle::current().block_on(async {
+                self.client
+                    .delete(&self.url)
+                    .header("Mcp-Session-Id", header)
+                    .send()
+                    .await
+                    .map_err(|e| LxError::runtime(format!("mcp http: shutdown: {e}"), span))?;
+                Ok(())
+            })
         })
     }
 
-    fn post(
-        &self,
-        body: &serde_json::Value,
-        span: Span,
-    ) -> Result<reqwest::blocking::Response, LxError> {
+    fn post(&self, body: &serde_json::Value, span: Span) -> Result<reqwest::Response, LxError> {
         let mut builder = self
             .client
             .post(&self.url)
@@ -96,13 +94,13 @@ impl HttpTransport {
             );
         }
         tokio::task::block_in_place(|| {
-            builder
-                .send()
+            tokio::runtime::Handle::current()
+                .block_on(builder.send())
                 .map_err(|e| LxError::runtime(format!("mcp http: send: {e}"), span))
         })
     }
 
-    fn capture_session_id(&mut self, resp: &reqwest::blocking::Response) {
+    fn capture_session_id(&mut self, resp: &reqwest::Response) {
         if let Some(sid) = resp
             .headers()
             .get("mcp-session-id")
@@ -113,7 +111,7 @@ impl HttpTransport {
     }
 }
 
-fn content_type(resp: &reqwest::blocking::Response) -> String {
+fn content_type(resp: &reqwest::Response) -> String {
     resp.headers()
         .get(CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
