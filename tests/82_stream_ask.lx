@@ -51,7 +51,6 @@ results8 = stream8 | collect
 assert (len results8 == 1) "non-list wraps as single item"
 assert (results8.0 == 42) "single value"
 
-use std/agent
 assert (agent.emit_stream != ()) "emit_stream exists"
 assert (agent.end_stream != ()) "end_stream exists"
 

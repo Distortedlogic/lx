@@ -28,7 +28,7 @@ run_git = (args) {
 +stash_pop = (_) { run_git "stash pop" ^ }
 +stash_list = (_) {
   raw = run_git "stash list" ^
-  raw | trim | split "\n" | filter (len > 0)
+  raw | trim | split "\n" | filter (x) { (x | len) > 0 }
 }
 +stash_drop = (ref_str) {
   idx = ref_str ?? "stash@{0}"

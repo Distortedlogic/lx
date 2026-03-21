@@ -5,7 +5,6 @@ use std/diag
 
 -- === Extract from source string ===
 src = `
-use std/agent
 
 worker = agent.spawn {command: "analyzer"} ^
 result = worker ~>? {action: "analyze" topic: "test"} ^

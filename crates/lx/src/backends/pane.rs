@@ -4,7 +4,6 @@ use std::sync::Arc;
 use crate::error::LxError;
 use crate::record;
 use crate::span::Span;
-use crate::stdlib::json_conv::{json_to_lx, lx_to_json};
 use crate::value::LxVal;
 
 use super::PaneBackend;
@@ -13,8 +12,7 @@ pub struct YieldPaneBackend;
 
 impl PaneBackend for YieldPaneBackend {
     fn open(&self, kind: &str, config: &LxVal, span: Span) -> Result<LxVal, LxError> {
-        let config_json =
-            lx_to_json(config, span).map_err(|e| LxError::runtime(format!("pane: {e}"), span))?;
+        let config_json = serde_json::Value::from(config);
         let msg = serde_json::json!({
             "__pane": {"action": "open", "kind": kind, "config": config_json}
         });
@@ -43,8 +41,7 @@ impl PaneBackend for YieldPaneBackend {
     }
 
     fn update(&self, pane_id: &str, content: &LxVal, span: Span) -> Result<(), LxError> {
-        let content_json =
-            lx_to_json(content, span).map_err(|e| LxError::runtime(format!("pane: {e}"), span))?;
+        let content_json = serde_json::Value::from(content);
         let msg = serde_json::json!({
             "__pane": {"action": "update", "pane_id": pane_id, "content": content_json}
         });
@@ -82,6 +79,6 @@ impl PaneBackend for YieldPaneBackend {
         }
         let response: serde_json::Value = serde_json::from_str(line.trim())
             .map_err(|e| LxError::runtime(format!("pane: JSON parse: {e}"), span))?;
-        Ok(json_to_lx(response))
+        Ok(LxVal::from(response))
     }
 }

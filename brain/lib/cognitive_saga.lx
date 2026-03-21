@@ -2,7 +2,6 @@
 -- Source: each step has a do/undo pair — undo actually reverses side effects
 
 use pkg/data/trace {TraceStore}
-use std/agent {Handoff}
 use pkg/core/handoff {as_context}
 use ../contracts {Response}
 use pkg/ai/perception : perceive

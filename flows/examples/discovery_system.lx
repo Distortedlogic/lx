@@ -8,7 +8,6 @@
 -- Source: mcp-toolbelt/arch_diagrams/discovery_system
 
 use pkg/data/knowledge {KnowledgeBase}
-use std/json
 use ../lib/github
 use pkg/infra/report
 use pkg/core/score : scoring

@@ -2,7 +2,6 @@
 -- review: uses AI to analyze a completed agent session transcript.
 -- quick_review: structural heuristic analysis, no AI call.
 
-use std/ai
 use pkg/core/prompt
 
 empty_review = {patterns: []  mistakes: []  facts: []  summary: "Empty transcript"  pattern_count: 0  mistake_count: 0}

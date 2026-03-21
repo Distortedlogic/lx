@@ -3,8 +3,6 @@
 -- create: build handlers map from config entries. Each entry maps action name to prompt fn.
 -- serve: run dispatch with the handlers. Use as +main = () { ai_agent.serve handlers }
 
-use std/ai
-use std/agent
 use pkg/agents/dispatch_rules {dispatch}
 
 +simple = (prompt_fn) (msg) {

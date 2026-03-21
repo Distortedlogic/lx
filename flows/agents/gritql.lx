@@ -1,6 +1,5 @@
 -- GritQL AST search specialist -- structural code search via Connector.
 
-use std/agent
 use pkg/connectors/catalog {gritql}
 use pkg/ai/ai_agent
 

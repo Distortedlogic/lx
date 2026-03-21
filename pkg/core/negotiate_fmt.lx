@@ -34,10 +34,20 @@ find_mappings_fn = (source_fields target_fields) {
   {mapping: map_rec  score: score}
 }
 
+trait_fields = (t) {
+  ms = methods_of t
+  ms | map (name) {
+    v = t | get name
+    (name v ?? None)
+  }
+}
+
 negotiate_format_fn = (agent source_trait target_trait) {
   fm = find_mappings_fn
-  source_fields = source_trait | entries
-  target_fields = target_trait | entries
+  st = type_of source_trait
+  tt = type_of target_trait
+  source_fields = st == "Record" ? (source_trait | entries) : (trait_fields source_trait)
+  target_fields = tt == "Record" ? (target_trait | entries) : (trait_fields target_trait)
   result = fm source_fields target_fields
   m = result.mapping
   mapped_count = m | entries | len

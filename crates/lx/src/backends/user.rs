@@ -154,6 +154,6 @@ impl UserBackend for StdinStdoutUserBackend {
             eprintln!("check_signal: failed to remove signal file {path}: {e}");
         }
         let jv: serde_json::Value = serde_json::from_str(content.trim()).ok()?;
-        Some(crate::stdlib::json_conv::json_to_lx(jv))
+        Some(LxVal::from(jv))
     }
 }

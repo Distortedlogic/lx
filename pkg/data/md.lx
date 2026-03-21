@@ -8,7 +8,7 @@ use std/md : md_core
 +to_text = (nodes) md_core.to_text nodes
 
 +sections = (nodes) {
-  nodes | filter (n) n.type == "heading"
+  nodes | filter (n) { n.type == "heading" }
     | map (h) {
       title: h.text ?? ""
       level: h.level ?? 1
@@ -17,31 +17,43 @@ use std/md : md_core
 }
 
 collect_section_content = (nodes heading) {
-  idx = nodes | find_index (n) n == heading
+  idx = nodes | find_index (n) { n == heading }
   idx ? {
     None -> ""
     Some i -> {
       rest = nodes | drop (i + 1)
       content_nodes = rest | take_while (n) {
-        n.type != "heading" || (n.level ?? 99) > (heading.level ?? 1)
+        nt = n.type ?? ""
+        nt != "heading" || (n.level ?? 99) > (heading.level ?? 1)
       }
-      content_nodes | map (n) node_to_text n | join "\n"
+      texts = content_nodes | map (node_to_text)
+      texts | join "\n"
     }
   }
 }
 
 node_to_text = (n) {
-  n.type ? {
+  t = n.type ?? ""
+  t ? {
     "para" -> n.text ?? ""
     "code" -> n.code ?? (n.text ?? "")
-    "list" -> n.items ? { Some items -> items | join "\n"; _ -> "" }
+    "list" -> {
+      items = n.items ?? []
+      items | map to_str | join "\n"
+    }
+    "ordered" -> {
+      items = n.items ?? []
+      items | map to_str | join "\n"
+    }
     "heading" -> n.text ?? ""
-    _ -> n.text ?? ""
+    "blockquote" -> n.text ?? ""
+    "hr" -> "---"
+    _ -> to_str (n.text ?? "")
   }
 }
 
 +code_blocks = (nodes) {
-  nodes | filter (n) n.type == "code"
+  nodes | filter (n) { n.type == "code" }
     | map (n) {lang: n.lang ?? None  code: n.code ?? (n.text ?? "")}
 }
 
@@ -60,7 +72,7 @@ node_to_text = (n) {
 +table = (headers rows) {type: "table"  headers  rows}
 +link = (text url) {type: "link"  text  url}
 +blockquote = (text) {type: "blockquote"  text}
-+hr = () {type: "hr"}
++hr = {type: "hr"}
 +raw = (text) {type: "raw"  text}
 +doc = (nodes) nodes
 
@@ -71,7 +83,8 @@ node_to_text = (n) {
 render_node = (n) {
   n.type ? {
     "heading" -> {
-      prefix = "#" | repeat (n.level ?? 1)
+      lvl = n.level ?? 1
+      prefix = repeat lvl "#"
       "{prefix} {n.text ?? ""}"
     }
     "para" -> n.text ?? ""
@@ -81,21 +94,25 @@ render_node = (n) {
     }
     "list" -> {
       items = n.items ?? []
-      items | map (i) "- {i}" | join "\n"
+      items | map (i) { "- {i}" } | join "\n"
     }
     "ordered" -> {
       items = n.items ?? []
-      items | enumerate | map (pair) {
-        (idx item) = pair
-        "{idx + 1}. {item}"
-      } | join "\n"
+      numbered = items | enumerate | map (pair) {
+        idx = pair.0
+        item = pair.1
+        (to_str (idx + 1)) ++ ". " ++ (to_str item)
+      }
+      numbered | join "\n"
     }
     "table" -> {
       headers = n.headers ?? []
       rows = n.rows ?? []
-      header_row = "| {headers | join " | "} |"
-      sep_row = "| {headers | map (_) "---" | join " | "} |"
-      data_rows = rows | map (row) "| {row | join " | "} |" | join "\n"
+      sep = " | "
+      header_row = "| " ++ (headers | join sep) ++ " |"
+      dashes = headers | map (_) { "---" }
+      sep_row = "| " ++ (dashes | join sep) ++ " |"
+      data_rows = rows | map (row) { "| " ++ (row | join sep) ++ " |" } | join "\n"
       "{header_row}\n{sep_row}\n{data_rows}"
     }
     "link" -> "[{n.text ?? ""}]({n.url ?? ""})"

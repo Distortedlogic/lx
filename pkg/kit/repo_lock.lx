@@ -17,12 +17,12 @@ use std/time
     None -> {
       now = time.now ()
       repo.locks.set id {
-        target
-        mode
+        target: target
+        mode: mode
         holder: scope.holder ?? "anonymous"
         acquired_at: now.ms
       }
-      Ok {id  target  mode}
+      Ok {id: id  target: target  mode: mode}
     }
   }
 }

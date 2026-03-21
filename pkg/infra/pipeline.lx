@@ -2,7 +2,6 @@
 -- Replaces std/pipeline.
 
 use std/fs
-use std/json
 use std/time
 
 Class +Pipeline = {
@@ -14,15 +13,15 @@ Class +Pipeline = {
 
 +create = (name opts) {
   storage = opts.storage ?? ".lx/pipelines/"
-  dir = "{storage}{name}/"
+  dir = storage ++ name ++ "/"
   $^mkdir -p {dir}
-  Pipeline {name  dir}
+  Pipeline {name: name  dir: dir}
 }
 
 +stage = (pipe stage_name input body) {
   input_hash = json.encode input
-  cache_file = "{pipe.dir}{stage_name}.json"
-  hash_file = "{pipe.dir}{stage_name}.hash"
+  cache_file = pipe.dir ++ stage_name ++ ".json"
+  hash_file = pipe.dir ++ stage_name ++ ".hash"
 
   cached = try fs.read hash_file
   has_cache = ok? cached
@@ -51,12 +50,13 @@ Class +Pipeline = {
 
 +status = (pipe) {
   entries = pipe.stages.entries ()
-  {name: pipe.name  status: pipe.status_val  stages: entries | map (e) {name: e.key  ..e.value}}
+  stage_list = entries | map (e) { {..e.value  name: e.key} }
+  {name: pipe.name  status: pipe.status_val  stages: stage_list}
 }
 
 +invalidate = (pipe stage_name) {
-  cache_file = "{pipe.dir}{stage_name}.json"
-  hash_file = "{pipe.dir}{stage_name}.hash"
+  cache_file = pipe.dir ++ stage_name ++ ".json"
+  hash_file = pipe.dir ++ stage_name ++ ".hash"
   try $rm -f {cache_file} {hash_file}
   pipe.stages.remove stage_name
   Ok stage_name

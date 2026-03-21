@@ -2,7 +2,6 @@
 -- Source: merged from brain/lib/quality.lx + flows/lib/grading.lx + critic.lx check_safety
 -- Provides: rubrics, grading, refinement, safety scanning, draft grading workflows
 
-use std/ai
 use pkg/core/prompt
 use pkg/core/audit
 use pkg/data/trace {TraceStore}

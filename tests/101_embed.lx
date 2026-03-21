@@ -1,4 +1,3 @@
-use std/ai
 
 result = ai.embed ["hello world" "test"]
 result ? {

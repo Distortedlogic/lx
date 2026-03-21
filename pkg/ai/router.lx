@@ -2,8 +2,6 @@
 -- route: uses AI to match prompt to catalog entry.
 -- quick_route: keyword overlap heuristic, no AI call.
 
-use std/ai
-use std/json
 use pkg/core/prompt
 
 no_match = {domain: "none"  agent: ""  confidence: 0.0  terminal: false}

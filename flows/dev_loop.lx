@@ -16,7 +16,6 @@
 -- Worker invocation uses claude CLI in agent mode. Adjust run_worker if needed.
 
 use std/fs
-use std/ai
 use std/env
 use std/time
 use ./prompts/dev_prompts

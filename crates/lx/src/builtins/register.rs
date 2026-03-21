@@ -185,6 +185,33 @@ pub fn register(env: &mut Env) {
     env.bind("Store".into(), crate::stdlib::build_constructor());
     env.bind("method_of".into(), mk("method_of", 2, bi_method_of));
     env.bind("methods_of".into(), mk("methods_of", 1, bi_methods_of));
+
+    let mut json_fields = IndexMap::new();
+    json_fields.insert("parse".into(), mk("json.parse", 1, bi_json_parse));
+    json_fields.insert("encode".into(), mk("json.encode", 1, bi_json_encode));
+    json_fields.insert(
+        "encode_pretty".into(),
+        mk("json.encode_pretty", 1, bi_json_encode_pretty),
+    );
+    env.bind("json".into(), LxVal::Record(Arc::new(json_fields)));
+
+    super::ai_builtins::register_ai(env);
+
+    let mut agent_fields = IndexMap::new();
+    agent_fields.insert("spawn".into(), mk("agent.spawn", 1, bi_agent_spawn_stub));
+    agent_fields.insert("kill".into(), mk("agent.kill", 1, bi_agent_kill_stub));
+    agent_fields.insert(
+        "implements".into(),
+        mk("agent.implements", 2, bi_agent_implements),
+    );
+    env.bind("agent".into(), LxVal::Record(Arc::new(agent_fields)));
+
+    let mut pane_fields = IndexMap::new();
+    pane_fields.insert("open".into(), mk("pane.open", 2, bi_pane_open));
+    pane_fields.insert("update".into(), mk("pane.update", 2, bi_pane_update));
+    pane_fields.insert("close".into(), mk("pane.close", 1, bi_pane_close));
+    pane_fields.insert("list".into(), mk("pane.list", 1, bi_pane_list));
+    env.bind("pane".into(), LxVal::Record(Arc::new(pane_fields)));
     env.bind("try".into(), mk("try", 2, bi_try));
     env.bind(
         "resolve_handler".into(),
@@ -197,6 +224,96 @@ pub fn register(env: &mut Env) {
     );
     ctx_fields.insert("get".into(), mk("context.get", 1, bi_global_context_get));
     env.bind("context".into(), LxVal::Record(Arc::new(ctx_fields)));
+}
+
+fn bi_agent_spawn_stub(
+    _args: &[LxVal],
+    span: Span,
+    _ctx: &Arc<RuntimeCtx>,
+) -> Result<LxVal, LxError> {
+    Err(LxError::runtime("agent.spawn: subprocess agents not yet available in this build", span))
+}
+
+fn bi_agent_kill_stub(
+    _args: &[LxVal],
+    span: Span,
+    _ctx: &Arc<RuntimeCtx>,
+) -> Result<LxVal, LxError> {
+    Err(LxError::runtime("agent.kill: subprocess agents not yet available in this build", span))
+}
+
+fn bi_agent_implements(
+    args: &[LxVal],
+    _span: Span,
+    _ctx: &Arc<RuntimeCtx>,
+) -> Result<LxVal, LxError> {
+    let target_trait = match &args[1] {
+        LxVal::Str(s) => s.to_string(),
+        LxVal::Trait { name, .. } => name.to_string(),
+        LxVal::Class { name, .. } => name.to_string(),
+        _ => String::new(),
+    };
+    let has = match &args[0] {
+        LxVal::Object { traits, .. } | LxVal::Class { traits, .. } => {
+            traits.iter().any(|t| t.as_ref() == target_trait.as_str())
+        }
+        LxVal::Record(r) => {
+            r.get("traits")
+                .or_else(|| r.get("__traits"))
+                .and_then(|v| v.as_list())
+                .map(|l| l.iter().any(|v| v.as_str() == Some(target_trait.as_str())))
+                .unwrap_or(false)
+        }
+        _ => false,
+    };
+    Ok(LxVal::Bool(has))
+}
+
+fn bi_pane_open(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+    let kind = args[0].as_str().ok_or_else(|| LxError::type_err("pane.open: kind must be Str", span))?;
+    ctx.pane.open(kind, &args[1], span)
+}
+
+fn bi_pane_update(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+    let id = args[0].as_str().ok_or_else(|| LxError::type_err("pane.update: id must be Str", span))?;
+    ctx.pane.update(id, &args[1], span)?;
+    Ok(LxVal::Unit)
+}
+
+fn bi_pane_close(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+    let id = args[0].as_str().ok_or_else(|| LxError::type_err("pane.close: id must be Str", span))?;
+    ctx.pane.close(id, span)?;
+    Ok(LxVal::Unit)
+}
+
+fn bi_pane_list(_args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+    ctx.pane.list(span)
+}
+
+fn bi_json_parse(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+    let s = args[0]
+        .as_str()
+        .ok_or_else(|| LxError::type_err("json.parse expects Str", span))?;
+    match serde_json::from_str::<serde_json::Value>(s) {
+        Ok(jv) => Ok(LxVal::Ok(Box::new(LxVal::from(jv)))),
+        Err(e) => Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(e.to_string().as_str()))))),
+    }
+}
+
+fn bi_json_encode(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+    let s = serde_json::to_string(&args[0])
+        .map_err(|e| LxError::runtime(e.to_string(), span))?;
+    Ok(LxVal::Str(Arc::from(s.as_str())))
+}
+
+fn bi_json_encode_pretty(
+    args: &[LxVal],
+    span: Span,
+    _ctx: &Arc<RuntimeCtx>,
+) -> Result<LxVal, LxError> {
+    let s = serde_json::to_string_pretty(&args[0])
+        .map_err(|e| LxError::runtime(e.to_string(), span))?;
+    Ok(LxVal::Str(Arc::from(s.as_str())))
 }
 
 fn bi_method_of(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
@@ -247,11 +364,6 @@ fn bi_resolve_handler(
     _ctx: &Arc<RuntimeCtx>,
 ) -> Result<LxVal, LxError> {
     let agent = &args[0];
-    if let Some(handler) = crate::stdlib::agent_reload::handler_id_from_agent(agent)
-        .and_then(crate::stdlib::agent_reload::lookup_handler)
-    {
-        return Ok(handler);
-    }
     if let LxVal::Record(r) = agent
         && let Some(h) = r.get("handler")
     {

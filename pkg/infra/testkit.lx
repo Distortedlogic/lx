@@ -4,7 +4,6 @@
 
 use pkg/core/audit
 use std/fs
-use std/json
 use std/env
 
 +default_grader = (output scenario) {

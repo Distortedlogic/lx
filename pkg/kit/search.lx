@@ -1,7 +1,6 @@
 -- Code search -- structured wrapper around ripgrep --json output.
 -- Returns lx Records instead of raw text. Requires rg (ripgrep) on PATH.
 
-use std/json
 
 run_rg = (cmd) {
   shell_r = $sh -c "{cmd}"

@@ -52,18 +52,14 @@ pub fn run_agent(script_path: &str) -> ExitCode {
                 continue;
             }
         };
-        let msg = lx::stdlib::json_conv::json_to_lx(json_val);
+        let msg = lx::value::LxVal::from(json_val);
         match ctx
             .tokio_runtime
             .block_on(interp.call(handler.clone(), msg))
         {
             Ok(result) => {
-                let result_json =
-                    lx::stdlib::json_conv::lx_to_json(&result, lx::span::Span::default());
-                match result_json {
-                    Ok(j) => println!("{}", serde_json::to_string(&j).unwrap_or_default()),
-                    Err(e) => println!("{}", serde_json::json!({"__err": format!("{e}")})),
-                }
+                let j = serde_json::Value::from(&result);
+                println!("{}", serde_json::to_string(&j).unwrap_or_default());
             }
             Err(e) => println!("{}", serde_json::json!({"__err": format!("{e}")})),
         }

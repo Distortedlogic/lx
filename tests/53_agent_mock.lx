@@ -2,7 +2,6 @@
 -- Tests: spec/agents-test-harness.md (mock, mock_calls, mock_assert_called)
 -- Phase: Mock agents with call tracking
 
-use std/agent
 use pkg/agents/mock {mock mock_calls mock_assert_called mock_assert_not_called}
 use pkg/agents/intercept {intercept}
 

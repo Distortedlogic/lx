@@ -1,7 +1,6 @@
 -- Deep analysis specialist: investigates problems thoroughly
 -- Source: dispatched when perception flags a complex or ambiguous input
 
-use std/ai
 use pkg/core/prompt
 use pkg/core/capability {advertise}
 use ../traits {Analyst}

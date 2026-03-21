@@ -4,7 +4,6 @@
 -- Note: Does not call AI backend (would invoke Claude CLI).
 --       Tests Trait validation and function existence only.
 
-use std/ai
 
 -- Define test Traits for structured output
 Trait AnalysisResult = {

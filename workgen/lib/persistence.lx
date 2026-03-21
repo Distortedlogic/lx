@@ -1,7 +1,6 @@
 -- Persistence for workgen runs — saves intermediate artifacts and status.
 
 use std/fs
-use std/json
 
 Class +RunStatus = {
   runner_dir: ".lx/workgen"

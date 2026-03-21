@@ -78,7 +78,7 @@ topo_order = (g) {
     }
   }
   result := []
-  queue := in_deg.entries () | filter (e) e.value == 0 | map (.key)
+  queue := in_deg.entries () | filter (e) { e.value == 0 } | map (.key)
   loop {
     (queue | len) == 0 ? break () : ()
     current = queue | first ?? ""

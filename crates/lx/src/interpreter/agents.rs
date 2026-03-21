@@ -1,6 +1,5 @@
 use std::sync::{Arc, mpsc};
 
-use num_bigint::BigInt;
 use parking_lot::Mutex;
 
 use super::Interpreter;
@@ -8,18 +7,6 @@ use crate::ast::{FieldDecl, SExpr, TraitEntry};
 use crate::error::LxError;
 use crate::span::Span;
 use crate::value::{FieldDef, LxVal};
-
-fn inject_deadline(msg: LxVal) -> LxVal {
-    let Some(ms) = crate::stdlib::deadline::current_remaining_ms() else {
-        return msg;
-    };
-    let LxVal::Record(fields) = msg else {
-        return msg;
-    };
-    let mut fields = (*fields).clone();
-    fields.insert("_deadline_ms".into(), LxVal::Int(BigInt::from(ms)));
-    LxVal::Record(Arc::new(fields))
-}
 
 fn extract_pid(agent: &LxVal, span: Span) -> Result<u32, LxError> {
     let LxVal::Record(fields) = agent else {
@@ -37,17 +24,10 @@ fn extract_pid(agent: &LxVal, span: Span) -> Result<u32, LxError> {
 impl Interpreter {
     fn get_agent_handler(&self, target: &LxVal, span: Span) -> Result<LxVal, LxError> {
         match target {
-            LxVal::Record(fields) => {
-                if let Some(handler) = crate::stdlib::agent_reload::handler_id_from_agent(target)
-                    .and_then(crate::stdlib::agent_reload::lookup_handler)
-                {
-                    return Ok(handler);
-                }
-                fields
-                    .get("handler")
-                    .cloned()
-                    .ok_or_else(|| LxError::runtime("agent has no 'handler' field", span))
-            }
+            LxVal::Record(fields) => fields
+                .get("handler")
+                .cloned()
+                .ok_or_else(|| LxError::runtime("agent has no 'handler' field", span)),
             other => Err(LxError::type_err(
                 format!(
                     "~> target must be an agent (Record with handler), got {}",
@@ -68,38 +48,18 @@ impl Interpreter {
         span: Span,
     ) -> Result<LxVal, LxError> {
         let target = self.eval(target_expr).await?;
-        let msg = inject_deadline(self.eval(msg_expr).await?);
+        let msg = self.eval(msg_expr).await?;
         if matches!(target, LxVal::Record(ref f) if f.contains_key("__pid")) {
-            let pid = extract_pid(&target, span)?;
-            crate::stdlib::agent::send_subprocess(pid, &msg, span)?;
-            return Ok(LxVal::Unit);
+            let _pid = extract_pid(&target, span)?;
+            return Err(LxError::runtime(
+                "subprocess agent send not supported (agent IPC removed)",
+                span,
+            ));
         }
-        if let Some(rejection) =
-            crate::stdlib::agent_lifecycle_run::run_message_hooks(&target, &msg, span, &self.ctx)?
-        {
-            return Ok(rejection);
-        }
-        let handler_id = crate::stdlib::agent_reload::handler_id_from_agent(&target);
         let handler = self.get_agent_handler(&target, span)?;
-        crate::stdlib::agent_reload::set_current_handler_id(handler_id);
-        let result = self.apply_func(handler.clone(), msg.clone(), span).await;
-        crate::stdlib::agent_reload::set_current_handler_id(None);
-        if let Some(hid) = handler_id {
-            crate::stdlib::agent_reload::apply_pending_evolve(hid);
-        }
-        match result {
+        match self.apply_func(handler, msg, span).await {
             Ok(_) => Ok(LxVal::Unit),
-            Err(e) => {
-                let err_val = LxVal::Str(Arc::from(e.to_string()));
-                if crate::stdlib::agent_lifecycle_run::run_error_hooks(
-                    &target, &err_val, &msg, span, &self.ctx,
-                )?
-                .is_some()
-                {
-                    return Ok(LxVal::Unit);
-                }
-                Err(e)
-            }
+            Err(e) => Err(e),
         }
     }
     pub(super) async fn eval_agent_ask(
@@ -109,36 +69,16 @@ impl Interpreter {
         span: Span,
     ) -> Result<LxVal, LxError> {
         let target = self.eval(target_expr).await?;
-        let msg = inject_deadline(self.eval(msg_expr).await?);
+        let msg = self.eval(msg_expr).await?;
         if matches!(target, LxVal::Record(ref f) if f.contains_key("__pid")) {
-            let pid = extract_pid(&target, span)?;
-            return crate::stdlib::agent::ask_subprocess(pid, &msg, span);
+            let _pid = extract_pid(&target, span)?;
+            return Err(LxError::runtime(
+                "subprocess agent ask not supported (agent IPC removed)",
+                span,
+            ));
         }
-        if let Some(rejection) =
-            crate::stdlib::agent_lifecycle_run::run_message_hooks(&target, &msg, span, &self.ctx)?
-        {
-            return Ok(rejection);
-        }
-        let handler_id = crate::stdlib::agent_reload::handler_id_from_agent(&target);
         let handler = self.get_agent_handler(&target, span)?;
-        crate::stdlib::agent_reload::set_current_handler_id(handler_id);
-        let result = self.apply_func(handler.clone(), msg.clone(), span).await;
-        crate::stdlib::agent_reload::set_current_handler_id(None);
-        if let Some(hid) = handler_id {
-            crate::stdlib::agent_reload::apply_pending_evolve(hid);
-        }
-        match &result {
-            Err(e) => {
-                let err_val = LxVal::Str(Arc::from(e.to_string()));
-                if let Some(handled) = crate::stdlib::agent_lifecycle_run::run_error_hooks(
-                    &target, &err_val, &msg, span, &self.ctx,
-                )? {
-                    return Ok(handled);
-                }
-                result
-            }
-            _ => result,
-        }
+        self.apply_func(handler, msg, span).await
     }
 
     pub(super) async fn eval_stream_ask(
@@ -148,10 +88,12 @@ impl Interpreter {
         span: Span,
     ) -> Result<LxVal, LxError> {
         let target = self.eval(target_expr).await?;
-        let msg = inject_deadline(self.eval(msg_expr).await?);
+        let msg = self.eval(msg_expr).await?;
         if matches!(target, LxVal::Record(ref f) if f.contains_key("__pid")) {
-            let pid = extract_pid(&target, span)?;
-            return crate::stdlib::agent_stream::stream_ask_subprocess(pid, &msg, span);
+            return Err(LxError::runtime(
+                "subprocess stream-ask not supported (agent IPC removed)",
+                span,
+            ));
         }
         let handler = self.get_agent_handler(&target, span)?;
         let result = self.apply_func(handler, msg, span).await?;

@@ -1,6 +1,5 @@
 -- Trait declarations: agent behavioral contracts with typed methods
 
-use std/agent
 use std/trait
 
 Trait ReviewRequest = {task: Str  path: Str}

@@ -3,7 +3,6 @@
 
 use pkg/data/profile
 use pkg/data/knowledge {KnowledgeBase}
-use std/agent
 use std/user
 use std/fs
 use ../contracts {Identity}

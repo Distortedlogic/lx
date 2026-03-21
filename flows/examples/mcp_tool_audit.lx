@@ -5,8 +5,6 @@
 -- Demonstrates: MCP integration, scenario-based evaluation, functional assessment, reporting.
 -- Source: mcp-toolbelt/arch_diagrams/mcp_tool_audit
 
-use std/mcp
-use std/json
 use std/fs
 use std/re
 use pkg/infra/report

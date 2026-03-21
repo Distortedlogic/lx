@@ -47,12 +47,8 @@ pub(super) fn store_id(v: &LxVal, span: Span) -> Result<u64, LxError> {
 
 pub(super) fn persist(state: &StoreState) {
     let Some(ref path) = state.path else { return };
-    let dummy_span = Span::default();
-    let Ok(json_val) =
-        super::json_conv::lx_to_json(&LxVal::Record(Arc::new(state.data.clone())), dummy_span)
-    else {
-        return;
-    };
+    let record = LxVal::Record(Arc::new(state.data.clone()));
+    let json_val = serde_json::Value::from(&record);
     let pretty = serde_json::to_string_pretty(&json_val).unwrap_or_default();
     let _ = std::fs::write(path, pretty);
 }
@@ -64,7 +60,7 @@ fn load_from_disk(path: &std::path::Path) -> IndexMap<String, LxVal> {
     let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&content) else {
         return IndexMap::new();
     };
-    let val = super::json_conv::json_to_lx(json_val);
+    let val = LxVal::from(json_val);
     match val {
         LxVal::Record(r) => r.as_ref().clone(),
         _ => IndexMap::new(),

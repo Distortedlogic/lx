@@ -2,7 +2,6 @@
 -- Tests: spec/agents-dispatch.md (dispatch, dispatch_multi)
 -- Phase: Pattern-based message routing
 
-use std/agent
 use pkg/agents/dispatch_rules {dispatch dispatch_multi}
 use pkg/agents/intercept {intercept}
 

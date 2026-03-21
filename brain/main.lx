@@ -2,10 +2,7 @@
 -- Source: perception → reasoning → planning → execution → reflection → response
 -- Architecture: sel racing for fast/thorough paths, with...as for scoped resources
 
-use std/ai
-use std/json
 use std/time
-use std/agent
 use pkg/infra/workflow
 
 use pkg/ai/perception {Perception}

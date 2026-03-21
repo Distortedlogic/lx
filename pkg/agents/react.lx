@@ -4,7 +4,6 @@
 -- Verification gate: failed observations trigger verify step, can abort loop.
 -- Returns Ok(thought) on done, Err(reason) on circuit break or verification failure.
 
-use std/agent
 use pkg/core/circuit {CircuitBreaker}
 use pkg/core/introspect {Inspector}
 

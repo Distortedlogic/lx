@@ -1,8 +1,6 @@
 -- Work Item Grader for workgen — scores generated work items against a rubric.
 -- Same pattern as workrunner/lib/grader.lx. Class-based, prompt-assembled, structured output.
 
-use std/ai
-use std/json
 use pkg/core/prompt
 
 Trait +GradeResult = {

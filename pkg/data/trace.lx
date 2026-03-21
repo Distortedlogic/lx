@@ -5,7 +5,6 @@
 -- Reputation: agent scoring from trace data via agent_score/agent_rank.
 
 use std/time
-use std/json
 use std/fs
 use pkg/core/collection {Collection}
 

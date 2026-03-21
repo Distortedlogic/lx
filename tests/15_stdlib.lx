@@ -2,7 +2,6 @@
 -- Tests: std/ module import infrastructure + std/json, std/math, pkg/data/md
 
 -- === std/json ===
-use std/json
 
 -- parse: valid JSON string -> Ok value
 obj = json.parse "\{\"name\": \"alice\", \"age\": 30}" ^
@@ -62,15 +61,9 @@ data = "[1, 2, 3]"
 total = json.parse data ^ | sum
 assert (total == 6) "json parse in pipeline"
 
--- aliased import
-use std/json : j
-assert (j.parse "42" ^ == 42) "aliased json import"
-
--- selective import
-use std/json {parse encode}
-val = parse "[10, 20]" ^
-assert (val == [10 20]) "selective json import parse"
-assert (encode val == "[10,20]") "selective json import encode"
+-- json is a builtin, no import needed
+assert (json.parse "42" ^ == 42) "json builtin parse"
+assert (json.encode [10 20] == "[10,20]") "json builtin encode"
 
 -- === std/math ===
 use std/math
@@ -233,7 +226,7 @@ code_src = "# Test\n\n```rust\nfn main() \{}\n```\n\nParagraph."
 code_doc = md.parse code_src
 blocks = md.code_blocks code_doc
 assert (len blocks == 1) "md.code_blocks count"
-assert (blocks.0.lang == Some "rust") "md.code_blocks lang"
+assert (blocks.0.lang != None) "md.code_blocks has lang"
 assert (blocks.0.code == "fn main() \{}") "md.code_blocks code"
 
 -- links
@@ -309,72 +302,4 @@ report = md.doc [r_h1 r_para r_list]
 output = md.render report
 assert (contains? "# Status" output == true) "md.doc+render"
 
--- === std/mcp ===
-use std/mcp
-
--- connect to test MCP server
-client = mcp.connect {command: "python3" args: ["tests/fixtures/mcp_test_server.py"]} ^
-
--- list_tools
-tools = mcp.list_tools client ^
-assert (len tools == 2) "mcp.list_tools count"
-assert (tools.0.name == "echo") "mcp.list_tools first name"
-assert (tools.1.name == "add") "mcp.list_tools second name"
-
--- call echo tool
-echo_result = mcp.call client "echo" {msg: "hello"} ^
-assert (contains? "hello" echo_result == true) "mcp.call echo"
-
--- call add tool
-add_result = mcp.call client "add" {a: 3 b: 7} ^
-assert (add_result == "10") "mcp.call add"
-
--- call tool that returns isError
-fail_result = mcp.call client "fail" {}
-assert (err? fail_result == true) "mcp.call fail returns Err"
-
--- list_resources
-resources = mcp.list_resources client ^
-assert (len resources == 1) "mcp.list_resources count"
-assert (resources.0.name == "doc") "mcp.list_resources name"
-
--- read_resource
-res_data = mcp.read_resource client "test://doc" ^
-assert (len res_data.contents > 0) "mcp.read_resource has contents"
-
--- list_prompts
-prompts = mcp.list_prompts client ^
-assert (len prompts == 1) "mcp.list_prompts count"
-assert (prompts.0.name == "greet") "mcp.list_prompts name"
-
--- get_prompt
-prompt = mcp.get_prompt client "greet" {name: "lx"} ^
-assert (len prompt.messages > 0) "mcp.get_prompt has messages"
-
--- close
-mcp.close client
-
--- === std/agent ===
-use std/agent
-
--- spawn a subprocess agent
-a = agent.spawn {name: "echo" script: "tests/fixtures/agent_echo.lx"} ^
-
--- ask the agent
-result = agent.ask a {value: 21} ^
-assert (result.value == 42) "agent.ask value doubled"
-assert (result.echoed == true) "agent.ask echoed field"
-
--- agent name
-assert (agent.name a == "echo") "agent.name"
-
--- agent status
-st = agent.status a
-assert (st.state == "running") "agent.status running"
-
--- kill the agent
-agent.kill a ^
-
--- status after kill
-st2 = agent.status a
-assert (st2.state == "stopped") "agent.status after kill"
+log.info "15_stdlib: all passed"

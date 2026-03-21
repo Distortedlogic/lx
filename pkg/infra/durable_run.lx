@@ -2,13 +2,12 @@
 -- Sub-module of pkg/infra/durable.
 
 use std/fs
-use std/json
 use std/time
 
 +run = (wf input) {
   now = time.now ()
   run_id = "{wf.name}_{now.ms}"
-  run_dir = "{wf.dir}{wf.name}/{run_id}/"
+  run_dir = wf.dir ++ wf.name ++ "/" ++ run_id ++ "/"
   $^mkdir -p {run_dir}
 
   ctx = {
@@ -22,11 +21,9 @@ use std/time
   status_rec = {workflow_id: run_id  name: wf.name  status: "running"  started_at: now.ms  input: input}
   fs.write "{run_dir}status.json" (json.encode_pretty status_rec) ^
 
-  handler = wf.handler ?? None
-  result = handler ? {
-    Some h -> try h ctx
-    None -> Err "no handler"
-  }
+  handler = wf.handler
+  raw = handler == None ? (Err "no handler") : (try handler ctx)
+  result = (err? raw) ? raw : (Ok raw)
 
   is_err = err? result
   final_status = is_err ? "failed" : "completed"
@@ -40,7 +37,7 @@ use std/time
 }
 
 +step = (ctx name body) {
-  step_file = "{ctx.run_dir}{name}.json"
+  step_file = ctx.run_dir ++ name ++ ".json"
   cached = try fs.read step_file
 
   (ok? cached) ? {
@@ -58,7 +55,7 @@ use std/time
 }
 
 +sleep_step = (ctx ms) {
-  sleep_file = "{ctx.run_dir}_sleep_{ms}.done"
+  sleep_file = ctx.run_dir ++ "_sleep_" ++ (to_str ms) ++ ".done"
   already = try fs.exists sleep_file
   done = (ok? already) && (already ?? false)
   done ? () : {
@@ -68,7 +65,7 @@ use std/time
 }
 
 +signal = (ctx name) {
-  signal_file = "{ctx.run_dir}_signal_{name}.json"
+  signal_file = ctx.run_dir ++ "_signal_" ++ name ++ ".json"
   loop {
     exists = try fs.exists signal_file
     ready = (ok? exists) && (exists ?? false)
@@ -84,14 +81,14 @@ use std/time
 }
 
 +send_signal = (wf name payload) {
-  base = "{wf.dir}{wf.name}/"
+  base = wf.dir ++ wf.name ++ "/"
   entries = try fs.ls base
   entries ? {
     Ok items -> {
       latest = items | filter (e) { e.kind == "directory" } | sort_by (.name) | last
       latest ? {
         Some dir -> {
-          signal_file = "{base}{dir.name}/_signal_{name}.json"
+          signal_file = base ++ dir.name ++ "/_signal_" ++ name ++ ".json"
           fs.write signal_file (json.encode_pretty payload) ^
           Ok name
         }

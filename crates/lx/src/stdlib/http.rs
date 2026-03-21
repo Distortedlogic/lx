@@ -6,7 +6,6 @@ use crate::backends::{HttpOpts, RuntimeCtx};
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
-use crate::stdlib::json_conv::lx_to_json;
 use crate::value::LxVal;
 
 pub fn build() -> IndexMap<String, LxVal> {
@@ -18,7 +17,7 @@ pub fn build() -> IndexMap<String, LxVal> {
     m
 }
 
-fn extract_opts(val: &LxVal, span: Span) -> Result<HttpOpts, LxError> {
+fn extract_opts(val: &LxVal, _span: Span) -> Result<HttpOpts, LxError> {
     let LxVal::Record(fields) = val else {
         return Ok(HttpOpts::default());
     };
@@ -44,10 +43,7 @@ fn extract_opts(val: &LxVal, span: Span) -> Result<HttpOpts, LxError> {
             None
         }
     });
-    let body = fields
-        .get("body")
-        .map(|v| lx_to_json(v, span))
-        .transpose()?;
+    let body = fields.get("body").map(serde_json::Value::from);
     Ok(HttpOpts {
         headers,
         query,
@@ -83,7 +79,7 @@ fn bi_post(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, L
     let url = args[0]
         .as_str()
         .ok_or_else(|| LxError::type_err("http.post expects Str url as first arg", span))?;
-    let body = lx_to_json(&args[1], span)?;
+    let body = serde_json::Value::from(&args[1]);
     let opts = HttpOpts {
         body: Some(body),
         ..Default::default()
@@ -95,7 +91,7 @@ fn bi_put(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, Lx
     let url = args[0]
         .as_str()
         .ok_or_else(|| LxError::type_err("http.put expects Str url as first arg", span))?;
-    let body = lx_to_json(&args[1], span)?;
+    let body = serde_json::Value::from(&args[1]);
     let opts = HttpOpts {
         body: Some(body),
         ..Default::default()

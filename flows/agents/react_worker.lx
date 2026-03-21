@@ -2,8 +2,6 @@
 -- Spawned by pkg/react for the multi-turn Thought-Action-Observation loop.
 -- This agent is typically spawned (not imported) because react needs multi-turn messaging.
 
-use std/ai
-use std/agent
 use pkg/agents/dispatch_rules {dispatch}
 
 +think = (msg) {

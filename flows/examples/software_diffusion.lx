@@ -12,7 +12,6 @@
 -- Demonstrates: workflow.run, convergence loops, pmap fan-out, guidance gates, reporting.
 -- Source: mcp-toolbelt/arch_diagrams/software_diffusion
 
-use std/agent
 use pkg/agents/dispatch
 use pkg/infra/guidance
 use pkg/infra/report

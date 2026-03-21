@@ -1,7 +1,6 @@
 -- Training data pipeline -- harvest traces, enhance via teacher, write JSONL.
 -- Generic training data operations for building fine-tuning datasets.
 
-use std/json
 use std/fs
 
 Trait +TraceData = {input: Str  output: Str  model: Str  score: Float}

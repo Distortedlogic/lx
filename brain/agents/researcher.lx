@@ -1,7 +1,6 @@
 -- Information gathering specialist: searches, reads, explores codebases
 -- Source: dispatched when the brain needs facts before reasoning
 
-use std/ai
 use pkg/core/prompt
 use std/fs
 use std/re

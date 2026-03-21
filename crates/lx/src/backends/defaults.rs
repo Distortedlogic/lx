@@ -10,7 +10,6 @@ use reqwest::header::CONTENT_TYPE;
 use crate::error::LxError;
 use crate::record;
 use crate::span::Span;
-use crate::stdlib::json_conv::{json_to_lx, lx_to_json};
 use crate::value::LxVal;
 
 use super::{
@@ -181,11 +180,9 @@ impl HttpBackend for ReqwestHttpBackend {
                 }
                 match builder.send().await {
                     Ok(resp) => response_to_value(resp, span).await,
-                    Err(e) => Ok(LxVal::Err(Box::new(crate::stdlib::agent_errors::upstream(
-                        url,
-                        0,
-                        &e.to_string(),
-                    )))),
+                    Err(e) => Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(
+                        e.to_string().as_str(),
+                    ))))),
                 }
             })
         })
@@ -204,7 +201,7 @@ async fn response_to_value(resp: reqwest::Response, span: Span) -> Result<LxVal,
         .await
         .map_err(|e| LxError::runtime(format!("http: body: {e}"), span))?;
     let body = if let Ok(jv) = serde_json::from_str::<serde_json::Value>(&body_str) {
-        json_to_lx(jv)
+        LxVal::from(jv)
     } else {
         LxVal::Str(Arc::from(body_str.as_str()))
     };
@@ -269,8 +266,7 @@ pub struct StdinStdoutYieldBackend;
 impl YieldBackend for StdinStdoutYieldBackend {
     fn yield_value(&self, value: LxVal, span: Span) -> Result<LxVal, LxError> {
         use std::io::BufRead;
-        let json =
-            lx_to_json(&value, span).map_err(|e| LxError::runtime(format!("yield: {e}"), span))?;
+        let json = serde_json::Value::from(&value);
         let msg = serde_json::json!({"__yield": json});
         println!("{msg}");
         std::io::stdout()
@@ -286,7 +282,7 @@ impl YieldBackend for StdinStdoutYieldBackend {
         }
         let response: serde_json::Value = serde_json::from_str(line.trim())
             .map_err(|e| LxError::runtime(format!("yield: JSON parse: {e}"), span))?;
-        Ok(json_to_lx(response))
+        Ok(LxVal::from(response))
     }
 }
 

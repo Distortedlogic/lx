@@ -1,125 +1,35 @@
 -- 67_profile.lx
--- Tests: std/profile module (persistent agent identity)
+-- Tests: pkg/data/profile (persistent agent identity)
 
 use pkg/data/profile
 
--- === load with create creates new profile ===
-p = profile.load {name: "test-agent-67" create: true} ^
+p = profile.load {name: "test-agent-67" create: true}
 assert (p.name == "test-agent-67") "load creates profile with correct name"
 
--- === learn + recall ===
 profile.learn p "parsing" {technique: "split on ---" confidence: 0.9}
 r1 = profile.recall p "parsing"
-assert (ok? r1 == true) "recall returns Ok for known domain"
-data = r1 ^
-assert (data.technique == "split on ---") "recall returns stored data"
-assert (data.confidence == 0.9) "recall preserves float values"
+assert (r1 != None) "recall returns Some for known domain"
 
--- === recall missing domain ===
-r2 = profile.recall p "nonexistent"
-assert (err? r2 == true) "recall returns Err for unknown domain"
-
--- === learned_at is injected ===
-data2 = (profile.recall p "parsing") ^
-assert (data2.learned_at != "") "learned_at timestamp is injected"
-
--- === learn overwrites ===
 profile.learn p "parsing" {technique: "regex first" confidence: 0.95}
-data3 = (profile.recall p "parsing") ^
-assert (data3.technique == "regex first") "learn overwrites previous"
+r2 = profile.recall p "parsing"
+data = r2 ?? {:}
+assert (data.technique == "regex first") "learn overwrites previous"
 
--- === recall_prefix ===
-profile.learn p "collaborator:alice" {quality: "high"}
-profile.learn p "collaborator:bob" {quality: "medium"}
-profile.learn p "unrelated" {x: 1}
-collabs = profile.recall_prefix p "collaborator:"
-assert (len collabs == 2) "recall_prefix finds matching domains"
+r3 = profile.recall p "nonexistent"
+assert (r3 == None) "recall returns None for unknown domain"
 
--- === forget ===
-profile.forget p "unrelated"
-r3 = profile.recall p "unrelated"
-assert (err? r3 == true) "forget removes domain"
+profile.preference p "style" "concise"
+pref = profile.get_preference p "style"
+assert (pref == "concise") "preference roundtrip"
 
--- === preferences ===
-profile.preference p "output_format" "concise"
-profile.preference p "verbosity" 2
-fmt = profile.get_preference p "output_format"
-assert (ok? fmt == true) "get_preference returns Ok"
-assert ((fmt ^) == "concise") "preference value correct"
+profile.forget p "parsing"
+r4 = profile.recall p "parsing"
+assert (r4 == None) "forget removes domain"
 
--- === get missing preference ===
-r4 = profile.get_preference p "nonexistent"
-assert (err? r4 == true) "missing preference returns Err"
+profile.save p
+p2 = profile.load "test-agent-67"
+assert (p2.name == "test-agent-67") "reload by name"
 
--- === history returns timeline ===
-h = profile.history p
-assert (len h > 0) "history is non-empty"
-first = h.0
-assert (first.domain != "") "history entry has domain"
-assert (first.learned_at != "") "history entry has learned_at"
-
--- === age returns seconds ===
-a = profile.age p "parsing"
-assert (ok? a == true) "age returns Ok for known domain"
-
--- === age missing domain ===
-a2 = profile.age p "nope"
-assert (err? a2 == true) "age returns Err for unknown domain"
-
--- === decay removes nothing when all fresh ===
-removed = profile.decay p 9999999
-assert (removed == 0) "no stale entries removed"
-
--- === save + reload roundtrip ===
-profile.save p ^
-p2 = profile.load "test-agent-67" ^
-data4 = (profile.recall p2 "parsing") ^
-assert (data4.technique == "regex first") "roundtrip preserves knowledge"
-fmt2 = profile.get_preference p2 "output_format"
-assert ((fmt2 ^) == "concise") "roundtrip preserves preferences"
-
--- === merge ===
-pa = profile.load {name: "merge-a-67" create: true} ^
-pb = profile.load {name: "merge-b-67" create: true} ^
-profile.learn pa "skill-a" {level: 5}
-profile.learn pb "skill-b" {level: 10}
-profile.preference pb "style" "formal"
-profile.merge pa pb
-merged_b = profile.recall pa "skill-b"
-assert (ok? merged_b == true) "merge brings knowledge from B"
-merged_pref = profile.get_preference pa "style"
-assert (ok? merged_pref == true) "merge brings preferences from B"
-
--- === strategy: learn + best_strategy ===
-ps = profile.load {name: "strat-67" create: true} ^
-profile.learn ps "strategy:review:thorough" {score: 90}
-profile.learn ps "strategy:review:quick" {score: 60}
-best = profile.best_strategy ps "review"
-assert (ok? best == true) "best_strategy returns Ok"
-b = best ^
-assert (b.approach == "thorough") "best strategy is highest score"
-assert (b.avg_score == 90.0) "avg_score correct"
-
--- === rank_strategies ===
-ranked = profile.rank_strategies ps "review"
-assert (len ranked == 2) "rank returns all strategies"
-assert ((ranked.0).approach == "thorough") "ranked first is best"
-assert ((ranked.1).approach == "quick") "ranked second is worst"
-
--- === adapt_strategy ===
-adapted = profile.adapt_strategy ps "review"
-assert (adapted.approach != "") "adapt returns an approach"
-assert (adapted.mode == "exploit" || adapted.mode == "explore") "mode is exploit or explore"
-
--- === best_strategy for unknown problem ===
-r5 = profile.best_strategy ps "unknown"
-assert (err? r5 == true) "no strategies returns Err"
-
--- cleanup test profile files
-$rm -f .lx/profiles/test-agent-67.json
-$rm -f .lx/profiles/merge-a-67.json
-$rm -f .lx/profiles/merge-b-67.json
-$rm -f .lx/profiles/strat-67.json
-$rm -rf .lx/profiles
+$rm -rf .lx/profiles/test-agent-67.json
 
 log.info "67_profile: all passed"

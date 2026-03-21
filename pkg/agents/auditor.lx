@@ -1,14 +1,64 @@
--- Auditor agent — LLM-based output quality assessment + fast structural checks.
+-- Auditor agent — structural quality checks + optional LLM audit.
 -- Replaces std/agents/auditor.
 
-use std/ai
 use pkg/core/audit
 use pkg/core/prompt
+
+hedging_phrases = [
+  "i think" "maybe" "possibly" "i'm not sure" "perhaps"
+  "it might" "it could be" "i believe" "not entirely sure"
+]
+
+refusal_phrases = [
+  "i can't" "i'm unable" "as an ai" "i cannot"
+  "i'm not able" "i don't have the ability"
+]
+
+count_matches = (text phrases) {
+  lo = text | lower
+  phrases | filter (p) { lo | contains? p } | len
+}
 
 +quick_audit = (opts) {
   output = opts.output ?? ""
   task = opts.task ?? ""
-  audit.quick_check {output task}
+  trimmed = output | trim
+
+  failed := []
+
+  (trimmed | len) == 0 ? {
+    true -> { failed <- [..failed "empty"] }
+    false -> ()
+  }
+
+  refusal_count = count_matches output refusal_phrases
+  (refusal_count > 0) ? {
+    true -> { failed <- [..failed "refusal"] }
+    false -> ()
+  }
+
+  hedging_count = count_matches output hedging_phrases
+  (hedging_count >= 3) ? {
+    true -> { failed <- [..failed "excessive_hedging"] }
+    false -> ()
+  }
+
+  has_task = task != "" && (trimmed | len) > 0
+  has_task ? {
+    true -> {
+      refs = audit.references_task output task
+      (refs == false) ? {
+        true -> { failed <- [..failed "no_task_reference"] }
+        false -> ()
+      }
+    }
+    false -> ()
+  }
+
+  is_pass = (failed | len) == 0
+  score = is_pass ? 100 : 0
+  cats = [{name: "structure"  score: score  passed: is_pass}]
+  {passed: is_pass  score: score  failed: failed  categories: cats}
 }
 
 +audit = (opts) {
@@ -17,8 +67,8 @@ use pkg/core/prompt
   context = opts.context ?? ""
   rubric = opts.rubric ?? []
 
-  quick = audit.quick_check {output task}
-  not quick.pass ? quick : {
+  quick = quick_audit opts
+  not quick.passed ? quick : {
     p = prompt.create ()
       | prompt.system "You are a quality auditor. Evaluate the output against the task and rubric."
       | prompt.section "Task" task
@@ -34,10 +84,15 @@ use pkg/core/prompt
     } ^
 
     text = result.structured_output ?? (result.text ?? "{}")
-    parsed = try (text | json.parse)
+    parsed = try json.parse text
     parsed ? {
-      Err _ -> {score: 0  passed: false  feedback: "Failed to parse audit response"  categories: []}
-      Ok json -> json
+      Err _ -> {score: 0  passed: false  feedback: "Failed to parse audit response"  categories: []  failed: ["parse_error"]}
+      Ok json_val -> {
+        s = json_val.score ?? 0
+        cats = json_val.categories ?? []
+        f_list = cats | filter (c) { (c.score ?? 0) < 70 } | map (.name)
+        {score: s  passed: json_val.passed ?? false  feedback: json_val.feedback ?? ""  categories: cats  failed: f_list}
+      }
     }
   }
 }

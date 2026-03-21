@@ -3,7 +3,6 @@
 -- run_one: single agent script, single message. run_many: parallel batch.
 -- run_with: custom spawn config. run_handler: action-routing dispatch.
 
-use std/agent
 
 +run_one = (script msg) {
   a = agent.spawn {command: "lx" args: ["run" script]} ^

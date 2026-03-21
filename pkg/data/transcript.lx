@@ -4,7 +4,6 @@
 -- Filters: tool_calls, tool_results, successes, failures.
 
 use std/fs
-use std/json
 
 Trait +TraceEntry = {type: Str  name: Str  input: Any  output: Any  success: Bool}
 

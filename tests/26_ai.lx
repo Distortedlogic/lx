@@ -1,7 +1,6 @@
 -- 26_ai.lx
 -- Tests: std/ai module (LLM integration via Claude CLI)
 
-use std/ai
 use std/env
 
 assert (type_of ai.prompt == "Func") "ai.prompt is a function"

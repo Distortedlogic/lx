@@ -4,7 +4,6 @@ use std::time::Instant;
 use lx::backends::YieldBackend;
 use lx::error::LxError;
 use lx::span::Span;
-use lx::stdlib::json_conv::{json_to_lx, lx_to_json};
 use lx::value::LxVal;
 use tokio::sync::oneshot;
 
@@ -34,8 +33,7 @@ impl DxYieldBackend {
 
 impl YieldBackend for DxYieldBackend {
     fn yield_value(&self, value: LxVal, span: Span) -> Result<LxVal, LxError> {
-        let json_val =
-            lx_to_json(&value, span).map_err(|e| LxError::runtime(format!("yield: {e}"), span))?;
+        let json_val = serde_json::Value::from(&value);
 
         let prompt_id = next_prompt_id();
 
@@ -75,6 +73,6 @@ impl YieldBackend for DxYieldBackend {
             ts: Instant::now(),
         });
 
-        Ok(json_to_lx(response))
+        Ok(LxVal::from(response))
     }
 }

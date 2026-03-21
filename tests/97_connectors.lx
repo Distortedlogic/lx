@@ -1,6 +1,5 @@
 -- Connector abstraction: Trait conformance, CliConnector, McpConnector
 
-use std/agent
 use pkg/core/connector {Connector}
 use pkg/connectors/cli {CliConnector}
 use pkg/connectors/mcp {McpConnector}

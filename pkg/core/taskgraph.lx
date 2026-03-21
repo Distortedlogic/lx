@@ -22,7 +22,7 @@ Class +TaskGraph = {
   retry_count = opts.retry ?? 0
   on_fail = opts.on_fail ?? "fail"
 
-  g.nodes.set id {id  handler  input  depends  input_from  timeout  retry: retry_count  on_fail  status: "pending"}
+  g.nodes.set id {id: id  handler: handler  input: input  depends: depends  input_from: input_from  timeout: timeout  retry: retry_count  on_fail: on_fail  status: "pending"}
   Ok id
 }
 
@@ -79,7 +79,7 @@ detect_cycle = (g) {
     }
   }
 
-  queue := in_deg.entries () | filter (e) e.value == 0 | map (.key)
+  queue := in_deg.entries () | filter (e) { e.value == 0 } | map (.key)
   processed := 0
   total = nodes | len
 
@@ -120,7 +120,7 @@ detect_cycle = (g) {
   }
 
   result := []
-  queue := in_deg.entries () | filter (e) e.value == 0 | map (.key)
+  queue := in_deg.entries () | filter (e) { e.value == 0 } | map (.key)
 
   loop {
     (queue | len) == 0 ? break () : ()

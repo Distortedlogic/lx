@@ -24,10 +24,9 @@ Class +Repo = {
 }
 
 +create = (name opts) {
-  root = try git.root ()
-  root_path = root ? { Ok r -> r; Err _ -> "." }
+  root_path = git.root () ?? "."
   strategy = opts.merge_strategy ?? "merge"
-  Repo {name  root: root_path  merge_strategy: strategy}
+  Repo {name: name  root: root_path  merge_strategy: strategy}
 }
 
 +status = (repo) {
@@ -38,11 +37,11 @@ Class +Repo = {
 }
 
 +worktrees = (repo) {
-  repo.worktrees.entries () | map (e) {name: e.key  ..e.value}
+  repo.worktrees.entries () | map (e) { {..e.value  name: e.key} }
 }
 
 +locks = (repo) {
-  repo.locks.entries () | map (e) {id: e.key  ..e.value}
+  repo.locks.entries () | map (e) { {..e.value  id: e.key} }
 }
 
 +on_change = (repo handler) {

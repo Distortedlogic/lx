@@ -2,7 +2,6 @@
 -- Each config has a name and a handlers list consumable by agent_factory.from_config.
 -- Custom handlers use type "custom" with handler_fn for non-standard logic.
 
-use std/ai
 
 Trait ElicitResult = {
   requirements: List

@@ -2,7 +2,6 @@
 -- plan: uses AI to decompose a complex task.
 -- quick_plan: sentence-splitting heuristic, no AI call.
 
-use std/ai
 use pkg/core/prompt
 
 empty_plan = {steps: []  task: ""  step_count: 0}

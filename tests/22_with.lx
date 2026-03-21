@@ -89,7 +89,6 @@ with mut state = {count: 0, items: []} {
 }
 
 -- with as pipeline context
-use std/json
 json_str = json.encode {name: "test", value: 42}
 with parsed = json.parse json_str ^ {
   assert (parsed.name == "test")

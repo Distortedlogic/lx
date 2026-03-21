@@ -2,8 +2,6 @@
 -- Uses pkg/core/prompt for prompt assembly, ai.prompt_with with structured output.
 -- Returns GradeResult with per-category scores, overall pass/fail, feedback.
 
-use std/ai
-use std/json
 use pkg/core/prompt
 
 Trait +GradeResult = {

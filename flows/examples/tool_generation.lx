@@ -8,8 +8,6 @@
 -- Source: mcp-toolbelt/arch_diagrams/tool_generation
 
 use pkg/core/plan
-use std/mcp
-use std/json
 use std/fs
 use std/re
 use pkg/ai/ai_agent

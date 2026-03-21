@@ -7,7 +7,6 @@
 -- Demonstrates: workflow.run, MCP tool integration, refine loops, parallel dispatch, routing.
 -- Source: mcp-toolbelt/arch_diagrams/flow_full_pipeline
 
-use std/agent
 use pkg/ai/router
 use flows/lib/agent_catalog {verify_handler}
 use pkg/connectors/catalog {gritql}

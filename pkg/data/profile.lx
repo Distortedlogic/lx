@@ -2,7 +2,6 @@
 -- Replaces std/profile.
 
 use std/fs
-use std/json
 use std/time
 
 Class +Profile = {
@@ -17,7 +16,7 @@ Class +Profile = {
 +load = (name_or_opts) {
   name = name_or_opts ? { {name: n ..} -> n; _ -> to_str name_or_opts }
   path = ".lx/profiles/{name}.json"
-  exists = fs.exists path ^
+  exists = fs.exists path
   exists ? {
     true -> {
       raw = fs.read path ^

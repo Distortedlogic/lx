@@ -1,7 +1,6 @@
 -- Status persistence + debug log storage for the work runner.
 
 use std/fs
-use std/json
 
 Class +RunStatus = {
   runner_dir: ".lx/work_runner"

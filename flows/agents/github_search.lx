@@ -1,6 +1,5 @@
 -- GitHub code search specialist -- find OSS implementations.
 
-use std/agent
 use ../lib/github
 use pkg/ai/ai_agent
 

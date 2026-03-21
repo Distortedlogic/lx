@@ -3,7 +3,6 @@
 -- with_server: bracket pattern for MCP connections.
 -- make_client: factory for connect/close pairs from a command name and MCP type.
 
-use std/mcp
 
 +with_server = (config work_fn) {
   server = mcp.connect config ^

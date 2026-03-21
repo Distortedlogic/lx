@@ -1,7 +1,6 @@
 -- Tool executor -- AI-powered tool selection, retry execution, result integration.
 -- Composes pkg/core/prompt + pkg/core/circuit + std/retry into a reusable pipeline.
 
-use std/ai
 use pkg/core/prompt
 use pkg/core/retry
 use pkg/core/circuit {CircuitBreaker}

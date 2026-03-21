@@ -1,13 +1,30 @@
 -- Trait format adaptation — field mapping between source and target Traits.
 -- Replaces agent_adapter.rs.
 
+to_plain_record = (val) {
+  s = Store ()
+  t = type_of val
+  t == "Record" ? {
+    true -> { val | entries | each (e) { s.set e.0 e.1 } }
+    false -> {
+      ms = methods_of val
+      ms | each (name) {
+        v = val | get name
+        v != None ? { true -> s.set name v; false -> () }
+      }
+    }
+  }
+  s.to_record ()
+}
+
 apply_mapping_fn = (msg mapping) {
   mapped = Store ()
-  msg | entries | each (e) {
+  rec = to_plain_record msg
+  rec | entries | each (e) {
     k = e.0
     v = e.1
-    new_key = mapping ? { Some m -> (m | entries | find (me) { me.0 == k }) ? { Some pair -> pair.1; _ -> k }; _ -> k }
-    new_key = (mapping | entries | find (me) { me.0 == k }) ? { Some pair -> pair.1; _ -> k }
+    target = (mapping | get k) ?? None
+    new_key = target != None ? target : k
     mapped.set new_key v
   }
   mapped.to_record ()

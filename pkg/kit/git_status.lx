@@ -10,7 +10,7 @@ run_git = (args) {
 }
 
 +parse_status = (raw) {
-  lines_list = raw | trim | split "\n" | filter (len > 0)
+  lines_list = raw | trim | split "\n" | filter (x) { (x | len) > 0 }
   branch_info := {head: ""  upstream: ""  ahead: 0  behind: 0}
   files := []
   lines_list | each (line) {
@@ -63,13 +63,13 @@ run_git = (args) {
 }
 
 +branches = (_) {
-  raw = run_git "branch --list --format=%(refname:short)" ^
-  raw | trim | split "\n" | filter (len > 0)
+  raw = run_git "branch --list" ^
+  raw | trim | split "\n" | filter (x) { (x | trim | len) > 0 } | map (b) { b | trim | replace "* " "" }
 }
 
 +remotes = (_) {
   raw = run_git "remote -v" ^
-  raw | trim | split "\n" | filter (len > 0) | map (line) {
+  raw | trim | split "\n" | filter (x) { (x | len) > 0 } | map (line) {
     parts = line | split "\t"
     name = parts | first ?? ""
     rest = parts | last ?? ""

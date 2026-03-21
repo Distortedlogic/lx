@@ -2,7 +2,6 @@
 -- Tests: spec/agents-intercept.md (message middleware)
 -- Phase: intercept
 
-use std/agent
 use pkg/agents/intercept {intercept}
 
 -- basic intercept: middleware transforms message before forwarding

@@ -19,7 +19,7 @@ run_git = (args) {
   result ? {
     Ok _ -> {
       now = time.now ()
-      repo.worktrees.set branch {path  created_at: now.ms  status: "active"}
+      repo.worktrees.set branch {path: path  created_at: now.ms  status: "active"}
       Ok {branch  path}
     }
     Err e -> Err e

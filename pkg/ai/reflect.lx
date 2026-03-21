@@ -2,7 +2,6 @@
 -- Source: extracted from brain/lib/reflection.lx
 -- Provides: action reflection, pattern extraction, strategy updates, feedback processing
 
-use std/ai
 use pkg/core/prompt
 use pkg/data/trace {TraceStore}
 

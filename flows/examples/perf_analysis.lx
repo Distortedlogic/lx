@@ -6,7 +6,6 @@
 -- Demonstrates: workflow.run, parallel pmap, reconciliation, conflict handling.
 -- Source: mcp-toolbelt/arch_diagrams/scenario_perf_analysis
 
-use std/agent
 use pkg/core/reconcile {reconcile}
 use ../agents/perf_specialist
 use pkg/infra/report

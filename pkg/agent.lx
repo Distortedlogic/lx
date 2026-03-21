@@ -3,7 +3,6 @@
 -- AI integration, tool execution, inter-agent communication, and self-description.
 -- Any Class conforming to Agent gets these defaults. Override the phases you need.
 
-use std/ai
 
 +Trait Agent = {
   init = () { }

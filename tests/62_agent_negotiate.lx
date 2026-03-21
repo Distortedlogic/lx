@@ -1,7 +1,6 @@
 -- 62_agent_negotiate.lx
 -- Tests: negotiate (multi-agent iterative consensus)
 
-use std/agent
 use pkg/agents/negotiate {negotiate}
 use pkg/agents/mock {mock}
 

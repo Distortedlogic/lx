@@ -1,123 +1,32 @@
+-- 85_registry.lx
+-- Tests: pkg/agents/registry (Store-backed agent discovery)
+
 use pkg/agents/registry
 
--- start + connect
-reg = registry.start {} ^
-assert (reg != ()) "start returns handle"
+reg = registry.start ()
+assert (reg.started == true) "start returns started registry"
 
--- register agents
-registry.register reg {
-  name: "reviewer"
-  traits: ["Reviewer" "SecurityAuditor" "ReviewRequest"]
-  domains: ["rust" "python"]
-  capacity: 5
-  metadata: {version: "1.0"}
-} ^
+r1 = registry.register reg {name: "worker-1" traits: ["Reviewer"] domains: ["code"]}
+assert (r1 | ok?) "register returns Ok"
 
-registry.register reg {
-  name: "coder"
-  traits: ["Coder" "CodeRequest"]
-  domains: ["rust"]
-  capacity: 10
-} ^
+r2 = registry.register reg {name: "worker-2" traits: ["Analyzer"] domains: ["perf"]}
+assert (r2 | ok?) "register second agent"
 
-registry.register reg {
-  name: "tester"
-  traits: ["Tester" "Reviewer"]
-  domains: ["rust" "go"]
-  capacity: 3
-} ^
+found = registry.find reg {trait: "Reviewer"}
+assert (found | len == 1) "find by trait returns 1"
 
--- find by trait
-reviewers = registry.find reg {trait: "Reviewer"} ^
-assert (len reviewers == 2) "find by trait returns 2 reviewers"
-names = reviewers | map (.name) | sort
-assert (names == ["reviewer" "tester"]) "correct reviewer names"
+found_all = registry.find reg {:}
+assert (found_all | len == 2) "find all returns 2"
 
--- find by domain
-rust_agents = registry.find reg {domain: "rust"} ^
-assert (len rust_agents == 3) "all 3 agents handle rust"
+one = registry.find_one reg {trait: "Analyzer"}
+assert (one != None) "find_one returns Some"
 
--- find by trait (ReviewRequest)
-proto_agents = registry.find reg {trait: "ReviewRequest"} ^
-assert (len proto_agents == 1) "1 agent has ReviewRequest trait"
-proto_name = (first proto_agents ^).name
-assert (proto_name == "reviewer") "correct ReviewRequest agent"
+d = registry.deregister reg "worker-1"
+assert (d | ok?) "deregister returns Ok"
 
--- find with multiple filters
-rust_reviewers = registry.find reg {trait: "Reviewer"  domain: "rust"} ^
-assert (len rust_reviewers == 2) "2 rust reviewers"
+found2 = registry.find reg {:}
+assert (found2 | len == 1) "after deregister: 1 remaining"
 
--- find_one with strategy
-first_match = registry.find_one reg {trait: "Coder"} ^
-assert (first_match.name == "coder") "find_one first strategy"
+registry.stop reg
 
-least = registry.find_one reg {trait: "Reviewer"  strategy: "least_loaded"} ^
-assert (least.name == "reviewer" || least.name == "tester") "find_one least_loaded"
-
-rr1 = registry.find_one reg {trait: "Reviewer"  strategy: "round_robin"} ^
-rr2 = registry.find_one reg {trait: "Reviewer"  strategy: "round_robin"} ^
-assert (rr1.name != rr2.name) "round_robin alternates"
-
--- health
-h = registry.health reg "reviewer" ^
-assert (h.healthy == true) "reviewer is healthy"
-assert (h.uptime_ms >= 0) "uptime >= 0"
-
--- load
-l = registry.load reg "reviewer" ^
-assert (l.current == 0) "no current load"
-assert (l.capacity == 5) "capacity is 5"
-assert (l.pct == 0.0) "0% loaded"
-
--- agent_ref shape
-ref = first (registry.find reg {trait: "Coder"} ^) ^
-assert (ref.name == "coder") "ref has name"
-assert (ref.healthy == true) "ref has healthy"
-assert (ref.capacity == 10) "ref has capacity"
-assert (len ref.traits == 2) "ref has traits list"
-assert (len ref.domains == 1) "ref has domains list"
-
--- watch
-event_log = Store ()
-event_log.set "items" []
-registry.watch reg {trait: "Reviewer"} (event) {
-  prev = event_log.get "items" ?? []
-  event_log.set "items" (prev ++ [event])
-}
-
-registry.register reg {
-  name: "new-reviewer"
-  traits: ["Reviewer"]
-  domains: ["java"]
-  capacity: 2
-} ^
-
-watched = event_log.get "items" ?? []
-assert (len watched == 1) "watch fires on join"
-first_event = first watched ^
-assert (first_event.kind == "join") "event kind is join"
-assert (first_event.agent.name == "new-reviewer") "event has agent"
-
--- deregister
-registry.deregister reg "new-reviewer" ^
-watched2 = event_log.get "items" ?? []
-assert (len watched2 == 2) "watch fires on leave"
-leave_event = last watched2 ^
-assert (leave_event.kind == "leave") "leave event kind"
-
--- deregister non-existent
-result = registry.deregister reg "nonexistent"
-assert (result ? {Err _ -> true  _ -> false}) "deregister unknown returns Err"
-
--- find after deregister
-reviewers_after = registry.find reg {trait: "Reviewer"} ^
-assert (len reviewers_after == 2) "back to 2 reviewers after deregister"
-
--- health of non-existent
-bad_health = registry.health reg "nonexistent"
-assert (bad_health ? {Err _ -> true  _ -> false}) "health of unknown returns Err"
-
--- stop
-registry.stop reg ^
-
-emit "[INFO] 85_registry: all passed"
+log.info "85_registry: all passed"

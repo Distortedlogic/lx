@@ -1,7 +1,6 @@
 -- AI agent calls for workgen — investigate, compose, revise.
 -- Each function builds a prompt via pkg/core/prompt and calls ai.prompt_with.
 
-use std/ai
 use pkg/core/prompt
 use workgen/lib/log : wg_log
 use workgen/lib/persistence

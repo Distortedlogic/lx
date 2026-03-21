@@ -10,7 +10,7 @@ use std/re
     Some r -> Err "region '{region}' already claimed by {r.holder}"
     None -> {
       now = time.now ()
-      ws.regions.set region {holder  claimed_at: now.ms  start: 0  end: (ws.content | lines | len)}
+      ws.regions.set region {holder: holder  claimed_at: now.ms  start: 0  end: (ws.content | lines | len)}
       Ok region
     }
   }
@@ -32,7 +32,7 @@ use std/re
     start = matched | first ?? 0
     end = matched | last ?? 0
     region = "pattern:{pattern}"
-    ws.regions.set region {holder  claimed_at: (time.now ()).ms  start  end}
+    ws.regions.set region {holder: holder  claimed_at: (time.now ()).ms  start: start  end: end}
     Ok region
   }
 }

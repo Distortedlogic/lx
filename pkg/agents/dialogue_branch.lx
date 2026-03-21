@@ -1,7 +1,6 @@
 -- Dialogue branching — fork, compare, merge for exploring conversation paths.
 -- Hoisted from agent_dialogue_branch.rs.
 
-use std/agent
 
 branches = Store ()
 

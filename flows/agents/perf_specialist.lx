@@ -1,7 +1,5 @@
 -- Performance analysis specialist -- domain-parameterized analysis.
 
-use std/ai
-use std/agent
 use pkg/ai/ai_agent
 
 +analyze = (msg) {

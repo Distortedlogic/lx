@@ -171,7 +171,8 @@ fn bi_save_to(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVa
     let s = STORES
         .get(&id)
         .ok_or_else(|| LxError::runtime("store: not found", span))?;
-    let json_val = super::json_conv::lx_to_json(&LxVal::Record(Arc::new(s.data.clone())), span)?;
+    let record = LxVal::Record(Arc::new(s.data.clone()));
+    let json_val = serde_json::Value::from(&record);
     let pretty = serde_json::to_string_pretty(&json_val).unwrap_or_default();
     std::fs::write(path, pretty).map_err(|e| LxError::runtime(format!("store.save: {e}"), span))?;
     Ok(LxVal::Unit)
@@ -186,7 +187,7 @@ fn bi_load_from(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Lx
         .map_err(|e| LxError::runtime(format!("store.load: {e}"), span))?;
     let json_val: serde_json::Value = serde_json::from_str(&content)
         .map_err(|e| LxError::runtime(format!("store.load: {e}"), span))?;
-    let val = super::json_conv::json_to_lx(json_val);
+    let val = LxVal::from(json_val);
     let data = match val {
         LxVal::Record(r) => r.as_ref().clone(),
         _ => return Err(LxError::runtime("store.load: expected JSON object", span)),

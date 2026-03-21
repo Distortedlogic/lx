@@ -3,7 +3,6 @@
 -- Verifies: std/yield Trait import, field defaults, kind injection,
 --   validation errors, orchestrator wire format
 
-use std/json
 use std/yield {YieldApproval YieldReflection YieldInformation YieldDelegation YieldProgress}
 
 -- ============================================================

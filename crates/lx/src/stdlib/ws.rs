@@ -204,9 +204,7 @@ fn bi_recv_json(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Lx
         LxVal::Ok(inner) => {
             if let LxVal::Str(s) = *inner {
                 match serde_json::from_str::<serde_json::Value>(&s) {
-                    Ok(json_val) => Ok(LxVal::Ok(Box::new(crate::stdlib::json_conv::json_to_lx(
-                        json_val,
-                    )))),
+                    Ok(json_val) => Ok(LxVal::Ok(Box::new(LxVal::from(json_val)))),
                     Err(e) => Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(
                         format!("ws.recv_json: parse error: {e}").as_str(),
                     ))))),

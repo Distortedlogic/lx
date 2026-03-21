@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::ast::{McpOutputType, McpToolDecl};
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::{BuiltinKind, FieldDef, McpOutputDef, McpToolDef, LxVal};
+use crate::value::{FieldDef, McpOutputDef, McpToolDef, LxVal};
 
 use super::Interpreter;
 
@@ -219,7 +219,7 @@ impl Interpreter {
     pub(super) fn apply_mcp_decl(
         &mut self,
         name: &str,
-        tools: &Arc<Vec<McpToolDef>>,
+        _tools: &Arc<Vec<McpToolDef>>,
         client: &LxVal,
         span: Span,
     ) -> Result<LxVal, LxError> {
@@ -242,17 +242,10 @@ impl Interpreter {
                     span,
                 )
             })?;
-        crate::stdlib::mcp::register_tool_defs(mcp_id, tools);
-        let mut result = rec.as_ref().clone();
-        for tool in tools.iter() {
-            let wrapper = LxVal::BuiltinFunc(crate::value::BuiltinFunc {
-                name: "mcp.typed_call",
-                arity: 3,
-                kind: BuiltinKind::Sync(crate::stdlib::mcp::typed_call),
-                applied: vec![client.clone(), LxVal::Str(Arc::from(tool.name.as_str()))],
-            });
-            result.insert(tool.name.clone(), wrapper);
-        }
-        Ok(LxVal::Record(Arc::new(result)))
+        let _ = mcp_id;
+        Err(LxError::runtime(
+            format!("MCP {name}: MCP runtime support removed (now an lx connector)"),
+            span,
+        ))
     }
 }

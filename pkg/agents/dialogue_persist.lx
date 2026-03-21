@@ -2,7 +2,6 @@
 -- Replaces agent_dialogue_persist.rs.
 
 use std/fs
-use std/json
 
 dialogue_dir = ".lx/dialogues"
 

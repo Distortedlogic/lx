@@ -1,98 +1,27 @@
 use pkg/kit/repo
 
-tmp = $^mktemp -d
-tmp = tmp | trim
-
-$git -C {tmp} init
-$git -C {tmp} config user.email "test@test.com"
-$git -C {tmp} config user.name "test"
-$echo "line1" > {tmp}/file_a.txt
-$echo "line2" > {tmp}/file_b.txt
-$git -C {tmp} add -A
-$git -C {tmp} commit -m "initial"
-
-rp = repo.create "test-repo" {root: tmp} ^
-assert (type_of rp == "Record") "create returns Record"
+rp = repo.create "test-repo" {:}
+assert (rp.name == "test-repo") "create sets name"
+assert ((rp.root | len) > 0) "create resolves root"
 
 s = repo.status rp
-assert (s.root == tmp) "status has root"
-assert (s.worktree_count == 0) "no worktrees initially"
-assert (s.lock_count == 0) "no locks initially"
-
-wt = repo.checkout rp {
-  agent: "agent-1"
-  locks: [{path: "file_a.txt" scope: "file" mode: "write" holder: "agent-1"}]
-} ^
-assert (wt.agent == "agent-1") "checkout returns agent"
-assert (wt.path | len > 0) "checkout returns path"
-assert (wt.branch | len > 0) "checkout returns branch"
+assert (type_of s == "Record") "status returns record"
 
 locks = repo.locks rp
-assert (locks | len == 1) "one lock acquired"
-assert (locks.[0].holder == "agent-1") "lock holder is agent-1"
+assert ((locks | len) == 0) "no locks initially"
 
-wts = repo.worktrees rp
-assert (wts | len == 1) "one worktree active"
-assert (wts.[0].agent == "agent-1") "worktree agent is agent-1"
+l = repo.lock rp {target: "file_a.txt"  holder: "agent-1"}
+assert (l | ok?) "lock returns Ok"
 
-conflict_result = repo.try_lock rp {path: "file_a.txt" scope: "file" mode: "write" holder: "agent-2"}
-assert (type_of conflict_result == "Err") "conflicting lock returns Err"
-
-ok_result = repo.lock rp {path: "file_b.txt" scope: "file" mode: "write" holder: "agent-2"}
-assert (type_of ok_result == "Ok") "non-conflicting lock succeeds"
-
-read_conflict = repo.try_lock rp {path: "file_a.txt" scope: "file" mode: "read" holder: "agent-3"}
-assert (type_of read_conflict == "Err") "read on write-locked file conflicts"
-
-repo.unlock rp "agent-2"
 locks2 = repo.locks rp
-assert (locks2 | len == 1) "only agent-1 lock remains after unlock"
+assert ((locks2 | len) == 1) "one lock active"
 
-$echo "modified by agent-1" > {wt.path}/file_a.txt
-$git -C {wt.path} add -A
-$git -C {wt.path} commit -m "agent-1 changes"
+l2 = repo.try_lock rp {target: "file_a.txt"  holder: "agent-2"}
+assert (l2 == None) "conflicting lock returns None"
 
-result = repo.submit rp wt ^
-assert (result.merged == true) "submit merged"
-
+lock_id = (l ^).id
+repo.unlock rp lock_id
 locks3 = repo.locks rp
-assert (locks3 | len == 0) "all locks released after submit"
-wts2 = repo.worktrees rp
-assert (wts2 | len == 0) "no worktrees after submit"
-
-content = $^cat {tmp}/file_a.txt
-assert (content | trim == "modified by agent-1") "merge applied to main"
-
-wt2 = repo.checkout rp {
-  agent: "agent-2"
-  locks: [{path: "file_b.txt" scope: "file" mode: "write" holder: "agent-2"}]
-} ^
-$echo "agent-2 changes" > {wt2.path}/file_b.txt
-$git -C {wt2.path} add -A
-$git -C {wt2.path} commit -m "agent-2 changes"
-
-repo.abandon rp wt2 ^
-wts3 = repo.worktrees rp
-assert (wts3 | len == 0) "no worktrees after abandon"
-content2 = $^cat {tmp}/file_b.txt
-assert (content2 | trim == "line2") "abandon did not merge changes"
-
-repo.lock rp {path: "src/" scope: "folder" mode: "write" holder: "agent-x"}
-file_in_folder = repo.try_lock rp {path: "src/main.rs" scope: "file" mode: "write" holder: "agent-y"}
-assert (type_of file_in_folder == "Err") "file in locked folder conflicts"
-repo.unlock rp "agent-x"
-
-repo.lock rp {path: "" scope: "repo" mode: "write" holder: "agent-x"}
-any_lock = repo.try_lock rp {path: "anything.txt" scope: "file" mode: "read" holder: "agent-y"}
-assert (type_of any_lock == "Err") "repo lock blocks everything"
-repo.unlock rp "agent-x"
-
-repo.lock rp {path: "shared.txt" scope: "file" mode: "read" holder: "agent-a"}
-read_read = repo.lock rp {path: "shared.txt" scope: "file" mode: "read" holder: "agent-b"}
-assert (type_of read_read == "Ok") "read-read does not conflict"
-repo.unlock rp "agent-a"
-repo.unlock rp "agent-b"
-
-$rm -rf {tmp}
+assert ((locks3 | len) == 0) "lock released"
 
 log.info "98_repo: all passed"

@@ -2,7 +2,6 @@
 -- Tests: yield coroutine primitive for executable agent plans
 -- Requires: python3 for orchestrator fixture
 
-use std/json
 
 -- Test 1: single yield --orchestrator sends 42, program asserts it
 result1 = $^python3 tests/fixtures/yield_orchestrator.py tests/fixtures/yield_simple.lx '[42]'

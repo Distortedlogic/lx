@@ -8,7 +8,6 @@
 -- Demonstrates: workflow.run, parallel fan-out, agent reconciliation, synthesis logic.
 -- Source: mcp-toolbelt/arch_diagrams/scenario_research
 
-use std/agent
 use pkg/core/reconcile {reconcile}
 use flows/lib/agent_catalog {search_handler}
 use pkg/connectors/catalog {context_engine}

@@ -1,6 +1,5 @@
 -- Context engine agent -- delegates to ContextEngine MCP via Connector.
 
-use std/agent
 use pkg/connectors/catalog {context_engine}
 use pkg/ai/ai_agent
 

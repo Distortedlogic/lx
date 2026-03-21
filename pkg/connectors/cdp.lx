@@ -2,7 +2,6 @@
 -- Requires std/ws. Requires Chrome/Chromium with --remote-debugging-port.
 
 use std/ws
-use std/json
 use std/time
 use std/http
 

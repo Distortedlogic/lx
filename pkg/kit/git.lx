@@ -58,17 +58,15 @@ run_git = (args) {
   n = opts.n ?? 10
   ref_str = opts.ref ?? ""
   path = opts.path ?? ""
-  fmt = "--format=%H%n%an%n%ae%n%at%n%s"
-  cmd = "log {fmt} -n {n}"
-  cmd = ref_str != "" ? "{cmd} {ref_str}" : cmd
-  cmd = path != "" ? "{cmd} -- {path}" : cmd
+  n_str = to_str n
+  cmd = "log --format=%H%x09%an%x09%ae%x09%at%x09%s -n " ++ n_str
+  cmd = ref_str != "" ? (cmd ++ " " ++ ref_str) : cmd
+  cmd = path != "" ? (cmd ++ " -- " ++ path) : cmd
   raw = run_git cmd ^
-  raw | trim | split "\n\n" | filter (len > 0) | map parse_log_entry
-}
-
-parse_log_entry = (block) {
-  parts = block | split "\n"
-  {hash: parts | get 0 ?? ""  author: parts | get 1 ?? ""  email: parts | get 2 ?? ""  timestamp: parts | get 3 ?? ""  subject: parts | get 4 ?? ""}
+  raw | trim | split "\n" | filter (x) { (x | trim | len) > 0 } | map (line) {
+    parts = line | split "\t"
+    {hash: parts | get 0 ?? ""  author: parts | get 1 ?? ""  email: parts | get 2 ?? ""  timestamp: parts | get 3 ?? ""  subject: parts | get 4 ?? ""}
+  }
 }
 
 +show = (ref_str) {

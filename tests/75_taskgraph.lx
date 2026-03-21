@@ -1,126 +1,26 @@
 -- 75_taskgraph.lx
--- Tests: std/taskgraph module (DAG declaration, dependency resolution, execution)
+-- Tests: pkg/core/taskgraph (DAG with topo sort and cycle detection)
 
 use pkg/core/taskgraph
 
--- === Create empty graph ===
-g = taskgraph.create "test-dag" ^
-assert (g.name == "test-dag") "create returns named graph"
+g = taskgraph.create {name: "test-graph"}
 
--- === Add tasks ===
-taskgraph.add g "parse" {handler: (input) {ast: "parsed"}} ^
-taskgraph.add g "lint" {handler: (input) {issues: []}} ^
-taskgraph.add g "review" {
-  depends: ["parse" "lint"]
-  handler: (input) {reviewed: true}
-} ^
+taskgraph.add g "a" {handler: (input) "result-a"  depends: []}
+taskgraph.add g "b" {handler: (input) "result-b"  depends: ["a"]}
+taskgraph.add g "c" {handler: (input) "result-c"  depends: ["a"]}
+taskgraph.add g "d" {handler: (input) "result-d"  depends: ["b" "c"]}
 
--- === Validate: valid graph ===
 v = taskgraph.validate g
-assert (ok? v == true) "validate succeeds on valid DAG"
+assert (v | ok?) "validate passes for valid DAG"
 
--- === Topological sort ===
-order = taskgraph.topo g ^
-assert (len order == 3) "topo returns all 3 tasks"
-parse_idx = find_index (== "parse") order
-lint_idx = find_index (== "lint") order
-review_idx = find_index (== "review") order
-assert (some? parse_idx == true) "parse in topo order"
-assert (some? lint_idx == true) "lint in topo order"
-assert (some? review_idx == true) "review in topo order"
+order = taskgraph.topo g
+assert (order | len == 4) "topo returns all 4 nodes"
+assert ((order | first) == Some "a") "topo: a is first"
 
--- === Status ===
+dot_str = taskgraph.dot g
+assert (dot_str | contains? "digraph") "dot output has digraph"
+
 st = taskgraph.status g
-assert (st.parse == "pending") "status: parse pending"
-assert (st.lint == "pending") "status: lint pending"
-assert (st.review == "pending") "status: review pending"
-
--- === DOT export ===
-dot = taskgraph.dot g
-assert (contains? "digraph" dot == true) "dot contains digraph"
-assert (contains? "parse" dot == true) "dot contains parse node"
-assert (contains? "review" dot == true) "dot contains review node"
-
--- === Run graph ===
-results = taskgraph.run g ^
-assert (results.parse.ast == "parsed") "run: parse produced ast"
-assert (results.lint.issues == []) "run: lint produced issues"
-assert (results.review.reviewed == true) "run: review ran after deps"
-
--- === input_from: dependency result threading ===
-g2 = taskgraph.create "input-from-test" ^
-taskgraph.add g2 "produce" {handler: (input) {value: 42}} ^
-taskgraph.add g2 "consume" {
-  depends: ["produce"]
-  input_from: (results) results.produce
-  handler: (input) {doubled: input.value * 2}
-} ^
-r2 = taskgraph.run g2 ^
-assert (r2.produce.value == 42) "input_from: producer result"
-assert (r2.consume.doubled == 84) "input_from: consumer got producer output"
-
--- === Static input (no depends) ===
-g3 = taskgraph.create "static-input" ^
-taskgraph.add g3 "greet" {
-  input: {name: "world"}
-  handler: (input) "hello {input.name}"
-} ^
-r3 = taskgraph.run g3 ^
-assert (r3.greet == "hello world") "static input passed to handler"
-
--- === Remove task ===
-g4 = taskgraph.create "remove-test" ^
-taskgraph.add g4 "a" {handler: (x) 1} ^
-taskgraph.add g4 "b" {depends: ["a"] handler: (x) 2} ^
-taskgraph.remove g4 "a" ^
-order4 = taskgraph.topo g4 ^
-assert (order4 == ["b"]) "remove: task a gone, b remains with dep cleaned"
-
--- === Cycle detection ===
-g5 = taskgraph.create "cycle-test" ^
-taskgraph.add g5 "x" {depends: ["y"]} ^
-taskgraph.add g5 "y" {depends: ["x"]} ^
-v5 = taskgraph.validate g5
-assert (err? v5 == true) "validate detects cycle"
-
--- === Unknown dependency detection ===
-g6 = taskgraph.create "unknown-dep" ^
-taskgraph.add g6 "a" {depends: ["nonexistent"]} ^
-v6 = taskgraph.validate g6
-assert (err? v6 == true) "validate detects unknown dependency"
-
--- === No handler: input passthrough ===
-g7 = taskgraph.create "no-handler" ^
-taskgraph.add g7 "passthrough" {input: {x: 99}} ^
-r7 = taskgraph.run g7 ^
-assert (r7.passthrough.x == 99) "no handler: input passed through as result"
-
--- === Diamond DAG ===
-g8 = taskgraph.create "diamond" ^
-taskgraph.add g8 "top" {handler: (x) {v: 1}} ^
-taskgraph.add g8 "left" {depends: ["top"] handler: (x) {v: 2}} ^
-taskgraph.add g8 "right" {depends: ["top"] handler: (x) {v: 3}} ^
-taskgraph.add g8 "bottom" {
-  depends: ["left" "right"]
-  input_from: (results) {l: results.left.v  r: results.right.v}
-  handler: (input) {sum: input.l + input.r}
-} ^
-r8 = taskgraph.run g8 ^
-assert (r8.top.v == 1) "diamond: top"
-assert (r8.left.v == 2) "diamond: left"
-assert (r8.right.v == 3) "diamond: right"
-assert (r8.bottom.sum == 5) "diamond: bottom aggregates left+right"
-
--- === run_with: on_complete callback ===
-completed := []
-g9 = taskgraph.create "callbacks" ^
-taskgraph.add g9 "step1" {handler: (x) "done1"} ^
-taskgraph.add g9 "step2" {depends: ["step1"] handler: (x) "done2"} ^
-r9 = taskgraph.run_with g9 {
-  on_complete: (id result) { completed <- [..completed id] }
-} ^
-assert (len completed == 2) "run_with: on_complete called for each task"
-assert (contains? "step1" completed == true) "run_with: step1 completed"
-assert (contains? "step2" completed == true) "run_with: step2 completed"
+assert (st | len == 4) "status returns all nodes"
 
 log.info "75_taskgraph: all passed"

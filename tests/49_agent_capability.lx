@@ -2,7 +2,6 @@
 -- Tests: spec/agents-capability.md (Capabilities Trait + capabilities + advertise)
 -- Phase: capabilities, advertise, Capabilities Trait
 
-use std/agent
 use pkg/core/capability {Capabilities capabilities advertise}
 
 -- Capabilities Trait validates and fills defaults

@@ -5,7 +5,6 @@
 -- Demonstrates: workflow.run, guard composition, reconciliation, transcript ingestion.
 -- Source: mcp-toolbelt/arch_diagrams/scenario_security_audit
 
-use std/agent
 use pkg/core/reconcile {reconcile}
 use pkg/agents/guard
 use pkg/kit/security_scan

@@ -2,7 +2,6 @@
 -- Source: extracted from brain/lib/reasoning.lx
 -- Provides: multi-strategy reasoning, decomposition, hypothesis formation and evaluation
 
-use std/ai
 use pkg/core/prompt
 
 Trait +Thought = {id: Str  content: Str  kind: Str  confidence: Float where confidence >= 0.0 && confidence <= 1.0  evidence: [Str]  depends_on: [Str]  alternatives: [Str]}

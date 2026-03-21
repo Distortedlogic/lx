@@ -22,23 +22,17 @@ Class +Workspace = {
 
 +create = (name opts) {
   content = opts.content ?? ""
-  Workspace {name  content}
+  Workspace {name: name  content: content}
 }
 
 +snapshot = (ws) { ws.content }
 
 +regions = (ws) {
-  ws.regions.entries () | map (e) {
-    name: e.key
-    ..e.value
-  }
+  ws.regions.entries () | map (e) { {..e.value  name: e.key} }
 }
 
 +conflicts = (ws) {
-  ws.conflicts.entries () | map (e) {
-    id: e.key
-    ..e.value
-  }
+  ws.conflicts.entries () | map (e) { {..e.value  id: e.key} }
 }
 
 +resolve = (ws conflict_id resolution) {

@@ -1,7 +1,6 @@
 -- AI agent calls — implement, fix, investigate, diagnose.
 -- Each function builds a prompt via pkg/core/prompt and calls ai.prompt_with.
 
-use std/ai
 use pkg/core/prompt
 use workrunner/lib/log
 use workrunner/lib/persistence

@@ -1,4 +1,3 @@
-use std/pane
 
 assert (type_of pane.open == "Func") "pane.open is a function"
 assert (type_of pane.update == "Func") "pane.update is a function"

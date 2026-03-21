@@ -109,5 +109,4 @@ assert a.count == 3
 assert b2.count == 0
 
 -- agent.implements works with objects
-use std/agent {implements}
-assert implements b Checkable
+assert (agent.implements b Checkable)

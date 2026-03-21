@@ -1,3 +1,4 @@
+mod ai_builtins;
 mod call;
 pub(crate) mod coll;
 mod coll_transform;

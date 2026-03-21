@@ -6,7 +6,6 @@ use pkg/data/memory {MemoryStore}
 use pkg/data/knowledge {KnowledgeBase}
 use pkg/data/profile
 use std/time
-use std/json
 use std/fs
 
 Trait +MemoryEntry = {content: Str  domain: Str  confidence: Float where confidence >= 0.0 && confidence <= 1.0  source: Str  tags: [Str]}

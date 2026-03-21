@@ -2,10 +2,8 @@
 -- Source: extracted from brain/lib/perception.lx
 -- Provides: intent classification, entity extraction, complexity assessment, domain detection
 
-use std/ai
 use pkg/core/prompt
 use std/re
-use std/json
 use pkg/kit/git
 
 Trait +Perception = {raw: Str  intent: Str  complexity: Str  entities: [Str]  domain: Str  urgency: Str = "normal"  requires_tools: Bool = false  requires_agents: Bool = false  ambiguity: Float = 0.0 where ambiguity >= 0.0 && ambiguity <= 1.0}

@@ -1,7 +1,6 @@
 -- GitHub API operations -- search repositories and normalize results.
 
 use std/http
-use std/json
 
 Trait +Candidate = {name: Str  url: Str  description: Str  stars: Int  lang: Str}
 

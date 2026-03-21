@@ -1,6 +1,5 @@
 -- lx package: std/prompt reimplemented as pure record builder
 
-use std/ai
 
 +create = (_) {
   {system: None  sections: []  constraints: []  instructions: []  examples: []}

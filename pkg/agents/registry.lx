@@ -60,31 +60,16 @@ Class +Registry = {
 }
 
 matches_query = (agent query) {
-  trait_match = query.trait ?? None
-  domain_match = query.domain ?? None
-  traits_match = query.traits ?? None
+  trait_match = query.trait
+  domain_match = query.domain
+  traits_match = query.traits
 
-  trait_ok = trait_match ? {
-    Some t -> {
-      agent_traits = agent.traits ?? []
-      agent_traits | contains? t
-    }
-    None -> true
-  }
-  domain_ok = domain_match ? {
-    Some d -> {
-      agent_domains = agent.domains ?? []
-      agent_domains | contains? d
-    }
-    None -> true
-  }
-  traits_ok = traits_match ? {
-    Some ts -> {
-      agent_traits = agent.traits ?? []
-      ts | all? (t) agent_traits | contains? t
-    }
-    None -> true
-  }
+  agent_traits = agent.traits ?? []
+  agent_domains = agent.domains ?? []
+
+  trait_ok = trait_match == None ? true : (agent_traits | contains? trait_match)
+  domain_ok = domain_match == None ? true : (agent_domains | contains? domain_match)
+  traits_ok = traits_match == None ? true : (traits_match | all? (t) { agent_traits | contains? t })
   trait_ok && domain_ok && traits_ok
 }
 

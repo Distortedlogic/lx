@@ -20,7 +20,7 @@ run_git = (args) {
 
 +worktree_list = (_) {
   raw = run_git "worktree list --porcelain" ^
-  blocks = raw | trim | split "\n\n" | filter (len > 0)
+  blocks = raw | trim | split "\n\n" | filter (x) { (x | len) > 0 }
   blocks | map (block) {
     lines_list = block | split "\n"
     path = lines_list | find (starts? "worktree ") ?? ""
@@ -30,6 +30,6 @@ run_git = (args) {
     branch = lines_list | find (starts? "branch ") ?? ""
     branch = branch != "" ? (branch | drop 7 | trim) : ""
     bare = lines_list | any? (== "bare")
-    {path  head  branch  bare}
+    {path: path  head: head  branch: branch  bare: bare}
   }
 }
