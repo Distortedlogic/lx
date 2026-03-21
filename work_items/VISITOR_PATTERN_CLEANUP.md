@@ -31,14 +31,17 @@ Formalize the AST visitor pattern infrastructure to eliminate spaghetti: extract
 # Files affected
 
 **New files:**
+
 - None (all changes to existing files)
 
 **Modified files — AST:**
+
 - `crates/lx/src/ast/mod.rs` — Stmt enum uses new struct variants
 - `crates/lx/src/ast/expr_types.rs` — Expr::Refine and Expr::Meta use RefineDef/MetaDef
 - `crates/lx/src/ast/types.rs` — Define TraitDeclData, AgentDeclData, ClassDeclData, RefineDef, MetaDef
 
 **Modified files — Visitor:**
+
 - `crates/lx/src/visitor/mod.rs` — Remove context structs, rewrite trait methods, add post-visit hooks
 - `crates/lx/src/visitor/walk/mod.rs` — Update walk_stmt, walk_expr for new enum shapes; add walk_receive, walk_trait_union, walk_stream_ask; fix walk_binding; add post-visit calls
 - `crates/lx/src/visitor/walk/walk_helpers.rs` — Absorb expression walks from walk_pattern.rs, renamed or expanded
@@ -46,6 +49,7 @@ Formalize the AST visitor pattern infrastructure to eliminate spaghetti: extract
 - `crates/lx/src/visitor/walk/walk_type.rs` — No structural changes (type walks are clean)
 
 **Modified files — Consumers:**
+
 - `crates/lx/src/stdlib/diag/diag_walk.rs` — New visitor signatures, post-visit hooks
 - `crates/lx/src/stdlib/diag/diag_walk_expr.rs` — New Refine/Meta shapes
 - `crates/lx/src/checker/stmts.rs` — Match on new Stmt struct variants
@@ -56,6 +60,7 @@ Formalize the AST visitor pattern infrastructure to eliminate spaghetti: extract
 - `crates/lx/src/interpreter/meta.rs` — Match on MetaDef
 
 **Modified files — Parser (construction sites):**
+
 - Parser files that construct Stmt::TraitDecl, Stmt::AgentDecl, Stmt::ClassDecl, Expr::Refine, Expr::Meta — update to construct the new structs
 
 # Task List
@@ -79,25 +84,23 @@ In `crates/lx/src/ast/types.rs`, define five new structs holding the fields curr
 
 All structs derive Debug, Clone. Do NOT yet change the enum variants — that happens in the next task.
 
-Verify: `just diagnose` passes.
-
 ## Task 2: Refactor Stmt and Expr enums to use named structs
 
 **Subject:** Replace inline fields in Stmt and Expr variants with the new named structs
 **ActiveForm:** Refactoring enum variants to use named structs
 
 In `crates/lx/src/ast/mod.rs`, change:
+
 - `Stmt::TraitDecl { name, entries, ... }` → `Stmt::TraitDecl(TraitDeclData)`
 - `Stmt::AgentDecl { name, traits, ... }` → `Stmt::AgentDecl(AgentDeclData)`
 - `Stmt::ClassDecl { name, traits, ... }` → `Stmt::ClassDecl(ClassDeclData)`
 
 In `crates/lx/src/ast/mod.rs` (the Expr enum):
+
 - `Expr::Refine { initial, grade, ... }` → `Expr::Refine(Box<RefineDef>)`
 - `Expr::Meta { task, strategies, ... }` → `Expr::Meta(Box<MetaDef>)`
 
 Then fix every compilation error. The compiler will identify every match arm and construction site that needs updating. At each match site, change destructuring from `Stmt::TraitDecl { name, entries, ... }` to `Stmt::TraitDecl(data)` and access fields as `data.name`, `data.entries`, etc. At each construction site, wrap fields in the struct constructor. Search the parser, interpreter (`exec_stmt.rs`, `refine.rs`, `meta.rs`), checker (`stmts.rs`, `synth.rs`, `synth_helpers.rs`), visitor walks (`walk/mod.rs`), and diag walker (`diag_walk.rs`, `diag_walk_expr.rs`).
-
-Verify: `just diagnose` passes. `just test` passes.
 
 ## Task 3: Rewrite AstVisitor trait — remove context structs, add missing methods
 
@@ -109,6 +112,7 @@ In `crates/lx/src/visitor/mod.rs`:
 Remove `TraitDeclCtx`, `AgentDeclCtx`, `RefineCtx`, `MetaCtx` entirely.
 
 Change visitor method signatures:
+
 - `visit_trait_decl(&mut self, ctx: &TraitDeclCtx, span)` → `visit_trait_decl(&mut self, data: &TraitDeclData, span: Span)`
 - `visit_agent_decl(&mut self, ctx: &AgentDeclCtx, span)` → `visit_agent_decl(&mut self, data: &AgentDeclData, span: Span)`
 - `visit_class_decl(&mut self, name, traits, fields, methods, exported, span)` → `visit_class_decl(&mut self, data: &ClassDeclData, span: Span)`
@@ -116,12 +120,11 @@ Change visitor method signatures:
 - `visit_meta(&mut self, ctx: &MetaCtx, span)` → `visit_meta(&mut self, def: &MetaDef, span: Span)`
 
 Add two new methods with empty defaults:
+
 - `fn visit_receive(&mut self, arms: &[ReceiveArm], span: Span)` — default calls `walk_receive(self, arms, span)`
 - `fn visit_trait_union(&mut self, _def: &TraitUnionDef, _span: Span)` — empty default
 
 Change `visit_stream_ask` default from `walk_agent_ask(self, target, msg, span)` to `walk_stream_ask(self, target, msg, span)`.
-
-Verify: `just diagnose` passes.
 
 ## Task 4: Update walk functions for new enum shapes and missing walks
 
@@ -131,12 +134,14 @@ Verify: `just diagnose` passes.
 In `crates/lx/src/visitor/walk/mod.rs`:
 
 Update `walk_stmt`:
+
 - `Stmt::TraitDecl(data) => v.visit_trait_decl(data, span)` — no context struct construction
 - `Stmt::AgentDecl(data) => v.visit_agent_decl(data, span)` — no context struct construction
 - `Stmt::ClassDecl(data) => v.visit_class_decl(data, span)` — no parameter explosion
 - `Stmt::TraitUnion(def) => v.visit_trait_union(def, span)` — was silently dropped, now dispatches
 
 Update `walk_expr`:
+
 - `Expr::Refine(def) => v.visit_refine(def, span)` — no context struct construction
 - `Expr::Meta(def) => v.visit_meta(def, span)` — no context struct construction
 - `Expr::Receive(arms) => v.visit_receive(arms, span)` — was inline loop, now delegates
@@ -157,8 +162,6 @@ Add `walk_trait_union`: empty (no children to walk).
 
 Add `walk_stream_ask`: body identical to `walk_agent_ask` — visit target and msg. This exists so `visit_stream_ask` has its own dedicated walk function.
 
-Verify: `just diagnose` passes.
-
 ## Task 5: Update diag_walk for new visitor API
 
 **Subject:** Fix diag_walk.rs and diag_walk_expr.rs for changed visitor method signatures
@@ -176,8 +179,6 @@ In `crates/lx/src/stdlib/diag/diag_walk_expr.rs`:
 
 Update the `Expr::Refine` arm in `visit_expr_diag` — access fields through `def.initial`, `def.grade`, `def.revise` instead of separate destructured fields.
 
-Verify: `just diagnose` passes. `just test` passes.
-
 ## Task 6: Reorganize walk file structure
 
 **Subject:** Move expression walks out of walk_pattern.rs into the expression walk file
@@ -191,8 +192,6 @@ After the move, `walk_pattern.rs` should contain only: `walk_pattern`, `walk_pat
 
 Update `walk/mod.rs` to reference the renamed module.
 
-Verify: `just diagnose` passes.
-
 ## Task 7: Fix capture.rs — exhaustive Expr variant handling
 
 **Subject:** Remove wildcard catch-all, explicitly handle every Expr variant in free variable analysis
@@ -201,6 +200,7 @@ Verify: `just diagnose` passes.
 In `crates/lx/src/checker/capture.rs`, replace the `_ => {}` catch-all at the end of `collect_free` with explicit arms for every remaining Expr variant:
 
 Variants that contain sub-expressions — recurse into them:
+
 - `Expr::WithResource { resources, body }` — recurse into resource exprs, recurse into body stmts with new bound scope
 - `Expr::WithContext { fields, body }` — recurse into field exprs, recurse into body stmts
 - `Expr::Refine(def)` — recurse into initial, grade, revise, threshold, max_rounds, on_round
@@ -217,17 +217,16 @@ Variants that contain sub-expressions — recurse into them:
 - `Expr::Receive(arms)` — recurse into each arm's handler
 
 Leaf variants — explicit no-ops:
+
 - `Expr::Literal(_)` — no free variables in literals (string interpolation free vars are already in the Expr tree as Ident nodes within StrPart::Interp)
 - `Expr::TypeConstructor(_)` — constructor names are not variable references
 - `Expr::Section(section)` — recurse into operand in Right/Left variants; BinOp/Field/Index are no-ops
 
 After this change, the compiler will enforce exhaustiveness when new Expr variants are added.
 
-Verify: `just diagnose` passes. `just test` passes.
-
 ## Task 8: Add post-visit hooks to AstVisitor
 
-**Subject:** Add visit_*_post methods for scope-managing nodes so consumers can run logic after children are visited
+**Subject:** Add visit\_\*\_post methods for scope-managing nodes so consumers can run logic after children are visited
 **ActiveForm:** Adding post-visit hooks to AstVisitor
 
 In `crates/lx/src/visitor/mod.rs`, add these methods to `AstVisitor`, all with empty default implementations:
@@ -248,8 +247,6 @@ In `crates/lx/src/visitor/mod.rs`, add these methods to `AstVisitor`, all with e
 
 In the corresponding walk functions (`walk_block`, `walk_func`, `walk_par`, `walk_sel`, `walk_match`, `walk_loop`, `walk_with`, `walk_with_resource`, `walk_with_context`, `walk_refine`, `walk_agent_decl`, `walk_class_decl`, `walk_ternary`), add a call to the post-visit method after all children have been visited.
 
-Verify: `just diagnose` passes. `just test` passes (post hooks are no-ops by default, so existing behavior is unchanged).
-
 ## Task 9: Refactor diag_walk to use post-visit hooks
 
 **Subject:** Replace manual save/restore context pattern in diag_walk with post-visit hooks
@@ -261,29 +258,4 @@ Refactor `visit_agent_decl`: Move the context restoration (`self.context = saved
 
 In `crates/lx/src/stdlib/diag/diag_walk_expr.rs`, the `visit_expr_diag` function has save/restore for `Par`, `Sel`, `Match`, `Ternary`, `Loop`, `Refine`, and `cron.every` handler. For each of these, the pattern is: save context → set new context → visit children → restore context. Move the restore into the corresponding post-visit hook implementations on Walker.
 
-For nodes where diag_walk overrides `visit_expr` (which dispatches through `visit_expr_diag`), add corresponding `visit_*_post` overrides that restore `self.context` to the saved value. The saved value can be stored in a `Vec<String>` stack field on `Walker` (push in pre-visit, pop in post-visit) instead of local variables.
-
-Verify: `just diagnose` passes. `just test` passes.
-
----
-
-## CRITICAL REMINDERS — READ BEFORE EVERY TASK
-
-Re-read before starting each task:
-
-1. **Call `complete_task` after each task.** The MCP handles formatting, committing, and diagnostics automatically.
-2. **Call `next_task` to get the next task.** Do not look ahead in the task list.
-3. **Do not add tasks, skip tasks, reorder tasks, or combine tasks.** Execute the task list exactly as written.
-4. **Tasks are implementation-only.** No commit, verify, format, or cleanup tasks — the MCP handles these.
-
----
-
-## Task Loading Instructions
-
-To execute this work item, load it with the workflow MCP:
-
-```
-mcp__workflow__load_work_item({ path: "work_items/VISITOR_PATTERN_CLEANUP.md" })
-```
-
-Then call `next_task` to begin. After completing each task's implementation, call `complete_task` to format, commit, and run diagnostics. Repeat until all tasks are done.
+For nodes where diag*walk overrides `visit_expr` (which dispatches through `visit_expr_diag`), add corresponding `visit*\*\_post`overrides that restore`self.context`to the saved value. The saved value can be stored in a`Vec<String>`stack field on`Walker` (push in pre-visit, pop in post-visit) instead of local variables.
