@@ -1,7 +1,7 @@
 -- 67_profile.lx
 -- Tests: std/profile module (persistent agent identity)
 
-use std/profile
+use pkg/data/profile
 
 -- === load with create creates new profile ===
 p = profile.load {name: "test-agent-67" create: true} ^

@@ -3,7 +3,7 @@
 -- Each Task has subject, description, active_form. WorkItem holds the collection.
 
 use std/fs
-use std/md
+use pkg/data/md
 use std/re
 
 Class +Task = {

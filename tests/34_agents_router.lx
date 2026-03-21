@@ -1,7 +1,7 @@
 -- 34_agents_router.lx
 -- Tests: std/agents/router module (prompt classification)
 
-use std/agents/router
+use pkg/ai/router
 
 catalog = [
   {name: "code_reviewer" domain: "code_review" description: "reviews code changes and pull requests" terminal: false}

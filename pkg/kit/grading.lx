@@ -3,7 +3,7 @@
 -- grade_run: full cycle -- spawn agent, get draft, grade, kill agent.
 
 use std/agent
-use std/agents/grader
+use pkg/agents/grader
 
 +defaults = {threshold: 95  max_rounds: 5}
 

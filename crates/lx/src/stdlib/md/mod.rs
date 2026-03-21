@@ -30,11 +30,6 @@ pub fn build() -> IndexMap<String, Value> {
     );
     m.insert("links".into(), mk("md.links", 1, md_parse::bi_links));
     m.insert("to_text".into(), mk("md.to_text", 1, md_parse::bi_to_text));
-    m.insert(
-        "render".into(),
-        mk("md.render", 1, super::md_build::bi_render),
-    );
-    super::md_build::register(&mut m);
     m
 }
 

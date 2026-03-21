@@ -1,7 +1,7 @@
 -- 40_agents_reviewer.lx
 -- Tests: std/agents/reviewer module (post-hoc transcript review)
 
-use std/agents/reviewer
+use pkg/ai/reviewer
 
 -- quick_review extracts structural patterns
 transcript = "Step 1: Read config.rs. Error: file not found. Step 2: Retry with correct path. Step 3: Read src/config.rs. Success: found configuration. Step 4: Applied fix. Tests passed. Complete."

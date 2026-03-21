@@ -1,0 +1,83 @@
+-- Workspace editing operations — claim, edit, append, release.
+-- Sub-module of pkg/agents/workspace.
+
+use std/time
+use std/re
+
++claim = (ws region holder) {
+  existing = ws.regions.get region
+  existing ? {
+    Some r -> Err "region '{region}' already claimed by {r.holder}"
+    None -> {
+      now = time.now ()
+      ws.regions.set region {holder  claimed_at: now.ms  start: 0  end: (ws.content | lines | len)}
+      Ok region
+    }
+  }
+}
+
++claim_pattern = (ws pattern holder) {
+  all_lines = ws.content | lines
+  matched := []
+  all_lines | enumerate | each (pair) {
+    idx = pair.0
+    line = pair.1
+    is_match = (re.is_match pattern line)
+    is_match ? {
+      true -> { matched <- [..matched idx] }
+      false -> ()
+    }
+  }
+  (matched | len) == 0 ? (Err "no lines match pattern: {pattern}") : {
+    start = matched | first ?? 0
+    end = matched | last ?? 0
+    region = "pattern:{pattern}"
+    ws.regions.set region {holder  claimed_at: (time.now ()).ms  start  end}
+    Ok region
+  }
+}
+
++edit = (ws region content) {
+  info = ws.regions.get region
+  info ? {
+    None -> Err "region '{region}' not claimed"
+    Some r -> {
+      all_lines = ws.content | lines
+      start = r.start ?? 0
+      end_line = r.end ?? (all_lines | len)
+      before = all_lines | take start
+      after = all_lines | drop (end_line + 1)
+      new_lines = content | lines
+      ws.content <- [..before ..new_lines ..after] | join "\n"
+      new_end = start + (new_lines | len) - 1
+      ws.regions.set region {..r  end: new_end}
+      now = time.now ()
+      ws.history.set "{now.ms}_{region}" {region  holder: r.holder  action: "edit"  timestamp: now.ms}
+      Ok content
+    }
+  }
+}
+
++append = (ws region content) {
+  info = ws.regions.get region
+  info ? {
+    None -> Err "region '{region}' not claimed"
+    Some r -> {
+      all_lines = ws.content | lines
+      end_line = r.end ?? (all_lines | len)
+      before = all_lines | take (end_line + 1)
+      after = all_lines | drop (end_line + 1)
+      new_lines = content | lines
+      ws.content <- [..before ..new_lines ..after] | join "\n"
+      new_end = end_line + (new_lines | len)
+      ws.regions.set region {..r  end: new_end}
+      Ok content
+    }
+  }
+}
+
++release = (ws region) {
+  existed = ws.regions.has region
+  ws.regions.remove region
+  existed ? (Ok region) : (Err "region '{region}' not found")
+}

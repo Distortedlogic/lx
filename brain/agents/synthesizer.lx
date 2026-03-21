@@ -3,7 +3,7 @@
 
 use std/ai
 use pkg/core/prompt
-use std/md
+use pkg/data/md
 use pkg/ai/reasoning {ReasoningChain}
 use pkg/core/capability {advertise}
 use ../contracts {Response Identity}

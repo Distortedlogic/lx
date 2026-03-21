@@ -1,0 +1,54 @@
+-- Repo worktree operations — checkout, submit, rebase, abandon.
+-- Sub-module of pkg/kit/repo.
+
+use std/time
+use pkg/kit/git
+
+run_git = (args) {
+  result = $sh -c "git {args} 2>&1"
+  result ? {
+    Ok r -> r.code == 0 ? (Ok r.out) : (Err r.out)
+    Err e -> Err (to_str e)
+  }
+}
+
++checkout = (repo branch) {
+  path = "{repo.root}/.lx/worktrees/{branch}"
+  $^mkdir -p {path}
+  result = try git.worktree_add path branch
+  result ? {
+    Ok _ -> {
+      now = time.now ()
+      repo.worktrees.set branch {path  created_at: now.ms  status: "active"}
+      Ok {branch  path}
+    }
+    Err e -> Err e
+  }
+}
+
++submit = (repo opts) {
+  branch = opts.branch ?? ""
+  target = opts.target ?? "main"
+  strategy = opts.strategy ?? repo.merge_strategy
+
+  strategy ? {
+    "rebase" -> run_git "rebase {target} {branch}"
+    "squash" -> run_git "merge --squash {branch}"
+    _ -> run_git "merge {branch}"
+  }
+}
+
++rebase = (repo onto) {
+  branch = try git.branch ()
+  branch ? {
+    Ok b -> run_git "rebase {onto}"
+    Err e -> Err e
+  }
+}
+
++abandon = (repo branch) {
+  result = try git.worktree_remove "{repo.root}/.lx/worktrees/{branch}"
+  repo.worktrees.remove branch
+  try run_git "branch -D {branch}"
+  Ok branch
+}

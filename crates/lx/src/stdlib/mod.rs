@@ -1,49 +1,52 @@
 pub(crate) mod agent;
+#[path = "agent/agent_dialogue.rs"]
 mod agent_dialogue;
+#[path = "agent/agent_dialogue_branch.rs"]
 mod agent_dialogue_branch;
+#[path = "agent/agent_errors.rs"]
 pub mod agent_errors;
+#[path = "agent/agent_gate.rs"]
 mod agent_gate;
+#[path = "agent/agent_ipc.rs"]
 mod agent_ipc;
+#[path = "agent/agent_lifecycle.rs"]
 pub(crate) mod agent_lifecycle;
+#[path = "agent/agent_lifecycle_run.rs"]
 pub(crate) mod agent_lifecycle_run;
+#[path = "agent/agent_pipeline.rs"]
 mod agent_pipeline;
+#[path = "agent/agent_pipeline_ctrl.rs"]
 mod agent_pipeline_ctrl;
+#[path = "agent/agent_pipeline_io.rs"]
 mod agent_pipeline_io;
+#[path = "agent/agent_pubsub.rs"]
 mod agent_pubsub;
+#[path = "agent/agent_reload.rs"]
 pub(crate) mod agent_reload;
+#[path = "agent/agent_route.rs"]
 mod agent_route;
+#[path = "agent/agent_route_table.rs"]
 mod agent_route_table;
+#[path = "agent/agent_stream.rs"]
 pub(crate) mod agent_stream;
+#[path = "agent/agent_supervise.rs"]
 mod agent_supervise;
-mod agents_auditor;
-mod agents_grader;
-mod agents_planner;
-mod agents_reviewer;
-mod agents_router;
+#[path = "ai_mod/mod.rs"]
 mod ai;
+#[path = "ai_mod/ai_structured.rs"]
 mod ai_structured;
 mod cron;
-mod ctx;
 pub(crate) mod deadline;
 mod describe;
 pub mod diag;
+#[path = "diag/diag_walk.rs"]
 mod diag_walk;
 mod diff;
+#[path = "diff/diff_merge.rs"]
 mod diff_merge;
-mod durable;
-mod durable_io;
-mod durable_run;
 mod env;
 mod flow;
 mod fs;
-mod git;
-mod git_branch;
-mod git_diff;
-mod git_diff_parse;
-mod git_log;
-mod git_ops;
-mod git_status;
-mod git_worktree;
 mod http;
 mod introspect;
 mod json;
@@ -51,38 +54,28 @@ pub mod json_conv;
 mod math;
 pub(crate) mod mcp;
 mod md;
-mod md_build;
 mod pane;
-mod pipeline;
-mod pipeline_io;
-mod profile;
-mod profile_io;
-mod profile_strategy;
 mod re;
-mod registry;
-mod registry_query;
-mod registry_store;
-mod repo;
-mod repo_lock;
-mod repo_worktree;
 mod sandbox;
+#[path = "sandbox/sandbox_exec.rs"]
 mod sandbox_exec;
+#[path = "sandbox/sandbox_policy.rs"]
 mod sandbox_policy;
+#[path = "sandbox/sandbox_scope.rs"]
 mod sandbox_scope;
 mod store;
+#[path = "store/store_dispatch.rs"]
 mod store_dispatch;
 
 pub(crate) use store_dispatch::{
     build_constructor, object_get_field, object_insert, object_update_nested, store_clone,
     store_len, store_method,
 };
-mod taskgraph;
+#[path = "test_mod/mod.rs"]
 mod test;
 mod time;
 mod trait_ops;
 mod user;
-mod workspace;
-mod workspace_edit;
 mod ws;
 mod yield_types;
 
@@ -92,54 +85,34 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
     if path.len() < 2 || path[0] != "std" {
         return None;
     }
-    let bindings = if path[1] == "agents" && path.len() >= 3 {
-        match path[2].as_str() {
-            "auditor" => agents_auditor::build(),
-            "grader" => agents_grader::build(),
-            "planner" => agents_planner::build(),
-            "reviewer" => agents_reviewer::build(),
-            "router" => agents_router::build(),
-            _ => return None,
-        }
-    } else {
-        match path[1].as_str() {
-            "json" => json::build(),
-            "ctx" => ctx::build(),
-            "math" => math::build(),
-            "fs" => fs::build(),
-            "git" => git::build(),
-            "env" => env::build(),
-            "flow" => flow::build(),
-            "re" => re::build(),
-            "md" => md::build(),
-            "agent" => agent::build(),
-            "mcp" => mcp::build(),
-            "http" => http::build(),
-            "introspect" => introspect::build(),
-            "time" => time::build(),
-            "cron" => cron::build(),
-            "deadline" => deadline::build(),
-            "ai" => ai::build(),
-            "describe" => describe::build(),
-            "diff" => diff::build(),
-            "diag" => diag::build(),
-            "durable" => durable::build(),
-            "pane" => pane::build(),
-            "pipeline" => pipeline::build(),
-            "sandbox" => sandbox::build(),
-            "store" => store::build(),
-            "taskgraph" => taskgraph::build(),
-            "test" => test::build(),
-            "profile" => profile::build(),
-            "registry" => registry::build(),
-            "repo" => repo::build(),
-            "trait" => trait_ops::build(),
-            "user" => user::build(),
-            "workspace" => workspace::build(),
-            "ws" => ws::build(),
-            "yield" => yield_types::build(),
-            _ => return None,
-        }
+    let bindings = match path[1].as_str() {
+        "json" => json::build(),
+        "math" => math::build(),
+        "fs" => fs::build(),
+        "env" => env::build(),
+        "flow" => flow::build(),
+        "re" => re::build(),
+        "md" => md::build(),
+        "agent" => agent::build(),
+        "mcp" => mcp::build(),
+        "http" => http::build(),
+        "introspect" => introspect::build(),
+        "time" => time::build(),
+        "cron" => cron::build(),
+        "deadline" => deadline::build(),
+        "ai" => ai::build(),
+        "describe" => describe::build(),
+        "diff" => diff::build(),
+        "diag" => diag::build(),
+        "pane" => pane::build(),
+        "sandbox" => sandbox::build(),
+        "store" => store::build(),
+        "test" => test::build(),
+        "trait" => trait_ops::build(),
+        "user" => user::build(),
+        "ws" => ws::build(),
+        "yield" => yield_types::build(),
+        _ => return None,
     };
     Some(ModuleExports {
         bindings,
@@ -151,19 +124,11 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
     if path.len() < 2 || path[0] != "std" {
         return false;
     }
-    if path[1] == "agents" && path.len() >= 3 {
-        return matches!(
-            path[2].as_str(),
-            "auditor" | "grader" | "planner" | "reviewer" | "router"
-        );
-    }
     matches!(
         path[1].as_str(),
         "json"
-            | "ctx"
             | "math"
             | "fs"
-            | "git"
             | "env"
             | "flow"
             | "re"
@@ -179,19 +144,12 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
             | "describe"
             | "diff"
             | "diag"
-            | "durable"
             | "pane"
-            | "pipeline"
             | "sandbox"
             | "store"
-            | "taskgraph"
             | "test"
-            | "profile"
-            | "registry"
-            | "repo"
             | "trait"
             | "user"
-            | "workspace"
             | "ws"
             | "yield"
     )

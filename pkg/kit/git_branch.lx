@@ -1,0 +1,65 @@
+-- Git branch, stash, and remote operations.
+-- Sub-module of pkg/kit/git.
+
+run_git = (args) {
+  result = $sh -c "git {args} 2>&1"
+  result ? {
+    Ok r -> r.code == 0 ? (Ok r.out) : (Err r.out)
+    Err e -> Err (to_str e)
+  }
+}
+
++create_branch = (name) { run_git "branch {name}" ^ }
++create_branch_at = (name ref_str) { run_git "branch {name} {ref_str}" ^ }
++delete_branch = (name) { run_git "branch -d {name}" ^ }
+
++checkout = (ref_str) { run_git "checkout {ref_str}" ^ }
++checkout_create = (name) { run_git "checkout -b {name}" ^ }
+
++merge = (branch) { run_git "merge {branch}" ^ }
+
++stash = (_) { run_git "stash" ^ }
++stash_with = (opts) {
+  msg = opts.message ?? ""
+  cmd = msg != "" ? "stash push -m \"{msg}\"" : "stash push"
+  cmd = (opts.include_untracked ?? false) ? "{cmd} --include-untracked" : cmd
+  run_git cmd ^
+}
++stash_pop = (_) { run_git "stash pop" ^ }
++stash_list = (_) {
+  raw = run_git "stash list" ^
+  raw | trim | split "\n" | filter (len > 0)
+}
++stash_drop = (ref_str) {
+  idx = ref_str ?? "stash@{0}"
+  run_git "stash drop {idx}" ^
+}
+
++fetch = (remote) {
+  r = remote ?? "origin"
+  run_git "fetch {r}" ^
+}
+
++pull = (opts) {
+  remote = opts.remote ?? "origin"
+  branch = opts.branch ?? ""
+  cmd = branch != "" ? "pull {remote} {branch}" : "pull {remote}"
+  run_git cmd ^
+}
+
++push = (opts) {
+  remote = opts.remote ?? "origin"
+  branch = opts.branch ?? ""
+  cmd = branch != "" ? "push {remote} {branch}" : "push {remote}"
+  run_git cmd ^
+}
+
++push_with = (opts) {
+  remote = opts.remote ?? "origin"
+  branch = opts.branch ?? ""
+  cmd = branch != "" ? "push {remote} {branch}" : "push {remote}"
+  cmd = (opts.force ?? false) ? "{cmd} --force" : cmd
+  cmd = (opts.set_upstream ?? false) ? "{cmd} --set-upstream" : cmd
+  cmd = (opts.tags ?? false) ? "{cmd} --tags" : cmd
+  run_git cmd ^
+}

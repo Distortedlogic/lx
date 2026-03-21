@@ -1,7 +1,7 @@
 -- 36_agents_planner.lx
 -- Tests: std/agents/planner module (task decomposition)
 
-use std/agents/planner
+use pkg/ai/planner
 
 -- === quick_plan (sentence splitting, no LLM) ===
 

@@ -1,4 +1,4 @@
-use std/workspace
+use pkg/agents/workspace
 
 code = "line_a\nline_b\nline_c\nline_d\nline_e\nline_f\nline_g\nline_h\nline_i"
 

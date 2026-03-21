@@ -2,7 +2,7 @@
 -- Tests: std/git module (structured git access)
 -- Runs inside a git repo so most read-only operations work
 
-use std/git
+use pkg/kit/git
 
 -- === is_repo ===
 assert (git.is_repo () == true) "is_repo in git repo"

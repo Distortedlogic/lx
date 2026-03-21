@@ -1,7 +1,7 @@
 -- 35_agents_grader.lx
 -- Tests: std/agents/grader module (rubric scoring, incremental re-grade)
 
-use std/agents/grader
+use pkg/agents/grader
 
 rubric = [
   {name: "correctness" description: "solution correctly fixes the bug and handles edge cases" weight: 3}

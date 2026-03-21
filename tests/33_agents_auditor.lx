@@ -1,7 +1,7 @@
 -- 33_agents_auditor.lx
 -- Tests: std/agents/auditor module (quality gate with structural pre-filter)
 
-use std/agents/auditor
+use pkg/agents/auditor
 
 -- === quick_audit (structural only, no LLM) ===
 

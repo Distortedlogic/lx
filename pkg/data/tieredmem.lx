@@ -4,7 +4,7 @@
 
 use pkg/data/memory {MemoryStore}
 use pkg/data/knowledge {KnowledgeBase}
-use std/profile
+use pkg/data/profile
 use std/time
 use std/json
 use std/fs

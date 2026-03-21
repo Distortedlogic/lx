@@ -1,0 +1,126 @@
+-- Task graph execution — wave-based parallel execution with retry/timeout.
+-- Sub-module of pkg/core/taskgraph.
+
+use std/time
+
++run = (g) { run_with g {} }
+
++run_with = (g opts) {
+  on_complete = opts.on_complete ?? None
+  on_fail_cb = opts.on_fail ?? None
+
+  order = topo_order g
+  waves = compute_waves g order
+  results = Store ()
+
+  waves | each (wave) {
+    wave_results = wave | pmap (id) {
+      node = g.nodes.get id
+      node ? {
+        None -> Err "node not found: {id}"
+        Some n -> {
+          g.nodes.set id {..n  status: "running"}
+          input = resolve_input n results
+          handler = n.handler
+          result = handler ? {
+            None -> Err "no handler for {id}"
+            Some h -> {
+              attempt := 0
+              max_retries = n.retry ?? 0
+              final := None
+              loop {
+                raw = try h input
+                is_err = err? raw
+                (is_err && attempt < max_retries) ? {
+                  true -> {
+                    attempt <- attempt + 1
+                    time.sleep 100
+                  }
+                  false -> {
+                    final <- Some raw
+                    break ()
+                  }
+                }
+              }
+              final ?? (Err "no result")
+            }
+          }
+          is_err = err? result
+          is_err ? {
+            true -> {
+              g.nodes.set id {..n  status: "failed"}
+              on_fail_cb ? { Some cb -> cb id result; _ -> () }
+              (n.on_fail ?? "fail") == "skip" ? (Ok None) : result
+            }
+            false -> {
+              g.nodes.set id {..n  status: "complete"}
+              results.set id result
+              on_complete ? { Some cb -> cb id result; _ -> () }
+              result
+            }
+          }
+        }
+      }
+    }
+  }
+
+  Ok (results.to_record ())
+}
+
+topo_order = (g) {
+  nodes = g.nodes.entries ()
+  in_deg = Store ()
+  nodes | each (e) { in_deg.set e.key 0 }
+  nodes | each (e) {
+    (e.value.depends ?? []) | each (dep) {
+      current = in_deg.get e.key ?? 0
+      in_deg.set e.key (current + 1)
+    }
+  }
+  result := []
+  queue := in_deg.entries () | filter (e) e.value == 0 | map (.key)
+  loop {
+    (queue | len) == 0 ? break () : ()
+    current = queue | first ?? ""
+    queue <- queue | drop 1
+    result <- [..result current]
+    nodes | each (e) {
+      deps = e.value.depends ?? []
+      (deps | contains? current) ? {
+        true -> {
+          new_deg = (in_deg.get e.key ?? 1) - 1
+          in_deg.set e.key new_deg
+          (new_deg == 0) ? {
+            true -> { queue <- [..queue e.key] }
+            false -> ()
+          }
+        }
+        false -> ()
+      }
+    }
+  }
+  result
+}
+
+compute_waves = (g order) {
+  depth = Store ()
+  order | each (id) {
+    node = g.nodes.get id
+    deps = node ? { Some n -> n.depends ?? []; _ -> [] }
+    max_dep = deps | map (d) depth.get d ?? 0 | fold 0 (acc v) (v > acc ? v : acc)
+    d = (deps | len) > 0 ? (max_dep + 1) : 0
+    depth.set id d
+  }
+  max_d = depth.values () | fold 0 (acc v) (v > acc ? v : acc)
+  0..=max_d | map (wave_idx) {
+    order | filter (id) (depth.get id ?? 0) == wave_idx
+  } | filter (w) (w | len) > 0
+}
+
+resolve_input = (node results) {
+  input_from = node.input_from ?? None
+  input_from ? {
+    Some transform -> transform (results.to_record ())
+    None -> node.input ?? {:}
+  }
+}

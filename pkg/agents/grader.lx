@@ -1,0 +1,86 @@
+-- Grader agent — LLM-based rubric scoring + fast structural grading.
+-- Replaces std/agents/grader.
+
+use std/ai
+use std/json
+use pkg/core/prompt
+
++quick_grade = (opts) {
+  work = opts.work ?? ""
+  task = opts.task ?? ""
+  rubric = opts.rubric ?? []
+  threshold = opts.threshold ?? 70
+  prev = opts.prev ?? None
+
+  is_empty = (work | len) == 0
+  empty_result = {score: 0  passed: false  feedback: "Empty output"  categories: []}
+  is_empty ? empty_result : {
+    categories = rubric | map (r) {
+      prev_score = prev ? {
+        Some p -> p.categories | find (c) { c.name == r.name }
+        _ -> None
+      }
+      carried = prev_score ?? None
+      carry_ok = carried != None && (carried.score ?? 0) >= 70
+      carried_rec = {name: r.name  score: carried.score  feedback: "Carried forward"  weight: r.weight ?? 1}
+      default_rec = {name: r.name  score: 50  feedback: "Needs LLM evaluation"  weight: r.weight ?? 1}
+      carry_ok ? carried_rec : default_rec
+    }
+    total_score := 0
+    total_weight := 0
+    categories | each (c) {
+      total_score <- total_score + (c.score * (c.weight ?? 1))
+      total_weight <- total_weight + (c.weight ?? 1)
+    }
+    final = total_weight > 0 ? (total_score // total_weight) : 0
+    {score: final  passed: final >= threshold  feedback: ""  categories: categories}
+  }
+}
+
++grade = (opts) {
+  work = opts.work ?? ""
+  task = opts.task ?? ""
+  rubric = opts.rubric ?? []
+  threshold = opts.threshold ?? 70
+  prev = opts.prev ?? None
+
+  rubric_text = rubric | map (r) "- {r.name} (weight {r.weight ?? 1}): {r.description ?? r.name}" | join "\n"
+
+  p = prompt.create ()
+    | prompt.system "You are a grader. Score the work against each rubric category 0-100."
+    | prompt.section "Task" task
+    | prompt.section "Work" work
+    | prompt.section "Rubric" rubric_text
+    | prompt.instruction `Return JSON: {score: int, passed: bool, feedback: str, categories: [{name, score, feedback}]}`
+
+  result = ai.prompt_with {
+    prompt: prompt.render p
+    disable_tools: true
+    json_schema: `{"type":"object","properties":{"score":{"type":"integer"},"passed":{"type":"boolean"},"feedback":{"type":"string"},"categories":{"type":"array","items":{"type":"object","properties":{"name":{"type":"string"},"score":{"type":"integer"},"feedback":{"type":"string"}}}}}}`
+  } ^
+
+  text = result.structured_output ?? (result.text ?? "{}")
+  parsed = try (text | json.parse)
+  parsed ? {
+    Err _ -> {score: 0  passed: false  feedback: "Failed to parse grade response"  categories: []}
+    Ok json -> {
+      cats = json.categories ?? []
+      total_score := 0
+      total_weight := 0
+      failed := []
+      cats | each (c) {
+        matched_rubric = rubric | find (r) { r.name == c.name }
+        w = matched_rubric ? { Some r -> r.weight ?? 1; _ -> 1 }
+        s = c.score ?? 0
+        total_score <- total_score + (s * w)
+        total_weight <- total_weight + w
+        (s < 70) ? {
+          true -> { failed <- [..failed c.name] }
+          false -> ()
+        }
+      }
+      final = total_weight > 0 ? (total_score // total_weight) : 0
+      {score: final  passed: final >= threshold && (failed | len == 0)  feedback: json.feedback ?? ""  categories: cats  failed: failed}
+    }
+  }
+}

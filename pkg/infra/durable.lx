@@ -1,0 +1,71 @@
+-- Durable workflows — checkpoint/resume with file-backed persistence.
+-- Replaces std/durable.
+
+use std/fs
+use std/json
+use std/time
+use pkg/infra/durable_run
+
++run = durable_run.run
++step = durable_run.step
++sleep = durable_run.sleep_step
++signal = durable_run.signal
++send_signal = durable_run.send_signal
+
+Class +Workflow = {
+  name: ""
+  run_id: ""
+  dir: ""
+  handler: None
+  opts: {:}
+}
+
++workflow = (name opts handler) {
+  storage = opts.storage_dir ?? ".lx/durable/"
+  Workflow {name  handler: Some handler  opts  dir: storage}
+}
+
++status = (wf_id) {
+  dirs = [".lx/durable/"]
+  found := None
+  dirs | each (base) {
+    entries = try fs.ls base
+    entries ? {
+      Ok items -> items | each (item) {
+        sub_entries = try fs.ls "{base}{item.name}/"
+        sub_entries ? {
+          Ok subs -> subs | each (sub) {
+            status_path = "{base}{item.name}/{sub.name}/status.json"
+            exists = try fs.exists status_path
+            should_check = (ok? exists) && (sub.name == wf_id || item.name == wf_id)
+            should_check ? {
+              true -> {
+                raw = try fs.read status_path
+                raw ? { Ok content -> { found <- Some (try json.parse content) }; _ -> () }
+              }
+              false -> ()
+            }
+          }
+          _ -> ()
+        }
+      }
+      _ -> ()
+    }
+  }
+  found ?? None
+}
+
++list = (_) {
+  base = ".lx/durable/"
+  exists = try fs.exists base
+  (ok? exists) ? {
+    true -> {
+      entries = try fs.ls base
+      entries ? {
+        Ok items -> items | filter (e) { e.kind == "directory" } | map (.name)
+        _ -> []
+      }
+    }
+    false -> []
+  }
+}

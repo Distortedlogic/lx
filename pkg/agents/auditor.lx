@@ -1,0 +1,43 @@
+-- Auditor agent — LLM-based output quality assessment + fast structural checks.
+-- Replaces std/agents/auditor.
+
+use std/ai
+use pkg/core/audit
+use pkg/core/prompt
+
++quick_audit = (opts) {
+  output = opts.output ?? ""
+  task = opts.task ?? ""
+  audit.quick_check {output task}
+}
+
++audit = (opts) {
+  output = opts.output ?? ""
+  task = opts.task ?? ""
+  context = opts.context ?? ""
+  rubric = opts.rubric ?? []
+
+  quick = audit.quick_check {output task}
+  not quick.pass ? quick : {
+    p = prompt.create ()
+      | prompt.system "You are a quality auditor. Evaluate the output against the task and rubric."
+      | prompt.section "Task" task
+      | prompt.section "Output" output
+      | prompt.section "Context" context
+      | prompt.section "Rubric" (rubric | map (r) "- {r.name}: {r.description}" | join "\n")
+      | prompt.instruction `Score each rubric category 0-100. Return JSON with: score (int), passed (bool), feedback (str), categories (list of {name, score, feedback}).`
+
+    result = ai.prompt_with {
+      prompt: prompt.render p
+      disable_tools: true
+      json_schema: `{"type":"object","properties":{"score":{"type":"integer"},"passed":{"type":"boolean"},"feedback":{"type":"string"},"categories":{"type":"array","items":{"type":"object","properties":{"name":{"type":"string"},"score":{"type":"integer"},"feedback":{"type":"string"}}}}}}`
+    } ^
+
+    text = result.structured_output ?? (result.text ?? "{}")
+    parsed = try (text | json.parse)
+    parsed ? {
+      Err _ -> {score: 0  passed: false  feedback: "Failed to parse audit response"  categories: []}
+      Ok json -> json
+    }
+  }
+}

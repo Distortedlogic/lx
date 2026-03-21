@@ -6,8 +6,8 @@ use std/ai
 use pkg/core/prompt
 use pkg/core/audit
 use pkg/data/trace {TraceStore}
-use std/agents/grader
-use std/agents/auditor
+use pkg/agents/grader
+use pkg/agents/auditor
 
 Trait +QualityGrade = {
   score: Float where score >= 0.0 && score <= 100.0

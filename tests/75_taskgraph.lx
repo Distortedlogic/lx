@@ -1,7 +1,7 @@
 -- 75_taskgraph.lx
 -- Tests: std/taskgraph module (DAG declaration, dependency resolution, execution)
 
-use std/taskgraph
+use pkg/core/taskgraph
 
 -- === Create empty graph ===
 g = taskgraph.create "test-dag" ^

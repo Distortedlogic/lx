@@ -1,0 +1,127 @@
+-- Agent profiles — file-backed knowledge/preference storage with decay.
+-- Replaces std/profile.
+
+use std/fs
+use std/json
+use std/time
+
+Class +Profile = {
+  name: ""
+  path: ""
+  created: ""
+  updated: ""
+  knowledge: Store ()
+  preferences: Store ()
+}
+
++load = (name_or_opts) {
+  name = name_or_opts ? { {name: n ..} -> n; _ -> to_str name_or_opts }
+  path = ".lx/profiles/{name}.json"
+  exists = fs.exists path ^
+  exists ? {
+    true -> {
+      raw = fs.read path ^
+      data = json.parse raw ^
+      p = Profile {name: name  path: path}
+      entries = data.knowledge ?? {:}
+      entries | keys | each (k) { p.knowledge.set k (entries | get k) }
+      prefs = data.preferences ?? {:}
+      prefs | keys | each (k) { p.preferences.set k (prefs | get k) }
+      p.created <- data.created ?? ""
+      p.updated <- data.updated ?? ""
+      p
+    }
+    false -> {
+      now = time.now () | time.format "%Y-%m-%dT%H:%M:%S"
+      $^mkdir -p .lx/profiles
+      Profile {name: name  path: path  created: now  updated: now}
+    }
+  }
+}
+
++save = (profile) {
+  now = time.now () | time.format "%Y-%m-%dT%H:%M:%S"
+  profile.updated <- now
+  data = {
+    name: profile.name
+    created: profile.created
+    updated: profile.updated
+    knowledge: profile.knowledge.to_record ()
+    preferences: profile.preferences.to_record ()
+  }
+  $^mkdir -p .lx/profiles
+  fs.write profile.path (json.encode_pretty data) ^
+}
+
++learn = (profile domain data) {
+  now = time.now ()
+  profile.knowledge.set domain {..data  timestamp: now.ms  confidence: data.confidence ?? 1.0}
+  profile.updated <- time.format "%Y-%m-%dT%H:%M:%S" now
+}
+
++recall = (profile domain) { profile.knowledge.get domain }
+
++recall_prefix = (profile prefix) {
+  profile.knowledge.entries () | filter (e) { e.key | starts? prefix } | map (.value)
+}
+
++forget = (profile domain) { profile.knowledge.remove domain }
+
++preference = (profile key val) { profile.preferences.set key val }
++get_preference = (profile key) { profile.preferences.get key }
+
++history = (profile) {
+  profile.knowledge.entries () | sort_by (e) e.value.timestamp ?? 0 | rev
+}
+
++merge = (p1 p2) {
+  p2.knowledge.entries () | each (e) {
+    existing = p1.knowledge.get e.key
+    existing ? {
+      None -> p1.knowledge.set e.key e.value
+      Some ex -> {
+        newer = (e.value.timestamp ?? 0) > (ex.timestamp ?? 0)
+        newer ? (p1.knowledge.set e.key e.value) : ()
+      }
+    }
+  }
+  p2.preferences.entries () | each (e) { p1.preferences.set e.key e.value }
+  p1
+}
+
++age = (profile domain) {
+  entry = profile.knowledge.get domain
+  entry ? {
+    Some e -> {
+      now = time.now ()
+      now.ms - (e.timestamp ?? 0)
+    }
+    None -> -1
+  }
+}
+
++decay = (profile factor) {
+  profile.knowledge.entries () | each (e) {
+    conf = e.value.confidence ?? 1.0
+    new_conf = conf * (factor ?? 0.9)
+    profile.knowledge.set e.key {..e.value  confidence: new_conf}
+  }
+}
+
++best_strategy = (profile domain) {
+  entries = profile.knowledge.entries () | filter (e) { e.key | starts? "strategy:{domain}" }
+  entries | sort_by (e) e.value.score ?? 0 | rev | first
+}
+
++rank_strategies = (profile domain) {
+  entries = profile.knowledge.entries () | filter (e) { e.key | starts? "strategy:{domain}" }
+  entries | sort_by (e) e.value.score ?? 0 | rev | map (e) {strategy: e.key  score: e.value.score ?? 0}
+}
+
++adapt_strategy = (profile domain result) {
+  key = "strategy:{domain}:{result.strategy ?? "default"}"
+  existing = profile.knowledge.get key
+  prev_score = existing ? { Some e -> e.score ?? 0; _ -> 0 }
+  new_score = (prev_score + (result.score ?? 0)) // 2
+  profile.knowledge.set key {strategy: result.strategy ?? "default"  score: new_score  timestamp: (time.now ()).ms}
+}

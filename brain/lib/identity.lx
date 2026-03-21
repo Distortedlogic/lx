@@ -1,7 +1,7 @@
 -- Core identity: values, personality, self-model, preference learning
 -- Source: the persistent self — who I am, what I value, how I adapt
 
-use std/profile
+use pkg/data/profile
 use pkg/data/knowledge {KnowledgeBase}
 use std/agent
 use std/user

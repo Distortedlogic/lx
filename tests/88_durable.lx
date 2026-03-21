@@ -1,7 +1,7 @@
 -- 82_durable.lx
 -- Tests: std/durable module (Temporal-style workflow persistence)
 
-use std/durable
+use pkg/infra/durable
 use std/fs
 use std/time
 

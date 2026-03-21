@@ -1,7 +1,7 @@
 -- 72_pipeline.lx
 -- Tests: std/pipeline module (checkpoint/resume for multi-stage pipelines)
 
-use std/pipeline
+use pkg/infra/pipeline
 use std/fs
 
 test_dir = "/tmp/lx_pipeline_test/"

@@ -2,7 +2,7 @@
 
 use std/fs
 use std/json
-use std/md
+use pkg/data/md
 use workgen/lib/log : wg_log
 use workgen/lib/persistence
 use workgen/lib/agents

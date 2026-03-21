@@ -1,0 +1,136 @@
+-- Git operations — shell-based git CLI wrapper.
+-- Replaces std/git core functions.
+
+use pkg/kit/git_branch
+use pkg/kit/git_status
+use pkg/kit/git_worktree
+
++create_branch = git_branch.create_branch
++create_branch_at = git_branch.create_branch_at
++delete_branch = git_branch.delete_branch
++checkout = git_branch.checkout
++checkout_create = git_branch.checkout_create
++merge = git_branch.merge
++stash = git_branch.stash
++stash_with = git_branch.stash_with
++stash_pop = git_branch.stash_pop
++stash_list = git_branch.stash_list
++stash_drop = git_branch.stash_drop
++fetch = git_branch.fetch
++pull = git_branch.pull
++push = git_branch.push
++push_with = git_branch.push_with
++branches = git_status.branches
++remotes = git_status.remotes
++worktree_add = git_worktree.worktree_add
++worktree_remove = git_worktree.worktree_remove
++worktree_list = git_worktree.worktree_list
+
+run_git = (args) {
+  result = $sh -c "git {args} 2>&1"
+  result ? {
+    Ok r -> r.code == 0 ? (Ok r.out) : (Err r.out)
+    Err e -> Err (to_str e)
+  }
+}
+
++status = (_) {
+  raw = run_git "--porcelain=v2 --branch status" ^
+  git_status.parse_status raw
+}
+
++branch = (_) {
+  raw = run_git "rev-parse --abbrev-ref HEAD" ^
+  raw | trim
+}
+
++root = (_) {
+  raw = run_git "rev-parse --show-toplevel" ^
+  raw | trim
+}
+
++is_repo = (_) {
+  result = try run_git "rev-parse --is-inside-work-tree"
+  ok? result
+}
+
++log = (opts) {
+  n = opts.n ?? 10
+  ref_str = opts.ref ?? ""
+  path = opts.path ?? ""
+  fmt = "--format=%H%n%an%n%ae%n%at%n%s"
+  cmd = "log {fmt} -n {n}"
+  cmd = ref_str != "" ? "{cmd} {ref_str}" : cmd
+  cmd = path != "" ? "{cmd} -- {path}" : cmd
+  raw = run_git cmd ^
+  raw | trim | split "\n\n" | filter (len > 0) | map parse_log_entry
+}
+
+parse_log_entry = (block) {
+  parts = block | split "\n"
+  {hash: parts | get 0 ?? ""  author: parts | get 1 ?? ""  email: parts | get 2 ?? ""  timestamp: parts | get 3 ?? ""  subject: parts | get 4 ?? ""}
+}
+
++show = (ref_str) {
+  raw = run_git "show --format=%H%n%an%n%s%n%b --no-patch {ref_str}" ^
+  parts = raw | trim | split "\n"
+  {hash: parts | get 0 ?? ""  author: parts | get 1 ?? ""  subject: parts | get 2 ?? ""  body: parts | drop 3 | join "\n"}
+}
+
++blame = (path) {
+  raw = run_git "blame --porcelain {path}" ^
+  raw
+}
+
++blame_range = (path start end) {
+  raw = run_git "blame -L{start},{end} --porcelain {path}" ^
+  raw
+}
+
++diff = (opts) {
+  ref_str = opts.ref ?? ""
+  path = opts.path ?? ""
+  staged = opts.staged ?? false
+  cmd = staged ? "diff --cached" : "diff"
+  cmd = ref_str != "" ? "{cmd} {ref_str}" : cmd
+  cmd = path != "" ? "{cmd} -- {path}" : cmd
+  run_git cmd ^
+}
+
++diff_stat = (opts) {
+  ref_str = opts.ref ?? ""
+  cmd = ref_str != "" ? "diff --stat {ref_str}" : "diff --stat"
+  run_git cmd ^
+}
+
++grep = (pattern path) {
+  cmd = path != "" ? "grep -n {pattern} -- {path}" : "grep -n {pattern}"
+  result = try run_git cmd
+  result ? { Ok out -> out; Err _ -> "" }
+}
+
++add = (paths) {
+  path_str = paths ? { [] -> "."; _ -> paths | join " " }
+  run_git "add {path_str}" ^
+}
+
++commit = (msg) { run_git "commit -m \"{msg}\"" ^ }
+
++commit_with = (opts) {
+  msg = opts.message ?? opts.msg ?? ""
+  cmd = "commit -m \"{msg}\""
+  cmd = (opts.author ?? "") != "" ? "{cmd} --author=\"{opts.author}\"" : cmd
+  cmd = (opts.amend ?? false) ? "{cmd} --amend" : cmd
+  cmd = (opts.allow_empty ?? false) ? "{cmd} --allow-empty" : cmd
+  run_git cmd ^
+}
+
++tag = (name) { run_git "tag {name}" ^ }
+
++tag_with = (name opts) {
+  msg = opts.message ?? ""
+  ref_str = opts.ref ?? ""
+  cmd = msg != "" ? "tag -a {name} -m \"{msg}\"" : "tag {name}"
+  cmd = ref_str != "" ? "{cmd} {ref_str}" : cmd
+  run_git cmd ^
+}
