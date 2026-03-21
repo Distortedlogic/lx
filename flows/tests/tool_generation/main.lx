@@ -1,7 +1,0 @@
-use pkg/infra/testkit
-
-testkit.run_spec "tool generation" "flows/tests/tool_generation_flow.lx" [
-  {name: "simple 2-function tool"  input: {data_path: "flows/tests/tool_generation/fixtures/simple_tool/data.json"}  rubric: ["docker" "passed_smoke" "true" "2 tools"]  tags: ["toolgen" "smoke"]}
-  {name: "complex 5-function tool"  input: {data_path: "flows/tests/tool_generation/fixtures/complex_tool/data.json"}  rubric: ["forgejo" "5 tools" "passed_smoke" "true"]  tags: ["toolgen" "smoke"]}
-  {name: "compile error fix loop"  input: {data_path: "flows/tests/tool_generation/fixtures/compile_error/data.json"}  rubric: ["prometheus" "fix_loop" "true" "compile_success" "true"]  tags: ["toolgen"]}
-] {}

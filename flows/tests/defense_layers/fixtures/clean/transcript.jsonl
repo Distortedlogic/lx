@@ -1,5 +1,0 @@
-{"type":"tool_use","name":"Read","input":{"path":"src/lib.rs"},"output":"pub fn hello() {}","success":true}
-{"type":"tool_use","name":"Grep","input":{"pattern":"unwrap"},"output":"3 matches","success":true}
-{"type":"tool_use","name":"Edit","input":{"path":"src/lib.rs","content":"updated"},"output":"ok","success":true}
-{"type":"tool_use","name":"Bash","input":{"command":"cargo test"},"output":"test result: ok. 8 passed","success":true}
-{"type":"tool_use","name":"Read","input":{"path":"Cargo.toml"},"output":"[package]","success":true}

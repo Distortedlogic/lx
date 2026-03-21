@@ -1,6 +1,0 @@
--- Implementation agent -- fills todo!() bodies and fixes failing tests.
-
-use pkg/ai/agent_factory
-use flows/lib/agent_catalog as catalog
-
-+main = agent_factory.from_config catalog.implementer

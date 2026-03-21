@@ -1,9 +1,0 @@
-{
-  "stages": [
-    {"name": "elicitor", "success": false, "output": "Incomplete spec: user said 'make it work' with no details"},
-    {"name": "structurer", "success": false, "output": "Cannot structure: insufficient requirements"},
-    {"name": "typer", "success": false, "output": "Skipped: no structure to type"},
-    {"name": "type_fixer", "success": false, "output": "Skipped: no types to fix", "type_errors_fixed": 0},
-    {"name": "implementer", "success": false, "output": "Skipped: no implementation possible"}
-  ]
-}

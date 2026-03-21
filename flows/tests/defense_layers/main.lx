@@ -1,8 +1,0 @@
-use pkg/infra/testkit
-
-testkit.run_spec "defense layers" "flows/tests/security_audit_flow.lx" [
-  {name: "parallel guardrail clean"  input: {project_dir: "flows/tests/defense_layers/fixtures/parallel_clean"}  rubric: ["findings" "0"]  tags: ["defense" "smoke"]}
-  {name: "parallel guardrail injection"  input: {project_dir: "flows/tests/defense_layers/fixtures/parallel_injection"}  rubric: ["findings" "critical" "injection"]  tags: ["defense" "smoke"]}
-  {name: "multi agent scan"  input: {project_dir: "flows/tests/defense_layers/fixtures/multi_agent"}  rubric: ["findings" "agents" "critical" "high"]  tags: ["defense"]}
-  {name: "clean system"  input: {project_dir: "flows/tests/defense_layers/fixtures/clean"}  rubric: ["findings" "0"]  tags: ["defense"]}
-] {threshold: 0.60  setup: testkit.touch_jsonl}

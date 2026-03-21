@@ -1,8 +1,0 @@
-use pkg/infra/testkit
-
-testkit.run_spec "agentic loop" "flows/tests/agentic_loop_flow.lx" [
-  {name: "simple task completion"  input: {actions_path: "flows/tests/agentic_loop/fixtures/simple_completion/actions.json"}  rubric: ["completed" "true" "turns" "3"]  tags: ["agentic" "smoke"]}
-  {name: "doom loop detection"  input: {actions_path: "flows/tests/agentic_loop/fixtures/doom_loop/actions.json"  repetition_window: 3}  rubric: ["doom_loop_detected" "true"]  tags: ["agentic" "smoke"]}
-  {name: "stagnating oscillation"  input: {actions_path: "flows/tests/agentic_loop/fixtures/stagnating/actions.json"  repetition_window: 3}  rubric: ["turns" "completed" "false"]  tags: ["agentic"]}
-  {name: "circuit breaker max turns"  input: {actions_path: "flows/tests/agentic_loop/fixtures/circuit_breaker/actions.json"  max_turns: 25}  rubric: ["circuit_breaker_fired" "true" "completed" "false"]  tags: ["agentic"]}
-] {threshold: 0.70}

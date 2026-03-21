@@ -1,6 +1,0 @@
--- Type fix agent -- resolves compilation errors in type stubs.
-
-use pkg/ai/agent_factory
-use flows/lib/agent_catalog as catalog
-
-+main = agent_factory.from_config catalog.type_fixer

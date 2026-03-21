@@ -1,5 +1,0 @@
-[
-  {"thought": "Need to read the file first", "action": "Read", "observation": "# README\nHas a typo: helo", "done": false},
-  {"thought": "Found typo, fix it", "action": "Edit", "observation": "File updated: helo -> hello", "done": false},
-  {"thought": "Verify the fix", "action": "Read", "observation": "# README\nFixed: hello", "done": true}
-]

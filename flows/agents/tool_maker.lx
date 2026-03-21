@@ -1,6 +1,0 @@
--- MCP tool builder -- handles all phases of tool generation.
-
-use pkg/ai/agent_factory
-use flows/lib/agent_catalog as catalog
-
-+main = agent_factory.from_config catalog.tool_maker

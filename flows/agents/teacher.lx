@@ -1,6 +1,0 @@
--- Teacher agent -- enhances training data via frontier model rewriting.
-
-use pkg/ai/agent_factory
-use flows/lib/agent_catalog as catalog
-
-+main = agent_factory.from_config catalog.teacher

@@ -1,6 +1,0 @@
--- Project scaffolder -- generates project structures from templates.
-
-use pkg/ai/agent_factory
-use flows/lib/agent_catalog as catalog
-
-+main = agent_factory.from_config catalog.scaffolder

@@ -1,7 +1,0 @@
-use pkg/infra/testkit
-
-testkit.run_spec "research" "flows/tests/research_flow.lx" [
-  {name: "rate limiting sources agree"  input: {data_path: "flows/tests/research/fixtures/rate_limiting/data.json"}  rubric: ["sources" "4" "governor" "rate" "confidence"]  tags: ["research" "smoke"]}
-  {name: "no oss match"  input: {data_path: "flows/tests/research/fixtures/no_oss_match/data.json"}  rubric: ["no OSS" "custom" "confidence"]  tags: ["research" "smoke"]}
-  {name: "conflicting sources"  input: {data_path: "flows/tests/research/fixtures/conflicting/data.json"}  rubric: ["sources" "reversible" "irreversible" "migration"]  tags: ["research"]}
-] {}

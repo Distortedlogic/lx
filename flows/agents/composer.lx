@@ -1,6 +1,0 @@
--- Content composer -- drafts and revises structured content.
-
-use pkg/ai/agent_factory
-use flows/lib/agent_catalog as catalog
-
-+main = agent_factory.from_config catalog.composer

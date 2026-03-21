@@ -1,6 +1,0 @@
-use pkg/infra/testkit
-
-testkit.run_spec_live "fine_tuning" "flows/tests/fine_tuning_flow.lx" [
-  {name: "harvest traces"  input: {agent: "classifier"  min_traces: 100}  rubric: ["traces" "harvested"]  tags: ["live" "training"]}
-  {name: "train specialist"  input: {agent: "auditor"  epochs: 1}  rubric: ["training" "complete"]  tags: ["live" "training"]}
-] {}

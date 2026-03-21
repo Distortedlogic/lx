@@ -1,7 +1,0 @@
-use pkg/infra/testkit
-
-testkit.run_spec "software diffusion" "flows/tests/software_diffusion_flow.lx" [
-  {name: "clean 5-stage pipeline"  input: {data_path: "flows/tests/software_diffusion/fixtures/clean_pipeline/data.json"}  rubric: ["stages_completed" "5" "complete" "implementation"]  tags: ["diffusion" "smoke"]}
-  {name: "type error recovery"  input: {data_path: "flows/tests/software_diffusion/fixtures/type_error/data.json"}  rubric: ["type_errors_fixed" "1" "complete" "stages_completed"]  tags: ["diffusion" "smoke"]}
-  {name: "incomplete elicitation"  input: {data_path: "flows/tests/software_diffusion/fixtures/elicitation_incomplete/data.json"}  rubric: ["failed" "elicitor" "stages_completed" "0"]  tags: ["diffusion"]}
-] {}

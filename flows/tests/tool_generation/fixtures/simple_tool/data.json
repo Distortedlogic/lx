@@ -1,6 +1,0 @@
-{
-  "gap": "missing container management tools",
-  "design": {"tool_name": "docker-mcp", "tools": ["list_containers", "get_logs"]},
-  "scaffold": {"files": ["src/main.rs", "src/tools.rs", "Cargo.toml"]},
-  "code": {"compile_success": true, "warnings": 0, "smoke_results": [{"tool": "list_containers", "pass": true}, {"tool": "get_logs", "pass": true}]}
-}

@@ -1,7 +1,0 @@
-use pkg/infra/testkit
-
-testkit.run_spec "full pipeline" "flows/tests/full_pipeline_flow.lx" [
-  {name: "audit passes first grade"  input: {data_path: "flows/tests/full_pipeline/fixtures/audit_pass/data.json"}  rubric: ["audit" "passed" "true" "iterations" "1"]  tags: ["pipeline" "smoke"]}
-  {name: "manual 3-item list"  input: {data_path: "flows/tests/full_pipeline/fixtures/manual_list/data.json"}  rubric: ["manual" "passed" "true" "findings" "injection"]  tags: ["pipeline" "smoke"]}
-  {name: "grading loop converges"  input: {data_path: "flows/tests/full_pipeline/fixtures/grading_loop/data.json"}  rubric: ["iterations" "2" "passed" "true" "grade_score"]  tags: ["pipeline"]}
-] {}

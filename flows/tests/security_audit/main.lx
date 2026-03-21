@@ -1,7 +1,0 @@
-use pkg/infra/testkit
-
-testkit.run_spec "security audit" "flows/tests/security_audit_flow.lx" [
-  {name: "stuck loop detection"  input: {project_dir: "flows/tests/security_audit/fixtures/stuck_loop"}  rubric: ["findings" "high" "tool calls"]  tags: ["security" "smoke"]}
-  {name: "prompt injection"  input: {project_dir: "flows/tests/security_audit/fixtures/injection"}  rubric: ["findings" "critical" "ignore"]  tags: ["security" "smoke"]}
-  {name: "clean audit"  input: {project_dir: "flows/tests/security_audit/fixtures/clean"}  rubric: ["findings"]  tags: ["security"]}
-] {threshold: 0.60  setup: testkit.touch_jsonl}

@@ -1,6 +1,0 @@
-use pkg/infra/testkit
-
-testkit.run_spec_live "project_setup" "flows/tests/project_setup_flow.lx" [
-  {name: "initialize new project"  input: {name: "test-project"  template: "rust-mcp"}  rubric: ["initialized" "project"]  tags: ["live" "setup"]}
-  {name: "configure mcp servers"  input: {name: "test-project"  servers: ["valkey" "postgres"]}  rubric: ["configured" "servers"]  tags: ["live" "setup"]}
-] {}

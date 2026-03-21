@@ -1,8 +1,0 @@
-{"type": "tool_use", "name": "Read", "input": {"path": "src/auth.rs"}, "output": "fn validate_token(t: &str) { ... }", "success": true}
-{"type": "tool_use", "name": "Edit", "input": {"path": "src/auth.rs", "content": "fn validate_token(t: &str) { check(t) }"}, "output": "ok", "success": true}
-{"type": "tool_use", "name": "Bash", "input": {"command": "cargo test"}, "output": "FAILED: test_auth_flow", "success": false}
-{"type": "tool_use", "name": "Edit", "input": {"path": "src/auth.rs", "content": "fn validate_token(t: &str) { verify(t) }"}, "output": "ok", "success": true}
-{"type": "tool_use", "name": "Bash", "input": {"command": "cargo test"}, "output": "FAILED: test_auth_flow", "success": false}
-{"type": "tool_use", "name": "Read", "input": {"path": "src/auth.rs"}, "output": "fn validate_token(t: &str) { verify(t) }", "success": true}
-{"type": "tool_use", "name": "Edit", "input": {"path": "src/auth.rs", "content": "fn validate_token(t: &str) { old_check(t) }"}, "output": "ok", "success": true}
-{"type": "tool_use", "name": "Bash", "input": {"command": "cargo test"}, "output": "FAILED: test_token_validation", "success": false}

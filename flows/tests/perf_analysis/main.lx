@@ -1,7 +1,0 @@
-use pkg/infra/testkit
-
-testkit.run_spec "perf analysis" "flows/tests/perf_analysis_flow.lx" [
-  {name: "memory leak detected"  input: {data_path: "flows/tests/perf_analysis/fixtures/memory_leak/data.json"}  rubric: ["memory" "critical" "cache" "findings"]  tags: ["perf" "smoke"]}
-  {name: "clean system"  input: {data_path: "flows/tests/perf_analysis/fixtures/clean/data.json"}  rubric: ["total_findings" "0"]  tags: ["perf"]}
-  {name: "multi category findings"  input: {data_path: "flows/tests/perf_analysis/fixtures/multi_category/data.json"}  rubric: ["threading" "memory" "critical" "categories"]  tags: ["perf" "smoke"]}
-] {}

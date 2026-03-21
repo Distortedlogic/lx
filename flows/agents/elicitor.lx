@@ -1,6 +1,0 @@
--- Elicitation agent -- clarifies user intent into structured specs.
-
-use pkg/ai/agent_factory
-use flows/lib/agent_catalog as catalog
-
-+main = agent_factory.from_config catalog.elicitor

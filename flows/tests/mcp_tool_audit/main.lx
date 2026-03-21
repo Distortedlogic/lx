@@ -1,6 +1,0 @@
-use pkg/infra/testkit
-
-testkit.run_spec_live "mcp_tool_audit" "flows/tests/mcp_tool_audit_flow.lx" [
-  {name: "audit available tools"  input: {target: "all"}  rubric: ["tools" "available"]  tags: ["live" "mcp"]}
-  {name: "detect missing tools"  input: {target: "docker"}  rubric: ["missing" "docker"]  tags: ["live" "mcp"]}
-] {}
