@@ -1,4 +1,3 @@
-mod ai_builtins;
 mod call;
 pub(crate) mod coll;
 mod coll_transform;
@@ -11,50 +10,28 @@ mod str;
 
 use std::sync::Arc;
 
-use crate::backends::RuntimeCtx;
 use crate::env::Env;
 use crate::error::LxError;
+use crate::runtime::RuntimeCtx;
 use crate::span::Span;
-use crate::value::{AsyncBuiltinFn, BuiltinFunc, BuiltinKind, SyncBuiltinFn, LxVal};
+use crate::value::{AsyncBuiltinFn, BuiltinFunc, BuiltinKind, LxVal, SyncBuiltinFn};
 
 pub fn mk(name: &'static str, arity: usize, func: SyncBuiltinFn) -> LxVal {
-    LxVal::BuiltinFunc(BuiltinFunc {
-        name,
-        arity,
-        kind: BuiltinKind::Sync(func),
-        applied: Vec::new(),
-    })
+  LxVal::BuiltinFunc(BuiltinFunc { name, arity, kind: BuiltinKind::Sync(func), applied: Vec::new() })
 }
 
 pub fn mk_async(name: &'static str, arity: usize, func: AsyncBuiltinFn) -> LxVal {
-    LxVal::BuiltinFunc(BuiltinFunc {
-        name,
-        arity,
-        kind: BuiltinKind::Async(func),
-        applied: Vec::new(),
-    })
+  LxVal::BuiltinFunc(BuiltinFunc { name, arity, kind: BuiltinKind::Async(func), applied: Vec::new() })
 }
 
 pub fn register(env: &mut Env) {
-    register::register(env);
+  register::register(env);
 }
 
-pub(crate) async fn call_value(
-    f: &LxVal,
-    arg: LxVal,
-    span: Span,
-    ctx: &Arc<RuntimeCtx>,
-) -> Result<LxVal, LxError> {
-    call::call_value(f, arg, span, ctx).await
+pub(crate) async fn call_value(f: &LxVal, arg: LxVal, span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+  call::call_value(f, arg, span, ctx).await
 }
 
-pub(crate) fn call_value_sync(
-    f: &LxVal,
-    arg: LxVal,
-    span: Span,
-    ctx: &Arc<RuntimeCtx>,
-) -> Result<LxVal, LxError> {
-    tokio::task::block_in_place(|| {
-        tokio::runtime::Handle::current().block_on(call::call_value(f, arg, span, ctx))
-    })
+pub(crate) fn call_value_sync(f: &LxVal, arg: LxVal, span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+  tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(call::call_value(f, arg, span, ctx)))
 }

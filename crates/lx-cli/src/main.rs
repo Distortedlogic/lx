@@ -13,243 +13,226 @@ use std::io::IsTerminal;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use lx::backends::{
-    NoopEmitBackend, NoopLogBackend, NoopUserBackend, RuntimeCtx, StdinStdoutUserBackend,
-};
+use lx::runtime::{NoopEmitBackend, NoopLogBackend, NoopUserBackend, RuntimeCtx, StdinStdoutUserBackend};
 
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(name = "lx", version, about = "The lx scripting language")]
 struct Cli {
-    #[command(subcommand)]
-    command: Command,
+  #[command(subcommand)]
+  command: Command,
 }
 
 #[derive(Subcommand)]
 enum Command {
-    Run {
-        file: String,
-        #[arg(long)]
-        json: bool,
-    },
-    Test {
-        #[arg()]
-        dir: Option<String>,
-        #[arg(short, long)]
-        member: Option<String>,
-    },
-    Check {
-        #[arg()]
-        file: Option<String>,
-        #[arg(short, long)]
-        member: Option<String>,
-        #[arg(long)]
-        strict: bool,
-    },
-    Agent {
-        script: String,
-    },
-    Diagram {
-        file: String,
-        #[arg(short, long)]
-        output: Option<String>,
-    },
-    List,
-    Init {
-        #[arg()]
-        name: Option<String>,
-        #[arg(long)]
-        flow: bool,
-    },
-    Install {
-        #[arg()]
-        package: Option<String>,
-    },
-    Update {
-        #[arg()]
-        package: Option<String>,
-    },
+  Run {
+    file: String,
+    #[arg(long)]
+    json: bool,
+  },
+  Test {
+    #[arg()]
+    dir: Option<String>,
+    #[arg(short, long)]
+    member: Option<String>,
+  },
+  Check {
+    #[arg()]
+    file: Option<String>,
+    #[arg(short, long)]
+    member: Option<String>,
+    #[arg(long)]
+    strict: bool,
+  },
+  Agent {
+    script: String,
+  },
+  Diagram {
+    file: String,
+    #[arg(short, long)]
+    output: Option<String>,
+  },
+  List,
+  Init {
+    #[arg()]
+    name: Option<String>,
+    #[arg(long)]
+    flow: bool,
+  },
+  Install {
+    #[arg()]
+    package: Option<String>,
+  },
+  Update {
+    #[arg()]
+    package: Option<String>,
+  },
 }
 
 fn main() -> ExitCode {
-    let cli = Cli::parse();
-    match cli.command {
-        Command::Run { file, json } => {
-            let resolved = resolve_run_target(&file);
-            run_file(&resolved, json)
-        }
-        Command::Check {
-            file,
-            member,
-            strict,
-        } => {
-            if let Some(file) = file {
-                check::check_file(&file, strict)
-            } else {
-                check::check_workspace(member.as_deref(), strict)
-            }
-        }
-        Command::Test { dir, member } => {
-            if let Some(dir) = dir {
-                testing::run_tests_dir(&dir)
-            } else {
-                testing::run_workspace_tests(member.as_deref())
-            }
-        }
-        Command::Agent { script } => agent_cmd::run_agent(&script),
-        Command::Diagram { file, output } => run_diagram(&file, output.as_deref()),
-        Command::List => listing::list_workspace(),
-        Command::Init { name, flow } => init::run_init(name.as_deref(), flow),
-        Command::Install { package } => install::run_install(package.as_deref()),
-        Command::Update { package } => install::run_update(package.as_deref()),
-    }
+  let cli = Cli::parse();
+  match cli.command {
+    Command::Run { file, json } => {
+      let resolved = resolve_run_target(&file);
+      run_file(&resolved, json)
+    },
+    Command::Check { file, member, strict } => {
+      if let Some(file) = file {
+        check::check_file(&file, strict)
+      } else {
+        check::check_workspace(member.as_deref(), strict)
+      }
+    },
+    Command::Test { dir, member } => {
+      if let Some(dir) = dir {
+        testing::run_tests_dir(&dir)
+      } else {
+        testing::run_workspace_tests(member.as_deref())
+      }
+    },
+    Command::Agent { script } => agent_cmd::run_agent(&script),
+    Command::Diagram { file, output } => run_diagram(&file, output.as_deref()),
+    Command::List => listing::list_workspace(),
+    Command::Init { name, flow } => init::run_init(name.as_deref(), flow),
+    Command::Install { package } => install::run_install(package.as_deref()),
+    Command::Update { package } => install::run_update(package.as_deref()),
+  }
 }
 
 fn resolve_run_target(target: &str) -> String {
-    let path = std::path::Path::new(target);
-    if path.exists() && path.is_file() {
-        return target.to_string();
+  let path = std::path::Path::new(target);
+  if path.exists() && path.is_file() {
+    return target.to_string();
+  }
+  let Ok(cwd) = std::env::current_dir() else {
+    return target.to_string();
+  };
+  let Some(root) = manifest::find_workspace_root(&cwd) else {
+    return target.to_string();
+  };
+  let Ok(ws) = manifest::load_workspace(&root) else {
+    return target.to_string();
+  };
+  for member in &ws.members {
+    if member.name == target {
+      let entry = member.entry.as_deref().unwrap_or("main.lx");
+      return member.dir.join(entry).to_string_lossy().to_string();
     }
-    let Ok(cwd) = std::env::current_dir() else {
-        return target.to_string();
-    };
-    let Some(root) = manifest::find_workspace_root(&cwd) else {
-        return target.to_string();
-    };
-    let Ok(ws) = manifest::load_workspace(&root) else {
-        return target.to_string();
-    };
-    for member in &ws.members {
-        if member.name == target {
-            let entry = member.entry.as_deref().unwrap_or("main.lx");
-            return member.dir.join(entry).to_string_lossy().to_string();
-        }
-    }
-    target.to_string()
+  }
+  target.to_string()
 }
 
 fn run_file(path: &str, _json: bool) -> ExitCode {
-    let source = match std::fs::read_to_string(path) {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("error: cannot read {path}: {e}");
-            return ExitCode::from(1);
+  let source = match std::fs::read_to_string(path) {
+    Ok(s) => s,
+    Err(e) => {
+      eprintln!("error: cannot read {path}: {e}");
+      return ExitCode::from(1);
+    },
+  };
+  let ws_members = manifest::try_load_workspace_members();
+  let dep_dirs = manifest::try_load_dep_dirs_no_dev();
+  let mut ctx_val =
+    if std::io::stdin().is_terminal() { RuntimeCtx { user: Arc::new(StdinStdoutUserBackend), ..RuntimeCtx::default() } } else { RuntimeCtx::default() };
+  ctx_val.workspace_members = ws_members;
+  ctx_val.dep_dirs = dep_dirs;
+  apply_manifest_backends(&mut ctx_val);
+  let ctx = Arc::new(ctx_val);
+  match run::run(&source, path, &ctx) {
+    Ok(()) => ExitCode::SUCCESS,
+    Err(errors) => {
+      let named = miette::NamedSource::new(path, source.clone());
+      for err in errors {
+        if let lx::error::LxError::Sourced { source_name, source_text, inner } = err {
+          let src = miette::NamedSource::new(source_name, source_text.to_string());
+          let report = miette::Report::new(*inner).with_source_code(src);
+          eprintln!("{report:?}");
+        } else {
+          let report = miette::Report::new(err).with_source_code(named.clone());
+          eprintln!("{report:?}");
         }
-    };
-    let ws_members = manifest::try_load_workspace_members();
-    let dep_dirs = manifest::try_load_dep_dirs_no_dev();
-    let mut ctx_val = if std::io::stdin().is_terminal() {
-        RuntimeCtx {
-            user: Arc::new(StdinStdoutUserBackend),
-            ..RuntimeCtx::default()
-        }
-    } else {
-        RuntimeCtx::default()
-    };
-    ctx_val.workspace_members = ws_members;
-    ctx_val.dep_dirs = dep_dirs;
-    apply_manifest_backends(&mut ctx_val);
-    let ctx = Arc::new(ctx_val);
-    match run::run(&source, path, &ctx) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(errors) => {
-            let named = miette::NamedSource::new(path, source.clone());
-            for err in errors {
-                if let lx::error::LxError::Sourced {
-                    source_name,
-                    source_text,
-                    inner,
-                } = err
-                {
-                    let src = miette::NamedSource::new(source_name, source_text.to_string());
-                    let report = miette::Report::new(*inner).with_source_code(src);
-                    eprintln!("{report:?}");
-                } else {
-                    let report = miette::Report::new(err).with_source_code(named.clone());
-                    eprintln!("{report:?}");
-                }
-            }
-            ExitCode::from(1)
-        }
-    }
+      }
+      ExitCode::from(1)
+    },
+  }
 }
 
 fn apply_manifest_backends(ctx: &mut RuntimeCtx) {
-    let Ok(cwd) = std::env::current_dir() else {
-        return;
-    };
-    let Some(root) = manifest::find_manifest_root(&cwd) else {
-        return;
-    };
-    let Ok(m) = manifest::load_manifest(&root) else {
-        return;
-    };
-    let Some(backends) = m.backends else {
-        return;
-    };
-    if let Some(ref name) = backends.emit {
-        match name.as_str() {
-            "noop" => ctx.emit = Arc::new(NoopEmitBackend),
-            "stdout" => {}
-            other => eprintln!("warning: unknown emit backend '{other}'"),
-        }
+  let Ok(cwd) = std::env::current_dir() else {
+    return;
+  };
+  let Some(root) = manifest::find_manifest_root(&cwd) else {
+    return;
+  };
+  let Ok(m) = manifest::load_manifest(&root) else {
+    return;
+  };
+  let Some(backends) = m.backends else {
+    return;
+  };
+  if let Some(ref name) = backends.emit {
+    match name.as_str() {
+      "noop" => ctx.emit = Arc::new(NoopEmitBackend),
+      "stdout" => {},
+      other => eprintln!("warning: unknown emit backend '{other}'"),
     }
-    if let Some(ref name) = backends.log {
-        match name.as_str() {
-            "noop" => ctx.log = Arc::new(NoopLogBackend),
-            "stderr" => {}
-            other => eprintln!("warning: unknown log backend '{other}'"),
-        }
+  }
+  if let Some(ref name) = backends.log {
+    match name.as_str() {
+      "noop" => ctx.log = Arc::new(NoopLogBackend),
+      "stderr" => {},
+      other => eprintln!("warning: unknown log backend '{other}'"),
     }
-    if let Some(ref name) = backends.user {
-        match name.as_str() {
-            "noop" => ctx.user = Arc::new(NoopUserBackend),
-            "stdin-stdout" => ctx.user = Arc::new(StdinStdoutUserBackend),
-            other => eprintln!("warning: unknown user backend '{other}'"),
-        }
+  }
+  if let Some(ref name) = backends.user {
+    match name.as_str() {
+      "noop" => ctx.user = Arc::new(NoopUserBackend),
+      "stdin-stdout" => ctx.user = Arc::new(StdinStdoutUserBackend),
+      other => eprintln!("warning: unknown user backend '{other}'"),
     }
-    if let Some(ref name) = backends.ai {
-        match name.as_str() {
-            "claude-code" => {}
-            other => eprintln!("warning: unknown ai backend '{other}'"),
-        }
+  }
+  if let Some(ref name) = backends.ai {
+    match name.as_str() {
+      "claude-code" => {},
+      other => eprintln!("warning: unknown ai backend '{other}'"),
     }
-    if let Some(ref name) = backends.shell {
-        match name.as_str() {
-            "process" => {}
-            other => eprintln!("warning: unknown shell backend '{other}'"),
-        }
+  }
+  if let Some(ref name) = backends.shell {
+    match name.as_str() {
+      "process" => {},
+      other => eprintln!("warning: unknown shell backend '{other}'"),
     }
-    if let Some(ref name) = backends.http {
-        match name.as_str() {
-            "reqwest" => {}
-            other => eprintln!("warning: unknown http backend '{other}'"),
-        }
+  }
+  if let Some(ref name) = backends.http {
+    match name.as_str() {
+      "reqwest" => {},
+      other => eprintln!("warning: unknown http backend '{other}'"),
     }
-    if let Some(ref name) = backends.yield_backend {
-        match name.as_str() {
-            "stdin-stdout" => {}
-            other => eprintln!("warning: unknown yield backend '{other}'"),
-        }
+  }
+  if let Some(ref name) = backends.yield_backend {
+    match name.as_str() {
+      "stdin-stdout" => {},
+      other => eprintln!("warning: unknown yield backend '{other}'"),
     }
+  }
 }
 
 fn run_diagram(path: &str, output: Option<&str>) -> ExitCode {
-    let (_source, program) = match run::read_and_parse(path) {
-        Ok(sp) => sp,
-        Err(code) => return code,
-    };
-    let mermaid = lx::stdlib::diag::extract_mermaid(&program);
-    match output {
-        Some(out_path) => {
-            if let Err(e) = std::fs::write(out_path, &mermaid) {
-                eprintln!("error: cannot write {out_path}: {e}");
-                return ExitCode::from(1);
-            }
-            println!("wrote diagram to {out_path}");
-        }
-        None => print!("{mermaid}"),
-    }
-    ExitCode::SUCCESS
+  let (_source, program) = match run::read_and_parse(path) {
+    Ok(sp) => sp,
+    Err(code) => return code,
+  };
+  let mermaid = lx::stdlib::diag::extract_mermaid(&program);
+  match output {
+    Some(out_path) => {
+      if let Err(e) = std::fs::write(out_path, &mermaid) {
+        eprintln!("error: cannot write {out_path}: {e}");
+        return ExitCode::from(1);
+      }
+      println!("wrote diagram to {out_path}");
+    },
+    None => print!("{mermaid}"),
+  }
+  ExitCode::SUCCESS
 }

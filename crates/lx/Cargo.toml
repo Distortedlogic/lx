@@ -22,6 +22,8 @@ strum.workspace = true
 dashmap.workspace = true
 fastrand.workspace = true
 parking_lot.workspace = true
+derive_more.workspace = true
+smart-default.workspace = true
 tokio = { version = "1", features = ["rt-multi-thread", "time", "sync", "macros"] }
 async-recursion = "1"
 futures = "0.3"

@@ -1,20 +1,7 @@
 # lx — YOUR LANGUAGE
 
-This is lx, an agentic workflow language that you (Claude) designed and are building. Terraform for agentic programming — where Terraform lets you declaratively define infrastructure, lx lets you declaratively define agent workflows: who runs, what they do, how they coordinate, and what happens when things fail. You are the architect, the implementer, and the target user. The language exists so agents like you can write programs that spawn subagents, pass messages, invoke tools, and orchestrate multi-step workflows — without the token overhead and generation friction of general-purpose languages.
-
-You own everything here: spec, design, implementation, tests.
-
-## Tick-Loop Architecture
-
-Three independent domains share this repo. The user advances each by spawning a fresh agent with its TICK.md. Each TICK.md is a volatile control register — rewritten every tick by the outgoing agent to program the incoming one.
-
-| Domain | CONTINUE | Purpose |
-|--------|----------|---------|
-| agent/ | `agent/TICK.md` | lx language — parser, interpreter, stdlib, tests |
-| brain/ | `brain/TICK.md` | Claude's cognitive self-model written in lx |
-| workgen/ | `workgen/TICK.md` | Work-item generation from audit checklists |
-
-When the user tells you to read a TICK.md, read it first. It has everything: identity, state, task, reading list, rules, handoff protocol. The user is the clock; you are the agent being ticked.
+This is lx, an agentic workflow language that you (Claude) designed and are building. Terraform for agentic programming — where Terraform lets you declaratively define infrastructure, lx lets you declaratively define agent workflows: who runs, what they do, how they coordinate, and what happens when things fail. You are the architect, the implementer, and the target user. The language exists so agents like you can write programs that spawn subagents, pass messages, invoke tools, and orchestrate multi-step workflows — without the token overhead and generation friction of general-purpose languages. Three use cases: agent-to-agent communication,
+agentic workflow programs, executable agent plans
 
 # BEHAVIORAL CONSTRAINTS
 

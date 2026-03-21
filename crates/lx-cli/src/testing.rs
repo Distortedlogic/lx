@@ -3,245 +3,203 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use lx::backends::RuntimeCtx;
+use lx::runtime::RuntimeCtx;
 
 use crate::manifest::{self, Member};
 
 struct TestEntry {
-    name: String,
-    path: std::path::PathBuf,
+  name: String,
+  path: std::path::PathBuf,
 }
 
 pub fn run_tests_dir(dir: &str) -> ExitCode {
-    let (threshold, runs) = load_test_config();
-    let entries = discover_tests(dir);
-    let ws_members = manifest::try_load_workspace_members();
-    let result = execute_tests(&entries, &ws_members, threshold, runs);
-    print_results(&result);
-    if result.failed > 0 {
-        ExitCode::from(1)
-    } else {
-        ExitCode::SUCCESS
-    }
+  let (threshold, runs) = load_test_config();
+  let entries = discover_tests(dir);
+  let ws_members = manifest::try_load_workspace_members();
+  let result = execute_tests(&entries, &ws_members, threshold, runs);
+  print_results(&result);
+  if result.failed > 0 { ExitCode::from(1) } else { ExitCode::SUCCESS }
 }
 
 pub fn run_workspace_tests(member_filter: Option<&str>) -> ExitCode {
-    let (threshold, runs) = load_test_config();
-    let cwd = match std::env::current_dir() {
-        Ok(d) => d,
-        Err(e) => {
-            eprintln!("error: cannot determine cwd: {e}");
-            return ExitCode::from(1);
-        }
-    };
-    let Some(root) = manifest::find_workspace_root(&cwd) else {
-        eprintln!("error: no workspace lx.toml found");
-        return ExitCode::from(1);
-    };
-    let Ok(ws) = manifest::load_workspace(&root) else {
-        eprintln!("error: failed to load workspace");
-        return ExitCode::from(1);
-    };
+  let (threshold, runs) = load_test_config();
+  let cwd = match std::env::current_dir() {
+    Ok(d) => d,
+    Err(e) => {
+      eprintln!("error: cannot determine cwd: {e}");
+      return ExitCode::from(1);
+    },
+  };
+  let Some(root) = manifest::find_workspace_root(&cwd) else {
+    eprintln!("error: no workspace lx.toml found");
+    return ExitCode::from(1);
+  };
+  let Ok(ws) = manifest::load_workspace(&root) else {
+    eprintln!("error: failed to load workspace");
+    return ExitCode::from(1);
+  };
 
-    let members: Vec<&Member> = if let Some(filter) = member_filter {
-        let found: Vec<_> = ws.members.iter().filter(|m| m.name == filter).collect();
-        if found.is_empty() {
-            eprintln!("error: no member named '{filter}'");
-            eprintln!(
-                "available: {}",
-                ws.members
-                    .iter()
-                    .map(|m| m.name.as_str())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            );
-            return ExitCode::from(1);
-        }
-        found
+  let members: Vec<&Member> = if let Some(filter) = member_filter {
+    let found: Vec<_> = ws.members.iter().filter(|m| m.name == filter).collect();
+    if found.is_empty() {
+      eprintln!("error: no member named '{filter}'");
+      eprintln!("available: {}", ws.members.iter().map(|m| m.name.as_str()).collect::<Vec<_>>().join(", "));
+      return ExitCode::from(1);
+    }
+    found
+  } else {
+    ws.members.iter().collect()
+  };
+
+  let ws_members = manifest::workspace_member_map(&ws);
+  let mut total_passed = 0u32;
+  let mut total_failed = 0u32;
+  let mut member_results = Vec::new();
+  let mut any_failure = false;
+
+  for member in &members {
+    let test_base = member.dir.join(&member.test_dir);
+    if !test_base.exists() {
+      member_results.push((member.name.clone(), 0u32, 0u32, true));
+      continue;
+    }
+    let entries = discover_tests_with_pattern(test_base.to_str().unwrap_or("."), &member.test_pattern);
+    let result = execute_tests(&entries, &ws_members, threshold, runs);
+    total_passed += result.passed;
+    total_failed += result.failed;
+    if result.failed > 0 {
+      any_failure = true;
+    }
+    member_results.push((member.name.clone(), result.passed, result.failed, false));
+  }
+
+  println!();
+  for (name, passed, failed, no_tests) in &member_results {
+    if *no_tests {
+      println!("{name:<16} (no tests)");
     } else {
-        ws.members.iter().collect()
-    };
-
-    let ws_members = manifest::workspace_member_map(&ws);
-    let mut total_passed = 0u32;
-    let mut total_failed = 0u32;
-    let mut member_results = Vec::new();
-    let mut any_failure = false;
-
-    for member in &members {
-        let test_base = member.dir.join(&member.test_dir);
-        if !test_base.exists() {
-            member_results.push((member.name.clone(), 0u32, 0u32, true));
-            continue;
-        }
-        let entries =
-            discover_tests_with_pattern(test_base.to_str().unwrap_or("."), &member.test_pattern);
-        let result = execute_tests(&entries, &ws_members, threshold, runs);
-        total_passed += result.passed;
-        total_failed += result.failed;
-        if result.failed > 0 {
-            any_failure = true;
-        }
-        member_results.push((member.name.clone(), result.passed, result.failed, false));
+      println!("{name:<16} {passed} passed, {failed} failed");
     }
+  }
+  println!("\nTOTAL: {total_passed} passed, {total_failed} failed, {} members", members.len());
 
-    println!();
-    for (name, passed, failed, no_tests) in &member_results {
-        if *no_tests {
-            println!("{name:<16} (no tests)");
-        } else {
-            println!("{name:<16} {passed} passed, {failed} failed");
-        }
-    }
-    println!(
-        "\nTOTAL: {total_passed} passed, {total_failed} failed, {} members",
-        members.len()
-    );
-
-    if any_failure {
-        ExitCode::from(1)
-    } else {
-        ExitCode::SUCCESS
-    }
+  if any_failure { ExitCode::from(1) } else { ExitCode::SUCCESS }
 }
 
 fn discover_tests(dir: &str) -> Vec<TestEntry> {
-    discover_tests_with_pattern(dir, "*.lx")
+  discover_tests_with_pattern(dir, "*.lx")
 }
 
 fn discover_tests_with_pattern(dir: &str, pattern: &str) -> Vec<TestEntry> {
-    let mut entries: Vec<TestEntry> = Vec::new();
-    let read_dir = match std::fs::read_dir(dir) {
-        Ok(d) => d,
-        Err(e) => {
-            eprintln!("error: cannot read directory {dir}: {e}");
-            return entries;
-        }
-    };
-    for entry in read_dir {
-        let Ok(entry) = entry else { continue };
-        let path = entry.path();
-        if path.extension().and_then(|e| e.to_str()) == Some("lx") {
-            let name = path
-                .file_name()
-                .map(|n| n.to_string_lossy().to_string())
-                .unwrap_or_default();
-            if glob_matches(pattern, &name) {
-                entries.push(TestEntry { name, path });
-            }
-        } else if path.is_dir() {
-            let main_lx = path.join("main.lx");
-            if main_lx.exists() {
-                let name = path
-                    .file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_default();
-                entries.push(TestEntry {
-                    name,
-                    path: main_lx,
-                });
-            }
-        }
+  let mut entries: Vec<TestEntry> = Vec::new();
+  let read_dir = match std::fs::read_dir(dir) {
+    Ok(d) => d,
+    Err(e) => {
+      eprintln!("error: cannot read directory {dir}: {e}");
+      return entries;
+    },
+  };
+  for entry in read_dir {
+    let Ok(entry) = entry else { continue };
+    let path = entry.path();
+    if path.extension().and_then(|e| e.to_str()) == Some("lx") {
+      let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+      if glob_matches(pattern, &name) {
+        entries.push(TestEntry { name, path });
+      }
+    } else if path.is_dir() {
+      let main_lx = path.join("main.lx");
+      if main_lx.exists() {
+        let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        entries.push(TestEntry { name, path: main_lx });
+      }
     }
-    entries.sort_by(|a, b| a.name.cmp(&b.name));
-    entries
+  }
+  entries.sort_by(|a, b| a.name.cmp(&b.name));
+  entries
 }
 
 struct TestResults {
-    passed: u32,
-    failed: u32,
-    fail_details: Vec<(String, Vec<lx::error::LxError>, miette::NamedSource<String>)>,
+  passed: u32,
+  failed: u32,
+  fail_details: Vec<(String, Vec<lx::error::LxError>, miette::NamedSource<String>)>,
 }
 
-fn execute_tests(
-    entries: &[TestEntry],
-    workspace_members: &HashMap<String, PathBuf>,
-    threshold: Option<f64>,
-    runs: Option<u32>,
-) -> TestResults {
-    let dep_dirs = crate::manifest::try_load_dep_dirs();
-    let mut passed = 0;
-    let mut failed = 0;
-    let mut fail_details = Vec::new();
-    for entry in entries {
-        let source = match std::fs::read_to_string(&entry.path) {
-            Ok(s) => s,
-            Err(e) => {
-                println!("SKIP {}: {e}", entry.name);
-                continue;
-            }
-        };
-        let ctx = Arc::new(RuntimeCtx {
-            workspace_members: workspace_members.clone(),
-            dep_dirs: dep_dirs.clone(),
-            test_threshold: threshold,
-            test_runs: runs,
-            ..RuntimeCtx::default()
-        });
-        let filename = entry.path.to_str().unwrap_or(&entry.name);
-        match crate::run::run(&source, filename, &ctx) {
-            Ok(()) => {
-                println!("PASS {}", entry.name);
-                passed += 1;
-            }
-            Err(errors) => {
-                let named = miette::NamedSource::new(&entry.name, source.clone());
-                let first = &errors[0];
-                let line = format!("{first}");
-                println!("FAIL {}: {line}", entry.name);
-                failed += 1;
-                fail_details.push((entry.name.clone(), errors, named));
-            }
-        }
+fn execute_tests(entries: &[TestEntry], workspace_members: &HashMap<String, PathBuf>, threshold: Option<f64>, runs: Option<u32>) -> TestResults {
+  let dep_dirs = crate::manifest::try_load_dep_dirs();
+  let mut passed = 0;
+  let mut failed = 0;
+  let mut fail_details = Vec::new();
+  for entry in entries {
+    let source = match std::fs::read_to_string(&entry.path) {
+      Ok(s) => s,
+      Err(e) => {
+        println!("SKIP {}: {e}", entry.name);
+        continue;
+      },
+    };
+    let ctx = Arc::new(RuntimeCtx {
+      workspace_members: workspace_members.clone(),
+      dep_dirs: dep_dirs.clone(),
+      test_threshold: threshold,
+      test_runs: runs,
+      ..RuntimeCtx::default()
+    });
+    let filename = entry.path.to_str().unwrap_or(&entry.name);
+    match crate::run::run(&source, filename, &ctx) {
+      Ok(()) => {
+        println!("PASS {}", entry.name);
+        passed += 1;
+      },
+      Err(errors) => {
+        let named = miette::NamedSource::new(&entry.name, source.clone());
+        let first = &errors[0];
+        let line = format!("{first}");
+        println!("FAIL {}: {line}", entry.name);
+        failed += 1;
+        fail_details.push((entry.name.clone(), errors, named));
+      },
     }
-    TestResults {
-        passed,
-        failed,
-        fail_details,
-    }
+  }
+  TestResults { passed, failed, fail_details }
 }
 
 fn print_results(results: &TestResults) {
-    println!(
-        "\n{} passed, {} failed, {} total",
-        results.passed,
-        results.failed,
-        results.passed + results.failed
-    );
-    if !results.fail_details.is_empty() {
-        println!("\n--- failures ---");
-        for (name, errors, named) in &results.fail_details {
-            println!("\n{name}:");
-            for err in errors {
-                let report = miette::Report::new(err.clone()).with_source_code(named.clone());
-                eprintln!("{report:?}");
-            }
-        }
+  println!("\n{} passed, {} failed, {} total", results.passed, results.failed, results.passed + results.failed);
+  if !results.fail_details.is_empty() {
+    println!("\n--- failures ---");
+    for (name, errors, named) in &results.fail_details {
+      println!("\n{name}:");
+      for err in errors {
+        let report = miette::Report::new(err.clone()).with_source_code(named.clone());
+        eprintln!("{report:?}");
+      }
     }
+  }
 }
 
 fn load_test_config() -> (Option<f64>, Option<u32>) {
-    let Ok(cwd) = std::env::current_dir() else {
-        return (None, None);
-    };
-    let Some(root) = manifest::find_manifest_root(&cwd) else {
-        return (None, None);
-    };
-    let Ok(m) = manifest::load_manifest(&root) else {
-        return (None, None);
-    };
-    match m.test {
-        Some(test) => (test.threshold, test.runs),
-        None => (None, None),
-    }
+  let Ok(cwd) = std::env::current_dir() else {
+    return (None, None);
+  };
+  let Some(root) = manifest::find_manifest_root(&cwd) else {
+    return (None, None);
+  };
+  let Ok(m) = manifest::load_manifest(&root) else {
+    return (None, None);
+  };
+  match m.test {
+    Some(test) => (test.threshold, test.runs),
+    None => (None, None),
+  }
 }
 
 fn glob_matches(pattern: &str, name: &str) -> bool {
-    if let Some(idx) = pattern.find('*') {
-        let prefix = &pattern[..idx];
-        let suffix = &pattern[idx + 1..];
-        name.starts_with(prefix) && name.ends_with(suffix)
-    } else {
-        pattern == name
-    }
+  if let Some(idx) = pattern.find('*') {
+    let prefix = &pattern[..idx];
+    let suffix = &pattern[idx + 1..];
+    name.starts_with(prefix) && name.ends_with(suffix)
+  } else {
+    pattern == name
+  }
 }

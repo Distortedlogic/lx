@@ -2,12 +2,6 @@
 members = [
   "crates/lx",
   "crates/lx-cli",
-  "crates/lx-dx",
-  "crates/lx-ui",
-  "crates/lx-tui",
-  "crates/lx-desktop",
-  "crates/lx-mobile",
-  "crates/lx-charts",
 ]
 resolver = "2"
 
@@ -45,6 +39,8 @@ dashmap = "6"
 fastrand = "2"
 toml = "0.8"
 parking_lot = "0.12"
+derive_more = { version = "1", features = ["from", "deref", "display", "try_from"] }
+smart-default = "0.7"
 
 [workspace.lints.rust]
 unsafe_code = "deny"

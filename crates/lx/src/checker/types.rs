@@ -1,251 +1,210 @@
 use std::collections::HashMap;
+use std::fmt;
 
 pub type TypeVarId = u32;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
-    Int,
-    Float,
-    Bool,
-    Str,
-    Regex,
-    Unit,
-    Bytes,
+  Int,
+  Float,
+  Bool,
+  Str,
+  Regex,
+  Unit,
+  Bytes,
 
-    List(Box<Type>),
-    Map {
-        key: Box<Type>,
-        value: Box<Type>,
-    },
-    Record(Vec<(String, Type)>),
-    Tuple(Vec<Type>),
+  List(Box<Type>),
+  Map { key: Box<Type>, value: Box<Type> },
+  Record(Vec<(String, Type)>),
+  Tuple(Vec<Type>),
 
-    Func {
-        param: Box<Type>,
-        ret: Box<Type>,
-    },
-    Result {
-        ok: Box<Type>,
-        err: Box<Type>,
-    },
-    Maybe(Box<Type>),
+  Func { param: Box<Type>, ret: Box<Type> },
+  Result { ok: Box<Type>, err: Box<Type> },
+  Maybe(Box<Type>),
 
-    Union {
-        name: String,
-        variants: Vec<Variant>,
-    },
+  Union { name: String, variants: Vec<Variant> },
 
-    Var(TypeVarId),
-    Unknown,
+  Var(TypeVarId),
+  Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Variant {
-    pub name: String,
-    pub fields: Vec<Type>,
+  pub name: String,
+  pub fields: Vec<Type>,
 }
 
+#[derive(Default)]
 pub struct UnificationTable {
-    bindings: Vec<Option<Type>>,
-}
-
-impl Default for UnificationTable {
-    fn default() -> Self {
-        Self::new()
-    }
+  bindings: Vec<Option<Type>>,
 }
 
 impl UnificationTable {
-    pub fn new() -> Self {
-        Self {
-            bindings: Vec::new(),
-        }
-    }
+  pub fn new() -> Self {
+    Self::default()
+  }
 
-    pub fn fresh_var(&mut self) -> Type {
-        let id = self.bindings.len() as TypeVarId;
-        self.bindings.push(None);
-        Type::Var(id)
-    }
+  pub fn fresh_var(&mut self) -> Type {
+    let id = self.bindings.len() as TypeVarId;
+    self.bindings.push(None);
+    Type::Var(id)
+  }
 
-    pub fn resolve(&self, ty: &Type) -> Type {
-        match ty {
-            Type::Var(id) => match self.bindings.get(*id as usize) {
-                Some(Some(bound)) => self.resolve(bound),
-                _ => ty.clone(),
-            },
-            _ => ty.clone(),
-        }
+  pub fn resolve(&self, ty: &Type) -> Type {
+    match ty {
+      Type::Var(id) => match self.bindings.get(*id as usize) {
+        Some(Some(bound)) => self.resolve(bound),
+        _ => ty.clone(),
+      },
+      _ => ty.clone(),
     }
+  }
 
-    pub fn resolve_deep(&self, ty: &Type) -> Type {
-        match ty {
-            Type::Var(id) => match self.bindings.get(*id as usize) {
-                Some(Some(bound)) => self.resolve_deep(bound),
-                _ => ty.clone(),
-            },
-            Type::List(inner) => Type::List(Box::new(self.resolve_deep(inner))),
-            Type::Map { key, value } => Type::Map {
-                key: Box::new(self.resolve_deep(key)),
-                value: Box::new(self.resolve_deep(value)),
-            },
-            Type::Record(fields) => Type::Record(
-                fields
-                    .iter()
-                    .map(|(n, t)| (n.clone(), self.resolve_deep(t)))
-                    .collect(),
-            ),
-            Type::Tuple(elems) => Type::Tuple(elems.iter().map(|t| self.resolve_deep(t)).collect()),
-            Type::Func { param, ret } => Type::Func {
-                param: Box::new(self.resolve_deep(param)),
-                ret: Box::new(self.resolve_deep(ret)),
-            },
-            Type::Result { ok, err } => Type::Result {
-                ok: Box::new(self.resolve_deep(ok)),
-                err: Box::new(self.resolve_deep(err)),
-            },
-            Type::Maybe(inner) => Type::Maybe(Box::new(self.resolve_deep(inner))),
-            _ => ty.clone(),
-        }
+  pub fn resolve_deep(&self, ty: &Type) -> Type {
+    match ty {
+      Type::Var(id) => match self.bindings.get(*id as usize) {
+        Some(Some(bound)) => self.resolve_deep(bound),
+        _ => ty.clone(),
+      },
+      Type::List(inner) => Type::List(Box::new(self.resolve_deep(inner))),
+      Type::Map { key, value } => Type::Map { key: Box::new(self.resolve_deep(key)), value: Box::new(self.resolve_deep(value)) },
+      Type::Record(fields) => Type::Record(fields.iter().map(|(n, t)| (n.clone(), self.resolve_deep(t))).collect()),
+      Type::Tuple(elems) => Type::Tuple(elems.iter().map(|t| self.resolve_deep(t)).collect()),
+      Type::Func { param, ret } => Type::Func { param: Box::new(self.resolve_deep(param)), ret: Box::new(self.resolve_deep(ret)) },
+      Type::Result { ok, err } => Type::Result { ok: Box::new(self.resolve_deep(ok)), err: Box::new(self.resolve_deep(err)) },
+      Type::Maybe(inner) => Type::Maybe(Box::new(self.resolve_deep(inner))),
+      _ => ty.clone(),
     }
+  }
 
-    pub fn unify(&mut self, a: &Type, b: &Type) -> Result<Type, String> {
-        let a = self.resolve(a);
-        let b = self.resolve(b);
-        match (&a, &b) {
-            _ if a == b => Ok(a),
-            (Type::Unknown, _) => Ok(b),
-            (_, Type::Unknown) => Ok(a),
-            (Type::Var(id), _) => {
-                if self.occurs(*id, &b) {
-                    return Err(format!("infinite type: t{id} occurs in {b:?}"));
-                }
-                self.bindings[*id as usize] = Some(b.clone());
-                Ok(b)
-            }
-            (_, Type::Var(id)) => {
-                if self.occurs(*id, &a) {
-                    return Err(format!("infinite type: t{id} occurs in {a:?}"));
-                }
-                self.bindings[*id as usize] = Some(a.clone());
-                Ok(a)
-            }
-            (Type::Int, Type::Float) | (Type::Float, Type::Int) => Ok(Type::Float),
-            (Type::List(a_inner), Type::List(b_inner)) => {
-                let inner = self.unify(a_inner, b_inner)?;
-                Ok(Type::List(Box::new(inner)))
-            }
-            (Type::Tuple(a_elems), Type::Tuple(b_elems)) if a_elems.len() == b_elems.len() => {
-                let elems: Result<Vec<_>, _> = a_elems
-                    .iter()
-                    .zip(b_elems.iter())
-                    .map(|(a, b)| self.unify(a, b))
-                    .collect();
-                Ok(Type::Tuple(elems?))
-            }
-            (Type::Func { param: ap, ret: ar }, Type::Func { param: bp, ret: br }) => {
-                let param = self.unify(ap, bp)?;
-                let ret = self.unify(ar, br)?;
-                Ok(Type::Func {
-                    param: Box::new(param),
-                    ret: Box::new(ret),
-                })
-            }
-            (Type::Result { ok: ao, err: ae }, Type::Result { ok: bo, err: be }) => {
-                let ok = self.unify(ao, bo)?;
-                let err = self.unify(ae, be)?;
-                Ok(Type::Result {
-                    ok: Box::new(ok),
-                    err: Box::new(err),
-                })
-            }
-            (Type::Maybe(a_inner), Type::Maybe(b_inner)) => {
-                let inner = self.unify(a_inner, b_inner)?;
-                Ok(Type::Maybe(Box::new(inner)))
-            }
-            (Type::Record(a_fields), Type::Record(b_fields)) => {
-                self.unify_records(a_fields, b_fields)
-            }
-            _ => Err(format!(
-                "type mismatch: expected {}, got {}",
-                display(&a),
-                display(&b)
-            )),
+  pub fn unify(&mut self, a: &Type, b: &Type) -> Result<Type, String> {
+    let a = self.resolve(a);
+    let b = self.resolve(b);
+    match (&a, &b) {
+      _ if a == b => Ok(a),
+      (Type::Unknown, _) => Ok(b),
+      (_, Type::Unknown) => Ok(a),
+      (Type::Var(id), _) => {
+        if self.occurs(*id, &b) {
+          return Err(format!("infinite type: t{id} occurs in {b:?}"));
         }
+        self.bindings[*id as usize] = Some(b.clone());
+        Ok(b)
+      },
+      (_, Type::Var(id)) => {
+        if self.occurs(*id, &a) {
+          return Err(format!("infinite type: t{id} occurs in {a:?}"));
+        }
+        self.bindings[*id as usize] = Some(a.clone());
+        Ok(a)
+      },
+      (Type::Int, Type::Float) | (Type::Float, Type::Int) => Ok(Type::Float),
+      (Type::List(a_inner), Type::List(b_inner)) => {
+        let inner = self.unify(a_inner, b_inner)?;
+        Ok(Type::List(Box::new(inner)))
+      },
+      (Type::Tuple(a_elems), Type::Tuple(b_elems)) if a_elems.len() == b_elems.len() => {
+        let elems: Result<Vec<_>, _> = a_elems.iter().zip(b_elems.iter()).map(|(a, b)| self.unify(a, b)).collect();
+        Ok(Type::Tuple(elems?))
+      },
+      (Type::Func { param: ap, ret: ar }, Type::Func { param: bp, ret: br }) => {
+        let param = self.unify(ap, bp)?;
+        let ret = self.unify(ar, br)?;
+        Ok(Type::Func { param: Box::new(param), ret: Box::new(ret) })
+      },
+      (Type::Result { ok: ao, err: ae }, Type::Result { ok: bo, err: be }) => {
+        let ok = self.unify(ao, bo)?;
+        let err = self.unify(ae, be)?;
+        Ok(Type::Result { ok: Box::new(ok), err: Box::new(err) })
+      },
+      (Type::Maybe(a_inner), Type::Maybe(b_inner)) => {
+        let inner = self.unify(a_inner, b_inner)?;
+        Ok(Type::Maybe(Box::new(inner)))
+      },
+      (Type::Record(a_fields), Type::Record(b_fields)) => self.unify_records(a_fields, b_fields),
+      _ => Err(format!("type mismatch: expected {a}, got {b}")),
     }
+  }
 
-    fn unify_records(
-        &mut self,
-        a: &[(String, Type)],
-        b: &[(String, Type)],
-    ) -> Result<Type, String> {
-        let a_map: HashMap<&str, &Type> = a.iter().map(|(n, t)| (n.as_str(), t)).collect();
-        let b_map: HashMap<&str, &Type> = b.iter().map(|(n, t)| (n.as_str(), t)).collect();
-        let mut fields = Vec::new();
-        for (name, a_ty) in &a_map {
-            if let Some(b_ty) = b_map.get(name) {
-                fields.push((name.to_string(), self.unify(a_ty, b_ty)?));
-            } else {
-                fields.push((name.to_string(), (*a_ty).clone()));
-            }
-        }
-        for (name, b_ty) in &b_map {
-            if !a_map.contains_key(name) {
-                fields.push((name.to_string(), (*b_ty).clone()));
-            }
-        }
-        Ok(Type::Record(fields))
+  fn unify_records(&mut self, a: &[(String, Type)], b: &[(String, Type)]) -> Result<Type, String> {
+    let a_map: HashMap<&str, &Type> = a.iter().map(|(n, t)| (n.as_str(), t)).collect();
+    let b_map: HashMap<&str, &Type> = b.iter().map(|(n, t)| (n.as_str(), t)).collect();
+    let mut fields = Vec::new();
+    for (name, a_ty) in &a_map {
+      if let Some(b_ty) = b_map.get(name) {
+        fields.push((name.to_string(), self.unify(a_ty, b_ty)?));
+      } else {
+        fields.push((name.to_string(), (*a_ty).clone()));
+      }
     }
+    for (name, b_ty) in &b_map {
+      if !a_map.contains_key(name) {
+        fields.push((name.to_string(), (*b_ty).clone()));
+      }
+    }
+    Ok(Type::Record(fields))
+  }
 
-    fn occurs(&self, var: TypeVarId, ty: &Type) -> bool {
-        match ty {
-            Type::Var(id) => {
-                if *id == var {
-                    return true;
-                }
-                match self.bindings.get(*id as usize) {
-                    Some(Some(bound)) => self.occurs(var, bound),
-                    _ => false,
-                }
-            }
-            Type::List(inner) | Type::Maybe(inner) => self.occurs(var, inner),
-            Type::Map { key, value } => self.occurs(var, key) || self.occurs(var, value),
-            Type::Func { param, ret } => self.occurs(var, param) || self.occurs(var, ret),
-            Type::Result { ok, err } => self.occurs(var, ok) || self.occurs(var, err),
-            Type::Tuple(elems) => elems.iter().any(|t| self.occurs(var, t)),
-            Type::Record(fields) => fields.iter().any(|(_, t)| self.occurs(var, t)),
-            _ => false,
+  fn occurs(&self, var: TypeVarId, ty: &Type) -> bool {
+    match ty {
+      Type::Var(id) => {
+        if *id == var {
+          return true;
         }
+        match self.bindings.get(*id as usize) {
+          Some(Some(bound)) => self.occurs(var, bound),
+          _ => false,
+        }
+      },
+      Type::List(inner) | Type::Maybe(inner) => self.occurs(var, inner),
+      Type::Map { key, value } => self.occurs(var, key) || self.occurs(var, value),
+      Type::Func { param, ret } => self.occurs(var, param) || self.occurs(var, ret),
+      Type::Result { ok, err } => self.occurs(var, ok) || self.occurs(var, err),
+      Type::Tuple(elems) => elems.iter().any(|t| self.occurs(var, t)),
+      Type::Record(fields) => fields.iter().any(|(_, t)| self.occurs(var, t)),
+      _ => false,
     }
+  }
 }
 
-pub fn display(ty: &Type) -> String {
-    match ty {
-        Type::Int => "Int".into(),
-        Type::Float => "Float".into(),
-        Type::Bool => "Bool".into(),
-        Type::Str => "Str".into(),
-        Type::Regex => "Regex".into(),
-        Type::Unit => "()".into(),
-        Type::Bytes => "Bytes".into(),
-        Type::List(inner) => format!("[{}]", display(inner)),
-        Type::Map { key, value } => format!("%{{{}: {}}}", display(key), display(value)),
-        Type::Record(fields) => {
-            let fs: Vec<_> = fields
-                .iter()
-                .map(|(n, t)| format!("{n}: {}", display(t)))
-                .collect();
-            format!("{{{}}}", fs.join("  "))
+impl fmt::Display for Type {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Type::Int => write!(f, "Int"),
+      Type::Float => write!(f, "Float"),
+      Type::Bool => write!(f, "Bool"),
+      Type::Str => write!(f, "Str"),
+      Type::Regex => write!(f, "Regex"),
+      Type::Unit => write!(f, "()"),
+      Type::Bytes => write!(f, "Bytes"),
+      Type::List(inner) => write!(f, "[{inner}]"),
+      Type::Map { key, value } => write!(f, "%{{{key}: {value}}}"),
+      Type::Record(fields) => {
+        write!(f, "{{")?;
+        for (i, (n, t)) in fields.iter().enumerate() {
+          if i > 0 {
+            write!(f, "  ")?;
+          }
+          write!(f, "{n}: {t}")?;
         }
-        Type::Tuple(elems) => {
-            let es: Vec<_> = elems.iter().map(display).collect();
-            format!("({})", es.join(", "))
+        write!(f, "}}")
+      },
+      Type::Tuple(elems) => {
+        write!(f, "(")?;
+        for (i, t) in elems.iter().enumerate() {
+          if i > 0 {
+            write!(f, ", ")?;
+          }
+          write!(f, "{t}")?;
         }
-        Type::Func { param, ret } => format!("{} -> {}", display(param), display(ret)),
-        Type::Result { ok, err } => format!("{} ^ {}", display(ok), display(err)),
-        Type::Maybe(inner) => format!("Maybe {}", display(inner)),
-        Type::Union { name, .. } => name.clone(),
-        Type::Var(id) => format!("t{id}"),
-        Type::Unknown => "?".into(),
+        write!(f, ")")
+      },
+      Type::Func { param, ret } => write!(f, "{param} -> {ret}"),
+      Type::Result { ok, err } => write!(f, "{ok} ^ {err}"),
+      Type::Maybe(inner) => write!(f, "Maybe {inner}"),
+      Type::Union { name, .. } => write!(f, "{name}"),
+      Type::Var(id) => write!(f, "t{id}"),
+      Type::Unknown => write!(f, "?"),
     }
+  }
 }
