@@ -29,11 +29,11 @@ use crate::ast::{BindTarget, Expr, Program, SExpr, Stmt};
 use crate::backends::RuntimeCtx;
 use crate::env::Env;
 use crate::error::LxError;
-use crate::value::Value;
+use crate::value::LxVal;
 
 #[derive(Debug, Clone)]
 pub(crate) struct ModuleExports {
-    pub(crate) bindings: IndexMap<String, Value>,
+    pub(crate) bindings: IndexMap<String, LxVal>,
     pub(crate) variant_ctors: Vec<String>,
 }
 
@@ -76,11 +76,11 @@ impl Interpreter {
         self.env = env.into_arc();
     }
 
-    pub async fn eval_expr(&mut self, expr: &SExpr) -> Result<Value, LxError> {
+    pub async fn eval_expr(&mut self, expr: &SExpr) -> Result<LxVal, LxError> {
         self.eval(expr).await
     }
 
-    pub async fn exec(&mut self, program: &Program) -> Result<Value, LxError> {
+    pub async fn exec(&mut self, program: &Program) -> Result<LxVal, LxError> {
         let mut forward_names = Vec::new();
         for stmt in &program.stmts {
             if let Stmt::Binding(b) = &stmt.node
@@ -94,11 +94,11 @@ impl Interpreter {
         if !forward_names.is_empty() {
             let mut env = self.env.child();
             for name in &forward_names {
-                env.bind_mut(name.clone(), Value::Unit);
+                env.bind_mut(name.clone(), LxVal::Unit);
             }
             self.env = env.into_arc();
         }
-        let mut result = Value::Unit;
+        let mut result = LxVal::Unit;
         for stmt in &program.stmts {
             result = self.eval_stmt(stmt).await?;
         }
@@ -106,7 +106,7 @@ impl Interpreter {
     }
 
     #[async_recursion(?Send)]
-    pub(crate) async fn eval(&mut self, expr: &SExpr) -> Result<Value, LxError> {
+    pub(crate) async fn eval(&mut self, expr: &SExpr) -> Result<LxVal, LxError> {
         let span = expr.span;
         match &expr.node {
             Expr::Literal(lit) => self.eval_literal(lit, span).await,
@@ -129,9 +129,9 @@ impl Interpreter {
                 let f = self.eval(func).await?;
                 if let Expr::NamedArg { name, value } = &arg.node {
                     let v = self.eval(value).await?;
-                    let named = Value::Tagged {
+                    let named = LxVal::Tagged {
                         tag: Arc::from("__named"),
-                        values: Arc::new(vec![Value::Str(Arc::from(name.as_str())), v]),
+                        values: Arc::new(vec![LxVal::Str(Arc::from(name.as_str())), v]),
                     };
                     self.apply_func(f, named, span).await
                 } else {
@@ -155,11 +155,11 @@ impl Interpreter {
             Expr::Propagate(inner) => {
                 let v = self.eval(inner).await?;
                 match v {
-                    Value::Ok(v) => Ok(*v),
-                    Value::Err(_) => Err(LxError::propagate(v, span)),
-                    Value::Some(v) => Ok(*v),
-                    Value::None => Err(LxError::propagate(
-                        Value::Err(Box::new(Value::Str(Arc::from("unwrapped None")))),
+                    LxVal::Ok(v) => Ok(*v),
+                    LxVal::Err(_) => Err(LxError::propagate(v, span)),
+                    LxVal::Some(v) => Ok(*v),
+                    LxVal::None => Err(LxError::propagate(
+                        LxVal::Err(Box::new(LxVal::Str(Arc::from("unwrapped None")))),
                         span,
                     )),
                     other => Err(LxError::type_err(
@@ -171,8 +171,8 @@ impl Interpreter {
             Expr::Coalesce { expr: e, default } => {
                 let v = self.eval(e).await?;
                 match v {
-                    Value::Ok(inner) | Value::Some(inner) => Ok(*inner),
-                    Value::Err(_) | Value::None => self.eval(default).await,
+                    LxVal::Ok(inner) | LxVal::Some(inner) => Ok(*inner),
+                    LxVal::Err(_) | LxVal::None => self.eval(default).await,
                     other => Ok(other),
                 }
             }
@@ -189,7 +189,7 @@ impl Interpreter {
             Expr::Break(val) => {
                 let v = match val {
                     Some(e) => self.eval(e).await?,
-                    None => Value::Unit,
+                    None => LxVal::Unit,
                 };
                 Err(LxError::break_signal(v))
             }
@@ -201,7 +201,7 @@ impl Interpreter {
             Expr::Emit { value } => {
                 let v = self.eval(value).await?;
                 self.ctx.emit.emit(&v, span)?;
-                Ok(Value::Unit)
+                Ok(LxVal::Unit)
             }
             Expr::Yield { value } => {
                 let v = self.eval(value).await?;
@@ -222,7 +222,7 @@ impl Interpreter {
                     child.bind(name.clone(), val);
                 }
                 self.env = child.into_arc();
-                let mut result = Value::Unit;
+                let mut result = LxVal::Unit;
                 for stmt in body {
                     result = self.eval_stmt(stmt).await?;
                 }

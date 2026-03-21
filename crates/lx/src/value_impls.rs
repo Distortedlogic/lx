@@ -1,13 +1,13 @@
 use std::hash::{Hash, Hasher};
 
-use crate::value::{Value, ValueKey};
+use crate::value::{LxVal, ValueKey};
 
 #[macro_export]
 macro_rules! record {
     ($($key:expr => $val:expr),* $(,)?) => {{
         let mut m = indexmap::IndexMap::new();
         $(m.insert(String::from($key), $val);)*
-        $crate::value::Value::Record(std::sync::Arc::new(m))
+        $crate::value::LxVal::Record(std::sync::Arc::new(m))
     }};
 }
 
@@ -25,24 +25,24 @@ impl Hash for ValueKey {
     }
 }
 
-impl PartialEq for Value {
+impl PartialEq for LxVal {
     fn eq(&self, other: &Self) -> bool {
         self.structural_eq(other)
     }
 }
 
-impl Value {
+impl LxVal {
     pub(crate) fn structural_eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Value::Int(a), Value::Int(b)) => a == b,
-            (Value::Float(a), Value::Float(b)) => a.to_bits() == b.to_bits(),
-            (Value::Bool(a), Value::Bool(b)) => a == b,
-            (Value::Str(a), Value::Str(b)) => a == b,
-            (Value::Regex(a), Value::Regex(b)) => a.as_str() == b.as_str(),
-            (Value::Unit, Value::Unit) => true,
-            (Value::List(a), Value::List(b)) => a == b,
-            (Value::Tuple(a), Value::Tuple(b)) => a == b,
-            (Value::Record(a), Value::Record(b)) => {
+            (LxVal::Int(a), LxVal::Int(b)) => a == b,
+            (LxVal::Float(a), LxVal::Float(b)) => a.to_bits() == b.to_bits(),
+            (LxVal::Bool(a), LxVal::Bool(b)) => a == b,
+            (LxVal::Str(a), LxVal::Str(b)) => a == b,
+            (LxVal::Regex(a), LxVal::Regex(b)) => a.as_str() == b.as_str(),
+            (LxVal::Unit, LxVal::Unit) => true,
+            (LxVal::List(a), LxVal::List(b)) => a == b,
+            (LxVal::Tuple(a), LxVal::Tuple(b)) => a == b,
+            (LxVal::Record(a), LxVal::Record(b)) => {
                 if a.len() != b.len() {
                     return false;
                 }
@@ -55,42 +55,42 @@ impl Value {
                     .zip(b_sorted.iter())
                     .all(|((ak, av), (bk, bv))| ak == bk && av == bv)
             }
-            (Value::Map(a), Value::Map(b)) => a == b,
-            (Value::Ok(a), Value::Ok(b)) => a == b,
-            (Value::Err(a), Value::Err(b)) => a == b,
-            (Value::Some(a), Value::Some(b)) => a == b,
-            (Value::None, Value::None) => true,
+            (LxVal::Map(a), LxVal::Map(b)) => a == b,
+            (LxVal::Ok(a), LxVal::Ok(b)) => a == b,
+            (LxVal::Err(a), LxVal::Err(b)) => a == b,
+            (LxVal::Some(a), LxVal::Some(b)) => a == b,
+            (LxVal::None, LxVal::None) => true,
             (
-                Value::Tagged {
+                LxVal::Tagged {
                     tag: t1,
                     values: v1,
                 },
-                Value::Tagged {
+                LxVal::Tagged {
                     tag: t2,
                     values: v2,
                 },
             ) => t1 == t2 && v1 == v2,
             (
-                Value::Range {
+                LxVal::Range {
                     start: s1,
                     end: e1,
                     inclusive: i1,
                 },
-                Value::Range {
+                LxVal::Range {
                     start: s2,
                     end: e2,
                     inclusive: i2,
                 },
             ) => s1 == s2 && e1 == e2 && i1 == i2,
-            (Value::TraitUnion { name: n1, .. }, Value::TraitUnion { name: n2, .. }) => n1 == n2,
-            (Value::McpDecl { name: n1, .. }, Value::McpDecl { name: n2, .. }) => n1 == n2,
-            (Value::Trait { name: n1, .. }, Value::Trait { name: n2, .. }) => n1 == n2,
-            (Value::Class { name: n1, .. }, Value::Class { name: n2, .. }) => n1 == n2,
-            (Value::Object { id: i1, .. }, Value::Object { id: i2, .. }) => i1 == i2,
-            (Value::Store { id: i1 }, Value::Store { id: i2 }) => i1 == i2,
-            (Value::Stream { .. }, _) | (_, Value::Stream { .. }) => false,
-            (Value::Func(_), _) | (_, Value::Func(_)) => false,
-            (Value::BuiltinFunc(_), _) | (_, Value::BuiltinFunc(_)) => false,
+            (LxVal::TraitUnion { name: n1, .. }, LxVal::TraitUnion { name: n2, .. }) => n1 == n2,
+            (LxVal::McpDecl { name: n1, .. }, LxVal::McpDecl { name: n2, .. }) => n1 == n2,
+            (LxVal::Trait { name: n1, .. }, LxVal::Trait { name: n2, .. }) => n1 == n2,
+            (LxVal::Class { name: n1, .. }, LxVal::Class { name: n2, .. }) => n1 == n2,
+            (LxVal::Object { id: i1, .. }, LxVal::Object { id: i2, .. }) => i1 == i2,
+            (LxVal::Store { id: i1 }, LxVal::Store { id: i2 }) => i1 == i2,
+            (LxVal::Stream { .. }, _) | (_, LxVal::Stream { .. }) => false,
+            (LxVal::Func(_), _) | (_, LxVal::Func(_)) => false,
+            (LxVal::BuiltinFunc(_), _) | (_, LxVal::BuiltinFunc(_)) => false,
             _ => false,
         }
     }
@@ -98,19 +98,19 @@ impl Value {
     pub(crate) fn hash_value<H: Hasher>(&self, state: &mut H) {
         std::mem::discriminant(self).hash(state);
         match self {
-            Value::Int(n) => n.hash(state),
-            Value::Float(f) => f.to_bits().hash(state),
-            Value::Bool(b) => b.hash(state),
-            Value::Str(s) => s.hash(state),
-            Value::Regex(r) => r.as_str().hash(state),
-            Value::Unit => {}
-            Value::List(items) | Value::Tuple(items) => {
+            LxVal::Int(n) => n.hash(state),
+            LxVal::Float(f) => f.to_bits().hash(state),
+            LxVal::Bool(b) => b.hash(state),
+            LxVal::Str(s) => s.hash(state),
+            LxVal::Regex(r) => r.as_str().hash(state),
+            LxVal::Unit => {}
+            LxVal::List(items) | LxVal::Tuple(items) => {
                 items.len().hash(state);
                 for item in items.iter() {
                     item.hash_value(state);
                 }
             }
-            Value::Record(fields) => {
+            LxVal::Record(fields) => {
                 fields.len().hash(state);
                 let mut pairs: Vec<_> = fields.iter().collect();
                 pairs.sort_by(|a, b| a.0.cmp(b.0));
@@ -119,22 +119,22 @@ impl Value {
                     v.hash_value(state);
                 }
             }
-            Value::Map(entries) => {
+            LxVal::Map(entries) => {
                 entries.len().hash(state);
                 for (k, v) in entries.iter() {
                     k.hash(state);
                     v.hash_value(state);
                 }
             }
-            Value::Ok(v) | Value::Err(v) | Value::Some(v) => v.hash_value(state),
-            Value::None => {}
-            Value::Tagged { tag, values } => {
+            LxVal::Ok(v) | LxVal::Err(v) | LxVal::Some(v) => v.hash_value(state),
+            LxVal::None => {}
+            LxVal::Tagged { tag, values } => {
                 tag.hash(state);
                 for v in values.iter() {
                     v.hash_value(state);
                 }
             }
-            Value::Range {
+            LxVal::Range {
                 start,
                 end,
                 inclusive,
@@ -143,16 +143,16 @@ impl Value {
                 end.hash(state);
                 inclusive.hash(state);
             }
-            Value::TraitUnion { name, .. } => name.hash(state),
-            Value::McpDecl { name, .. } => name.hash(state),
-            Value::Trait { name, .. } => name.hash(state),
-            Value::Class { name, .. } => name.hash(state),
-            Value::Object { id, .. } => id.hash(state),
-            Value::Store { id } => id.hash(state),
-            Value::Func(_)
-            | Value::BuiltinFunc(_)
-            | Value::TaggedCtor { .. }
-            | Value::Stream { .. } => {}
+            LxVal::TraitUnion { name, .. } => name.hash(state),
+            LxVal::McpDecl { name, .. } => name.hash(state),
+            LxVal::Trait { name, .. } => name.hash(state),
+            LxVal::Class { name, .. } => name.hash(state),
+            LxVal::Object { id, .. } => id.hash(state),
+            LxVal::Store { id } => id.hash(state),
+            LxVal::Func(_)
+            | LxVal::BuiltinFunc(_)
+            | LxVal::TaggedCtor { .. }
+            | LxVal::Stream { .. } => {}
         }
     }
 }

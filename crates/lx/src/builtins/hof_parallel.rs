@@ -4,13 +4,13 @@ use std::sync::Arc;
 use crate::backends::RuntimeCtx;
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
 use super::hof::{call, get_list};
 
-type BoxFut = Pin<Box<dyn std::future::Future<Output = Result<Value, LxError>>>>;
+type BoxFut = Pin<Box<dyn std::future::Future<Output = Result<LxVal, LxError>>>>;
 
-pub(super) fn bi_pmap(args: Vec<Value>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
+pub(super) fn bi_pmap(args: Vec<LxVal>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
     Box::pin(async move {
         let items = get_list(&args[1], "pmap", sp)?;
         let func = &args[0];
@@ -26,11 +26,11 @@ pub(super) fn bi_pmap(args: Vec<Value>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFu
         for r in results {
             out.push(r?);
         }
-        Ok(Value::List(Arc::new(out)))
+        Ok(LxVal::List(Arc::new(out)))
     })
 }
 
-pub(super) fn bi_pmap_n(args: Vec<Value>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
+pub(super) fn bi_pmap_n(args: Vec<LxVal>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
     Box::pin(async move {
         let items = get_list(&args[2], "pmap_n", sp)?;
         let n = args[0]
@@ -58,6 +58,6 @@ pub(super) fn bi_pmap_n(args: Vec<Value>, sp: Span, ctx: Arc<RuntimeCtx>) -> Box
                 out.push(r?);
             }
         }
-        Ok(Value::List(Arc::new(out)))
+        Ok(LxVal::List(Arc::new(out)))
     })
 }

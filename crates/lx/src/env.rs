@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use parking_lot::Mutex;
 
-use crate::value::Value;
+use crate::value::LxVal;
 
 #[derive(Debug, Clone)]
 pub struct Env {
@@ -13,8 +13,8 @@ pub struct Env {
 
 #[derive(Debug, Clone)]
 enum Slot {
-    Immutable(Value),
-    Mutable(Arc<Mutex<Value>>),
+    Immutable(LxVal),
+    Mutable(Arc<Mutex<LxVal>>),
 }
 
 impl Env {
@@ -36,16 +36,16 @@ impl Env {
         Self::with_parent(Arc::clone(self))
     }
 
-    pub fn bind(&mut self, name: String, value: Value) {
+    pub fn bind(&mut self, name: String, value: LxVal) {
         self.bindings.insert(name, Slot::Immutable(value));
     }
 
-    pub fn bind_mut(&mut self, name: String, value: Value) {
+    pub fn bind_mut(&mut self, name: String, value: LxVal) {
         self.bindings
             .insert(name, Slot::Mutable(Arc::new(Mutex::new(value))));
     }
 
-    pub fn reassign(&self, name: &str, value: Value) -> Result<(), String> {
+    pub fn reassign(&self, name: &str, value: LxVal) -> Result<(), String> {
         if let Some(slot) = self.bindings.get(name) {
             match slot {
                 Slot::Mutable(cell) => {
@@ -63,7 +63,7 @@ impl Env {
         Err(format!("undefined variable '{name}'"))
     }
 
-    pub fn get(&self, name: &str) -> Option<Value> {
+    pub fn get(&self, name: &str) -> Option<LxVal> {
         if let Some(slot) = self.bindings.get(name) {
             return Some(match slot {
                 Slot::Immutable(v) => v.clone(),

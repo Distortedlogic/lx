@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 
 use crate::ast::{BindTarget, Stmt};
 use crate::error::LxError;
-use crate::value::Value;
+use crate::value::LxVal;
 
 use super::Interpreter;
 
@@ -26,7 +26,7 @@ fn binding_pattern_hint(pat_str: &str) -> Option<&'static str> {
 
 impl Interpreter {
     #[async_recursion(?Send)]
-    pub(crate) async fn eval_stmt(&mut self, stmt: &crate::ast::SStmt) -> Result<Value, LxError> {
+    pub(crate) async fn eval_stmt(&mut self, stmt: &crate::ast::SStmt) -> Result<LxVal, LxError> {
         match &stmt.node {
             Stmt::Binding(b) => {
                 let val = self.eval(&b.value).await?;
@@ -82,11 +82,11 @@ impl Interpreter {
                         self.env = env.into_arc();
                     }
                 }
-                Ok(Value::Unit)
+                Ok(LxVal::Unit)
             }
             Stmt::Use(use_stmt) => {
                 self.eval_use(use_stmt, stmt.span).await?;
-                Ok(Value::Unit)
+                Ok(LxVal::Unit)
             }
             Stmt::TypeDef { variants, .. } => {
                 let mut env = self.env.child();
@@ -95,7 +95,7 @@ impl Interpreter {
                     if *arity == 0 {
                         env.bind(
                             ctor_name.clone(),
-                            Value::Tagged {
+                            LxVal::Tagged {
                                 tag,
                                 values: Arc::new(vec![]),
                             },
@@ -103,7 +103,7 @@ impl Interpreter {
                     } else {
                         env.bind(
                             ctor_name.clone(),
-                            Value::TaggedCtor {
+                            LxVal::TaggedCtor {
                                 tag,
                                 arity: *arity,
                                 applied: vec![],
@@ -112,7 +112,7 @@ impl Interpreter {
                     }
                 }
                 self.env = env.into_arc();
-                Ok(Value::Unit)
+                Ok(LxVal::Unit)
             }
             Stmt::TraitUnion(def) => self.eval_trait_union(&def.name, &def.variants, stmt.span),
             Stmt::McpDecl { name, tools, .. } => self.eval_mcp_decl(name, tools, stmt.span).await,
@@ -154,7 +154,7 @@ impl Interpreter {
                     let handler = self.eval(&d.handler).await?;
                     default_impls.insert(d.name.clone(), handler);
                 }
-                let val = Value::Trait {
+                let val = LxVal::Trait {
                     name: Arc::from(name.as_str()),
                     fields: Arc::new(trait_fields),
                     methods: Arc::new(method_defs),
@@ -166,7 +166,7 @@ impl Interpreter {
                 let mut env = self.env.child();
                 env.bind(name.clone(), val);
                 self.env = env.into_arc();
-                Ok(Value::Unit)
+                Ok(LxVal::Unit)
             }
             Stmt::AgentDecl {
                 name,
@@ -208,7 +208,7 @@ impl Interpreter {
                     name,
                     stmt.span,
                 )?;
-                let val = Value::Class {
+                let val = LxVal::Class {
                     name: Arc::from(name.as_str()),
                     traits: Arc::new(all_traits.iter().map(|s| Arc::from(s.as_str())).collect()),
                     defaults: Arc::new(IndexMap::new()),
@@ -217,7 +217,7 @@ impl Interpreter {
                 let mut env = self.env.child();
                 env.bind(name.clone(), val);
                 self.env = env.into_arc();
-                Ok(Value::Unit)
+                Ok(LxVal::Unit)
             }
             Stmt::ClassDecl {
                 name,
@@ -237,7 +237,7 @@ impl Interpreter {
                     method_map.insert(m.name.clone(), handler);
                 }
                 Self::inject_traits(&mut method_map, traits, &self.env, "Class", name, stmt.span)?;
-                let val = Value::Class {
+                let val = LxVal::Class {
                     name: Arc::from(name.as_str()),
                     traits: Arc::new(traits.iter().map(|s| Arc::from(s.as_str())).collect()),
                     defaults: Arc::new(defaults_map),
@@ -246,7 +246,7 @@ impl Interpreter {
                 let mut env = self.env.child();
                 env.bind(name.clone(), val);
                 self.env = env.into_arc();
-                Ok(Value::Unit)
+                Ok(LxVal::Unit)
             }
             Stmt::FieldUpdate {
                 name,
@@ -257,16 +257,16 @@ impl Interpreter {
                 let current = self.env.get(name).ok_or_else(|| {
                     LxError::runtime(format!("undefined variable '{name}'"), stmt.span)
                 })?;
-                if let Value::Object { id, .. } = &current {
+                if let LxVal::Object { id, .. } = &current {
                     crate::stdlib::object_update_nested(*id, fields, new_val)
                         .map_err(|e| LxError::runtime(e, stmt.span))?;
-                    return Ok(Value::Unit);
+                    return Ok(LxVal::Unit);
                 }
                 let updated = Self::update_record_field(&current, fields, new_val, stmt.span)?;
                 self.env
                     .reassign(name, updated)
                     .map_err(|e| LxError::runtime(e, stmt.span))?;
-                Ok(Value::Unit)
+                Ok(LxVal::Unit)
             }
             Stmt::Expr(e) => self.eval(e).await,
         }

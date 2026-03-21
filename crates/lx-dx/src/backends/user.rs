@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use lx::backends::UserBackend;
-use lx::value::Value;
+use lx::value::LxVal;
 use tokio::sync::oneshot;
 
 use crate::event::{EventBus, RuntimeEvent, UserPromptKind, next_prompt_id};
@@ -151,7 +151,7 @@ impl UserBackend for DxUserBackend {
         });
     }
 
-    fn check_signal(&self) -> Option<Value> {
+    fn check_signal(&self) -> Option<LxVal> {
         None
     }
 }

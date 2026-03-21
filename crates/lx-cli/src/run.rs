@@ -16,7 +16,7 @@ pub fn run(
     ctx.tokio_runtime.block_on(async {
         match interp.exec(&program).await {
             Ok(val) => {
-                if !matches!(val, lx::value::Value::Unit) {
+                if !matches!(val, lx::value::LxVal::Unit) {
                     println!("{val}");
                 }
                 Ok(())

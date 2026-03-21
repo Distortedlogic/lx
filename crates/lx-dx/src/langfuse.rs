@@ -2,7 +2,7 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use chrono::Utc;
 use reqwest::Client;
-use serde_json::{Value, json};
+use serde_json::{LxVal, json};
 use uuid::Uuid;
 
 const DEFAULT_BASE_URL: &str = "https://cloud.langfuse.com";
@@ -48,7 +48,7 @@ impl LangfuseClient {
         self.enabled
     }
 
-    pub fn create_trace<'a>(&'a self, name: &str, metadata: Value) -> LangfuseTrace<'a> {
+    pub fn create_trace<'a>(&'a self, name: &str, metadata: LxVal) -> LangfuseTrace<'a> {
         let trace_id = Uuid::new_v4().to_string();
         if self.enabled {
             let body = json!({
@@ -129,7 +129,7 @@ impl LangfuseClient {
         self.fire_and_forget("events", body);
     }
 
-    fn fire_and_forget(&self, endpoint: &str, body: Value) {
+    fn fire_and_forget(&self, endpoint: &str, body: LxVal) {
         let Some(ref auth) = self.auth_header else {
             return;
         };
@@ -202,7 +202,7 @@ impl<'a> LangfuseGeneration<'a> {
         }));
     }
 
-    fn end_with(&self, body: Value) {
+    fn end_with(&self, body: LxVal) {
         if !self.client.enabled {
             return;
         }

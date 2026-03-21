@@ -14,7 +14,7 @@ use crate::builtins::mk;
 use crate::error::LxError;
 use crate::record;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
 type WsSink = Arc<
     TokioMutex<
@@ -41,22 +41,22 @@ struct WsConn {
 static WS_CONNS: LazyLock<DashMap<u64, WsConn>> = LazyLock::new(DashMap::new);
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
-fn conn_id(v: &Value, span: Span) -> Result<u64, LxError> {
-    let Value::Record(fields) = v else {
+fn conn_id(v: &LxVal, span: Span) -> Result<u64, LxError> {
+    let LxVal::Record(fields) = v else {
         return Err(LxError::type_err(
             "ws: expected connection handle Record",
             span,
         ));
     };
     match fields.get("__ws_id") {
-        Some(Value::Int(n)) => {
+        Some(LxVal::Int(n)) => {
             u64::try_from(n).map_err(|_| LxError::type_err("ws: invalid connection id", span))
         }
         _ => Err(LxError::type_err("ws: missing __ws_id in handle", span)),
     }
 }
 
-pub fn build() -> IndexMap<String, Value> {
+pub fn build() -> IndexMap<String, LxVal> {
     let mut m = IndexMap::new();
     m.insert("connect".into(), mk("ws.connect", 1, bi_connect));
     m.insert("send".into(), mk("ws.send", 2, bi_send));
@@ -66,7 +66,7 @@ pub fn build() -> IndexMap<String, Value> {
     m
 }
 
-fn bi_connect(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_connect(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let url = args[0]
         .as_str()
         .ok_or_else(|| LxError::type_err("ws.connect expects Str url", span))?
@@ -75,7 +75,7 @@ fn bi_connect(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Valu
     tokio::task::block_in_place(|| {
         tokio::runtime::Handle::current().block_on(async {
             match connect_async(&url).await {
-                Err(e) => Ok(Value::Err(Box::new(Value::Str(Arc::from(
+                Err(e) => Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(
                     format!("ws.connect: {e}").as_str(),
                 ))))),
                 Ok((ws_stream, _response)) => {
@@ -88,9 +88,9 @@ fn bi_connect(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Valu
                             stream: Arc::new(TokioMutex::new(stream)),
                         },
                     );
-                    Ok(Value::Ok(Box::new(record! {
-                        "__ws_id" => Value::Int(BigInt::from(id)),
-                        "url" => Value::Str(Arc::from(url.as_str()))
+                    Ok(LxVal::Ok(Box::new(record! {
+                        "__ws_id" => LxVal::Int(BigInt::from(id)),
+                        "url" => LxVal::Str(Arc::from(url.as_str()))
                     })))
                 }
             }
@@ -98,15 +98,15 @@ fn bi_connect(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Valu
     })
 }
 
-fn bi_close(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_close(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let id = conn_id(&args[0], span)?;
     match WS_CONNS.remove(&id) {
         Some((_, conn)) => {
             let val = tokio::task::block_in_place(|| {
                 tokio::runtime::Handle::current().block_on(async {
                     match conn.sink.lock().await.close().await {
-                        Ok(()) => Value::Ok(Box::new(Value::Unit)),
-                        Err(e) => Value::Err(Box::new(Value::Str(Arc::from(
+                        Ok(()) => LxVal::Ok(Box::new(LxVal::Unit)),
+                        Err(e) => LxVal::Err(Box::new(LxVal::Str(Arc::from(
                             format!("ws.close: {e}").as_str(),
                         )))),
                     }
@@ -114,13 +114,13 @@ fn bi_close(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value,
             });
             Ok(val)
         }
-        None => Ok(Value::Err(Box::new(Value::Str(Arc::from(
+        None => Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(
             "ws.close: connection not found",
         ))))),
     }
 }
 
-fn bi_send(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_send(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let id = conn_id(&args[0], span)?;
     let msg = args[1]
         .as_str()
@@ -130,7 +130,7 @@ fn bi_send(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, 
     let sink = match WS_CONNS.get(&id) {
         Some(conn) => conn.sink.clone(),
         None => {
-            return Ok(Value::Err(Box::new(Value::Str(Arc::from(
+            return Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(
                 "ws.send: connection not found",
             )))));
         }
@@ -139,8 +139,8 @@ fn bi_send(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, 
     tokio::task::block_in_place(|| {
         tokio::runtime::Handle::current().block_on(async {
             match sink.lock().await.send(Message::Text(msg)).await {
-                Ok(()) => Ok(Value::Ok(Box::new(Value::Unit))),
-                Err(e) => Ok(Value::Err(Box::new(Value::Str(Arc::from(
+                Ok(()) => Ok(LxVal::Ok(Box::new(LxVal::Unit))),
+                Err(e) => Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(
                     format!("ws.send: {e}").as_str(),
                 ))))),
             }
@@ -148,12 +148,12 @@ fn bi_send(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, 
     })
 }
 
-fn bi_recv(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_recv(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let id = conn_id(&args[0], span)?;
     let (sink, stream) = match WS_CONNS.get(&id) {
         Some(conn) => (conn.sink.clone(), conn.stream.clone()),
         None => {
-            return Ok(Value::Err(Box::new(Value::Str(Arc::from(
+            return Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(
                 "ws.recv: connection not found",
             )))));
         }
@@ -164,27 +164,27 @@ fn bi_recv(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, 
             loop {
                 match stream.lock().await.next().await {
                     None => {
-                        return Ok(Value::Err(Box::new(Value::Str(Arc::from(
+                        return Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(
                             "connection closed",
                         )))));
                     }
                     Some(Err(e)) => {
-                        return Ok(Value::Err(Box::new(Value::Str(Arc::from(
+                        return Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(
                             format!("ws.recv: {e}").as_str(),
                         )))));
                     }
                     Some(Ok(Message::Text(t))) => {
-                        return Ok(Value::Ok(Box::new(Value::Str(Arc::from(
+                        return Ok(LxVal::Ok(Box::new(LxVal::Str(Arc::from(
                             t.to_string().as_str(),
                         )))));
                     }
                     Some(Ok(Message::Binary(b))) => {
                         let hex: String = b.iter().map(|byte| format!("{byte:02x}")).collect();
-                        return Ok(Value::Ok(Box::new(Value::Str(Arc::from(hex.as_str())))));
+                        return Ok(LxVal::Ok(Box::new(LxVal::Str(Arc::from(hex.as_str())))));
                     }
                     Some(Ok(Message::Close(_))) => {
                         WS_CONNS.remove(&id);
-                        return Ok(Value::Err(Box::new(Value::Str(Arc::from(
+                        return Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(
                             "connection closed",
                         )))));
                     }
@@ -198,21 +198,21 @@ fn bi_recv(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, 
     })
 }
 
-fn bi_recv_json(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_recv_json(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let recv_result = bi_recv(args, span, _ctx)?;
     match recv_result {
-        Value::Ok(inner) => {
-            if let Value::Str(s) = *inner {
+        LxVal::Ok(inner) => {
+            if let LxVal::Str(s) = *inner {
                 match serde_json::from_str::<serde_json::Value>(&s) {
-                    Ok(json_val) => Ok(Value::Ok(Box::new(crate::stdlib::json_conv::json_to_lx(
+                    Ok(json_val) => Ok(LxVal::Ok(Box::new(crate::stdlib::json_conv::json_to_lx(
                         json_val,
                     )))),
-                    Err(e) => Ok(Value::Err(Box::new(Value::Str(Arc::from(
+                    Err(e) => Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(
                         format!("ws.recv_json: parse error: {e}").as_str(),
                     ))))),
                 }
             } else {
-                Ok(Value::Err(Box::new(Value::Str(Arc::from(
+                Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(
                     "ws.recv_json: expected Str from recv",
                 )))))
             }

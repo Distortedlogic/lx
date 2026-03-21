@@ -3,14 +3,14 @@ use std::sync::Arc;
 use crate::backends::RuntimeCtx;
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
 pub(super) fn invoke_flow(
     flow_path: &str,
-    input: &Value,
+    input: &LxVal,
     ctx: &Arc<RuntimeCtx>,
     span: Span,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     let path = if flow_path.starts_with("./") || flow_path.starts_with("../") {
         if let Some(ref dir) = *ctx.source_dir.lock() {
             dir.join(flow_path)

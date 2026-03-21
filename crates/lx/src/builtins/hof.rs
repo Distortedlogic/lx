@@ -6,7 +6,7 @@ use num_traits::ToPrimitive;
 use crate::backends::RuntimeCtx;
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
 pub(super) fn register(env: &mut crate::env::Env) {
     use super::{mk, mk_async};
@@ -86,33 +86,33 @@ pub(super) fn register(env: &mut crate::env::Env) {
     );
 }
 
-type BoxFut = Pin<Box<dyn std::future::Future<Output = Result<Value, LxError>>>>;
+type BoxFut = Pin<Box<dyn std::future::Future<Output = Result<LxVal, LxError>>>>;
 
 pub(super) async fn call(
-    f: &Value,
-    arg: Value,
+    f: &LxVal,
+    arg: LxVal,
     span: Span,
     ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     crate::builtins::call_value(f, arg, span, ctx).await
 }
 
-fn range_to_list(start: i64, end: i64, inclusive: bool) -> Vec<Value> {
+fn range_to_list(start: i64, end: i64, inclusive: bool) -> Vec<LxVal> {
     if inclusive {
-        (start..=end).map(|i| Value::Int(i.into())).collect()
+        (start..=end).map(|i| LxVal::Int(i.into())).collect()
     } else {
-        (start..end).map(|i| Value::Int(i.into())).collect()
+        (start..end).map(|i| LxVal::Int(i.into())).collect()
     }
 }
 
 pub(super) enum ListRef<'a> {
-    Borrowed(&'a [Value]),
-    Owned(Vec<Value>),
+    Borrowed(&'a [LxVal]),
+    Owned(Vec<LxVal>),
 }
 
 impl<'a> std::ops::Deref for ListRef<'a> {
-    type Target = [Value];
-    fn deref(&self) -> &[Value] {
+    type Target = [LxVal];
+    fn deref(&self) -> &[LxVal] {
         match self {
             ListRef::Borrowed(s) => s,
             ListRef::Owned(v) => v.as_slice(),
@@ -120,16 +120,16 @@ impl<'a> std::ops::Deref for ListRef<'a> {
     }
 }
 
-pub(super) fn get_list<'a>(v: &'a Value, name: &str, sp: Span) -> Result<ListRef<'a>, LxError> {
+pub(super) fn get_list<'a>(v: &'a LxVal, name: &str, sp: Span) -> Result<ListRef<'a>, LxError> {
     match v {
-        Value::List(l) => Ok(ListRef::Borrowed(l.as_ref())),
-        Value::Range {
+        LxVal::List(l) => Ok(ListRef::Borrowed(l.as_ref())),
+        LxVal::Range {
             start,
             end,
             inclusive,
         } => Ok(ListRef::Owned(range_to_list(*start, *end, *inclusive))),
-        Value::Stream { rx, .. } => {
-            let items: Vec<Value> = rx.lock().try_iter().collect();
+        LxVal::Stream { rx, .. } => {
+            let items: Vec<LxVal> = rx.lock().try_iter().collect();
             Ok(ListRef::Owned(items))
         }
         other => Err(LxError::type_err(
@@ -142,18 +142,18 @@ pub(super) fn get_list<'a>(v: &'a Value, name: &str, sp: Span) -> Result<ListRef
     }
 }
 
-fn bi_map(args: Vec<Value>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
+fn bi_map(args: Vec<LxVal>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
     Box::pin(async move {
         let items = get_list(&args[1], "map", sp)?;
         let mut out = Vec::with_capacity(items.len());
         for v in items.iter() {
             out.push(call(&args[0], v.clone(), sp, &ctx).await?);
         }
-        Ok(Value::List(Arc::new(out)))
+        Ok(LxVal::List(Arc::new(out)))
     })
 }
 
-fn bi_filter(args: Vec<Value>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
+fn bi_filter(args: Vec<LxVal>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
     Box::pin(async move {
         let items = get_list(&args[1], "filter", sp)?;
         let mut out = Vec::new();
@@ -173,11 +173,11 @@ fn bi_filter(args: Vec<Value>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
                 }
             }
         }
-        Ok(Value::List(Arc::new(out)))
+        Ok(LxVal::List(Arc::new(out)))
     })
 }
 
-fn bi_fold(args: Vec<Value>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
+fn bi_fold(args: Vec<LxVal>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
     Box::pin(async move {
         let items = get_list(&args[2], "fold", sp)?;
         let mut acc = args[0].clone();
@@ -190,32 +190,32 @@ fn bi_fold(args: Vec<Value>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
     })
 }
 
-fn bi_flat_map(args: Vec<Value>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
+fn bi_flat_map(args: Vec<LxVal>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
     Box::pin(async move {
         let items = get_list(&args[1], "flat_map", sp)?;
         let mut out = Vec::new();
         for v in items.iter() {
             let result = call(&args[0], v.clone(), sp, &ctx).await?;
             match result {
-                Value::List(l) => out.extend(l.as_ref().iter().cloned()),
+                LxVal::List(l) => out.extend(l.as_ref().iter().cloned()),
                 other => out.push(other),
             }
         }
-        Ok(Value::List(Arc::new(out)))
+        Ok(LxVal::List(Arc::new(out)))
     })
 }
 
-fn bi_each(args: Vec<Value>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
+fn bi_each(args: Vec<LxVal>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
     Box::pin(async move {
         let items = get_list(&args[1], "each", sp)?;
         for v in items.iter() {
             call(&args[0], v.clone(), sp, &ctx).await?;
         }
-        Ok(Value::Unit)
+        Ok(LxVal::Unit)
     })
 }
 
-fn bi_take(args: &[Value], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_take(args: &[LxVal], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let n = args[0].as_int().ok_or_else(|| {
         LxError::type_err(
             format!("take: first arg must be Int, got {}", args[0].type_name()),
@@ -226,12 +226,12 @@ fn bi_take(args: &[Value], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, Lx
         .to_usize()
         .ok_or_else(|| LxError::runtime("take: count out of range", sp))?;
     let items = get_list(&args[1], "take", sp)?;
-    Ok(Value::List(Arc::new(
+    Ok(LxVal::List(Arc::new(
         items.iter().take(n).cloned().collect(),
     )))
 }
 
-fn bi_drop(args: &[Value], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_drop(args: &[LxVal], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let n = args[0].as_int().ok_or_else(|| {
         LxError::type_err(
             format!("drop: first arg must be Int, got {}", args[0].type_name()),
@@ -242,77 +242,77 @@ fn bi_drop(args: &[Value], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, Lx
         .to_usize()
         .ok_or_else(|| LxError::runtime("drop: count out of range", sp))?;
     let items = get_list(&args[1], "drop", sp)?;
-    Ok(Value::List(Arc::new(
+    Ok(LxVal::List(Arc::new(
         items.iter().skip(n).cloned().collect(),
     )))
 }
 
-fn bi_zip(args: &[Value], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_zip(args: &[LxVal], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let a = get_list(&args[0], "zip", sp)?;
     let b = get_list(&args[1], "zip", sp)?;
-    let out: Vec<Value> = a
+    let out: Vec<LxVal> = a
         .iter()
         .zip(b.iter())
-        .map(|(x, y)| Value::Tuple(Arc::new(vec![y.clone(), x.clone()])))
+        .map(|(x, y)| LxVal::Tuple(Arc::new(vec![y.clone(), x.clone()])))
         .collect();
-    Ok(Value::List(Arc::new(out)))
+    Ok(LxVal::List(Arc::new(out)))
 }
 
-fn bi_enumerate(args: &[Value], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_enumerate(args: &[LxVal], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let items = get_list(&args[0], "enumerate", sp)?;
-    let out: Vec<Value> = items
+    let out: Vec<LxVal> = items
         .iter()
         .enumerate()
-        .map(|(i, v)| Value::Tuple(Arc::new(vec![Value::Int(i.into()), v.clone()])))
+        .map(|(i, v)| LxVal::Tuple(Arc::new(vec![LxVal::Int(i.into()), v.clone()])))
         .collect();
-    Ok(Value::List(Arc::new(out)))
+    Ok(LxVal::List(Arc::new(out)))
 }
 
-fn bi_find(args: Vec<Value>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
+fn bi_find(args: Vec<LxVal>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
     Box::pin(async move {
         let items = get_list(&args[1], "find", sp)?;
         for v in items.iter() {
             let result = call(&args[0], v.clone(), sp, &ctx).await?;
             if result.as_bool() == Some(true) {
-                return Ok(Value::Some(Box::new(v.clone())));
+                return Ok(LxVal::Some(Box::new(v.clone())));
             }
         }
-        Ok(Value::None)
+        Ok(LxVal::None)
     })
 }
 
-fn bi_any(args: Vec<Value>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
+fn bi_any(args: Vec<LxVal>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
     Box::pin(async move {
         let items = get_list(&args[1], "any?", sp)?;
         for v in items.iter() {
             if call(&args[0], v.clone(), sp, &ctx).await?.as_bool() == Some(true) {
-                return Ok(Value::Bool(true));
+                return Ok(LxVal::Bool(true));
             }
         }
-        Ok(Value::Bool(false))
+        Ok(LxVal::Bool(false))
     })
 }
 
-fn bi_all(args: Vec<Value>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
+fn bi_all(args: Vec<LxVal>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
     Box::pin(async move {
         let items = get_list(&args[1], "all?", sp)?;
         for v in items.iter() {
             if call(&args[0], v.clone(), sp, &ctx).await?.as_bool() != Some(true) {
-                return Ok(Value::Bool(false));
+                return Ok(LxVal::Bool(false));
             }
         }
-        Ok(Value::Bool(true))
+        Ok(LxVal::Bool(true))
     })
 }
 
-fn bi_none_q(args: Vec<Value>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
+fn bi_none_q(args: Vec<LxVal>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
     Box::pin(async move {
         let items = get_list(&args[1], "none?", sp)?;
         for v in items.iter() {
             if call(&args[0], v.clone(), sp, &ctx).await?.as_bool() == Some(true) {
-                return Ok(Value::Bool(false));
+                return Ok(LxVal::Bool(false));
             }
         }
-        Ok(Value::Bool(true))
+        Ok(LxVal::Bool(true))
     })
 }

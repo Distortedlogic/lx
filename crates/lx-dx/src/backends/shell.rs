@@ -5,7 +5,7 @@ use lx::backends::ProcessShellBackend;
 use lx::backends::ShellBackend;
 use lx::error::LxError;
 use lx::span::Span;
-use lx::value::Value;
+use lx::value::LxVal;
 
 use crate::event::{EventBus, RuntimeEvent};
 
@@ -16,7 +16,7 @@ pub struct DxShellBackend {
 }
 
 impl ShellBackend for DxShellBackend {
-    fn exec(&self, cmd: &str, span: Span) -> Result<Value, LxError> {
+    fn exec(&self, cmd: &str, span: Span) -> Result<LxVal, LxError> {
         self.bus.send(RuntimeEvent::ShellExec {
             agent_id: self.agent_id.clone(),
             cmd: cmd.to_string(),
@@ -28,7 +28,7 @@ impl ShellBackend for DxShellBackend {
         Ok(result)
     }
 
-    fn exec_capture(&self, cmd: &str, span: Span) -> Result<Value, LxError> {
+    fn exec_capture(&self, cmd: &str, span: Span) -> Result<LxVal, LxError> {
         self.bus.send(RuntimeEvent::ShellExec {
             agent_id: self.agent_id.clone(),
             cmd: cmd.to_string(),
@@ -62,7 +62,7 @@ impl ShellBackend for DxShellBackend {
     }
 }
 
-fn emit_shell_result(bus: &EventBus, agent_id: &str, cmd: &str, val: &Value) {
+fn emit_shell_result(bus: &EventBus, agent_id: &str, cmd: &str, val: &LxVal) {
     let (exit_code, stdout, stderr) = extract_shell_fields(val);
     bus.send(RuntimeEvent::ShellResult {
         agent_id: agent_id.to_string(),
@@ -74,9 +74,9 @@ fn emit_shell_result(bus: &EventBus, agent_id: &str, cmd: &str, val: &Value) {
     });
 }
 
-fn extract_shell_fields(val: &Value) -> (i32, String, String) {
+fn extract_shell_fields(val: &LxVal) -> (i32, String, String) {
     match val {
-        Value::Ok(inner) => {
+        LxVal::Ok(inner) => {
             let code = inner
                 .int_field("code")
                 .map(|n| format!("{n}").parse::<i32>().unwrap_or(0))
@@ -85,7 +85,7 @@ fn extract_shell_fields(val: &Value) -> (i32, String, String) {
             let stderr = inner.str_field("err").unwrap_or("").to_string();
             (code, stdout, stderr)
         }
-        Value::Err(inner) => {
+        LxVal::Err(inner) => {
             let msg = inner.str_field("msg").unwrap_or("").to_string();
             (1, String::new(), msg)
         }

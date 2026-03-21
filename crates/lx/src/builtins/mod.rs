@@ -14,10 +14,10 @@ use crate::backends::RuntimeCtx;
 use crate::env::Env;
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::{AsyncBuiltinFn, BuiltinFunc, BuiltinKind, SyncBuiltinFn, Value};
+use crate::value::{AsyncBuiltinFn, BuiltinFunc, BuiltinKind, SyncBuiltinFn, LxVal};
 
-pub fn mk(name: &'static str, arity: usize, func: SyncBuiltinFn) -> Value {
-    Value::BuiltinFunc(BuiltinFunc {
+pub fn mk(name: &'static str, arity: usize, func: SyncBuiltinFn) -> LxVal {
+    LxVal::BuiltinFunc(BuiltinFunc {
         name,
         arity,
         kind: BuiltinKind::Sync(func),
@@ -25,8 +25,8 @@ pub fn mk(name: &'static str, arity: usize, func: SyncBuiltinFn) -> Value {
     })
 }
 
-pub fn mk_async(name: &'static str, arity: usize, func: AsyncBuiltinFn) -> Value {
-    Value::BuiltinFunc(BuiltinFunc {
+pub fn mk_async(name: &'static str, arity: usize, func: AsyncBuiltinFn) -> LxVal {
+    LxVal::BuiltinFunc(BuiltinFunc {
         name,
         arity,
         kind: BuiltinKind::Async(func),
@@ -39,20 +39,20 @@ pub fn register(env: &mut Env) {
 }
 
 pub(crate) async fn call_value(
-    f: &Value,
-    arg: Value,
+    f: &LxVal,
+    arg: LxVal,
     span: Span,
     ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     call::call_value(f, arg, span, ctx).await
 }
 
 pub(crate) fn call_value_sync(
-    f: &Value,
-    arg: Value,
+    f: &LxVal,
+    arg: LxVal,
     span: Span,
     ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     tokio::task::block_in_place(|| {
         tokio::runtime::Handle::current().block_on(call::call_value(f, arg, span, ctx))
     })

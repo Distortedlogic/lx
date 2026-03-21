@@ -5,15 +5,15 @@ use num_traits::ToPrimitive;
 use crate::ast::{Expr, FieldKind, SExpr, Section, Spanned};
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::{LxFunc, Value};
+use crate::value::{LxFunc, LxVal};
 
 use super::Interpreter;
 
 impl Interpreter {
-    fn make_section_func(&self, params: &[&str], body_expr: Expr, span: Span) -> Value {
+    fn make_section_func(&self, params: &[&str], body_expr: Expr, span: Span) -> LxVal {
         let body = Spanned::new(body_expr, span);
         let arity = params.len();
-        Value::Func(Box::new(LxFunc {
+        LxVal::Func(Box::new(LxFunc {
             params: params.iter().map(|p| (*p).into()).collect(),
             defaults: vec![None; arity],
             body: Arc::new(body),
@@ -25,7 +25,7 @@ impl Interpreter {
         }))
     }
 
-    pub(super) fn eval_section(&mut self, sec: &Section, span: Span) -> Result<Value, LxError> {
+    pub(super) fn eval_section(&mut self, sec: &Section, span: Span) -> Result<LxVal, LxError> {
         match sec {
             Section::Right { op, operand } => {
                 let body = Expr::Binary {
@@ -73,26 +73,26 @@ impl Interpreter {
         expr: &SExpr,
         field: &FieldKind,
         span: Span,
-    ) -> Result<Value, LxError> {
+    ) -> Result<LxVal, LxError> {
         let val = self.eval(expr).await?;
         match field {
             FieldKind::Named(name) => match &val {
-                Value::Record(r) => Ok(r.get(name).cloned().unwrap_or(Value::None)),
-                Value::Class { methods, .. } => {
+                LxVal::Record(r) => Ok(r.get(name).cloned().unwrap_or(LxVal::None)),
+                LxVal::Class { methods, .. } => {
                     if let Some(method) = methods.get(name) {
                         Ok(Self::inject_self(method, &val))
                     } else {
-                        Ok(Value::None)
+                        Ok(LxVal::None)
                     }
                 }
-                Value::Object { id, methods, .. } => {
+                LxVal::Object { id, methods, .. } => {
                     if let Some(method) = methods.get(name) {
                         Ok(Self::inject_self(method, &val))
                     } else {
-                        Ok(crate::stdlib::object_get_field(*id, name).unwrap_or(Value::None))
+                        Ok(crate::stdlib::object_get_field(*id, name).unwrap_or(LxVal::None))
                     }
                 }
-                Value::Store { .. } => crate::stdlib::store_method(name, &val).ok_or_else(|| {
+                LxVal::Store { .. } => crate::stdlib::store_method(name, &val).ok_or_else(|| {
                     LxError::type_err(format!("Store has no method '{name}'"), span)
                 }),
                 other => Err(LxError::type_err(
@@ -102,8 +102,8 @@ impl Interpreter {
             },
             FieldKind::Index(idx) => {
                 let items = match &val {
-                    Value::Tuple(t) => t.as_ref(),
-                    Value::List(l) => l.as_ref(),
+                    LxVal::Tuple(t) => t.as_ref(),
+                    LxVal::List(l) => l.as_ref(),
                     other => {
                         return Err(LxError::type_err(
                             format!("index access on {}, not Tuple/List", other.type_name()),
@@ -124,14 +124,14 @@ impl Interpreter {
             FieldKind::Computed(key_expr) => {
                 let key = self.eval(key_expr).await?;
                 match (&val, &key) {
-                    (Value::Record(r), Value::Str(s)) => {
-                        Ok(r.get(s.as_ref()).cloned().unwrap_or(Value::None))
+                    (LxVal::Record(r), LxVal::Str(s)) => {
+                        Ok(r.get(s.as_ref()).cloned().unwrap_or(LxVal::None))
                     }
-                    (Value::Map(m), Value::Str(s)) => {
-                        let vk = crate::value::ValueKey(Value::Str(s.clone()));
-                        Ok(m.get(&vk).cloned().unwrap_or(Value::None))
+                    (LxVal::Map(m), LxVal::Str(s)) => {
+                        let vk = crate::value::ValueKey(LxVal::Str(s.clone()));
+                        Ok(m.get(&vk).cloned().unwrap_or(LxVal::None))
                     }
-                    (Value::List(items), Value::Int(n)) => {
+                    (LxVal::List(items), LxVal::Int(n)) => {
                         let i = n.to_i64().ok_or_else(|| {
                             LxError::runtime(format!("index {n} too large for i64"), span)
                         })?;
@@ -156,13 +156,13 @@ impl Interpreter {
         }
     }
 
-    fn inject_self(method: &Value, self_val: &Value) -> Value {
-        if let Value::Func(lf) = method {
+    fn inject_self(method: &LxVal, self_val: &LxVal) -> LxVal {
+        if let LxVal::Func(lf) = method {
             let mut method_env = lf.closure.child();
             method_env.bind("self".to_string(), self_val.clone());
             let mut lf = lf.clone();
             lf.closure = method_env.into_arc();
-            Value::Func(lf)
+            LxVal::Func(lf)
         } else {
             method.clone()
         }
@@ -174,13 +174,13 @@ impl Interpreter {
         then_: &SExpr,
         else_: &Option<Box<SExpr>>,
         span: Span,
-    ) -> Result<Value, LxError> {
+    ) -> Result<LxVal, LxError> {
         let cv = self.eval(cond).await?;
         match cv.as_bool() {
             Some(true) => self.eval(then_).await,
             Some(false) => match else_ {
                 Some(e) => self.eval(e).await,
-                None => Ok(Value::Unit),
+                None => Ok(LxVal::Unit),
             },
             _ => Err(LxError::type_err(
                 format!(

@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use crate::value::Value;
+use crate::value::LxVal;
 
 use super::UserBackend;
 
@@ -27,7 +27,7 @@ impl UserBackend for NoopUserBackend {
 
     fn table(&self, _headers: &[String], _rows: &[Vec<String>]) {}
 
-    fn check_signal(&self) -> Option<Value> {
+    fn check_signal(&self) -> Option<LxVal> {
         None
     }
 }
@@ -146,7 +146,7 @@ impl UserBackend for StdinStdoutUserBackend {
         }
     }
 
-    fn check_signal(&self) -> Option<Value> {
+    fn check_signal(&self) -> Option<LxVal> {
         let pid = std::process::id();
         let path = format!(".lx/signals/{pid}.json");
         let content = std::fs::read_to_string(&path).ok()?;

@@ -7,18 +7,18 @@ use crate::backends::{LogLevel, RuntimeCtx};
 use crate::env::Env;
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
 use super::mk;
 
-fn make_log_builtin(name: &'static str, level: LogLevel) -> Value {
+fn make_log_builtin(name: &'static str, level: LogLevel) -> LxVal {
     fn log_fn(
-        args: &[Value],
+        args: &[LxVal],
         span: Span,
         ctx: &Arc<RuntimeCtx>,
         level: LogLevel,
         name: &str,
-    ) -> Result<Value, LxError> {
+    ) -> Result<LxVal, LxError> {
         let s = args[0].as_str().ok_or_else(|| {
             LxError::type_err(
                 format!("log.{name} expects Str, got {}", args[0].type_name()),
@@ -26,7 +26,7 @@ fn make_log_builtin(name: &'static str, level: LogLevel) -> Value {
             )
         })?;
         ctx.log.log(level, s);
-        Ok(Value::Unit)
+        Ok(LxVal::Unit)
     }
     match level {
         LogLevel::Info => mk(name, 1, |a, s, c| log_fn(a, s, c, LogLevel::Info, "info")),
@@ -36,9 +36,9 @@ fn make_log_builtin(name: &'static str, level: LogLevel) -> Value {
     }
 }
 
-fn bi_not(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_not(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     match &args[0] {
-        Value::Bool(b) => Ok(Value::Bool(!b)),
+        LxVal::Bool(b) => Ok(LxVal::Bool(!b)),
         other => Err(LxError::type_err(
             format!("not expects Bool, got {}", other.type_name()),
             span,
@@ -46,14 +46,14 @@ fn bi_not(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, L
     }
 }
 
-fn bi_len(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_len(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let n = match &args[0] {
-        Value::Str(s) => s.chars().count(),
-        Value::List(l) => l.len(),
-        Value::Record(r) => r.len(),
-        Value::Map(m) => m.len(),
-        Value::Tuple(t) => t.len(),
-        Value::Store { id } => crate::stdlib::store_len(*id),
+        LxVal::Str(s) => s.chars().count(),
+        LxVal::List(l) => l.len(),
+        LxVal::Record(r) => r.len(),
+        LxVal::Map(m) => m.len(),
+        LxVal::Tuple(t) => t.len(),
+        LxVal::Store { id } => crate::stdlib::store_len(*id),
         other => {
             return Err(LxError::type_err(
                 format!("len expects collection, got {}", other.type_name()),
@@ -61,17 +61,17 @@ fn bi_len(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, L
             ));
         }
     };
-    Ok(Value::Int(BigInt::from(n)))
+    Ok(LxVal::Int(BigInt::from(n)))
 }
 
-fn bi_empty(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_empty(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let empty = match &args[0] {
-        Value::Str(s) => s.is_empty(),
-        Value::List(l) => l.is_empty(),
-        Value::Record(r) => r.is_empty(),
-        Value::Map(m) => m.is_empty(),
-        Value::Tuple(t) => t.is_empty(),
-        Value::Store { id } => crate::stdlib::store_len(*id) == 0,
+        LxVal::Str(s) => s.is_empty(),
+        LxVal::List(l) => l.is_empty(),
+        LxVal::Record(r) => r.is_empty(),
+        LxVal::Map(m) => m.is_empty(),
+        LxVal::Tuple(t) => t.is_empty(),
+        LxVal::Store { id } => crate::stdlib::store_len(*id) == 0,
         other => {
             return Err(LxError::type_err(
                 format!("empty? expects collection, got {}", other.type_name()),
@@ -79,37 +79,37 @@ fn bi_empty(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value,
             ));
         }
     };
-    Ok(Value::Bool(empty))
+    Ok(LxVal::Bool(empty))
 }
 
-fn bi_to_str(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    Ok(Value::Str(Arc::from(format!("{}", args[0]).as_str())))
+fn bi_to_str(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+    Ok(LxVal::Str(Arc::from(format!("{}", args[0]).as_str())))
 }
 
-fn bi_identity(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_identity(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     Ok(args[0].clone())
 }
 
-fn bi_dbg(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_dbg(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     eprintln!("[dbg] {}", args[0]);
     Ok(args[0].clone())
 }
 
-fn bi_ok_q(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    Ok(Value::Bool(matches!(&args[0], Value::Ok(_))))
+fn bi_ok_q(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+    Ok(LxVal::Bool(matches!(&args[0], LxVal::Ok(_))))
 }
 
-fn bi_err_q(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    Ok(Value::Bool(matches!(&args[0], Value::Err(_))))
+fn bi_err_q(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+    Ok(LxVal::Bool(matches!(&args[0], LxVal::Err(_))))
 }
 
-fn bi_some_q(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    Ok(Value::Bool(matches!(&args[0], Value::Some(_))))
+fn bi_some_q(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+    Ok(LxVal::Bool(matches!(&args[0], LxVal::Some(_))))
 }
 
-fn bi_even(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_even(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     match &args[0] {
-        Value::Int(n) => Ok(Value::Bool(n % BigInt::from(2) == BigInt::from(0))),
+        LxVal::Int(n) => Ok(LxVal::Bool(n % BigInt::from(2) == BigInt::from(0))),
         other => Err(LxError::type_err(
             format!("even? expects Int, got {}", other.type_name()),
             span,
@@ -117,9 +117,9 @@ fn bi_even(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, 
     }
 }
 
-fn bi_odd(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_odd(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     match &args[0] {
-        Value::Int(n) => Ok(Value::Bool(n % BigInt::from(2) != BigInt::from(0))),
+        LxVal::Int(n) => Ok(LxVal::Bool(n % BigInt::from(2) != BigInt::from(0))),
         other => Err(LxError::type_err(
             format!("odd? expects Int, got {}", other.type_name()),
             span,
@@ -127,33 +127,33 @@ fn bi_odd(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, L
     }
 }
 
-fn bi_type_of(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    Ok(Value::Str(Arc::from(args[0].type_name())))
+fn bi_type_of(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+    Ok(LxVal::Str(Arc::from(args[0].type_name())))
 }
 
-fn bi_print(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_print(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     println!("{}", args[0]);
-    Ok(Value::Unit)
+    Ok(LxVal::Unit)
 }
 
 pub fn register(env: &mut Env) {
-    env.bind("true".into(), Value::Bool(true));
-    env.bind("false".into(), Value::Bool(false));
-    env.bind("None".into(), Value::None);
+    env.bind("true".into(), LxVal::Bool(true));
+    env.bind("false".into(), LxVal::Bool(false));
+    env.bind("None".into(), LxVal::None);
     env.bind(
         "Ok".into(),
-        mk("Ok", 1, |a, _, _ctx| Ok(Value::Ok(Box::new(a[0].clone())))),
+        mk("Ok", 1, |a, _, _ctx| Ok(LxVal::Ok(Box::new(a[0].clone())))),
     );
     env.bind(
         "Err".into(),
         mk("Err", 1, |a, _, _ctx| {
-            Ok(Value::Err(Box::new(a[0].clone())))
+            Ok(LxVal::Err(Box::new(a[0].clone())))
         }),
     );
     env.bind(
         "Some".into(),
         mk("Some", 1, |a, _, _ctx| {
-            Ok(Value::Some(Box::new(a[0].clone())))
+            Ok(LxVal::Some(Box::new(a[0].clone())))
         }),
     );
     env.bind("not".into(), mk("not", 1, bi_not));
@@ -180,7 +180,7 @@ pub fn register(env: &mut Env) {
         "debug".into(),
         make_log_builtin("log.debug", LogLevel::Debug),
     );
-    env.bind("log".into(), Value::Record(Arc::new(log_fields)));
+    env.bind("log".into(), LxVal::Record(Arc::new(log_fields)));
     super::hof::register(env);
     env.bind("Store".into(), crate::stdlib::build_constructor());
     env.bind("method_of".into(), mk("method_of", 2, bi_method_of));
@@ -196,87 +196,87 @@ pub fn register(env: &mut Env) {
         mk("context.current", 1, bi_global_context_current),
     );
     ctx_fields.insert("get".into(), mk("context.get", 1, bi_global_context_get));
-    env.bind("context".into(), Value::Record(Arc::new(ctx_fields)));
+    env.bind("context".into(), LxVal::Record(Arc::new(ctx_fields)));
 }
 
-fn bi_method_of(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_method_of(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let name = match &args[1] {
-        Value::Str(s) => s.as_ref(),
-        _ => return Ok(Value::None),
+        LxVal::Str(s) => s.as_ref(),
+        _ => return Ok(LxVal::None),
     };
     match &args[0] {
-        Value::Object { methods, .. } | Value::Class { methods, .. } => match methods.get(name) {
+        LxVal::Object { methods, .. } | LxVal::Class { methods, .. } => match methods.get(name) {
             Some(method) => Ok(inject_self_for_method(method, &args[0])),
-            None => Ok(Value::None),
+            None => Ok(LxVal::None),
         },
-        _ => Ok(Value::None),
+        _ => Ok(LxVal::None),
     }
 }
 
-fn inject_self_for_method(method: &Value, self_val: &Value) -> Value {
-    if let Value::Func(lf) = method {
+fn inject_self_for_method(method: &LxVal, self_val: &LxVal) -> LxVal {
+    if let LxVal::Func(lf) = method {
         let mut env = lf.closure.child();
         env.bind("self".to_string(), self_val.clone());
         let mut lf = lf.clone();
         lf.closure = env.into_arc();
-        Value::Func(lf)
+        LxVal::Func(lf)
     } else {
         method.clone()
     }
 }
 
 fn bi_global_context_current(
-    _args: &[Value],
+    _args: &[LxVal],
     _span: Span,
     _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     crate::interpreter::ambient::global_context_current()
 }
 
 fn bi_global_context_get(
-    args: &[Value],
+    args: &[LxVal],
     span: Span,
     _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     crate::interpreter::ambient::global_context_get(&args[0], span)
 }
 
 fn bi_resolve_handler(
-    args: &[Value],
+    args: &[LxVal],
     _span: Span,
     _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     let agent = &args[0];
     if let Some(handler) = crate::stdlib::agent_reload::handler_id_from_agent(agent)
         .and_then(crate::stdlib::agent_reload::lookup_handler)
     {
         return Ok(handler);
     }
-    if let Value::Record(r) = agent
+    if let LxVal::Record(r) = agent
         && let Some(h) = r.get("handler")
     {
         return Ok(h.clone());
     }
-    Ok(Value::None)
+    Ok(LxVal::None)
 }
 
-fn bi_try(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_try(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let f = &args[0];
     let arg = args[1].clone();
     match crate::builtins::call_value_sync(f, arg, span, ctx) {
         Ok(v) => Ok(v),
-        Err(LxError::Propagate { value, .. }) => Ok(Value::Err(value)),
+        Err(LxError::Propagate { value, .. }) => Ok(LxVal::Err(value)),
         Err(e) => Err(e),
     }
 }
 
-fn bi_methods_of(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_methods_of(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let names = match &args[0] {
-        Value::Object { methods, .. } | Value::Class { methods, .. } => methods
+        LxVal::Object { methods, .. } | LxVal::Class { methods, .. } => methods
             .keys()
-            .map(|k| Value::Str(Arc::from(k.as_str())))
+            .map(|k| LxVal::Str(Arc::from(k.as_str())))
             .collect(),
         _ => vec![],
     };
-    Ok(Value::List(Arc::new(names)))
+    Ok(LxVal::List(Arc::new(names)))
 }

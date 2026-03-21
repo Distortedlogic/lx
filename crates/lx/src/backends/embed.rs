@@ -5,18 +5,18 @@ use serde_json::json;
 
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
 use super::{EmbedBackend, EmbedOpts};
 
 pub struct VoyageEmbedBackend;
 
 impl EmbedBackend for VoyageEmbedBackend {
-    fn embed(&self, texts: &[String], opts: &EmbedOpts, span: Span) -> Result<Value, LxError> {
+    fn embed(&self, texts: &[String], opts: &EmbedOpts, span: Span) -> Result<LxVal, LxError> {
         let api_key = match std::env::var("VOYAGE_API_KEY") {
             Ok(k) if !k.is_empty() => k,
             _ => {
-                return Ok(Value::Err(Box::new(Value::Str(Arc::from(
+                return Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(
                     "VOYAGE_API_KEY not set — get one at https://dash.voyageai.com/",
                 )))));
             }
@@ -49,7 +49,7 @@ impl EmbedBackend for VoyageEmbedBackend {
                 let resp = match resp {
                     Ok(r) => r,
                     Err(e) => {
-                        return Ok(Value::Err(Box::new(Value::Str(Arc::from(format!(
+                        return Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(format!(
                             "embed: request failed: {e}"
                         ))))));
                     }
@@ -62,7 +62,7 @@ impl EmbedBackend for VoyageEmbedBackend {
                     .map_err(|e| LxError::runtime(format!("embed: body read: {e}"), span))?;
 
                 if status != 200 {
-                    return Ok(Value::Err(Box::new(Value::Str(Arc::from(format!(
+                    return Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(format!(
                         "embed: API error {status}: {body_text}"
                     ))))));
                 }
@@ -74,20 +74,20 @@ impl EmbedBackend for VoyageEmbedBackend {
                     LxError::runtime("embed: missing 'data' array in response", span)
                 })?;
 
-                let vectors: Vec<Value> = data
+                let vectors: Vec<LxVal> = data
                     .iter()
                     .filter_map(|item| item.get("embedding").and_then(|e| e.as_array()))
                     .map(|arr| {
-                        let floats: Vec<Value> = arr
+                        let floats: Vec<LxVal> = arr
                             .iter()
                             .filter_map(|f| f.as_f64())
-                            .map(Value::Float)
+                            .map(LxVal::Float)
                             .collect();
-                        Value::List(Arc::new(floats))
+                        LxVal::List(Arc::new(floats))
                     })
                     .collect();
 
-                Ok(Value::Ok(Box::new(Value::List(Arc::new(vectors)))))
+                Ok(LxVal::Ok(Box::new(LxVal::List(Arc::new(vectors)))))
             })
         })
     }

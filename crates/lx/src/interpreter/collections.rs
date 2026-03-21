@@ -1,11 +1,11 @@
 use crate::ast::{Expr, ListElem, MapEntry, RecordField, SExpr};
 use crate::error::LxError;
-use crate::value::{Value, ValueKey};
+use crate::value::{LxVal, ValueKey};
 use indexmap::IndexMap;
 use std::sync::Arc;
 
 impl super::Interpreter {
-    pub(super) async fn eval_list(&mut self, elems: &[ListElem]) -> Result<Value, LxError> {
+    pub(super) async fn eval_list(&mut self, elems: &[ListElem]) -> Result<LxVal, LxError> {
         let mut out = Vec::new();
         for elem in elems {
             match elem {
@@ -13,7 +13,7 @@ impl super::Interpreter {
                 ListElem::Spread(e) => {
                     let v = self.eval(e).await?;
                     match v {
-                        Value::List(items) => out.extend(items.as_ref().iter().cloned()),
+                        LxVal::List(items) => out.extend(items.as_ref().iter().cloned()),
                         other => {
                             return Err(LxError::type_err(
                                 format!("spread requires List, got {}", other.type_name()),
@@ -24,16 +24,16 @@ impl super::Interpreter {
                 }
             }
         }
-        Ok(Value::List(Arc::new(out)))
+        Ok(LxVal::List(Arc::new(out)))
     }
 
-    pub(super) async fn eval_record(&mut self, fields: &[RecordField]) -> Result<Value, LxError> {
+    pub(super) async fn eval_record(&mut self, fields: &[RecordField]) -> Result<LxVal, LxError> {
         let mut map = IndexMap::new();
         for f in fields {
             if f.is_spread {
                 let v = self.eval(&f.value).await?;
                 match v {
-                    Value::Record(r) => {
+                    LxVal::Record(r) => {
                         for (k, v) in r.as_ref() {
                             map.insert(k.clone(), v.clone());
                         }
@@ -57,24 +57,24 @@ impl super::Interpreter {
                 map.insert(name, val);
             }
         }
-        Ok(Value::Record(Arc::new(map)))
+        Ok(LxVal::Record(Arc::new(map)))
     }
 
-    pub(super) async fn eval_tuple(&mut self, elems: &[SExpr]) -> Result<Value, LxError> {
+    pub(super) async fn eval_tuple(&mut self, elems: &[SExpr]) -> Result<LxVal, LxError> {
         let mut vals = Vec::with_capacity(elems.len());
         for e in elems {
             vals.push(self.eval(e).await?);
         }
-        Ok(Value::Tuple(Arc::new(vals)))
+        Ok(LxVal::Tuple(Arc::new(vals)))
     }
 
-    pub(super) async fn eval_map(&mut self, entries: &[MapEntry]) -> Result<Value, LxError> {
+    pub(super) async fn eval_map(&mut self, entries: &[MapEntry]) -> Result<LxVal, LxError> {
         let mut map = IndexMap::new();
         for entry in entries {
             if entry.is_spread {
                 let v = self.eval(&entry.value).await?;
                 match v {
-                    Value::Map(m) => {
+                    LxVal::Map(m) => {
                         for (k, v) in m.as_ref() {
                             map.insert(k.clone(), v.clone());
                         }
@@ -96,6 +96,6 @@ impl super::Interpreter {
                 map.insert(ValueKey(key), val);
             }
         }
-        Ok(Value::Map(Arc::new(map)))
+        Ok(LxVal::Map(Arc::new(map)))
     }
 }

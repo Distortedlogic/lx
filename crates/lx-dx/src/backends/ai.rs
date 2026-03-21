@@ -4,7 +4,7 @@ use std::time::Instant;
 use lx::backends::{AiBackend, AiOpts};
 use lx::error::LxError;
 use lx::span::Span;
-use lx::value::Value;
+use lx::value::LxVal;
 
 use crate::event::{EventBus, RuntimeEvent, next_call_id};
 use crate::langfuse::LangfuseClient;
@@ -17,7 +17,7 @@ pub struct DxAiBackend {
 }
 
 impl AiBackend for DxAiBackend {
-    fn prompt(&self, text: &str, opts: &AiOpts, span: Span) -> Result<Value, LxError> {
+    fn prompt(&self, text: &str, opts: &AiOpts, span: Span) -> Result<LxVal, LxError> {
         let call_id = next_call_id();
         let model_name = opts.model.clone().unwrap_or_else(|| "claude".to_string());
 

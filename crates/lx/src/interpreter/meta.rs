@@ -7,7 +7,7 @@ use num_traits::ToPrimitive;
 use crate::ast::SExpr;
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
 use super::Interpreter;
 
@@ -20,22 +20,22 @@ pub(super) struct MetaArgs<'a> {
     pub(super) on_switch: Option<&'a SExpr>,
 }
 
-fn make_attempt_record(strategy: &Value, quality: i64, viable: bool, reason: Value) -> Value {
+fn make_attempt_record(strategy: &LxVal, quality: i64, viable: bool, reason: LxVal) -> LxVal {
     let mut fields = IndexMap::new();
     fields.insert("strategy".into(), strategy.clone());
-    fields.insert("quality".into(), Value::Int(BigInt::from(quality)));
-    fields.insert("viable".into(), Value::Bool(viable));
+    fields.insert("quality".into(), LxVal::Int(BigInt::from(quality)));
+    fields.insert("viable".into(), LxVal::Bool(viable));
     fields.insert("reason".into(), reason);
-    Value::Record(Arc::new(fields))
+    LxVal::Record(Arc::new(fields))
 }
 
-fn extract_eval_fields(val: &Value, span: Span) -> Result<(bool, i64, Value), LxError> {
+fn extract_eval_fields(val: &LxVal, span: Span) -> Result<(bool, i64, LxVal), LxError> {
     match val {
-        Value::Record(fields) => {
+        LxVal::Record(fields) => {
             let viable = fields
                 .get("viable")
                 .and_then(|v| {
-                    if let Value::Bool(b) = v {
+                    if let LxVal::Bool(b) = v {
                         Some(*b)
                     } else {
                         None
@@ -60,7 +60,7 @@ fn extract_eval_fields(val: &Value, span: Span) -> Result<(bool, i64, Value), Lx
             let reason = fields
                 .get("reason")
                 .cloned()
-                .unwrap_or(Value::Str(Arc::from("")));
+                .unwrap_or(LxVal::Str(Arc::from("")));
             Ok((viable, quality, reason))
         }
         _ => Err(LxError::type_err(
@@ -75,7 +75,7 @@ impl Interpreter {
         &mut self,
         args: &MetaArgs<'_>,
         span: Span,
-    ) -> Result<Value, LxError> {
+    ) -> Result<LxVal, LxError> {
         let task_val = self.eval(args.task).await?;
         let strategies_val = self.eval(args.strategies).await?;
         let attempt_fn = self.eval(args.attempt).await?;
@@ -90,7 +90,7 @@ impl Interpreter {
         };
 
         let strategy_list = match &strategies_val {
-            Value::List(items) => items.as_ref().clone(),
+            LxVal::List(items) => items.as_ref().clone(),
             _ => {
                 return Err(LxError::type_err("meta: strategies must be a list", span));
             }
@@ -113,14 +113,14 @@ impl Interpreter {
                 && let Some(prev) = attempts.last()
             {
                 let prev_strat = match prev {
-                    Value::Record(f) => f.get("strategy").cloned().unwrap_or(Value::Unit),
-                    _ => Value::Unit,
+                    LxVal::Record(f) => f.get("strategy").cloned().unwrap_or(LxVal::Unit),
+                    _ => LxVal::Unit,
                 };
                 let reason_val = match prev {
-                    Value::Record(f) => f.get("reason").cloned().unwrap_or(Value::Unit),
-                    _ => Value::Unit,
+                    LxVal::Record(f) => f.get("reason").cloned().unwrap_or(LxVal::Unit),
+                    _ => LxVal::Unit,
                 };
-                let arg = Value::Tuple(Arc::new(vec![prev_strat, strategy.clone(), reason_val]));
+                let arg = LxVal::Tuple(Arc::new(vec![prev_strat, strategy.clone(), reason_val]));
                 crate::builtins::call_value(cb, arg, span, &self.ctx).await?;
             }
 
@@ -153,17 +153,17 @@ impl Interpreter {
     }
 }
 
-fn select_mode_name(val: &Value) -> Option<&str> {
+fn select_mode_name(val: &LxVal) -> Option<&str> {
     match val {
-        Value::Tagged { tag, .. } => Some(tag.as_ref()),
-        Value::Str(s) => Some(s.as_ref()),
+        LxVal::Tagged { tag, .. } => Some(tag.as_ref()),
+        LxVal::Str(s) => Some(s.as_ref()),
         _ => None,
     }
 }
 
 fn build_order(
-    strategies: &[Value],
-    select: &Option<Value>,
+    strategies: &[LxVal],
+    select: &Option<LxVal>,
     span: Span,
 ) -> Result<Vec<usize>, LxError> {
     let n = strategies.len();
@@ -194,22 +194,22 @@ fn build_order(
     }
 }
 
-fn make_ok_result(result: Value, strategy: &Value, attempts: &[Value]) -> Value {
+fn make_ok_result(result: LxVal, strategy: &LxVal, attempts: &[LxVal]) -> LxVal {
     let mut fields = IndexMap::new();
     fields.insert("result".into(), result);
     fields.insert("strategy".into(), strategy.clone());
-    fields.insert("attempts".into(), Value::List(Arc::new(attempts.to_vec())));
-    Value::Ok(Box::new(Value::Record(Arc::new(fields))))
+    fields.insert("attempts".into(), LxVal::List(Arc::new(attempts.to_vec())));
+    LxVal::Ok(Box::new(LxVal::Record(Arc::new(fields))))
 }
 
-fn make_err_result(attempts: &[Value], best_strategy: &Value, best_quality: i64) -> Value {
+fn make_err_result(attempts: &[LxVal], best_strategy: &LxVal, best_quality: i64) -> LxVal {
     let mut best_fields = IndexMap::new();
     best_fields.insert("strategy".into(), best_strategy.clone());
-    best_fields.insert("quality".into(), Value::Int(BigInt::from(best_quality)));
+    best_fields.insert("quality".into(), LxVal::Int(BigInt::from(best_quality)));
 
     let mut fields = IndexMap::new();
-    fields.insert("reason".into(), Value::Str(Arc::from("all_exhausted")));
-    fields.insert("attempts".into(), Value::List(Arc::new(attempts.to_vec())));
-    fields.insert("best".into(), Value::Record(Arc::new(best_fields)));
-    Value::Err(Box::new(Value::Record(Arc::new(fields))))
+    fields.insert("reason".into(), LxVal::Str(Arc::from("all_exhausted")));
+    fields.insert("attempts".into(), LxVal::List(Arc::new(attempts.to_vec())));
+    fields.insert("best".into(), LxVal::Record(Arc::new(best_fields)));
+    LxVal::Err(Box::new(LxVal::Record(Arc::new(fields))))
 }

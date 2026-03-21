@@ -5,14 +5,14 @@ use crate::error::LxError;
 use crate::record;
 use crate::span::Span;
 use crate::stdlib::json_conv::{json_to_lx, lx_to_json};
-use crate::value::Value;
+use crate::value::LxVal;
 
 use super::PaneBackend;
 
 pub struct YieldPaneBackend;
 
 impl PaneBackend for YieldPaneBackend {
-    fn open(&self, kind: &str, config: &Value, span: Span) -> Result<Value, LxError> {
+    fn open(&self, kind: &str, config: &LxVal, span: Span) -> Result<LxVal, LxError> {
         let config_json =
             lx_to_json(config, span).map_err(|e| LxError::runtime(format!("pane: {e}"), span))?;
         let msg = serde_json::json!({
@@ -37,12 +37,12 @@ impl PaneBackend for YieldPaneBackend {
             .and_then(|v| v.as_str())
             .ok_or_else(|| LxError::runtime("pane: response missing 'pane_id'", span))?;
         Ok(record! {
-            "__pane_id" => Value::Str(Arc::from(pane_id)),
-            "kind" => Value::Str(Arc::from(kind)),
+            "__pane_id" => LxVal::Str(Arc::from(pane_id)),
+            "kind" => LxVal::Str(Arc::from(kind)),
         })
     }
 
-    fn update(&self, pane_id: &str, content: &Value, span: Span) -> Result<(), LxError> {
+    fn update(&self, pane_id: &str, content: &LxVal, span: Span) -> Result<(), LxError> {
         let content_json =
             lx_to_json(content, span).map_err(|e| LxError::runtime(format!("pane: {e}"), span))?;
         let msg = serde_json::json!({
@@ -66,7 +66,7 @@ impl PaneBackend for YieldPaneBackend {
         Ok(())
     }
 
-    fn list(&self, span: Span) -> Result<Value, LxError> {
+    fn list(&self, span: Span) -> Result<LxVal, LxError> {
         let msg = serde_json::json!({"__pane": {"action": "list"}});
         println!("{msg}");
         std::io::stdout()

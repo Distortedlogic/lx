@@ -5,7 +5,7 @@ use num_traits::ToPrimitive;
 use crate::ast::{BinOp, Literal, SExpr, StrPart, UnaryOp};
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
 use super::Interpreter;
 
@@ -48,21 +48,21 @@ impl Interpreter {
         &mut self,
         lit: &Literal,
         span: Span,
-    ) -> Result<Value, LxError> {
+    ) -> Result<LxVal, LxError> {
         match lit {
-            Literal::Int(n) => Ok(Value::Int(n.clone())),
-            Literal::Float(f) => Ok(Value::Float(*f)),
-            Literal::Bool(b) => Ok(Value::Bool(*b)),
+            Literal::Int(n) => Ok(LxVal::Int(n.clone())),
+            Literal::Float(f) => Ok(LxVal::Float(*f)),
+            Literal::Bool(b) => Ok(LxVal::Bool(*b)),
             Literal::Str(parts) => self.eval_string_parts(parts).await,
-            Literal::RawStr(s) => Ok(Value::Str(Arc::from(s.as_str()))),
+            Literal::RawStr(s) => Ok(LxVal::Str(Arc::from(s.as_str()))),
             Literal::Regex(s) => {
                 let re = regex::Regex::new(s)
                     .map_err(|e| LxError::runtime(format!("invalid regex: {e}"), span))?;
-                Ok(Value::Regex(Arc::new(re)))
+                Ok(LxVal::Regex(Arc::new(re)))
             }
             Literal::Unit => {
                 let _ = span;
-                Ok(Value::Unit)
+                Ok(LxVal::Unit)
             }
         }
     }
@@ -70,20 +70,20 @@ impl Interpreter {
     pub(super) fn binary_op(
         &self,
         op: &BinOp,
-        lv: &Value,
-        rv: &Value,
+        lv: &LxVal,
+        rv: &LxVal,
         span: Span,
-    ) -> Result<Value, LxError> {
+    ) -> Result<LxVal, LxError> {
         match op {
-            BinOp::Eq => return Ok(Value::Bool(lv == rv)),
-            BinOp::NotEq => return Ok(Value::Bool(lv != rv)),
+            BinOp::Eq => return Ok(LxVal::Bool(lv == rv)),
+            BinOp::NotEq => return Ok(LxVal::Bool(lv != rv)),
             _ => {}
         }
         match (op, lv, rv) {
-            (BinOp::Add, Value::Int(a), Value::Int(b)) => Ok(Value::Int(a + b)),
-            (BinOp::Sub, Value::Int(a), Value::Int(b)) => Ok(Value::Int(a - b)),
-            (BinOp::Mul, Value::Int(a), Value::Int(b)) => Ok(Value::Int(a * b)),
-            (BinOp::Div, Value::Int(a), Value::Int(b)) => {
+            (BinOp::Add, LxVal::Int(a), LxVal::Int(b)) => Ok(LxVal::Int(a + b)),
+            (BinOp::Sub, LxVal::Int(a), LxVal::Int(b)) => Ok(LxVal::Int(a - b)),
+            (BinOp::Mul, LxVal::Int(a), LxVal::Int(b)) => Ok(LxVal::Int(a * b)),
+            (BinOp::Div, LxVal::Int(a), LxVal::Int(b)) => {
                 if b.sign() == num_bigint::Sign::NoSign {
                     return Err(LxError::division_by_zero(span));
                 }
@@ -93,40 +93,40 @@ impl Interpreter {
                 let bf = b
                     .to_f64()
                     .ok_or_else(|| LxError::runtime("int too large for float", span))?;
-                Ok(Value::Float(af / bf))
+                Ok(LxVal::Float(af / bf))
             }
-            (BinOp::IntDiv, Value::Int(a), Value::Int(b)) => {
+            (BinOp::IntDiv, LxVal::Int(a), LxVal::Int(b)) => {
                 if b.sign() == num_bigint::Sign::NoSign {
                     return Err(LxError::division_by_zero(span));
                 }
                 let (q, r) = num_integer::div_rem(a.clone(), b.clone());
                 if r.sign() != num_bigint::Sign::NoSign && (a.sign() != b.sign()) {
-                    Ok(Value::Int(q - 1))
+                    Ok(LxVal::Int(q - 1))
                 } else {
-                    Ok(Value::Int(q))
+                    Ok(LxVal::Int(q))
                 }
             }
-            (BinOp::Mod, Value::Int(a), Value::Int(b)) => {
+            (BinOp::Mod, LxVal::Int(a), LxVal::Int(b)) => {
                 if b.sign() == num_bigint::Sign::NoSign {
                     return Err(LxError::division_by_zero(span));
                 }
-                Ok(Value::Int(a % b))
+                Ok(LxVal::Int(a % b))
             }
-            (BinOp::Add, Value::Float(a), Value::Float(b)) => Ok(Value::Float(a + b)),
-            (BinOp::Sub, Value::Float(a), Value::Float(b)) => Ok(Value::Float(a - b)),
-            (BinOp::Mul, Value::Float(a), Value::Float(b)) => Ok(Value::Float(a * b)),
-            (BinOp::Div, Value::Float(_), Value::Float(b)) if *b == 0.0 => {
+            (BinOp::Add, LxVal::Float(a), LxVal::Float(b)) => Ok(LxVal::Float(a + b)),
+            (BinOp::Sub, LxVal::Float(a), LxVal::Float(b)) => Ok(LxVal::Float(a - b)),
+            (BinOp::Mul, LxVal::Float(a), LxVal::Float(b)) => Ok(LxVal::Float(a * b)),
+            (BinOp::Div, LxVal::Float(_), LxVal::Float(b)) if *b == 0.0 => {
                 Err(LxError::division_by_zero(span))
             }
-            (BinOp::Div, Value::Float(a), Value::Float(b)) => Ok(Value::Float(a / b)),
-            (BinOp::IntDiv, Value::Float(_), Value::Float(b)) if *b == 0.0 => {
+            (BinOp::Div, LxVal::Float(a), LxVal::Float(b)) => Ok(LxVal::Float(a / b)),
+            (BinOp::IntDiv, LxVal::Float(_), LxVal::Float(b)) if *b == 0.0 => {
                 Err(LxError::division_by_zero(span))
             }
-            (BinOp::IntDiv, Value::Float(a), Value::Float(b)) => Ok(Value::Float((a / b).floor())),
-            (BinOp::Mod, Value::Float(_), Value::Float(b)) if *b == 0.0 => {
+            (BinOp::IntDiv, LxVal::Float(a), LxVal::Float(b)) => Ok(LxVal::Float((a / b).floor())),
+            (BinOp::Mod, LxVal::Float(_), LxVal::Float(b)) if *b == 0.0 => {
                 Err(LxError::division_by_zero(span))
             }
-            (BinOp::Mod, Value::Float(a), Value::Float(b)) => Ok(Value::Float(a % b)),
+            (BinOp::Mod, LxVal::Float(a), LxVal::Float(b)) => Ok(LxVal::Float(a % b)),
             (
                 op @ (BinOp::Add
                 | BinOp::Sub
@@ -134,13 +134,13 @@ impl Interpreter {
                 | BinOp::Div
                 | BinOp::IntDiv
                 | BinOp::Mod),
-                Value::Int(a),
-                Value::Float(b),
+                LxVal::Int(a),
+                LxVal::Float(b),
             ) => {
                 let af = a
                     .to_f64()
                     .ok_or_else(|| LxError::runtime("int too large for float", span))?;
-                self.binary_op(op, &Value::Float(af), &Value::Float(*b), span)
+                self.binary_op(op, &LxVal::Float(af), &LxVal::Float(*b), span)
             }
             (
                 op @ (BinOp::Add
@@ -149,61 +149,61 @@ impl Interpreter {
                 | BinOp::Div
                 | BinOp::IntDiv
                 | BinOp::Mod),
-                Value::Float(a),
-                Value::Int(b),
+                LxVal::Float(a),
+                LxVal::Int(b),
             ) => {
                 let bf = b
                     .to_f64()
                     .ok_or_else(|| LxError::runtime("int too large for float", span))?;
-                self.binary_op(op, &Value::Float(*a), &Value::Float(bf), span)
+                self.binary_op(op, &LxVal::Float(*a), &LxVal::Float(bf), span)
             }
-            (BinOp::Lt, Value::Int(a), Value::Int(b)) => Ok(Value::Bool(a < b)),
-            (BinOp::Gt, Value::Int(a), Value::Int(b)) => Ok(Value::Bool(a > b)),
-            (BinOp::LtEq, Value::Int(a), Value::Int(b)) => Ok(Value::Bool(a <= b)),
-            (BinOp::GtEq, Value::Int(a), Value::Int(b)) => Ok(Value::Bool(a >= b)),
-            (BinOp::Lt, Value::Float(a), Value::Float(b)) => Ok(Value::Bool(a < b)),
-            (BinOp::Gt, Value::Float(a), Value::Float(b)) => Ok(Value::Bool(a > b)),
-            (BinOp::LtEq, Value::Float(a), Value::Float(b)) => Ok(Value::Bool(a <= b)),
-            (BinOp::GtEq, Value::Float(a), Value::Float(b)) => Ok(Value::Bool(a >= b)),
-            (BinOp::Lt, Value::Str(a), Value::Str(b)) => Ok(Value::Bool(a < b)),
-            (BinOp::Gt, Value::Str(a), Value::Str(b)) => Ok(Value::Bool(a > b)),
-            (BinOp::LtEq, Value::Str(a), Value::Str(b)) => Ok(Value::Bool(a <= b)),
-            (BinOp::GtEq, Value::Str(a), Value::Str(b)) => Ok(Value::Bool(a >= b)),
-            (BinOp::Concat, Value::Str(a), Value::Str(b)) => {
+            (BinOp::Lt, LxVal::Int(a), LxVal::Int(b)) => Ok(LxVal::Bool(a < b)),
+            (BinOp::Gt, LxVal::Int(a), LxVal::Int(b)) => Ok(LxVal::Bool(a > b)),
+            (BinOp::LtEq, LxVal::Int(a), LxVal::Int(b)) => Ok(LxVal::Bool(a <= b)),
+            (BinOp::GtEq, LxVal::Int(a), LxVal::Int(b)) => Ok(LxVal::Bool(a >= b)),
+            (BinOp::Lt, LxVal::Float(a), LxVal::Float(b)) => Ok(LxVal::Bool(a < b)),
+            (BinOp::Gt, LxVal::Float(a), LxVal::Float(b)) => Ok(LxVal::Bool(a > b)),
+            (BinOp::LtEq, LxVal::Float(a), LxVal::Float(b)) => Ok(LxVal::Bool(a <= b)),
+            (BinOp::GtEq, LxVal::Float(a), LxVal::Float(b)) => Ok(LxVal::Bool(a >= b)),
+            (BinOp::Lt, LxVal::Str(a), LxVal::Str(b)) => Ok(LxVal::Bool(a < b)),
+            (BinOp::Gt, LxVal::Str(a), LxVal::Str(b)) => Ok(LxVal::Bool(a > b)),
+            (BinOp::LtEq, LxVal::Str(a), LxVal::Str(b)) => Ok(LxVal::Bool(a <= b)),
+            (BinOp::GtEq, LxVal::Str(a), LxVal::Str(b)) => Ok(LxVal::Bool(a >= b)),
+            (BinOp::Concat, LxVal::Str(a), LxVal::Str(b)) => {
                 let mut s = String::from(a.as_ref());
                 s.push_str(b);
-                Ok(Value::Str(Arc::from(s)))
+                Ok(LxVal::Str(Arc::from(s)))
             }
-            (BinOp::Range, Value::Int(a), Value::Int(b)) => {
+            (BinOp::Range, LxVal::Int(a), LxVal::Int(b)) => {
                 let s = a
                     .to_i64()
                     .ok_or_else(|| LxError::runtime("range start too large", span))?;
                 let e = b
                     .to_i64()
                     .ok_or_else(|| LxError::runtime("range end too large", span))?;
-                Ok(Value::Range {
+                Ok(LxVal::Range {
                     start: s,
                     end: e,
                     inclusive: false,
                 })
             }
-            (BinOp::RangeInclusive, Value::Int(a), Value::Int(b)) => {
+            (BinOp::RangeInclusive, LxVal::Int(a), LxVal::Int(b)) => {
                 let s = a
                     .to_i64()
                     .ok_or_else(|| LxError::runtime("range start too large", span))?;
                 let e = b
                     .to_i64()
                     .ok_or_else(|| LxError::runtime("range end too large", span))?;
-                Ok(Value::Range {
+                Ok(LxVal::Range {
                     start: s,
                     end: e,
                     inclusive: true,
                 })
             }
-            (BinOp::Concat, Value::List(a), Value::List(b)) => {
+            (BinOp::Concat, LxVal::List(a), LxVal::List(b)) => {
                 let mut v = a.as_ref().clone();
                 v.extend(b.as_ref().iter().cloned());
-                Ok(Value::List(Arc::new(v)))
+                Ok(LxVal::List(Arc::new(v)))
             }
             _ => Err(LxError::type_err(
                 format!(
@@ -221,12 +221,12 @@ impl Interpreter {
         op: &UnaryOp,
         operand: &SExpr,
         span: Span,
-    ) -> Result<Value, LxError> {
+    ) -> Result<LxVal, LxError> {
         let v = self.eval(operand).await?;
         match (op, &v) {
-            (UnaryOp::Neg, Value::Int(n)) => Ok(Value::Int(-n)),
-            (UnaryOp::Neg, Value::Float(f)) => Ok(Value::Float(-f)),
-            (UnaryOp::Not, Value::Bool(b)) => Ok(Value::Bool(!b)),
+            (UnaryOp::Neg, LxVal::Int(n)) => Ok(LxVal::Int(-n)),
+            (UnaryOp::Neg, LxVal::Float(f)) => Ok(LxVal::Float(-f)),
+            (UnaryOp::Not, LxVal::Bool(b)) => Ok(LxVal::Bool(!b)),
             _ => Err(LxError::type_err(
                 format!("cannot apply '{op}' to {}", v.type_name()),
                 span,
@@ -234,7 +234,7 @@ impl Interpreter {
         }
     }
 
-    pub(super) async fn eval_string_parts(&mut self, parts: &[StrPart]) -> Result<Value, LxError> {
+    pub(super) async fn eval_string_parts(&mut self, parts: &[StrPart]) -> Result<LxVal, LxError> {
         let mut buf = String::new();
         for part in parts {
             match part {
@@ -249,7 +249,7 @@ impl Interpreter {
         if buf.starts_with('\n') {
             buf = dedent_string(&buf);
         }
-        Ok(Value::Str(Arc::from(buf)))
+        Ok(LxVal::Str(Arc::from(buf)))
     }
 
     pub(super) async fn eval_short_circuit(
@@ -258,13 +258,13 @@ impl Interpreter {
         right: &SExpr,
         is_and: bool,
         span: Span,
-    ) -> Result<Value, LxError> {
+    ) -> Result<LxVal, LxError> {
         let l = self.eval(left).await?;
         let l = self.force_defaults(l, span).await?;
         let short_circuit_on = !is_and;
         let op_name = if is_and { "&&" } else { "||" };
         match l.as_bool() {
-            Some(b) if b == short_circuit_on => Ok(Value::Bool(short_circuit_on)),
+            Some(b) if b == short_circuit_on => Ok(LxVal::Bool(short_circuit_on)),
             Some(_) => {
                 let r = self.eval(right).await?;
                 self.force_defaults(r, span).await
@@ -276,11 +276,11 @@ impl Interpreter {
         }
     }
 
-    pub(super) async fn close_resource(&mut self, val: &Value, span: Span) {
-        if let Value::Record(fields) = val
+    pub(super) async fn close_resource(&mut self, val: &LxVal, span: Span) {
+        if let LxVal::Record(fields) = val
             && let Some(close_fn) = fields.get("close")
             && let Err(e) =
-                crate::builtins::call_value(close_fn, Value::Unit, span, &self.ctx).await
+                crate::builtins::call_value(close_fn, LxVal::Unit, span, &self.ctx).await
         {
             eprintln!("close_resource: close callback failed: {e}");
         }

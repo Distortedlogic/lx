@@ -8,14 +8,14 @@ use crate::builtins::mk;
 use crate::error::LxError;
 use crate::record;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
 use crate::ast::Program;
 use crate::visitor::AstVisitor;
 
 use super::diag_walk::{DiagEdge, DiagNode, Graph, Subgraph, Walker};
 
-pub fn build() -> IndexMap<String, Value> {
+pub fn build() -> IndexMap<String, LxVal> {
     let mut m = IndexMap::new();
     m.insert("extract".into(), mk("diag.extract", 1, bi_extract));
     m.insert(
@@ -30,7 +30,7 @@ pub fn build() -> IndexMap<String, Value> {
     m
 }
 
-fn bi_extract(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_extract(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let src = args[0]
         .as_str()
         .ok_or_else(|| LxError::type_err("diag.extract expects Str", span))?;
@@ -38,7 +38,7 @@ fn bi_extract(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Valu
     Ok(graph_to_value(&graph))
 }
 
-fn bi_extract_file(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_extract_file(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let path = args[0]
         .as_str()
         .ok_or_else(|| LxError::type_err("diag.extract_file expects Str", span))?;
@@ -48,14 +48,14 @@ fn bi_extract_file(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result
     Ok(graph_to_value(&graph))
 }
 
-fn bi_to_mermaid(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_to_mermaid(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let graph = value_to_graph(&args[0], span)?;
-    Ok(Value::Str(Arc::from(to_mermaid(&graph).as_str())))
+    Ok(LxVal::Str(Arc::from(to_mermaid(&graph).as_str())))
 }
 
-fn bi_to_graph_chart(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_to_graph_chart(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let graph = value_to_graph(&args[0], span)?;
-    Ok(Value::Str(Arc::from(graph_to_echart_json(&graph).as_str())))
+    Ok(LxVal::Str(Arc::from(graph_to_echart_json(&graph).as_str())))
 }
 
 pub fn extract_mermaid(program: &Program) -> String {
@@ -225,42 +225,42 @@ fn extract_graph(src: &str, span: Span) -> Result<Graph, LxError> {
     Ok(walker.into_graph())
 }
 
-fn node_to_value(node: &DiagNode) -> Value {
-    let children: Vec<Value> = node.children.iter().map(node_to_value).collect();
+fn node_to_value(node: &DiagNode) -> LxVal {
+    let children: Vec<LxVal> = node.children.iter().map(node_to_value).collect();
     let offset_val = match node.source_offset {
-        Some(o) => Value::Int(BigInt::from(o)),
-        None => Value::None,
+        Some(o) => LxVal::Int(BigInt::from(o)),
+        None => LxVal::None,
     };
     record! {
-        "id" => Value::Str(Arc::from(node.id.as_str())),
-        "label" => Value::Str(Arc::from(node.label.as_str())),
-        "kind" => Value::Str(Arc::from(node.kind.as_str())),
-        "children" => Value::List(Arc::new(children)),
+        "id" => LxVal::Str(Arc::from(node.id.as_str())),
+        "label" => LxVal::Str(Arc::from(node.label.as_str())),
+        "kind" => LxVal::Str(Arc::from(node.kind.as_str())),
+        "children" => LxVal::List(Arc::new(children)),
         "source_offset" => offset_val,
     }
 }
 
-fn edge_to_value(edge: &DiagEdge) -> Value {
+fn edge_to_value(edge: &DiagEdge) -> LxVal {
     record! {
-        "from" => Value::Str(Arc::from(edge.from.as_str())),
-        "to" => Value::Str(Arc::from(edge.to.as_str())),
-        "label" => Value::Str(Arc::from(edge.label.as_str())),
-        "style" => Value::Str(Arc::from(edge.style.as_str())),
-        "edge_type" => Value::Str(Arc::from(edge.edge_type.as_str())),
+        "from" => LxVal::Str(Arc::from(edge.from.as_str())),
+        "to" => LxVal::Str(Arc::from(edge.to.as_str())),
+        "label" => LxVal::Str(Arc::from(edge.label.as_str())),
+        "style" => LxVal::Str(Arc::from(edge.style.as_str())),
+        "edge_type" => LxVal::Str(Arc::from(edge.edge_type.as_str())),
     }
 }
 
-fn graph_to_value(graph: &Graph) -> Value {
-    let nodes: Vec<Value> = graph.nodes.iter().map(node_to_value).collect();
-    let edges: Vec<Value> = graph.edges.iter().map(edge_to_value).collect();
+fn graph_to_value(graph: &Graph) -> LxVal {
+    let nodes: Vec<LxVal> = graph.nodes.iter().map(node_to_value).collect();
+    let edges: Vec<LxVal> = graph.edges.iter().map(edge_to_value).collect();
     record! {
-        "nodes" => Value::List(Arc::new(nodes)),
-        "edges" => Value::List(Arc::new(edges)),
+        "nodes" => LxVal::List(Arc::new(nodes)),
+        "edges" => LxVal::List(Arc::new(edges)),
     }
 }
 
-fn value_to_graph(val: &Value, span: Span) -> Result<Graph, LxError> {
-    let Value::Record(rec) = val else {
+fn value_to_graph(val: &LxVal, span: Span) -> Result<Graph, LxError> {
+    let LxVal::Record(rec) = val else {
         return Err(LxError::type_err(
             "diag.to_mermaid expects Graph record",
             span,
@@ -273,14 +273,14 @@ fn value_to_graph(val: &Value, span: Span) -> Result<Graph, LxError> {
         .get("edges")
         .ok_or_else(|| LxError::type_err("graph missing 'edges'", span))?;
     let nodes = match nodes_val {
-        Value::List(l) => l
+        LxVal::List(l) => l
             .iter()
             .map(|v| value_to_node(v, span))
             .collect::<Result<_, _>>()?,
         _ => return Err(LxError::type_err("graph.nodes must be List", span)),
     };
     let edges = match edges_val {
-        Value::List(l) => l
+        LxVal::List(l) => l
             .iter()
             .map(|v| value_to_edge(v, span))
             .collect::<Result<_, _>>()?,
@@ -293,8 +293,8 @@ fn value_to_graph(val: &Value, span: Span) -> Result<Graph, LxError> {
     })
 }
 
-fn value_to_node(val: &Value, span: Span) -> Result<DiagNode, LxError> {
-    let Value::Record(rec) = val else {
+fn value_to_node(val: &LxVal, span: Span) -> Result<DiagNode, LxError> {
+    let LxVal::Record(rec) = val else {
         return Err(LxError::type_err("node must be Record", span));
     };
     let str_field = |k: &str| -> Result<String, LxError> {
@@ -304,14 +304,14 @@ fn value_to_node(val: &Value, span: Span) -> Result<DiagNode, LxError> {
             .ok_or_else(|| LxError::type_err(format!("node missing '{k}'"), span))
     };
     let children = match rec.get("children") {
-        Some(Value::List(l)) => l
+        Some(LxVal::List(l)) => l
             .iter()
             .map(|v| value_to_node(v, span))
             .collect::<Result<_, _>>()?,
         _ => vec![],
     };
     let source_offset = rec.get("source_offset").and_then(|v| {
-        if let Value::Int(i) = v {
+        if let LxVal::Int(i) = v {
             use num_traits::ToPrimitive;
             i.to_u32()
         } else {
@@ -327,8 +327,8 @@ fn value_to_node(val: &Value, span: Span) -> Result<DiagNode, LxError> {
     })
 }
 
-fn value_to_edge(val: &Value, span: Span) -> Result<DiagEdge, LxError> {
-    let Value::Record(rec) = val else {
+fn value_to_edge(val: &LxVal, span: Span) -> Result<DiagEdge, LxError> {
+    let LxVal::Record(rec) = val else {
         return Err(LxError::type_err("edge must be Record", span));
     };
     let str_field = |k: &str| -> Result<String, LxError> {

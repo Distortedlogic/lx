@@ -5,15 +5,15 @@ use indexmap::IndexMap;
 use crate::backends::RuntimeCtx;
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
 use super::{extract_record, score_to_f64};
 
 pub(crate) fn bi_report(
-    args: &[Value],
+    args: &[LxVal],
     span: Span,
     ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     let results = extract_record(&args[0], "test.report", span)?;
     let spec_name = results
         .get("spec")
@@ -24,7 +24,7 @@ pub(crate) fn bi_report(
         .and_then(|v| v.as_float())
         .unwrap_or(0.75);
     let scenarios = match results.get("scenarios") {
-        Some(Value::List(list)) => list.as_ref().clone(),
+        Some(LxVal::List(list)) => list.as_ref().clone(),
         _ => Vec::new(),
     };
 
@@ -35,7 +35,7 @@ pub(crate) fn bi_report(
     let total = scenarios.len();
 
     for scenario_val in &scenarios {
-        let Value::Record(sr) = scenario_val else {
+        let LxVal::Record(sr) = scenario_val else {
             continue;
         };
         format_scenario(sr, &mut out, &mut passed_count);
@@ -49,11 +49,11 @@ pub(crate) fn bi_report(
         "\nOverall: {spec_score:.2} — {passed_count}/{total} scenarios passed (threshold: {threshold:.2})\n"
     ));
 
-    ctx.emit.emit(&Value::Str(Arc::from(out.as_str())), span)?;
-    Ok(Value::Unit)
+    ctx.emit.emit(&LxVal::Str(Arc::from(out.as_str())), span)?;
+    Ok(LxVal::Unit)
 }
 
-fn format_scenario(sr: &IndexMap<String, Value>, out: &mut String, passed_count: &mut usize) {
+fn format_scenario(sr: &IndexMap<String, LxVal>, out: &mut String, passed_count: &mut usize) {
     let s_name = sr.get("name").and_then(|v| v.as_str()).unwrap_or("?");
     let s_score = sr.get("score").and_then(|v| v.as_float()).unwrap_or(0.0);
     let s_passed = sr.get("passed").and_then(|v| v.as_bool()).unwrap_or(false);
@@ -61,7 +61,7 @@ fn format_scenario(sr: &IndexMap<String, Value>, out: &mut String, passed_count:
     let s_min = sr.get("min").and_then(|v| v.as_float()).unwrap_or(s_score);
     let s_max = sr.get("max").and_then(|v| v.as_float()).unwrap_or(s_score);
     let runs = match sr.get("runs") {
-        Some(Value::List(l)) => l.len(),
+        Some(LxVal::List(l)) => l.len(),
         _ => 0,
     };
     if s_passed {
@@ -74,18 +74,18 @@ fn format_scenario(sr: &IndexMap<String, Value>, out: &mut String, passed_count:
         "  {s_name} {dots} {s_score:.2} {status} ({runs} runs, mean {s_mean:.2}, min {s_min:.2}, max {s_max:.2})\n"
     ));
 
-    if let Some(Value::List(run_list)) = sr.get("runs")
+    if let Some(LxVal::List(run_list)) = sr.get("runs")
         && !run_list.is_empty()
     {
         format_dimensions(run_list, out);
     }
 }
 
-fn format_dimensions(run_list: &[Value], out: &mut String) {
+fn format_dimensions(run_list: &[LxVal], out: &mut String) {
     let mut dim_scores: IndexMap<String, Vec<f64>> = IndexMap::new();
     for run_val in run_list.iter() {
-        if let Value::Record(rr) = run_val
-            && let Some(Value::Record(scores)) = rr.get("scores")
+        if let LxVal::Record(rr) = run_val
+            && let Some(LxVal::Record(scores)) = rr.get("scores")
         {
             for (dim, val) in scores.iter() {
                 dim_scores

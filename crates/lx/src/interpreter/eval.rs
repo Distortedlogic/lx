@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::ast::{BinOp, SExpr, SStmt, SelArm};
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
 use super::Interpreter;
 
@@ -14,7 +14,7 @@ impl Interpreter {
         left: &SExpr,
         right: &SExpr,
         span: Span,
-    ) -> Result<Value, LxError> {
+    ) -> Result<LxVal, LxError> {
         if *op == BinOp::And {
             return self.eval_short_circuit(left, right, true, span).await;
         }
@@ -28,10 +28,10 @@ impl Interpreter {
         self.binary_op(op, &lv, &rv, span)
     }
 
-    pub(super) async fn eval_block(&mut self, stmts: &[SStmt]) -> Result<Value, LxError> {
+    pub(super) async fn eval_block(&mut self, stmts: &[SStmt]) -> Result<LxVal, LxError> {
         let saved = Arc::clone(&self.env);
         self.env = Arc::new(self.env.child());
-        let mut result = Value::Unit;
+        let mut result = LxVal::Unit;
         for stmt in stmts {
             result = self.eval_stmt(stmt).await?;
         }
@@ -39,7 +39,7 @@ impl Interpreter {
         Ok(result)
     }
 
-    pub(super) async fn eval_loop(&mut self, stmts: &[SStmt]) -> Result<Value, LxError> {
+    pub(super) async fn eval_loop(&mut self, stmts: &[SStmt]) -> Result<LxVal, LxError> {
         loop {
             let saved = Arc::clone(&self.env);
             self.env = Arc::new(self.env.child());
@@ -66,10 +66,10 @@ impl Interpreter {
         start: Option<&SExpr>,
         end: Option<&SExpr>,
         span: Span,
-    ) -> Result<Value, LxError> {
+    ) -> Result<LxVal, LxError> {
         let val = self.eval(expr).await?;
         let items = match &val {
-            Value::List(l) => l.as_ref(),
+            LxVal::List(l) => l.as_ref(),
             other => {
                 return Err(LxError::type_err(
                     format!("slice requires List, got {}", other.type_name()),
@@ -104,10 +104,10 @@ impl Interpreter {
         };
         let s = s.min(len);
         let en = en.min(len);
-        Ok(Value::List(Arc::new(items[s..en].to_vec())))
+        Ok(LxVal::List(Arc::new(items[s..en].to_vec())))
     }
 
-    pub(super) async fn eval_par(&mut self, stmts: &[SStmt]) -> Result<Value, LxError> {
+    pub(super) async fn eval_par(&mut self, stmts: &[SStmt]) -> Result<LxVal, LxError> {
         let stmts_owned: Vec<SStmt> = stmts.to_vec();
         let mut futures = Vec::with_capacity(stmts_owned.len());
         for stmt in stmts_owned {
@@ -134,10 +134,10 @@ impl Interpreter {
         for r in results {
             vals.push(r?);
         }
-        Ok(Value::Tuple(Arc::new(vals)))
+        Ok(LxVal::Tuple(Arc::new(vals)))
     }
 
-    pub(super) async fn eval_sel(&mut self, arms: &[SelArm], span: Span) -> Result<Value, LxError> {
+    pub(super) async fn eval_sel(&mut self, arms: &[SelArm], span: Span) -> Result<LxVal, LxError> {
         if arms.is_empty() {
             return Err(LxError::runtime("sel: no arms", span));
         }
@@ -185,8 +185,8 @@ impl Interpreter {
         resources: &[(SExpr, String)],
         body: &[SStmt],
         span: Span,
-    ) -> Result<Value, LxError> {
-        let mut acquired: Vec<(String, Value)> = Vec::new();
+    ) -> Result<LxVal, LxError> {
+        let mut acquired: Vec<(String, LxVal)> = Vec::new();
         for (expr, name) in resources {
             match self.eval(expr).await {
                 Ok(val) => acquired.push((name.clone(), val)),
@@ -204,7 +204,7 @@ impl Interpreter {
             child.bind(name.clone(), val.clone());
         }
         self.env = child.into_arc();
-        let mut result = Value::Unit;
+        let mut result = LxVal::Unit;
         let mut body_err = None;
         for stmt in body {
             match self.eval_stmt(stmt).await {
@@ -230,11 +230,11 @@ impl Interpreter {
         expr: &SExpr,
         msg: &Option<Box<SExpr>>,
         span: Span,
-    ) -> Result<Value, LxError> {
+    ) -> Result<LxVal, LxError> {
         let val = self.eval(expr).await?;
         let val = self.force_defaults(val, span).await?;
         match val.as_bool() {
-            Some(true) => Ok(Value::Unit),
+            Some(true) => Ok(LxVal::Unit),
             Some(false) => {
                 let message = match msg {
                     Some(m) => {

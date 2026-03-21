@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::ast::{Literal, MatchArm, Pattern, SExpr};
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
 impl super::Interpreter {
     pub(super) async fn eval_match(
@@ -11,7 +11,7 @@ impl super::Interpreter {
         scrutinee: &SExpr,
         arms: &[MatchArm],
         span: Span,
-    ) -> Result<Value, LxError> {
+    ) -> Result<LxVal, LxError> {
         let val = self.eval(scrutinee).await?;
         for arm in arms {
             if let Some(bindings) = self.try_match_pattern(&arm.pattern.node, &val) {
@@ -60,19 +60,19 @@ impl super::Interpreter {
     pub(super) fn try_match_pattern(
         &self,
         pattern: &Pattern,
-        value: &Value,
-    ) -> Option<Vec<(String, Value)>> {
+        value: &LxVal,
+    ) -> Option<Vec<(String, LxVal)>> {
         match pattern {
             Pattern::Wildcard => Some(vec![]),
             Pattern::Bind(name) => Some(vec![(name.clone(), value.clone())]),
             Pattern::Literal(lit) => {
                 let matches = match (lit, value) {
-                    (Literal::Int(a), Value::Int(b)) => a == b,
-                    (Literal::Float(a), Value::Float(b)) => a.to_bits() == b.to_bits(),
-                    (Literal::Bool(a), Value::Bool(b)) => a == b,
-                    (Literal::Unit, Value::Unit) => true,
-                    (Literal::RawStr(a), Value::Str(b)) => a.as_str() == b.as_ref(),
-                    (Literal::Str(parts), Value::Str(b)) => {
+                    (Literal::Int(a), LxVal::Int(b)) => a == b,
+                    (Literal::Float(a), LxVal::Float(b)) => a.to_bits() == b.to_bits(),
+                    (Literal::Bool(a), LxVal::Bool(b)) => a == b,
+                    (Literal::Unit, LxVal::Unit) => true,
+                    (Literal::RawStr(a), LxVal::Str(b)) => a.as_str() == b.as_ref(),
+                    (Literal::Str(parts), LxVal::Str(b)) => {
                         let mut s = String::new();
                         for part in parts {
                             match part {
@@ -87,7 +87,7 @@ impl super::Interpreter {
                 if matches { Some(vec![]) } else { None }
             }
             Pattern::Tuple(pats) => {
-                let Value::Tuple(items) = value else {
+                let LxVal::Tuple(items) = value else {
                     return None;
                 };
                 if pats.len() != items.len() {
@@ -100,7 +100,7 @@ impl super::Interpreter {
                 Some(bindings)
             }
             Pattern::List { elems, rest } => {
-                let Value::List(items) = value else {
+                let LxVal::List(items) = value else {
                     return None;
                 };
                 if rest.is_some() {
@@ -116,12 +116,12 @@ impl super::Interpreter {
                 }
                 if let Some(rest_name) = rest {
                     let remaining = items[elems.len()..].to_vec();
-                    bindings.push((rest_name.clone(), Value::List(Arc::new(remaining))));
+                    bindings.push((rest_name.clone(), LxVal::List(Arc::new(remaining))));
                 }
                 Some(bindings)
             }
             Pattern::Record { fields, rest } => {
-                let Value::Record(rec) = value else {
+                let LxVal::Record(rec) = value else {
                     return None;
                 };
                 let mut bindings = vec![];
@@ -136,25 +136,25 @@ impl super::Interpreter {
                 if let Some(rest_name) = rest {
                     let matched_keys: std::collections::HashSet<&str> =
                         fields.iter().map(|f| f.name.as_str()).collect();
-                    let remaining: indexmap::IndexMap<String, Value> = rec
+                    let remaining: indexmap::IndexMap<String, LxVal> = rec
                         .iter()
                         .filter(|(k, _)| !matched_keys.contains(k.as_str()))
                         .map(|(k, v)| (k.clone(), v.clone()))
                         .collect();
-                    bindings.push((rest_name.clone(), Value::Record(Arc::new(remaining))));
+                    bindings.push((rest_name.clone(), LxVal::Record(Arc::new(remaining))));
                 }
                 Some(bindings)
             }
             Pattern::Constructor { name, args } => match (name.as_str(), value) {
-                ("Ok", Value::Ok(v)) if args.len() == 1 => self.try_match_pattern(&args[0].node, v),
-                ("Err", Value::Err(v)) if args.len() == 1 => {
+                ("Ok", LxVal::Ok(v)) if args.len() == 1 => self.try_match_pattern(&args[0].node, v),
+                ("Err", LxVal::Err(v)) if args.len() == 1 => {
                     self.try_match_pattern(&args[0].node, v)
                 }
-                ("Some", Value::Some(v)) if args.len() == 1 => {
+                ("Some", LxVal::Some(v)) if args.len() == 1 => {
                     self.try_match_pattern(&args[0].node, v)
                 }
-                ("None", Value::None) if args.is_empty() => Some(vec![]),
-                (tag, Value::Tagged { tag: vtag, values })
+                ("None", LxVal::None) if args.is_empty() => Some(vec![]),
+                (tag, LxVal::Tagged { tag: vtag, values })
                     if tag == vtag.as_ref() && args.len() == values.len() =>
                 {
                     let mut bindings = vec![];

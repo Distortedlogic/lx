@@ -7,9 +7,9 @@ use crate::builtins::mk;
 use crate::error::LxError;
 use crate::record;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
-pub fn build() -> IndexMap<String, Value> {
+pub fn build() -> IndexMap<String, LxVal> {
     let mut m = IndexMap::new();
     m.insert("match".into(), mk("re.match", 2, bi_match));
     m.insert("find_all".into(), mk("re.find_all", 2, bi_find_all));
@@ -28,10 +28,10 @@ enum RePattern<'a> {
     Raw(&'a str),
 }
 
-fn get_pattern(v: &Value, span: Span) -> Result<RePattern<'_>, LxError> {
+fn get_pattern(v: &LxVal, span: Span) -> Result<RePattern<'_>, LxError> {
     match v {
-        Value::Regex(r) => Ok(RePattern::Compiled(r)),
-        Value::Str(s) => Ok(RePattern::Raw(s.as_ref())),
+        LxVal::Regex(r) => Ok(RePattern::Compiled(r)),
+        LxVal::Str(s) => Ok(RePattern::Raw(s.as_ref())),
         other => Err(LxError::type_err(
             format!(
                 "re: expected Regex or Str pattern, got {}",
@@ -56,36 +56,36 @@ fn to_regex<'a>(
     }
 }
 
-fn bi_match(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_match(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let pat = get_pattern(&args[0], span)?;
     let input = args[1]
         .as_str()
         .ok_or_else(|| LxError::type_err("re.match expects Str input", span))?;
     let re = to_regex(&pat, span)?;
     match re.find(input) {
-        Some(m) => Ok(Value::Some(Box::new(record! {
-            "text" => Value::Str(Arc::from(m.as_str())),
-            "start" => Value::Int(m.start().into()),
-            "end" => Value::Int(m.end().into()),
+        Some(m) => Ok(LxVal::Some(Box::new(record! {
+            "text" => LxVal::Str(Arc::from(m.as_str())),
+            "start" => LxVal::Int(m.start().into()),
+            "end" => LxVal::Int(m.end().into()),
         }))),
-        None => Ok(Value::None),
+        None => Ok(LxVal::None),
     }
 }
 
-fn bi_find_all(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_find_all(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let pat = get_pattern(&args[0], span)?;
     let input = args[1]
         .as_str()
         .ok_or_else(|| LxError::type_err("re.find_all expects Str input", span))?;
     let re = to_regex(&pat, span)?;
-    let matches: Vec<Value> = re
+    let matches: Vec<LxVal> = re
         .find_iter(input)
-        .map(|m| Value::Str(Arc::from(m.as_str())))
+        .map(|m| LxVal::Str(Arc::from(m.as_str())))
         .collect();
-    Ok(Value::List(Arc::new(matches)))
+    Ok(LxVal::List(Arc::new(matches)))
 }
 
-fn bi_replace(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_replace(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let pat = get_pattern(&args[0], span)?;
     let replacement = args[1]
         .as_str()
@@ -95,10 +95,10 @@ fn bi_replace(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Valu
         .ok_or_else(|| LxError::type_err("re.replace expects Str input", span))?;
     let re = to_regex(&pat, span)?;
     let result = re.replace(input, replacement);
-    Ok(Value::Str(Arc::from(result.as_ref())))
+    Ok(LxVal::Str(Arc::from(result.as_ref())))
 }
 
-fn bi_replace_all(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_replace_all(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let pat = get_pattern(&args[0], span)?;
     let replacement = args[1]
         .as_str()
@@ -108,24 +108,24 @@ fn bi_replace_all(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<
         .ok_or_else(|| LxError::type_err("re.replace_all expects Str input", span))?;
     let re = to_regex(&pat, span)?;
     let result = re.replace_all(input, replacement);
-    Ok(Value::Str(Arc::from(result.as_ref())))
+    Ok(LxVal::Str(Arc::from(result.as_ref())))
 }
 
-fn bi_split(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_split(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let pat = get_pattern(&args[0], span)?;
     let input = args[1]
         .as_str()
         .ok_or_else(|| LxError::type_err("re.split expects Str input", span))?;
     let re = to_regex(&pat, span)?;
-    let parts: Vec<Value> = re.split(input).map(|s| Value::Str(Arc::from(s))).collect();
-    Ok(Value::List(Arc::new(parts)))
+    let parts: Vec<LxVal> = re.split(input).map(|s| LxVal::Str(Arc::from(s))).collect();
+    Ok(LxVal::List(Arc::new(parts)))
 }
 
-fn bi_is_match(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_is_match(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let pat = get_pattern(&args[0], span)?;
     let input = args[1]
         .as_str()
         .ok_or_else(|| LxError::type_err("re.is_match expects Str input", span))?;
     let re = to_regex(&pat, span)?;
-    Ok(Value::Bool(re.is_match(input)))
+    Ok(LxVal::Bool(re.is_match(input)))
 }

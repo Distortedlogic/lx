@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::ast::ReceiveArm;
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
 use super::Interpreter;
 
@@ -12,24 +12,24 @@ impl Interpreter {
         &mut self,
         arms: &[ReceiveArm],
         span: Span,
-    ) -> Result<Value, LxError> {
+    ) -> Result<LxVal, LxError> {
         let ready_msg = crate::record! {
-            "kind" => Value::Str(Arc::from("ready"))
+            "kind" => LxVal::Str(Arc::from("ready"))
         };
         let mut msg = self.ctx.yield_.yield_value(ready_msg, span)?;
 
         loop {
             let action = match &msg {
-                Value::Record(r) => r
+                LxVal::Record(r) => r
                     .get("action")
                     .cloned()
                     .and_then(|v| v.as_str().map(|s| s.to_string()))
                     .unwrap_or_default(),
-                Value::None => break,
+                LxVal::None => break,
                 _ => String::new(),
             };
 
-            let mut result = Value::Err(Box::new(Value::Str(Arc::from(format!(
+            let mut result = LxVal::Err(Box::new(LxVal::Str(Arc::from(format!(
                 "unknown action: {action}"
             )))));
 
@@ -42,16 +42,16 @@ impl Interpreter {
             }
 
             let response = crate::record! {
-                "kind" => Value::Str(Arc::from("result")),
+                "kind" => LxVal::Str(Arc::from("result")),
                 "data" => result
             };
             msg = self.ctx.yield_.yield_value(response, span)?;
 
-            if matches!(msg, Value::None) {
+            if matches!(msg, LxVal::None) {
                 break;
             }
         }
 
-        Ok(Value::Unit)
+        Ok(LxVal::Unit)
     }
 }

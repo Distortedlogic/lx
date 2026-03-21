@@ -4,7 +4,7 @@ use std::time::Instant;
 use lx::backends::EmitBackend;
 use lx::error::LxError;
 use lx::span::Span;
-use lx::value::Value;
+use lx::value::LxVal;
 
 use crate::event::{EventBus, RuntimeEvent};
 
@@ -14,7 +14,7 @@ pub struct DxEmitBackend {
 }
 
 impl EmitBackend for DxEmitBackend {
-    fn emit(&self, value: &Value, _span: Span) -> Result<(), LxError> {
+    fn emit(&self, value: &LxVal, _span: Span) -> Result<(), LxError> {
         self.bus.send(RuntimeEvent::Emit {
             agent_id: self.agent_id.clone(),
             value: format!("{value}"),

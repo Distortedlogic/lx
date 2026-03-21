@@ -6,28 +6,28 @@ use pulldown_cmark::{Event, Parser, Tag, TagEnd};
 use crate::backends::RuntimeCtx;
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
 use super::{field_str, get_nodes, node_rec, nodes_by_type};
 
 pub(super) fn bi_sections(
-    args: &[Value],
+    args: &[LxVal],
     span: Span,
     _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     let nodes = get_nodes(&args[0], span)?;
     let mut sections = Vec::new();
     let mut cur: Option<(i64, String, String)> = None;
     for node in nodes {
-        if let Value::Record(r) = node {
+        if let LxVal::Record(r) = node {
             if field_str(r, "type").as_deref() == Some("heading") {
                 if let Some((lv, title, content)) = cur.take() {
                     sections.push(node_rec(
                         "section",
                         vec![
-                            ("level", Value::Int(BigInt::from(lv))),
-                            ("title", Value::Str(Arc::from(title.as_str()))),
-                            ("content", Value::Str(Arc::from(content.trim()))),
+                            ("level", LxVal::Int(BigInt::from(lv))),
+                            ("title", LxVal::Str(Arc::from(title.as_str()))),
+                            ("content", LxVal::Str(Arc::from(content.trim()))),
                         ],
                     ));
                 }
@@ -52,42 +52,42 @@ pub(super) fn bi_sections(
         sections.push(node_rec(
             "section",
             vec![
-                ("level", Value::Int(BigInt::from(lv))),
-                ("title", Value::Str(Arc::from(title.as_str()))),
-                ("content", Value::Str(Arc::from(content.trim()))),
+                ("level", LxVal::Int(BigInt::from(lv))),
+                ("title", LxVal::Str(Arc::from(title.as_str()))),
+                ("content", LxVal::Str(Arc::from(content.trim()))),
             ],
         ));
     }
-    Ok(Value::List(Arc::new(sections)))
+    Ok(LxVal::List(Arc::new(sections)))
 }
 
 pub(super) fn bi_code_blocks(
-    args: &[Value],
+    args: &[LxVal],
     span: Span,
     _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
-    Ok(Value::List(Arc::new(nodes_by_type(
+) -> Result<LxVal, LxError> {
+    Ok(LxVal::List(Arc::new(nodes_by_type(
         get_nodes(&args[0], span)?,
         "code",
     ))))
 }
 
 pub(super) fn bi_headings(
-    args: &[Value],
+    args: &[LxVal],
     span: Span,
     _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
-    Ok(Value::List(Arc::new(nodes_by_type(
+) -> Result<LxVal, LxError> {
+    Ok(LxVal::List(Arc::new(nodes_by_type(
         get_nodes(&args[0], span)?,
         "heading",
     ))))
 }
 
 pub(super) fn bi_links(
-    args: &[Value],
+    args: &[LxVal],
     span: Span,
     _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     let input = args[0]
         .as_str()
         .ok_or_else(|| LxError::type_err("md.links expects Str (markdown source)", span))?;
@@ -107,8 +107,8 @@ pub(super) fn bi_links(
                 links.push(node_rec(
                     "link",
                     vec![
-                        ("text", Value::Str(Arc::from(link_text.as_str()))),
-                        ("url", Value::Str(Arc::from(link_url.as_str()))),
+                        ("text", LxVal::Str(Arc::from(link_text.as_str()))),
+                        ("url", LxVal::Str(Arc::from(link_url.as_str()))),
                     ],
                 ));
                 in_link = false;
@@ -117,14 +117,14 @@ pub(super) fn bi_links(
             _ => {}
         }
     }
-    Ok(Value::List(Arc::new(links)))
+    Ok(LxVal::List(Arc::new(links)))
 }
 
 pub(super) fn bi_to_text(
-    args: &[Value],
+    args: &[LxVal],
     span: Span,
     _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     let input = args[0]
         .as_str()
         .ok_or_else(|| LxError::type_err("md.to_text expects Str (markdown source)", span))?;
@@ -140,5 +140,5 @@ pub(super) fn bi_to_text(
             _ => {}
         }
     }
-    Ok(Value::Str(Arc::from(out.trim())))
+    Ok(LxVal::Str(Arc::from(out.trim())))
 }

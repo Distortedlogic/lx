@@ -18,9 +18,9 @@ use crate::backends::RuntimeCtx;
 use crate::builtins::{call_value, mk};
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
-pub fn build() -> IndexMap<String, Value> {
+pub fn build() -> IndexMap<String, LxVal> {
     let mut m = IndexMap::new();
     m.insert("schedule".into(), mk("cron.schedule", 2, bi_schedule));
     m.insert("every".into(), mk("cron.every", 2, bi_every));
@@ -35,7 +35,7 @@ pub fn build() -> IndexMap<String, Value> {
     m
 }
 
-fn bi_schedule(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_schedule(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let expr = args[0]
         .as_str()
         .ok_or_else(|| LxError::type_err("cron.schedule: first arg must be Str", span))?;
@@ -59,17 +59,17 @@ fn bi_schedule(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Valu
             }
             if let Err(e) =
                 ctx.tokio_runtime
-                    .block_on(call_value(&callback, Value::Unit, span, &ctx))
+                    .block_on(call_value(&callback, LxVal::Unit, span, &ctx))
             {
                 eprintln!("[cron] schedule error: {e}");
             }
         }
         JOBS.remove(&id);
     });
-    Ok(Value::Int(BigInt::from(id)))
+    Ok(LxVal::Int(BigInt::from(id)))
 }
 
-fn bi_every(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_every(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let ms = positive_ms(&args[0], "cron.every", span)?;
     require_fn(&args[1], "cron.every", span)?;
     let callback = args[1].clone();
@@ -86,17 +86,17 @@ fn bi_every(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, 
             }
             if let Err(e) =
                 ctx.tokio_runtime
-                    .block_on(call_value(&callback, Value::Unit, span, &ctx))
+                    .block_on(call_value(&callback, LxVal::Unit, span, &ctx))
             {
                 eprintln!("[cron] every error: {e}");
             }
         }
         JOBS.remove(&id);
     });
-    Ok(Value::Int(BigInt::from(id)))
+    Ok(LxVal::Int(BigInt::from(id)))
 }
 
-fn bi_after(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_after(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let ms = positive_ms(&args[0], "cron.after", span)?;
     require_fn(&args[1], "cron.after", span)?;
     Ok(spawn_oneshot(
@@ -108,7 +108,7 @@ fn bi_after(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, 
     ))
 }
 
-fn bi_at(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_at(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let time_str = args[0]
         .as_str()
         .ok_or_else(|| LxError::type_err("cron.at: first arg must be ISO time Str", span))?;
@@ -130,7 +130,7 @@ fn bi_at(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxE
     ))
 }
 
-fn bi_cancel(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_cancel(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let id = args[0]
         .as_int()
         .ok_or_else(|| LxError::type_err("cron.cancel expects Int handle", span))?;
@@ -140,37 +140,37 @@ fn bi_cancel(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
     match JOBS.remove(&id) {
         Some((_, job)) => {
             job.cancel.store(true, Ordering::Relaxed);
-            Ok(Value::Unit)
+            Ok(LxVal::Unit)
         }
-        None => Ok(Value::Err(Box::new(Value::Str(Arc::from(
+        None => Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(
             format!("cron.cancel: no job with id {id}").as_str(),
         ))))),
     }
 }
 
-fn bi_next(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_next(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let expr = args[0]
         .as_str()
         .ok_or_else(|| LxError::type_err("cron.next: expected Str expression", span))?;
     let schedule = match parse_schedule(expr, span) {
         Ok(s) => s,
         Err(e) => {
-            return Ok(Value::Err(Box::new(Value::Str(Arc::from(
+            return Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(
                 e.to_string().as_str(),
             )))));
         }
     };
     match schedule.upcoming(Utc).next() {
-        Some(dt) => Ok(Value::Ok(Box::new(dt_to_record(dt)))),
-        None => Ok(Value::Err(Box::new(Value::Str(Arc::from(
+        Some(dt) => Ok(LxVal::Ok(Box::new(dt_to_record(dt)))),
+        None => Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(
             "no upcoming occurrence",
         ))))),
     }
 }
 
-fn bi_next_n(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_next_n(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let n = match &args[0] {
-        Value::Int(n) => {
+        LxVal::Int(n) => {
             let v: i64 = n
                 .try_into()
                 .map_err(|_| LxError::type_err("cron.next_n: count too large", span))?;
@@ -195,30 +195,30 @@ fn bi_next_n(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
     let schedule = match parse_schedule(expr, span) {
         Ok(s) => s,
         Err(e) => {
-            return Ok(Value::Err(Box::new(Value::Str(Arc::from(
+            return Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(
                 e.to_string().as_str(),
             )))));
         }
     };
-    let times: Vec<Value> = schedule.upcoming(Utc).take(n).map(dt_to_record).collect();
-    Ok(Value::List(Arc::new(times)))
+    let times: Vec<LxVal> = schedule.upcoming(Utc).take(n).map(dt_to_record).collect();
+    Ok(LxVal::List(Arc::new(times)))
 }
 
-fn bi_list(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_list(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let _ = &args[0];
-    let ids: Vec<Value> = JOBS
+    let ids: Vec<LxVal> = JOBS
         .iter()
-        .map(|e| Value::Int(BigInt::from(*e.key())))
+        .map(|e| LxVal::Int(BigInt::from(*e.key())))
         .collect();
-    Ok(Value::List(Arc::new(ids)))
+    Ok(LxVal::List(Arc::new(ids)))
 }
 
-fn bi_active(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_active(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let _ = &args[0];
-    Ok(Value::Int(BigInt::from(JOBS.len())))
+    Ok(LxVal::Int(BigInt::from(JOBS.len())))
 }
 
-fn bi_run(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_run(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let _ = &args[0];
     loop {
         if JOBS.is_empty() {
@@ -226,5 +226,5 @@ fn bi_run(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, 
         }
         thread::sleep(Duration::from_millis(500));
     }
-    Ok(Value::Unit)
+    Ok(LxVal::Unit)
 }

@@ -43,12 +43,12 @@ pub enum LxError {
     },
 
     #[error("break")]
-    BreakSignal { value: Box<crate::value::Value> },
+    BreakSignal { value: Box<crate::value::LxVal> },
 
     #[error("propagated error: {value}")]
     #[diagnostic(code(lx::propagate))]
     Propagate {
-        value: Box<crate::value::Value>,
+        value: Box<crate::value::LxVal>,
         #[label("error propagated here")]
         span: SourceSpan,
     },
@@ -96,13 +96,13 @@ impl LxError {
         Self::runtime("division by zero", span)
     }
 
-    pub fn break_signal(value: crate::value::Value) -> Self {
+    pub fn break_signal(value: crate::value::LxVal) -> Self {
         Self::BreakSignal {
             value: Box::new(value),
         }
     }
 
-    pub fn propagate(value: crate::value::Value, span: Span) -> Self {
+    pub fn propagate(value: crate::value::LxVal, span: Span) -> Self {
         Self::Propagate {
             value: Box::new(value),
             span: span.into(),

@@ -8,7 +8,7 @@ use crate::backends::{
 use crate::builtins::call_value_sync;
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
 use super::sandbox::{POLICIES, Policy, ShellPolicy, policy_id};
 
@@ -70,7 +70,7 @@ fn build_restricted_ctx(base: &Arc<RuntimeCtx>, policy: &Policy) -> Arc<RuntimeC
     })
 }
 
-pub fn bi_scope(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+pub fn bi_scope(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let pid = policy_id(&args[0], span)?;
     let policy = POLICIES
         .get(&pid)
@@ -80,7 +80,7 @@ pub fn bi_scope(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Val
     let restricted_ctx = build_restricted_ctx(ctx, &policy);
 
     POLICY_STACK.with(|stack| stack.borrow_mut().push(pid));
-    let result = call_value_sync(&args[1], Value::Unit, span, &restricted_ctx);
+    let result = call_value_sync(&args[1], LxVal::Unit, span, &restricted_ctx);
     POLICY_STACK.with(|stack| stack.borrow_mut().pop());
 
     result

@@ -6,7 +6,7 @@ use lx::error::LxError;
 use lx::interpreter::Interpreter;
 use lx::lexer;
 use lx::parser;
-use lx::value::Value;
+use lx::value::LxVal;
 
 use crate::backends::build_runtime_ctx;
 use crate::event::{EventBus, RuntimeEvent};
@@ -22,7 +22,7 @@ impl ProgramRunner {
         Self { bus, langfuse }
     }
 
-    pub async fn run(&self, source_path: &str) -> Result<Value, RunError> {
+    pub async fn run(&self, source_path: &str) -> Result<LxVal, RunError> {
         let source = tokio::fs::read_to_string(source_path)
             .await
             .map_err(|e| RunError::Io(format!("read {source_path}: {e}")))?;

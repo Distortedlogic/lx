@@ -7,7 +7,7 @@ use num_traits::ToPrimitive;
 use crate::ast::SExpr;
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
 use super::Interpreter;
 
@@ -20,9 +20,9 @@ pub(super) struct RefineArgs<'a> {
     pub(super) on_round: Option<&'a SExpr>,
 }
 
-fn extract_score(grade_result: &Value, span: Span) -> Result<i64, LxError> {
+fn extract_score(grade_result: &LxVal, span: Span) -> Result<i64, LxError> {
     match grade_result {
-        Value::Record(fields) => {
+        LxVal::Record(fields) => {
             let score = fields.get("score").ok_or_else(|| {
                 LxError::runtime(
                     "refine: grade function must return record with 'score' field",
@@ -41,9 +41,9 @@ fn extract_score(grade_result: &Value, span: Span) -> Result<i64, LxError> {
     }
 }
 
-fn extract_feedback(grade_result: &Value, span: Span) -> Result<Value, LxError> {
+fn extract_feedback(grade_result: &LxVal, span: Span) -> Result<LxVal, LxError> {
     match grade_result {
-        Value::Record(fields) => {
+        LxVal::Record(fields) => {
             let feedback = fields.get("feedback").ok_or_else(|| {
                 LxError::runtime("refine: grade result must have 'feedback' field", span)
             })?;
@@ -55,22 +55,22 @@ fn extract_feedback(grade_result: &Value, span: Span) -> Result<Value, LxError> 
 
 fn make_refine_result(
     tag: &str,
-    work: Value,
+    work: LxVal,
     rounds: i64,
     final_score: i64,
     reason: Option<&str>,
-) -> Value {
+) -> LxVal {
     let mut fields = IndexMap::new();
     fields.insert("work".into(), work);
-    fields.insert("rounds".into(), Value::Int(BigInt::from(rounds)));
-    fields.insert("final_score".into(), Value::Int(BigInt::from(final_score)));
+    fields.insert("rounds".into(), LxVal::Int(BigInt::from(rounds)));
+    fields.insert("final_score".into(), LxVal::Int(BigInt::from(final_score)));
     if let Some(r) = reason {
-        fields.insert("reason".into(), Value::Str(Arc::from(r)));
+        fields.insert("reason".into(), LxVal::Str(Arc::from(r)));
     }
-    let record = Value::Record(Arc::new(fields));
+    let record = LxVal::Record(Arc::new(fields));
     match tag {
-        "ok" => Value::Ok(Box::new(record)),
-        _ => Value::Err(Box::new(record)),
+        "ok" => LxVal::Ok(Box::new(record)),
+        _ => LxVal::Err(Box::new(record)),
     }
 }
 
@@ -79,7 +79,7 @@ impl Interpreter {
         &mut self,
         args: &RefineArgs<'_>,
         span: Span,
-    ) -> Result<Value, LxError> {
+    ) -> Result<LxVal, LxError> {
         let mut work = self.eval(args.initial).await?;
         let grade_fn = self.eval(args.grade).await?;
         let revise_fn = self.eval(args.revise).await?;
@@ -119,10 +119,10 @@ impl Interpreter {
             score = extract_score(&grade_result, span)?;
 
             if let Some(ref cb) = on_round_fn {
-                let arg = Value::Tuple(Arc::new(vec![
-                    Value::Int(BigInt::from(round)),
+                let arg = LxVal::Tuple(Arc::new(vec![
+                    LxVal::Int(BigInt::from(round)),
                     work.clone(),
-                    Value::Int(BigInt::from(score)),
+                    LxVal::Int(BigInt::from(score)),
                 ]));
                 crate::builtins::call_value(cb, arg, span, &self.ctx).await?;
             }

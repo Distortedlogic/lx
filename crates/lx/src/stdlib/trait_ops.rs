@@ -6,32 +6,32 @@ use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::{McpOutputDef, TraitMethodDef, Value};
+use crate::value::{McpOutputDef, TraitMethodDef, LxVal};
 
-pub fn build() -> IndexMap<String, Value> {
+pub fn build() -> IndexMap<String, LxVal> {
     let mut m = IndexMap::new();
     m.insert("methods".into(), mk("trait.methods", 1, bi_methods));
     m.insert("match".into(), mk("trait.match", 2, bi_match));
     m
 }
 
-fn method_to_record(m: &TraitMethodDef) -> Value {
+fn method_to_record(m: &TraitMethodDef) -> LxVal {
     let mut rec = IndexMap::new();
-    rec.insert("name".into(), Value::Str(Arc::from(m.name.as_str())));
-    let input_fields: Vec<Value> = m
+    rec.insert("name".into(), LxVal::Str(Arc::from(m.name.as_str())));
+    let input_fields: Vec<LxVal> = m
         .input
         .iter()
         .map(|f| {
             let mut fr = IndexMap::new();
-            fr.insert("name".into(), Value::Str(Arc::from(f.name.as_str())));
-            fr.insert("type".into(), Value::Str(Arc::from(f.type_name.as_str())));
-            Value::Record(Arc::new(fr))
+            fr.insert("name".into(), LxVal::Str(Arc::from(f.name.as_str())));
+            fr.insert("type".into(), LxVal::Str(Arc::from(f.type_name.as_str())));
+            LxVal::Record(Arc::new(fr))
         })
         .collect();
-    rec.insert("input".into(), Value::List(Arc::new(input_fields)));
+    rec.insert("input".into(), LxVal::List(Arc::new(input_fields)));
     let output_str = output_type_str(&m.output);
-    rec.insert("output".into(), Value::Str(Arc::from(output_str.as_str())));
-    Value::Record(Arc::new(rec))
+    rec.insert("output".into(), LxVal::Str(Arc::from(output_str.as_str())));
+    LxVal::Record(Arc::new(rec))
 }
 
 fn output_type_str(out: &McpOutputDef) -> String {
@@ -48,8 +48,8 @@ fn output_type_str(out: &McpOutputDef) -> String {
     }
 }
 
-fn bi_methods(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let Value::Trait { methods, .. } = &args[0] else {
+fn bi_methods(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+    let LxVal::Trait { methods, .. } = &args[0] else {
         return Err(LxError::type_err(
             format!(
                 "trait.methods: expected Trait, got {} `{}`",
@@ -59,12 +59,12 @@ fn bi_methods(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Valu
             span,
         ));
     };
-    let records: Vec<Value> = methods.iter().map(method_to_record).collect();
-    Ok(Value::List(Arc::new(records)))
+    let records: Vec<LxVal> = methods.iter().map(method_to_record).collect();
+    Ok(LxVal::List(Arc::new(records)))
 }
 
-fn bi_match(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
-    let Value::Trait { methods, .. } = &args[0] else {
+fn bi_match(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+    let LxVal::Trait { methods, .. } = &args[0] else {
         return Err(LxError::type_err(
             format!(
                 "trait.match: expected Trait, got {} `{}`",
@@ -108,10 +108,10 @@ fn bi_match(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value,
     }
     if best_score > 0.0 {
         let mut rec = IndexMap::new();
-        rec.insert("method".into(), Value::Str(Arc::from(best_name.as_str())));
-        rec.insert("score".into(), Value::Float(best_score));
-        Ok(Value::Record(Arc::new(rec)))
+        rec.insert("method".into(), LxVal::Str(Arc::from(best_name.as_str())));
+        rec.insert("score".into(), LxVal::Float(best_score));
+        Ok(LxVal::Record(Arc::new(rec)))
     } else {
-        Ok(Value::None)
+        Ok(LxVal::None)
     }
 }

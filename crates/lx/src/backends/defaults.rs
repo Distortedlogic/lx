@@ -11,7 +11,7 @@ use crate::error::LxError;
 use crate::record;
 use crate::span::Span;
 use crate::stdlib::json_conv::{json_to_lx, lx_to_json};
-use crate::value::Value;
+use crate::value::LxVal;
 
 use super::{
     AiBackend, AiOpts, EmitBackend, HttpBackend, HttpOpts, LogBackend, LogLevel, ShellBackend,
@@ -21,7 +21,7 @@ use super::{
 pub struct ClaudeCodeAiBackend;
 
 impl AiBackend for ClaudeCodeAiBackend {
-    fn prompt(&self, text: &str, opts: &AiOpts, span: Span) -> Result<Value, LxError> {
+    fn prompt(&self, text: &str, opts: &AiOpts, span: Span) -> Result<LxVal, LxError> {
         let mut cmd = Command::new("claude");
         cmd.arg("-p").arg("--output-format").arg("json");
         if let Some(ref s) = opts.system {
@@ -56,7 +56,7 @@ impl AiBackend for ClaudeCodeAiBackend {
         let mut child = match cmd.spawn() {
             Ok(c) => c,
             Err(e) => {
-                return Ok(Value::Err(Box::new(Value::Str(Arc::from(format!(
+                return Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(format!(
                     "ai: cannot run 'claude': {e}"
                 ))))));
             }
@@ -72,7 +72,7 @@ impl AiBackend for ClaudeCodeAiBackend {
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
         if !output.status.success() && stdout.trim().is_empty() {
-            return Ok(Value::Err(Box::new(Value::Str(Arc::from(format!(
+            return Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(format!(
                 "ai: claude exited {}: {stderr}",
                 output.status
             ))))));
@@ -87,7 +87,7 @@ impl AiBackend for ClaudeCodeAiBackend {
     }
 }
 
-fn parse_ai_response(jv: &serde_json::Value) -> Result<Value, LxError> {
+fn parse_ai_response(jv: &serde_json::Value) -> Result<LxVal, LxError> {
     let is_error = jv
         .get("is_error")
         .and_then(|v| v.as_bool())
@@ -102,36 +102,36 @@ fn parse_ai_response(jv: &serde_json::Value) -> Result<Value, LxError> {
     };
     if is_error {
         let mut fields = IndexMap::new();
-        fields.insert("msg".into(), Value::Str(Arc::from(result_text.as_str())));
+        fields.insert("msg".into(), LxVal::Str(Arc::from(result_text.as_str())));
         if let Some(sub) = jv.get("subtype").and_then(|v| v.as_str()) {
-            fields.insert("subtype".into(), Value::Str(Arc::from(sub)));
+            fields.insert("subtype".into(), LxVal::Str(Arc::from(sub)));
         }
-        return Ok(Value::Err(Box::new(Value::Record(Arc::new(fields)))));
+        return Ok(LxVal::Err(Box::new(LxVal::Record(Arc::new(fields)))));
     }
     let mut fields = IndexMap::new();
-    fields.insert("text".into(), Value::Str(Arc::from(result_text.as_str())));
+    fields.insert("text".into(), LxVal::Str(Arc::from(result_text.as_str())));
     if let Some(sid) = jv.get("session_id").and_then(|v| v.as_str()) {
-        fields.insert("session_id".into(), Value::Str(Arc::from(sid)));
+        fields.insert("session_id".into(), LxVal::Str(Arc::from(sid)));
     }
     if let Some(cost) = jv.get("cost_usd").and_then(|v| v.as_f64()) {
-        fields.insert("cost".into(), Value::Float(cost));
+        fields.insert("cost".into(), LxVal::Float(cost));
     }
     if let Some(turns) = jv.get("num_turns").and_then(|v| v.as_i64()) {
-        fields.insert("turns".into(), Value::Int(BigInt::from(turns)));
+        fields.insert("turns".into(), LxVal::Int(BigInt::from(turns)));
     }
     if let Some(ms) = jv.get("duration_ms").and_then(|v| v.as_i64()) {
-        fields.insert("duration_ms".into(), Value::Int(BigInt::from(ms)));
+        fields.insert("duration_ms".into(), LxVal::Int(BigInt::from(ms)));
     }
     if let Some(model) = jv.get("model").and_then(|v| v.as_str()) {
-        fields.insert("model".into(), Value::Str(Arc::from(model)));
+        fields.insert("model".into(), LxVal::Str(Arc::from(model)));
     }
-    Ok(Value::Ok(Box::new(Value::Record(Arc::new(fields)))))
+    Ok(LxVal::Ok(Box::new(LxVal::Record(Arc::new(fields)))))
 }
 
 pub struct StdoutEmitBackend;
 
 impl EmitBackend for StdoutEmitBackend {
-    fn emit(&self, value: &Value, _span: Span) -> Result<(), LxError> {
+    fn emit(&self, value: &LxVal, _span: Span) -> Result<(), LxError> {
         println!("{value}");
         Ok(())
     }
@@ -146,7 +146,7 @@ impl HttpBackend for ReqwestHttpBackend {
         url: &str,
         opts: &HttpOpts,
         span: Span,
-    ) -> Result<Value, LxError> {
+    ) -> Result<LxVal, LxError> {
         tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
                 let c = Client::builder()
@@ -181,7 +181,7 @@ impl HttpBackend for ReqwestHttpBackend {
                 }
                 match builder.send().await {
                     Ok(resp) => response_to_value(resp, span).await,
-                    Err(e) => Ok(Value::Err(Box::new(crate::stdlib::agent_errors::upstream(
+                    Err(e) => Ok(LxVal::Err(Box::new(crate::stdlib::agent_errors::upstream(
                         url,
                         0,
                         &e.to_string(),
@@ -192,12 +192,12 @@ impl HttpBackend for ReqwestHttpBackend {
     }
 }
 
-async fn response_to_value(resp: reqwest::Response, span: Span) -> Result<Value, LxError> {
+async fn response_to_value(resp: reqwest::Response, span: Span) -> Result<LxVal, LxError> {
     let status = resp.status().as_u16();
     let mut headers = IndexMap::new();
     for (name, value) in resp.headers() {
         let v = value.to_str().unwrap_or("").to_string();
-        headers.insert(name.to_string(), Value::Str(Arc::from(v.as_str())));
+        headers.insert(name.to_string(), LxVal::Str(Arc::from(v.as_str())));
     }
     let body_str = resp
         .text()
@@ -206,57 +206,57 @@ async fn response_to_value(resp: reqwest::Response, span: Span) -> Result<Value,
     let body = if let Ok(jv) = serde_json::from_str::<serde_json::Value>(&body_str) {
         json_to_lx(jv)
     } else {
-        Value::Str(Arc::from(body_str.as_str()))
+        LxVal::Str(Arc::from(body_str.as_str()))
     };
-    Ok(Value::Ok(Box::new(record! {
-        "status" => Value::Int(BigInt::from(status)),
+    Ok(LxVal::Ok(Box::new(record! {
+        "status" => LxVal::Int(BigInt::from(status)),
         "body" => body,
-        "headers" => Value::Record(Arc::new(headers)),
+        "headers" => LxVal::Record(Arc::new(headers)),
     })))
 }
 
 pub struct ProcessShellBackend;
 
 impl ShellBackend for ProcessShellBackend {
-    fn exec(&self, cmd: &str, _span: Span) -> Result<Value, LxError> {
+    fn exec(&self, cmd: &str, _span: Span) -> Result<LxVal, LxError> {
         match Command::new("sh").arg("-c").arg(cmd).output() {
             Ok(output) => {
                 let out = String::from_utf8_lossy(&output.stdout).into_owned();
                 let err = String::from_utf8_lossy(&output.stderr).into_owned();
                 let code = output.status.code().unwrap_or(-1);
-                Ok(Value::Ok(Box::new(record! {
-                    "out" => Value::Str(Arc::from(out.as_str())),
-                    "err" => Value::Str(Arc::from(err.as_str())),
-                    "code" => Value::Int(code.into()),
+                Ok(LxVal::Ok(Box::new(record! {
+                    "out" => LxVal::Str(Arc::from(out.as_str())),
+                    "err" => LxVal::Str(Arc::from(err.as_str())),
+                    "code" => LxVal::Int(code.into()),
                 })))
             }
-            Err(e) => Ok(Value::Err(Box::new(record! {
-                "cmd" => Value::Str(Arc::from(cmd)),
-                "msg" => Value::Str(Arc::from(e.to_string().as_str())),
+            Err(e) => Ok(LxVal::Err(Box::new(record! {
+                "cmd" => LxVal::Str(Arc::from(cmd)),
+                "msg" => LxVal::Str(Arc::from(e.to_string().as_str())),
             }))),
         }
     }
 
-    fn exec_capture(&self, cmd: &str, span: Span) -> Result<Value, LxError> {
+    fn exec_capture(&self, cmd: &str, span: Span) -> Result<LxVal, LxError> {
         match Command::new("sh").arg("-c").arg(cmd).output() {
             Ok(output) => {
                 let code = output.status.code().unwrap_or(-1);
                 if code == 0 {
                     let out = String::from_utf8_lossy(&output.stdout).into_owned();
-                    Ok(Value::Str(Arc::from(out.as_str())))
+                    Ok(LxVal::Str(Arc::from(out.as_str())))
                 } else {
                     let err = String::from_utf8_lossy(&output.stderr).into_owned();
-                    let shell_err = Value::Err(Box::new(record! {
-                        "cmd" => Value::Str(Arc::from(cmd)),
-                        "msg" => Value::Str(Arc::from(err.as_str())),
+                    let shell_err = LxVal::Err(Box::new(record! {
+                        "cmd" => LxVal::Str(Arc::from(cmd)),
+                        "msg" => LxVal::Str(Arc::from(err.as_str())),
                     }));
                     Err(LxError::propagate(shell_err, span))
                 }
             }
             Err(e) => {
-                let shell_err = Value::Err(Box::new(record! {
-                    "cmd" => Value::Str(Arc::from(cmd)),
-                    "msg" => Value::Str(Arc::from(e.to_string().as_str())),
+                let shell_err = LxVal::Err(Box::new(record! {
+                    "cmd" => LxVal::Str(Arc::from(cmd)),
+                    "msg" => LxVal::Str(Arc::from(e.to_string().as_str())),
                 }));
                 Err(LxError::propagate(shell_err, span))
             }
@@ -267,7 +267,7 @@ impl ShellBackend for ProcessShellBackend {
 pub struct StdinStdoutYieldBackend;
 
 impl YieldBackend for StdinStdoutYieldBackend {
-    fn yield_value(&self, value: Value, span: Span) -> Result<Value, LxError> {
+    fn yield_value(&self, value: LxVal, span: Span) -> Result<LxVal, LxError> {
         use std::io::BufRead;
         let json =
             lx_to_json(&value, span).map_err(|e| LxError::runtime(format!("yield: {e}"), span))?;
@@ -307,7 +307,7 @@ impl LogBackend for StderrLogBackend {
 pub struct NoopEmitBackend;
 
 impl EmitBackend for NoopEmitBackend {
-    fn emit(&self, _value: &Value, _span: Span) -> Result<(), LxError> {
+    fn emit(&self, _value: &LxVal, _span: Span) -> Result<(), LxError> {
         Ok(())
     }
 }

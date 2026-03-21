@@ -12,7 +12,7 @@ use crate::error::LxError;
 use crate::span::Span;
 
 #[derive(Debug, Clone, IntoStaticStr)]
-pub enum Value {
+pub enum LxVal {
     Int(BigInt),
     Float(f64),
     Bool(bool),
@@ -20,30 +20,30 @@ pub enum Value {
     Regex(Arc<regex::Regex>),
     Unit,
 
-    List(Arc<Vec<Value>>),
-    Record(Arc<IndexMap<String, Value>>),
-    Map(Arc<IndexMap<ValueKey, Value>>),
-    Tuple(Arc<Vec<Value>>),
+    List(Arc<Vec<LxVal>>),
+    Record(Arc<IndexMap<String, LxVal>>),
+    Map(Arc<IndexMap<ValueKey, LxVal>>),
+    Tuple(Arc<Vec<LxVal>>),
 
     #[strum(serialize = "Func")]
     Func(Box<LxFunc>),
     #[strum(serialize = "Func")]
     BuiltinFunc(BuiltinFunc),
 
-    Ok(Box<Value>),
-    Err(Box<Value>),
-    Some(Box<Value>),
+    Ok(Box<LxVal>),
+    Err(Box<LxVal>),
+    Some(Box<LxVal>),
     None,
 
     Tagged {
         tag: Arc<str>,
-        values: Arc<Vec<Value>>,
+        values: Arc<Vec<LxVal>>,
     },
     #[strum(serialize = "Func")]
     TaggedCtor {
         tag: Arc<str>,
         arity: usize,
-        applied: Vec<Value>,
+        applied: Vec<LxVal>,
     },
     Range {
         start: i64,
@@ -62,7 +62,7 @@ pub enum Value {
         name: Arc<str>,
         fields: Arc<Vec<FieldDef>>,
         methods: Arc<Vec<TraitMethodDef>>,
-        defaults: Arc<IndexMap<String, Value>>,
+        defaults: Arc<IndexMap<String, LxVal>>,
         requires: Arc<Vec<Arc<str>>>,
         description: Option<Arc<str>>,
         tags: Arc<Vec<Arc<str>>>,
@@ -70,94 +70,94 @@ pub enum Value {
     Class {
         name: Arc<str>,
         traits: Arc<Vec<Arc<str>>>,
-        defaults: Arc<IndexMap<String, Value>>,
-        methods: Arc<IndexMap<String, Value>>,
+        defaults: Arc<IndexMap<String, LxVal>>,
+        methods: Arc<IndexMap<String, LxVal>>,
     },
     Object {
         class_name: Arc<str>,
         id: u64,
         traits: Arc<Vec<Arc<str>>>,
-        methods: Arc<IndexMap<String, Value>>,
+        methods: Arc<IndexMap<String, LxVal>>,
     },
     Store {
         id: u64,
     },
     Stream {
-        rx: Arc<Mutex<mpsc::Receiver<Value>>>,
+        rx: Arc<Mutex<mpsc::Receiver<LxVal>>>,
         cancel_tx: Arc<Mutex<Option<mpsc::Sender<()>>>>,
     },
 }
 
 #[derive(Debug, Clone)]
-pub struct ValueKey(pub Value);
+pub struct ValueKey(pub LxVal);
 
-impl Value {
+impl LxVal {
     pub fn as_int(&self) -> Option<&BigInt> {
         match self {
-            Value::Int(n) => Some(n),
+            LxVal::Int(n) => Some(n),
             _ => None,
         }
     }
 
     pub fn as_float(&self) -> Option<f64> {
         match self {
-            Value::Float(f) => Some(*f),
+            LxVal::Float(f) => Some(*f),
             _ => None,
         }
     }
 
     pub fn as_bool(&self) -> Option<bool> {
         match self {
-            Value::Bool(b) => Some(*b),
+            LxVal::Bool(b) => Some(*b),
             _ => None,
         }
     }
 
     pub fn as_str(&self) -> Option<&str> {
         match self {
-            Value::Str(s) => Some(s),
+            LxVal::Str(s) => Some(s),
             _ => None,
         }
     }
 
-    pub fn as_list(&self) -> Option<&Arc<Vec<Value>>> {
+    pub fn as_list(&self) -> Option<&Arc<Vec<LxVal>>> {
         match self {
-            Value::List(l) => Some(l),
+            LxVal::List(l) => Some(l),
             _ => None,
         }
     }
 
     pub fn str_field(&self, key: &str) -> Option<&str> {
         match self {
-            Value::Record(fields) => fields.get(key).and_then(|v| v.as_str()),
+            LxVal::Record(fields) => fields.get(key).and_then(|v| v.as_str()),
             _ => None,
         }
     }
 
     pub fn int_field(&self, key: &str) -> Option<&BigInt> {
         match self {
-            Value::Record(fields) => fields.get(key).and_then(|v| v.as_int()),
+            LxVal::Record(fields) => fields.get(key).and_then(|v| v.as_int()),
             _ => None,
         }
     }
 
     pub fn float_field(&self, key: &str) -> Option<f64> {
         match self {
-            Value::Record(fields) => fields.get(key).and_then(|v| v.as_float()),
+            LxVal::Record(fields) => fields.get(key).and_then(|v| v.as_float()),
             _ => None,
         }
     }
 
     pub fn bool_field(&self, key: &str) -> Option<bool> {
         match self {
-            Value::Record(fields) => fields.get(key).and_then(|v| v.as_bool()),
+            LxVal::Record(fields) => fields.get(key).and_then(|v| v.as_bool()),
             _ => None,
         }
     }
 
-    pub fn list_field(&self, key: &str) -> Option<&[Value]> {
+    pub fn list_field(&self, key: &str) -> Option<&[LxVal]> {
         match self {
-            Value::Record(fields) => fields
+            LxVal::Record(fields) => fields
                 .get(key)
                 .and_then(|v| v.as_list())
                 .map(|l| l.as_slice()),
@@ -165,10 +165,10 @@ impl Value {
         }
     }
 
-    pub fn record_field(&self, key: &str) -> Option<&IndexMap<String, Value>> {
+    pub fn record_field(&self, key: &str) -> Option<&IndexMap<String, LxVal>> {
         match self {
-            Value::Record(fields) => fields.get(key).and_then(|v| match v {
-                Value::Record(inner) => Some(inner.as_ref()),
+            LxVal::Record(fields) => fields.get(key).and_then(|v| match v {
+                LxVal::Record(inner) => Some(inner.as_ref()),
                 _ => None,
             }),
             _ => None,
@@ -176,7 +176,7 @@ impl Value {
     }
 
     pub fn is_truthy_err(&self) -> bool {
-        matches!(self, Value::Err(_) | Value::None)
+        matches!(self, LxVal::Err(_) | LxVal::None)
     }
 
     pub fn type_name(&self) -> &'static str {
@@ -196,24 +196,24 @@ impl Value {
 #[derive(Debug, Clone)]
 pub struct LxFunc {
     pub params: Vec<String>,
-    pub defaults: Vec<Option<Value>>,
+    pub defaults: Vec<Option<LxVal>>,
     pub body: Arc<SExpr>,
     pub closure: Arc<Env>,
     pub arity: usize,
-    pub applied: Vec<Value>,
+    pub applied: Vec<LxVal>,
     pub source_text: Arc<str>,
     pub source_name: Arc<str>,
 }
 
 pub type SyncBuiltinFn =
-    fn(&[Value], Span, &std::sync::Arc<crate::backends::RuntimeCtx>) -> Result<Value, LxError>;
+    fn(&[LxVal], Span, &std::sync::Arc<crate::backends::RuntimeCtx>) -> Result<LxVal, LxError>;
 
 pub type AsyncBuiltinFn =
     fn(
-        Vec<Value>,
+        Vec<LxVal>,
         Span,
         std::sync::Arc<crate::backends::RuntimeCtx>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Value, LxError>>>>;
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<LxVal, LxError>>>>;
 
 #[derive(Clone, Copy)]
 pub enum BuiltinKind {
@@ -226,14 +226,14 @@ pub struct BuiltinFunc {
     pub name: &'static str,
     pub arity: usize,
     pub kind: BuiltinKind,
-    pub applied: Vec<Value>,
+    pub applied: Vec<LxVal>,
 }
 
 #[derive(Debug, Clone)]
 pub struct FieldDef {
     pub name: String,
     pub type_name: String,
-    pub default: Option<Value>,
+    pub default: Option<LxVal>,
     pub constraint: Option<Arc<crate::ast::SExpr>>,
 }
 

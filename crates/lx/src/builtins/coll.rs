@@ -7,31 +7,31 @@ use crate::backends::RuntimeCtx;
 use crate::env::Env;
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::{Value, ValueKey};
+use crate::value::{LxVal, ValueKey};
 
 use super::mk;
 
-pub(crate) fn cmp_values(a: &Value, b: &Value) -> std::cmp::Ordering {
+pub(crate) fn cmp_values(a: &LxVal, b: &LxVal) -> std::cmp::Ordering {
     match (a, b) {
-        (Value::Int(x), Value::Int(y)) => x.cmp(y),
-        (Value::Float(x), Value::Float(y)) => x.total_cmp(y),
-        (Value::Int(x), Value::Float(y)) => x
+        (LxVal::Int(x), LxVal::Int(y)) => x.cmp(y),
+        (LxVal::Float(x), LxVal::Float(y)) => x.total_cmp(y),
+        (LxVal::Int(x), LxVal::Float(y)) => x
             .to_f64()
             .map_or(std::cmp::Ordering::Greater, |xf| xf.total_cmp(y)),
-        (Value::Float(x), Value::Int(y)) => y
+        (LxVal::Float(x), LxVal::Int(y)) => y
             .to_f64()
             .map_or(std::cmp::Ordering::Less, |yf| x.total_cmp(&yf)),
-        (Value::Str(x), Value::Str(y)) => x.cmp(y),
-        (Value::Bool(x), Value::Bool(y)) => x.cmp(y),
+        (LxVal::Str(x), LxVal::Str(y)) => x.cmp(y),
+        (LxVal::Bool(x), LxVal::Bool(y)) => x.cmp(y),
         _ => std::cmp::Ordering::Equal,
     }
 }
 
-fn maybe(v: Option<&Value>) -> Value {
-    v.map_or(Value::None, |v| Value::Some(Box::new(v.clone())))
+fn maybe(v: Option<&LxVal>) -> LxVal {
+    v.map_or(LxVal::None, |v| LxVal::Some(Box::new(v.clone())))
 }
 
-fn bi_first(args: &[Value], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_first(args: &[LxVal], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     Ok(maybe(
         args[0]
             .as_list()
@@ -45,7 +45,7 @@ fn bi_first(args: &[Value], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, L
     ))
 }
 
-fn bi_last(args: &[Value], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_last(args: &[LxVal], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     Ok(maybe(
         args[0]
             .as_list()
@@ -59,9 +59,9 @@ fn bi_last(args: &[Value], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, Lx
     ))
 }
 
-fn bi_contains(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_contains(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     match &args[1] {
-        Value::Str(s) => {
+        LxVal::Str(s) => {
             let needle = args[0].as_str().ok_or_else(|| {
                 LxError::type_err(
                     format!(
@@ -71,9 +71,9 @@ fn bi_contains(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Val
                     span,
                 )
             })?;
-            Ok(Value::Bool(s.contains(needle)))
+            Ok(LxVal::Bool(s.contains(needle)))
         }
-        Value::List(l) => Ok(Value::Bool(l.iter().any(|v| v == &args[0]))),
+        LxVal::List(l) => Ok(LxVal::Bool(l.iter().any(|v| v == &args[0]))),
         other => Err(LxError::type_err(
             format!("contains? expects Str/List, got {}", other.type_name()),
             span,
@@ -81,9 +81,9 @@ fn bi_contains(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Val
     }
 }
 
-fn bi_get(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_get(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     match &args[1] {
-        Value::List(l) => {
+        LxVal::List(l) => {
             let n = args[0].as_int().ok_or_else(|| {
                 LxError::type_err(
                     format!(
@@ -98,11 +98,11 @@ fn bi_get(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, L
                 .ok_or_else(|| LxError::runtime("get: index out of range", span))?;
             let idx = if idx < 0 { l.len() as i64 + idx } else { idx };
             if idx < 0 {
-                return Ok(Value::None);
+                return Ok(LxVal::None);
             }
             Ok(maybe(l.get(idx as usize)))
         }
-        Value::Record(r) => {
+        LxVal::Record(r) => {
             let key = args[0].as_str().ok_or_else(|| {
                 LxError::type_err(
                     format!(
@@ -114,7 +114,7 @@ fn bi_get(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, L
             })?;
             Ok(maybe(r.get(key)))
         }
-        Value::Map(m) => Ok(maybe(m.get(&ValueKey(args[0].clone())))),
+        LxVal::Map(m) => Ok(maybe(m.get(&ValueKey(args[0].clone())))),
         other => Err(LxError::type_err(
             format!("get expects List/Record/Map, got {}", other.type_name()),
             span,
@@ -122,13 +122,13 @@ fn bi_get(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, L
     }
 }
 
-fn kv_tuple(k: Value, v: Value) -> Value {
-    Value::Tuple(Arc::new(vec![k, v]))
+fn kv_tuple(k: LxVal, v: LxVal) -> LxVal {
+    LxVal::Tuple(Arc::new(vec![k, v]))
 }
 
-fn bi_to_list(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_to_list(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     match &args[0] {
-        Value::Map(m) => Ok(Value::List(Arc::new(
+        LxVal::Map(m) => Ok(LxVal::List(Arc::new(
             m.iter()
                 .map(|(k, v)| kv_tuple(k.0.clone(), v.clone()))
                 .collect(),
@@ -140,18 +140,18 @@ fn bi_to_list(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Valu
     }
 }
 
-fn bi_to_map(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_to_map(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     match &args[0] {
-        Value::Record(r) => Ok(Value::Map(Arc::new(
+        LxVal::Record(r) => Ok(LxVal::Map(Arc::new(
             r.iter()
-                .map(|(k, v)| (ValueKey(Value::Str(Arc::from(k.as_str()))), v.clone()))
+                .map(|(k, v)| (ValueKey(LxVal::Str(Arc::from(k.as_str()))), v.clone()))
                 .collect(),
         ))),
-        Value::List(l) => {
+        LxVal::List(l) => {
             let mut m = IndexMap::new();
             for v in l.iter() {
                 match v {
-                    Value::Tuple(t) if t.len() == 2 => {
+                    LxVal::Tuple(t) if t.len() == 2 => {
                         m.insert(ValueKey(t[0].clone()), t[1].clone());
                     }
                     other => {
@@ -162,7 +162,7 @@ fn bi_to_map(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
                     }
                 }
             }
-            Ok(Value::Map(Arc::new(m)))
+            Ok(LxVal::Map(Arc::new(m)))
         }
         other => Err(LxError::type_err(
             format!("to_map expects Record/List, got {}", other.type_name()),
@@ -171,9 +171,9 @@ fn bi_to_map(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
     }
 }
 
-fn bi_to_record(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_to_record(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let m = match &args[0] {
-        Value::Map(m) => m,
+        LxVal::Map(m) => m,
         other => {
             return Err(LxError::type_err(
                 format!("to_record expects Map, got {}", other.type_name()),
@@ -191,17 +191,17 @@ fn bi_to_record(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Va
         })?;
         r.insert(key.to_string(), v.clone());
     }
-    Ok(Value::Record(Arc::new(r)))
+    Ok(LxVal::Record(Arc::new(r)))
 }
 
-fn bi_keys(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_keys(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     match &args[0] {
-        Value::Map(m) => Ok(Value::List(Arc::new(
+        LxVal::Map(m) => Ok(LxVal::List(Arc::new(
             m.keys().map(|k| k.0.clone()).collect(),
         ))),
-        Value::Record(r) => Ok(Value::List(Arc::new(
+        LxVal::Record(r) => Ok(LxVal::List(Arc::new(
             r.keys()
-                .map(|k| Value::Str(Arc::from(k.as_str())))
+                .map(|k| LxVal::Str(Arc::from(k.as_str())))
                 .collect(),
         ))),
         other => Err(LxError::type_err(
@@ -211,10 +211,10 @@ fn bi_keys(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, 
     }
 }
 
-fn bi_values(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_values(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     match &args[0] {
-        Value::Map(m) => Ok(Value::List(Arc::new(m.values().cloned().collect()))),
-        Value::Record(r) => Ok(Value::List(Arc::new(r.values().cloned().collect()))),
+        LxVal::Map(m) => Ok(LxVal::List(Arc::new(m.values().cloned().collect()))),
+        LxVal::Record(r) => Ok(LxVal::List(Arc::new(r.values().cloned().collect()))),
         other => Err(LxError::type_err(
             format!("values expects Map/Record, got {}", other.type_name()),
             span,
@@ -222,16 +222,16 @@ fn bi_values(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value
     }
 }
 
-fn bi_entries(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_entries(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     match &args[0] {
-        Value::Map(m) => Ok(Value::List(Arc::new(
+        LxVal::Map(m) => Ok(LxVal::List(Arc::new(
             m.iter()
                 .map(|(k, v)| kv_tuple(k.0.clone(), v.clone()))
                 .collect(),
         ))),
-        Value::Record(r) => Ok(Value::List(Arc::new(
+        LxVal::Record(r) => Ok(LxVal::List(Arc::new(
             r.iter()
-                .map(|(k, v)| kv_tuple(Value::Str(Arc::from(k.as_str())), v.clone()))
+                .map(|(k, v)| kv_tuple(LxVal::Str(Arc::from(k.as_str())), v.clone()))
                 .collect(),
         ))),
         other => Err(LxError::type_err(

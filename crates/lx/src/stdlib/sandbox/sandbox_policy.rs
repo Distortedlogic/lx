@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use crate::error::LxError;
 use crate::record;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
 use super::sandbox::{Policy, ShellPolicy};
 
@@ -75,12 +75,12 @@ pub(super) fn make_preset(name: &str) -> Policy {
     }
 }
 
-fn extract_string_list(v: &Value) -> Vec<String> {
+fn extract_string_list(v: &LxVal) -> Vec<String> {
     match v {
-        Value::List(items) => items
+        LxVal::List(items) => items
             .iter()
             .filter_map(|item| match item {
-                Value::Str(s) => Some(s.to_string()),
+                LxVal::Str(s) => Some(s.to_string()),
                 _ => None,
             })
             .collect(),
@@ -89,12 +89,12 @@ fn extract_string_list(v: &Value) -> Vec<String> {
 }
 
 pub(super) fn parse_policy(
-    config: &IndexMap<String, Value>,
+    config: &IndexMap<String, LxVal>,
     span: Span,
 ) -> Result<Policy, LxError> {
     let mut p = make_preset("pure");
 
-    if let Some(Value::Record(fs)) = config.get("fs") {
+    if let Some(LxVal::Record(fs)) = config.get("fs") {
         if let Some(v) = fs.get("read") {
             p.fs_read = extract_string_list(v);
         }
@@ -103,16 +103,16 @@ pub(super) fn parse_policy(
         }
     }
 
-    if let Some(Value::Record(net)) = config.get("net")
+    if let Some(LxVal::Record(net)) = config.get("net")
         && let Some(v) = net.get("allow")
     {
         p.net_allow = extract_string_list(v);
     }
 
     match config.get("shell") {
-        Some(Value::Bool(true)) => p.shell = ShellPolicy::Allow,
-        Some(Value::Bool(false)) => p.shell = ShellPolicy::Deny,
-        Some(Value::Record(r)) => {
+        Some(LxVal::Bool(true)) => p.shell = ShellPolicy::Allow,
+        Some(LxVal::Bool(false)) => p.shell = ShellPolicy::Deny,
+        Some(LxVal::Record(r)) => {
             if let Some(v) = r.get("allow") {
                 p.shell = ShellPolicy::AllowList(extract_string_list(v));
             }
@@ -120,25 +120,25 @@ pub(super) fn parse_policy(
         _ => {}
     }
 
-    if let Some(Value::Bool(b)) = config.get("agent") {
+    if let Some(LxVal::Bool(b)) = config.get("agent") {
         p.agent = *b;
     }
-    if let Some(Value::Bool(b)) = config.get("mcp") {
+    if let Some(LxVal::Bool(b)) = config.get("mcp") {
         p.mcp = *b;
     }
-    if let Some(Value::Bool(b)) = config.get("ai") {
+    if let Some(LxVal::Bool(b)) = config.get("ai") {
         p.ai = *b;
     }
-    if let Some(Value::Bool(b)) = config.get("embed") {
+    if let Some(LxVal::Bool(b)) = config.get("embed") {
         p.embed = *b;
     }
-    if let Some(Value::Bool(b)) = config.get("pane") {
+    if let Some(LxVal::Bool(b)) = config.get("pane") {
         p.pane = *b;
     }
 
     if let Some(v) = config.get("max_time_ms") {
         match v {
-            Value::Int(n) => {
+            LxVal::Int(n) => {
                 p.max_time_ms = n
                     .try_into()
                     .map_err(|_| LxError::type_err("sandbox: max_time_ms must be positive", span))?
@@ -191,20 +191,20 @@ fn intersect_shell(a: &ShellPolicy, b: &ShellPolicy) -> ShellPolicy {
     }
 }
 
-pub(super) fn policy_to_describe(p: &Policy) -> Value {
+pub(super) fn policy_to_describe(p: &Policy) -> LxVal {
     let shell_val = match &p.shell {
-        ShellPolicy::Deny => Value::Bool(false),
-        ShellPolicy::Allow => Value::Bool(true),
-        ShellPolicy::AllowList(cmds) => Value::List(Arc::new(
+        ShellPolicy::Deny => LxVal::Bool(false),
+        ShellPolicy::Allow => LxVal::Bool(true),
+        ShellPolicy::AllowList(cmds) => LxVal::List(Arc::new(
             cmds.iter()
-                .map(|s| Value::Str(Arc::from(s.as_str())))
+                .map(|s| LxVal::Str(Arc::from(s.as_str())))
                 .collect(),
         )),
     };
-    let to_list = |v: &[String]| -> Value {
-        Value::List(Arc::new(
+    let to_list = |v: &[String]| -> LxVal {
+        LxVal::List(Arc::new(
             v.iter()
-                .map(|s| Value::Str(Arc::from(s.as_str())))
+                .map(|s| LxVal::Str(Arc::from(s.as_str())))
                 .collect(),
         ))
     };
@@ -213,11 +213,11 @@ pub(super) fn policy_to_describe(p: &Policy) -> Value {
         "fs_write" => to_list(&p.fs_write),
         "net" => to_list(&p.net_allow),
         "shell" => shell_val,
-        "agent" => Value::Bool(p.agent),
-        "mcp" => Value::Bool(p.mcp),
-        "ai" => Value::Bool(p.ai),
-        "embed" => Value::Bool(p.embed),
-        "pane" => Value::Bool(p.pane),
+        "agent" => LxVal::Bool(p.agent),
+        "mcp" => LxVal::Bool(p.mcp),
+        "ai" => LxVal::Bool(p.ai),
+        "embed" => LxVal::Bool(p.embed),
+        "pane" => LxVal::Bool(p.pane),
     }
 }
 

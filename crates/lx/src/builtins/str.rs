@@ -6,7 +6,7 @@ use crate::backends::RuntimeCtx;
 use crate::env::Env;
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
 use super::mk;
 
@@ -14,13 +14,13 @@ use super::mk;
 mod str_extra;
 
 fn str_transform(
-    args: &[Value],
+    args: &[LxVal],
     span: Span,
     name: &str,
     f: fn(&str) -> String,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     match &args[0] {
-        Value::Str(s) => Ok(Value::Str(Arc::from(f(s).as_str()))),
+        LxVal::Str(s) => Ok(LxVal::Str(Arc::from(f(s).as_str()))),
         other => Err(LxError::type_err(
             format!("{name} expects Str, got {}", other.type_name()),
             span,
@@ -28,31 +28,31 @@ fn str_transform(
     }
 }
 
-fn bi_trim(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_trim(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     str_transform(args, span, "trim", |s| s.trim().to_string())
 }
 
-fn bi_trim_start(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_trim_start(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     str_transform(args, span, "trim_start", |s| s.trim_start().to_string())
 }
 
-fn bi_trim_end(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_trim_end(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     str_transform(args, span, "trim_end", |s| s.trim_end().to_string())
 }
 
-fn bi_upper(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_upper(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     str_transform(args, span, "upper", |s| s.to_uppercase())
 }
 
-fn bi_lower(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_lower(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     str_transform(args, span, "lower", |s| s.to_lowercase())
 }
 
-fn bi_lines(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_lines(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     match &args[0] {
-        Value::Str(s) => {
-            let items: Vec<Value> = s.lines().map(|l| Value::Str(Arc::from(l))).collect();
-            Ok(Value::List(Arc::new(items)))
+        LxVal::Str(s) => {
+            let items: Vec<LxVal> = s.lines().map(|l| LxVal::Str(Arc::from(l))).collect();
+            Ok(LxVal::List(Arc::new(items)))
         }
         other => Err(LxError::type_err(
             format!("lines expects Str, got {}", other.type_name()),
@@ -61,14 +61,14 @@ fn bi_lines(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value,
     }
 }
 
-fn bi_chars(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_chars(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     match &args[0] {
-        Value::Str(s) => {
-            let items: Vec<Value> = s
+        LxVal::Str(s) => {
+            let items: Vec<LxVal> = s
                 .chars()
-                .map(|c| Value::Str(Arc::from(c.to_string().as_str())))
+                .map(|c| LxVal::Str(Arc::from(c.to_string().as_str())))
                 .collect();
-            Ok(Value::List(Arc::new(items)))
+            Ok(LxVal::List(Arc::new(items)))
         }
         other => Err(LxError::type_err(
             format!("chars expects Str, got {}", other.type_name()),
@@ -77,9 +77,9 @@ fn bi_chars(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value,
     }
 }
 
-fn bi_byte_len(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_byte_len(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     match &args[0] {
-        Value::Str(s) => Ok(Value::Int(BigInt::from(s.len()))),
+        LxVal::Str(s) => Ok(LxVal::Int(BigInt::from(s.len()))),
         other => Err(LxError::type_err(
             format!("byte_len expects Str, got {}", other.type_name()),
             span,
@@ -87,7 +87,7 @@ fn bi_byte_len(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Val
     }
 }
 
-fn bi_split(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_split(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let sep = args[0].as_str().ok_or_else(|| {
         LxError::type_err(
             format!("split: first arg must be Str, got {}", args[0].type_name()),
@@ -100,11 +100,11 @@ fn bi_split(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value,
             span,
         )
     })?;
-    let items: Vec<Value> = s.split(sep).map(|p| Value::Str(Arc::from(p))).collect();
-    Ok(Value::List(Arc::new(items)))
+    let items: Vec<LxVal> = s.split(sep).map(|p| LxVal::Str(Arc::from(p))).collect();
+    Ok(LxVal::List(Arc::new(items)))
 }
 
-fn bi_join(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_join(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let sep = args[0].as_str().ok_or_else(|| {
         LxError::type_err(
             format!("join: first arg must be Str, got {}", args[0].type_name()),
@@ -128,7 +128,7 @@ fn bi_join(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, 
             })
         })
         .collect();
-    Ok(Value::Str(Arc::from(parts?.join(sep).as_str())))
+    Ok(LxVal::Str(Arc::from(parts?.join(sep).as_str())))
 }
 
 pub(super) fn register(env: &mut Env) {

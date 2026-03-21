@@ -3,28 +3,28 @@ use std::sync::Arc;
 use crate::backends::RuntimeCtx;
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::{BuiltinKind, Value};
+use crate::value::{BuiltinKind, LxVal};
 
 pub(crate) async fn call_value(
-    f: &Value,
-    arg: Value,
+    f: &LxVal,
+    arg: LxVal,
     span: Span,
     ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     match f {
-        Value::Func(lf) => {
+        LxVal::Func(lf) => {
             let mut lf = lf.clone();
             lf.applied.push(arg);
             if lf.applied.len() == 1
                 && lf.arity > 1
-                && let Value::Tuple(ref elems) = lf.applied[0]
+                && let LxVal::Tuple(ref elems) = lf.applied[0]
                 && elems.len() == lf.arity
             {
                 let elems = elems.as_ref().clone();
                 lf.applied = elems;
             }
             if lf.applied.len() < lf.arity {
-                return Ok(Value::Func(lf));
+                return Ok(LxVal::Func(lf));
             }
             let mut interp =
                 crate::interpreter::Interpreter::with_env(&lf.closure, Arc::clone(ctx));
@@ -43,18 +43,18 @@ pub(crate) async fn call_value(
                 other => other,
             }
         }
-        Value::BuiltinFunc(bf) => {
+        LxVal::BuiltinFunc(bf) => {
             let mut bf = bf.clone();
             bf.applied.push(arg);
             if bf.applied.len() < bf.arity {
-                return Ok(Value::BuiltinFunc(bf));
+                return Ok(LxVal::BuiltinFunc(bf));
             }
             match bf.kind {
                 BuiltinKind::Sync(f) => f(&bf.applied, span, ctx),
                 BuiltinKind::Async(f) => f(bf.applied, span, Arc::clone(ctx)).await,
             }
         }
-        Value::TaggedCtor {
+        LxVal::TaggedCtor {
             tag,
             arity,
             applied,
@@ -62,13 +62,13 @@ pub(crate) async fn call_value(
             let mut applied = applied.clone();
             applied.push(arg);
             if applied.len() < *arity {
-                Ok(Value::TaggedCtor {
+                Ok(LxVal::TaggedCtor {
                     tag: tag.clone(),
                     arity: *arity,
                     applied,
                 })
             } else {
-                Ok(Value::Tagged {
+                Ok(LxVal::Tagged {
                     tag: tag.clone(),
                     values: Arc::new(applied),
                 })

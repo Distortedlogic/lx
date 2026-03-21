@@ -14,7 +14,7 @@ use crate::builtins::call_value;
 use crate::error::LxError;
 use crate::record;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
 pub(super) static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -40,9 +40,9 @@ pub(super) fn parse_schedule(expr: &str, span: Span) -> Result<Schedule, LxError
         .map_err(|e| LxError::runtime(format!("cron: invalid expression '{expr}': {e}"), span))
 }
 
-pub(super) fn positive_ms(val: &Value, name: &str, span: Span) -> Result<u64, LxError> {
+pub(super) fn positive_ms(val: &LxVal, name: &str, span: Span) -> Result<u64, LxError> {
     match val {
-        Value::Int(n) => {
+        LxVal::Int(n) => {
             let v: i64 = n
                 .try_into()
                 .map_err(|_| LxError::type_err(format!("{name}: value too large"), span))?;
@@ -51,7 +51,7 @@ pub(super) fn positive_ms(val: &Value, name: &str, span: Span) -> Result<u64, Lx
             }
             Ok(v as u64)
         }
-        Value::Float(f) => {
+        LxVal::Float(f) => {
             if *f <= 0.0 {
                 return Err(LxError::type_err(format!("{name}: must be positive"), span));
             }
@@ -64,9 +64,9 @@ pub(super) fn positive_ms(val: &Value, name: &str, span: Span) -> Result<u64, Lx
     }
 }
 
-pub(super) fn require_fn(val: &Value, name: &str, span: Span) -> Result<(), LxError> {
+pub(super) fn require_fn(val: &LxVal, name: &str, span: Span) -> Result<(), LxError> {
     match val {
-        Value::Func(_) | Value::BuiltinFunc(_) => Ok(()),
+        LxVal::Func(_) | LxVal::BuiltinFunc(_) => Ok(()),
         _ => Err(LxError::type_err(
             format!("{name}: expected a function"),
             span,
@@ -86,11 +86,11 @@ pub(super) fn sleep_cancellable(dur: Duration, cancel: &AtomicBool) -> bool {
 
 pub(super) fn spawn_oneshot(
     dur: Duration,
-    callback: Value,
+    callback: LxVal,
     span: Span,
     ctx: Arc<RuntimeCtx>,
     label: &'static str,
-) -> Value {
+) -> LxVal {
     let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
     let cancel = Arc::new(AtomicBool::new(false));
     let flag = cancel.clone();
@@ -99,21 +99,21 @@ pub(super) fn spawn_oneshot(
         if !sleep_cancellable(dur, &flag)
             && let Err(e) =
                 ctx.tokio_runtime
-                    .block_on(call_value(&callback, Value::Unit, span, &ctx))
+                    .block_on(call_value(&callback, LxVal::Unit, span, &ctx))
         {
             eprintln!("[cron] {label} error: {e}");
         }
         JOBS.remove(&id);
     });
-    Value::Int(BigInt::from(id))
+    LxVal::Int(BigInt::from(id))
 }
 
-pub(super) fn dt_to_record(dt: DateTime<Utc>) -> Value {
+pub(super) fn dt_to_record(dt: DateTime<Utc>) -> LxVal {
     let local: DateTime<Local> = dt.with_timezone(&Local);
     record! {
-        "epoch" => Value::Int(BigInt::from(dt.timestamp())),
-        "ms" => Value::Int(BigInt::from(dt.timestamp_millis())),
-        "iso" => Value::Str(Arc::from(dt.to_rfc3339().as_str())),
-        "local" => Value::Str(Arc::from(local.to_rfc3339().as_str())),
+        "epoch" => LxVal::Int(BigInt::from(dt.timestamp())),
+        "ms" => LxVal::Int(BigInt::from(dt.timestamp_millis())),
+        "iso" => LxVal::Str(Arc::from(dt.to_rfc3339().as_str())),
+        "local" => LxVal::Str(Arc::from(local.to_rfc3339().as_str())),
     }
 }

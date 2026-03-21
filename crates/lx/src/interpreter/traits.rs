@@ -4,13 +4,13 @@ use indexmap::IndexMap;
 
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
 use super::Interpreter;
 
 impl Interpreter {
     pub(super) fn inject_traits(
-        methods: &mut IndexMap<String, Value>,
+        methods: &mut IndexMap<String, LxVal>,
         traits: &[String],
         env: &Arc<crate::env::Env>,
         kind: &str,
@@ -18,7 +18,7 @@ impl Interpreter {
         span: Span,
     ) -> Result<(), LxError> {
         for tn in traits {
-            let Some(Value::Trait {
+            let Some(LxVal::Trait {
                 methods: req,
                 defaults,
                 ..

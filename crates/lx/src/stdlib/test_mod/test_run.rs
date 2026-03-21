@@ -9,14 +9,14 @@ use crate::builtins::call_value_sync;
 use crate::error::LxError;
 use crate::record;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
 use super::test_invoke::invoke_flow;
 use super::{extract_record, extract_str, score_to_f64};
 
 fn compute_weighted_score(
-    scores: &IndexMap<String, Value>,
-    weights: &IndexMap<String, Value>,
+    scores: &IndexMap<String, LxVal>,
+    weights: &IndexMap<String, LxVal>,
 ) -> f64 {
     if scores.is_empty() {
         return 0.0;
@@ -49,7 +49,7 @@ fn compute_weighted_score(
     }
 }
 
-fn filter_by_tag(scenarios: &[Value]) -> Vec<&Value> {
+fn filter_by_tag(scenarios: &[LxVal]) -> Vec<&LxVal> {
     let tag = std::env::var("LX_TEST_TAG").unwrap_or_default();
     if tag.is_empty() {
         return scenarios.iter().collect();
@@ -57,8 +57,8 @@ fn filter_by_tag(scenarios: &[Value]) -> Vec<&Value> {
     scenarios
         .iter()
         .filter(|s| {
-            matches!(s, Value::Record(r)
-            if matches!(r.get("tags"), Some(Value::List(tags))
+            matches!(s, LxVal::Record(r)
+            if matches!(r.get("tags"), Some(LxVal::List(tags))
                 if tags.iter().any(|t| t.as_str().is_some_and(|s| s == tag))))
         })
         .collect()
@@ -66,20 +66,20 @@ fn filter_by_tag(scenarios: &[Value]) -> Vec<&Value> {
 
 struct RunCtx<'a> {
     flow_path: &'a str,
-    grader: &'a Value,
-    weights: &'a IndexMap<String, Value>,
+    grader: &'a LxVal,
+    weights: &'a IndexMap<String, LxVal>,
     threshold: f64,
-    setup: Option<&'a Value>,
-    teardown: Option<&'a Value>,
+    setup: Option<&'a LxVal>,
+    teardown: Option<&'a LxVal>,
     span: Span,
     ctx: &'a Arc<RuntimeCtx>,
 }
 
-fn run_one_scenario(scenario_val: &Value, rc: &RunCtx<'_>) -> Result<Value, LxError> {
+fn run_one_scenario(scenario_val: &LxVal, rc: &RunCtx<'_>) -> Result<LxVal, LxError> {
     let span = rc.span;
     let scenario_fields = extract_record(scenario_val, "test.run", span)?;
     let s_name = extract_str(scenario_fields, "name", "test.run", span)?;
-    let input = scenario_fields.get("input").cloned().unwrap_or(Value::Unit);
+    let input = scenario_fields.get("input").cloned().unwrap_or(LxVal::Unit);
     let runs: i64 = scenario_fields
         .get("runs")
         .and_then(|v| v.as_int())
@@ -97,10 +97,10 @@ fn run_one_scenario(scenario_val: &Value, rc: &RunCtx<'_>) -> Result<Value, LxEr
         let output = invoke_flow(rc.flow_path, &input, rc.ctx, span)?;
         let elapsed_ms = start.elapsed().as_millis() as i64;
 
-        let grader_input = Value::Tuple(Arc::new(vec![output.clone(), scenario_val.clone()]));
+        let grader_input = LxVal::Tuple(Arc::new(vec![output.clone(), scenario_val.clone()]));
         let scores_val = call_value_sync(rc.grader, grader_input, span, rc.ctx)?;
         let scores_map = match &scores_val {
-            Value::Record(r) => r.as_ref().clone(),
+            LxVal::Record(r) => r.as_ref().clone(),
             _ => {
                 return Err(LxError::runtime(
                     format!(
@@ -116,9 +116,9 @@ fn run_one_scenario(scenario_val: &Value, rc: &RunCtx<'_>) -> Result<Value, LxEr
         run_scores.push(weighted);
         run_results.push(record! {
             "scores" => scores_val,
-            "weighted" => Value::Float(weighted),
+            "weighted" => LxVal::Float(weighted),
             "output" => output,
-            "elapsed_ms" => Value::Int(BigInt::from(elapsed_ms)),
+            "elapsed_ms" => LxVal::Int(BigInt::from(elapsed_ms)),
         });
         if let Some(teardown_fn) = rc.teardown {
             call_value_sync(teardown_fn, scenario_val.clone(), span, rc.ctx)?;
@@ -135,22 +135,22 @@ fn run_one_scenario(scenario_val: &Value, rc: &RunCtx<'_>) -> Result<Value, LxEr
     let passed = mean >= rc.threshold;
 
     Ok(record! {
-        "name" => Value::Str(Arc::from(s_name)),
-        "passed" => Value::Bool(passed),
-        "score" => Value::Float(mean),
-        "runs" => Value::List(Arc::new(run_results)),
-        "mean" => Value::Float(mean),
-        "min" => Value::Float(if min.is_infinite() { 0.0 } else { min }),
-        "max" => Value::Float(if max.is_infinite() { 0.0 } else { max }),
+        "name" => LxVal::Str(Arc::from(s_name)),
+        "passed" => LxVal::Bool(passed),
+        "score" => LxVal::Float(mean),
+        "runs" => LxVal::List(Arc::new(run_results)),
+        "mean" => LxVal::Float(mean),
+        "min" => LxVal::Float(if min.is_infinite() { 0.0 } else { min }),
+        "max" => LxVal::Float(if max.is_infinite() { 0.0 } else { max }),
     })
 }
 
 fn run_scenarios(
-    spec_fields: &IndexMap<String, Value>,
-    scenarios: &[Value],
+    spec_fields: &IndexMap<String, LxVal>,
+    scenarios: &[LxVal],
     span: Span,
     ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     let flow_path = extract_str(spec_fields, "flow", "test.run", span)?.to_string();
     let grader = spec_fields
         .get("grader")
@@ -160,15 +160,15 @@ fn run_scenarios(
         .and_then(|v| v.as_float())
         .unwrap_or(0.75);
     let weights_map = match spec_fields.get("weights") {
-        Some(Value::Record(r)) => r.as_ref().clone(),
+        Some(LxVal::Record(r)) => r.as_ref().clone(),
         _ => IndexMap::new(),
     };
     let setup = spec_fields
         .get("setup")
-        .filter(|v| !matches!(v, Value::None));
+        .filter(|v| !matches!(v, LxVal::None));
     let teardown = spec_fields
         .get("teardown")
-        .filter(|v| !matches!(v, Value::None));
+        .filter(|v| !matches!(v, LxVal::None));
     let spec_name = spec_fields
         .get("name")
         .and_then(|v| v.as_str())
@@ -190,7 +190,7 @@ fn run_scenarios(
 
     for scenario_val in &filtered {
         let result = run_one_scenario(scenario_val, &rc)?;
-        if let Value::Record(r) = &result
+        if let LxVal::Record(r) = &result
             && r.get("passed").and_then(|v| v.as_bool()) != Some(true)
         {
             all_passed = false;
@@ -204,48 +204,48 @@ fn run_scenarios(
         let sum: f64 = scenario_results
             .iter()
             .filter_map(|s| match s {
-                Value::Record(r) => r.get("score").and_then(|v| v.as_float()),
+                LxVal::Record(r) => r.get("score").and_then(|v| v.as_float()),
                 _ => None,
             })
             .sum();
         sum / scenario_results.len() as f64
     };
 
-    Ok(Value::Ok(Box::new(record! {
-        "spec" => Value::Str(Arc::from(spec_name)),
-        "passed" => Value::Bool(all_passed),
-        "score" => Value::Float(spec_score),
-        "threshold" => Value::Float(threshold),
-        "scenarios" => Value::List(Arc::new(scenario_results)),
+    Ok(LxVal::Ok(Box::new(record! {
+        "spec" => LxVal::Str(Arc::from(spec_name)),
+        "passed" => LxVal::Bool(all_passed),
+        "score" => LxVal::Float(spec_score),
+        "threshold" => LxVal::Float(threshold),
+        "scenarios" => LxVal::List(Arc::new(scenario_results)),
     })))
 }
 
-pub(crate) fn bi_run(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+pub(crate) fn bi_run(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let spec_fields = extract_record(&args[0], "test.run", span)?;
     let scenarios = match spec_fields.get("scenarios") {
-        Some(Value::List(list)) => list.as_ref().clone(),
+        Some(LxVal::List(list)) => list.as_ref().clone(),
         _ => Vec::new(),
     };
     run_scenarios(spec_fields, &scenarios, span, ctx)
 }
 
 pub(crate) fn bi_run_scenario(
-    args: &[Value],
+    args: &[LxVal],
     span: Span,
     ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     let spec_fields = extract_record(&args[0], "test.run_scenario", span)?;
     let target_name = args[1]
         .as_str()
         .ok_or_else(|| LxError::type_err("test.run_scenario: name must be Str", span))?;
     let scenarios = match spec_fields.get("scenarios") {
-        Some(Value::List(list)) => list.as_ref().clone(),
+        Some(LxVal::List(list)) => list.as_ref().clone(),
         _ => Vec::new(),
     };
-    let matching: Vec<Value> = scenarios
+    let matching: Vec<LxVal> = scenarios
         .into_iter()
         .filter(|s| match s {
-            Value::Record(r) => r
+            LxVal::Record(r) => r
                 .get("name")
                 .and_then(|v| v.as_str())
                 .is_some_and(|n| n == target_name),

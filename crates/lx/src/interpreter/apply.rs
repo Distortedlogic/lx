@@ -3,20 +3,20 @@ use std::sync::Arc;
 use crate::ast::{Param, SExpr};
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::{BuiltinKind, LxFunc, Value};
+use crate::value::{BuiltinKind, LxFunc, LxVal};
 
 use super::Interpreter;
 
 impl Interpreter {
     pub async fn apply_func(
         &mut self,
-        func: Value,
-        arg: Value,
+        func: LxVal,
+        arg: LxVal,
         span: Span,
-    ) -> Result<Value, LxError> {
+    ) -> Result<LxVal, LxError> {
         match func {
-            Value::Func(mut lf) => {
-                if let Value::Unit = &arg
+            LxVal::Func(mut lf) => {
+                if let LxVal::Unit = &arg
                     && lf.arity == 0
                     && lf.applied.is_empty()
                 {
@@ -41,14 +41,14 @@ impl Interpreter {
                 self.apply_named_args(&mut lf, arg);
                 if lf.applied.len() == 1
                     && lf.arity > 1
-                    && let Value::Tuple(ref elems) = lf.applied[0]
+                    && let LxVal::Tuple(ref elems) = lf.applied[0]
                     && elems.len() == lf.arity
                 {
                     let elems = elems.as_ref().clone();
                     lf.applied = elems;
                 }
                 if lf.applied.len() < lf.arity {
-                    return Ok(Value::Func(lf));
+                    return Ok(LxVal::Func(lf));
                 }
                 let is_cross_module = self.source != lf.source_text.as_ref();
                 let fn_source_text = Arc::clone(&lf.source_text);
@@ -75,51 +75,51 @@ impl Interpreter {
                     other => other,
                 }
             }
-            Value::BuiltinFunc(mut bf) => {
+            LxVal::BuiltinFunc(mut bf) => {
                 bf.applied.push(arg);
                 if bf.applied.len() < bf.arity {
-                    return Ok(Value::BuiltinFunc(bf));
+                    return Ok(LxVal::BuiltinFunc(bf));
                 }
                 match bf.kind {
                     BuiltinKind::Sync(f) => f(&bf.applied, span, &self.ctx),
                     BuiltinKind::Async(f) => f(bf.applied, span, Arc::clone(&self.ctx)).await,
                 }
             }
-            Value::TaggedCtor {
+            LxVal::TaggedCtor {
                 tag,
                 arity,
                 mut applied,
             } => {
                 applied.push(arg);
                 if applied.len() < arity {
-                    Ok(Value::TaggedCtor {
+                    Ok(LxVal::TaggedCtor {
                         tag,
                         arity,
                         applied,
                     })
                 } else {
-                    Ok(Value::Tagged {
+                    Ok(LxVal::Tagged {
                         tag,
                         values: Arc::new(applied),
                     })
                 }
             }
-            Value::Trait { name, fields, .. } if !fields.is_empty() => {
+            LxVal::Trait { name, fields, .. } if !fields.is_empty() => {
                 self.apply_trait_fields(&name, &fields, &arg, span).await
             }
-            Value::TraitUnion { name, variants } => {
+            LxVal::TraitUnion { name, variants } => {
                 self.apply_trait_union(&name, &variants, &arg, span).await
             }
-            Value::McpDecl { name, tools } => self.apply_mcp_decl(&name, &tools, &arg, span),
-            Value::Class {
+            LxVal::McpDecl { name, tools } => self.apply_mcp_decl(&name, &tools, &arg, span),
+            LxVal::Class {
                 name,
                 traits,
                 defaults,
                 methods,
             } => {
                 let overrides = match &arg {
-                    Value::Record(r) => r.as_ref().clone(),
-                    Value::Unit => indexmap::IndexMap::new(),
+                    LxVal::Record(r) => r.as_ref().clone(),
+                    LxVal::Unit => indexmap::IndexMap::new(),
                     _ => {
                         return Err(LxError::type_err(
                             format!(
@@ -135,12 +135,12 @@ impl Interpreter {
                     fields.insert(k, v);
                 }
                 for v in fields.values_mut() {
-                    if let Value::Store { id: store_id } = v {
+                    if let LxVal::Store { id: store_id } = v {
                         *store_id = crate::stdlib::store_clone(*store_id);
                     }
                 }
                 let id = crate::stdlib::object_insert(fields);
-                Ok(Value::Object {
+                Ok(LxVal::Object {
                     class_name: name,
                     id,
                     traits,
@@ -156,16 +156,16 @@ impl Interpreter {
 
     pub(super) async fn force_defaults(
         &mut self,
-        val: Value,
+        val: LxVal,
         _span: Span,
-    ) -> Result<Value, LxError> {
+    ) -> Result<LxVal, LxError> {
         match val {
-            Value::Func(ref lf)
+            LxVal::Func(ref lf)
                 if lf.applied.len() < lf.arity
                     && (lf.applied.len()..lf.arity)
                         .all(|i| matches!(lf.defaults.get(i), Some(Some(_)))) =>
             {
-                let Value::Func(lf) = val else { unreachable!() };
+                let LxVal::Func(lf) = val else { unreachable!() };
                 let saved = Arc::clone(&self.env);
                 let saved_source = std::mem::replace(&mut self.source, lf.source_text.to_string());
                 let mut call_env = lf.closure.child();
@@ -194,25 +194,25 @@ impl Interpreter {
         left: &SExpr,
         right: &SExpr,
         span: Span,
-    ) -> Result<Value, LxError> {
+    ) -> Result<LxVal, LxError> {
         let val = self.eval(left).await?;
         let val = self.force_defaults(val, span).await?;
         let func = self.eval(right).await?;
         self.apply_func(func, val, span).await
     }
 
-    fn apply_named_args(&self, lf: &mut LxFunc, arg: Value) {
-        if let Value::Tagged {
+    fn apply_named_args(&self, lf: &mut LxFunc, arg: LxVal) {
+        if let LxVal::Tagged {
             ref tag,
             ref values,
         } = arg
             && tag.as_ref() == "__named"
             && values.len() == 2
-            && let Value::Str(ref name) = values[0]
+            && let LxVal::Str(ref name) = values[0]
         {
             if let Some(idx) = lf.params.iter().position(|p| p == name.as_ref()) {
                 while lf.applied.len() < idx {
-                    lf.applied.push(Value::Unit);
+                    lf.applied.push(LxVal::Unit);
                 }
                 if lf.applied.len() == idx {
                     lf.applied.push(values[1].clone());
@@ -231,7 +231,7 @@ impl Interpreter {
         &mut self,
         params: &[Param],
         body: &SExpr,
-    ) -> Result<Value, LxError> {
+    ) -> Result<LxVal, LxError> {
         let param_names: Vec<String> = params.iter().map(|p| p.name.clone()).collect();
         let mut defaults = Vec::new();
         for p in params {
@@ -257,7 +257,7 @@ impl Interpreter {
             .as_ref()
             .map(|d| d.display().to_string())
             .unwrap_or_default();
-        Ok(Value::Func(Box::new(LxFunc {
+        Ok(LxVal::Func(Box::new(LxFunc {
             params: param_names,
             defaults,
             body: Arc::new(body.clone()),

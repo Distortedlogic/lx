@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::ast::{McpOutputType, McpToolDecl};
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::{BuiltinKind, FieldDef, McpOutputDef, McpToolDef, Value};
+use crate::value::{BuiltinKind, FieldDef, McpOutputDef, McpToolDef, LxVal};
 
 use super::Interpreter;
 
@@ -13,7 +13,7 @@ impl Interpreter {
         name: &str,
         tools: &[McpToolDecl],
         _span: Span,
-    ) -> Result<Value, LxError> {
+    ) -> Result<LxVal, LxError> {
         let mut tool_defs = Vec::new();
         for t in tools {
             let mut input = Vec::new();
@@ -36,20 +36,20 @@ impl Interpreter {
                 output,
             });
         }
-        let val = Value::McpDecl {
+        let val = LxVal::McpDecl {
             name: Arc::from(name),
             tools: Arc::new(tool_defs),
         };
         let mut env = self.env.child();
         env.bind(name.to_string(), val);
         self.env = env.into_arc();
-        Ok(Value::Unit)
+        Ok(LxVal::Unit)
     }
 
     pub(super) fn resolve_mcp_output(&self, out: &McpOutputType) -> McpOutputDef {
         match out {
             McpOutputType::Named(n) => {
-                if let Some(Value::Trait { fields, .. }) = self.env.get(n) {
+                if let Some(LxVal::Trait { fields, .. }) = self.env.get(n) {
                     McpOutputDef::Record((*fields).clone())
                 } else {
                     McpOutputDef::Simple(n.clone())
@@ -77,11 +77,11 @@ impl Interpreter {
         &mut self,
         name: &str,
         fields: &Arc<Vec<FieldDef>>,
-        arg: &Value,
+        arg: &LxVal,
         _span: Span,
-    ) -> Result<Value, LxError> {
-        let Value::Record(rec) = arg else {
-            return Ok(Value::Err(Box::new(Value::Str(Arc::from(format!(
+    ) -> Result<LxVal, LxError> {
+        let LxVal::Record(rec) = arg else {
+            return Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(format!(
                 "Trait {name}: expected Record, got {}",
                 arg.type_name()
             ))))));
@@ -91,7 +91,7 @@ impl Interpreter {
             match rec.get(&field.name) {
                 Some(val) => {
                     if field.type_name != "Any" && val.type_name() != field.type_name {
-                        return Ok(Value::Err(Box::new(Value::Str(Arc::from(format!(
+                        return Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(format!(
                             "Trait {name}: field '{}' expected {}, got {}",
                             field.name,
                             field.type_name,
@@ -103,7 +103,7 @@ impl Interpreter {
                     if let Some(ref default) = field.default {
                         result.insert(field.name.clone(), default.clone());
                     } else {
-                        return Ok(Value::Err(Box::new(Value::Str(Arc::from(format!(
+                        return Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(format!(
                             "Trait {name}: missing required field '{}'",
                             field.name
                         ))))));
@@ -113,7 +113,7 @@ impl Interpreter {
         }
         for field in fields.iter() {
             if let Some(ref constraint_expr) = field.constraint {
-                let val = result.get(&field.name).cloned().unwrap_or(Value::Unit);
+                let val = result.get(&field.name).cloned().unwrap_or(LxVal::Unit);
                 let saved = Arc::clone(&self.env);
                 let mut scope = self.env.child();
                 scope.bind(field.name.clone(), val);
@@ -123,7 +123,7 @@ impl Interpreter {
                 match ok.as_bool() {
                     Some(true) => {}
                     _ => {
-                        return Ok(Value::Err(Box::new(Value::Str(Arc::from(format!(
+                        return Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(format!(
                             "Trait {name}: field '{}' constraint violated",
                             field.name
                         ))))));
@@ -131,18 +131,18 @@ impl Interpreter {
                 }
             }
         }
-        Ok(Value::Record(Arc::new(result)))
+        Ok(LxVal::Record(Arc::new(result)))
     }
 
     pub(super) async fn apply_trait_union(
         &mut self,
         name: &str,
         variants: &Arc<Vec<Arc<str>>>,
-        arg: &Value,
+        arg: &LxVal,
         span: Span,
-    ) -> Result<Value, LxError> {
-        let Value::Record(rec) = arg else {
-            return Ok(Value::Err(Box::new(Value::Str(Arc::from(format!(
+    ) -> Result<LxVal, LxError> {
+        let LxVal::Record(rec) = arg else {
+            return Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(format!(
                 "Trait union {name}: expected Record, got {}",
                 arg.type_name()
             ))))));
@@ -151,7 +151,7 @@ impl Interpreter {
             let Some(proto) = self.env.get(variant_name.as_ref()) else {
                 continue;
             };
-            let Value::Trait {
+            let LxVal::Trait {
                 fields: ref proto_fields,
                 ..
             } = proto
@@ -162,7 +162,7 @@ impl Interpreter {
                 let mut result = rec.as_ref().clone();
                 result.insert(
                     "_variant".to_string(),
-                    Value::Str(Arc::from(variant_name.as_ref())),
+                    LxVal::Str(Arc::from(variant_name.as_ref())),
                 );
                 for field in proto_fields.iter() {
                     if !rec.contains_key(&field.name)
@@ -171,11 +171,11 @@ impl Interpreter {
                         result.insert(field.name.clone(), default.clone());
                     }
                 }
-                return Ok(Value::Record(Arc::new(result)));
+                return Ok(LxVal::Record(Arc::new(result)));
             }
         }
         let variant_names: Vec<&str> = variants.iter().map(|v| v.as_ref()).collect();
-        Ok(Value::Err(Box::new(Value::Str(Arc::from(format!(
+        Ok(LxVal::Err(Box::new(LxVal::Str(Arc::from(format!(
             "Trait union {name}: no variant matched. Tried: {}",
             variant_names.join(", ")
         ))))))
@@ -184,7 +184,7 @@ impl Interpreter {
     fn try_match_variant(
         &mut self,
         fields: &Arc<Vec<FieldDef>>,
-        rec: &Arc<indexmap::IndexMap<String, Value>>,
+        rec: &Arc<indexmap::IndexMap<String, LxVal>>,
         span: Span,
     ) -> Result<(), LxError> {
         for field in fields.iter() {
@@ -220,10 +220,10 @@ impl Interpreter {
         &mut self,
         name: &str,
         tools: &Arc<Vec<McpToolDef>>,
-        client: &Value,
+        client: &LxVal,
         span: Span,
-    ) -> Result<Value, LxError> {
-        let Value::Record(rec) = client else {
+    ) -> Result<LxVal, LxError> {
+        let LxVal::Record(rec) = client else {
             return Err(LxError::type_err(
                 format!(
                     "MCP {name}: expected connection Record, got {}",
@@ -245,14 +245,14 @@ impl Interpreter {
         crate::stdlib::mcp::register_tool_defs(mcp_id, tools);
         let mut result = rec.as_ref().clone();
         for tool in tools.iter() {
-            let wrapper = Value::BuiltinFunc(crate::value::BuiltinFunc {
+            let wrapper = LxVal::BuiltinFunc(crate::value::BuiltinFunc {
                 name: "mcp.typed_call",
                 arity: 3,
                 kind: BuiltinKind::Sync(crate::stdlib::mcp::typed_call),
-                applied: vec![client.clone(), Value::Str(Arc::from(tool.name.as_str()))],
+                applied: vec![client.clone(), LxVal::Str(Arc::from(tool.name.as_str()))],
             });
             result.insert(tool.name.clone(), wrapper);
         }
-        Ok(Value::Record(Arc::new(result)))
+        Ok(LxVal::Record(Arc::new(result)))
     }
 }

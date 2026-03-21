@@ -7,9 +7,9 @@ use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
 use crate::stdlib::json_conv::lx_to_json;
-use crate::value::Value;
+use crate::value::LxVal;
 
-pub fn build() -> IndexMap<String, Value> {
+pub fn build() -> IndexMap<String, LxVal> {
     let mut m = IndexMap::new();
     m.insert("get".into(), mk("http.get", 1, bi_get));
     m.insert("post".into(), mk("http.post", 2, bi_post));
@@ -18,12 +18,12 @@ pub fn build() -> IndexMap<String, Value> {
     m
 }
 
-fn extract_opts(val: &Value, span: Span) -> Result<HttpOpts, LxError> {
-    let Value::Record(fields) = val else {
+fn extract_opts(val: &LxVal, span: Span) -> Result<HttpOpts, LxError> {
+    let LxVal::Record(fields) = val else {
         return Ok(HttpOpts::default());
     };
     let headers = fields.get("headers").and_then(|v| {
-        if let Value::Record(hdr_fields) = v {
+        if let LxVal::Record(hdr_fields) = v {
             let map: IndexMap<String, String> = hdr_fields
                 .iter()
                 .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
@@ -34,7 +34,7 @@ fn extract_opts(val: &Value, span: Span) -> Result<HttpOpts, LxError> {
         }
     });
     let query = fields.get("query").and_then(|v| {
-        if let Value::Record(q_fields) = v {
+        if let LxVal::Record(q_fields) = v {
             let map: IndexMap<String, String> = q_fields
                 .iter()
                 .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
@@ -55,10 +55,10 @@ fn extract_opts(val: &Value, span: Span) -> Result<HttpOpts, LxError> {
     })
 }
 
-fn bi_get(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_get(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let (url, opts) = match &args[0] {
-        Value::Str(s) => (s.to_string(), HttpOpts::default()),
-        Value::Record(fields) => {
+        LxVal::Str(s) => (s.to_string(), HttpOpts::default()),
+        LxVal::Record(fields) => {
             let url = fields
                 .get("url")
                 .and_then(|v| v.as_str())
@@ -79,7 +79,7 @@ fn bi_get(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, Lx
     ctx.http.request("GET", &url, &opts, span)
 }
 
-fn bi_post(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_post(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let url = args[0]
         .as_str()
         .ok_or_else(|| LxError::type_err("http.post expects Str url as first arg", span))?;
@@ -91,7 +91,7 @@ fn bi_post(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, L
     ctx.http.request("POST", url, &opts, span)
 }
 
-fn bi_put(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_put(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let url = args[0]
         .as_str()
         .ok_or_else(|| LxError::type_err("http.put expects Str url as first arg", span))?;
@@ -103,7 +103,7 @@ fn bi_put(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, Lx
     ctx.http.request("PUT", url, &opts, span)
 }
 
-fn bi_delete(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_delete(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let url = args[0]
         .as_str()
         .ok_or_else(|| LxError::type_err("http.delete expects Str url", span))?;

@@ -11,17 +11,17 @@ use crate::builtins::{call_value_sync, mk};
 use crate::error::LxError;
 use crate::record;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
 pub(super) struct StoreState {
-    pub(super) data: IndexMap<String, Value>,
+    pub(super) data: IndexMap<String, LxVal>,
     pub(super) path: Option<PathBuf>,
 }
 
 pub(super) static STORES: LazyLock<DashMap<u64, StoreState>> = LazyLock::new(DashMap::new);
 pub(super) static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
-pub fn build() -> IndexMap<String, Value> {
+pub fn build() -> IndexMap<String, LxVal> {
     let mut m = IndexMap::new();
     m.insert("create".into(), mk("store.create", 1, bi_create));
     m.insert("set".into(), mk("store.set", 3, bi_set));
@@ -38,9 +38,9 @@ pub fn build() -> IndexMap<String, Value> {
     m
 }
 
-pub(super) fn store_id(v: &Value, span: Span) -> Result<u64, LxError> {
+pub(super) fn store_id(v: &LxVal, span: Span) -> Result<u64, LxError> {
     match v {
-        Value::Store { id } => Ok(*id),
+        LxVal::Store { id } => Ok(*id),
         _ => Err(LxError::type_err("store: expected Store", span)),
     }
 }
@@ -49,7 +49,7 @@ pub(super) fn persist(state: &StoreState) {
     let Some(ref path) = state.path else { return };
     let dummy_span = Span::default();
     let Ok(json_val) =
-        super::json_conv::lx_to_json(&Value::Record(Arc::new(state.data.clone())), dummy_span)
+        super::json_conv::lx_to_json(&LxVal::Record(Arc::new(state.data.clone())), dummy_span)
     else {
         return;
     };
@@ -57,7 +57,7 @@ pub(super) fn persist(state: &StoreState) {
     let _ = std::fs::write(path, pretty);
 }
 
-fn load_from_disk(path: &std::path::Path) -> IndexMap<String, Value> {
+fn load_from_disk(path: &std::path::Path) -> IndexMap<String, LxVal> {
     let Ok(content) = std::fs::read_to_string(path) else {
         return IndexMap::new();
     };
@@ -66,19 +66,19 @@ fn load_from_disk(path: &std::path::Path) -> IndexMap<String, Value> {
     };
     let val = super::json_conv::json_to_lx(json_val);
     match val {
-        Value::Record(r) => r.as_ref().clone(),
+        LxVal::Record(r) => r.as_ref().clone(),
         _ => IndexMap::new(),
     }
 }
 
 pub(super) fn bi_create(
-    args: &[Value],
+    args: &[LxVal],
     span: Span,
     _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     let path = match &args[0] {
-        Value::Record(r) => r.get("persist").and_then(|v| v.as_str()).map(PathBuf::from),
-        Value::Unit => None,
+        LxVal::Record(r) => r.get("persist").and_then(|v| v.as_str()).map(PathBuf::from),
+        LxVal::Unit => None,
         _ => {
             return Err(LxError::type_err(
                 "store.create: opts must be Record or ()",
@@ -89,10 +89,10 @@ pub(super) fn bi_create(
     let data = path.as_deref().map(load_from_disk).unwrap_or_default();
     let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
     STORES.insert(id, StoreState { data, path });
-    Ok(Value::Store { id })
+    Ok(LxVal::Store { id })
 }
 
-pub(super) fn bi_set(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+pub(super) fn bi_set(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let id = store_id(&args[0], span)?;
     let key = args[1]
         .as_str()
@@ -102,10 +102,10 @@ pub(super) fn bi_set(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Resu
         .ok_or_else(|| LxError::runtime("store: not found", span))?;
     s.data.insert(key.to_string(), args[2].clone());
     persist(&s);
-    Ok(Value::Unit)
+    Ok(LxVal::Unit)
 }
 
-pub(super) fn bi_get(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+pub(super) fn bi_get(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let id = store_id(&args[0], span)?;
     let key = args[1]
         .as_str()
@@ -113,14 +113,14 @@ pub(super) fn bi_get(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Resu
     let s = STORES
         .get(&id)
         .ok_or_else(|| LxError::runtime("store: not found", span))?;
-    Ok(s.data.get(key).cloned().unwrap_or(Value::None))
+    Ok(s.data.get(key).cloned().unwrap_or(LxVal::None))
 }
 
 pub(super) fn bi_update(
-    args: &[Value],
+    args: &[LxVal],
     span: Span,
     ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     let id = store_id(&args[0], span)?;
     let key = args[1]
         .as_str()
@@ -129,9 +129,9 @@ pub(super) fn bi_update(
     let mut s = STORES
         .get_mut(&id)
         .ok_or_else(|| LxError::runtime("store: not found", span))?;
-    let old = s.data.get(key).cloned().unwrap_or(Value::None);
+    let old = s.data.get(key).cloned().unwrap_or(LxVal::None);
     let new_val = call_value_sync(f, old, span, ctx)?;
-    if let Value::Err(_) = &new_val {
+    if let LxVal::Err(_) = &new_val {
         return Ok(new_val);
     }
     s.data.insert(key.to_string(), new_val.clone());
@@ -140,10 +140,10 @@ pub(super) fn bi_update(
 }
 
 pub(super) fn bi_remove(
-    args: &[Value],
+    args: &[LxVal],
     span: Span,
     _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     let id = store_id(&args[0], span)?;
     let key = args[1]
         .as_str()
@@ -151,55 +151,55 @@ pub(super) fn bi_remove(
     let mut s = STORES
         .get_mut(&id)
         .ok_or_else(|| LxError::runtime("store: not found", span))?;
-    let removed = s.data.shift_remove(key).unwrap_or(Value::None);
+    let removed = s.data.shift_remove(key).unwrap_or(LxVal::None);
     persist(&s);
     Ok(removed)
 }
 
 pub(super) fn bi_keys(
-    args: &[Value],
+    args: &[LxVal],
     span: Span,
     _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     let id = store_id(&args[0], span)?;
     let s = STORES
         .get(&id)
         .ok_or_else(|| LxError::runtime("store: not found", span))?;
-    let keys: Vec<Value> = s
+    let keys: Vec<LxVal> = s
         .data
         .keys()
-        .map(|k| Value::Str(Arc::from(k.as_str())))
+        .map(|k| LxVal::Str(Arc::from(k.as_str())))
         .collect();
-    Ok(Value::List(Arc::new(keys)))
+    Ok(LxVal::List(Arc::new(keys)))
 }
 
 pub(super) fn bi_entries(
-    args: &[Value],
+    args: &[LxVal],
     span: Span,
     _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     let id = store_id(&args[0], span)?;
     let s = STORES
         .get(&id)
         .ok_or_else(|| LxError::runtime("store: not found", span))?;
-    let entries: Vec<Value> = s
+    let entries: Vec<LxVal> = s
         .data
         .iter()
         .map(|(k, v)| {
             record! {
-                "key" => Value::Str(Arc::from(k.as_str())),
+                "key" => LxVal::Str(Arc::from(k.as_str())),
                 "value" => v.clone(),
             }
         })
         .collect();
-    Ok(Value::List(Arc::new(entries)))
+    Ok(LxVal::List(Arc::new(entries)))
 }
 
 pub(super) fn bi_query(
-    args: &[Value],
+    args: &[LxVal],
     span: Span,
     ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     let id = store_id(&args[0], span)?;
     let pred = &args[1];
     let s = STORES
@@ -210,61 +210,61 @@ pub(super) fn bi_query(
     let mut matched = Vec::new();
     for (k, v) in snapshot {
         let entry = record! {
-            "key" => Value::Str(Arc::from(k.as_str())),
+            "key" => LxVal::Str(Arc::from(k.as_str())),
             "value" => v,
         };
         let result = call_value_sync(pred, entry.clone(), span, ctx)?;
-        if matches!(result, Value::Bool(true)) {
+        if matches!(result, LxVal::Bool(true)) {
             matched.push(entry);
         }
     }
-    Ok(Value::List(Arc::new(matched)))
+    Ok(LxVal::List(Arc::new(matched)))
 }
 
 pub(super) fn bi_count(
-    args: &[Value],
+    args: &[LxVal],
     span: Span,
     _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     let id = store_id(&args[0], span)?;
     let s = STORES
         .get(&id)
         .ok_or_else(|| LxError::runtime("store: not found", span))?;
-    Ok(Value::Int(BigInt::from(s.data.len())))
+    Ok(LxVal::Int(BigInt::from(s.data.len())))
 }
 
 pub(super) fn bi_clear(
-    args: &[Value],
+    args: &[LxVal],
     span: Span,
     _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     let id = store_id(&args[0], span)?;
     let mut s = STORES
         .get_mut(&id)
         .ok_or_else(|| LxError::runtime("store: not found", span))?;
     s.data.clear();
     persist(&s);
-    Ok(Value::Unit)
+    Ok(LxVal::Unit)
 }
 
 pub(super) fn bi_persist(
-    args: &[Value],
+    args: &[LxVal],
     span: Span,
     _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     let id = store_id(&args[0], span)?;
     let s = STORES
         .get(&id)
         .ok_or_else(|| LxError::runtime("store: not found", span))?;
     persist(&s);
-    Ok(Value::Unit)
+    Ok(LxVal::Unit)
 }
 
 pub(super) fn bi_load(
-    args: &[Value],
+    args: &[LxVal],
     span: Span,
     _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     let id = store_id(&args[0], span)?;
     let mut s = STORES
         .get_mut(&id)
@@ -272,5 +272,5 @@ pub(super) fn bi_load(
     if let Some(ref path) = s.path {
         s.data = load_from_disk(path);
     }
-    Ok(Value::Unit)
+    Ok(LxVal::Unit)
 }

@@ -5,13 +5,13 @@ use num_traits::ToPrimitive;
 use crate::backends::RuntimeCtx;
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
 pub(super) fn bi_replace(
-    args: &[Value],
+    args: &[LxVal],
     span: Span,
     _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     let old = args[0].as_str().ok_or_else(|| {
         LxError::type_err(
             format!(
@@ -39,14 +39,14 @@ pub(super) fn bi_replace(
             span,
         )
     })?;
-    Ok(Value::Str(Arc::from(s.replacen(old, new, 1).as_str())))
+    Ok(LxVal::Str(Arc::from(s.replacen(old, new, 1).as_str())))
 }
 
 pub(super) fn bi_replace_all(
-    args: &[Value],
+    args: &[LxVal],
     span: Span,
     _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     let old = args[0].as_str().ok_or_else(|| {
         LxError::type_err(
             format!(
@@ -74,14 +74,14 @@ pub(super) fn bi_replace_all(
             span,
         )
     })?;
-    Ok(Value::Str(Arc::from(s.replace(old, new).as_str())))
+    Ok(LxVal::Str(Arc::from(s.replace(old, new).as_str())))
 }
 
 pub(super) fn bi_repeat(
-    args: &[Value],
+    args: &[LxVal],
     span: Span,
     _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     let n = args[0].as_int().ok_or_else(|| {
         LxError::type_err(
             format!("repeat: first arg must be Int, got {}", args[0].type_name()),
@@ -100,14 +100,14 @@ pub(super) fn bi_repeat(
     let count = n
         .to_usize()
         .ok_or_else(|| LxError::runtime("repeat: count out of range", span))?;
-    Ok(Value::Str(Arc::from(s.repeat(count).as_str())))
+    Ok(LxVal::Str(Arc::from(s.repeat(count).as_str())))
 }
 
 pub(super) fn bi_starts(
-    args: &[Value],
+    args: &[LxVal],
     span: Span,
     _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     let prefix = args[0].as_str().ok_or_else(|| {
         LxError::type_err(
             format!(
@@ -126,14 +126,14 @@ pub(super) fn bi_starts(
             span,
         )
     })?;
-    Ok(Value::Bool(s.starts_with(prefix)))
+    Ok(LxVal::Bool(s.starts_with(prefix)))
 }
 
 pub(super) fn bi_ends(
-    args: &[Value],
+    args: &[LxVal],
     span: Span,
     _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     let suffix = args[0].as_str().ok_or_else(|| {
         LxError::type_err(
             format!("ends?: first arg must be Str, got {}", args[0].type_name()),
@@ -146,10 +146,10 @@ pub(super) fn bi_ends(
             span,
         )
     })?;
-    Ok(Value::Bool(s.ends_with(suffix)))
+    Ok(LxVal::Bool(s.ends_with(suffix)))
 }
 
-fn pad(args: &[Value], span: Span, name: &str, left: bool) -> Result<Value, LxError> {
+fn pad(args: &[LxVal], span: Span, name: &str, left: bool) -> Result<LxVal, LxError> {
     let width = args[0]
         .as_int()
         .ok_or_else(|| {
@@ -171,7 +171,7 @@ fn pad(args: &[Value], span: Span, name: &str, left: bool) -> Result<Value, LxEr
     })?;
     let char_count = s.chars().count();
     if char_count >= width {
-        Ok(Value::Str(Arc::from(s)))
+        Ok(LxVal::Str(Arc::from(s)))
     } else {
         let padding = " ".repeat(width - char_count);
         let result = if left {
@@ -179,22 +179,22 @@ fn pad(args: &[Value], span: Span, name: &str, left: bool) -> Result<Value, LxEr
         } else {
             format!("{s}{padding}")
         };
-        Ok(Value::Str(Arc::from(result.as_str())))
+        Ok(LxVal::Str(Arc::from(result.as_str())))
     }
 }
 
 pub(super) fn bi_pad_left(
-    args: &[Value],
+    args: &[LxVal],
     span: Span,
     _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     pad(args, span, "pad_left", true)
 }
 
 pub(super) fn bi_pad_right(
-    args: &[Value],
+    args: &[LxVal],
     span: Span,
     _ctx: &Arc<RuntimeCtx>,
-) -> Result<Value, LxError> {
+) -> Result<LxVal, LxError> {
     pad(args, span, "pad_right", false)
 }

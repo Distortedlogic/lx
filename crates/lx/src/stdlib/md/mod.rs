@@ -11,9 +11,9 @@ use crate::backends::RuntimeCtx;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
-pub fn build() -> IndexMap<String, Value> {
+pub fn build() -> IndexMap<String, LxVal> {
     let mut m = IndexMap::new();
     m.insert("parse".into(), mk("md.parse", 1, bi_parse));
     m.insert(
@@ -44,13 +44,13 @@ fn h_level(level: HeadingLevel) -> i64 {
     }
 }
 
-pub(super) fn node_rec(type_str: &str, fields: Vec<(&str, Value)>) -> Value {
+pub(super) fn node_rec(type_str: &str, fields: Vec<(&str, LxVal)>) -> LxVal {
     let mut rec = IndexMap::new();
-    rec.insert("type".into(), Value::Str(Arc::from(type_str)));
+    rec.insert("type".into(), LxVal::Str(Arc::from(type_str)));
     for (k, v) in fields {
         rec.insert(k.into(), v);
     }
-    Value::Record(Arc::new(rec))
+    LxVal::Record(Arc::new(rec))
 }
 
 enum Block {
@@ -63,12 +63,12 @@ enum Block {
     Other,
 }
 
-fn parse_to_nodes(input: &str) -> Vec<Value> {
+fn parse_to_nodes(input: &str) -> Vec<LxVal> {
     let parser = Parser::new_ext(input, Options::ENABLE_TABLES);
     let mut nodes = Vec::new();
     let mut text = String::new();
     let mut stack: Vec<Block> = Vec::new();
-    let mut items: Vec<Value> = Vec::new();
+    let mut items: Vec<LxVal> = Vec::new();
     let mut code_lang: Option<String> = None;
     for event in parser {
         match event {
@@ -112,8 +112,8 @@ fn parse_to_nodes(input: &str) -> Vec<Value> {
                         nodes.push(node_rec(
                             "heading",
                             vec![
-                                ("level", Value::Int(BigInt::from(h_level(level)))),
-                                ("text", Value::Str(Arc::from(text.trim()))),
+                                ("level", LxVal::Int(BigInt::from(h_level(level)))),
+                                ("text", LxVal::Str(Arc::from(text.trim()))),
                             ],
                         ));
                     }
@@ -124,34 +124,34 @@ fn parse_to_nodes(input: &str) -> Vec<Value> {
                     {
                         nodes.push(node_rec(
                             "para",
-                            vec![("text", Value::Str(Arc::from(text.trim())))],
+                            vec![("text", LxVal::Str(Arc::from(text.trim())))],
                         ));
                     }
                     TagEnd::CodeBlock => {
                         let lang = match code_lang.take() {
-                            Some(l) => Value::Some(Box::new(Value::Str(Arc::from(l.as_str())))),
-                            None => Value::None,
+                            Some(l) => LxVal::Some(Box::new(LxVal::Str(Arc::from(l.as_str())))),
+                            None => LxVal::None,
                         };
                         nodes.push(node_rec(
                             "code",
                             vec![
                                 ("lang", lang),
-                                ("code", Value::Str(Arc::from(text.trim_end()))),
+                                ("code", LxVal::Str(Arc::from(text.trim_end()))),
                             ],
                         ));
                     }
-                    TagEnd::Item => items.push(Value::Str(Arc::from(text.trim()))),
+                    TagEnd::Item => items.push(LxVal::Str(Arc::from(text.trim()))),
                     TagEnd::List(is_ordered) => {
                         let t = if is_ordered { "ordered" } else { "list" };
                         nodes.push(node_rec(
                             t,
-                            vec![("items", Value::List(Arc::new(std::mem::take(&mut items))))],
+                            vec![("items", LxVal::List(Arc::new(std::mem::take(&mut items))))],
                         ));
                     }
                     TagEnd::BlockQuote(_) => {
                         nodes.push(node_rec(
                             "blockquote",
-                            vec![("text", Value::Str(Arc::from(text.trim())))],
+                            vec![("text", LxVal::Str(Arc::from(text.trim())))],
                         ));
                     }
                     _ => {}
@@ -171,30 +171,30 @@ fn parse_to_nodes(input: &str) -> Vec<Value> {
     nodes
 }
 
-fn bi_parse(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_parse(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let input = args[0]
         .as_str()
         .ok_or_else(|| LxError::type_err("md.parse expects Str", span))?;
-    Ok(Value::List(Arc::new(parse_to_nodes(input))))
+    Ok(LxVal::List(Arc::new(parse_to_nodes(input))))
 }
 
-pub(super) fn field_str(rec: &IndexMap<String, Value>, field: &str) -> Option<String> {
+pub(super) fn field_str(rec: &IndexMap<String, LxVal>, field: &str) -> Option<String> {
     rec.get(field)
         .and_then(|v| v.as_str())
         .map(|s| s.to_string())
 }
 
-pub(super) fn get_nodes(val: &Value, span: Span) -> Result<&[Value], LxError> {
+pub(super) fn get_nodes(val: &LxVal, span: Span) -> Result<&[LxVal], LxError> {
     val.as_list()
         .map(|l| l.as_slice())
         .ok_or_else(|| LxError::type_err("md: expected List (parsed doc)", span))
 }
 
-pub(super) fn nodes_by_type(nodes: &[Value], type_name: &str) -> Vec<Value> {
+pub(super) fn nodes_by_type(nodes: &[LxVal], type_name: &str) -> Vec<LxVal> {
     nodes
         .iter()
         .filter(|n| {
-            if let Value::Record(r) = n {
+            if let LxVal::Record(r) = n {
                 field_str(r, "type").as_deref() == Some(type_name)
             } else {
                 false

@@ -5,7 +5,7 @@ use lx::backends::YieldBackend;
 use lx::error::LxError;
 use lx::span::Span;
 use lx::stdlib::json_conv::{json_to_lx, lx_to_json};
-use lx::value::Value;
+use lx::value::LxVal;
 use tokio::sync::oneshot;
 
 use crate::event::{EventBus, RuntimeEvent, next_prompt_id};
@@ -33,7 +33,7 @@ impl DxYieldBackend {
 }
 
 impl YieldBackend for DxYieldBackend {
-    fn yield_value(&self, value: Value, span: Span) -> Result<Value, LxError> {
+    fn yield_value(&self, value: LxVal, span: Span) -> Result<LxVal, LxError> {
         let json_val =
             lx_to_json(&value, span).map_err(|e| LxError::runtime(format!("yield: {e}"), span))?;
 

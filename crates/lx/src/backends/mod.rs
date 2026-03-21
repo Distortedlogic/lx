@@ -18,7 +18,7 @@ use indexmap::IndexMap;
 
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
 pub enum AgentEvent {
     Spawned { id: String, name: String },
@@ -95,11 +95,11 @@ pub struct EmbedOpts {
 }
 
 pub trait AiBackend: Send + Sync {
-    fn prompt(&self, text: &str, opts: &AiOpts, span: Span) -> Result<Value, LxError>;
+    fn prompt(&self, text: &str, opts: &AiOpts, span: Span) -> Result<LxVal, LxError>;
 }
 
 pub trait EmitBackend: Send + Sync {
-    fn emit(&self, value: &Value, span: Span) -> Result<(), LxError>;
+    fn emit(&self, value: &LxVal, span: Span) -> Result<(), LxError>;
 }
 
 pub trait HttpBackend: Send + Sync {
@@ -109,16 +109,16 @@ pub trait HttpBackend: Send + Sync {
         url: &str,
         opts: &HttpOpts,
         span: Span,
-    ) -> Result<Value, LxError>;
+    ) -> Result<LxVal, LxError>;
 }
 
 pub trait ShellBackend: Send + Sync {
-    fn exec(&self, cmd: &str, span: Span) -> Result<Value, LxError>;
-    fn exec_capture(&self, cmd: &str, span: Span) -> Result<Value, LxError>;
+    fn exec(&self, cmd: &str, span: Span) -> Result<LxVal, LxError>;
+    fn exec_capture(&self, cmd: &str, span: Span) -> Result<LxVal, LxError>;
 }
 
 pub trait YieldBackend: Send + Sync {
-    fn yield_value(&self, value: Value, span: Span) -> Result<Value, LxError>;
+    fn yield_value(&self, value: LxVal, span: Span) -> Result<LxVal, LxError>;
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -141,16 +141,16 @@ pub trait UserBackend: Send + Sync {
     fn progress_pct(&self, pct: f64, message: &str);
     fn status(&self, level: &str, message: &str);
     fn table(&self, headers: &[String], rows: &[Vec<String>]);
-    fn check_signal(&self) -> Option<Value>;
+    fn check_signal(&self) -> Option<LxVal>;
 }
 
 pub trait PaneBackend: Send + Sync {
-    fn open(&self, kind: &str, config: &Value, span: Span) -> Result<Value, LxError>;
-    fn update(&self, pane_id: &str, content: &Value, span: Span) -> Result<(), LxError>;
+    fn open(&self, kind: &str, config: &LxVal, span: Span) -> Result<LxVal, LxError>;
+    fn update(&self, pane_id: &str, content: &LxVal, span: Span) -> Result<(), LxError>;
     fn close(&self, pane_id: &str, span: Span) -> Result<(), LxError>;
-    fn list(&self, span: Span) -> Result<Value, LxError>;
+    fn list(&self, span: Span) -> Result<LxVal, LxError>;
 }
 
 pub trait EmbedBackend: Send + Sync {
-    fn embed(&self, texts: &[String], opts: &EmbedOpts, span: Span) -> Result<Value, LxError>;
+    fn embed(&self, texts: &[String], opts: &EmbedOpts, span: Span) -> Result<LxVal, LxError>;
 }

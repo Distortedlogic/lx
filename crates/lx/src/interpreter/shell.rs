@@ -1,7 +1,7 @@
 use crate::ast::{ShellMode, StrPart};
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
 use super::Interpreter;
 
@@ -11,7 +11,7 @@ impl Interpreter {
         mode: &ShellMode,
         parts: &[StrPart],
         span: Span,
-    ) -> Result<Value, LxError> {
+    ) -> Result<LxVal, LxError> {
         let cmd_str = self.build_shell_string(parts).await?;
         let cmd_trimmed = cmd_str.trim();
         match mode {

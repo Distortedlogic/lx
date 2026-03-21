@@ -6,7 +6,7 @@ use indexmap::IndexMap;
 use crate::ast::{BindTarget, Program, Stmt, UseKind, UseStmt};
 use crate::error::LxError;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
 use super::{Interpreter, ModuleExports};
 
@@ -46,11 +46,11 @@ impl Interpreter {
                     .path
                     .last()
                     .ok_or_else(|| LxError::runtime("empty module path", span))?;
-                let record = Value::Record(Arc::new(exports.bindings.clone()));
+                let record = LxVal::Record(Arc::new(exports.bindings.clone()));
                 env.bind(module_name.clone(), record);
             }
             UseKind::Alias(alias) => {
-                let record = Value::Record(Arc::new(exports.bindings.clone()));
+                let record = LxVal::Record(Arc::new(exports.bindings.clone()));
                 env.bind(alias.clone(), record);
             }
             UseKind::Selective(names) => {

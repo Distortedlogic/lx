@@ -15,9 +15,9 @@ use crate::builtins::mk;
 use crate::error::LxError;
 use crate::record;
 use crate::span::Span;
-use crate::value::Value;
+use crate::value::LxVal;
 
-pub fn build() -> IndexMap<String, Value> {
+pub fn build() -> IndexMap<String, LxVal> {
     let mut m = IndexMap::new();
     m.insert("spec".into(), mk("test.spec", 2, bi_spec));
     m.insert("scenario".into(), mk("test.scenario", 3, bi_scenario));
@@ -34,12 +34,12 @@ pub fn build() -> IndexMap<String, Value> {
 }
 
 pub(super) fn extract_record<'a>(
-    v: &'a Value,
+    v: &'a LxVal,
     name: &str,
     span: Span,
-) -> Result<&'a IndexMap<String, Value>, LxError> {
+) -> Result<&'a IndexMap<String, LxVal>, LxError> {
     match v {
-        Value::Record(r) => Ok(r.as_ref()),
+        LxVal::Record(r) => Ok(r.as_ref()),
         _ => Err(LxError::type_err(
             format!("{name}: expected Record, got {}", v.type_name()),
             span,
@@ -48,7 +48,7 @@ pub(super) fn extract_record<'a>(
 }
 
 pub(super) fn extract_str<'a>(
-    r: &'a IndexMap<String, Value>,
+    r: &'a IndexMap<String, LxVal>,
     key: &str,
     name: &str,
     span: Span,
@@ -58,16 +58,16 @@ pub(super) fn extract_str<'a>(
         .ok_or_else(|| LxError::type_err(format!("{name}: '{key}' must be Str"), span))
 }
 
-pub(super) fn score_to_f64(v: &Value) -> Option<f64> {
+pub(super) fn score_to_f64(v: &LxVal) -> Option<f64> {
     match v {
-        Value::Float(f) => Some(*f),
-        Value::Bool(b) => Some(if *b { 1.0 } else { 0.0 }),
-        Value::Int(n) => i64::try_from(n).ok().map(|n| n as f64),
+        LxVal::Float(f) => Some(*f),
+        LxVal::Bool(b) => Some(if *b { 1.0 } else { 0.0 }),
+        LxVal::Int(n) => i64::try_from(n).ok().map(|n| n as f64),
         _ => None,
     }
 }
 
-fn bi_spec(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_spec(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let name = args[0]
         .as_str()
         .ok_or_else(|| LxError::type_err("test.spec: name must be Str", span))?;
@@ -94,10 +94,10 @@ fn bi_spec(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, 
     let weights = opts
         .get("weights")
         .cloned()
-        .unwrap_or_else(|| Value::Record(Arc::new(IndexMap::new())));
+        .unwrap_or_else(|| LxVal::Record(Arc::new(IndexMap::new())));
 
-    let setup = opts.get("setup").cloned().unwrap_or(Value::None);
-    let teardown = opts.get("teardown").cloned().unwrap_or(Value::None);
+    let setup = opts.get("setup").cloned().unwrap_or(LxVal::None);
+    let teardown = opts.get("teardown").cloned().unwrap_or(LxVal::None);
 
     let timeout = opts
         .get("timeout")
@@ -106,19 +106,19 @@ fn bi_spec(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, 
         .unwrap_or(300);
 
     let mut m = IndexMap::new();
-    m.insert("name".into(), Value::Str(Arc::from(name)));
+    m.insert("name".into(), LxVal::Str(Arc::from(name)));
     m.insert("flow".into(), flow);
     m.insert("grader".into(), grader);
-    m.insert("threshold".into(), Value::Float(threshold));
+    m.insert("threshold".into(), LxVal::Float(threshold));
     m.insert("weights".into(), weights);
     m.insert("setup".into(), setup);
     m.insert("teardown".into(), teardown);
-    m.insert("timeout".into(), Value::Int(BigInt::from(timeout)));
-    m.insert("scenarios".into(), Value::List(Arc::new(Vec::new())));
-    Ok(Value::Record(Arc::new(m)))
+    m.insert("timeout".into(), LxVal::Int(BigInt::from(timeout)));
+    m.insert("scenarios".into(), LxVal::List(Arc::new(Vec::new())));
+    Ok(LxVal::Record(Arc::new(m)))
 }
 
-fn bi_scenario(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+fn bi_scenario(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
     let spec_fields = extract_record(&args[0], "test.scenario", span)?;
     let scenario_name = args[1]
         .as_str()
@@ -133,36 +133,36 @@ fn bi_scenario(args: &[Value], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Val
     let rubric = opts
         .get("rubric")
         .cloned()
-        .unwrap_or_else(|| Value::List(Arc::new(Vec::new())));
+        .unwrap_or_else(|| LxVal::List(Arc::new(Vec::new())));
     let runs = opts
         .get("runs")
         .and_then(|v| v.as_int())
         .and_then(|n| i64::try_from(n).ok())
         .unwrap_or(3);
-    let expect = opts.get("expect").cloned().unwrap_or(Value::None);
+    let expect = opts.get("expect").cloned().unwrap_or(LxVal::None);
     let tags = opts
         .get("tags")
         .cloned()
-        .unwrap_or_else(|| Value::List(Arc::new(Vec::new())));
+        .unwrap_or_else(|| LxVal::List(Arc::new(Vec::new())));
 
     let scenario = record! {
-        "name" => Value::Str(Arc::from(scenario_name)),
+        "name" => LxVal::Str(Arc::from(scenario_name)),
         "input" => input,
         "rubric" => rubric,
-        "runs" => Value::Int(BigInt::from(runs)),
+        "runs" => LxVal::Int(BigInt::from(runs)),
         "expect" => expect,
         "tags" => tags,
     };
 
     let mut new_spec = spec_fields.clone();
     let scenarios = match new_spec.get("scenarios") {
-        Some(Value::List(list)) => {
+        Some(LxVal::List(list)) => {
             let mut new_list = list.as_ref().clone();
             new_list.push(scenario);
-            Value::List(Arc::new(new_list))
+            LxVal::List(Arc::new(new_list))
         }
-        _ => Value::List(Arc::new(vec![scenario])),
+        _ => LxVal::List(Arc::new(vec![scenario])),
     };
     new_spec.insert("scenarios".into(), scenarios);
-    Ok(Value::Record(Arc::new(new_spec)))
+    Ok(LxVal::Record(Arc::new(new_spec)))
 }
