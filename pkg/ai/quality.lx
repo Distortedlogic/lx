@@ -4,7 +4,7 @@
 
 use std/ai
 use pkg/core/prompt
-use std/audit
+use pkg/core/audit
 use pkg/data/trace {TraceStore}
 use std/agents/grader
 use std/agents/auditor

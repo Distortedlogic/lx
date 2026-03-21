@@ -185,6 +185,11 @@ pub fn register(env: &mut Env) {
     env.bind("Store".into(), crate::stdlib::build_constructor());
     env.bind("method_of".into(), mk("method_of", 2, bi_method_of));
     env.bind("methods_of".into(), mk("methods_of", 1, bi_methods_of));
+    env.bind("try".into(), mk("try", 2, bi_try));
+    env.bind(
+        "resolve_handler".into(),
+        mk("resolve_handler", 1, bi_resolve_handler),
+    );
     let mut ctx_fields = IndexMap::new();
     ctx_fields.insert(
         "current".into(),
@@ -234,6 +239,35 @@ fn bi_global_context_get(
     _ctx: &Arc<RuntimeCtx>,
 ) -> Result<Value, LxError> {
     crate::interpreter::ambient::global_context_get(&args[0], span)
+}
+
+fn bi_resolve_handler(
+    args: &[Value],
+    _span: Span,
+    _ctx: &Arc<RuntimeCtx>,
+) -> Result<Value, LxError> {
+    let agent = &args[0];
+    if let Some(handler) = crate::stdlib::agent_reload::handler_id_from_agent(agent)
+        .and_then(crate::stdlib::agent_reload::lookup_handler)
+    {
+        return Ok(handler);
+    }
+    if let Value::Record(r) = agent
+        && let Some(h) = r.get("handler")
+    {
+        return Ok(h.clone());
+    }
+    Ok(Value::None)
+}
+
+fn bi_try(args: &[Value], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {
+    let f = &args[0];
+    let arg = args[1].clone();
+    match crate::builtins::call_value_sync(f, arg, span, ctx) {
+        Ok(v) => Ok(v),
+        Err(LxError::Propagate { value, .. }) => Ok(Value::Err(value)),
+        Err(e) => Err(e),
+    }
 }
 
 fn bi_methods_of(args: &[Value], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Value, LxError> {

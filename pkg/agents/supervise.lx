@@ -1,0 +1,38 @@
+-- Erlang-style supervision — one_for_one, one_for_all, rest_for_one.
+-- Hoisted from agent_supervise.rs.
+
+supervisors = Store ()
+
++supervise = (children opts) {
+  strategy = opts.strategy ?? "one_for_one"
+  max_restarts = opts.max_restarts ?? 3
+  state = Store ()
+  state.set "children" children
+  state.set "strategy" strategy
+  state.set "max_restarts" max_restarts
+  state.set "restart_counts" {}
+  id = to_str (len (supervisors.keys ()))
+  supervisors.set id state
+  {__supervisor_id: id  strategy: strategy  children: children}
+}
+
++child = (name agent opts) {
+  restart = opts.restart ?? "permanent"
+  {name: name  agent: agent  restart: restart  status: "running"}
+}
+
++supervise_stop = (supervisor) {
+  id = supervisor.__supervisor_id ?? "unknown"
+  state = supervisors.get id
+  has_state = state != None
+  has_state ? {
+    children = state.get "children"
+    children | each (c) {
+      has_pid = c.agent.__pid != None
+      has_pid ? agent.kill c.agent
+    }
+    supervisors.remove id
+  }
+  ok_val = Ok ()
+  ok_val
+}

@@ -1,10 +1,12 @@
 use std/agent
+use pkg/core/adapter {adapter coerce}
+use pkg/core/negotiate_fmt {negotiate_format}
 
 Trait ReviewOutput = {score: Float  label: Str  details: Str}
 Trait AnalysisInput = {confidence: Float  category: Str  context: Str}
 
--- agent.adapter: static field mapping
-adapter = agent.adapter ReviewOutput AnalysisInput {
+-- adapter: static field mapping
+adapter = adapter ReviewOutput AnalysisInput {
   score: "confidence"
   label: "category"
   details: "context"
@@ -16,26 +18,26 @@ assert (transformed.confidence == 0.9) "maps score -> confidence"
 assert (transformed.category == "good") "maps label -> category"
 assert (transformed.context == "looks fine") "maps details -> context"
 
--- agent.adapter: pass-through unmapped fields
+-- adapter: pass-through unmapped fields
 Trait Source = {a: Str  b: Str  c: Str}
 Trait Target = {x: Str  b: Str  c: Str}
-adapter2 = agent.adapter Source Target {a: "x"}
+adapter2 = adapter Source Target {a: "x"}
 msg2 = Source {a: "alpha"  b: "beta"  c: "gamma"}
 t2 = adapter2 msg2
 assert (t2.x == "alpha") "maps a -> x"
 assert (t2.b == "beta") "b passes through"
 assert (t2.c == "gamma") "c passes through"
 
--- agent.adapter: missing required field produces Err
+-- adapter: missing required field produces Err
 Trait Small = {x: Str}
 Trait Big = {a: Str  b: Str}
-adapter3 = agent.adapter Small Big {x: "a"}
+adapter3 = adapter Small Big {x: "a"}
 result3 = adapter3 (Small {x: "hello"}) ?? "caught"
 assert (result3 == "caught") "errors on missing required field"
 
--- agent.coerce: one-shot transform
+-- coerce: one-shot transform
 msg4 = {score: 0.75  label: "fair"  details: "ok"}
-coerced = agent.coerce msg4 AnalysisInput {
+coerced = coerce msg4 AnalysisInput {
   score: "confidence"
   label: "category"
   details: "context"
@@ -45,7 +47,7 @@ assert (inner.confidence == 0.75) "coerces score -> confidence"
 assert (inner.category == "fair") "coerces label -> category"
 assert (inner.context == "ok") "coerces details -> context"
 
--- agent.negotiate_format: exact match returns identity adapter
+-- negotiate_format: exact match returns identity adapter
 Trait TaskReq = {task: Str  priority: Int}
 
 caps_with_task_req = {traits: [TaskReq]  tools: []  domains: []}
@@ -57,7 +59,7 @@ same_c = {handler: (msg) {
   msg.type == "capabilities" ? (caps_with_task_req) : {result: "ok"}
 }  name: "same_c"}
 
-exact_result = agent.negotiate_format same_p same_c
+exact_result = negotiate_format same_p same_c
 assert (exact_result ? {Ok _ -> true; _ -> false}) "exact match succeeds"
 adapter_fn = exact_result ?? (x) x
 test_msg = {task: "deploy"  priority: 5}
@@ -65,7 +67,7 @@ adapted = adapter_fn test_msg
 assert (adapted.task == "deploy") "identity adapter passes through"
 assert (adapted.priority == 5) "identity adapter passes through (int)"
 
--- agent.negotiate_format: structural match with same field names
+-- negotiate_format: structural match with same field names
 Trait WorkItem = {task: Str  priority: Int}
 caps_with_work_item = {traits: [WorkItem]  tools: []  domains: []}
 
@@ -76,14 +78,14 @@ struct_c = {handler: (msg) {
   msg.type == "capabilities" ? (caps_with_work_item) : {result: "ok"}
 }  name: "sc"}
 
-struct_result = agent.negotiate_format struct_p struct_c
+struct_result = negotiate_format struct_p struct_c
 assert (struct_result ? {Ok _ -> true; _ -> false}) "structural match succeeds"
 struct_adapter = struct_result ?? (x) x
 struct_msg = {task: "build"  priority: 1}
 struct_adapted = struct_adapter struct_msg
 assert (struct_adapted.task == "build") "structural adapter preserves fields"
 
--- agent.negotiate_format: incompatible returns Err
+-- negotiate_format: incompatible returns Err
 Trait Foo = {x: Int  y: Int}
 Trait Bar = {completely_different: Str  also_unrelated: Str}
 caps_foo = {traits: [Foo]  tools: []  domains: []}
@@ -96,7 +98,7 @@ incompat_c = {handler: (msg) {
   msg.type == "capabilities" ? (caps_bar) : ()
 }  name: "ic"}
 
-incompat_result = agent.negotiate_format incompat_p incompat_c
+incompat_result = negotiate_format incompat_p incompat_c
 assert (incompat_result ? {Err _ -> true; _ -> false}) "incompatible returns Err"
 
 emit "[INFO] 90_agent_adapter: all passed"

@@ -3,7 +3,7 @@
 
 use std/ai
 use pkg/core/prompt
-use std/retry
+use pkg/core/retry
 use pkg/core/circuit {CircuitBreaker}
 use std/time
 use pkg/core/score

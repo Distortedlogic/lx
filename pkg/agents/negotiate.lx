@@ -1,0 +1,36 @@
+-- N-party iterative consensus — round-based negotiation with convergence function.
+-- Replaces agent_negotiate.rs.
+
+negotiate_fn = (agents config) {
+  proposal = config.proposal
+  max_rounds = config.max_rounds ?? 3
+  converge_fn = config.converge
+  on_round_fn = config.on_round
+  has_on_round = on_round_fn != None
+  positions := []
+  round := 1
+  result := None
+  done := false
+  loop {
+    done ? break ()
+    is_past = round > max_rounds
+    is_past ? break ()
+    msg = {round: round  proposal: proposal  positions: positions}
+    responses = agents | map (agent) {
+      resp = agent ~>? msg
+      {agent: agent.name ?? "unknown"  position: resp}
+    }
+    has_on_round ? on_round_fn round responses
+    converge_result = converge_fn responses
+    is_ok = ok? converge_result
+    inner = converge_result ?? converge_result
+    ok_val = Ok {result: inner  rounds: round  positions: responses  unanimous: true}
+    result <- is_ok ? ok_val : result
+    done <- is_ok ? true : done
+    positions <- responses
+    round <- round + 1
+  }
+  has_result = result != None
+  has_result ? result : Err {reason: "no_consensus"  rounds: max_rounds  positions: positions}
+}
++negotiate = negotiate_fn

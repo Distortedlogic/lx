@@ -1,12 +1,13 @@
 -- 47_agent_intercept.lx
 -- Tests: spec/agents-intercept.md (message middleware)
--- Phase: agent.intercept
+-- Phase: intercept
 
 use std/agent
+use pkg/agents/intercept {intercept}
 
 -- basic intercept: middleware transforms message before forwarding
 doubler = {handler: (msg) msg.value * 2}
-enriched = agent.intercept doubler (msg next) {
+enriched = intercept doubler (msg next) {
   next {value: msg.value + 10}
 }
 assert (enriched ~>? {value: 5} == 30) "intercept transforms message"
@@ -15,7 +16,7 @@ assert (enriched ~>? {value: 5} == 30) "intercept transforms message"
 assert (doubler ~>? {value: 5} == 10) "original agent unchanged"
 
 -- intercept can modify response
-logged = agent.intercept doubler (msg next) {
+logged = intercept doubler (msg next) {
   result = next msg
   {original: result  intercepted: true}
 }
@@ -24,7 +25,7 @@ assert (r.original == 6) "intercept can wrap response"
 assert (r.intercepted == true) "intercept adds metadata"
 
 -- middleware can short-circuit (not call next)
-gated = agent.intercept doubler (msg next) {
+gated = intercept doubler (msg next) {
   msg.value > 0 ? {
     true -> next msg
     false -> Err "blocked: negative value"
@@ -35,11 +36,11 @@ assert (gated ~>? {value: -1} == Err "blocked: negative value") "gate blocks neg
 
 -- chained interceptors: compose by wrapping
 worker = {handler: (msg) msg.x + 1}
-step1 = agent.intercept worker (msg next) {
+step1 = intercept worker (msg next) {
   result = next msg
   result * 2
 }
-step2 = agent.intercept step1 (msg next) {
+step2 = intercept step1 (msg next) {
   result = next msg
   result + 100
 }
@@ -47,21 +48,21 @@ assert (step2 ~>? {x: 4} == 110) "chained: (4+1)*2+100=110"
 
 -- intercept with send (~>) returns unit
 side_agent = {handler: (msg) msg}
-tracked = agent.intercept side_agent (msg next) {
+tracked = intercept side_agent (msg next) {
   next msg
 }
 assert (tracked ~> {action: "log"} == ()) "intercept with send returns unit"
 
 -- intercept preserves non-handler fields
 named_agent = {name: "worker" role: "analyst" handler: (x) x}
-wrapped = agent.intercept named_agent (msg next) {
+wrapped = intercept named_agent (msg next) {
   next msg
 }
 assert (wrapped.name == "worker") "intercept preserves name"
 assert (wrapped.role == "analyst") "intercept preserves role"
 
 -- middleware receives original message
-spy = agent.intercept doubler (msg next) {
+spy = intercept doubler (msg next) {
   {saw_value: msg.value  result: (next msg)}
 }
 r2 = spy ~>? {value: 7}

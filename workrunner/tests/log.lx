@@ -1,0 +1,5 @@
+use workrunner/lib/log : ts_log
+
+ts_log.log "test message from log module"
+
+log.info "log: all passed"

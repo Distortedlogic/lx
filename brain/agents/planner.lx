@@ -3,7 +3,7 @@
 
 use std/ai
 use pkg/core/prompt
-use std/plan
+use pkg/core/plan
 use ../traits {Planner}
 use pkg/core/score
 use pkg/core/contracts {ActionPlan}

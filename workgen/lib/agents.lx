@@ -1,0 +1,77 @@
+-- AI agent calls for workgen — investigate, compose, revise.
+-- Each function builds a prompt via pkg/core/prompt and calls ai.prompt_with.
+
+use std/ai
+use pkg/core/prompt
+use workgen/lib/log : wg_log
+use workgen/lib/persistence
+
++investigate = (audit_content root runner_dir slug) {
+  wg_log.log "  > claude: investigate codebase (max 30 turns)..."
+
+  p = prompt.create ()
+    | prompt.system "You are a code auditor. Investigate the codebase thoroughly — read files, search for patterns. Produce a numbered findings list."
+    | prompt.section "Audit Checklist" audit_content
+    | prompt.instruction "For each audit item, search the codebase under '{root}/' to determine if it is violated"
+    | prompt.instruction "Read every relevant file — do not guess from filenames alone"
+    | prompt.instruction "Return a numbered list of findings: concrete problem, root cause, single best fix, affected files"
+    | prompt.constraint "Report ONLY problems — do not list things that are correct"
+    | prompt.constraint "One fix per finding, verbal only, no code snippets"
+
+  result = ai.prompt_with {
+    prompt: prompt.render p
+    tools: ["Read" "Glob" "Grep" "Bash"]
+    max_turns: 30
+  } ^
+
+  findings = result.text ?? ""
+  persistence.save_debug runner_dir slug "investigate.md" findings
+  wg_log.log "  < investigate done ({findings | lines | len} lines, {result.turns ?? 0} turns)"
+  findings
+}
+
++compose = (audit_content rules_content findings runner_dir slug) {
+  wg_log.log "  > claude: compose work item document..."
+
+  p = prompt.create ()
+    | prompt.system "You are a markdown document generator. Output the document directly. Start with '# Goal'. No conversation."
+    | prompt.section "Audit Checklist" audit_content
+    | prompt.section "Process Rules" rules_content
+    | prompt.section "Investigation Findings" findings
+    | prompt.instruction "Produce a single markdown work item document following the Process Rules exactly"
+    | prompt.instruction "Required sections: # Goal, # Why, # What changes, # Files affected, # Task List, # CRITICAL REMINDERS"
+    | prompt.constraint "Output ONLY the raw markdown — no preamble, no commentary"
+    | prompt.constraint "Start with '# Goal' — nothing before it"
+
+  result = ai.prompt_with {
+    prompt: prompt.render p
+    disable_tools: true
+  } ^
+
+  draft = result.text ?? ""
+  persistence.save_debug runner_dir slug "compose.md" draft
+  wg_log.log "  < compose done ({draft | lines | len} lines)"
+  draft
+}
+
++revise = (draft feedback runner_dir slug round_num) {
+  wg_log.log "  > claude: revise draft (round {round_num})..."
+
+  p = prompt.create ()
+    | prompt.system "You are revising a work item document. Fix every feedback item. Output the complete revised document."
+    | prompt.section "Current Document" draft
+    | prompt.section "Feedback to Fix" feedback
+    | prompt.instruction "Fix ALL feedback items. Return the complete revised markdown document."
+    | prompt.constraint "Do not remove content to avoid checks — fix issues properly"
+    | prompt.constraint "Start with '# Goal' — nothing before it"
+
+  result = ai.prompt_with {
+    prompt: prompt.render p
+    disable_tools: true
+  } ^
+
+  revised = result.text ?? ""
+  persistence.save_debug runner_dir slug "revise_round_{round_num}.md" revised
+  wg_log.log "  < revise done ({revised | lines | len} lines)"
+  revised
+}

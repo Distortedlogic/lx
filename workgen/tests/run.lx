@@ -1,60 +1,46 @@
 -- Satisfaction test runner for workgen.
--- Runs workgen for real against each scenario's fixture codebase.
+-- Runs workgen against each scenario's fixture codebase.
 -- Usage: lx run workgen/tests/run.lx
 -- Filter: TEST_TAG=smoke lx run workgen/tests/run.lx
 
 use std/env
 use std/fs
-use std/agents/grader
-use pkg/core/score
-use ../main : workgen
+use workgen/lib/log : wg_log
+use workgen/lib/audit_parser
+use workgen/lib/grader {Grader}
+use workgen/lib/orchestrator
 use ./spec
 
-run_scenario = (scenario) {
-  emit "\n  --- {scenario.name} ---"
-  result = workgen.run scenario.audit "workgen/rules/work-item.md" scenario.root
-  result ? {
-    Ok r -> {
-      output = fs.read r.path ?? ""
-      grade_result = grader.grade {
-        work: output
-        task: "work item for {scenario.name} covering: {scenario.expected_findings | join ", "}"
-        rubric: spec.rubric
-        threshold: spec.threshold_pct
-      }
-      emit "    score: {grade_result.score}  passed: {grade_result.passed}"
-      grade_result.passed | not ? emit "    feedback: {grade_result.feedback}"
-      {name: scenario.name  passed: grade_result.passed  score: grade_result.score}
-    }
-    Err e -> {
-      emit "    ERROR: {e}"
-      {name: scenario.name  passed: false  score: 0.0}
-    }
-  }
+wi_grader = Grader {threshold: spec.threshold_pct  rubric: spec.rubric}
+rules_content = fs.read "workgen/rules/work-item.md" ^
+
+run_scenario_impl = (scenario) {
+  wg_log.log "  --- {scenario.name} ---"
+  audit = audit_parser.load scenario.audit
+  result = orchestrator.run_audit audit rules_content scenario.root wi_grader 3 ".lx/workgen_test"
+  {name: scenario.name  passed: result.status == "pass"  score: result.score}
 }
 
 +main = () {
   tag_filter = env.get "TEST_TAG" ?? ""
-  scenarios = tag_filter == "" ?
-    spec.scenarios :
-    (spec.scenarios | filter (s) s.tags | contains? tag_filter)
+  scenarios = tag_filter == "" ? spec.scenarios : (spec.scenarios | filter (s) { s.tags | contains? tag_filter })
 
-  emit "=== workgen satisfaction tests ==="
-  emit "scenarios: {scenarios | len}"
-  emit "threshold: {spec.threshold}"
+  wg_log.log "=== workgen satisfaction tests ==="
+  wg_log.log "scenarios: {scenarios | len}"
+  wg_log.log "threshold: {spec.threshold}"
 
-  results = scenarios | pmap_n 4 run_scenario
+  results = scenarios | map run_scenario_impl
 
-  passed_count = results | filter (.passed) | len
+  passed_count = results | filter (r) { r.passed == true } | len
   total = results | len
-  overall = score.average (results | map (.score))
 
-  emit "\n=== {spec.name} ==="
+  wg_log.log ""
+  wg_log.log "=== {spec.name} ==="
   results | each (r) {
     status = r.passed ? "PASS" : "FAIL"
-    emit "  {r.name}: {r.score} {status}"
+    wg_log.log "  {r.name}: {r.score} {status}"
   }
-  emit "\nOverall: {overall} — {passed_count}/{total} passed (threshold: {spec.threshold})"
+  wg_log.log "Overall: {passed_count}/{total} passed (threshold: {spec.threshold})"
 
   passed_count == total ? (Ok results) : (Err "some scenarios failed")
 }

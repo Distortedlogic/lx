@@ -1,0 +1,33 @@
+use pkg/kit/template
+
+tmpl = template.from_string `Hello {{name}}, you are {{age}} years old.`
+result = template.render tmpl {name: "Claude"  age: 3}
+assert (result == "Hello Claude, you are 3 years old.") "variable substitution"
+
+tmpl2 = template.from_string `{{user.name}} ({{user.role}})`
+result2 = template.render tmpl2 {user: {name: "Alice"  role: "admin"}}
+assert (result2 == "Alice (admin)") "dot access"
+
+tmpl3 = template.from_string `{{#if admin}}Admin{{/if}}`
+assert ((template.render tmpl3 {admin: true}) == "Admin") "if true"
+assert ((template.render tmpl3 {admin: false}) == "") "if false"
+
+tmpl4 = template.from_string `{{#if premium}}Pro{{#else}}Free{{/if}}`
+assert ((template.render tmpl4 {premium: true}) == "Pro") "if-else true"
+assert ((template.render tmpl4 {premium: false}) == "Free") "if-else false"
+
+tmpl5 = template.from_string `{{#each items}}[{{.}}]{{/each}}`
+result5 = template.render tmpl5 {items: ["a" "b" "c"]}
+assert (result5 == "[a][b][c]") "each with primitives"
+
+tmpl6 = template.from_string `{{#each users}}{{name}},{{/each}}`
+result6 = template.render tmpl6 {users: [{name: "A"} {name: "B"}]}
+assert (result6 == "A,B,") "each with records"
+
+header = template.from_string `HEADER`
+tmpl7 = template.from_string `{{> hdr}} body`
+tmpl7 = template.with_partial tmpl7 "hdr" header
+result7 = template.render tmpl7 {}
+assert (result7 == "HEADER body") "partial inclusion"
+
+log.info "105_template: all passed"

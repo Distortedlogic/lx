@@ -1,0 +1,109 @@
+-- AI agent calls — implement, fix, investigate, diagnose.
+-- Each function builds a prompt via pkg/core/prompt and calls ai.prompt_with.
+
+use std/ai
+use pkg/core/prompt
+use workrunner/lib/log
+use workrunner/lib/persistence
+
++implement = (wi task bootstrap_ctx runner_dir) {
+  log.log "    > claude: implement task {task.num} (max 25 turns)..."
+  ctx = task.context_for_agent ()
+
+  p = prompt.create ()
+    | prompt.system "You are implementing one task from a work item. Follow the task description exactly. Use justfile recipes. No code comments. 300 line file limit."
+    | prompt.section "Context Bootstrap" bootstrap_ctx
+    | prompt.section "Work Item Context" (wi.context_for_implement ())
+    | prompt.section "Current Task" ctx
+    | prompt.instruction "Run `just diagnose` after implementation to verify compilation."
+    | prompt.constraint "Do not add code comments or doc strings"
+    | prompt.constraint "No #[allow()] macros"
+
+  result = ai.prompt_with {
+    prompt: prompt.render p
+    tools: ["Read" "Edit" "Write" "Bash" "Glob" "Grep"]
+    max_turns: 25
+  } ^
+
+  persistence.save_debug runner_dir wi.slug "task_{task.num}_implement.md" (result.text ?? "")
+  log.log "    < done ({result.turns ?? 0} turns)"
+  result
+}
+
++diagnose = (task runner_dir slug) {
+  log.log "    > diagnose after task {task.num}..."
+  diag = $just diagnose
+  diag_out = diag ?? {out: ""  err: "command failed"  code: 1}
+  output = diag_out.out ?? diag_out.err ?? ""
+  clean = output | contains? "0 errors" && (output | contains? "0 warnings")
+  persistence.save_debug runner_dir slug "task_{task.num}_diagnose.txt" output
+  clean ? log.log "    TASK {task.num}: compiles clean" : log.log "    TASK {task.num}: compilation issues"
+  clean
+}
+
++fix = (wi task bootstrap_ctx feedback runner_dir) {
+  log.log "    > claude: fix task {task.num}..."
+  ctx = task.context_for_agent ()
+
+  p = prompt.create ()
+    | prompt.system "Fix the issues found in this task. Fix ONLY what the grader flagged."
+    | prompt.section "Context Bootstrap" bootstrap_ctx
+    | prompt.section "Task" ctx
+    | prompt.section "Grader Feedback" feedback
+    | prompt.instruction "Fix the issues. Run `just diagnose` after."
+    | prompt.constraint "Do not add code comments. Fix only listed issues."
+
+  result = ai.prompt_with {
+    prompt: prompt.render p
+    tools: ["Read" "Edit" "Write" "Bash" "Glob" "Grep"]
+    max_turns: 15
+  } ^
+
+  persistence.save_debug runner_dir wi.slug "task_{task.num}_fix.md" (result.text ?? "")
+  log.log "    < fix done ({result.turns ?? 0} turns)"
+  result
+}
+
++investigate = (wi bootstrap_ctx runner_dir) {
+  log.log "  > claude: investigate full work item..."
+  p = prompt.create ()
+    | prompt.system "Investigate whether a work item is fully implemented. Be terse."
+    | prompt.section "Work Item" (wi.context_for_investigate ())
+    | prompt.instruction "Check each file in Files Affected exists (use Glob)"
+    | prompt.instruction "Check mod.rs registrations if applicable (use Grep)"
+    | prompt.instruction "Run `just diagnose` — report ONLY errors/warnings"
+    | prompt.instruction "Run `just test` — report ONLY failures"
+    | prompt.instruction "For each task: DONE or MISSING with one line"
+    | prompt.instruction "Keep under 2000 chars. No file contents."
+
+  result = ai.prompt_with {
+    prompt: prompt.render p
+    tools: ["Read" "Glob" "Grep" "Bash"]
+    max_turns: 20
+  } ^
+
+  report = result.text ?? ""
+  persistence.save_debug runner_dir wi.slug "investigate.md" report
+  log.log "  < investigate done ({report | len} chars)"
+  report
+}
+
++fix_work_item = (wi bootstrap_ctx feedback failed_text runner_dir) {
+  log.log "  > claude: fix work item..."
+  p = prompt.create ()
+    | prompt.system "Fix issues found in work item grading. Fix ONLY what failed."
+    | prompt.section "Context Bootstrap" bootstrap_ctx
+    | prompt.section "Work Item" (wi.context_for_investigate ())
+    | prompt.section "Grader Feedback" feedback
+    | prompt.section "Failed" failed_text
+    | prompt.instruction "Fix failed categories. Run `just diagnose` and `just test`."
+
+  result = ai.prompt_with {
+    prompt: prompt.render p
+    tools: ["Read" "Edit" "Write" "Bash" "Glob" "Grep"]
+    max_turns: 25
+  } ^
+  persistence.save_debug runner_dir wi.slug "fix_wi.md" (result.text ?? "")
+  log.log "  < fix done ({result.turns ?? 0} turns)"
+  result
+}

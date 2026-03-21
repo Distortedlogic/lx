@@ -1,4 +1,5 @@
 use std/agent
+use pkg/agents/intercept {intercept}
 
 -- agent.reload: basic handler replacement
 old_handler = (msg) "old: " ++ msg.task
@@ -88,7 +89,7 @@ middleware = (msg next) {
   inner = next {data: "wrapped(" ++ msg.data ++ ")"}
   "mid[" ++ inner ++ "]"
 }
-intercepted = agent.intercept base_agent middleware
+intercepted = intercept base_agent middleware
 
 i1 = intercepted ~>? {data: "x"}
 assert i1 == "mid[base: wrapped(x)]" "intercept+reload: before"

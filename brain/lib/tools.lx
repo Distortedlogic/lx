@@ -2,7 +2,7 @@
 -- Source: bridges cognitive intent to concrete actions via MCP/shell/AI
 -- Delegates generic tool operations to pkg/kit/tool_executor.
 
-use std/budget
+use pkg/core/budget
 use pkg/kit/tool_executor : executor
 use pkg/core/contracts {ToolRequest ToolResult ActionPlan}
 use pkg/core/prompt

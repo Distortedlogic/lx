@@ -1,0 +1,22 @@
+use workrunner/lib/grader {Grader GradeResult CategoryScore}
+
+g = Grader {
+  threshold: 80
+  rubric: [
+    {name: "completeness"  description: "all tasks done"  weight: 50}
+    {name: "quality"  description: "code is correct"  weight: 50}
+  ]
+}
+
+assert (type_of g == "Object") "grader is Object"
+assert (g.rubric | len == 2) "rubric has 2 categories"
+assert (g.threshold == 80) "threshold is 80"
+
+empty = g.empty_result "test reason"
+assert (empty.score == 0) "empty score is 0"
+assert (empty.passed == false) "empty not passed"
+assert (empty.feedback == "test reason") "empty feedback"
+assert (empty.categories | len == 2) "empty has 2 categories"
+assert (empty.failed | len == 2) "empty has 2 failed"
+
+log.info "grader_unit: all passed"

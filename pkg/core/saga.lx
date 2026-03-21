@@ -1,0 +1,114 @@
+-- Compensating transactions — try/undo loop with retry and dependency ordering.
+-- Replaces the Rust std/saga module with pure lx logic.
+
+use std/time
+use pkg/core/retry {compute_delay}
+
+step_id = (step) { step.id ?? "unknown" }
+step_deps = (step) { step.depends ?? [] }
+
+next_ready = (remaining completed_ids) {
+  remaining | find (step) {
+    deps = step_deps step
+    deps | all? (d) { completed_ids | contains? d }
+  }
+}
+
+try_step = (do_fn prev retries) {
+  cd = compute_delay
+  attempt := 0
+  loop {
+    is_last = attempt >= retries
+    raw = try do_fn prev
+    is_err = err? raw
+    (is_err == false) ? break raw
+    is_last ? break raw
+    delay = cd {backoff: "exponential"  base_ms: 100  max_delay_ms: 30000} attempt
+    time.sleep delay
+    attempt <- attempt + 1
+  }
+}
+
+compensate = (completed opts) {
+  compensated := []
+  comp_errors := []
+  reversed = completed | rev
+  reversed | each (entry) {
+    has_on_comp = opts.on_compensate != None
+    has_on_comp ? opts.on_compensate entry.id entry.result
+    undo_result = try entry.undo entry.result
+    is_err = err? undo_result
+    undo_err_val = undo_result ? { Err e -> e; _ -> "unknown" }
+    compensated <- is_err ? compensated : compensated ++ [entry.id]
+    comp_errors <- is_err ? comp_errors ++ [{step: entry.id  error: undo_err_val}] : comp_errors
+  }
+  {compensated: compensated  comp_errors: comp_errors}
+}
+
+make_saga_err = (failed_step error comp_result) {
+  base = {failed_step: failed_step  error: error  compensated: comp_result.compensated}
+  has_errors = (comp_result.comp_errors | len) > 0
+  with_errors = {..base  compensation_errors: comp_result.comp_errors}
+  has_errors ? with_errors : base
+}
+
+do_run = (steps initial_rec opts) {
+  si = step_id
+  sd = step_deps
+  nr = next_ready
+  ts = try_step
+  cf = compensate
+  me = make_saga_err
+  retries = opts.max_retries ?? 0
+  result_store = Store ()
+  has_initial = initial_rec != () && initial_rec != None
+  has_initial ? (initial_rec | entries | each (p) { result_store.set p.0 p.1 })
+  remaining := steps
+  completed := []
+  completed_ids := result_store.keys ()
+  err_out := None
+  loop {
+    is_empty = (remaining | len) == 0
+    has_err = err_out != None
+    is_empty || has_err ? break ()
+    ready = nr remaining completed_ids
+    has_ready = ready != None
+    err_out <- (has_ready == false) ? Err "saga: cycle or unmet dependencies" : err_out
+    (has_ready == false) ? break ()
+    step = ready ? { Some s -> s; _ -> ready }
+    sid = si step
+    remaining <- remaining | filter (s) { (si s) != sid }
+    do_fn = step.do
+    undo_fn = step.undo
+    prev = result_store.to_record ()
+    result = ts do_fn prev retries
+    is_err = err? result
+    err_val = result ? { Err e -> e; _ -> result }
+    no_comp = {compensated: []  comp_errors: []}
+    comp = is_err ? (cf completed opts) : no_comp
+    fail_err = Err (me sid err_val comp)
+    err_out <- is_err ? fail_err : err_out
+    is_err ? break ()
+    result_store.set sid result
+    completed <- completed ++ [{id: sid  result: result  undo: undo_fn}]
+    completed_ids <- completed_ids ++ [sid]
+  }
+  has_final_err = err_out != None
+  final_record = result_store.to_record ()
+  ok_result = Ok final_record
+  has_final_err ? err_out : ok_result
+}
+
+run_fn = (steps) { do_run steps {} {max_retries: 0} }
++run = run_fn
+
+run_with_fn = (steps opts) { do_run steps {} opts }
++run_with = run_with_fn
+
++define = (steps) { {__saga: true  steps: steps} }
+
+execute_fn = (definition initial) {
+  steps = definition.steps ?? []
+  do_run steps initial {max_retries: 0}
+}
++execute = execute_fn

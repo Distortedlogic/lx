@@ -1,0 +1,108 @@
+-- Text quality checks — hedging, refusal, repetition, keyword overlap, rubric evaluation.
+-- Replaces the Rust std/audit module with pure lx logic.
+
+use std/fs
+
+hedging_phrases = [
+  "i think" "maybe" "possibly" "i'm not sure" "perhaps"
+  "it might" "it could be" "i believe" "not entirely sure"
+]
+
+refusal_phrases = [
+  "i can't" "i'm unable" "as an ai" "i cannot"
+  "i'm not able" "i don't have the ability"
+]
+
++is_empty = (s) { s | trim | len == 0 }
+
++is_too_short = (s min_len) { (len s) < min_len }
+
+is_repetitive = (s) {
+  normalized = s | replace "\n" "."
+  sentences = normalized | split "." | map (x) { x | trim | lower } | filter (x) { (len x) > 0 }
+  total = sentences | len
+  below_min = total < 2
+  below_min ? false : {
+    seen = Store ()
+    dupes = sentences | fold 0 (count item) {
+      (seen.has item) ? count + 1 : { seen.set item true; count }
+    }
+    dupes * 2 >= total
+  }
+}
++is_repetitive = is_repetitive
+
+is_hedging = (s) {
+  lo = s | lower
+  hedging_phrases | any? (h) { lo | contains? h }
+}
++is_hedging = is_hedging
+
+is_refusal = (s) {
+  lo = s | lower
+  refusal_phrases | any? (r) { lo | contains? r }
+}
++is_refusal = is_refusal
+
+references_task = (output task) {
+  lo = output | lower
+  words = task | split " " | filter (w) { (len w) > 3 } | map lower
+  total = words | len
+  none_needed = total == 0
+  none_needed ? true : {
+    hits = words | filter (w) { lo | contains? w } | len
+    hits * 3 >= total
+  }
+}
++references_task = references_task
+
++files_exist = (paths) { paths | all? (p) { fs.exists p } }
+
++has_diff = (s) {
+  (s | contains? "diff --git") || (s | contains? "@@") || ((s | contains? "+++") && (s | contains? "---"))
+}
+
++rubric = (categories) { categories }
+
+evaluate = (categories data) {
+  threshold = data.threshold ?? 95
+  results = categories | map (cat) {
+    name = cat.name ?? "unknown"
+    weight = cat.weight ?? 0
+    check_fn = cat.check
+    passed = check_fn data == true
+    score = passed ? 100 : 0
+    {name: name  weight: weight  score: score  passed: passed}
+  }
+  total_weight = results | fold 0 (acc item) { acc + item.weight }
+  total_score = results | fold 0 (acc item) { acc + item.score * item.weight }
+  final_score = total_weight > 0 ? total_score // total_weight : 0
+  cat_records = results | map (r) { {name: r.name  score: r.score  passed: r.passed} }
+  failed_names = results | filter (r) { r.passed == false } | map (.name)
+  feedback_parts = results | filter (r) { r.passed == false } | map (r) { r.name ++ ": failed" }
+  feedback = feedback_parts | join "; "
+  passed = final_score >= threshold
+  {score: final_score  passed: passed  categories: cat_records  feedback: feedback  failed: failed_names}
+}
++evaluate = evaluate
+
+check_min_length = (output min_len) {
+  (len output) < min_len ? ["output too short (" ++ (to_str (len output)) ++ " < " ++ (to_str min_len) ++ ")"] : []
+}
+
+quick_check = (opts) {
+  output = opts.output ?? ""
+  reasons = (output | trim | len == 0) ? ["output is empty"] : []
+  ml = opts.min_length
+  has_ml = ml != None
+  reasons = has_ml ? reasons ++ (check_min_length output ml) : reasons
+  reasons = (opts.no_hedging ?? false) && (is_hedging output) ? reasons ++ ["output contains hedging language"] : reasons
+  reasons = (opts.no_refusal ?? false) && (is_refusal output) ? reasons ++ ["output contains refusal language"] : reasons
+  task_str = opts.task
+  has_task = task_str != None
+  refs = has_task ? (references_task output task_str) : true
+  reasons = (refs == false) ? reasons ++ ["output doesn't reference task"] : reasons
+  passed = (len reasons) == 0
+  {passed: passed  reasons: reasons}
+}
++quick_check = quick_check

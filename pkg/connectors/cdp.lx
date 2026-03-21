@@ -1,0 +1,139 @@
+-- CDP client -- Chrome DevTools Protocol over WebSocket.
+-- Requires std/ws. Requires Chrome/Chromium with --remote-debugging-port.
+
+use std/ws
+use std/json
+use std/time
+use std/http
+
+msg_id := 0
+
+next_id = () {
+  msg_id <- msg_id + 1
+  msg_id
+}
+
+send_cmd = (conn method params) {
+  id = next_id ()
+  payload = json.encode {id: id  method: method  params: params}
+  ws.send conn payload ^
+  recv_response conn id
+}
+
+recv_response = (conn expected_id) {
+  raw = ws.recv_json conn ^
+  (raw.id == expected_id) ? raw : (recv_response conn expected_id)
+}
+
+launch = (opts) {
+  port = opts.port ?? 9222
+  chrome = opts.chrome ?? "google-chrome-stable"
+  headless = opts.headless ?? true
+  headless_flag = headless ? "--headless=new" : ""
+  cmd = "{chrome} {headless_flag} --remote-debugging-port={port} --no-first-run --no-default-browser-check --disable-gpu &"
+  $^{cmd}
+  time.sleep 1000
+  version_raw = http.get "http://localhost:{port}/json/version" ^
+  ws_url = version_raw.body.webSocketDebuggerUrl
+  conn = ws.connect ws_url ^
+  {..conn  port: port  __cdp: true}
+}
++launch = launch
+
+connect_cdp = (url) {
+  conn = ws.connect url ^
+  {..conn  __cdp: true}
+}
++connect = connect_cdp
+
+navigate = (conn url) {
+  send_cmd conn "Page.navigate" {url: url} ^
+  time.sleep 500
+  Ok ()
+}
++navigate = navigate
+
+screenshot_fn = (conn opts) {
+  format = opts.format ?? "png"
+  quality = opts.quality ?? 80
+  result = send_cmd conn "Page.captureScreenshot" {format: format  quality: quality} ^
+  result.result.data
+}
++screenshot = screenshot_fn
+
+evaluate_fn = (conn expression) {
+  result = send_cmd conn "Runtime.evaluate" {expression: expression  returnByValue: true} ^
+  result.result.result.value ?? result.result.result
+}
++evaluate = evaluate_fn
+
+click = (conn selector) {
+  doc = send_cmd conn "DOM.getDocument" {depth: 0} ^
+  node = send_cmd conn "DOM.querySelector" {nodeId: doc.result.root.nodeId  selector: selector} ^
+  node_id = node.result.nodeId
+  (node_id == 0) ? (Err "element not found: {selector}") : (click_at conn node_id)
+}
+
+click_at = (conn node_id) {
+  box_model = send_cmd conn "DOM.getBoxModel" {nodeId: node_id} ^
+  quad = box_model.result.model.content
+  x = ((get quad 0) + (get quad 2)) / 2
+  y = ((get quad 1) + (get quad 5)) / 2
+  send_cmd conn "Input.dispatchMouseEvent" {type: "mousePressed"  x: x  y: y  button: "left"  clickCount: 1} ^
+  send_cmd conn "Input.dispatchMouseEvent" {type: "mouseReleased"  x: x  y: y  button: "left"  clickCount: 1} ^
+  Ok ()
+}
++click = click
+
+type_text = (conn selector text) {
+  click conn selector ^
+  text | chars | each (ch) {
+    send_cmd conn "Input.dispatchKeyEvent" {type: "keyDown"  text: ch} ^
+    send_cmd conn "Input.dispatchKeyEvent" {type: "keyUp"  text: ch} ^
+  }
+  Ok ()
+}
++type_text = type_text
+
+wait_for = (conn selector timeout_ms) {
+  deadline_ms = time.now().ms + timeout_ms
+  poll_for conn selector deadline_ms
+}
+
+poll_for = (conn selector deadline_ms) {
+  doc = send_cmd conn "DOM.getDocument" {depth: 0} ^
+  node = send_cmd conn "DOM.querySelector" {nodeId: doc.result.root.nodeId  selector: selector} ^
+  nid = node.result.nodeId
+  (nid != 0) ? (Ok nid) : (poll_retry conn selector deadline_ms)
+}
+
+poll_retry = (conn selector deadline_ms) {
+  now = time.now().ms
+  (now > deadline_ms) ? (Err "timeout waiting for {selector}") : (poll_sleep conn selector deadline_ms)
+}
+
+poll_sleep = (conn selector deadline_ms) {
+  time.sleep 100
+  poll_for conn selector deadline_ms
+}
++wait_for = wait_for
+
+content_fn = (conn) {
+  doc = send_cmd conn "DOM.getDocument" {depth: -1} ^
+  html = send_cmd conn "DOM.getOuterHTML" {nodeId: doc.result.root.nodeId} ^
+  html.result.outerHTML
+}
++content = content_fn
+
+close_fn = (conn) {
+  ws.close conn ^
+  port = conn.port
+  (port != None) ? (kill_chrome port) : (Ok ())
+}
+
+kill_chrome = (port) {
+  cmd = "kill $(lsof -ti :{port}) 2>/dev/null"
+  $^{cmd}
+  Ok ()
+}
++close = close_fn

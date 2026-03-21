@@ -1,0 +1,38 @@
+use workrunner/lib/work_item
+use std/fs
+
+wi = work_item.load "work_items/PKG_CDP.md"
+assert (wi.task_count () == 2) "CDP has 2 tasks"
+assert (wi.goal | len > 0) "CDP has goal"
+assert (wi.files_affected | len > 0) "CDP has files_affected"
+assert (wi.slug == "pkg_cdp") "CDP slug correct"
+
+t1 = (wi.get_task 1) ?? {subject: ""}
+assert (t1.subject | len > 0) "task 1 has subject"
+assert (t1.description | len > 0) "task 1 has description"
+assert (t1.num == 1) "task 1 num is 1"
+
+t2 = (wi.get_task 2) ?? {subject: ""}
+assert (t2.subject | len > 0) "task 2 has subject"
+
+missing = (wi.get_task 99) ?? None
+assert (missing == None) "task 99 does not exist"
+
+ctx = wi.context_for_implement ()
+assert (ctx | contains? "Goal") "implement context has goal"
+assert (ctx | contains? "Files Affected") "implement context has files affected"
+
+inv_ctx = wi.context_for_investigate ()
+assert (inv_ctx | len > 0) "investigate context is raw markdown"
+
+summaries = wi.task_summaries ()
+assert (summaries | len == 2) "2 summaries"
+
+wi2 = work_item.load "work_items/AI_BACKEND_MEDIA.md"
+assert (wi2.task_count () >= 3) "media has 3+ tasks"
+assert (wi2.slug == "ai_backend_media") "media slug"
+
+wi3 = work_item.load "work_items/STD_SANDBOX.md"
+assert (wi3.task_count () >= 4) "sandbox has 4+ tasks"
+
+log.info "work_item_edges: all passed"

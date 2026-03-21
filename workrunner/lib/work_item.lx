@@ -1,0 +1,116 @@
+-- WorkItem + Task classes -- Structured representation of work item markdown.
+-- Parses the standard work item format: Goal, Why, What Changes, Files Affected, Task List.
+-- Each Task has subject, description, active_form. WorkItem holds the collection.
+
+use std/fs
+use std/md
+use std/re
+
+Class +Task = {
+  num: 0
+  subject: ""
+  description: ""
+  active_form: ""
+  full_text: ""
+
+  context_for_agent = () {
+    "Task {self.num}: {self.subject}\n\n{self.description}"
+  }
+
+  summary = () {
+    "Task {self.num}: {self.subject}"
+  }
+}
+
+Class +WorkItem = {
+  path: ""
+  slug: ""
+  goal: ""
+  why: ""
+  what_changes: ""
+  files_affected: ""
+  raw: ""
+  tasks: []
+
+  task_count = () {
+    self.tasks | len
+  }
+
+  get_task = (n) {
+    self.tasks | find (t) t.num == n
+  }
+
+  context_for_implement = () {
+    "# Goal\n{self.goal}\n\n# What Changes\n{self.what_changes}\n\n# Files Affected\n{self.files_affected}"
+  }
+
+  context_for_investigate = () {
+    self.raw
+  }
+
+  task_summaries = () {
+    self.tasks | map (t) t.summary ()
+  }
+}
+
+parse_task_section = (sec num) {
+  title = sec.title
+  body = sec.content
+
+  subject_line = (body | lines | find (l) { l | starts? "Subject:" }) ?? ""
+  subject = subject_line | len > 0 ? (subject_line | replace "Subject:" "" | trim) : title
+
+  af_line = (body | lines | find (l) { l | starts? "ActiveForm:" }) ?? ""
+  active_form = af_line | len > 0 ? (af_line | replace "ActiveForm:" "" | trim) : ""
+
+  desc_line = (body | lines | find (l) { l | starts? "Description:" }) ?? ""
+  desc_start = desc_line | len > 0
+  desc_tail = (body | split "Description:" | last) ?? body
+  description = desc_start ? (desc_tail | trim) : body
+
+  Task {num: num  subject: subject  description: description  active_form: active_form  full_text: body}
+}
+
+extract_raw_section = (raw title) {
+  marker = "\n# {title}\n"
+  parts = raw | split marker
+  too_few = parts | len < 2
+  too_few ? "" : (extract_until_next_heading parts)
+}
+
+extract_until_next_heading = (parts) {
+  after = (parts | drop 1 | first) ?? ""
+  after_lines = after | lines
+  content_lines = after_lines | take_while (line) { not (line | starts? "# ") }
+  content_lines | join "\n" | trim
+}
+
++load = (path) {
+  raw = fs.read path ^
+  goal = extract_raw_section raw "Goal"
+  why = extract_raw_section raw "Why"
+  what_changes = extract_raw_section raw "What Changes"
+  files_affected = extract_raw_section raw "Files Affected"
+
+  parsed = md.parse raw
+  sections = md.sections parsed
+  task_sections = sections | filter (s) s.level == 3 && (s.title | starts? "Task")
+  task_sections | len == 0 ? assert false "work_item.load: no tasks found in {path}"
+  tasks = task_sections | enumerate | map (pair) {
+    (idx sec) = pair
+    parse_task_section sec (idx + 1)
+  }
+
+  slug = path | replace "work_items/" "" | replace ".md" "" | lower
+
+  WorkItem {
+    path: path
+    slug: slug
+    goal: goal
+    why: why
+    what_changes: what_changes
+    files_affected: files_affected
+    raw: raw
+    tasks: tasks
+  }
+}

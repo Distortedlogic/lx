@@ -5,6 +5,7 @@ use std/ai
 use pkg/core/prompt
 use pkg/agents/guard
 use pkg/core/score
+use pkg/core/capability {advertise}
 use ../traits {Critic}
 
 Trait Critique = {
@@ -76,7 +77,7 @@ check_correctness = (code: Str  task: Str) -> {ok: Bool  issues: [Str]} {
 }
 
 +main = () {
-  agent.advertise {
+  advertise {
     traits: ["Critique"]
     domains: ["critic" "review" "verification" "quality"]
     tools: ["ai"]

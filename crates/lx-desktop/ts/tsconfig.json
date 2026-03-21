@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES5",
+    "outDir": "../assets/js",
+    "rootDir": "src",
+    "strict": true,
+    "removeComments": true,
+    "sourceMap": false,
+    "declaration": false,
+    "lib": ["ES5", "DOM"]
+  },
+  "include": ["src/**/*.ts"]
+}

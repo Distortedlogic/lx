@@ -1,0 +1,38 @@
+-- Dialogue branching — fork, compare, merge for exploring conversation paths.
+-- Hoisted from agent_dialogue_branch.rs.
+
+use std/agent
+
+branches = Store ()
+
++dialogue_fork = (session count) {
+  parent_id = session.id ?? "unknown"
+  history = agent.dialogue_history session
+  forks = 0 | range count | map (i) {
+    fork_id = "{parent_id}_fork_{i}"
+    fork = agent.dialogue session.agent session.config ^
+    branches.set fork_id {parent: parent_id  session: fork  index: i}
+    fork
+  }
+  forks
+}
+
++dialogue_compare = (forks grader_fn) {
+  scored = forks | enumerate | map (pair) {
+    idx = pair.0
+    fork = pair.1
+    history = agent.dialogue_history fork
+    score = grader_fn fork history
+    {index: idx  session: fork  score: score}
+  }
+  scored | sort_by (.score) | rev
+}
+
++dialogue_merge = (ranked parent) {
+  winner = ranked.0
+  winner.session
+}
+
++dialogue_branches = () {
+  branches.entries ()
+}

@@ -2,7 +2,7 @@
 -- check_cargo: parameterized cargo command runner returning Signal.
 -- gate: combine multiple signals into pass/fail decision.
 
-use std/audit
+use pkg/core/audit
 
 Trait +Signal = {proceed: Bool  feedback: Str  source: Str}
 

@@ -17,7 +17,7 @@ assert (rust_first.file | ends? ".rs") "rust file extension"
 lx_files = search.files "" {path: "tests"  glob: "*.lx"}
 assert (lx_files | len > 0) "found .lx files"
 has_self = lx_files | any? (f) { f.file | contains? "103_search" }
-assert (has_self) "files list includes this test"
+assert (has_self == true) "files list includes this test"
 
 counts = search.count "fn build" {path: "crates/lx/src/stdlib"  type: "rust"}
 assert (counts | len > 0) "found count results"
@@ -34,7 +34,7 @@ assert (first_rep.new | contains? "find") "new text has replacement"
 ci_results = search.content "SEARCH" {path: "tests/103_search.lx"  case_insensitive: true}
 assert (ci_results | len > 0) "case insensitive search works"
 
-no_results = search.content "zzz_nonexistent_pattern_zzz" {path: "tests/103_search.lx"}
+no_results = search.content "zzz_nonexistent_zzz" {path: "tests/fixtures"}
 assert (no_results | len == 0) "no matches for garbage pattern"
 
 log.info "103_search: all passed"

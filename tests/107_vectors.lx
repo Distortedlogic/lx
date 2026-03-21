@@ -1,0 +1,81 @@
+use pkg/data/vectors {VectorIndex}
+use std/fs
+
+idx = VectorIndex ()
+
+idx.add_raw "doc1" "rust programming" {topic: "code"} [1.0 0.0 0.0] ^
+idx.add_raw "doc2" "python scripting" {topic: "code"} [0.9 0.1 0.0] ^
+idx.add_raw "doc3" "baking bread" {topic: "food"} [0.0 0.0 1.0] ^
+
+assert (idx.len () == 3) "three entries indexed"
+
+results = idx.search_raw [1.0 0.0 0.0] 2 ^
+assert (len results == 2) "search returns k results"
+assert (results.[0].id == "doc1") "most similar is doc1"
+assert (results.[1].id == "doc2") "second most similar is doc2"
+assert (results.[0].score > results.[1].score) "scores are descending"
+
+results_all = idx.search_raw [0.0 0.0 1.0] 3 ^
+assert (results_all.[0].id == "doc3") "food query matches food doc"
+
+found = idx.get "doc1"
+assert (found != None) "get by id works"
+assert (found.text == "rust programming") "get returns stored text"
+assert (found.metadata.topic == "code") "get returns stored metadata"
+
+idx.remove "doc2"
+assert (idx.len () == 2) "remove reduces count"
+assert (idx.get "doc2" == None) "removed entry is gone"
+
+results_after = idx.search_raw [1.0 0.0 0.0] 3 ^
+assert (len results_after == 2) "search reflects removal"
+
+save_path = "/tmp/lx_vectors_test.json"
+idx.save save_path
+
+idx2 = VectorIndex ()
+idx2.load save_path
+assert (idx2.len () == 2) "load restores entries"
+loaded = idx2.get "doc1"
+assert (loaded.text == "rust programming") "load preserves text"
+assert (loaded.vector.[0] == 1.0) "load preserves vector"
+
+fs.remove save_path ^
+
+embed_idx = VectorIndex ()
+add_result = embed_idx.add "e1" "semantic search test" {source: "test"}
+add_result ? {
+  Ok id -> {
+    assert (id == "e1") "add returns id"
+    assert (embed_idx.len () == 1) "add stores entry"
+    stored = embed_idx.get "e1"
+    assert (stored.text == "semantic search test") "add stores text"
+    assert (stored.vector | len > 0) "add stores vector"
+
+    batch_result = embed_idx.add_batch [
+      {id: "e2"  text: "machine learning"  metadata: {}}
+      {id: "e3"  text: "deep learning"  metadata: {}}
+    ]
+    batch_result ? {
+      Ok count -> {
+        assert (count == 2) "add_batch returns count"
+        assert (embed_idx.len () == 3) "add_batch stores all entries"
+      }
+      Err e -> log.info "107_vectors: add_batch skipped ({e})"
+    }
+
+    search_result = embed_idx.search "learning" 2
+    search_result ? {
+      Ok hits -> {
+        assert (hits | len <= 2) "search returns at most k"
+        assert (hits.[0].score >= hits.[1].score) "search scores descending"
+      }
+      Err e -> log.info "107_vectors: search skipped ({e})"
+    }
+
+    log.info "107_vectors: embed tests passed"
+  }
+  Err e -> log.info "107_vectors: embed tests skipped ({e})"
+}
+
+log.info "107_vectors: all passed"

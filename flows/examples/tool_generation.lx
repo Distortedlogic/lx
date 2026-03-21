@@ -7,7 +7,7 @@
 -- Demonstrates: workflow.run, DAG execution via std/plan, compile gates, MCP registration.
 -- Source: mcp-toolbelt/arch_diagrams/tool_generation
 
-use std/plan
+use pkg/core/plan
 use std/mcp
 use std/json
 use std/fs

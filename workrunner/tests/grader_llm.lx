@@ -1,0 +1,25 @@
+use workrunner/lib/grader {Grader}
+
+g = Grader {
+  threshold: 80
+  rubric: [
+    {name: "completeness"  description: "all tasks done"  weight: 50}
+    {name: "quality"  description: "code is correct"  weight: 50}
+  ]
+}
+
+result = g.grade "Task 1: DONE. Task 2: DONE. All files exist. Tests pass. 0 errors." "Verify implementation"
+emit "score: {result.score}"
+emit "passed: {result.passed}"
+emit "feedback: {result.feedback}"
+emit "categories: {result.categories | len}"
+result.categories | each (cat) {
+  icon = cat.passed ? "+" : "x"
+  emit "  [{icon}] {cat.name}: {cat.score}/100 — {cat.feedback}"
+}
+
+assert (result.score >= 0) "score is non-negative"
+assert (result.categories | len == 2) "has 2 categories"
+assert (result.feedback | len > 0) "has feedback"
+
+log.info "grader_llm: all passed"

@@ -3,6 +3,7 @@
 
 use pkg/data/trace {TraceStore}
 use std/agent {Handoff}
+use pkg/core/handoff {as_context}
 use ../contracts {Response}
 use pkg/ai/perception : perceive
 use pkg/ai/reasoning : reason
@@ -51,7 +52,7 @@ use ../lib/context_mgr : ctx_mgr
         handoff = Handoff {
           from: "perception"
           to: "reasoning"
-          context: agent.as_context {intent: perception.intent  domain: perception.domain  complexity: perception.complexity  memories}
+          context: as_context {intent: perception.intent  domain: perception.domain  complexity: perception.complexity  memories}
           task: perception.raw
         }
 
@@ -109,7 +110,7 @@ use ../lib/context_mgr : ctx_mgr
         handoff = Handoff {
           from: "execution"
           to: "response"
-          context: agent.as_context {
+          context: as_context {
             goal: chain.goal
             conclusion: chain.conclusion
             strategy: chain.strategy

@@ -1,20 +1,22 @@
 -- 62_agent_negotiate.lx
--- Tests: agent.negotiate (multi-agent iterative consensus)
+-- Tests: negotiate (multi-agent iterative consensus)
 
 use std/agent
+use pkg/agents/negotiate {negotiate}
+use pkg/agents/mock {mock}
 
 -- === Setup mock agents ===
-always_approve = agent.mock [
+always_approve = mock [
   {match: "any" respond: (msg) {approved: true score: 90 feedback: "looks good"}}
 ]
 
-strict_reviewer = agent.mock [
+strict_reviewer = mock [
   {match: (msg) msg.round < 3 respond: {approved: false score: 40 feedback: "needs work"}}
   {match: "any" respond: {approved: true score: 80 feedback: "acceptable"}}
 ]
 
 -- === Unanimous convergence ===
-r1 = agent.negotiate [always_approve always_approve] {
+r1 = negotiate [always_approve always_approve] {
   proposal: "build a REST API"
   max_rounds: 3
   converge: (responses) {
@@ -27,7 +29,7 @@ assert (r1.rounds == 1) "unanimous in round 1"
 assert (len r1.positions == 2) "2 positions"
 
 -- === Convergence after multiple rounds ===
-r2 = agent.negotiate [always_approve strict_reviewer] {
+r2 = negotiate [always_approve strict_reviewer] {
   proposal: "deploy to prod"
   max_rounds: 5
   converge: (responses) {
@@ -40,11 +42,11 @@ assert (r2.rounds == 3) "converged at round 3"
 assert (len r2.positions == 2) "2 positions after convergence"
 
 -- === No consensus ===
-never_approve = agent.mock [
+never_approve = mock [
   {match: "any" respond: {approved: false score: 10 feedback: "rejected"}}
 ]
 
-r3 = agent.negotiate [always_approve never_approve] {
+r3 = negotiate [always_approve never_approve] {
   proposal: "radical change"
   max_rounds: 2
   converge: (responses) {
@@ -58,14 +60,14 @@ assert (r3_err.reason == "no_consensus") "reason is no_consensus"
 assert (r3_err.rounds == 2) "used all rounds"
 
 -- === Score-based convergence ===
-scorer_a = agent.mock [
+scorer_a = mock [
   {match: "any" respond: {score: 85}}
 ]
-scorer_b = agent.mock [
+scorer_b = mock [
   {match: "any" respond: {score: 75}}
 ]
 
-r4 = agent.negotiate [scorer_a scorer_b] {
+r4 = negotiate [scorer_a scorer_b] {
   proposal: "evaluate approach"
   max_rounds: 3
   converge: (responses) {
@@ -79,14 +81,14 @@ assert (r4.rounds == 1) "score converged round 1"
 assert (r4.result.avg_score == 80.0) "avg score 80"
 
 -- === Agents receive positions from prior round ===
-position_aware = agent.mock [
+position_aware = mock [
   {match: (msg) msg.round == 1 respond: {value: 10}}
   {match: (msg) msg.round > 1 respond: (msg)
     {value: (msg.positions | map (p) p.position.value | fold 0 (+))}
   }
 ]
 
-r5 = agent.negotiate [position_aware position_aware] {
+r5 = negotiate [position_aware position_aware] {
   proposal: "sum test"
   max_rounds: 3
   converge: (responses) {
@@ -101,7 +103,7 @@ assert (ok? r5 == true) "position-aware converges"
 
 -- === On round callback ===
 round_count := 0
-r6 = agent.negotiate [always_approve always_approve] {
+r6 = negotiate [always_approve always_approve] {
   proposal: "callback test"
   max_rounds: 3
   converge: (responses) Ok "done"

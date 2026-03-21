@@ -1,2 +1,2 @@
 [workspace]
-members = ["tests", "brain", "workgen", "flows", "pkg"]
+members = ["tests", "brain", "workgen", "flows", "pkg", "workrunner"]

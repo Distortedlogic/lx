@@ -1,10 +1,11 @@
 -- Generic AI agent -- parameterized by action→prompt template mappings.
 -- Replaces the 14 identical receive-prompt-return agent files in flows/agents/.
 -- create: build handlers map from config entries. Each entry maps action name to prompt fn.
--- serve: run agent.dispatch with the handlers. Use as +main = () { ai_agent.serve handlers }
+-- serve: run dispatch with the handlers. Use as +main = () { ai_agent.serve handlers }
 
 use std/ai
 use std/agent
+use pkg/agents/dispatch_rules {dispatch}
 
 +simple = (prompt_fn) (msg) {
   ai.prompt (prompt_fn msg) ?? ""
@@ -30,4 +31,4 @@ use std/agent
   }
 }
 
-+serve = (handlers) { agent.dispatch handlers }
++serve = (handlers) { dispatch handlers }

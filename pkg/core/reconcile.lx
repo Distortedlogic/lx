@@ -1,0 +1,197 @@
+-- Multi-result reconciliation — 6 strategies for merging agent outputs.
+-- Replaces agent_reconcile.rs, agent_reconcile_strat.rs, agent_reconcile_score.rs.
+
+call_key = (config item) {
+  kf = config.key
+  has_kf = kf != None
+  has_kf ? (kf item) : (to_str item)
+}
+
+flatten_results = (results config) {
+  flatten_field = config.flatten
+  has_field = flatten_field != None
+  has_field ? (results | flat_map (r) { get flatten_field r ?? [] }) : (results | flat_map (r) {
+    is_list = (type_of r) == "List"
+    is_list ? r : [r]
+  })
+}
+
+make_result = (merged sources conflicts dropped) {
+  {merged: merged  sources: sources  conflicts: conflicts  dropped: dropped  rounds: 1  dissenting: []}
+}
+
+do_union = (results config) {
+  ck = call_key
+  flat = flatten_results results config
+  seen = Store ()
+  conflicts := []
+  merged := []
+  flat | each (item) {
+    k = ck config item
+    already = seen.has k
+    resolver = config.conflict
+    has_resolver = resolver != None
+    new_conflicts = already ? conflicts ++ [{key: k  items: [seen.get k  item]}] : conflicts
+    conflicts <- new_conflicts
+    new_merged = (already == false) ? merged ++ [item] : merged
+    merged <- new_merged
+    update_val = already && has_resolver ? (resolver (seen.get k) item) : item
+    (already == false) ? (seen.set k item)
+    already && has_resolver ? (seen.set k update_val)
+  }
+  final_merged = seen.values ()
+  make_result final_merged (results | len) conflicts []
+}
+
+do_intersection = (results config) {
+  ck = call_key
+  flat_sets = results | map (set) {
+    s = Store ()
+    set | each (item) {
+      k = ck config item
+      s.set k true
+    }
+    s
+  }
+  all_items = results | flat_map (set) set
+  first_set = results.0 ?? []
+  kept_keys = Store ()
+  kept = first_set | filter (item) {
+    k = ck config item
+    is_kept = flat_sets | all? (s) { s.has k }
+    is_kept ? (kept_keys.set k true)
+    is_kept
+  }
+  dropped = all_items | filter (item) {
+    k = ck config item
+    (kept_keys.has k) == false
+  }
+  make_result kept (results | len) [] dropped
+}
+
+do_vote = (results config) {
+  vote_field = config.vote_field ?? "vote"
+  weight_fn = config.weight
+  has_weight = weight_fn != None
+  quorum = config.quorum ?? "majority"
+  tallies = Store ()
+  total_weight := 0
+  results | enumerate | each (pair) {
+    idx = pair.0
+    result = pair.1
+    vote_val = get vote_field result
+    k = to_str (vote_val ?? result)
+    w = has_weight ? (weight_fn idx) : 1
+    old = (tallies.get k) ?? 0
+    tallies.set k (old + w)
+    total_weight <- total_weight + w
+  }
+  total = results | len
+  best_key := ""
+  best_count := 0
+  tallies.entries () | each (e) {
+    is_better = e.value > best_count
+    best_key <- is_better ? e.key : best_key
+    best_count <- is_better ? e.value : best_count
+  }
+  quorum_n = (type_of quorum) == "Record" ? (quorum.n ?? 0) : 0
+  quorum_str = (type_of quorum) == "Str" ? quorum : ""
+  tw = total_weight
+  quorum_met = quorum_str ? {
+    "any" -> best_count > 0
+    "majority" -> best_count * 2 > tw
+    "unanimous" -> best_count == tw
+    "" -> best_count >= quorum_n
+    _ -> false
+  }
+  best_val := None
+  results | each (result) {
+    vote_val = get vote_field result
+    k = to_str (vote_val ?? result)
+    matched = k == best_key
+    new_best = vote_val ?? result
+    best_val <- matched ? new_best : best_val
+  }
+  dissenting = results | enumerate | filter (pair) {
+    vote_val = get vote_field pair.1
+    (to_str (vote_val ?? pair.1)) != best_key
+  } | map (.0)
+  merged = quorum_met ? best_val : None
+  {merged: merged  sources: total  conflicts: []  dropped: []  rounds: 1  dissenting: dissenting  quorum_met: quorum_met}
+}
+
+do_highest_confidence = (results config) {
+  best := None
+  best_conf := -1.0
+  results | each (r) {
+    conf = (r.confidence ?? 0) + 0.0
+    is_better = conf > best_conf
+    best <- is_better ? r : best
+    best_conf <- is_better ? conf : best_conf
+  }
+  make_result best (results | len) [] []
+}
+
+do_max_score = (results config) {
+  score_fn = config.score
+  best := None
+  best_score := -999999.0
+  results | each (r) {
+    s = (score_fn r) + 0.0
+    is_better = s > best_score
+    best <- is_better ? r : best
+    best_score <- is_better ? s : best_score
+  }
+  make_result best (results | len) [] []
+}
+
+do_merge_fields = (results config) {
+  merged = Store ()
+  conflicts := []
+  results | each (r) {
+    r | entries | each (e) {
+      k = e.0
+      v = e.1
+      existing = merged.get k
+      has_existing = existing != None
+      is_list = has_existing && (type_of existing) == "List" && (type_of v) == "List"
+      resolver = config.conflict
+      has_resolver = resolver != None
+      resolved = has_existing && has_resolver && (is_list == false) ? (resolver existing v) : v
+      new_conflicts = has_existing && (is_list == false) ? conflicts ++ [{key: k  values: [existing  v]}] : conflicts
+      conflicts <- new_conflicts
+      merged.set k (has_existing && is_list ? existing ++ v : (has_existing ? resolved : v))
+    }
+  }
+  rec = merged.to_record ()
+  make_result rec (results | len) conflicts []
+}
+
+reconcile_fn = (results config) {
+  du = do_union
+  di = do_intersection
+  dv = do_vote
+  dhc = do_highest_confidence
+  dms = do_max_score
+  dmf = do_merge_fields
+  mr = make_result
+  strategy = config.strategy ?? "union"
+  is_fn = (type_of strategy) == "Func"
+  is_fn ? {
+    true -> {
+      custom_val = strategy results
+      src_count = results | len
+      mr custom_val src_count [] []
+    }
+    false -> strategy ? {
+      "union" -> du results config
+      "intersection" -> di results config
+      "vote" -> dv results config
+      "highest_confidence" -> dhc results config
+      "max_score" -> dms results config
+      "merge_fields" -> dmf results config
+      _ -> du results config
+    }
+  }
+}
++reconcile = reconcile_fn

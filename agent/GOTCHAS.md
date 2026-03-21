@@ -9,6 +9,9 @@
 - **Multi-arg calls before `?` silently misbind.** `re.is_match pattern input ? { ... }` — `?` binds to `input`, not the full call. **Fix:** `(re.is_match pattern input) ? { ... }`.
 - **`()` before `(param) { body }` breaks argument parsing.** `f name () (x) { body }` — parser doesn't see 4 args. The `()` followed by `(x)` confuses it. **Fix:** bind either to a variable first: `input = ()` then `f name input (x) { body }`.
 - **`f arg () { body }` passes Unit then a separate block, not a closure.** `deadline.scope dl () { body }` — the `()` is consumed as Unit (second arg), and `{ body }` becomes a separate block expression. **Fix:** bind the closure first: `body_fn = () { ... }` then `f arg body_fn`.
+- **`$cmd ^` — the `^` is consumed by the shell, not lx.** `result = $sh -c "{cmd}" ^` — the `^` becomes part of the shell command string. **Fix:** separate the unwrap: `r = $sh -c "{cmd}"` then `val = r ^` or `val = (r ^).out`.
+- **`$^{cmd}` throws `LxError::propagate` on non-zero exit, NOT `Value::Err`.** `($^{cmd}) ?? ""` does NOT catch the error because `??` only catches `Value::Err` and `Value::None`, not `LxError`. rg exits 1 on no matches, so `$^rg ...` throws uncatchably when there are no results. **Fix:** use `$sh -c "{cmd}"` (returns `Ok({out, err, code})` regardless of exit code), then check `.code` or just use `.out`.
+- **`${cmd}` is multi-line shell block syntax, NOT `$` with variable interpolation.** `${cmd}` opens a multi-line shell block (like `${ cd /tmp; ls }`), it does not run the value of `cmd` as a shell command. **Fix:** use `$sh -c "{cmd}"` to run a dynamically constructed command string.
 
 ## Fixed Parser Traps (Session 64)
 
@@ -36,6 +39,26 @@
 
 - **Tuple destructuring in HOF lambdas doesn't work.** `list | enumerate | map (i s) {id: i ...}` — `(i s)` is not parsed as two-parameter destructuring. `i` is undefined at call site. **Fix:** use single-param + field access: `map (pair) {id: pair.0  title: pair.1}`.
 
+## type_of Returns "Func" Not "Fn"
+
+- **`type_of some_function` returns `"Func"`, not `"Fn"`.** `assert (type_of f == "Fn") "is function"` fails. **Fix:** use `"Func"`: `assert (type_of f == "Func") "is function"`.
+
+## assert Parses Greedily
+
+- **`assert val "msg"` calls `val` with `"msg"` as argument.** `assert foo_done "test passed"` — when `foo_done` is `true`, this tries to call `true("test passed")`. **Fix:** always parenthesize the condition: `assert (foo_done == true) "msg"` or `assert (some_expr) "msg"`.
+
+## not Is a Function, Not an Operator
+
+- **`not x` is curried application, not negation.** `assert (not is_foo) "msg"` — `not is_foo` returns a partially applied function, not a bool. **Fix:** use `== false` comparison: `assert (is_foo == false) "msg"`. Or fully apply: `assert ((not is_foo) == true) "msg"`.
+
+## Module Name Collisions
+
+- **`use module/lib/log` shadows builtin `log`.** Importing a module named `log` replaces the builtin `log.info`/`log.warn` namespace. Inside that module, `log.info` won't work. **Fix:** alias the import: `use module/lib/log : ts_log`. Or use a different module name.
+
+## No SCREAMING_CASE Constants
+
+- **Uppercase identifiers are TypeName tokens.** `TARGET_GRADE = 93` fails — `TARGET` is lexed as a `TypeName` (constructor), not an identifier. lx has no `const` keyword or SCREAMING_CASE convention. **Fix:** use lowercase `target_grade = 93`. Immutable bindings (no `:=`) are already non-reassignable.
+
 ## Keyword Field Names
 
 - **`par` is a keyword — can't use as record field via dot access.** `module.par` fails to parse because `par` is consumed as the `par { }` keyword. `std/flow` uses `flow.parallel` instead. Same applies to other keywords: `sel`, `match`, `if`, `use`, `emit`, `yield`, `refine`, `receive`, `Agent`, `Trait`, `Trait`, `MCP`.
@@ -52,6 +75,10 @@
 
 - **Sections don't support `==` or `!=`.** `filter (.status == "pass")` fails — the section parser can't handle comparison operators. **Fix:** use a lambda: `filter (r) r.status == "pass"`.
 
+## find/first/last Return Some, Not the Value
+
+- **`find`, `first`, and `last` return `Some(val)` or `None`, not the value directly.** `list | find pred | (.field)` fails — `.field` is called on `Some(record)`. `list | last | trim` fails — `trim` is called on `Some(str)`. **Fix:** unwrap with `??`: `(list | find pred) ?? default`. Parenthesize the expression before `??` because `??` binds looser than `|`.
+
 ## Computed Tuple Access
 
 - **`tuple.[0]` doesn't work.** Computed field access on tuples fails with "unsupported types Tuple / Int". **Fix:** use destructuring: `(a b) = tuple` then access `a` and `b` directly.
@@ -63,6 +90,7 @@
 ## lx Package Traps
 
 - **Self-recursive `+` exports need two-step pattern.** `+f = (n) { f (n-1) }` — `+` exports are excluded from forward declarations so builtins aren't shadowed. This means `+f` can't call itself directly. **Fix:** `f = (n) { f (n-1) }; +f = f`.
+- **Closures inside `+` functions can't capture non-exported module bindings.** `helper = (x) x * 2` then `+main = () { list | each (x) { helper x } }` — `helper` is silently `None` inside the `each` closure, and the `each` body doesn't execute. **Fix:** inline the helper body, or pass the helper as a parameter, or use the two-step export: `helper = ...; +helper = helper`.
 - **Adjacent string interpolation blocks fail.** `"{head}{tail}"` — the first `{head}` evaluates to a Str, then `{tail}` tries to call the Str as a function. **Fix:** use `++` concatenation: `head ++ tail`. Or use a single interpolation with the full expression.
 - **String interpolation parses `{key: val}` as lx code.** `"Return JSON: {score: Int, issues: [Str]}"` — the `{score: Int}` is parsed as a record literal, causing parse errors (e.g., "unexpected token: Colon"). **Fix:** use backtick raw strings for text containing literal braces: `` `Return JSON: {score: Int}` ``.
 - **Multi-line ternary chains don't parse.** `cond1 ? val1\n: cond2 ? val2\n: default` — the `:` on a new line is parsed as something else. **Fix:** keep the entire ternary chain on one line, or extract conditions into named bindings and nest: `cond1 ? val1 : (cond2 ? val2 : default)`.
@@ -92,6 +120,23 @@
 
 - **`cron.every` takes milliseconds, not seconds.** `cron.every 60 fn` fires every 60ms (16 times/second), not every minute. **Fix:** `cron.every 60000 fn` for once per minute.
 - **Cron closures capture scope at definition time.** `cron.every 1000 () { x }` where `x` is defined AFTER the cron call → "undefined variable" error on the background thread. **Fix:** define all variables the closure needs before the `cron.every` call.
+
+## grader.grade / AiBackend Traps
+
+- **`grader.grade` used `max_turns: 1` which caused empty responses.** Claude Code uses tools by default. With `max_turns: 1`, it uses a tool on turn 1, hits the limit on turn 2, and returns empty `result` text. **Fixed:** grader now uses `disable_tools: true` and `json_schema` for guaranteed structured output.
+- **`--tools ""` disables all tools in Claude CLI.** Passing `--allowedTools ""` (empty string) does NOT disable tools — it passes an empty allowlist which confuses the CLI. Use `--tools ""` instead.
+- **`--json-schema` puts output in `structured_output`, not `result`.** When `--json-schema` is used, the `result` field in Claude CLI JSON output is empty string. The structured data is in `structured_output` field. `parse_ai_response` must check `structured_output` first.
+- **`AiOpts` supports `disable_tools: bool` and `json_schema: Option<String>`.** These map to `--tools ""` and `--json-schema <schema>` on the Claude CLI. Use for any LLM call that should just answer without tool use.
+
+## md.sections Limitations
+
+- **`md.sections` drops bullet list and code block content.** Sections with only `- item` bullets or fenced code return empty `content`. Only plain text paragraphs between headings are captured. **Fix:** use raw string splitting (`split "\n# Title\n"` + `take_while`) instead of `md.sections` for sections that contain bullet lists.
+- **`md.sections` splits sub-headings into separate sections.** `# Parent` with `### Child` inside — the child becomes its own section, not content of the parent. `Parent` section has empty content. **Fix:** use `md.sections` for the sub-headings directly: `sections | filter (s) s.level == 3`.
+
+## Agent vs Class Field Syntax
+
+- **`Agent` keyword does not support field declarations with `:`.** `Agent Foo = { x: 0 }` fails — the parser expects `=` (method assignment) for everything except `uses`, `init`, `on`. Only `Class` supports `field: default` syntax. **Fix:** use `Class Foo : [Agent] = { x: 0 }` instead.
+- **`Class : [Agent]` does NOT inject Agent Trait defaults.** `Class Foo : [Agent] = { ... }` — `self.think`, `self.think_with` etc. are `None`, not the defaults from `pkg/agent.lx`. This may be a bug in trait injection for the Agent Trait specifically. **Workaround:** call `ai.prompt_with` directly instead of `self.think_with`.
 
 ## Incomplete Wiring
 

@@ -1,0 +1,191 @@
+-- Budget tracking — multi-dimensional cost tracking with thresholds and sub-budgets.
+-- Replaces the Rust std/budget module with Store-backed lx implementation.
+
+use std/time
+use pkg/core/agent_errors {BudgetExhausted}
+
+budgets = Store ()
+
+create_fn = (opts) {
+  tight = (opts.tight_at ?? 50.0) + 0.0
+  critical = (opts.critical_at ?? 80.0) + 0.0
+  dims = opts | entries | filter (e) {
+    k = e.0
+    v = e.1
+    k != "tight_at" && k != "critical_at" && (type_of v == "Float" || type_of v == "Int")
+  }
+  initial = Store ()
+  used_store = Store ()
+  dims | each (e) {
+    initial.set e.0 (e.1 + 0.0)
+    used_store.set e.0 0.0
+  }
+  now = time.now ()
+  state = Store ()
+  state.set "initial" initial
+  state.set "used" used_store
+  state.set "steps" 0
+  state.set "start_ms" now.ms
+  state.set "tight_at" tight
+  state.set "critical_at" critical
+  state.set "parent" None
+  id = to_str now.ms
+  budgets.set id state
+  {__budget_id: id}
+}
++create = create_fn
+
+get_state = (b) {
+  id = b.__budget_id
+  budgets.get id
+}
+
+spend_fn = (b amounts) {
+  gs = get_state
+  state = gs b
+  initial = state.get "initial"
+  used_store = state.get "used"
+  state.set "steps" ((state.get "steps") + 1)
+  amounts | entries | each (e) {
+    k = e.0
+    v = e.1
+    old = (used_store.get k) ?? 0.0
+    used_store.set k (old + v + 0.0)
+  }
+  parent = state.get "parent"
+  has_parent = parent != None
+  has_parent ? spend_fn parent amounts
+  exceeded := []
+  initial.keys () | each (k) {
+    limit = initial.get k
+    spent = (used_store.get k) ?? 0.0
+    is_over = spent > limit
+    new_exceeded = exceeded ++ [k]
+    exceeded <- is_over ? new_exceeded : exceeded
+  }
+  has_exceeded = (exceeded | len) > 0
+  first_exceeded = exceeded | first
+  resource = first_exceeded ? { Some s -> s; _ -> "unknown" }
+  spent_val = (used_store.get resource) ?? 0.0
+  limit_val = (initial.get resource) ?? 0.0
+  err_rec = BudgetExhausted {used: spent_val  limit: limit_val  resource: resource}
+  budget_err = Err err_rec
+  ok_unit = Ok ()
+  has_exceeded ? budget_err : ok_unit
+}
++spend = spend_fn
+
+remaining_fn = (b) {
+  gs = get_state
+  state = gs b
+  initial = state.get "initial"
+  used_store = state.get "used"
+  result = Store ()
+  initial.keys () | each (k) {
+    limit = initial.get k
+    spent = (used_store.get k) ?? 0.0
+    result.set k (limit - spent)
+  }
+  result.to_record ()
+}
++remaining = remaining_fn
+
+used_fn = (b) {
+  gs = get_state
+  state = gs b
+  used_store = state.get "used"
+  used_store.to_record ()
+}
++used = used_fn
+
+used_pct_fn = (b) {
+  gs = get_state
+  state = gs b
+  initial = state.get "initial"
+  used_store = state.get "used"
+  result = Store ()
+  initial.keys () | each (k) {
+    limit = initial.get k
+    spent = (used_store.get k) ?? 0.0
+    pct = limit == 0.0 ? 100.0 : spent / limit * 100.0
+    result.set k pct
+  }
+  result.to_record ()
+}
++used_pct = used_pct_fn
+
+status_fn = (b) {
+  gs = get_state
+  state = gs b
+  initial = state.get "initial"
+  used_store = state.get "used"
+  tight = state.get "tight_at"
+  critical = state.get "critical_at"
+  max_pct := 0.0
+  initial.keys () | each (k) {
+    limit = initial.get k
+    spent = (used_store.get k) ?? 0.0
+    pct = limit == 0.0 ? 100.0 : spent / limit * 100.0
+    max_pct <- pct > max_pct ? pct : max_pct
+  }
+  max_pct > 100.0 ? "exceeded" : (max_pct >= critical ? "critical" : (max_pct >= tight ? "tight" : "comfortable"))
+}
++status = status_fn
+
+project_fn = (b opts) {
+  gs = get_state
+  state = gs b
+  initial = state.get "initial"
+  used_store = state.get "used"
+  steps = state.get "steps"
+  remaining_steps = opts.remaining_steps ?? 1
+  total_steps = steps + remaining_steps
+  result_projected = Store ()
+  result_headroom = Store ()
+  will_exceed := []
+  initial.keys () | each (k) {
+    limit = initial.get k
+    spent = (used_store.get k) ?? 0.0
+    per_step = steps > 0 ? spent / steps : spent
+    projected = per_step * total_steps
+    result_projected.set k projected
+    headroom = limit - projected
+    result_headroom.set k headroom
+    is_over = projected > limit
+    new_we = will_exceed ++ [k]
+    will_exceed <- is_over ? new_we : will_exceed
+  }
+  proj_rec = result_projected.to_record ()
+  head_rec = result_headroom.to_record ()
+  {projected_total: proj_rec  headroom: head_rec  will_exceed: will_exceed}
+}
++project = project_fn
+
+slice_fn = (parent limits) {
+  gs = get_state
+  parent_state = gs parent
+  tight = parent_state.get "tight_at"
+  critical = parent_state.get "critical_at"
+  start_ms = parent_state.get "start_ms"
+  child_initial = Store ()
+  child_used = Store ()
+  limits | entries | each (e) {
+    k = e.0
+    v = e.1
+    child_initial.set k (v + 0.0)
+    child_used.set k 0.0
+  }
+  child_state = Store ()
+  child_state.set "initial" child_initial
+  child_state.set "used" child_used
+  child_state.set "steps" 0
+  child_state.set "start_ms" start_ms
+  child_state.set "tight_at" tight
+  child_state.set "critical_at" critical
+  child_state.set "parent" parent
+  now = time.now ()
+  id = to_str now.ms ++ "_child"
+  budgets.set id child_state
+  {__budget_id: id}
+}
++slice = slice_fn

@@ -97,6 +97,10 @@ test-flows-tagged tag:
 tui file:
   cargo run -p lx-tui -- {{file}}
 
+# compile lx-desktop TypeScript (chart_init, formatters, etc.)
+ts-build:
+  cd crates/lx-desktop/ts && npm run build
+
 # run lx-desktop app
 desktop:
   dx serve --bin lx-desktop

@@ -3,8 +3,8 @@
 -- Architecture: saga-based pipeline with reactive specialist agents
 
 use std/agent
-use std/saga
-use std/budget
+use pkg/core/saga
+use pkg/core/budget
 use std/cron
 use pkg/infra/workflow
 use pkg/data/tasks {TaskStore}

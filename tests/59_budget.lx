@@ -1,7 +1,7 @@
 -- 59_budget.lx
 -- Tests: std/budget module (resource cost tracking and projection)
 
-use std/budget
+use pkg/core/budget
 
 -- === Create budget ===
 b = budget.create {tokens: 50000 api_calls: 20}

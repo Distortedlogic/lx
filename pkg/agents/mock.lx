@@ -1,0 +1,70 @@
+-- Mock agents with Store-backed call recording for testing.
+-- Replaces agent_mock.rs.
+
+matches_pattern = (pattern msg) {
+  pattern == "any" ? true : {
+    is_fn = (type_of pattern) == "Func"
+    is_fn ? (pattern msg) == true : {
+      is_record = (type_of pattern) == "Record"
+      is_record ? (pattern | entries | all? (e) { ((get e.0 msg) ?? None) == e.1 }) : pattern == msg
+    }
+  }
+}
+
+mock_counter = Store ()
+mock_counter.set "n" 0
+
+mock_fn = (rules) {
+  mp = matches_pattern
+  n = mock_counter.get "n"
+  mock_counter.set "n" (n + 1)
+  mock_name = "mock_" ++ (to_str n)
+  calls = Store ()
+  calls.set "log" []
+  handler = (msg) {
+    matched = rules | find (rule) {
+      mp rule.match msg
+    }
+    matched ? {
+      Some rule -> {
+        resp_val = rule.respond
+        is_fn = (type_of resp_val) == "Func"
+        response = is_fn ? (resp_val msg) : resp_val
+        old_log = calls.get "log"
+        calls.set "log" (old_log ++ [{msg: msg  response: response}])
+        response
+      }
+      _ -> {
+        old_log = calls.get "log"
+        calls.set "log" (old_log ++ [{msg: msg  response: None}])
+        None
+      }
+    }
+  }
+  {name: mock_name  handler: handler  __mock_calls: calls}
+}
++mock = mock_fn
+
+mock_calls_fn = (mock_agent) {
+  store = mock_agent.__mock_calls
+  store.get "log"
+}
++mock_calls = mock_calls_fn
+
+mock_assert_called_fn = (mock_agent pattern) {
+  mp = matches_pattern
+  log = mock_calls_fn mock_agent
+  found = log | any? (entry) { mp pattern entry.msg }
+  ok_val = Ok ()
+  found ? ok_val : Err "expected call not found"
+}
++mock_assert_called = mock_assert_called_fn
+
+mock_assert_not_called_fn = (mock_agent pattern) {
+  mp = matches_pattern
+  log = mock_calls_fn mock_agent
+  found = log | any? (entry) { mp pattern entry.msg }
+  ok_val = Ok ()
+  (found == false) ? ok_val : Err "unexpected call found"
+}
++mock_assert_not_called = mock_assert_not_called_fn

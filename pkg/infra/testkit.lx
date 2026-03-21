@@ -2,7 +2,7 @@
 -- Provides: default_grader, default_weights, load_fixture, live_only, always_pass_grader
 -- Eliminates per-spec boilerplate across all flow test main.lx files
 
-use std/audit
+use pkg/core/audit
 use std/fs
 use std/json
 use std/env

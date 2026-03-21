@@ -1,9 +1,9 @@
 -- 49_agent_capability.lx
--- Tests: spec/agents-capability.md (Capabilities Trait + agent.capabilities + agent.advertise)
--- Phase: agent.capabilities, agent.advertise, Capabilities Trait
+-- Tests: spec/agents-capability.md (Capabilities Trait + capabilities + advertise)
+-- Phase: capabilities, advertise, Capabilities Trait
 
-use std/agent {Capabilities}
 use std/agent
+use pkg/core/capability {Capabilities capabilities advertise}
 
 -- Capabilities Trait validates and fills defaults
 caps = Capabilities {
@@ -31,7 +31,7 @@ assert (caps2.budget_remaining == 5000) "caps explicit budget"
 assert (caps2.status == "busy") "caps explicit status"
 assert (caps2.accepts | len == 2) "caps explicit accepts"
 
--- agent.capabilities queries an agent handler
+-- capabilities queries an agent handler
 cap_agent = {handler: (msg) {
   msg.type ? {
     "capabilities" -> Capabilities {
@@ -43,13 +43,13 @@ cap_agent = {handler: (msg) {
     _ -> {echo: msg}
   }
 }}
-result = agent.capabilities cap_agent ^
+result = capabilities cap_agent ^
 assert (result.traits == ["ReviewRequest"]) "capabilities query returns traits"
 assert (result.tools | len == 2) "capabilities query returns tools"
 assert (result.status == "ready") "capabilities query returns status"
 
--- agent.advertise stores capabilities
-agent.advertise "test_worker" caps ^
+-- advertise stores capabilities
+advertise "test_worker" caps ^
 assert true "advertise succeeds"
 
 -- capabilities-based routing pattern
@@ -68,7 +68,7 @@ workers = [
   }}
 ]
 candidates = workers | filter (w) {
-  c = agent.capabilities w ^
+  c = capabilities w ^
   c.domains | any? (== "rust")
 }
 assert (candidates | len == 1) "capability filter finds rust expert"

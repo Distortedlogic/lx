@@ -4,6 +4,7 @@
 
 use std/ai
 use std/agent
+use pkg/agents/dispatch_rules {dispatch}
 
 +think = (msg) {
   prompt = "Task: {msg.task}\nHistory: {msg.history | len} turns\nThink step by step. What action should we take next? If done, set action to 'done'."
@@ -35,4 +36,4 @@ use std/agent
 
 +handlers = %{"think": think  "execute": execute  "verify": verify  "hint": hint}
 
-+main = () { agent.dispatch handlers }
++main = () { dispatch handlers }

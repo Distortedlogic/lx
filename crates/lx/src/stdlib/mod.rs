@@ -1,27 +1,15 @@
 pub(crate) mod agent;
-mod agent_adapter;
-mod agent_capability;
 mod agent_dialogue;
 mod agent_dialogue_branch;
-mod agent_dialogue_persist;
-mod agent_dispatch;
 pub mod agent_errors;
 mod agent_gate;
-mod agent_handoff;
-mod agent_intercept;
 mod agent_ipc;
 pub(crate) mod agent_lifecycle;
 pub(crate) mod agent_lifecycle_run;
-mod agent_mock;
-mod agent_negotiate;
-mod agent_negotiate_fmt;
 mod agent_pipeline;
 mod agent_pipeline_ctrl;
 mod agent_pipeline_io;
 mod agent_pubsub;
-mod agent_reconcile;
-mod agent_reconcile_score;
-mod agent_reconcile_strat;
 pub(crate) mod agent_reload;
 mod agent_route;
 mod agent_route_table;
@@ -34,8 +22,6 @@ mod agents_reviewer;
 mod agents_router;
 mod ai;
 mod ai_structured;
-mod audit;
-mod budget;
 mod cron;
 mod ctx;
 pub(crate) mod deadline;
@@ -69,7 +55,6 @@ mod md_build;
 mod pane;
 mod pipeline;
 mod pipeline_io;
-mod plan;
 mod profile;
 mod profile_io;
 mod profile_strategy;
@@ -80,13 +65,10 @@ mod registry_store;
 mod repo;
 mod repo_lock;
 mod repo_worktree;
-pub(crate) mod retry;
-mod saga;
 mod sandbox;
 mod sandbox_exec;
 mod sandbox_policy;
 mod sandbox_scope;
-mod step_deps;
 mod store;
 mod store_dispatch;
 
@@ -138,17 +120,12 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
             "cron" => cron::build(),
             "deadline" => deadline::build(),
             "ai" => ai::build(),
-            "audit" => audit::build(),
-            "budget" => budget::build(),
             "describe" => describe::build(),
             "diff" => diff::build(),
             "diag" => diag::build(),
             "durable" => durable::build(),
             "pane" => pane::build(),
             "pipeline" => pipeline::build(),
-            "plan" => plan::build(),
-            "retry" => retry::build(),
-            "saga" => saga::build(),
             "sandbox" => sandbox::build(),
             "store" => store::build(),
             "taskgraph" => taskgraph::build(),
@@ -198,8 +175,6 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
             | "time"
             | "cron"
             | "ai"
-            | "audit"
-            | "budget"
             | "deadline"
             | "describe"
             | "diff"
@@ -207,9 +182,6 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
             | "durable"
             | "pane"
             | "pipeline"
-            | "plan"
-            | "retry"
-            | "saga"
             | "sandbox"
             | "store"
             | "taskgraph"

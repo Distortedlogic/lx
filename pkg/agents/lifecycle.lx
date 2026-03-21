@@ -1,0 +1,64 @@
+-- Agent lifecycle hooks — startup, shutdown, error, idle, message, signal events.
+-- Hoisted from agent_lifecycle.rs + agent_lifecycle_run.rs.
+
+hooks = Store ()
+next_id = Store ()
+next_id.set "v" 1
+
+get_hooks = (agent_name event) {
+  key = "{agent_name}:{event}"
+  hooks.get key ?? []
+}
+
+add_hook = (agent_name event handler) {
+  key = "{agent_name}:{event}"
+  existing = hooks.get key ?? []
+  id = next_id.get "v"
+  next_id.set "v" (id + 1)
+  hooks.set key (existing ++ [{id: id  handler: handler}])
+  id
+}
+
++on = (agent event handler) {
+  name = agent.name ?? "unknown"
+  add_hook name event handler
+}
+
++on_remove = (agent hook_id) {
+  name = agent.name ?? "unknown"
+  all_keys = hooks.keys ()
+  all_keys | each (key) {
+    entries = hooks.get key ?? []
+    filtered = entries | filter (e) { e.id != hook_id }
+    hooks.set key filtered
+  }
+}
+
+run_hooks = (agent_name event arg) {
+  gh = get_hooks
+  entries = gh agent_name event
+  entries | each (entry) { entry.handler arg }
+}
+
++startup = (agent) {
+  rh = run_hooks
+  name = agent.name ?? "unknown"
+  rh name "startup" ()
+}
+
++shutdown = (agent) {
+  rh = run_hooks
+  name = agent.name ?? "unknown"
+  rh name "shutdown" ()
+}
+
++signal = (agent sig) {
+  rh = run_hooks
+  name = agent.name ?? "unknown"
+  rh name "signal" sig
+}
+
++idle_hooks = (agent duration_secs handler) {
+  name = agent.name ?? "unknown"
+  add_hook name "idle" handler
+}

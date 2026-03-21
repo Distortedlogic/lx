@@ -1,8 +1,10 @@
 -- 54_agent_dispatch.lx
--- Tests: spec/agents-dispatch.md (agent.dispatch, agent.dispatch_multi)
+-- Tests: spec/agents-dispatch.md (dispatch, dispatch_multi)
 -- Phase: Pattern-based message routing
 
 use std/agent
+use pkg/agents/dispatch_rules {dispatch dispatch_multi}
+use pkg/agents/intercept {intercept}
 
 -- setup target agents
 security_agent = {handler: (msg) {domain: "security" result: "sec_handled"}}
@@ -10,7 +12,7 @@ perf_agent = {handler: (msg) {domain: "perf" result: "perf_handled"}}
 general_agent = {handler: (msg) {domain: "general" result: "gen_handled"}}
 
 -- basic dispatch: first match wins
-dispatcher = agent.dispatch [
+dispatcher = dispatch [
   {match: {domain: "security"} to: security_agent}
   {match: {domain: "performance"} to: perf_agent}
   {match: "default" to: general_agent}
@@ -26,14 +28,14 @@ r3 = dispatcher ~>? {domain: "other" task: "misc"}
 assert (r3.result == "gen_handled") "dispatch falls back to default"
 
 -- no match returns Err
-strict = agent.dispatch [
+strict = dispatch [
   {match: {domain: "security"} to: security_agent}
 ]
 no_match = strict ~>? {domain: "unknown"}
 assert (no_match == Err {type: "no_route" message: {domain: "unknown"}}) "no match returns Err"
 
 -- function predicate matching
-fn_dispatch = agent.dispatch [
+fn_dispatch = dispatch [
   {match: (msg) msg.value > 100 to: (msg) {size: "big"  value: msg.value}}
   {match: "default" to: (msg) {size: "small"  value: msg.value}}
 ]
@@ -41,14 +43,14 @@ assert ((fn_dispatch ~>? {value: 200}).size == "big") "fn predicate matches"
 assert ((fn_dispatch ~>? {value: 5}).size == "small") "fn predicate rejects"
 
 -- dispatch with transform
-transforming = agent.dispatch [
+transforming = dispatch [
   {match: "default" to: general_agent transform: (msg) {domain: msg.raw_domain}}
 ]
 r4 = transforming ~>? {raw_domain: "general"}
 assert (r4.result == "gen_handled") "dispatch transforms message"
 
 -- dispatch_multi: fan-out to all matches
-multi = agent.dispatch_multi [
+multi = dispatch_multi [
   {match: {needs_security: true} to: security_agent}
   {match: {needs_perf: true} to: perf_agent}
   {match: "default" to: general_agent}
@@ -59,7 +61,7 @@ assert (results.0.result.result == "sec_handled") "multi first result is securit
 assert (results.1.result.result == "perf_handled") "multi second result is perf"
 
 -- dispatch with intercept composition
-traced = agent.intercept dispatcher (msg next) {
+traced = intercept dispatcher (msg next) {
   result = next msg
   {..result  traced: true}
 }

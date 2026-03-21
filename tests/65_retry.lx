@@ -1,7 +1,7 @@
 -- 65_retry.lx
 -- Tests: std/retry module (retry-with-backoff for transient failures)
 
-use std/retry
+use pkg/core/retry
 
 -- === retry succeeds on first try ===
 always_ok = () Ok 42

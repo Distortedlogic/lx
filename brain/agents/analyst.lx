@@ -3,6 +3,7 @@
 
 use std/ai
 use pkg/core/prompt
+use pkg/core/capability {advertise}
 use ../traits {Analyst}
 
 Trait AnalysisResult = {
@@ -75,7 +76,7 @@ Agent DeepAnalyst: Analyst = {
 }
 
 +main = () {
-  agent.advertise {
+  advertise {
     traits: ["AnalysisResult"]
     domains: ["analyst" "analysis" "investigation" "comparison"]
     tools: ["ai"]

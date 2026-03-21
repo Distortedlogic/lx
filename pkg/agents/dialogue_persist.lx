@@ -1,0 +1,60 @@
+-- Dialogue persistence — save/load/list/delete via std/fs + std/json.
+-- Replaces agent_dialogue_persist.rs.
+
+use std/fs
+use std/json
+
+dialogue_dir = ".lx/dialogues"
+
+ensure_dir_fn = () {
+  exists = fs.exists dialogue_dir
+  (exists == false) ? fs.mkdir dialogue_dir
+}
+
+dialogue_save_fn = (session id) {
+  ed = ensure_dir_fn
+  ed ()
+  config = session.config ?? session
+  history_val = session.turns ?? session.history ?? []
+  data = {id: id  config: config  turns: history_val  created: ""  updated: ""}
+  content = json.encode_pretty data
+  path = "{dialogue_dir}/{id}.json"
+  fs.write path content ^
+  ok_val = Ok ()
+  ok_val
+}
++dialogue_save = dialogue_save_fn
+
+dialogue_load_fn = (id agent) {
+  path = "{dialogue_dir}/{id}.json"
+  content = fs.read path ^
+  data = json.parse content ^
+  {..data  agent: agent}
+}
++dialogue_load = dialogue_load_fn
+
+dialogue_list_fn = () {
+  ed = ensure_dir_fn
+  ed ()
+  exists = fs.exists dialogue_dir
+  has_dir = exists == true
+  (has_dir == false) ? [] : {
+    files = fs.ls dialogue_dir ^
+    files | filter (f) { f | contains? ".json" } | map (f) {
+      path = "{dialogue_dir}/{f}"
+      content = fs.read path ^
+      data = json.parse content ^
+      id_val = data.id ?? f
+      {id: id_val  role: data.config.role ?? ""  turns: len (data.turns ?? [])  created: data.created ?? ""  updated: data.updated ?? ""}
+    }
+  }
+}
++dialogue_list = dialogue_list_fn
+
+dialogue_delete_fn = (id) {
+  path = "{dialogue_dir}/{id}.json"
+  fs.remove path ^
+  ok_val = Ok ()
+  ok_val
+}
++dialogue_delete = dialogue_delete_fn

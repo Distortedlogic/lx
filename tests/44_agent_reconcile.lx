@@ -1,4 +1,5 @@
 use std/agent
+use pkg/core/reconcile {reconcile}
 
 -- === Union: dedup by key, keep first ===
 
@@ -7,7 +8,7 @@ search_results = [
   [{id: "a" file: "main.rs" severity: 5}  {id: "c" file: "util.rs" severity: 2}]
 ]
 
-union_result = agent.reconcile search_results {
+union_result = reconcile search_results {
   strategy: "union"
   key: (item) item.id
 }
@@ -19,7 +20,7 @@ assert (union_result.merged.0.severity == 3) "union: default keeps first"
 
 -- === Union: custom conflict ===
 
-union_conflict = agent.reconcile search_results {
+union_conflict = reconcile search_results {
   strategy: "union"
   key: (item) item.id
   conflict: (a b) b
@@ -34,7 +35,7 @@ wrapped = [
   {findings: [{id: "x" s: 3} {id: "z" s: 4}]}
 ]
 
-flat_result = agent.reconcile wrapped {
+flat_result = reconcile wrapped {
   strategy: "union"
   flatten: "findings"
   key: (item) item.id
@@ -50,7 +51,7 @@ inter_results = [
   [{id: "a"} {id: "c"} {id: "e"}]
 ]
 
-inter = agent.reconcile inter_results {
+inter = reconcile inter_results {
   strategy: "intersection"
   key: (item) item.id
 }
@@ -66,7 +67,7 @@ votes = [
   {approved: false reason: "needs work"}
 ]
 
-vote_result = agent.reconcile votes {
+vote_result = reconcile votes {
   strategy: "vote"
   vote_field: "approved"
   quorum: "majority"
@@ -78,7 +79,7 @@ assert (len vote_result.dissenting == 1) "vote: 1 dissenter"
 
 -- === Vote: unanimous (not met) ===
 
-vote_unan = agent.reconcile votes {
+vote_unan = reconcile votes {
   strategy: "vote"
   vote_field: "approved"
   quorum: "unanimous"
@@ -89,7 +90,7 @@ assert (unan_merged == None) "vote unanimous: not met returns None"
 
 -- === Vote: quorum N ===
 
-vote_n = agent.reconcile votes {
+vote_n = reconcile votes {
   strategy: "vote"
   vote_field: "approved"
   quorum: {n: 2}
@@ -105,7 +106,7 @@ classifiers = [
   {classification: "performance"}
 ]
 
-class_result = agent.reconcile classifiers {
+class_result = reconcile classifiers {
   strategy: "vote"
   vote_field: "classification"
   quorum: "majority"
@@ -121,7 +122,7 @@ weighted_votes = [
   {approved: false}
 ]
 
-weighted_result = agent.reconcile weighted_votes {
+weighted_result = reconcile weighted_votes {
   strategy: "vote"
   vote_field: "approved"
   quorum: "majority"
@@ -138,7 +139,7 @@ conf_results = [
   {answer: "C" confidence: 0.8}
 ]
 
-best = agent.reconcile conf_results {
+best = reconcile conf_results {
   strategy: "highest_confidence"
 }
 
@@ -152,7 +153,7 @@ approaches = [
   {code: "v3" quality: 72}
 ]
 
-scored = agent.reconcile approaches {
+scored = reconcile approaches {
   strategy: "max_score"
   score: (r) r.quality
 }
@@ -161,7 +162,7 @@ assert (scored.merged.code == "v2") "max_score: v2 wins"
 
 -- === Max score: early stop ===
 
-early = agent.reconcile approaches {
+early = reconcile approaches {
   strategy: "max_score"
   score: (r) r.quality
   early_stop: 80.0
@@ -174,7 +175,7 @@ assert (early.merged.code == "v2") "max_score early_stop: v2 exceeds 80"
 partial_a = {name: "report" tags: ["security"] score: 7}
 partial_b = {name: "report" tags: ["perf"] extra: "data"}
 
-merge_result = agent.reconcile [partial_a partial_b] {
+merge_result = reconcile [partial_a partial_b] {
   strategy: "merge_fields"
 }
 
@@ -185,7 +186,7 @@ assert (len merge_result.conflicts == 1) "merge_fields: name conflicted"
 
 -- === Custom strategy ===
 
-custom = agent.reconcile [1 2 3] {
+custom = reconcile [1 2 3] {
   strategy: (results) results | fold 0 (acc x) acc + x
 }
 

@@ -9,7 +9,9 @@ impl PaneNode {
             | Self::Browser { .. }
             | Self::Editor { .. }
             | Self::Agent { .. }
-            | Self::Canvas { .. } => vec![(self.clone(), rect)],
+            | Self::Canvas { .. }
+            | Self::Chart { .. }
+            | Self::FlowGraph { .. } => vec![(self.clone(), rect)],
             Self::Split {
                 direction,
                 ratio,
@@ -31,7 +33,9 @@ impl PaneNode {
             | Self::Browser { .. }
             | Self::Editor { .. }
             | Self::Agent { .. }
-            | Self::Canvas { .. } => vec![],
+            | Self::Canvas { .. }
+            | Self::Chart { .. }
+            | Self::FlowGraph { .. } => vec![],
             Self::Split {
                 id: sid,
                 direction,
@@ -73,7 +77,9 @@ impl PaneNode {
             | Self::Browser { id, .. }
             | Self::Editor { id, .. }
             | Self::Agent { id, .. }
-            | Self::Canvas { id, .. } => vec![id.clone()],
+            | Self::Canvas { id, .. }
+            | Self::Chart { id, .. }
+            | Self::FlowGraph { id, .. } => vec![id.clone()],
             Self::Split { first, second, .. } => {
                 let mut ids = first.all_pane_ids();
                 ids.extend(second.all_pane_ids());
@@ -88,7 +94,9 @@ impl PaneNode {
             Self::Browser { .. }
             | Self::Editor { .. }
             | Self::Agent { .. }
-            | Self::Canvas { .. } => None,
+            | Self::Canvas { .. }
+            | Self::Chart { .. }
+            | Self::FlowGraph { .. } => None,
             Self::Split { first, second, .. } => first
                 .first_terminal_id()
                 .or_else(|| second.first_terminal_id()),
@@ -105,7 +113,11 @@ impl PaneNode {
                     .parent()
                     .map(|p| p.to_string_lossy().into_owned())
             }
-            Self::Browser { id, .. } | Self::Agent { id, .. } | Self::Canvas { id, .. }
+            Self::Browser { id, .. }
+            | Self::Agent { id, .. }
+            | Self::Canvas { id, .. }
+            | Self::Chart { id, .. }
+            | Self::FlowGraph { id, .. }
                 if id == target_id =>
             {
                 None
@@ -117,7 +129,9 @@ impl PaneNode {
             | Self::Browser { .. }
             | Self::Editor { .. }
             | Self::Agent { .. }
-            | Self::Canvas { .. } => None,
+            | Self::Canvas { .. }
+            | Self::Chart { .. }
+            | Self::FlowGraph { .. } => None,
         }
     }
 }

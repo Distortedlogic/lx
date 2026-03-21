@@ -1,178 +1,79 @@
--- Work-item generation from audit checklists.
--- Given an audit file and a codebase root, produce a verified work-item
--- document following the multi-phase process in rules/work-item.md.
+-- Work Item Generator — generates work items from audit checklists.
 --
--- Phases: investigate (AI with tools) -> compose (AI text gen) ->
---         write -> verify/refine loop (grader.grade + trace.should_stop).
+-- Pipeline: parse audit → investigate codebase → compose draft → grade → revise loop.
+-- Persists status + debug logs to .lx/workgen/.
 --
--- The investigate phase gives the AI Read/Glob/Grep/Bash to explore the
--- codebase. The compose phase has all context in the prompt (tools: []).
--- The verify loop is the core value over a raw claude -p call.
---
--- Usage: AUDIT_FILE=rules/rust-audit.md lx run workgen/run.lx
+-- Usage: AUDIT_FILE=rules/foo.md RULES_FILE=rules/work-item.md lx run workgen
+-- Interactive: lx run workgen/audit.lx
 
-use std/fs
-use std/ai
 use std/env
-use std/md
-use std/audit
-use pkg/kit/investigate
-use pkg/core/prompt
-use pkg/ai/quality
-use pkg/infra/workflow
+use std/fs
+use std/time
+use std/cron
+use workgen/lib/log : wg_log
+use workgen/lib/persistence {RunStatus}
+use workgen/lib/audit_parser
+use workgen/lib/grader {Grader}
+use workgen/lib/orchestrator
 
-rubric = audit.rubric [
-  {name: "coverage"     description: "every audit item has a finding and task"  weight: 25}
-  {name: "task_quality"  description: "tasks are unambiguous, correctly ordered, with exact files and changes"  weight: 25}
-  {name: "compliance"   description: "follows work-item.md format: required sections, CRITICAL REMINDERS footer, implementation-only tasks"  weight: 25}
-  {name: "correctness"  description: "proposed fixes are correct for the codebase"  weight: 25}
-]
+max_rounds = 3
+runner_dir = ".lx/workgen"
 
-required_sections = ["Goal" "Why" "What changes" "Files affected" "Task List" "CRITICAL REMINDERS"]
+wi_grader = Grader {
+  threshold: 75
+  rubric: [
+    {name: "coverage"  description: "every audit item has a finding and task"  weight: 25}
+    {name: "task_quality"  description: "tasks are unambiguous, correctly ordered, with exact files and changes"  weight: 25}
+    {name: "compliance"  description: "follows work-item.md format: required sections, CRITICAL REMINDERS footer"  weight: 25}
+    {name: "correctness"  description: "proposed fixes are correct for the codebase"  weight: 25}
+  ]
+}
 
 +main = () {
   audit_path = env.get "AUDIT_FILE" ?? ""
   rules_path = env.get "RULES_FILE" ?? ""
   root = env.get "ROOT" ?? "."
 
-  missing := false
-  audit_path == "" ? { emit "error: AUDIT_FILE not set"; missing <- true }
-  rules_path == "" ? { emit "error: RULES_FILE not set"; missing <- true }
+  audit_path == "" ? assert false "AUDIT_FILE env var not set"
+  rules_path == "" ? assert false "RULES_FILE env var not set"
 
-  missing ? {
-    emit "usage: just -f workgen/justfile audit-rust"
-    Err "required env vars not set"
-  } : run audit_path rules_path root
+  run audit_path rules_path root
 }
 
-+run = (audit_path rules_path root) {
-  audit_content = fs.read audit_path ^
+run = (audit_path rules_path root) {
+  wg_log.log "=== Work Item Generator ==="
+
+  audit = audit_parser.load audit_path
   rules_content = fs.read rules_path ^
-  raw_name = audit_path | split "/" | last ^
-  base = raw_name | split "." | first ^
-  name = base | replace "-" "_" | upper
 
-  workflow.run "workgen" audit_path (session) {
-    emit "=== Work Item Generator ==="
-    emit "audit: {audit_path}"
-    emit "root: {root}"
-    emit "output: work_items/{name}.md\n"
+  status = RunStatus {runner_dir: runner_dir}
+  status.load ()
 
-    findings = investigate_audit audit_content root ^
-    session.record {name: "investigate"  input: audit_path  output: findings} ?? ()
+  already_done = status.is_completed audit.name
+  already_done ? wg_log.log "{audit.name} already completed — skipping"
+  already_done ? assert false "already completed"
 
-    draft = compose audit_content rules_content findings ^
-    session.record {name: "compose"  input: "findings"  output: draft} ?? ()
+  start = time.now ()
+  start_ms = start.ms
 
-    out_path = write_draft name draft ^
-
-    final = verify_and_revise out_path draft name ^
-    fs.write out_path final ^
-
-    emit "\n=== complete: {out_path} ==="
-    Ok {path: out_path  name: name}
-  }
-}
-
-investigate_audit = (audit_content root) {
-  emit "--- Phase 1-2: Investigation & Findings ---"
-  out = investigate.run audit_content root {
-    system: "You are a code auditor. Investigate the codebase thoroughly — read files, search for patterns. Produce a numbered findings list. No conversation."
-    instructions: [
-      "For each audit item, search the codebase under '{root}/' to determine if it is violated"
-      "Read every relevant file — do not guess from filenames alone"
-      "Return a numbered list of findings: concrete problem, root cause, single best fix, affected files"
-    ]
-    constraints: [
-      "Report ONLY problems — do not list things that are correct"
-      "One fix per finding, verbal only, no code snippets"
-    ]
-  }
-  emit "investigation complete ({out | lines | len} lines)"
-  Ok out
-}
-
-compose = (audit_content rules_content findings) {
-  emit "\n--- Phase 3-4: Composition & Task List ---"
-  p = prompt.create ()
-    | prompt.section "Audit Checklist" audit_content
-    | prompt.section "Process Rules" rules_content
-    | prompt.section "Investigation Findings" findings
-    | prompt.instruction "Produce a single markdown work item document following the Process Rules exactly"
-    | prompt.instruction "Required sections: # Goal, # Why, # What changes, # Files affected, # Task List, # CRITICAL REMINDERS"
-    | prompt.constraint "Output ONLY the raw markdown — no preamble, no commentary"
-    | prompt.constraint "Start with '# Goal' — nothing before it"
-  out = prompt.ask_with p {
-    append_system: "You are a markdown document generator. Output the document directly. Start with '# Goal'. No conversation."
-    tools: []
-  } ""
-  emit "composition complete ({out | lines | len} lines)"
-  Ok out
-}
-
-write_draft = (name content) {
-  fs.mkdir "work_items" ^
-  path = "work_items/{name}.md"
-  fs.write path content ^
-  emit "\n--- Phase 5: Written to {path} ---"
-  Ok path
-}
-
-check_sections = (draft) {
-  headings = md.parse draft | md.headings
-  missing = required_sections | filter (req) {
-    headings | any? (h) contains? req h.text | not
-  }
-  missing | empty? ? {
-    emit "  sections: all {required_sections | len} required sections present"
-    true
-  } : {
-    emit "  sections: missing {missing | join ", "}"
-    false
-  }
-}
-
-verify_and_revise = (path draft name) {
-  emit "\n--- Phase 6: Verification Loop ---"
-
-  structural = quality.quick_check draft "work item for {name}"
-  structural.passed ?
-    (emit "  structural pre-check: passed") :
-    (emit "  structural pre-check: {structural.reasons | join ", "}")
-
-  check_sections draft
-
-  result = refine draft {
-    grade: (work) {
-      use std/agents/grader
-      g = grader.grade {work  task: "work item document for {name}"  rubric  threshold: 75}
-      emit "  score {g.score} passed={g.passed}"
-      {score: to_int g.score  feedback: g.feedback}
-    }
-    revise: (work feedback) {
-      p = prompt.create ()
-        | prompt.section "Current Document" work
-        | prompt.section "Feedback to Fix" feedback
-        | prompt.instruction "Fix ALL feedback items. Return the complete revised markdown document."
-        | prompt.constraint "Do not remove content to avoid checks — fix issues properly"
-        | prompt.constraint "Start with '# Goal' — nothing before it"
-      revised = prompt.ask_with p {
-        append_system: "You are revising a work item document. Fix every feedback item. Output the complete revised document."
-        tools: []
-      } work
-      fs.write path revised ^
-      revised
-    }
-    threshold: 75
-    max_rounds: 3
-    on_round: (round work score) emit "  refinement round {round}: {score}"
+  heartbeat = cron.every 60000 () {
+    t = time.now ()
+    ts = t | time.format "%H:%M:%S"
+    mins = ((t.ms - start_ms) // 1000) // 60
+    emit "[{ts}] heartbeat — {mins}m elapsed"
   }
 
-  final = result ? { Ok r -> r.work; Err r -> r.work }
+  result = orchestrator.run_audit audit rules_content root wi_grader max_rounds runner_dir
+  status.record_result result
 
-  audit_result = quality.final_audit final "work item for {name}"
-  audit_result.full_passed ?
-    (emit "  auditor: passed (score {audit_result.score})") :
-    (emit "  auditor: failed (score {audit_result.score}) — {audit_result.feedback}")
-  Ok final
+  elapsed = (time.now().ms - start_ms) // 1000
+  wg_log.log ""
+  wg_log.log "=== DONE ==="
+  icon = result.status == "pass" ? "OK" : "FAIL"
+  wg_log.log "  [{icon}] {result.name} — {result.score}/100 ({result.rounds} rounds, {elapsed}s)"
+  result.status == "pass" ? wg_log.log "  output: {result.path}"
+  result.status != "pass" ? wg_log.log "  feedback: {result.feedback}"
 }
++run = run
+
+main ()

@@ -1,0 +1,104 @@
+-- Work Item Grader for workgen — scores generated work items against a rubric.
+-- Same pattern as workrunner/lib/grader.lx. Class-based, prompt-assembled, structured output.
+
+use std/ai
+use std/json
+use pkg/core/prompt
+
+Trait +GradeResult = {
+  score: Int
+  passed: Bool
+  categories: List
+  feedback: Str
+  failed: List
+}
+
+Trait +CategoryScore = {
+  name: Str
+  score: Int
+  passed: Bool
+  feedback: Str
+}
+
+Class +Grader = {
+  rubric: []
+  threshold: 75
+
+  grade = (work task) {
+    p = self.build_prompt work task
+    rendered = prompt.render p
+    schema_str = self.schema ()
+    result = ai.prompt_with {
+      prompt: rendered
+      disable_tools: true
+      json_schema: schema_str
+    } ^
+
+    response_text = result.text ?? ""
+    response_text | len == 0 ? (self.empty_result "empty LLM response") : (self.parse_response response_text)
+  }
+
+  build_prompt = (work task) {
+    category_lines = self.rubric | enumerate | map (pair) {
+      (idx cat) = pair
+      "{idx + 1}. {cat.name} (weight {cat.weight}) — {cat.description}"
+    } | join "\n"
+
+    prompt.create ()
+      | prompt.system "You are a grader scoring work against a rubric. For each category, assign a score 0-100 and brief feedback. A category passes at score >= 70."
+      | prompt.section "Task" task
+      | prompt.section "Work to Grade" work
+      | prompt.section "Rubric Categories" category_lines
+  }
+
+  schema = () {
+    `{"type":"object","properties":{"categories":{"type":"array","items":{"type":"object","properties":{"name":{"type":"string"},"score":{"type":"integer","minimum":0,"maximum":100},"feedback":{"type":"string"}},"required":["name","score","feedback"]}}},"required":["categories"]}`
+  }
+
+  parse_response = (text) {
+    parsed = json.parse text
+    parsed ? {
+      Err e -> self.empty_result "JSON parse error: {e}"
+      Ok json_val -> self.assemble json_val
+    }
+  }
+
+  assemble = (json_val) {
+    raw_cats = json_val.categories ?? []
+    total_score := 0
+    total_weight := 0
+    failed := []
+    categories := []
+
+    self.rubric | each (rub) {
+      default_match = {name: rub.name  score: 0  feedback: "not evaluated"}
+      matched = (raw_cats | find (c) { c.name == rub.name }) ?? default_match
+      score = matched.score ?? 0
+      fb = matched.feedback ?? ""
+      cat_passed = score >= 70
+      weight = rub.weight ?? 1
+
+      total_score <- total_score + score * weight
+      total_weight <- total_weight + weight
+      cat_score = CategoryScore {name: rub.name  score: score  passed: cat_passed  feedback: fb}
+      categories <- [..categories cat_score]
+      new_failed = cat_passed == false ? [..failed rub.name] : failed
+      failed <- new_failed
+    }
+
+    final_score = total_weight > 0 ? (total_score // total_weight) : 0
+    no_failures = failed | len == 0
+    overall = final_score >= self.threshold && no_failures
+    feedback_str = no_failures ? "All categories passed" : "Failed: {failed | join ", "}"
+
+    GradeResult {score: final_score  passed: overall  categories: categories  feedback: feedback_str  failed: failed}
+  }
+
+  empty_result = (reason) {
+    cats = self.rubric | map (r) {
+      CategoryScore {name: r.name  score: 0  passed: false  feedback: reason}
+    }
+    names = self.rubric | map (r) r.name
+    GradeResult {score: 0  passed: false  categories: cats  feedback: reason  failed: names}
+  }
+}

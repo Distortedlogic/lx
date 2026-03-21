@@ -1,0 +1,9 @@
+[package]
+name = "workrunner"
+version = "0.1.0"
+entry = "main.lx"
+description = "Agentic work item executor with per-task grading"
+
+[test]
+dir = "tests"
+pattern = "*.lx"

@@ -3,12 +3,13 @@
 --   researcher: web search for external patterns and best practices.
 --   context-engine: codebase retrieval for current approach and gaps.
 --   github-search: code search for OSS implementations and libraries.
--- Merge via agent.reconcile (merge_fields) to unify results.
+-- Merge via reconcile (merge_fields) to unify results.
 -- Synthesis: recommend best OSS match or suggest implementation from external patterns.
 -- Demonstrates: workflow.run, parallel fan-out, agent reconciliation, synthesis logic.
 -- Source: mcp-toolbelt/arch_diagrams/scenario_research
 
 use std/agent
+use pkg/core/reconcile {reconcile}
 use flows/lib/agent_catalog {search_handler}
 use pkg/connectors/catalog {context_engine}
 use ../agents/github_search
@@ -37,7 +38,7 @@ Trait ResearchRequest = {topic: Str  compare_to: Str  find_oss: Bool}
     }
     context_engine.disconnect ()
 
-    merged = agent.reconcile [external internal oss] {strategy: "merge_fields"}
+    merged = reconcile [external internal oss] {strategy: "merge_fields"}
     recommendation = synthesize external oss
 
     report.write "research_report.md" "Research: {request.topic}" [

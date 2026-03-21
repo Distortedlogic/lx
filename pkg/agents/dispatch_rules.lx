@@ -1,0 +1,54 @@
+-- Pattern-based message dispatch — route messages to handlers by matching rules.
+-- Replaces agent_dispatch.rs.
+
+matches_rule = (rule msg) {
+  pattern = rule.match
+  is_default = pattern == "default"
+  is_default ? true : {
+    is_fn = (type_of pattern) == "Func"
+    is_fn ? (pattern msg) == true : {
+      is_record = (type_of pattern) == "Record"
+      is_record ? (pattern | entries | all? (e) { ((get e.0 msg) ?? None) == e.1 }) : false
+    }
+  }
+}
+
+apply_rule = (rule msg) {
+  transform_fn = rule.transform
+  has_transform = transform_fn != None
+  transformed = has_transform ? (transform_fn msg) : msg
+  target = rule.to
+  is_fn = (type_of target) == "Func"
+  is_fn ? (target transformed) : (target ~>? transformed)
+}
+
+dispatch_fn = (rules) {
+  mr = matches_rule
+  ar = apply_rule
+  handler = (msg) {
+    matched = rules | find (rule) {
+      result = mr rule msg
+      result
+    }
+    matched ? { Some rule -> ar rule msg; _ -> Err {type: "no_route"  message: msg} }
+  }
+  {name: "dispatch"  handler: handler}
+}
++dispatch = dispatch_fn
+
+dispatch_multi_fn = (rules) {
+  mr = matches_rule
+  ar = apply_rule
+  handler = (msg) {
+    matched = rules | filter (rule) {
+      result = mr rule msg
+      result
+    }
+    matched | map (rule) {
+      resp = ar rule msg
+      {result: resp}
+    }
+  }
+  {name: "dispatch_multi"  handler: handler}
+}
++dispatch_multi = dispatch_multi_fn

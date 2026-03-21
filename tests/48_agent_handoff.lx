@@ -2,7 +2,7 @@
 -- Tests: spec/agents-handoff.md (Handoff Trait + agent.as_context)
 -- Phase: agent.Handoff Trait, agent.as_context formatting helper
 
-use std/agent {Handoff}
+use pkg/core/handoff {Handoff as_context}
 use std/agent
 
 -- Handoff Trait validates and fills defaults
@@ -32,7 +32,7 @@ assert (h2.files_read | len == 2) "handoff files_read populated"
 assert (h2.duration_ms == 1500) "handoff duration_ms explicit"
 
 -- agent.as_context formats handoff as readable string
-ctx = agent.as_context h2
+ctx = as_context h2
 assert (ctx | contains? "Previous Agent Handoff") "as_context has header"
 assert (ctx | contains? "Result:") "as_context has result"
 assert (ctx | contains? "Tried:") "as_context has tried"
@@ -44,7 +44,7 @@ assert (ctx | contains? "Files examined:") "as_context has files_read"
 assert (ctx | contains? "Tools used:") "as_context has tools_used"
 
 -- as_context omits empty sections
-ctx_minimal = agent.as_context h
+ctx_minimal = as_context h
 assert (ctx_minimal | contains? "Result:") "minimal has result"
 assert (!(ctx_minimal | contains? "Tried:")) "minimal omits empty tried"
 assert (!(ctx_minimal | contains? "Assumptions:")) "minimal omits empty assumptions"
@@ -57,7 +57,7 @@ assert (response.got_tried | len == 2) "handoff as message preserves tried"
 
 -- handoff with dialogue context initialization
 dialogue_agent = {handler: (msg) {has_context: msg.context != ()}}
-session = agent.dialogue dialogue_agent {context: (agent.as_context h2)} ^
+session = agent.dialogue dialogue_agent {context: (as_context h2)} ^
 r = agent.dialogue_turn session "proceed with fix" ^
 assert (r.has_context == true) "handoff context in dialogue"
 agent.dialogue_end session

@@ -3,6 +3,10 @@
 -- Architecture: agents spawned as subprocesses, communicate via ~>?, pub/sub for events
 
 use std/agent
+use pkg/agents/intercept {intercept}
+use pkg/core/capability {capabilities}
+use pkg/core/reconcile {reconcile}
+use pkg/agents/negotiate {negotiate}
 use pkg/data/trace {TraceStore}
 use pkg/core/contracts {AgentTask AgentResult}
 
@@ -17,7 +21,7 @@ use pkg/core/contracts {AgentTask AgentResult}
 }
 
 +setup_tracing = (workforce: Any  session: Any) -> Any {
-  trace_wrap = (worker name) agent.intercept worker (msg next) {
+  trace_wrap = (worker name) intercept worker (msg next) {
     session.record {name: "{name}_msg" input: msg.action ?? "unknown"} ?? ()
     next msg
   }
@@ -71,9 +75,9 @@ use pkg/core/contracts {AgentTask AgentResult}
 
 route_to_worker = (workforce: Any  specialist: Str) -> Any {
   caps = [
-    agent.capabilities workforce.analyst ^
-    agent.capabilities workforce.critic ^
-    agent.capabilities workforce.researcher ^
+    capabilities workforce.analyst ^
+    capabilities workforce.critic ^
+    capabilities workforce.researcher ^
   ]
     | zip [workforce.analyst workforce.critic workforce.researcher]
 
@@ -98,7 +102,7 @@ route_to_worker = (workforce: Any  specialist: Str) -> Any {
 }
 
 +fan_out_and_reconcile = (workforce: Any  tasks: [AgentTask]  strategy: Str = "merge_fields") -> Any {
-  fan_out workforce tasks ^ | (results) agent.reconcile results {strategy}
+  fan_out workforce tasks ^ | (results) reconcile results {strategy}
 }
 
 +parallel_review = (workforce: Any  content: Str  task: Str) -> Any {
@@ -112,7 +116,7 @@ route_to_worker = (workforce: Any  specialist: Str) -> Any {
   agreement ? {
     {analysis: analysis  critique: critique  consensus: true}
   } : {
-    negotiated = agent.negotiate [workforce.analyst workforce.critic] {
+    negotiated = negotiate [workforce.analyst workforce.critic] {
       topic: "review of: {task}"
       max_rounds: 3
       strategy: "convergence"

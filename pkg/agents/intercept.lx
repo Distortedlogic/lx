@@ -1,0 +1,19 @@
+-- Composable message middleware with short-circuit support.
+-- Replaces agent_intercept.rs.
+
+intercept_fn = (agent middleware) {
+  orig_handler = agent.handler
+  next_fn = (msg) {
+    resolved = resolve_handler agent
+    h = resolved ?? orig_handler
+    h msg
+  }
+  nf = next_fn
+  mw = middleware
+  new_handler = (msg) {
+    result = mw msg nf
+    result
+  }
+  {..agent  handler: new_handler  __intercepted: true}
+}
++intercept = intercept_fn

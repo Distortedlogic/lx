@@ -1,10 +1,12 @@
 use std/agent
+use pkg/agents/mock {mock}
+use pkg/core/reconcile {reconcile}
 
-reviewer = agent.mock [
+reviewer = mock [
   {match: "any" respond: {approved: true findings: ["looks good"]}}
 ]
 
-security = agent.mock [
+security = mock [
   {match: "any" respond: {approved: true findings: ["secure"]}}
 ]
 
@@ -38,7 +40,7 @@ msg3 = {task: "x"}
 route_fail = agent.route msg3 {trait: "NonExistent"}
 assert (err? route_fail == true) "route: should error when no match"
 
-fallback_agent = agent.mock [
+fallback_agent = mock [
   {match: "any" respond: {fallback: true}}
 ]
 fb_result = agent.route msg3 {trait: "NonExistent" fallback: fallback_agent} ^
@@ -47,11 +49,9 @@ assert fb_result.fallback == true "route: should use fallback"
 results = agent.route_multi msg1 {trait: "Reviewer"} ^
 assert (results | len) == 2 "route_multi: should get 2 results"
 
-reconciled = agent.route_multi msg1 {
-  trait: "Reviewer"
-  reconcile: {strategy: "vote" vote_field: "approved"}
-} ^
-assert reconciled.merged == true "route_multi: vote should pass"
+multi_results = agent.route_multi msg1 {trait: "Reviewer"} ^
+reconciled = reconcile multi_results {strategy: "vote" vote_field: "approved"}
+assert (reconciled.merged == true) "route_multi: vote should pass"
 
 agent.unregister reviewer ^
 remaining = agent.registered () ^
@@ -64,9 +64,9 @@ assert (empty | len) == 0 "unregister: should be empty"
 multi_fail = agent.route_multi msg3 {trait: "Gone"}
 assert (err? multi_fail == true) "route_multi: should error when no agents"
 
-a1 = agent.mock [{match: "any" respond: {id: 1}}]
-a2 = agent.mock [{match: "any" respond: {id: 2}}]
-a3 = agent.mock [{match: "any" respond: {id: 3}}]
+a1 = mock [{match: "any" respond: {id: 1}}]
+a2 = mock [{match: "any" respond: {id: 2}}]
+a3 = mock [{match: "any" respond: {id: 3}}]
 
 agent.register a1 {traits: ["Worker"]} ^
 agent.register a2 {traits: ["Worker"]} ^
@@ -82,7 +82,7 @@ agent.unregister a1 ^
 agent.unregister a2 ^
 agent.unregister a3 ^
 
-cap_agent = agent.mock [{match: "any" respond: {ok: true}}]
+cap_agent = mock [{match: "any" respond: {ok: true}}]
 agent.register cap_agent {traits: ["Limited"] max_concurrent: 0} ^
 
 cap_result = agent.route msg3 {trait: "Limited"}

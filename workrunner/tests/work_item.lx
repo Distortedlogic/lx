@@ -1,0 +1,34 @@
+use workrunner/lib/work_item
+
+wi = work_item.load "workrunner/tests/fixtures/test_work_item.md"
+
+assert (wi.path == "workrunner/tests/fixtures/test_work_item.md") "path set"
+assert (wi.slug | len > 0) "slug set"
+assert (wi.goal | contains? "Test work item") "goal parsed"
+assert (wi.why | contains? "Testing") "why parsed"
+assert (wi.what_changes | contains? "dummy.txt") "what_changes parsed"
+assert (wi.files_affected | contains? "dummy.txt") "files_affected parsed"
+
+tc = wi.task_count ()
+assert (tc == 2) "2 tasks parsed"
+
+t1 = wi.get_task 1
+assert (t1 != None) "task 1 found"
+t1v = t1 ?? {subject: ""}
+assert (t1v.subject | contains? "dummy") "task 1 subject"
+assert (t1v.description | contains? "hello world") "task 1 description"
+assert (t1v.num == 1) "task 1 num"
+
+t2 = wi.get_task 2
+assert (t2 != None) "task 2 found"
+t2v = t2 ?? {subject: ""}
+assert (t2v.subject | contains? "Verify") "task 2 subject"
+
+ctx = wi.context_for_implement ()
+assert (ctx | contains? "Goal") "implement context has Goal"
+assert (ctx | contains? "Files Affected") "implement context has Files Affected"
+
+summaries = wi.task_summaries ()
+assert (summaries | len == 2) "2 summaries"
+
+log.info "111_work_item: all passed"

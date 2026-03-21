@@ -4,7 +4,7 @@
 
 use pkg/core/introspect {Inspector}
 use pkg/core/circuit {CircuitBreaker}
-use std/budget
+use pkg/core/budget
 use std/time
 
 Trait +CognitiveState = {

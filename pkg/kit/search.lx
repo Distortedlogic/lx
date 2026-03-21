@@ -3,18 +3,11 @@
 
 use std/json
 
-build_content_cmd = (pattern opts) {
-  path = opts.path ?? "."
-  type_flag = opts.type ?? ""
-  glob_flag = opts.glob ?? ""
-  case_flag = opts.case_insensitive ?? false
-
-  cmd = "rg --json"
-  cmd = case_flag ? "{cmd} -i" : cmd
-  cmd = type_flag != "" ? "{cmd} --type {type_flag}" : cmd
-  cmd = glob_flag != "" ? "{cmd} --glob '{glob_flag}'" : cmd
-  "{cmd} -- '{pattern}' {path}"
+run_rg = (cmd) {
+  shell_r = $sh -c "{cmd}"
+  (shell_r ^).out ?? ""
 }
++run_rg = run_rg
 
 parse_match = (obj) {
   subs = obj.data.submatches ?? []
@@ -25,26 +18,36 @@ parse_match = (obj) {
     end: sm.end
     text: sm.match.text
   }
-  result = {
+  {
     file: obj.data.path.text
     line: obj.data.line_number
-    col
+    col: col
     text: obj.data.lines.text | trim
     submatches: parsed_subs
   }
-  result
 }
++parse_match = parse_match
 
 +content = (pattern opts) {
-  cmd = build_content_cmd pattern opts
-  raw = ($^{cmd}) ?? ""
-  raw == "" ? [] : {
+  path = opts.path ?? "."
+  type_flag = opts.type ?? ""
+  glob_flag = opts.glob ?? ""
+  case_flag = opts.case_insensitive ?? false
+
+  cmd = "rg --json"
+  cmd = case_flag ? "{cmd} -i" : cmd
+  cmd = type_flag != "" ? "{cmd} --type {type_flag}" : cmd
+  cmd = glob_flag != "" ? "{cmd} --glob '{glob_flag}'" : cmd
+  cmd = "{cmd} -- '{pattern}' {path}"
+
+  raw = run_rg cmd
+  raw | len == 0 ? [] : (
     raw | lines
       | filter (line) { line | len > 0 }
       | map (line) { json.parse line ^ }
       | filter (obj) { obj.type == "match" }
       | map parse_match
-  }
+  )
 }
 
 +files = (pattern opts) {
@@ -57,16 +60,13 @@ parse_match = (obj) {
   cmd = glob_flag != "" ? "{cmd} --glob '{glob_flag}'" : cmd
   cmd = "{cmd} {path}"
 
-  raw = ($^{cmd}) ?? ""
-  raw == "" ? [] : {
+  raw = run_rg cmd
+  raw | len == 0 ? [] : (
     raw | lines
       | filter (line) { line | len > 0 }
-      | map (line) {
-          trimmed = line | trim
-          result = {file: trimmed}
-          result
-        }
-  }
+      | map (line) { line | trim }
+      | map (trimmed) { {file: trimmed} }
+  )
 }
 
 +count = (pattern opts) {
@@ -81,20 +81,14 @@ parse_match = (obj) {
   cmd = glob_flag != "" ? "{cmd} --glob '{glob_flag}'" : cmd
   cmd = "{cmd} -- '{pattern}' {path}"
 
-  raw = ($^{cmd}) ?? ""
-  raw == "" ? [] : {
+  raw = run_rg cmd
+  raw | len == 0 ? [] : (
     raw | lines
       | filter (line) { line | len > 0 }
       | map (line) { json.parse line ^ }
       | filter (obj) { obj.type == "end" }
-      | map (obj) {
-          result = {
-            file: obj.data.path.text
-            count: obj.data.stats.matches
-          }
-          result
-        }
-  }
+      | map (obj) { {file: obj.data.path.text  count: obj.data.stats.matches} }
+  )
 }
 
 +replace = (pattern replacement opts) {
@@ -109,23 +103,21 @@ parse_match = (obj) {
   cmd = glob_flag != "" ? "{cmd} --glob '{glob_flag}'" : cmd
   cmd = "{cmd} -- '{pattern}' {path}"
 
-  raw = ($^{cmd}) ?? ""
-  raw == "" ? [] : {
+  raw = run_rg cmd
+  raw | len == 0 ? [] : (
     raw | lines
       | filter (line) { line | len > 0 }
       | map (line) { json.parse line ^ }
       | filter (obj) { obj.type == "match" }
       | map (obj) {
           subs = obj.data.submatches ?? []
-          first_sub = subs | first
-          new_text = first_sub ? { Some s -> s.replacement.text ?? ""; None -> "" }
-          result = {
+          new_text = (subs | first) ?? {replacement: {text: ""}}
+          {
             file: obj.data.path.text
             line: obj.data.line_number
             old: obj.data.lines.text | trim
-            new: new_text
+            new: new_text.replacement.text ?? ""
           }
-          result
         }
-  }
+  )
 }

@@ -36,6 +36,17 @@ pub enum SplitDirection {
     Vertical,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PaneKind {
+    Terminal,
+    Browser,
+    Editor,
+    Agent,
+    Canvas,
+    Chart,
+    FlowGraph,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum PaneNode {
     Terminal {
@@ -63,6 +74,15 @@ pub enum PaneNode {
         widget_type: String,
         config: serde_json::Value,
     },
+    Chart {
+        id: String,
+        chart_json: String,
+        title: Option<String>,
+    },
+    FlowGraph {
+        id: String,
+        source_path: String,
+    },
     Split {
         id: String,
         direction: SplitDirection,
@@ -79,7 +99,22 @@ impl PaneNode {
             | Self::Browser { id, .. }
             | Self::Editor { id, .. }
             | Self::Agent { id, .. }
-            | Self::Canvas { id, .. } => Some(id),
+            | Self::Canvas { id, .. }
+            | Self::Chart { id, .. }
+            | Self::FlowGraph { id, .. } => Some(id),
+            Self::Split { .. } => None,
+        }
+    }
+
+    pub fn pane_kind(&self) -> Option<PaneKind> {
+        match self {
+            Self::Terminal { .. } => Some(PaneKind::Terminal),
+            Self::Browser { .. } => Some(PaneKind::Browser),
+            Self::Editor { .. } => Some(PaneKind::Editor),
+            Self::Agent { .. } => Some(PaneKind::Agent),
+            Self::Canvas { .. } => Some(PaneKind::Canvas),
+            Self::Chart { .. } => Some(PaneKind::Chart),
+            Self::FlowGraph { .. } => Some(PaneKind::FlowGraph),
             Self::Split { .. } => None,
         }
     }
@@ -121,7 +156,9 @@ impl PaneNode {
             | Self::Browser { .. }
             | Self::Editor { .. }
             | Self::Agent { .. }
-            | Self::Canvas { .. } => Some(self),
+            | Self::Canvas { .. }
+            | Self::Chart { .. }
+            | Self::FlowGraph { .. } => Some(self),
             Self::Split {
                 id: sid,
                 direction,

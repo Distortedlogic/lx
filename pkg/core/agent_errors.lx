@@ -1,0 +1,15 @@
+-- AgentErr union type — structured error variants for agent operations.
+-- Replaces the tagged_ctors() exports from std/agent.
+
++AgentErr =
+  | Timeout {elapsed_ms: Int  deadline_ms: Int}
+  | RateLimited {retry_after_ms: Int  limit: Str}
+  | BudgetExhausted {used: Float  limit: Float  resource: Str}
+  | ContextOverflow {size: Int  capacity: Int  content: Str}
+  | Incompetent {agent: Str  task: Str  score: Float  threshold: Float}
+  | Upstream {service: Str  code: Int  message: Str}
+  | PermissionDenied {action: Str  resource: Str}
+  | TraitViolation {expected: Str  got: Str  message: Str}
+  | Unavailable {agent: Str  reason: Str}
+  | Cancelled {reason: Str}
+  | Internal {message: Str}

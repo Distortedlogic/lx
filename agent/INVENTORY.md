@@ -38,34 +38,45 @@
 - `with context key: val { body }` — ambient context propagation. Scoped state flows through call chains without explicit parameter threading. `context.field` dot-access, `context.current ()` returns full context record, `context.get key` returns Some/None. Nesting merges with outer context; inner values override; outer restored on scope exit. `context` globally available (returns `{}` outside any scope)
 - `meta task { strategies: [...] attempt: fn evaluate: fn select?: "sequential" on_switch?: fn }` — strategy-level iteration. Tries fundamentally different approaches. Returns `Ok {result strategy attempts}` on first viable, `Err {reason attempts best}` if all exhausted. Contextual keyword (not reserved — usable as identifier). Composes with `refine` (meta selects approach, refine optimizes within it)
 
-## Stdlib (43 Rust modules + 6 standard agents + 11 lx packages)
+## Stdlib (30 Rust modules + 6 standard agents + 11 lx packages)
 
 - Data: `std/json`, `std/md`, `std/re`, `std/math`, `std/time`
 - System: `std/fs`, `std/env`, `std/http`
 - Git: `std/git` — 36 functions
-- State primitive: `std/store` — backing implementation for `Value::Store`. `Store ()` constructor creates a first-class Store value with dot-access methods (set, get, keys, values, entries, remove, len, has, clear, filter, query, map, merge, update, save, load, persist, reload)
-- Resilience: `std/retry`, `std/deadline`
+- State primitive: `std/store` — backing implementation for `Value::Store`. `Store ()` constructor creates a first-class Store value with dot-access methods (set, get, keys, values, entries, remove, len, has, clear, filter, query, map, merge, update, save, load, persist, reload, to_record)
+- Resilience: `std/deadline`
 - Communication: `std/agent`, `std/mcp`, `std/ai`
 - Observation: `std/introspect` — system-wide live introspection: `system` (full snapshot), `agents` (agent list), `agent` (deep single-agent info), `messages` (in-flight), `bottleneck` (busiest agent). Aggregates from REGISTRY, SESSIONS, SUPERVISORS, TOPICS, ROUTE_TABLE
 - Scheduling: `std/cron`
-- Orchestration: `std/ctx` (deprecated — use Store), `std/audit`, `std/plan`, `std/saga`, `std/pipeline`, `std/taskgraph`, `std/workspace`
-- Collaboration: `std/workspace` — concurrent multi-agent editing: `create`, `claim`, `claim_pattern`, `edit`, `append`, `release`, `snapshot`, `regions`, `conflicts`, `resolve`, `history`, `watch`. Line-based region claiming with overlap detection, auto-bound adjustment, regex pattern claiming, watcher callbacks
-- Discovery: `std/registry` — cross-process agent discovery: `start`, `stop`, `connect`, `register`, `deregister`, `find`, `find_one`, `health`, `load`, `watch`. In-memory registry with trait/trait/domain filtering, 4 selection strategies (first, least_loaded, round_robin, random), health/load tracking, watcher callbacks for join/leave events
-- Persistence: `std/durable` — Temporal-style workflow persistence: `workflow`, `run`, `step` (idempotent with caching), `sleep`, `signal`, `send_signal`, `status`, `list`. File-backed at `.lx/durable/`
-- Yield types: `std/yield` — 5 Trait-only exports (YieldApproval, YieldReflection, YieldInformation, YieldDelegation, YieldProgress). Typed yield variants with `kind` field default for orchestrator dispatch. No functions, pure Trait definitions
-- Cost management: `std/budget`
-- Standard agents: `std/agents/auditor`, `std/agents/grader` (Rust-backed, use internal APIs). `std/agents/planner`, `std/agents/router`, `std/agents/reviewer` (deprecated — use pkg/ai/ equivalents). `std/agents/monitor` removed (use pkg/agents/guard)
+- Orchestration: `std/ctx` (deprecated — use Store), `std/pipeline`, `std/taskgraph`, `std/workspace`
+- Collaboration: `std/workspace` — concurrent multi-agent editing
+- Discovery: `std/registry` — cross-process agent discovery
+- Persistence: `std/durable` — Temporal-style workflow persistence
+- Yield types: `std/yield` — 5 Trait-only exports
+- Standard agents: `std/agents/auditor`, `std/agents/grader` (Rust-backed, use internal APIs). `std/agents/planner`, `std/agents/router`, `std/agents/reviewer` (deprecated — use pkg/ai/ equivalents)
+- Builtins: `try` (catch propagated errors), `resolve_handler` (look up hot-reloaded agent handlers)
 
-## lx Packages (pkg/ workspace member — 42 packages in 7 clusters)
+## lx Packages (pkg/ workspace member — 53 packages in 7 clusters)
 
 **pkg/core/** — foundational primitives:
+- `adapter` — Trait format adaptation: field mapping between source/target Traits (hoisted from std/agent)
+- `agent_errors` — AgentErr union type: 11 structured error variants (hoisted from std/agent)
+- `audit` — text quality checks: is_empty, is_hedging, is_refusal, references_task, evaluate, quick_check (hoisted from std/audit)
+- `budget` — Budget tracking: multi-dimensional cost tracking with thresholds and sub-budgets (hoisted from std/budget)
+- `capability` — Capabilities Trait + advertise/lookup for runtime capability discovery (hoisted from std/agent)
 - `circuit` — CircuitBreaker Class: turn/action/time/repetition trip conditions
 - `collection` — Collection Trait: get, keys, values, remove, query, len, has, save, load defaults
 - `contracts` — shared Trait definitions: ToolRequest, ToolResult, ActionPlan, ActionResult, AgentTask, AgentResult, ContextItem
-- `introspect` — Inspector Class + 8 introspection functions: self_assess, detect_doom_loop, strategy_analysis, time_pressure, generate_status, should_pivot, narrate_thinking, suggest_pivot
+- `handoff` — Handoff Trait + as_context formatter (hoisted from std/agent)
+- `introspect` — Inspector Class + 8 introspection functions
+- `negotiate_fmt` — Trait format negotiation with structural matching (hoisted from std/agent)
+- `plan` — dependency-aware step execution with revision actions (hoisted from std/plan)
 - `pool` — Pool Class: worker pools with round-robin dispatch
-- `prompt` — composable prompt assembly: create, system, section, instruction, constraint, render, ask, ask_with, ask_lines
-- `connector` — Connector Trait: connect, disconnect, call, tools — generic interface for all external tool access
+- `prompt` — composable prompt assembly
+- `reconcile` — 6 reconciliation strategies: union, intersection, vote, highest_confidence, max_score, merge_fields (hoisted from std/agent)
+- `retry` — backoff computation and retry loop: exponential/linear/constant (hoisted from std/retry)
+- `saga` — compensating transactions: try/undo loop with retry and dependency ordering (hoisted from std/saga)
+- `connector` — Connector Trait: connect, disconnect, call, tools
 - `score` — composite scoring, tier classification, normalize, average
 
 **pkg/connectors/** — external tool connectors:
@@ -94,11 +105,16 @@
 - `transcript` — JSONL transcript ingestion: parse, filter, pattern extraction
 
 **pkg/agents/** — agent lifecycle:
-- `catalog` — agent registry: create, by_domain, by_name, add (route removed — use pkg/ai/router.quick_route)
-- `dialogue` — multi-turn conversation state: init_conversation, add_turn, topic tracking, rapport (pass-through wrappers removed — use std/agent directly)
+- `catalog` — agent registry: create, by_domain, by_name, add
+- `dialogue` — multi-turn conversation state
+- `dialogue_persist` — dialogue save/load/list/delete via std/fs + std/json (hoisted from std/agent)
 - `dispatch` — spawn/ask/kill shorthand: run_one, run_many, run_with, run_handler
-- `guard` — security scanning: check (with optional patterns), injection detection, loop detection, resource monitoring, severity helpers
-- `monitor` — health monitoring: circuit breaker + budget + inspector facade (introspection functions moved to pkg/core/introspect)
+- `dispatch_rules` — pattern-based message dispatch: dispatch, dispatch_multi (hoisted from std/agent)
+- `guard` — security scanning
+- `intercept` — composable message middleware with short-circuit (hoisted from std/agent)
+- `mock` — mock agents with Store-backed call recording (hoisted from std/agent)
+- `monitor` — health monitoring: circuit breaker + budget + inspector facade
+- `negotiate` — N-party iterative consensus with convergence function (hoisted from std/agent)
 - `react` — ReAct loop engine: think→action→observation with circuit breaker
 
 **pkg/infra/** — pipeline tooling:
@@ -122,26 +138,19 @@
 - Flow composition: `std/flow` — `load`, `run`, `pipe`, `parallel`, `branch`, `with_retry`, `with_timeout`, `with_fallback`. Flows as first-class composable values with isolated interpreter execution
 - Task graphs: `std/taskgraph` — `create`, `add`, `remove`, `run`, `run_with`, `validate`, `topo`, `status`, `dot`. DAG-aware subtask decomposition with topological execution, dependency result threading (`input_from`), per-task retry/timeout/on_fail policy, wave-based parallel scheduling, DOT export
 
-## Agent Extensions (19 sub-modules of `std/agent`)
+## Agent Extensions (8 remaining Rust sub-modules of `std/agent`)
 
-- `agent.reconcile` — 6 merge strategies (union, intersection, vote, highest_confidence, max_score, merge_fields) + custom Fn
-- `agent.dialogue` — multi-turn stateful sessions with config `{role? context? max_turns?}`. Branching: `dialogue_fork` (N forks sharing parent history), `dialogue_compare` (grade + rank forks), `dialogue_merge` (pick winner, resume parent), `dialogue_branches` (list active forks). Parent suspended while forks active. Recursive nested fork support
-- `agent.intercept` — composable message middleware with short-circuit
-- `Handoff` Trait + `agent.as_context` — structured context transfer for LLM consumption
-- `Capabilities` Trait + `agent.capabilities` + `agent.advertise` — runtime capability discovery
+- `agent.dialogue` — multi-turn stateful sessions with config `{role? context? max_turns?}`. Branching: `dialogue_fork`, `dialogue_compare`, `dialogue_merge`, `dialogue_branches`
 - `GateResult` Trait + `agent.gate` — human-in-the-loop approval gates via yield
 - `agent.supervise` — Erlang-style supervision: one_for_one/one_for_all/rest_for_one
-- `agent.mock` — mock agents with call tracking for testing
-- `agent.dispatch` — pattern-based message routing without LLM
-- `agent.negotiate` — N-party iterative consensus with converge function
 - `agent.topic` / `agent.subscribe` / `agent.publish` — in-process pub/sub with filtered subscriptions
-- `agent.route` / `agent.register` — capability-based routing: register agents with traits/protocols/domains, route by filter with selection strategies (least_busy, round_robin, random, custom), fan-out with reconcile via `route_multi`
-- `agent.pipeline` — consumer-driven flow control with backpressure: 11 functions (`pipeline`, `pipeline_send`, `pipeline_collect`, `pipeline_batch`, `pipeline_stats`, `pipeline_on_pressure`, `pipeline_pause`, `pipeline_resume`, `pipeline_drain`, `pipeline_close`, `pipeline_add_worker`). Bounded buffers, 4 overflow policies (block, drop_oldest, drop_newest, sample), tail-first pump for backpressure, round-robin worker dispatch, pressure callbacks with level thresholds, per-stage stats with bottleneck detection
-- `agent.emit_stream` / `agent.end_stream` — agent-side streaming API for `~>>?`. `emit_stream` writes `{"type":"stream","value":...}` JSON-line, `end_stream` writes `{"type":"stream_end"}`
-- `agent.adapter` / `agent.negotiate_format` / `agent.coerce` — Trait format negotiation: `adapter` creates reusable field-mapping interceptors from source→target Trait with explicit mapping record, `negotiate_format` auto-discovers compatible Trait mappings via agent capabilities (exact/structural/subset matching with Levenshtein heuristics), `coerce` does one-shot message transform with validation. Adapters return `Value::Err` on missing required fields (catchable with `??`)
-- `agent.reload` / `agent.evolve` / `agent.update_traits` — Hot-swap agent handlers: `reload` replaces handler externally (returns new agent Record with `__handler_id` referencing global mutable handler store), `evolve` self-updates from within handler (thread-local pending flag applied by interpreter after handler returns, takes effect on NEXT message), `update_traits` adds/removes traits on agent Records. Subprocess agents return `Err` on reload. Interceptors preserved — interceptor `next` dynamically resolves handler via store
-- `agent.dialogue_save` / `agent.dialogue_load` / `agent.dialogue_list` / `agent.dialogue_delete` — Dialogue persistence: `dialogue_save` persists session state (config + turn history) to `.lx/dialogues/{id}.json`. `dialogue_load` restores session from file and binds to a (possibly different) agent. `dialogue_list` enumerates saved dialogues with metadata (id, role, turns, created, updated, context_preview). `dialogue_delete` removes saved dialogue. Atomic writes (tmp+rename). JSON serialization via `json_conv`
-- `agent.on` / `agent.on_remove` / `agent.startup` / `agent.shutdown` / `agent.signal` / `agent.idle_hooks` — Lifecycle hooks: 6 events (startup, shutdown, error, idle, message, signal). Dynamic hook registration on agents. Multiple hooks per event (fire in registration order). Idle hooks require duration in seconds. Error hooks are curried `(err)(msg)`. `agent.kill` runs shutdown hooks before killing. Global HOOKS DashMap with auto-assigned lifecycle IDs
+- `agent.route` / `agent.register` — capability-based routing with selection strategies
+- `agent.pipeline` — consumer-driven flow control with backpressure
+- `agent.emit_stream` / `agent.end_stream` — agent-side streaming API for `~>>?`
+- `agent.reload` / `agent.evolve` / `agent.update_traits` — hot-swap agent handlers
+- `agent.on` / lifecycle hooks — 6 events (startup, shutdown, error, idle, message, signal)
+
+**Hoisted to lx packages:** reconcile → `pkg/core/reconcile`, intercept → `pkg/agents/intercept`, Handoff → `pkg/core/handoff`, Capabilities → `pkg/core/capability`, mock → `pkg/agents/mock`, dispatch → `pkg/agents/dispatch_rules`, negotiate → `pkg/agents/negotiate`, adapter/coerce → `pkg/core/adapter`, negotiate_format → `pkg/core/negotiate_fmt`, dialogue_persist → `pkg/agents/dialogue_persist`, agent_errors → `pkg/core/agent_errors`
 
 ## Other Extensions
 
@@ -151,8 +160,10 @@
 ## Runtime
 
 - **Async interpreter**: `eval`/`exec`/`eval_expr` are `async fn`. Interpreter runs inside `ctx.tokio_runtime.block_on()` at CLI entry. Builtin functions split: `BuiltinKind::Sync` (pure builtins — math, string, collection ops) and `BuiltinKind::Async` (HOFs that invoke callbacks — map, filter, fold, etc., return `BoxFuture`). `call_value` is async; `call_value_sync` bridge for sync stdlib functions (`block_in_place` + `Handle::current().block_on()`). Cron background threads use `ctx.tokio_runtime.block_on()` directly
-- All I/O builtins receive `&Arc<RuntimeCtx>` — backend traits (still sync): `AiBackend`, `EmitBackend`, `HttpBackend`, `ShellBackend`, `YieldBackend`, `LogBackend`, `UserBackend`
-- Standard defaults: `ClaudeCodeAiBackend`, `ReqwestHttpBackend`, `ProcessShellBackend`, `StdoutEmitBackend`, `StdinStdoutYieldBackend`, `StderrLogBackend`, `NoopUserBackend`
+- All I/O builtins receive `&Arc<RuntimeCtx>` — backend traits (still sync): `AiBackend`, `EmitBackend`, `HttpBackend`, `ShellBackend`, `YieldBackend`, `LogBackend`, `UserBackend`, `PaneBackend`, `EmbedBackend`
+- Standard defaults: `ClaudeCodeAiBackend`, `ReqwestHttpBackend`, `ProcessShellBackend`, `StdoutEmitBackend`, `StdinStdoutYieldBackend`, `StderrLogBackend`, `NoopUserBackend`, `YieldPaneBackend`, `VoyageEmbedBackend`
+- `AiOpts` fields: `system`, `model`, `max_turns`, `resume`, `tools`, `append_system`, `disable_tools` (bool → `--tools ""`), `json_schema` (Str → `--json-schema`). `ClaudeCodeAiBackend` maps `structured_output` JSON field to `result.text` when `json_schema` is set
+- Deny backends for sandboxing: `DenyShellBackend`, `DenyHttpBackend`, `DenyAiBackend`, `DenyPaneBackend`, `DenyEmbedBackend`, `RestrictedShellBackend` (command allowlist). In `backends/restricted.rs`
 - Embedders construct custom `RuntimeCtx` to swap backends for testing, server deployment, or sandboxing
 - Dependencies: `async-recursion` (recursive eval boxing), `futures` (join_all/select_all), `tokio` (runtime), `rayon` (still present but unused by concurrency primitives)
 

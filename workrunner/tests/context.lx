@@ -1,0 +1,10 @@
+use workrunner/lib/context
+
+ctx = context.load_bootstrap ()
+assert (ctx | len > 0) "bootstrap context is non-empty"
+assert (ctx | contains? "Context Bootstrap") "has header"
+assert (ctx | contains? "Inventory") "has inventory section"
+assert (ctx | contains? "Reference") "has reference section"
+assert (ctx | contains? "Stdlib") "has stdlib section"
+
+log.info "context: all passed"

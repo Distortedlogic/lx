@@ -1,7 +1,7 @@
 -- 73_agent_errors.lx
 -- Tests: AgentErr structured error variants (spec/agents-errors.md)
 
-use std/agent {Timeout RateLimited BudgetExhausted ContextOverflow Incompetent Upstream PermissionDenied TraitViolation Unavailable Cancelled Internal}
+use pkg/core/agent_errors {Timeout RateLimited BudgetExhausted ContextOverflow Incompetent Upstream PermissionDenied TraitViolation Unavailable Cancelled Internal}
 
 -- === Construct variants ===
 
@@ -95,7 +95,7 @@ assert (retry_decision (Cancelled {reason: ""}) == false) "no retry cancelled"
 
 -- === Budget.spend returns BudgetExhausted ===
 
-use std/budget
+use pkg/core/budget
 small = budget.create {tokens: 100}
 budget.spend small {tokens: 50} ^
 over = budget.spend small {tokens: 60}

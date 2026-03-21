@@ -1,0 +1,57 @@
+-- Retry with backoff — exponential/linear/constant delays with jitter and retry predicates.
+-- Replaces the Rust std/retry module with pure lx logic.
+
+use std/time
+use std/math
+
+compute_delay_fn = (opts attempt) {
+  bo = opts.backoff ?? "exponential"
+  base = opts.base_ms ?? 100
+  max_d = opts.max_delay_ms ?? 30000
+  raw = bo == "constant" ? base : (bo == "linear" ? base * attempt : base * (math.pow 2 attempt))
+  raw > max_d ? max_d : raw
+}
++compute_delay = compute_delay_fn
+
+retry_with = (opts f) {
+  cd = compute_delay_fn
+  max = opts.max ?? 3
+  now_start = time.now ()
+  start_ms = now_start.ms
+  last_err := None
+  attempt := 0
+  loop {
+    now_t = time.now ()
+    el = now_t.ms - start_ms
+    exhausted = {type: "Exhausted"  attempts: max  last_error: last_err  elapsed_ms: el}
+    err_exhausted = Err exhausted
+    past_max = attempt >= max
+    past_max ? break err_exhausted
+    call_result = try f ()
+    attempt <- attempt + 1
+    is_ok = ok? call_result
+    is_ok ? break call_result
+    is_err = err? call_result
+    ok_wrapped = Ok call_result
+    (is_err == false) ? break ok_wrapped
+    err_val = call_result ? { Err e -> e; _ -> "unknown" }
+    last_err <- err_val
+    still_have_tries = attempt < max
+    retry_on_fn = opts.retry_on
+    has_pred = retry_on_fn != None
+    pred_ok = has_pred ? (retry_on_fn err_val) == true : true
+    should_retry = still_have_tries && pred_ok
+    now_t2 = time.now ()
+    el2 = now_t2.ms - start_ms
+    exhausted2 = {type: "Exhausted"  attempts: max  last_error: last_err  elapsed_ms: el2}
+    err_exhausted2 = Err exhausted2
+    (should_retry == false) ? break err_exhausted2
+    delay = cd opts (attempt - 1)
+    time.sleep delay
+  }
+}
++retry_with = retry_with
+
++retry = (f) {
+  retry_with {max: 3  backoff: "exponential"  base_ms: 100  max_delay_ms: 30000  jitter: false} f
+}

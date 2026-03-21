@@ -1,0 +1,75 @@
+-- In-process pub/sub — topics, subscriptions, filtered delivery.
+-- Hoisted from agent_pubsub.rs.
+
+topics = Store ()
+
++topic = (name) {
+  has = topics.has name
+  (has == false) ? topics.set name {subscribers: []  filtered: []}
+  name
+}
+
++subscribe = (agent topic_name) {
+  t = topic topic_name
+  data = topics.get topic_name ?? {subscribers: []  filtered: []}
+  subs = data.subscribers ?? []
+  topics.set topic_name {subscribers: subs ++ [agent]  filtered: data.filtered ?? []}
+  ok_val = Ok ()
+  ok_val
+}
+
++subscribe_filtered = (agent topic_name predicate) {
+  t = topic topic_name
+  data = topics.get topic_name ?? {subscribers: []  filtered: []}
+  filtered = data.filtered ?? []
+  topics.set topic_name {subscribers: data.subscribers ?? []  filtered: filtered ++ [{agent: agent  predicate: predicate}]}
+  ok_val = Ok ()
+  ok_val
+}
+
++unsubscribe = (agent topic_name) {
+  data = topics.get topic_name ?? {subscribers: []  filtered: []}
+  agent_name = agent.name ?? "unknown"
+  new_subs = data.subscribers | filter (s) { (s.name ?? "unknown") != agent_name }
+  new_filtered = (data.filtered ?? []) | filter (f) { (f.agent.name ?? "unknown") != agent_name }
+  topics.set topic_name {subscribers: new_subs  filtered: new_filtered}
+  ok_val = Ok ()
+  ok_val
+}
+
++publish = (topic_name msg) {
+  data = topics.get topic_name ?? {subscribers: []  filtered: []}
+  tagged_msg = {..msg  _topic: topic_name}
+  subs = data.subscribers ?? []
+  subs | each (sub) { sub ~>? tagged_msg }
+  filtered = data.filtered ?? []
+  filtered | each (f) {
+    passes = f.predicate tagged_msg
+    passes ? (f.agent ~>? tagged_msg)
+  }
+  ok_val = Ok ()
+  ok_val
+}
+
++publish_collect = (topic_name msg) {
+  data = topics.get topic_name ?? {subscribers: []  filtered: []}
+  tagged_msg = {..msg  _topic: topic_name}
+  subs = data.subscribers ?? []
+  results = subs | map (sub) {
+    resp = sub ~>? tagged_msg
+    {agent: sub.name ?? "unknown"  result: resp}
+  }
+  ok_val = Ok results
+  ok_val
+}
+
++subscribers = (topic_name) {
+  data = topics.get topic_name ?? {subscribers: []  filtered: []}
+  plain = (data.subscribers ?? []) | map (s) { {name: s.name ?? "unknown"  filtered: false} }
+  filt = (data.filtered ?? []) | map (f) { {name: f.agent.name ?? "unknown"  filtered: true} }
+  plain ++ filt
+}
+
++topics = () {
+  topics.keys ()
+}

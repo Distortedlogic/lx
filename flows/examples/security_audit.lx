@@ -1,11 +1,12 @@
 -- Security audit of running subagents -- detect stuck loops, injection, resource abuse.
 -- Data source: Claude CLI transcripts (~/.claude/projects/<project>/*.jsonl).
--- Uses pkg/security_scan.scan_transcripts for detection, agent.reconcile for dedup.
+-- Uses pkg/security_scan.scan_transcripts for detection, reconcile for dedup.
 -- Severity-sorted output with critical/high classification and markdown report.
 -- Demonstrates: workflow.run, guard composition, reconciliation, transcript ingestion.
 -- Source: mcp-toolbelt/arch_diagrams/scenario_security_audit
 
 use std/agent
+use pkg/core/reconcile {reconcile}
 use pkg/agents/guard
 use pkg/kit/security_scan
 use pkg/infra/report
@@ -26,7 +27,7 @@ use pkg/infra/workflow
         Ok {findings: 0  critical: 0  high: 0}
       }
       false -> {
-        merged = agent.reconcile result.findings {
+        merged = reconcile result.findings {
           strategy: "union"
           key: (f) "{f.agent_id}:{f.type}"
         }

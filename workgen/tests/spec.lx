@@ -2,13 +2,11 @@
 -- Each scenario runs workgen for real against a fixture codebase
 -- with planted violations. The AI-backed grader.grade evaluates output.
 
-use std/audit
-
 +name = "workgen"
 +threshold = 0.75
 +threshold_pct = to_int (threshold * 100)
 
-+rubric = audit.rubric [
++rubric = [
   {name: "structure"   description: "has Goal, Why, What changes, Files affected, Task List, CRITICAL REMINDERS sections"  weight: 25}
   {name: "coverage"    description: "every planted violation from the audit checklist has a corresponding finding and fix task"  weight: 30}
   {name: "compliance"  description: "follows work-item.md process rules: implementation-only tasks, CRITICAL REMINDERS footer"  weight: 25}

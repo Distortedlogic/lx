@@ -1,0 +1,32 @@
+use workrunner/lib/work_item
+use workrunner/lib/log
+use workrunner/lib/orchestrator
+use workrunner/lib/grader {Grader}
+use workrunner/lib/context
+
+wi = work_item.load "workrunner/tests/fixtures/tiny_work_item.md"
+assert (wi.task_count () == 1) "tiny has 1 task"
+assert (wi.slug | len > 0) "slug set"
+
+log.log "orchestrator test: parsing OK"
+
+bootstrap_ctx = context.load_bootstrap ()
+assert (bootstrap_ctx | len > 0) "bootstrap loaded"
+
+grader_inst = Grader {
+  threshold: 50
+  rubric: [
+    {name: "file_exists"  description: "tests/fixtures/tiny_test.txt exists"  weight: 100}
+  ]
+}
+
+log.log "orchestrator test: running work item..."
+result = orchestrator.run_work_item wi.path 0 1 grader_inst bootstrap_ctx 2 ".lx/work_runner_test"
+
+log.log "result status: {result.status}"
+log.log "result score: {result.score}"
+assert (result.path == wi.path) "result has path"
+assert (result.status == "pass" || result.status == "fail") "result has valid status"
+assert (result.score >= 0) "result has score"
+
+log.log "orchestrator: all passed"

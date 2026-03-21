@@ -5,6 +5,7 @@ use std/ai
 use pkg/core/prompt
 use std/md
 use pkg/ai/reasoning {ReasoningChain}
+use pkg/core/capability {advertise}
 use ../contracts {Response Identity}
 use ../traits {Synthesizer}
 
@@ -97,7 +98,7 @@ suggest_follow_ups = (task: Str  response: Str) -> [Str] {
 }
 
 +main = () {
-  agent.advertise {
+  advertise {
     traits: ["Response"]
     domains: ["synthesizer" "response" "formatting" "composition"]
     tools: ["ai"]

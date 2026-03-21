@@ -1,10 +1,10 @@
 # Goal
 
-Hoist pure-logic and Store-replaceable Rust stdlib modules into lx packages (`pkg/`), making the language more self-hosting. Two small Rust primitives (`try` builtin, `resolve_handler` builtin) are added first to close the one feature gap (propagated error catching from `^` in user callbacks), then 16 modules totaling ~3,200 lines of Rust are replaced with ~1,900 lines of idiomatic lx. 19 concrete tasks.
+Hoist pure-logic and Store-replaceable Rust stdlib modules into lx packages (`pkg/`), making the language more self-hosting. Two small Rust primitives (`try` builtin, `resolve_handler` builtin) are added first to close the one feature gap (propagated error catching from `^` in user callbacks), then 16 modules totaling ~3,200 lines of Rust are replaced with ~1,900 lines of idiomatic lx. `agent_errors.rs` stays as an internal Rust helper (still called by 6 non-hoisted modules) but its lx-visible exports move to `pkg/core/agent_errors.lx`. 19 concrete tasks.
 
 # Why
 
-- 21 Rust stdlib files implement pure logic (string matching, record manipulation, list operations, arithmetic, control flow) that has zero dependency on Rust-specific APIs (no DashMap, no threading, no async, no FFI). This logic is expressible in lx using existing builtins and should live in lx to reduce the Rust surface area and make the stdlib self-hosting
+- 20 Rust stdlib files implement pure logic (string matching, record manipulation, list operations, arithmetic, control flow) that has zero dependency on Rust-specific APIs (no DashMap, no threading, no async, no FFI). This logic is expressible in lx using existing builtins and should live in lx to reduce the Rust surface area and make the stdlib self-hosting. One additional file (`agent_errors.rs`) has its lx-visible exports moved to lx but stays as an internal Rust helper for non-hoisted callers
 - `std/audit` (378 lines across 2 files) does string pattern matching (hedging detection, refusal detection, keyword overlap, repetition detection) — all expressible with lx's `lower`, `contains?`, `split`, `len`, `trim`
 - `std/plan` (275 lines across 2 files) is a dependency-aware step executor — pure loop with record field access, set membership checks, and callback invocations
 - `std/saga` (252 lines) is compensating transactions — a try/undo loop with retry delegation, expressible as lx control flow
@@ -20,7 +20,7 @@ Hoist pure-logic and Store-replaceable Rust stdlib modules into lx packages (`pk
 
 **Standalone module hoists (Tasks 3-7):** Replace `std/audit`, `std/retry`, `std/plan`, `std/saga`, and `std/budget` with lx packages in `pkg/core/`. Each task creates the lx package, updates imports in consumer files, removes the Rust module registration, and deletes the Rust source files.
 
-**Agent error type hoist (Task 8):** Replace `agent_errors.rs` tagged value constructors with lx type definitions in `pkg/core/agent_errors.lx`. Inline the two remaining Rust-internal calls (in `deadline.rs` and `budget.rs`) before deleting the file.
+**Agent error type hoist (Task 8):** Create lx type definitions in `pkg/core/agent_errors.lx` mirroring the 11 AgentErr variants. Remove the `tagged_ctors()` exports from `agent.rs` so lx code imports constructors from `pkg/core/agent_errors` instead of `std/agent`. Keep `agent_errors.rs` as an internal Rust helper — 6 non-hoisted Rust modules (agent_ipc.rs, agent_route.rs, agent.rs, introspect.rs, mcp.rs, mcp_typed.rs) still call its builder functions.
 
 **Agent extension hoists (Tasks 9-16):** Replace 10 agent extension files with lx packages across `pkg/core/` and `pkg/agents/`. Each task creates the lx package, removes the extension from `agent.rs`'s build map, updates consumer imports from `use std/agent {X}` to `use pkg/.../X`, and deletes the Rust source files.
 
@@ -48,13 +48,12 @@ Hoist pure-logic and Store-replaceable Rust stdlib modules into lx packages (`pk
 **New Rust builtins:**
 - `crates/lx/src/builtins/mod.rs` or `crates/lx/src/builtins/register.rs` — `try` and `resolve_handler` builtins
 
-**Deleted Rust files (21 files):**
+**Deleted Rust files (20 files):**
 - `crates/lx/src/stdlib/audit.rs`, `audit_score.rs`
 - `crates/lx/src/stdlib/retry.rs`
 - `crates/lx/src/stdlib/plan.rs`, `step_deps.rs`
 - `crates/lx/src/stdlib/saga.rs`
 - `crates/lx/src/stdlib/budget.rs`, `budget_report.rs`
-- `crates/lx/src/stdlib/agent_errors.rs`
 - `crates/lx/src/stdlib/agent_handoff.rs`
 - `crates/lx/src/stdlib/agent_adapter.rs`
 - `crates/lx/src/stdlib/agent_reconcile.rs`, `agent_reconcile_strat.rs`, `agent_reconcile_score.rs`
@@ -65,10 +64,12 @@ Hoist pure-logic and Store-replaceable Rust stdlib modules into lx packages (`pk
 - `crates/lx/src/stdlib/agent_capability.rs`
 - `crates/lx/src/stdlib/agent_dialogue_persist.rs`
 
+**Kept as internal Rust helper (not deleted):**
+- `crates/lx/src/stdlib/agent_errors.rs` — still called by 6 non-hoisted Rust modules (agent_ipc.rs, agent_route.rs, agent.rs, introspect.rs, mcp.rs, mcp_typed.rs); only the lx-visible exports via `tagged_ctors()` are removed
+
 **Modified Rust files:**
 - `crates/lx/src/stdlib/mod.rs` — remove module declarations and registrations for hoisted modules
-- `crates/lx/src/stdlib/agent.rs` — remove build() entries for hoisted agent extensions
-- `crates/lx/src/stdlib/deadline.rs` — inline timeout tagged value construction (2 call sites)
+- `crates/lx/src/stdlib/agent.rs` — remove build() entries for hoisted agent extensions, remove `tagged_ctors()` loop
 
 **Modified lx files:** all consumer .lx files that import hoisted modules (tests, flows, brain, pkg)
 
@@ -208,7 +209,7 @@ Verify: `just diagnose` passes. `just test` passes.
 **Subject:** Replace Rust agent error constructors with lx type definitions
 **ActiveForm:** Hoisting agent errors to lx
 
-Create `pkg/core/agent_errors.lx` defining the AgentErr union type and constructor functions:
+Create `pkg/core/agent_errors.lx` defining the AgentErr union type. Field structures must match the constructors used in `tests/73_agent_errors.lx`:
 
 ```
 type AgentErr
@@ -216,20 +217,20 @@ type AgentErr
   | RateLimited {retry_after_ms: Int limit: Str}
   | BudgetExhausted {used: Float limit: Float resource: Str}
   | ContextOverflow {size: Int capacity: Int content: Str}
-  | Incompetent Str
+  | Incompetent {agent: Str task: Str score: Float threshold: Float}
   | Upstream {service: Str code: Int message: Str}
-  | PermissionDenied Str
-  | TraitViolation Str
+  | PermissionDenied {action: Str resource: Str}
+  | TraitViolation {expected: Str got: Str message: Str}
   | Unavailable {agent: Str reason: Str}
-  | Cancelled Str
+  | Cancelled {reason: Str}
   | Internal {message: Str}
 ```
 
 Export the type and all constructors via `+`.
 
-In `crates/lx/src/stdlib/deadline.rs`, inline the timeout construction: replace any call to `super::agent_errors::timeout(elapsed, deadline)` with the literal `Value::Tagged { tag: Arc::from("Timeout"), values: Arc::new(vec![record! { "elapsed_ms" => Value::Int(BigInt::from(elapsed)), "deadline_ms" => Value::Int(BigInt::from(deadline)) }]) }`.
+In `crates/lx/src/stdlib/agent.rs` `build()`, remove the `tagged_ctors()` insertion loop (line ~181) that exposes constructors to lx. Do NOT remove `mod agent_errors;` from `mod.rs` and do NOT delete `agent_errors.rs` — 6 non-hoisted Rust modules still call its builder functions internally: `agent_ipc.rs` (`unavailable`), `agent_route.rs` (`unavailable` x2), `agent.rs` (`unavailable`), `introspect.rs` (`unavailable`), `mcp.rs` (`upstream`), `mcp_typed.rs` (`upstream`), and `budget.rs` (`budget_exhausted` — hoisted in Task 7, but inline the call there before deleting budget.rs).
 
-In `crates/lx/src/stdlib/agent.rs` `build()`, remove all entries from `agent_errors::tagged_ctors()` insertion loop. Remove `mod agent_errors;` from `mod.rs`. Delete `crates/lx/src/stdlib/agent_errors.rs`. Update all `use std/agent {Timeout RateLimited ...}` imports to `use pkg/core/agent_errors {Timeout RateLimited ...}`.
+Update `tests/73_agent_errors.lx` import from `use std/agent {Timeout RateLimited BudgetExhausted ContextOverflow Incompetent Upstream PermissionDenied TraitViolation Unavailable Cancelled Internal}` to `use pkg/core/agent_errors {Timeout RateLimited BudgetExhausted ContextOverflow Incompetent Upstream PermissionDenied TraitViolation Unavailable Cancelled Internal}`. Update any other .lx files that selectively import these error constructors from `std/agent`.
 
 Verify: `just diagnose` passes. `just test` passes.
 

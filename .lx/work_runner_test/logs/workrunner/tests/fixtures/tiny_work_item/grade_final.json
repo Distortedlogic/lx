@@ -1,0 +1,14 @@
+{
+  "score": 100,
+  "passed": true,
+  "categories": [
+    {
+      "name": "file_exists",
+      "score": 100,
+      "passed": true,
+      "feedback": "Confirmed: tests/fixtures/tiny_test.txt is present in the working tree (visible as untracked '??' in git status)."
+    }
+  ],
+  "feedback": "All categories passed",
+  "failed": []
+}

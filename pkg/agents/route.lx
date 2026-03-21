@@ -1,0 +1,65 @@
+-- Capability-based agent routing — register, route, route_multi.
+-- Hoisted from agent_route.rs + agent_route_table.rs.
+
+route_table = Store ()
+
++register = (agent opts) {
+  name = agent.name ?? "unknown"
+  entry = {agent: agent  traits: opts.traits ?? []  domains: opts.domains ?? []  protocols: opts.protocols ?? []  max_concurrent: opts.max_concurrent ?? -1  load: 0}
+  route_table.set name entry
+  ok_val = Ok ()
+  ok_val
+}
+
++unregister = (agent) {
+  name = agent.name ?? "unknown"
+  route_table.remove name
+  ok_val = Ok ()
+  ok_val
+}
+
++registered = (filter_opts) {
+  all_entries = route_table.values ()
+  has_filter = filter_opts != () && filter_opts != None
+  (has_filter == false) ? all_entries : {
+    trait_filter = filter_opts.trait ?? None
+    domain_filter = filter_opts.domain ?? None
+    all_entries | filter (entry) {
+      trait_ok = trait_filter == None ? true : (entry.traits | contains? trait_filter)
+      domain_ok = domain_filter == None ? true : (entry.domains | contains? domain_filter)
+      trait_ok && domain_ok
+    }
+  }
+}
+
+find_candidates = (filter_opts) {
+  reg = registered
+  entries = reg filter_opts
+  entries | map (.agent)
+}
+
++route = (msg opts) {
+  fc = find_candidates
+  candidates = fc opts
+  has_fallback = opts.fallback != None
+  is_empty = (candidates | len) == 0
+  is_empty && has_fallback ? (opts.fallback ~>? msg) : (is_empty ? Err "no matching agent" : {
+    strategy = opts.strategy ?? "first"
+    selected = strategy ? {
+      "first" -> candidates.0
+      "random" -> candidates.0
+      _ -> candidates.0
+    }
+    result = selected ~>? msg
+    ok_val = Ok result
+    ok_val
+  })
+}
+
++route_multi = (msg opts) {
+  fc = find_candidates
+  candidates = fc opts
+  results = candidates | map (agent) { agent ~>? msg }
+  ok_val = Ok results
+  ok_val
+}

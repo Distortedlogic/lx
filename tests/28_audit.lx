@@ -1,7 +1,7 @@
 -- 28_audit.lx
 -- Tests: std/audit module (structural quality checks)
 
-use std/audit
+use pkg/core/audit
 use std/fs
 
 -- === Built-in checks ===

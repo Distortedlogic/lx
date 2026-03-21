@@ -1,0 +1,35 @@
+use workrunner/lib/persistence {RunStatus}
+
+runner_dir = "/tmp/lx_test_persistence"
+$rm -rf {runner_dir}
+
+st = RunStatus {runner_dir: runner_dir}
+st.load ()
+
+assert (st.results | len == 0) "starts with no results"
+assert (st.completed_count () == 0) "starts with 0 completed"
+is_foo = st.is_completed "foo.md"
+assert (is_foo == false) "foo not completed initially"
+
+st.record_result {status: "pass"  score: 95  path: "foo.md"  feedback: "ok"}
+assert (st.results | len == 1) "1 result after recording pass"
+assert (st.completed_count () == 1) "1 completed after pass"
+foo_done = st.is_completed "foo.md"
+assert (foo_done == true) "foo completed after pass"
+
+st.record_result {status: "fail"  score: 40  path: "bar.md"  feedback: "bad"}
+assert (st.results | len == 2) "2 results total"
+assert (st.completed_count () == 1) "still 1 completed — fail doesnt add"
+bar_done = st.is_completed "bar.md"
+assert (bar_done == false) "bar not completed after fail"
+
+st2 = RunStatus {runner_dir: runner_dir}
+st2.load ()
+assert (st2.results | len == 2) "reloaded 2 results from disk"
+assert (st2.completed_count () == 1) "reloaded 1 completed"
+foo_reloaded = st2.is_completed "foo.md"
+assert (foo_reloaded == true) "foo still completed after reload"
+
+$rm -rf {runner_dir}
+
+log.info "persistence: all passed"

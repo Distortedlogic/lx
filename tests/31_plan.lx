@@ -1,7 +1,7 @@
 -- 31_plan.lx
 -- Tests: std/plan module (dynamic plan execution with revision)
 
-use std/plan
+use pkg/core/plan
 
 -- helpers
 id_exec = (step ctx) step.id

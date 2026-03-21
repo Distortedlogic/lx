@@ -41,6 +41,21 @@ pub fn StatusBadge(status: String) -> Element {
 }
 
 #[component]
+pub fn StatsCard(title: String, value: String, #[props(default)] icon: Option<String>) -> Element {
+    rsx! {
+        div { class: "bg-gray-800 rounded-lg p-4",
+            div { class: "flex items-center justify-between",
+                span { class: "text-gray-400 text-sm", "{title}" }
+                if let Some(ref icon_str) = icon {
+                    span { class: "text-lg", "{icon_str}" }
+                }
+            }
+            div { class: "text-2xl font-bold mt-2", "{value}" }
+        }
+    }
+}
+
+#[component]
 pub fn Skeleton(
     #[props(default = "w-full".to_string())] width: String,
     #[props(default = "h-4".to_string())] height: String,

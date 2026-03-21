@@ -1,0 +1,31 @@
+-- Trait format adaptation — field mapping between source and target Traits.
+-- Replaces agent_adapter.rs.
+
+apply_mapping_fn = (msg mapping) {
+  mapped = Store ()
+  msg | entries | each (e) {
+    k = e.0
+    v = e.1
+    new_key = mapping ? { Some m -> (m | entries | find (me) { me.0 == k }) ? { Some pair -> pair.1; _ -> k }; _ -> k }
+    new_key = (mapping | entries | find (me) { me.0 == k }) ? { Some pair -> pair.1; _ -> k }
+    mapped.set new_key v
+  }
+  mapped.to_record ()
+}
+
+adapter_fn = (source_trait target_trait mapping) {
+  am = apply_mapping_fn
+  (msg) {
+    transformed = am msg mapping
+    transformed
+  }
+}
++adapter = adapter_fn
+
+coerce_fn = (msg target_trait mapping) {
+  am = apply_mapping_fn
+  transformed = am msg mapping
+  ok_val = Ok transformed
+  ok_val
+}
++coerce = coerce_fn

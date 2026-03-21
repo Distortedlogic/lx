@@ -1,0 +1,104 @@
+-- Agentic Work Runner -- entrypoint. Composition only.
+--
+-- Usage: lx run workrunner
+-- Reset: rm -rf .lx/work_runner/
+
+use std/time
+use std/cron
+use workrunner/lib/log
+use workrunner/lib/context
+use workrunner/lib/persistence {RunStatus}
+use workrunner/lib/grader {Grader}
+use workrunner/lib/orchestrator
+
+target_grade = 93
+max_fix_rounds = 3
+runner_dir = ".lx/work_runner"
+
+work_item_paths = [
+  -- "work_items/STD_DIFF.md"
+  -- "work_items/STD_WS.md"
+  -- "work_items/PANE_BACKEND.md"
+  -- "work_items/EMBED_BACKEND.md"
+  -- "work_items/STD_SANDBOX.md"
+  -- "work_items/PKG_SEARCH.md"
+  -- "work_items/PKG_NOTIFY.md"
+  -- "work_items/PKG_TEMPLATE.md"
+  -- "work_items/PKG_CDP.md"
+  "work_items/PKG_VECTORS.md"
+  "work_items/PKG_CANVAS.md"
+  "work_items/AI_BACKEND_LOCAL_LLM.md"
+  "work_items/AI_BACKEND_MEDIA.md"
+  "work_items/TOOLBELT_BACKENDS.md"
+  "work_items/AGENTIC_CROSS_CUTTING.md"
+]
+
+grader = Grader {
+  threshold: target_grade
+  rubric: [
+    {name: "files_created"  description: "All files in Files Affected exist"  weight: 20}
+    {name: "compilation"  description: "just diagnose 0 errors 0 warnings"  weight: 25}
+    {name: "tests_pass"  description: "just test passes all tests"  weight: 25}
+    {name: "api_correct"  description: "Functions registered in mod.rs, API matches spec"  weight: 15}
+    {name: "completeness"  description: "All tasks implemented"  weight: 15}
+  ]
+}
+
+bootstrap_ctx = context.load_bootstrap ()
+
+status = RunStatus {runner_dir: runner_dir}
+status.load ()
+
+total = work_item_paths | len
+log.log "Agentic Work Runner — {total} work items ({status.completed_count ()} already completed)"
+log.log "Target: work item >= {target_grade}/100 | max fix rounds: {max_fix_rounds}"
+status.completed_count () > 0 ? log.log "Skipping: {status.completed | join ", "}"
+
+start = time.now ()
+start_ms = start.ms
+
+heartbeat = cron.every 60000 () {
+  t = time.now ()
+  ts = t | time.format "%H:%M:%S"
+  mins = ((t.ms - start_ms) // 1000) // 60
+  emit "[{ts}] heartbeat — {mins}m elapsed"
+}
+
+run_one = (idx path) {
+  result = orchestrator.run_work_item path idx total grader bootstrap_ctx max_fix_rounds runner_dir
+  icon = result.status == "pass" ? "PASS" : "FAIL"
+  log.log "  >>> {icon} {path} — {result.score}/100"
+  status.record_result result
+  log.log "  status saved ({status.completed_count ()} completed)"
+}
+
+work_item_paths | enumerate | each (idx_path) {
+  (idx path) = idx_path
+  skip = status.is_completed path
+  skip ? log.log "=== [{idx + 1}/{total}] {path} === SKIP"
+  not skip ? run_one idx path
+}
+
+elapsed = time.now().ms - start.ms
+
+log.log ""
+log.log "=== SUMMARY ==="
+pass_list = status.results | filter (r) r.status == "pass"
+fail_list = status.results | filter (r) r.status != "pass"
+
+log.log "Passed: {pass_list | len}/{total}"
+log.log "Time: {elapsed // 1000}s"
+log.log ""
+
+status.results | each (r) {
+  icon = r.status == "pass" ? "OK" : "FAIL"
+  log.log "  [{icon}] {r.path} — {r.score}/100"
+}
+
+has_failures = fail_list | len > 0
+has_failures ? log.log ""
+has_failures ? log.log "Failed items:"
+fail_list | each (r) {
+  log.log "  {r.path}: {r.status} at {r.score}"
+  log.log "    {r.feedback}"
+}
