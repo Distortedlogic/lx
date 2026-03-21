@@ -47,7 +47,7 @@ pub(super) fn bi_headings(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) ->
 }
 
 pub(super) fn bi_links(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let input = args[0].as_str().ok_or_else(|| LxError::type_err("md.links expects Str (markdown source)", span))?;
+  let input = args[0].require_str("md.links", span)?;
   let parser = Parser::new(input);
   let mut links = Vec::new();
   let mut in_link = false;
@@ -72,7 +72,7 @@ pub(super) fn bi_links(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Re
 }
 
 pub(super) fn bi_to_text(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let input = args[0].as_str().ok_or_else(|| LxError::type_err("md.to_text expects Str (markdown source)", span))?;
+  let input = args[0].require_str("md.to_text", span)?;
   let parser = Parser::new(input);
   let mut out = String::new();
   for event in parser {

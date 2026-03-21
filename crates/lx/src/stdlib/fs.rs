@@ -23,7 +23,7 @@ pub fn build() -> IndexMap<String, LxVal> {
 }
 
 fn bi_read(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let path = args[0].as_str().ok_or_else(|| LxError::type_err("fs.read expects Str path", span))?;
+  let path = args[0].require_str("fs.read", span)?;
   match std::fs::read_to_string(path) {
     Ok(contents) => Ok(LxVal::Ok(Box::new(LxVal::str(contents)))),
     Err(e) => Ok(LxVal::Err(Box::new(LxVal::str(e.to_string())))),
@@ -31,7 +31,7 @@ fn bi_read(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, 
 }
 
 fn bi_write(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let path = args[0].as_str().ok_or_else(|| LxError::type_err("fs.write expects Str path", span))?;
+  let path = args[0].require_str("fs.write", span)?;
   let content = format!("{}", args[1]);
   match std::fs::write(path, content) {
     Ok(()) => Ok(LxVal::Ok(Box::new(LxVal::Unit))),
@@ -41,7 +41,7 @@ fn bi_write(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal,
 
 fn bi_append(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   use std::io::Write;
-  let path = args[0].as_str().ok_or_else(|| LxError::type_err("fs.append expects Str path", span))?;
+  let path = args[0].require_str("fs.append", span)?;
   let content = format!("{}", args[1]);
   let result = std::fs::OpenOptions::new().create(true).append(true).open(path).and_then(|mut f| f.write_all(content.as_bytes()));
   match result {
@@ -51,12 +51,12 @@ fn bi_append(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal
 }
 
 fn bi_exists(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let path = args[0].as_str().ok_or_else(|| LxError::type_err("fs.exists expects Str path", span))?;
+  let path = args[0].require_str("fs.exists", span)?;
   Ok(LxVal::Bool(std::path::Path::new(path).exists()))
 }
 
 fn bi_remove(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let path_str = args[0].as_str().ok_or_else(|| LxError::type_err("fs.remove expects Str path", span))?;
+  let path_str = args[0].require_str("fs.remove", span)?;
   let path = std::path::Path::new(path_str);
   let result = if path.is_dir() { std::fs::remove_dir_all(path) } else { std::fs::remove_file(path) };
   match result {
@@ -66,7 +66,7 @@ fn bi_remove(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal
 }
 
 fn bi_mkdir(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let path = args[0].as_str().ok_or_else(|| LxError::type_err("fs.mkdir expects Str path", span))?;
+  let path = args[0].require_str("fs.mkdir", span)?;
   match std::fs::create_dir_all(path) {
     Ok(()) => Ok(LxVal::Ok(Box::new(LxVal::Unit))),
     Err(e) => Ok(LxVal::Err(Box::new(LxVal::str(e.to_string())))),
@@ -74,7 +74,7 @@ fn bi_mkdir(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal,
 }
 
 fn bi_ls(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let path = args[0].as_str().ok_or_else(|| LxError::type_err("fs.ls expects Str path", span))?;
+  let path = args[0].require_str("fs.ls", span)?;
   match std::fs::read_dir(path) {
     Ok(entries) => {
       let mut items = Vec::new();
@@ -98,7 +98,7 @@ fn bi_ls(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, Lx
 }
 
 fn bi_stat(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let path = args[0].as_str().ok_or_else(|| LxError::type_err("fs.stat expects Str path", span))?;
+  let path = args[0].require_str("fs.stat", span)?;
   match std::fs::metadata(path) {
     Ok(meta) => Ok(LxVal::Ok(Box::new(record! {
         "size" => LxVal::int(meta.len()),

@@ -24,13 +24,13 @@ pub fn build() -> IndexMap<String, LxVal> {
 }
 
 fn bi_extract(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let src = args[0].as_str().ok_or_else(|| LxError::type_err("diag.extract expects Str", span))?;
+  let src = args[0].require_str("diag.extract", span)?;
   let graph = extract_graph(src, span)?;
   Ok(graph_to_value(&graph))
 }
 
 fn bi_extract_file(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let path = args[0].as_str().ok_or_else(|| LxError::type_err("diag.extract_file expects Str", span))?;
+  let path = args[0].require_str("diag.extract_file", span)?;
   let src = std::fs::read_to_string(path).map_err(|e| LxError::runtime(format!("diag.extract_file: {e}"), span))?;
   let graph = extract_graph(&src, span)?;
   Ok(graph_to_value(&graph))
@@ -38,12 +38,12 @@ fn bi_extract_file(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result
 
 fn bi_to_mermaid(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let graph = value_to_graph(&args[0], span)?;
-  Ok(LxVal::str(to_mermaid(&graph).as_str())))
+  Ok(LxVal::str(to_mermaid(&graph).as_str()))
 }
 
 fn bi_to_graph_chart(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let graph = value_to_graph(&args[0], span)?;
-  Ok(LxVal::str(graph_to_echart_json(&graph).as_str())))
+  Ok(LxVal::str(graph_to_echart_json(&graph).as_str()))
 }
 
 pub fn extract_mermaid(program: &Program) -> String {
@@ -208,9 +208,9 @@ fn node_to_value(node: &DiagNode) -> LxVal {
     None => LxVal::None,
   };
   record! {
-      "id" => LxVal::str(node.id.as_str())),
-      "label" => LxVal::str(node.label.as_str())),
-      "kind" => LxVal::str(node.kind.as_str())),
+      "id" => LxVal::str(node.id.as_str()),
+      "label" => LxVal::str(node.label.as_str()),
+      "kind" => LxVal::str(node.kind.as_str()),
       "children" => LxVal::list(children),
       "source_offset" => offset_val,
   }
@@ -218,11 +218,11 @@ fn node_to_value(node: &DiagNode) -> LxVal {
 
 fn edge_to_value(edge: &DiagEdge) -> LxVal {
   record! {
-      "from" => LxVal::str(edge.from.as_str())),
-      "to" => LxVal::str(edge.to.as_str())),
-      "label" => LxVal::str(edge.label.as_str())),
-      "style" => LxVal::str(edge.style.as_str())),
-      "edge_type" => LxVal::str(edge.edge_type.as_str())),
+      "from" => LxVal::str(edge.from.as_str()),
+      "to" => LxVal::str(edge.to.as_str()),
+      "label" => LxVal::str(edge.label.as_str()),
+      "style" => LxVal::str(edge.style.as_str()),
+      "edge_type" => LxVal::str(edge.edge_type.as_str()),
   }
 }
 

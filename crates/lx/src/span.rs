@@ -1,25 +1,19 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub struct Span {
-  pub offset: u32,
-  pub len: u16,
+pub type Span = miette::SourceSpan;
+
+pub trait SpanExt {
+  fn new(offset: usize, len: usize) -> Span;
+  fn from_range(start: usize, end: usize) -> Span;
+  fn end(&self) -> usize;
 }
 
-impl Span {
-  pub fn new(offset: u32, len: u16) -> Self {
-    Self { offset, len }
+impl SpanExt for Span {
+  fn new(offset: usize, len: usize) -> Span {
+    (offset, len).into()
   }
-
-  pub fn from_range(start: u32, end: u32) -> Self {
-    Self { offset: start, len: (end - start) as u16 }
+  fn from_range(start: usize, end: usize) -> Span {
+    (start, end - start).into()
   }
-
-  pub fn end(&self) -> u32 {
-    self.offset + self.len as u32
-  }
-}
-
-impl From<Span> for miette::SourceSpan {
-  fn from(s: Span) -> Self {
-    (s.offset as usize, s.len as usize).into()
+  fn end(&self) -> usize {
+    self.offset() + self.len()
   }
 }

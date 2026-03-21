@@ -22,7 +22,7 @@ fn bi_collect(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxV
 }
 
 fn bi_step(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let step = args[0].as_int().ok_or_else(|| LxError::type_err(format!("step: first arg must be Int, got {}", args[0].type_name()), span))?;
+  let step = args[0].require_int("step", span)?;
   let step = step.to_i64().ok_or_else(|| LxError::runtime("step: value too large", span))?;
   if step <= 0 {
     return Err(LxError::runtime("step: must be positive", span));

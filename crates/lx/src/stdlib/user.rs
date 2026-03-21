@@ -24,12 +24,12 @@ pub fn build() -> IndexMap<String, LxVal> {
 }
 
 fn bi_confirm(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let msg = args[0].as_str().ok_or_else(|| LxError::type_err("user.confirm: expected Str message", span))?;
+  let msg = args[0].require_str("user.confirm", span)?;
   ctx.user.confirm(msg).map(LxVal::Bool).map_err(|e| LxError::runtime(format!("user.confirm: {e}"), span))
 }
 
 fn bi_choose(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let msg = args[0].as_str().ok_or_else(|| LxError::type_err("user.choose: expected Str message", span))?;
+  let msg = args[0].require_str("user.choose", span)?;
   let LxVal::List(items) = &args[1] else {
     return Err(LxError::type_err("user.choose: second arg must be List", span));
   };
@@ -58,12 +58,12 @@ fn option_label(v: &LxVal) -> String {
 }
 
 fn bi_ask(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let msg = args[0].as_str().ok_or_else(|| LxError::type_err("user.ask: expected Str message", span))?;
+  let msg = args[0].require_str("user.ask", span)?;
   ctx.user.ask(msg, None).map(LxVal::str).map_err(|e| LxError::runtime(format!("user.ask: {e}"), span))
 }
 
 fn bi_ask_with(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let msg = args[0].as_str().ok_or_else(|| LxError::type_err("user.ask_with: expected Str message", span))?;
+  let msg = args[0].require_str("user.ask_with", span)?;
   let LxVal::Record(opts) = &args[1] else {
     return Err(LxError::type_err("user.ask_with: second arg must be Record", span));
   };
@@ -85,7 +85,7 @@ fn bi_ask_with(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVa
 fn bi_progress(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let current = args[0].as_int().and_then(|n| usize::try_from(n).ok()).ok_or_else(|| LxError::type_err("user.progress: expected Int current", span))?;
   let total = args[1].as_int().and_then(|n| usize::try_from(n).ok()).ok_or_else(|| LxError::type_err("user.progress: expected Int total", span))?;
-  let msg = args[2].as_str().ok_or_else(|| LxError::type_err("user.progress: expected Str message", span))?;
+  let msg = args[2].require_str("user.progress", span)?;
   ctx.user.progress(current, total, msg);
   Ok(LxVal::Unit)
 }
@@ -101,14 +101,14 @@ fn bi_progress_pct(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<
       return Err(LxError::type_err("user.progress_pct: expected Float pct", span));
     },
   };
-  let msg = args[1].as_str().ok_or_else(|| LxError::type_err("user.progress_pct: expected Str message", span))?;
+  let msg = args[1].require_str("user.progress_pct", span)?;
   ctx.user.progress_pct(pct, msg);
   Ok(LxVal::Unit)
 }
 
 fn bi_status(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let level = args[0].as_str().ok_or_else(|| LxError::type_err("user.status: expected Str level", span))?;
-  let msg = args[1].as_str().ok_or_else(|| LxError::type_err("user.status: expected Str message", span))?;
+  let level = args[0].require_str("user.status", span)?;
+  let msg = args[1].require_str("user.status", span)?;
   ctx.user.status(level, msg);
   Ok(LxVal::Unit)
 }

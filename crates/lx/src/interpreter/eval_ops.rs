@@ -110,7 +110,7 @@ impl Interpreter {
       (BinOp::Concat, LxVal::Str(a), LxVal::Str(b)) => {
         let mut s = String::from(a.as_ref());
         s.push_str(b);
-        Ok(LxVal::str(s)))
+        Ok(LxVal::str(s))
       },
       (BinOp::Range, LxVal::Int(a), LxVal::Int(b)) => {
         let s = a.to_i64().ok_or_else(|| LxError::runtime("range start too large", span))?;
@@ -156,7 +156,7 @@ impl Interpreter {
     if buf.starts_with('\n') {
       buf = dedent_string(&buf);
     }
-    Ok(LxVal::str(buf)))
+    Ok(LxVal::str(buf))
   }
 
   pub(super) async fn eval_short_circuit(&mut self, left: &SExpr, right: &SExpr, is_and: bool, span: Span) -> Result<LxVal, LxError> {

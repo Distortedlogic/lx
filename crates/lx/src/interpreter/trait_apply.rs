@@ -9,26 +9,21 @@ use super::Interpreter;
 impl Interpreter {
   pub(super) async fn apply_trait_fields(&mut self, name: &str, fields: &Arc<Vec<FieldDef>>, arg: &LxVal, _span: Span) -> Result<LxVal, LxError> {
     let LxVal::Record(rec) = arg else {
-      return Ok(LxVal::Err(Box::new(LxVal::str(format!("Trait {name}: expected Record, got {}", arg.type_name()))))));
+      return Ok(LxVal::Err(Box::new(LxVal::str(format!("Trait {name}: expected Record, got {}", arg.type_name())))));
     };
     let mut result = rec.as_ref().clone();
     for field in fields.iter() {
       match rec.get(&field.name) {
         Some(val) => {
           if field.type_name != "Any" && val.type_name() != field.type_name {
-            return Ok(LxVal::Err(Box::new(LxVal::str(format!(
-              "Trait {name}: field '{}' expected {}, got {}",
-              field.name,
-              field.type_name,
-              val.type_name()
-            ))))));
+            return Ok(LxVal::Err(Box::new(LxVal::str(format!("Trait {name}: field '{}' expected {}, got {}", field.name, field.type_name, val.type_name())))));
           }
         },
         None => {
           if let Some(ref default) = field.default {
             result.insert(field.name.clone(), default.clone());
           } else {
-            return Ok(LxVal::Err(Box::new(LxVal::str(format!("Trait {name}: missing required field '{}'", field.name))))));
+            return Ok(LxVal::Err(Box::new(LxVal::str(format!("Trait {name}: missing required field '{}'", field.name)))));
           }
         },
       }
@@ -45,7 +40,7 @@ impl Interpreter {
         match ok.as_bool() {
           Some(true) => {},
           _ => {
-            return Ok(LxVal::Err(Box::new(LxVal::str(format!("Trait {name}: field '{}' constraint violated", field.name))))));
+            return Ok(LxVal::Err(Box::new(LxVal::str(format!("Trait {name}: field '{}' constraint violated", field.name)))));
           },
         }
       }
@@ -55,7 +50,7 @@ impl Interpreter {
 
   pub(super) async fn apply_trait_union(&mut self, name: &str, variants: &Arc<Vec<Arc<str>>>, arg: &LxVal, span: Span) -> Result<LxVal, LxError> {
     let LxVal::Record(rec) = arg else {
-      return Ok(LxVal::Err(Box::new(LxVal::str(format!("Trait union {name}: expected Record, got {}", arg.type_name()))))));
+      return Ok(LxVal::Err(Box::new(LxVal::str(format!("Trait union {name}: expected Record, got {}", arg.type_name())))));
     };
     for variant_name in variants.iter() {
       let Some(proto) = self.env.get(variant_name.as_ref()) else {
@@ -66,7 +61,7 @@ impl Interpreter {
       };
       if self.try_match_variant(proto_fields, rec, span).is_ok() {
         let mut result = rec.as_ref().clone();
-        result.insert("_variant".to_string(), LxVal::str(variant_name.as_ref())));
+        result.insert("_variant".to_string(), LxVal::str(variant_name.as_ref()));
         for field in proto_fields.iter() {
           if !rec.contains_key(&field.name)
             && let Some(ref default) = field.default
@@ -78,7 +73,7 @@ impl Interpreter {
       }
     }
     let variant_names: Vec<&str> = variants.iter().map(|v| v.as_ref()).collect();
-    Ok(LxVal::Err(Box::new(LxVal::str(format!("Trait union {name}: no variant matched. Tried: {}", variant_names.join(", ")))))))
+    Ok(LxVal::Err(Box::new(LxVal::str(format!("Trait union {name}: no variant matched. Tried: {}", variant_names.join(", "))))))
   }
 
   fn try_match_variant(&mut self, fields: &Arc<Vec<FieldDef>>, rec: &Arc<indexmap::IndexMap<String, LxVal>>, span: Span) -> Result<(), LxError> {

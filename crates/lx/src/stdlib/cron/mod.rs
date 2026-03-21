@@ -31,7 +31,7 @@ pub fn build() -> IndexMap<String, LxVal> {
 }
 
 fn bi_schedule(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let expr = args[0].as_str().ok_or_else(|| LxError::type_err("cron.schedule: first arg must be Str", span))?;
+  let expr = args[0].require_str("cron.schedule", span)?;
   let schedule = parse_schedule(expr, span)?;
   require_fn(&args[1], "cron.schedule", span)?;
   let callback = args[1].clone();
@@ -90,7 +90,7 @@ fn bi_after(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, 
 }
 
 fn bi_at(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let time_str = args[0].as_str().ok_or_else(|| LxError::type_err("cron.at: first arg must be ISO time Str", span))?;
+  let time_str = args[0].require_str("cron.at", span)?;
   let target = DateTime::parse_from_rfc3339(time_str)
     .map(|dt| dt.with_timezone(&Utc))
     .map_err(|e| LxError::runtime(format!("cron.at: invalid time '{time_str}': {e}"), span))?;
@@ -104,7 +104,7 @@ fn bi_at(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxE
 }
 
 fn bi_cancel(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let id = args[0].as_int().ok_or_else(|| LxError::type_err("cron.cancel expects Int handle", span))?;
+  let id = args[0].require_int("cron.cancel", span)?;
   let id: u64 = id.try_into().map_err(|_| LxError::type_err("cron.cancel: invalid handle", span))?;
   match JOBS.remove(&id) {
     Some((_, job)) => {
@@ -116,7 +116,7 @@ fn bi_cancel(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal
 }
 
 fn bi_next(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let expr = args[0].as_str().ok_or_else(|| LxError::type_err("cron.next: expected Str expression", span))?;
+  let expr = args[0].require_str("cron.next", span)?;
   let schedule = match parse_schedule(expr, span) {
     Ok(s) => s,
     Err(e) => {
@@ -142,7 +142,7 @@ fn bi_next_n(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal
       return Err(LxError::type_err("cron.next_n: first arg must be Int", span));
     },
   };
-  let expr = args[1].as_str().ok_or_else(|| LxError::type_err("cron.next_n: second arg must be Str", span))?;
+  let expr = args[1].require_str("cron.next_n", span)?;
   let schedule = match parse_schedule(expr, span) {
     Ok(s) => s,
     Err(e) => {

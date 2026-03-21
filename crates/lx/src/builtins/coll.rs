@@ -28,18 +28,17 @@ fn maybe(v: Option<&LxVal>) -> LxVal {
 }
 
 fn bi_first(args: &[LxVal], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  Ok(maybe(args[0].as_list().ok_or_else(|| LxError::type_err(format!("first expects List, got {}", args[0].type_name()), sp))?.first()))
+  Ok(maybe(args[0].require_list("first", sp)?.first()))
 }
 
 fn bi_last(args: &[LxVal], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  Ok(maybe(args[0].as_list().ok_or_else(|| LxError::type_err(format!("last expects List, got {}", args[0].type_name()), sp))?.last()))
+  Ok(maybe(args[0].require_list("last", sp)?.last()))
 }
 
 fn bi_contains(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   match &args[1] {
     LxVal::Str(s) => {
-      let needle =
-        args[0].as_str().ok_or_else(|| LxError::type_err(format!("contains?: needle must be Str for Str haystack, got {}", args[0].type_name()), span))?;
+      let needle = args[0].require_str("contains?", span)?;
       Ok(LxVal::Bool(s.contains(needle)))
     },
     LxVal::List(l) => Ok(LxVal::Bool(l.iter().any(|v| v == &args[0]))),
@@ -50,7 +49,7 @@ fn bi_contains(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxV
 fn bi_get(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   match &args[1] {
     LxVal::List(l) => {
-      let n = args[0].as_int().ok_or_else(|| LxError::type_err(format!("get: index must be Int for List, got {}", args[0].type_name()), span))?;
+      let n = args[0].require_int("get", span)?;
       let idx = n.to_i64().ok_or_else(|| LxError::runtime("get: index out of range", span))?;
       let idx = if idx < 0 { l.len() as i64 + idx } else { idx };
       if idx < 0 {
@@ -59,7 +58,7 @@ fn bi_get(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, L
       Ok(maybe(l.get(idx as usize)))
     },
     LxVal::Record(r) => {
-      let key = args[0].as_str().ok_or_else(|| LxError::type_err(format!("get: key must be Str for Record, got {}", args[0].type_name()), span))?;
+      let key = args[0].require_str("get", span)?;
       Ok(maybe(r.get(key)))
     },
     LxVal::Map(m) => Ok(maybe(m.get(&ValueKey(args[0].clone())))),
@@ -108,7 +107,7 @@ fn bi_to_record(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Lx
   };
   let mut r = IndexMap::new();
   for (k, v) in m.iter() {
-    let key = k.0.as_str().ok_or_else(|| LxError::type_err(format!("to_record: map key must be Str, got {}", k.0.type_name()), span))?;
+    let key = k.0.require_str("to_record", span)?;
     r.insert(key.to_string(), v.clone());
   }
   Ok(LxVal::record(r))

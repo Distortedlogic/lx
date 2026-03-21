@@ -66,17 +66,16 @@ fn bi_byte_len(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxV
 }
 
 fn bi_split(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let sep = args[0].as_str().ok_or_else(|| LxError::type_err(format!("split: first arg must be Str, got {}", args[0].type_name()), span))?;
-  let s = args[1].as_str().ok_or_else(|| LxError::type_err(format!("split: second arg must be Str, got {}", args[1].type_name()), span))?;
+  let sep = args[0].require_str("split", span)?;
+  let s = args[1].require_str("split", span)?;
   let items: Vec<LxVal> = s.split(sep).map(LxVal::str).collect();
   Ok(LxVal::list(items))
 }
 
 fn bi_join(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let sep = args[0].as_str().ok_or_else(|| LxError::type_err(format!("join: first arg must be Str, got {}", args[0].type_name()), span))?;
-  let list = args[1].as_list().ok_or_else(|| LxError::type_err(format!("join: second arg must be List, got {}", args[1].type_name()), span))?;
-  let parts: Result<Vec<&str>, LxError> =
-    list.iter().map(|v| v.as_str().ok_or_else(|| LxError::type_err(format!("join: list elements must be Str, got {}", v.type_name()), span))).collect();
+  let sep = args[0].require_str("join", span)?;
+  let list = args[1].require_list("join", span)?;
+  let parts: Result<Vec<&str>, LxError> = list.iter().map(|v| v.require_str("join", span)).collect();
   Ok(LxVal::str(parts?.join(sep)))
 }
 

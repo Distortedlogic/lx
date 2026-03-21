@@ -8,6 +8,7 @@ mod hof_parallel;
 mod register;
 mod str;
 
+use std::pin::Pin;
 use std::sync::Arc;
 
 use crate::env::Env;
@@ -15,6 +16,8 @@ use crate::error::LxError;
 use crate::runtime::RuntimeCtx;
 use crate::span::Span;
 use crate::value::{AsyncBuiltinFn, BuiltinFunc, BuiltinKind, LxVal, SyncBuiltinFn};
+
+pub(crate) type BoxFut = Pin<Box<dyn std::future::Future<Output = Result<LxVal, LxError>>>>;
 
 pub fn mk(name: &'static str, arity: usize, func: SyncBuiltinFn) -> LxVal {
   LxVal::BuiltinFunc(BuiltinFunc { name, arity, kind: BuiltinKind::Sync(func), applied: Vec::new() })

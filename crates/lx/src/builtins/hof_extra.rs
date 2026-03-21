@@ -1,4 +1,3 @@
-use std::pin::Pin;
 use std::sync::Arc;
 
 use indexmap::IndexMap;
@@ -8,9 +7,8 @@ use crate::runtime::RuntimeCtx;
 use crate::span::Span;
 use crate::value::LxVal;
 
+use super::BoxFut;
 use super::hof::{call, get_list};
-
-type BoxFut = Pin<Box<dyn std::future::Future<Output = Result<LxVal, LxError>>>>;
 
 pub(super) fn bi_take_while(args: Vec<LxVal>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
   Box::pin(async move {
@@ -122,7 +120,7 @@ pub(super) fn bi_group_by(args: Vec<LxVal>, sp: Span, ctx: Arc<RuntimeCtx>) -> B
 }
 
 pub(super) fn bi_chunks(args: &[LxVal], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let n = args[0].as_int().ok_or_else(|| LxError::type_err(format!("chunks: size must be Int, got {}", args[0].type_name()), sp))?;
+  let n = args[0].require_int("chunks", sp)?;
   let items = get_list(&args[1], "chunks", sp)?;
   let n = usize::try_from(n.clone()).map_err(|_| LxError::runtime("chunks: invalid size", sp))?;
   if n == 0 {
@@ -133,7 +131,7 @@ pub(super) fn bi_chunks(args: &[LxVal], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Res
 }
 
 pub(super) fn bi_windows(args: &[LxVal], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let n = args[0].as_int().ok_or_else(|| LxError::type_err(format!("windows: size must be Int, got {}", args[0].type_name()), sp))?;
+  let n = args[0].require_int("windows", sp)?;
   let items = get_list(&args[1], "windows", sp)?;
   let n = usize::try_from(n.clone()).map_err(|_| LxError::runtime("windows: invalid size", sp))?;
   if n == 0 || items.len() < n {

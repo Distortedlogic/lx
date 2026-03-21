@@ -44,7 +44,7 @@ pub fn global_context_current() -> Result<LxVal, LxError> {
 }
 
 pub fn global_context_get(key_val: &LxVal, span: Span) -> Result<LxVal, LxError> {
-  let key = key_val.as_str().ok_or_else(|| LxError::type_err("context.get expects Str key", span))?;
+  let key = key_val.require_str("context.get", span)?;
   let fields = get_ambient_snapshot();
   match fields.get(key) {
     Some(v) => Ok(LxVal::Some(Box::new(v.clone()))),

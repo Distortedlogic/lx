@@ -49,15 +49,15 @@ fn bi_sleep(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal,
 }
 
 fn bi_format(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let fmt = args[0].as_str().ok_or_else(|| LxError::type_err("time.format expects Str format", span))?;
+  let fmt = args[0].require_str("time.format", span)?;
   let ts = record_to_datetime(&args[1], span)?;
   let formatted = ts.format(fmt).to_string();
   Ok(LxVal::str(formatted))
 }
 
 fn bi_parse(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let fmt = args[0].as_str().ok_or_else(|| LxError::type_err("time.parse expects Str format", span))?;
-  let input = args[1].as_str().ok_or_else(|| LxError::type_err("time.parse expects Str input", span))?;
+  let fmt = args[0].require_str("time.parse", span)?;
+  let input = args[1].require_str("time.parse", span)?;
   match DateTime::parse_from_str(input, fmt) {
     Ok(dt) => Ok(LxVal::Ok(Box::new(timestamp_to_record(dt.with_timezone(&Utc))))),
     Err(e) => Ok(LxVal::Err(Box::new(LxVal::str(format!("time.parse: {e}"))))),

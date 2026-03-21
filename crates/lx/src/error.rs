@@ -1,4 +1,4 @@
-use miette::{Diagnostic, SourceSpan};
+use miette::Diagnostic;
 use thiserror::Error;
 
 use crate::span::Span;
@@ -12,7 +12,7 @@ pub enum LxError {
   Parse {
     msg: String,
     #[label("{msg}")]
-    span: SourceSpan,
+    span: Span,
     #[help]
     help: Option<String>,
   },
@@ -22,7 +22,7 @@ pub enum LxError {
   Runtime {
     msg: String,
     #[label("{msg}")]
-    span: SourceSpan,
+    span: Span,
   },
 
   #[error("assertion failed: {expr}")]
@@ -31,7 +31,7 @@ pub enum LxError {
     expr: String,
     message: Option<String>,
     #[label("assertion failed")]
-    span: SourceSpan,
+    span: Span,
   },
 
   #[error("type error: {msg}")]
@@ -39,7 +39,7 @@ pub enum LxError {
   Type {
     msg: String,
     #[label("{msg}")]
-    span: SourceSpan,
+    span: Span,
   },
 
   #[error("break")]
@@ -50,7 +50,7 @@ pub enum LxError {
   Propagate {
     value: Box<crate::value::LxVal>,
     #[label("error propagated here")]
-    span: SourceSpan,
+    span: Span,
   },
 
   #[error("{inner}")]
@@ -59,19 +59,19 @@ pub enum LxError {
 
 impl LxError {
   pub fn parse(msg: impl Into<String>, span: Span, help: Option<String>) -> Self {
-    Self::Parse { msg: msg.into(), span: span.into(), help }
+    Self::Parse { msg: msg.into(), span, help }
   }
 
   pub fn runtime(msg: impl Into<String>, span: Span) -> Self {
-    Self::Runtime { msg: msg.into(), span: span.into() }
+    Self::Runtime { msg: msg.into(), span }
   }
 
   pub fn assert_fail(expr: impl Into<String>, message: Option<String>, span: Span) -> Self {
-    Self::Assert { expr: expr.into(), message, span: span.into() }
+    Self::Assert { expr: expr.into(), message, span }
   }
 
   pub fn type_err(msg: impl Into<String>, span: Span) -> Self {
-    Self::Type { msg: msg.into(), span: span.into() }
+    Self::Type { msg: msg.into(), span }
   }
 
   pub fn division_by_zero(span: Span) -> Self {
@@ -83,7 +83,7 @@ impl LxError {
   }
 
   pub fn propagate(value: crate::value::LxVal, span: Span) -> Self {
-    Self::Propagate { value: Box::new(value), span: span.into() }
+    Self::Propagate { value: Box::new(value), span }
   }
 
   pub fn with_source(self, name: String, text: std::sync::Arc<str>) -> Self {

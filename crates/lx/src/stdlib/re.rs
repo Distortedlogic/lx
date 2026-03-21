@@ -45,7 +45,7 @@ fn to_regex<'a>(pat: &'a RePattern<'a>, span: Span) -> Result<std::borrow::Cow<'
 
 fn bi_match(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let pat = get_pattern(&args[0], span)?;
-  let input = args[1].as_str().ok_or_else(|| LxError::type_err("re.match expects Str input", span))?;
+  let input = args[1].require_str("re.match", span)?;
   let re = to_regex(&pat, span)?;
   match re.find(input) {
     Some(m) => Ok(LxVal::Some(Box::new(record! {
@@ -59,7 +59,7 @@ fn bi_match(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal,
 
 fn bi_find_all(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let pat = get_pattern(&args[0], span)?;
-  let input = args[1].as_str().ok_or_else(|| LxError::type_err("re.find_all expects Str input", span))?;
+  let input = args[1].require_str("re.find_all", span)?;
   let re = to_regex(&pat, span)?;
   let matches: Vec<LxVal> = re.find_iter(input).map(|m| LxVal::str(m.as_str())).collect();
   Ok(LxVal::list(matches))
@@ -67,8 +67,8 @@ fn bi_find_all(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxV
 
 fn bi_replace(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let pat = get_pattern(&args[0], span)?;
-  let replacement = args[1].as_str().ok_or_else(|| LxError::type_err("re.replace expects Str replacement", span))?;
-  let input = args[2].as_str().ok_or_else(|| LxError::type_err("re.replace expects Str input", span))?;
+  let replacement = args[1].require_str("re.replace", span)?;
+  let input = args[2].require_str("re.replace", span)?;
   let re = to_regex(&pat, span)?;
   let result = re.replace(input, replacement);
   Ok(LxVal::str(result.as_ref()))
@@ -76,8 +76,8 @@ fn bi_replace(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVa
 
 fn bi_replace_all(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let pat = get_pattern(&args[0], span)?;
-  let replacement = args[1].as_str().ok_or_else(|| LxError::type_err("re.replace_all expects Str replacement", span))?;
-  let input = args[2].as_str().ok_or_else(|| LxError::type_err("re.replace_all expects Str input", span))?;
+  let replacement = args[1].require_str("re.replace_all", span)?;
+  let input = args[2].require_str("re.replace_all", span)?;
   let re = to_regex(&pat, span)?;
   let result = re.replace_all(input, replacement);
   Ok(LxVal::str(result.as_ref()))
@@ -85,7 +85,7 @@ fn bi_replace_all(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<
 
 fn bi_split(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let pat = get_pattern(&args[0], span)?;
-  let input = args[1].as_str().ok_or_else(|| LxError::type_err("re.split expects Str input", span))?;
+  let input = args[1].require_str("re.split", span)?;
   let re = to_regex(&pat, span)?;
   let parts: Vec<LxVal> = re.split(input).map(LxVal::str).collect();
   Ok(LxVal::list(parts))
@@ -93,7 +93,7 @@ fn bi_split(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal,
 
 fn bi_is_match(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let pat = get_pattern(&args[0], span)?;
-  let input = args[1].as_str().ok_or_else(|| LxError::type_err("re.is_match expects Str input", span))?;
+  let input = args[1].require_str("re.is_match", span)?;
   let re = to_regex(&pat, span)?;
   Ok(LxVal::Bool(re.is_match(input)))
 }

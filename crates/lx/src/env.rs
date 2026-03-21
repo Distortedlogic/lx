@@ -1,20 +1,15 @@
-use std::collections::HashMap;
+use std::collections::HashSet;
 use std::sync::Arc;
 
-use parking_lot::Mutex;
+use dashmap::DashMap;
 
 use crate::value::LxVal;
 
 #[derive(Debug, Clone, Default)]
 pub struct Env {
-  bindings: HashMap<String, Slot>,
+  bindings: DashMap<String, LxVal>,
+  mutables: HashSet<String>,
   parent: Option<Arc<Env>>,
-}
-
-#[derive(Debug, Clone)]
-enum Slot {
-  Immutable(LxVal),
-  Mutable(Arc<Mutex<LxVal>>),
 }
 
 impl Env {
@@ -23,7 +18,7 @@ impl Env {
   }
 
   pub fn with_parent(parent: Arc<Env>) -> Self {
-    Self { bindings: HashMap::new(), parent: Some(parent) }
+    Self { parent: Some(parent), ..Self::default() }
   }
 
   pub fn child(self: &Arc<Self>) -> Self {
@@ -31,24 +26,21 @@ impl Env {
   }
 
   pub fn bind(&mut self, name: String, value: LxVal) {
-    self.bindings.insert(name, Slot::Immutable(value));
+    self.bindings.insert(name, value);
   }
 
   pub fn bind_mut(&mut self, name: String, value: LxVal) {
-    self.bindings.insert(name, Slot::Mutable(Arc::new(Mutex::new(value))));
+    self.mutables.insert(name.clone());
+    self.bindings.insert(name, value);
   }
 
   pub fn reassign(&self, name: &str, value: LxVal) -> Result<(), String> {
-    if let Some(slot) = self.bindings.get(name) {
-      match slot {
-        Slot::Mutable(cell) => {
-          *cell.lock() = value;
-          return Ok(());
-        },
-        Slot::Immutable(_) => {
-          return Err(format!("cannot reassign immutable binding '{name}'"));
-        },
+    if self.bindings.contains_key(name) {
+      if self.mutables.contains(name) {
+        self.bindings.insert(name.to_string(), value);
+        return Ok(());
       }
+      return Err(format!("cannot reassign immutable binding '{name}'"));
     }
     if let Some(parent) = &self.parent {
       return parent.reassign(name, value);
@@ -57,24 +49,17 @@ impl Env {
   }
 
   pub fn get(&self, name: &str) -> Option<LxVal> {
-    if let Some(slot) = self.bindings.get(name) {
-      return Some(match slot {
-        Slot::Immutable(v) => v.clone(),
-        Slot::Mutable(cell) => cell.lock().clone(),
-      });
+    if let Some(v) = self.bindings.get(name) {
+      return Some(v.value().clone());
     }
-    if let Some(parent) = &self.parent {
-      return parent.get(name);
-    }
-    None
+    self.parent.as_ref().and_then(|p| p.get(name))
   }
 
   pub fn has_mut(&self, name: &str) -> bool {
-    match self.bindings.get(name) {
-      Some(Slot::Mutable(_)) => true,
-      Some(_) => false,
-      None => self.parent.as_ref().is_some_and(|p| p.has_mut(name)),
+    if self.bindings.contains_key(name) {
+      return self.mutables.contains(name);
     }
+    self.parent.as_ref().is_some_and(|p| p.has_mut(name))
   }
 
   pub fn into_arc(self) -> Arc<Self> {

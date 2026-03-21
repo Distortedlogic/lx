@@ -82,7 +82,7 @@ pub(super) fn bi_create(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> R
 
 pub(super) fn bi_set(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
-  let key = args[1].as_str().ok_or_else(|| LxError::type_err("store.set: key must be Str", span))?;
+  let key = args[1].require_str("store.set", span)?;
   let mut s = STORES.get_mut(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
   s.data.insert(key.to_string(), args[2].clone());
   persist(&s);
@@ -91,14 +91,14 @@ pub(super) fn bi_set(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Resu
 
 pub(super) fn bi_get(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
-  let key = args[1].as_str().ok_or_else(|| LxError::type_err("store.get: key must be Str", span))?;
+  let key = args[1].require_str("store.get", span)?;
   let s = STORES.get(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
   Ok(s.data.get(key).cloned().unwrap_or(LxVal::None))
 }
 
 pub(super) fn bi_update(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
-  let key = args[1].as_str().ok_or_else(|| LxError::type_err("store.update: key must be Str", span))?;
+  let key = args[1].require_str("store.update", span)?;
   let f = &args[2];
   let mut s = STORES.get_mut(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
   let old = s.data.get(key).cloned().unwrap_or(LxVal::None);
@@ -113,7 +113,7 @@ pub(super) fn bi_update(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Re
 
 pub(super) fn bi_remove(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
-  let key = args[1].as_str().ok_or_else(|| LxError::type_err("store.remove: key must be Str", span))?;
+  let key = args[1].require_str("store.remove", span)?;
   let mut s = STORES.get_mut(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
   let removed = s.data.shift_remove(key).unwrap_or(LxVal::None);
   persist(&s);

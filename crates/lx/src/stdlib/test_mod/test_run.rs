@@ -174,7 +174,7 @@ pub(crate) fn bi_run(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Resul
 
 pub(crate) fn bi_run_scenario(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let spec_fields = extract_record(&args[0], "test.run_scenario", span)?;
-  let target_name = args[1].as_str().ok_or_else(|| LxError::type_err("test.run_scenario: name must be Str", span))?;
+  let target_name = args[1].require_str("test.run_scenario", span)?;
   let scenarios = match spec_fields.get("scenarios") {
     Some(LxVal::List(list)) => list.as_ref().clone(),
     _ => Vec::new(),

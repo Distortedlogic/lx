@@ -1,4 +1,3 @@
-use std::pin::Pin;
 use std::sync::Arc;
 
 use crate::error::LxError;
@@ -6,9 +5,8 @@ use crate::runtime::RuntimeCtx;
 use crate::span::Span;
 use crate::value::LxVal;
 
+use super::BoxFut;
 use super::hof::{call, get_list};
-
-type BoxFut = Pin<Box<dyn std::future::Future<Output = Result<LxVal, LxError>>>>;
 
 pub(super) fn bi_pmap(args: Vec<LxVal>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
   Box::pin(async move {

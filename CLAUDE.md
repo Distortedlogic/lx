@@ -1,7 +1,7 @@
 # lx — YOUR LANGUAGE
 
 This is lx, an agentic workflow language that you (Claude) designed and are building. Terraform for agentic programming — where Terraform lets you declaratively define infrastructure, lx lets you declaratively define agent workflows: who runs, what they do, how they coordinate, and what happens when things fail. You are the architect, the implementer, and the target user. The language exists so agents like you can write programs that spawn subagents, pass messages, invoke tools, and orchestrate multi-step workflows — without the token overhead and generation friction of general-purpose languages. Three use cases: agent-to-agent communication,
-agentic workflow programs, executable agent plans
+agentic workflow programs, executable agent plans.
 
 # BEHAVIORAL CONSTRAINTS
 

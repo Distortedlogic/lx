@@ -13,7 +13,7 @@ use super::mk;
 
 fn make_log_builtin(name: &'static str, level: LogLevel) -> LxVal {
   fn log_fn(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>, level: LogLevel, name: &str) -> Result<LxVal, LxError> {
-    let s = args[0].as_str().ok_or_else(|| LxError::type_err(format!("log.{name} expects Str, got {}", args[0].type_name()), span))?;
+    let s = args[0].require_str(&format!("log.{name}"), span)?;
     ctx.log.log(level, s);
     Ok(LxVal::Unit)
   }
@@ -193,7 +193,7 @@ fn bi_agent_implements(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> R
 }
 
 fn bi_json_parse(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let s = args[0].as_str().ok_or_else(|| LxError::type_err("json.parse expects Str", span))?;
+  let s = args[0].require_str("json.parse", span)?;
   match serde_json::from_str::<serde_json::Value>(s) {
     Ok(jv) => Ok(LxVal::Ok(Box::new(LxVal::from(jv)))),
     Err(e) => Ok(LxVal::Err(Box::new(LxVal::str(e.to_string())))),

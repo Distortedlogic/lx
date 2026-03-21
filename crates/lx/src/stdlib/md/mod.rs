@@ -137,7 +137,7 @@ fn parse_to_nodes(input: &str) -> Vec<LxVal> {
 }
 
 fn bi_parse(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let input = args[0].as_str().ok_or_else(|| LxError::type_err("md.parse expects Str", span))?;
+  let input = args[0].require_str("md.parse", span)?;
   Ok(LxVal::list(parse_to_nodes(input)))
 }
 

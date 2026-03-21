@@ -119,14 +119,14 @@ fn bi_to_record(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Lx
 
 fn bi_has(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
-  let key = args[1].as_str().ok_or_else(|| LxError::type_err("store.has: key must be Str", span))?;
+  let key = args[1].require_str("store.has", span)?;
   let s = STORES.get(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
   Ok(LxVal::Bool(s.data.contains_key(key)))
 }
 
 fn bi_save_to(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
-  let path = args[1].as_str().ok_or_else(|| LxError::type_err("store.save: path must be Str", span))?;
+  let path = args[1].require_str("store.save", span)?;
   let s = STORES.get(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
   let record = LxVal::record(s.data.clone());
   let json_val = serde_json::Value::from(&record);
@@ -137,7 +137,7 @@ fn bi_save_to(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVa
 
 fn bi_load_from(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
-  let path = args[1].as_str().ok_or_else(|| LxError::type_err("store.load: path must be Str", span))?;
+  let path = args[1].require_str("store.load", span)?;
   let content = std::fs::read_to_string(path).map_err(|e| LxError::runtime(format!("store.load: {e}"), span))?;
   let json_val: serde_json::Value = serde_json::from_str(&content).map_err(|e| LxError::runtime(format!("store.load: {e}"), span))?;
   let val = LxVal::from(json_val);

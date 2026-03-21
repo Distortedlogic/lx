@@ -15,20 +15,20 @@ use super::coll::cmp_values;
 use super::mk;
 
 fn bi_sort(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let l = args[0].as_list().ok_or_else(|| LxError::type_err(format!("sort expects List, got {}", args[0].type_name()), span))?;
-  let mut items = l.as_ref().clone();
+  let l = args[0].require_list("sort", span)?;
+  let mut items = l.to_vec();
   items.sort_by(cmp_values);
   Ok(LxVal::list(items))
 }
 
 fn bi_sorted_q(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let l = args[0].as_list().ok_or_else(|| LxError::type_err(format!("sorted? expects List, got {}", args[0].type_name()), span))?;
+  let l = args[0].require_list("sorted?", span)?;
   Ok(LxVal::Bool(l.windows(2).all(|w| cmp_values(&w[0], &w[1]).is_le())))
 }
 
 fn bi_rev(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let l = args[0].as_list().ok_or_else(|| LxError::type_err(format!("rev expects List, got {}", args[0].type_name()), span))?;
-  let mut items = l.as_ref().clone();
+  let l = args[0].require_list("rev", span)?;
+  let mut items = l.to_vec();
   items.reverse();
   Ok(LxVal::list(items))
 }
@@ -66,27 +66,27 @@ fn num_fold(
 }
 
 fn bi_sum(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let l = args[0].as_list().ok_or_else(|| LxError::type_err(format!("sum expects List, got {}", args[0].type_name()), span))?;
+  let l = args[0].require_list("sum", span)?;
   num_fold("sum", l, BigInt::from(0), 0.0, |a, b| a + b, |a, b| a + b, span)
 }
 
 fn bi_product(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let l = args[0].as_list().ok_or_else(|| LxError::type_err(format!("product expects List, got {}", args[0].type_name()), span))?;
+  let l = args[0].require_list("product", span)?;
   num_fold("product", l, BigInt::from(1), 1.0, |a, b| a * b, |a, b| a * b, span)
 }
 
 fn bi_min(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let l = args[0].as_list().ok_or_else(|| LxError::type_err(format!("min expects List, got {}", args[0].type_name()), span))?;
+  let l = args[0].require_list("min", span)?;
   l.iter().min_by(|a, b| cmp_values(a, b)).cloned().ok_or_else(|| LxError::runtime("min: empty list", span))
 }
 
 fn bi_max(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let l = args[0].as_list().ok_or_else(|| LxError::type_err(format!("max expects List, got {}", args[0].type_name()), span))?;
+  let l = args[0].require_list("max", span)?;
   l.iter().max_by(|a, b| cmp_values(a, b)).cloned().ok_or_else(|| LxError::runtime("max: empty list", span))
 }
 
 fn bi_uniq(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let l = args[0].as_list().ok_or_else(|| LxError::type_err(format!("uniq expects List, got {}", args[0].type_name()), span))?;
+  let l = args[0].require_list("uniq", span)?;
   let mut out: Vec<LxVal> = Vec::with_capacity(l.len());
   for v in l.iter() {
     if out.last() != Some(v) {
@@ -97,7 +97,7 @@ fn bi_uniq(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, 
 }
 
 fn bi_flatten(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let l = args[0].as_list().ok_or_else(|| LxError::type_err(format!("flatten expects List, got {}", args[0].type_name()), span))?;
+  let l = args[0].require_list("flatten", span)?;
   let mut out = Vec::new();
   for v in l.iter() {
     match v {
@@ -112,7 +112,7 @@ fn bi_has_key(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVa
   match &args[1] {
     LxVal::Map(m) => Ok(LxVal::Bool(m.contains_key(&ValueKey(args[0].clone())))),
     LxVal::Record(r) => {
-      let key = args[0].as_str().ok_or_else(|| LxError::type_err(format!("has_key?: key must be Str for Record, got {}", args[0].type_name()), span))?;
+      let key = args[0].require_str("has_key?", span)?;
       Ok(LxVal::Bool(r.contains_key(key)))
     },
     other => Err(LxError::type_err(format!("has_key? expects Map/Record, got {}", other.type_name()), span)),

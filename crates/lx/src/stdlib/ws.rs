@@ -48,7 +48,7 @@ pub fn build() -> IndexMap<String, LxVal> {
 }
 
 fn bi_connect(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let url = args[0].as_str().ok_or_else(|| LxError::type_err("ws.connect expects Str url", span))?.to_string();
+  let url = args[0].require_str("ws.connect", span)?.to_string();
 
   tokio::task::block_in_place(|| {
     tokio::runtime::Handle::current().block_on(async {
@@ -88,7 +88,7 @@ fn bi_close(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal,
 
 fn bi_send(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = conn_id(&args[0], span)?;
-  let msg = args[1].as_str().ok_or_else(|| LxError::type_err("ws.send expects Str message", span))?.to_string();
+  let msg = args[1].require_str("ws.send", span)?.to_string();
 
   let sink = match WS_CONNS.get(&id) {
     Some(conn) => conn.sink.clone(),

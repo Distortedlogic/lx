@@ -47,7 +47,7 @@ pub(super) fn score_to_f64(v: &LxVal) -> Option<f64> {
 }
 
 fn bi_spec(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let name = args[0].as_str().ok_or_else(|| LxError::type_err("test.spec: name must be Str", span))?;
+  let name = args[0].require_str("test.spec", span)?;
   let opts = extract_record(&args[1], "test.spec", span)?;
 
   let flow = opts.get("flow").ok_or_else(|| LxError::type_err("test.spec: 'flow' is required", span))?.clone();
@@ -81,7 +81,7 @@ fn bi_spec(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, 
 
 fn bi_scenario(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let spec_fields = extract_record(&args[0], "test.scenario", span)?;
-  let scenario_name = args[1].as_str().ok_or_else(|| LxError::type_err("test.scenario: name must be Str", span))?;
+  let scenario_name = args[1].require_str("test.scenario", span)?;
   let opts = extract_record(&args[2], "test.scenario", span)?;
 
   let input = opts.get("input").ok_or_else(|| LxError::type_err("test.scenario: 'input' is required", span))?.clone();

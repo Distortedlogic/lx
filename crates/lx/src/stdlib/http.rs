@@ -57,20 +57,20 @@ fn bi_get(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, Lx
 }
 
 fn bi_post(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let url = args[0].as_str().ok_or_else(|| LxError::type_err("http.post expects Str url as first arg", span))?;
+  let url = args[0].require_str("http.post", span)?;
   let body = serde_json::Value::from(&args[1]);
   let opts = HttpOpts { body: Some(body), ..Default::default() };
   ctx.http.request("POST", url, &opts, span)
 }
 
 fn bi_put(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let url = args[0].as_str().ok_or_else(|| LxError::type_err("http.put expects Str url as first arg", span))?;
+  let url = args[0].require_str("http.put", span)?;
   let body = serde_json::Value::from(&args[1]);
   let opts = HttpOpts { body: Some(body), ..Default::default() };
   ctx.http.request("PUT", url, &opts, span)
 }
 
 fn bi_delete(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let url = args[0].as_str().ok_or_else(|| LxError::type_err("http.delete expects Str url", span))?;
+  let url = args[0].require_str("http.delete", span)?;
   ctx.http.request("DELETE", url, &HttpOpts::default(), span)
 }

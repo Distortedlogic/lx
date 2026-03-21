@@ -1,4 +1,3 @@
-use std::pin::Pin;
 use std::sync::Arc;
 
 use num_traits::ToPrimitive;
@@ -7,6 +6,8 @@ use crate::error::LxError;
 use crate::runtime::RuntimeCtx;
 use crate::span::Span;
 use crate::value::LxVal;
+
+use super::BoxFut;
 
 pub(super) fn register(env: &mut crate::env::Env) {
   use super::{mk, mk_async};
@@ -40,8 +41,6 @@ pub(super) fn register(env: &mut crate::env::Env) {
   env.bind("pmap".into(), mk_async("pmap", 2, super::hof_parallel::bi_pmap));
   env.bind("pmap_n".into(), mk_async("pmap_n", 3, super::hof_parallel::bi_pmap_n));
 }
-
-type BoxFut = Pin<Box<dyn std::future::Future<Output = Result<LxVal, LxError>>>>;
 
 pub(super) async fn call(f: &LxVal, arg: LxVal, span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   crate::builtins::call_value(f, arg, span, ctx).await
@@ -142,14 +141,14 @@ fn bi_each(args: Vec<LxVal>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
 }
 
 fn bi_take(args: &[LxVal], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let n = args[0].as_int().ok_or_else(|| LxError::type_err(format!("take: first arg must be Int, got {}", args[0].type_name()), sp))?;
+  let n = args[0].require_int("take", sp)?;
   let n = n.to_usize().ok_or_else(|| LxError::runtime("take: count out of range", sp))?;
   let items = get_list(&args[1], "take", sp)?;
   Ok(LxVal::list(items.iter().take(n).cloned().collect()))
 }
 
 fn bi_drop(args: &[LxVal], sp: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let n = args[0].as_int().ok_or_else(|| LxError::type_err(format!("drop: first arg must be Int, got {}", args[0].type_name()), sp))?;
+  let n = args[0].require_int("drop", sp)?;
   let n = n.to_usize().ok_or_else(|| LxError::runtime("drop: count out of range", sp))?;
   let items = get_list(&args[1], "drop", sp)?;
   Ok(LxVal::list(items.iter().skip(n).cloned().collect()))
