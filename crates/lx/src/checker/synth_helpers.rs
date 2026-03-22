@@ -3,6 +3,7 @@ use miette::SourceSpan;
 
 use crate::ast::{BinOp, Expr, Literal, MapEntry, MatchArm, Param, Pattern, PatternConstructor, PatternList, PatternRecord, SExpr, SPattern, SType};
 
+use super::diagnostics::DiagnosticKind;
 use super::types::{Type, TypeContext};
 use super::{Checker, DiagLevel};
 
@@ -80,7 +81,7 @@ impl Checker {
     let fv = super::capture::free_vars(expr);
     for name in &fv {
       if self.mutables.contains(name) {
-        self.emit(DiagLevel::Error, format!("cannot capture mutable binding `{name}` in concurrent context"), span);
+        self.emit(DiagLevel::Error, DiagnosticKind::MutableCaptureInConcurrent { name: *name }, span);
       }
     }
   }
@@ -117,7 +118,7 @@ impl Checker {
       let variant_names: Vec<Sym> = variants.iter().map(|v| v.name).collect();
       let missing = super::exhaust::check_exhaustiveness(*name, &variant_names, arms);
       for v in &missing {
-        self.emit(DiagLevel::Warning, format!("non-exhaustive match on {name}: missing {v}"), span);
+        self.emit(DiagLevel::Warning, DiagnosticKind::NonExhaustiveMatch { type_name: *name, missing_variant: *v }, span);
       }
     }
     let result = self.fresh();
@@ -174,7 +175,7 @@ impl Checker {
       BinOp::Eq | BinOp::NotEq | BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq => Type::Bool,
       BinOp::And | BinOp::Or => {
         if lt != Type::Bool && lt != Type::Unknown {
-          self.emit(DiagLevel::Error, "logical operator requires Bool".into(), span);
+          self.emit(DiagLevel::Error, DiagnosticKind::LogicalOpRequiresBool, span);
         }
         Type::Bool
       },

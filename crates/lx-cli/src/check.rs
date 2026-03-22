@@ -1,6 +1,10 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use lx::checker::{check, DiagLevel};
+use lx::error::LxError;
+use miette::{NamedSource, Report};
+
 use crate::manifest;
 use crate::run;
 
@@ -9,7 +13,7 @@ pub fn check_file(path: &str, strict: bool) -> ExitCode {
     Ok(sp) => sp,
     Err(code) => return code,
   };
-  let result = lx::checker::check(&program);
+  let result = check(&program);
   if result.diagnostics.is_empty() {
     println!("ok: {path}");
     ExitCode::SUCCESS
@@ -18,18 +22,18 @@ pub fn check_file(path: &str, strict: bool) -> ExitCode {
     let mut warnings = 0u32;
     for d in &result.diagnostics {
       let prefix = match d.level {
-        lx::checker::DiagLevel::Error => {
+        DiagLevel::Error => {
           errors += 1;
           "error"
         },
-        lx::checker::DiagLevel::Warning => {
+        DiagLevel::Warning => {
           warnings += 1;
           "warning"
         },
       };
-      let err = lx::error::LxError::type_err(format!("{prefix}: {}", d.msg), d.span, d.help.clone());
-      let named = miette::NamedSource::new(path, source.clone());
-      let report = miette::Report::new(err).with_source_code(named);
+      let err = LxError::type_err(format!("{prefix}: {}", d.kind), d.span, d.kind.help());
+      let named = NamedSource::new(path, source.clone());
+      let report = Report::new(err).with_source_code(named);
       eprintln!("{report:?}");
     }
     let fail_count = if strict { errors + warnings } else { errors };
@@ -79,30 +83,30 @@ pub fn check_workspace(member_filter: Option<&str>, strict: bool) -> ExitCode {
       let path_str = file.display().to_string();
       match run::read_and_parse(&path_str) {
         Ok((source, program)) => {
-          let result = lx::checker::check(&program);
+          let result = check(&program);
           let file_errors: u32 =
-            result.diagnostics.iter().filter(|d| d.level == lx::checker::DiagLevel::Error || (strict && d.level == lx::checker::DiagLevel::Warning)).count()
+            result.diagnostics.iter().filter(|d| d.level == DiagLevel::Error || (strict && d.level == DiagLevel::Warning)).count()
               as u32;
           if file_errors == 0 && result.diagnostics.is_empty() {
             member_ok += 1;
           } else if file_errors == 0 {
             member_ok += 1;
             for d in &result.diagnostics {
-              let err = lx::error::LxError::type_err(format!("warning: {}", d.msg), d.span, d.help.clone());
-              let named = miette::NamedSource::new(path_str.clone(), source.clone());
-              let report = miette::Report::new(err).with_source_code(named);
+              let err = LxError::type_err(format!("warning: {}", d.kind), d.span, d.kind.help());
+              let named = NamedSource::new(path_str.clone(), source.clone());
+              let report = Report::new(err).with_source_code(named);
               eprintln!("{report:?}");
             }
           } else {
             member_err += 1;
             for d in &result.diagnostics {
               let prefix = match d.level {
-                lx::checker::DiagLevel::Error => "error",
-                lx::checker::DiagLevel::Warning => "warning",
+                DiagLevel::Error => "error",
+                DiagLevel::Warning => "warning",
               };
-              let err = lx::error::LxError::type_err(format!("{prefix}: {}", d.msg), d.span, d.help.clone());
-              let named = miette::NamedSource::new(path_str.clone(), source.clone());
-              let report = miette::Report::new(err).with_source_code(named);
+              let err = LxError::type_err(format!("{prefix}: {}", d.kind), d.span, d.kind.help());
+              let named = NamedSource::new(path_str.clone(), source.clone());
+              let report = Report::new(err).with_source_code(named);
               eprintln!("{report:?}");
             }
           }

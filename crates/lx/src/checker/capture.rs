@@ -1,183 +1,223 @@
 use std::collections::HashSet;
+use std::ops::ControlFlow;
 
-use crate::ast::{
-  BindTarget, Expr, ExprApply, ExprAssert, ExprBinary, ExprCoalesce, ExprEmit, ExprFieldAccess, ExprFunc, ExprMatch, ExprNamedArg, ExprPipe, ExprSlice,
-  ExprTernary, ExprTimeout, ExprUnary, ExprWith, ExprYield, ListElem, SExpr, SStmt, Section, Stmt, StmtFieldUpdate, WithKind,
-};
+use crate::ast::{BindTarget, Binding, FieldPattern, MatchArm, Param, SExpr, SPattern, SStmt, SType};
 use crate::sym::Sym;
+use crate::visitor::{walk_binding, walk_func, AstVisitor};
+use miette::SourceSpan;
 
-pub fn free_vars(expr: &SExpr) -> HashSet<Sym> {
-  let mut vars = HashSet::new();
-  let mut bound = HashSet::new();
-  collect_free(&expr.node, &mut vars, &mut bound);
-  vars
+struct FreeVarCollector {
+  free: HashSet<Sym>,
+  scopes: Vec<HashSet<Sym>>,
 }
 
-fn free_vars_stmts(stmts: &[SStmt], vars: &mut HashSet<Sym>, bound: &mut HashSet<Sym>) {
-  for s in stmts {
-    match &s.node {
-      Stmt::Binding(b) => {
-        collect_free(&b.value.node, vars, bound);
-        match &b.target {
-          BindTarget::Name(n) => {
-            bound.insert(*n);
-          },
-          BindTarget::Reassign(n) => {
-            if !bound.contains(n) {
-              vars.insert(*n);
-            }
-          },
-          BindTarget::Pattern(_) => {},
-        }
-      },
-      Stmt::Expr(e) => collect_free(&e.node, vars, bound),
-      Stmt::FieldUpdate(StmtFieldUpdate { value, .. }) => collect_free(&value.node, vars, bound),
-      _ => {},
+impl FreeVarCollector {
+  fn new() -> Self {
+    Self {
+      free: HashSet::new(),
+      scopes: vec![HashSet::new()],
+    }
+  }
+
+  fn is_bound(&self, name: Sym) -> bool {
+    self.scopes.iter().any(|s| s.contains(&name))
+  }
+
+  fn push_scope(&mut self) {
+    self.scopes.push(HashSet::new());
+  }
+
+  fn pop_scope(&mut self) {
+    self.scopes.pop();
+  }
+
+  fn bind(&mut self, name: Sym) {
+    if let Some(scope) = self.scopes.last_mut() {
+      scope.insert(name);
     }
   }
 }
 
-fn collect_free(expr: &Expr, vars: &mut HashSet<Sym>, bound: &mut HashSet<Sym>) {
-  match expr {
-    Expr::Ident(name) => {
-      if !bound.contains(name) {
-        vars.insert(*name);
-      }
-    },
-    Expr::Func(ExprFunc { params, body, .. }) => {
-      let mut inner_bound = bound.clone();
-      for p in params {
-        inner_bound.insert(p.name);
-      }
-      collect_free(&body.node, vars, &mut inner_bound);
-    },
-    Expr::Binary(ExprBinary { left, right, .. }) => {
-      collect_free(&left.node, vars, bound);
-      collect_free(&right.node, vars, bound);
-    },
-    Expr::Unary(ExprUnary { operand, .. }) => collect_free(&operand.node, vars, bound),
-    Expr::Pipe(ExprPipe { left, right }) => {
-      collect_free(&left.node, vars, bound);
-      collect_free(&right.node, vars, bound);
-    },
-    Expr::Apply(ExprApply { func, arg }) => {
-      collect_free(&func.node, vars, bound);
-      collect_free(&arg.node, vars, bound);
-    },
-    Expr::Block(stmts) => {
-      let mut inner = bound.clone();
-      free_vars_stmts(stmts, vars, &mut inner);
-    },
-    Expr::Tuple(elems) => {
-      for e in elems {
-        collect_free(&e.node, vars, bound);
-      }
-    },
-    Expr::List(elems) => {
-      for e in elems {
-        match e {
-          ListElem::Single(e) | ListElem::Spread(e) => {
-            collect_free(&e.node, vars, bound);
-          },
-        }
-      }
-    },
-    Expr::Record(fields) => {
-      for f in fields {
-        collect_free(&f.value.node, vars, bound);
-      }
-    },
-    Expr::Map(entries) => {
-      for e in entries {
-        if let Some(k) = &e.key {
-          collect_free(&k.node, vars, bound);
-        }
-        collect_free(&e.value.node, vars, bound);
-      }
-    },
-    Expr::Match(ExprMatch { scrutinee, arms }) => {
-      collect_free(&scrutinee.node, vars, bound);
-      for arm in arms {
-        collect_free(&arm.body.node, vars, bound);
-      }
-    },
-    Expr::Ternary(ExprTernary { cond, then_, else_, .. }) => {
-      collect_free(&cond.node, vars, bound);
-      collect_free(&then_.node, vars, bound);
-      if let Some(e) = else_ {
-        collect_free(&e.node, vars, bound);
-      }
-    },
-    Expr::With(ExprWith { kind, body }) => match kind {
-      WithKind::Binding { name, value, .. } => {
-        collect_free(&value.node, vars, bound);
-        let mut inner = bound.clone();
-        inner.insert(*name);
-        free_vars_stmts(body, vars, &mut inner);
-      },
-      WithKind::Resources { resources } => {
-        let mut inner = bound.clone();
-        for (r, name) in resources {
-          collect_free(&r.node, vars, bound);
-          inner.insert(*name);
-        }
-        free_vars_stmts(body, vars, &mut inner);
-      },
-      WithKind::Context { fields } => {
-        for (_, expr) in fields {
-          collect_free(&expr.node, vars, bound);
-        }
-        free_vars_stmts(body, vars, bound);
-      },
-    },
-    Expr::Par(stmts) => free_vars_stmts(stmts, vars, bound),
-    Expr::Timeout(ExprTimeout { ms, body }) => {
-      collect_free(&ms.node, vars, bound);
-      collect_free(&body.node, vars, bound);
-    },
-    Expr::Sel(arms) => {
-      for arm in arms {
-        collect_free(&arm.expr.node, vars, bound);
-        collect_free(&arm.handler.node, vars, bound);
-      }
-    },
-    Expr::Propagate(inner) => collect_free(&inner.node, vars, bound),
-    Expr::Coalesce(ExprCoalesce { expr, default }) => {
-      collect_free(&expr.node, vars, bound);
-      collect_free(&default.node, vars, bound);
-    },
-    Expr::FieldAccess(ExprFieldAccess { expr, .. }) => collect_free(&expr.node, vars, bound),
-    Expr::Yield(ExprYield { value }) | Expr::Emit(ExprEmit { value }) => {
-      collect_free(&value.node, vars, bound);
-    },
-    Expr::Loop(stmts) => free_vars_stmts(stmts, vars, bound),
-    Expr::Break(val) => {
-      if let Some(v) = val {
-        collect_free(&v.node, vars, bound);
-      }
-    },
-    Expr::Assert(ExprAssert { expr, msg }) => {
-      collect_free(&expr.node, vars, bound);
-      if let Some(m) = msg {
-        collect_free(&m.node, vars, bound);
-      }
-    },
-    Expr::NamedArg(ExprNamedArg { value, .. }) => collect_free(&value.node, vars, bound),
-    Expr::Slice(ExprSlice { expr, start, end }) => {
-      collect_free(&expr.node, vars, bound);
-      if let Some(s) = start {
-        collect_free(&s.node, vars, bound);
-      }
-      if let Some(e) = end {
-        collect_free(&e.node, vars, bound);
-      }
-    },
-    Expr::Section(section) => match section {
-      Section::Right { operand, .. } | Section::Left { operand, .. } => {
-        collect_free(&operand.node, vars, bound);
-      },
-      Section::BinOp(_) | Section::Field(_) | Section::Index(_) => {},
-    },
-    Expr::Literal(_) | Expr::TypeConstructor(_) => {},
+impl AstVisitor for FreeVarCollector {
+  fn visit_ident(&mut self, name: Sym, _span: SourceSpan) -> ControlFlow<()> {
+    if !self.is_bound(name) {
+      self.free.insert(name);
+    }
+    ControlFlow::Continue(())
   }
+
+  fn visit_binding(&mut self, binding: &Binding, span: SourceSpan) -> ControlFlow<()> {
+    walk_binding(self, binding, span)?;
+    match &binding.target {
+      BindTarget::Name(n) => self.bind(*n),
+      BindTarget::Reassign(n) => {
+        if !self.is_bound(*n) {
+          self.free.insert(*n);
+        }
+      },
+      BindTarget::Pattern(_) => {},
+    }
+    ControlFlow::Continue(())
+  }
+
+  fn visit_func(
+    &mut self,
+    params: &[Param],
+    ret_type: Option<&SType>,
+    guard: Option<&SExpr>,
+    body: &SExpr,
+    span: SourceSpan,
+  ) -> ControlFlow<()> {
+    self.push_scope();
+    for p in params {
+      self.bind(p.name);
+    }
+    walk_func(self, params, ret_type, guard, body, span)?;
+    self.pop_scope();
+    ControlFlow::Continue(())
+  }
+
+  fn visit_block(&mut self, stmts: &[SStmt], _span: SourceSpan) -> ControlFlow<()> {
+    self.push_scope();
+    for s in stmts {
+      self.visit_stmt(&s.node, s.span)?;
+    }
+    self.pop_scope();
+    ControlFlow::Continue(())
+  }
+
+  fn visit_pattern_bind(&mut self, name: Sym, _span: SourceSpan) -> ControlFlow<()> {
+    self.bind(name);
+    ControlFlow::Continue(())
+  }
+
+  fn visit_pattern_list(
+    &mut self,
+    elems: &[SPattern],
+    rest: Option<Sym>,
+    _span: SourceSpan,
+  ) -> ControlFlow<()> {
+    for e in elems {
+      self.visit_pattern(&e.node, e.span)?;
+    }
+    if let Some(r) = rest {
+      self.bind(r);
+    }
+    ControlFlow::Continue(())
+  }
+
+  fn visit_pattern_record(
+    &mut self,
+    fields: &[FieldPattern],
+    rest: Option<Sym>,
+    _span: SourceSpan,
+  ) -> ControlFlow<()> {
+    for f in fields {
+      if let Some(ref p) = f.pattern {
+        self.visit_pattern(&p.node, p.span)?;
+      } else {
+        self.bind(f.name);
+      }
+    }
+    if let Some(r) = rest {
+      self.bind(r);
+    }
+    ControlFlow::Continue(())
+  }
+
+  fn visit_with(
+    &mut self,
+    name: Sym,
+    value: &SExpr,
+    body: &[SStmt],
+    _mutable: bool,
+    _span: SourceSpan,
+  ) -> ControlFlow<()> {
+    self.visit_expr(&value.node, value.span)?;
+    self.push_scope();
+    self.bind(name);
+    for s in body {
+      self.visit_stmt(&s.node, s.span)?;
+    }
+    self.pop_scope();
+    ControlFlow::Continue(())
+  }
+
+  fn visit_with_resource(
+    &mut self,
+    resources: &[(SExpr, Sym)],
+    body: &[SStmt],
+    _span: SourceSpan,
+  ) -> ControlFlow<()> {
+    for (r, _) in resources {
+      self.visit_expr(&r.node, r.span)?;
+    }
+    self.push_scope();
+    for (_, name) in resources {
+      self.bind(*name);
+    }
+    for s in body {
+      self.visit_stmt(&s.node, s.span)?;
+    }
+    self.pop_scope();
+    ControlFlow::Continue(())
+  }
+
+  fn visit_with_context(
+    &mut self,
+    fields: &[(Sym, SExpr)],
+    body: &[SStmt],
+    _span: SourceSpan,
+  ) -> ControlFlow<()> {
+    for (_, expr) in fields {
+      self.visit_expr(&expr.node, expr.span)?;
+    }
+    for s in body {
+      self.visit_stmt(&s.node, s.span)?;
+    }
+    ControlFlow::Continue(())
+  }
+
+  fn visit_loop(&mut self, stmts: &[SStmt], _span: SourceSpan) -> ControlFlow<()> {
+    self.push_scope();
+    for s in stmts {
+      self.visit_stmt(&s.node, s.span)?;
+    }
+    self.pop_scope();
+    ControlFlow::Continue(())
+  }
+
+  fn visit_par(&mut self, stmts: &[SStmt], _span: SourceSpan) -> ControlFlow<()> {
+    self.push_scope();
+    for s in stmts {
+      self.visit_stmt(&s.node, s.span)?;
+    }
+    self.pop_scope();
+    ControlFlow::Continue(())
+  }
+
+  fn visit_match(
+    &mut self,
+    scrutinee: &SExpr,
+    arms: &[MatchArm],
+    _span: SourceSpan,
+  ) -> ControlFlow<()> {
+    self.visit_expr(&scrutinee.node, scrutinee.span)?;
+    for arm in arms {
+      self.push_scope();
+      self.visit_pattern(&arm.pattern.node, arm.pattern.span)?;
+      if let Some(ref g) = arm.guard {
+        self.visit_expr(&g.node, g.span)?;
+      }
+      self.visit_expr(&arm.body.node, arm.body.span)?;
+      self.pop_scope();
+    }
+    ControlFlow::Continue(())
+  }
+}
+
+pub fn free_vars(expr: &SExpr) -> HashSet<Sym> {
+  let mut collector = FreeVarCollector::new();
+  let _ = collector.visit_expr(&expr.node, expr.span);
+  collector.free
 }

@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "declaration": false,
+    "declarationMap": false,
+    "verbatimModuleSyntax": false,
+    "paths": {
+      "@lx/audio-capture": ["../audio-capture/src/index.ts"],
+      "@lx/audio-playback": ["../audio-playback/src/index.ts"],
+      "@lx/widget-bridge/*": ["../widget-bridge/*"]
+    }
+  },
+  "include": ["src"]
+}

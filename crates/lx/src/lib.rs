@@ -10,4 +10,5 @@ pub mod runtime;
 pub mod stdlib;
 pub mod sym;
 pub mod value;
+pub mod folder;
 pub mod visitor;

@@ -2,6 +2,7 @@ use crate::ast::{BindTarget, Binding, SStmt, Stmt, StmtFieldUpdate, StmtTypeDef,
 use crate::sym::Sym;
 use miette::SourceSpan;
 
+use super::diagnostics::DiagnosticKind;
 use super::types::{self, Type, TypeContext};
 use super::{Checker, DiagLevel};
 
@@ -86,7 +87,7 @@ impl Checker {
 
   fn check_import_conflict(&mut self, name: Sym, span: SourceSpan) {
     if let Some(existing) = self.import_sources.get(&name) {
-      self.emit(DiagLevel::Warning, format!("'{name}' already imported at offset {}", existing.offset()), span);
+      self.emit(DiagLevel::Warning, DiagnosticKind::DuplicateImport { name, original_offset: existing.offset() }, span);
     } else {
       self.import_sources.insert(name, span);
     }

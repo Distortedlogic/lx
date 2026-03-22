@@ -1,3 +1,5 @@
+use std::sync::atomic::{AtomicU32, Ordering};
+
 use crate::sym::Sym;
 mod display;
 mod expr_types;
@@ -8,15 +10,30 @@ pub use types::*;
 
 use miette::SourceSpan;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct NodeId(pub u32);
+
+static NEXT_NODE_ID: AtomicU32 = AtomicU32::new(0);
+
+pub fn reset_node_ids() {
+  NEXT_NODE_ID.store(0, Ordering::Relaxed);
+}
+
 #[derive(Debug, Clone)]
 pub struct Spanned<T> {
   pub node: T,
   pub span: SourceSpan,
+  pub id: NodeId,
 }
 
 impl<T> Spanned<T> {
   pub fn new(node: T, span: SourceSpan) -> Self {
-    Self { node, span }
+    let id = NodeId(NEXT_NODE_ID.fetch_add(1, Ordering::Relaxed));
+    Self { node, span, id }
+  }
+
+  pub fn with_id(node: T, span: SourceSpan, id: NodeId) -> Self {
+    Self { node, span, id }
   }
 }
 

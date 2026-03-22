@@ -27,7 +27,23 @@ importers:
         specifier: ^8.0.0
         version: 8.0.1
 
+  ts/audio-capture: {}
+
+  ts/audio-playback: {}
+
   ts/dx-charts: {}
+
+  ts/voice-client:
+    dependencies:
+      '@lx/audio-capture':
+        specifier: workspace:*
+        version: link:../audio-capture
+      '@lx/audio-playback':
+        specifier: workspace:*
+        version: link:../audio-playback
+      '@lx/widget-bridge':
+        specifier: workspace:*
+        version: link:../widget-bridge
 
   ts/widget-bridge:
     dependencies:

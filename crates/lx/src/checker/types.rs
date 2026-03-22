@@ -163,12 +163,14 @@ impl UnificationTable {
   }
 }
 
+#[derive(Clone)]
 pub struct TypeError {
   pub expected: Type,
   pub found: Type,
   pub context: TypeContext,
 }
 
+#[derive(Clone)]
 pub enum TypeContext {
   FuncArg { func_name: String, param_name: String, param_idx: usize },
   FuncReturn { func_name: String },

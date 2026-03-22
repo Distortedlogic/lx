@@ -1,0 +1,19 @@
+{
+  "name": "@lx/voice-client",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/voice-client.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "vite build",
+    "check": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@lx/audio-capture": "workspace:*",
+    "@lx/audio-playback": "workspace:*",
+    "@lx/widget-bridge": "workspace:*"
+  }
+}

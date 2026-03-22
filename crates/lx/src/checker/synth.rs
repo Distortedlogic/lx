@@ -4,6 +4,7 @@ use crate::ast::{
 };
 use crate::sym::intern;
 
+use super::diagnostics::DiagnosticKind;
 use super::synth_helpers::synth_literal;
 use super::types::{Type, TypeContext};
 use super::{Checker, DiagLevel};
@@ -24,7 +25,7 @@ impl Checker {
         match self.table.resolve(&t) {
           Type::Int | Type::Float => t,
           _ => {
-            self.emit(DiagLevel::Error, "negation requires Int or Float".into(), expr.span);
+            self.emit(DiagLevel::Error, DiagnosticKind::NegationRequiresNumeric, expr.span);
             Type::Unknown
           },
         }
@@ -60,7 +61,7 @@ impl Checker {
           Type::Maybe(inner) => *inner,
           Type::Unknown => Type::Unknown,
           _ => {
-            self.emit(DiagLevel::Error, "^ requires Result or Maybe".into(), expr.span);
+            self.emit(DiagLevel::Error, DiagnosticKind::PropagateRequiresResultOrMaybe, expr.span);
             Type::Unknown
           },
         }
@@ -74,7 +75,7 @@ impl Checker {
         let ct = self.synth(cond);
         let resolved = self.table.resolve(&ct);
         if resolved != Type::Bool && resolved != Type::Unknown {
-          self.emit(DiagLevel::Error, "ternary condition must be Bool".into(), cond.span);
+          self.emit(DiagLevel::Error, DiagnosticKind::TernaryCondNotBool, cond.span);
         }
         let tt = self.synth(then_);
         if let Some(e) = else_ {
@@ -172,7 +173,7 @@ impl Checker {
         let ms_type = self.synth(ms);
         let resolved = self.table.resolve(&ms_type);
         if resolved != Type::Int && resolved != Type::Float && resolved != Type::Unknown {
-          self.emit(DiagLevel::Error, "timeout ms must be Int or Float".into(), ms.span);
+          self.emit(DiagLevel::Error, DiagnosticKind::TimeoutMsNotNumeric, ms.span);
         }
         let body_type = self.synth(body);
         let err_fields = vec![(intern("kind"), Type::Str), (intern("ms"), Type::Int)];

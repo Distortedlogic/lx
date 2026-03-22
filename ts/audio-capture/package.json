@@ -1,0 +1,14 @@
+{
+  "name": "@lx/audio-capture",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/audio-capture.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "vite build",
+    "check": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  }
+}

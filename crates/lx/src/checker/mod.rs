@@ -1,5 +1,6 @@
 use crate::sym::Sym;
 mod capture;
+pub mod diagnostics;
 mod exhaust;
 mod stmts;
 mod synth;
@@ -9,6 +10,7 @@ pub mod types;
 use std::collections::{HashMap, HashSet};
 
 use crate::ast::{Program, SType, TypeExpr};
+use diagnostics::DiagnosticKind;
 use miette::SourceSpan;
 
 use types::{Type, UnificationTable};
@@ -21,9 +23,9 @@ pub enum DiagLevel {
 
 pub struct Diagnostic {
   pub level: DiagLevel,
-  pub msg: String,
+  pub kind: DiagnosticKind,
   pub span: SourceSpan,
-  pub help: Option<String>,
+  pub secondary: Vec<(SourceSpan, String)>,
 }
 
 pub struct CheckResult {
@@ -76,14 +78,13 @@ impl Checker {
     self.scope.pop();
   }
 
-  pub(crate) fn emit(&mut self, level: DiagLevel, msg: String, span: SourceSpan) {
-    self.diagnostics.push(Diagnostic { level, msg, span, help: None });
+  pub(crate) fn emit(&mut self, level: DiagLevel, kind: DiagnosticKind, span: SourceSpan) {
+    self.diagnostics.push(Diagnostic { level, kind, span, secondary: Vec::new() });
   }
 
   pub(crate) fn emit_type_error(&mut self, te: &types::TypeError, span: SourceSpan) {
-    let help = te.help();
-    let msg = te.to_message();
-    self.diagnostics.push(Diagnostic { level: DiagLevel::Error, msg, span, help });
+    let kind = DiagnosticKind::TypeMismatch { error: te.clone() };
+    self.diagnostics.push(Diagnostic { level: DiagLevel::Error, kind, span, secondary: Vec::new() });
   }
 
   pub(crate) fn fresh(&mut self) -> Type {
