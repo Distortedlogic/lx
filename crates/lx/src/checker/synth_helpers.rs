@@ -1,3 +1,5 @@
+use miette::SourceSpan;
+
 use crate::ast::{BinOp, Expr, Literal, MapEntry, MatchArm, Param, Pattern, SExpr, SPattern, SStmt, SType};
 
 use super::Checker;
@@ -72,7 +74,7 @@ impl Checker {
     }
   }
 
-  pub(super) fn check_mutable_captures(&mut self, expr: &SExpr, span: crate::span::Span) {
+  pub(super) fn check_mutable_captures(&mut self, expr: &SExpr, span: SourceSpan) {
     let fv = super::capture::free_vars(expr);
     for name in &fv {
       if self.mutables.contains(name) {
@@ -81,7 +83,7 @@ impl Checker {
     }
   }
 
-  pub(super) fn check_mutable_captures_stmts(&mut self, stmts: &[SStmt], span: crate::span::Span) {
+  pub(super) fn check_mutable_captures_stmts(&mut self, stmts: &[SStmt], span: SourceSpan) {
     for s in stmts {
       if let crate::ast::Stmt::Expr(e) = &s.node {
         self.check_mutable_captures(e, span);
@@ -113,7 +115,7 @@ impl Checker {
     }
   }
 
-  pub(super) fn synth_match(&mut self, scrutinee: &SExpr, arms: &[MatchArm], span: crate::span::Span) -> Type {
+  pub(super) fn synth_match(&mut self, scrutinee: &SExpr, arms: &[MatchArm], span: SourceSpan) -> Type {
     let scrut_t = self.synth(scrutinee);
     let resolved_scrut = self.table.resolve(&scrut_t);
     if let Type::Union { ref name, ref variants } = resolved_scrut {
@@ -158,7 +160,7 @@ impl Checker {
     Type::Map { key: Box::new(key_t), value: Box::new(val_t) }
   }
 
-  pub(super) fn synth_binary(&mut self, op: &BinOp, lt: &Type, rt: &Type, span: crate::span::Span) -> Type {
+  pub(super) fn synth_binary(&mut self, op: &BinOp, lt: &Type, rt: &Type, span: SourceSpan) -> Type {
     let lt = self.table.resolve(lt);
     let rt = self.table.resolve(rt);
     match op {
@@ -181,7 +183,6 @@ pub(super) fn synth_literal(lit: &Literal) -> Type {
     Literal::Int(_) => Type::Int,
     Literal::Float(_) => Type::Float,
     Literal::Str(_) | Literal::RawStr(_) => Type::Str,
-    Literal::Regex(_) => Type::Regex,
     Literal::Bool(_) => Type::Bool,
     Literal::Unit => Type::Unit,
   }

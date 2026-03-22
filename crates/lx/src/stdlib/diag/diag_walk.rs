@@ -12,8 +12,8 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 use crate::ast::{BindTarget, Binding, Expr, MatchArm, Program, SExpr, SStmt, SelArm, Stmt, TraitDeclData, UseStmt};
-use crate::span::Span;
 use crate::visitor::{AstVisitor, walk_loop, walk_par, walk_program};
+use miette::SourceSpan;
 
 pub(crate) use diag_types::*;
 
@@ -55,10 +55,10 @@ impl Walker {
     self.add_node_at(prefix, label, kind, None)
   }
 
-  pub(super) fn add_node_at(&mut self, prefix: &str, label: String, kind: &str, span: Option<Span>) -> String {
+  pub(super) fn add_node_at(&mut self, prefix: &str, label: String, kind: &str, span: Option<SourceSpan>) -> String {
     let id = format!("{prefix}_{}", self.next_id);
     self.next_id += 1;
-    self.nodes.push(DiagNode { id: id.clone(), label, kind: kind.into(), children: vec![], source_offset: span.map(|s| s.offset) });
+    self.nodes.push(DiagNode { id: id.clone(), label, kind: kind.into(), children: vec![], source_offset: span.map(|s| s.offset() as u32) });
     if let Some(ref fn_name) = self.current_fn {
       self.subgraph_nodes.entry(fn_name.clone()).or_default().push(id.clone());
     }
@@ -97,7 +97,7 @@ impl AstVisitor for Walker {
     walk_program(self, program);
   }
 
-  fn visit_binding(&mut self, binding: &Binding, _span: Span) {
+  fn visit_binding(&mut self, binding: &Binding, _span: SourceSpan) {
     let name = match &binding.target {
       BindTarget::Name(n) | BindTarget::Reassign(n) => Some(n.clone()),
       _ => None,
@@ -144,22 +144,22 @@ impl AstVisitor for Walker {
     self.visit_expr(&binding.value.node, binding.value.span);
   }
 
-  fn visit_use(&mut self, stmt: &UseStmt, _span: Span) {
+  fn visit_use(&mut self, stmt: &UseStmt, _span: SourceSpan) {
     let is_base_std = stmt.path.first().is_some_and(|p| p == "std") && stmt.path.len() == 2;
     if !is_base_std && let Some(last) = stmt.path.last() {
       self.imported_modules.insert(last.clone());
     }
   }
 
-  fn visit_type_def(&mut self, name: &str, _variants: &[(String, usize)], _exported: bool, _span: Span) {
+  fn visit_type_def(&mut self, name: &str, _variants: &[(String, usize)], _exported: bool, _span: SourceSpan) {
     self.add_node("type", name.to_string(), "type");
   }
 
-  fn visit_trait_decl(&mut self, data: &TraitDeclData, _span: Span) {
+  fn visit_trait_decl(&mut self, data: &TraitDeclData, _span: SourceSpan) {
     self.add_node("type", data.name.clone(), "type");
   }
 
-  fn visit_par(&mut self, stmts: &[SStmt], span: Span) {
+  fn visit_par(&mut self, stmts: &[SStmt], span: SourceSpan) {
     let fork_id = self.add_node_at("fork", "par".into(), "fork", Some(span));
     let ctx = self.context.clone();
     self.add_edge(&ctx, &fork_id, String::new(), "solid");
@@ -168,11 +168,11 @@ impl AstVisitor for Walker {
     walk_par(self, stmts, span);
   }
 
-  fn visit_par_post(&mut self, _stmts: &[SStmt], _span: Span) {
+  fn visit_par_post(&mut self, _stmts: &[SStmt], _span: SourceSpan) {
     self.context = self.context_stack.pop().expect("diag: context_stack underflow");
   }
 
-  fn visit_sel(&mut self, arms: &[SelArm], span: Span) {
+  fn visit_sel(&mut self, arms: &[SelArm], span: SourceSpan) {
     let dec_id = self.add_node_at("sel", "sel".into(), "decision", Some(span));
     let ctx = self.context.clone();
     self.add_edge(&ctx, &dec_id, String::new(), "solid");
@@ -184,11 +184,11 @@ impl AstVisitor for Walker {
     self.visit_sel_post(arms, span);
   }
 
-  fn visit_sel_post(&mut self, _arms: &[SelArm], _span: Span) {
+  fn visit_sel_post(&mut self, _arms: &[SelArm], _span: SourceSpan) {
     self.context = self.context_stack.pop().expect("diag: context_stack underflow");
   }
 
-  fn visit_match(&mut self, scrutinee: &SExpr, arms: &[MatchArm], span: Span) {
+  fn visit_match(&mut self, scrutinee: &SExpr, arms: &[MatchArm], span: SourceSpan) {
     let label = format!("{}?", diag_helpers::expr_label(&scrutinee.node));
     let dec_id = self.add_node_at("match", label, "decision", Some(span));
     let ctx = self.context.clone();
@@ -201,11 +201,11 @@ impl AstVisitor for Walker {
     self.visit_match_post(scrutinee, arms, span);
   }
 
-  fn visit_match_post(&mut self, _scrutinee: &SExpr, _arms: &[MatchArm], _span: Span) {
+  fn visit_match_post(&mut self, _scrutinee: &SExpr, _arms: &[MatchArm], _span: SourceSpan) {
     self.context = self.context_stack.pop().expect("diag: context_stack underflow");
   }
 
-  fn visit_ternary(&mut self, cond: &SExpr, then_: &SExpr, else_: Option<&SExpr>, span: Span) {
+  fn visit_ternary(&mut self, cond: &SExpr, then_: &SExpr, else_: Option<&SExpr>, span: SourceSpan) {
     let label = format!("{}?", diag_helpers::expr_label(&cond.node));
     let dec_id = self.add_node_at("cond", label, "decision", Some(span));
     let ctx = self.context.clone();
@@ -220,11 +220,11 @@ impl AstVisitor for Walker {
     self.visit_ternary_post(cond, then_, else_, span);
   }
 
-  fn visit_ternary_post(&mut self, _cond: &SExpr, _then_: &SExpr, _else_: Option<&SExpr>, _span: Span) {
+  fn visit_ternary_post(&mut self, _cond: &SExpr, _then_: &SExpr, _else_: Option<&SExpr>, _span: SourceSpan) {
     self.context = self.context_stack.pop().expect("diag: context_stack underflow");
   }
 
-  fn visit_loop(&mut self, stmts: &[SStmt], span: Span) {
+  fn visit_loop(&mut self, stmts: &[SStmt], span: SourceSpan) {
     let loop_id = self.add_node_at("loop", "loop".into(), "loop", Some(span));
     let ctx = self.context.clone();
     self.add_edge(&ctx, &loop_id, String::new(), "solid");
@@ -233,11 +233,11 @@ impl AstVisitor for Walker {
     walk_loop(self, stmts, span);
   }
 
-  fn visit_loop_post(&mut self, _stmts: &[SStmt], _span: Span) {
+  fn visit_loop_post(&mut self, _stmts: &[SStmt], _span: SourceSpan) {
     self.context = self.context_stack.pop().expect("diag: context_stack underflow");
   }
 
-  fn visit_expr(&mut self, expr: &Expr, span: Span) {
+  fn visit_expr(&mut self, expr: &Expr, span: SourceSpan) {
     diag_walk_expr::visit_expr_diag(self, expr, span);
   }
 }

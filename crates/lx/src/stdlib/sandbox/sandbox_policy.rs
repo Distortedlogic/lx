@@ -2,42 +2,21 @@ use indexmap::IndexMap;
 
 use crate::error::LxError;
 use crate::record;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
-use super::sandbox::{Policy, ShellPolicy};
+use super::sandbox::Policy;
 
 pub(super) fn make_preset(name: &str) -> Policy {
   match name {
-    "pure" => Policy {
-      fs_read: vec![],
-      fs_write: vec![],
-      net_allow: vec![],
-      shell: ShellPolicy::Deny,
-      agent: false,
-      mcp: false,
-      ai: false,
-      embed: false,
-      pane: false,
-      max_time_ms: 0,
-    },
-    "readonly" => Policy {
-      fs_read: vec![".".into()],
-      fs_write: vec![],
-      net_allow: vec![],
-      shell: ShellPolicy::Deny,
-      agent: false,
-      mcp: false,
-      ai: false,
-      embed: false,
-      pane: false,
-      max_time_ms: 0,
+    "pure" => Policy { fs_read: vec![], fs_write: vec![], net_allow: vec![], agent: false, mcp: false, ai: false, embed: false, pane: false, max_time_ms: 0 },
+    "readonly" => {
+      Policy { fs_read: vec![".".into()], fs_write: vec![], net_allow: vec![], agent: false, mcp: false, ai: false, embed: false, pane: false, max_time_ms: 0 }
     },
     "local" => Policy {
       fs_read: vec![".".into()],
       fs_write: vec![".".into()],
       net_allow: vec![],
-      shell: ShellPolicy::Allow,
       agent: false,
       mcp: false,
       ai: false,
@@ -49,7 +28,6 @@ pub(super) fn make_preset(name: &str) -> Policy {
       fs_read: vec![".".into()],
       fs_write: vec![".".into()],
       net_allow: vec!["*".into()],
-      shell: ShellPolicy::Deny,
       agent: false,
       mcp: false,
       ai: true,
@@ -61,7 +39,6 @@ pub(super) fn make_preset(name: &str) -> Policy {
       fs_read: vec!["*".into()],
       fs_write: vec!["*".into()],
       net_allow: vec!["*".into()],
-      shell: ShellPolicy::Allow,
       agent: true,
       mcp: true,
       ai: true,
@@ -86,7 +63,7 @@ fn extract_string_list(v: &LxVal) -> Vec<String> {
   }
 }
 
-pub(super) fn parse_policy(config: &IndexMap<String, LxVal>, span: Span) -> Result<Policy, LxError> {
+pub(super) fn parse_policy(config: &IndexMap<String, LxVal>, span: SourceSpan) -> Result<Policy, LxError> {
   let mut p = make_preset("pure");
 
   if let Some(LxVal::Record(fs)) = config.get("fs") {
@@ -102,17 +79,6 @@ pub(super) fn parse_policy(config: &IndexMap<String, LxVal>, span: Span) -> Resu
     && let Some(v) = net.get("allow")
   {
     p.net_allow = extract_string_list(v);
-  }
-
-  match config.get("shell") {
-    Some(LxVal::Bool(true)) => p.shell = ShellPolicy::Allow,
-    Some(LxVal::Bool(false)) => p.shell = ShellPolicy::Deny,
-    Some(LxVal::Record(r)) => {
-      if let Some(v) = r.get("allow") {
-        p.shell = ShellPolicy::AllowList(extract_string_list(v));
-      }
-    },
-    _ => {},
   }
 
   if let Some(LxVal::Bool(b)) = config.get("agent") {
@@ -147,7 +113,6 @@ pub(super) fn intersect_policies(policies: &[Policy]) -> Policy {
     result.fs_read = intersect_paths(&result.fs_read, &p.fs_read);
     result.fs_write = intersect_paths(&result.fs_write, &p.fs_write);
     result.net_allow = intersect_paths(&result.net_allow, &p.net_allow);
-    result.shell = intersect_shell(&result.shell, &p.shell);
     result.agent = result.agent && p.agent;
     result.mcp = result.mcp && p.mcp;
     result.ai = result.ai && p.ai;
@@ -170,28 +135,12 @@ fn intersect_paths(a: &[String], b: &[String]) -> Vec<String> {
   a.iter().filter(|x| b.contains(x)).cloned().collect()
 }
 
-fn intersect_shell(a: &ShellPolicy, b: &ShellPolicy) -> ShellPolicy {
-  match (a, b) {
-    (ShellPolicy::Deny, _) | (_, ShellPolicy::Deny) => ShellPolicy::Deny,
-    (ShellPolicy::AllowList(la), ShellPolicy::AllowList(lb)) => ShellPolicy::AllowList(la.iter().filter(|x| lb.contains(x)).cloned().collect()),
-    (ShellPolicy::AllowList(l), ShellPolicy::Allow) => ShellPolicy::AllowList(l.clone()),
-    (ShellPolicy::Allow, ShellPolicy::AllowList(l)) => ShellPolicy::AllowList(l.clone()),
-    (ShellPolicy::Allow, ShellPolicy::Allow) => ShellPolicy::Allow,
-  }
-}
-
 pub(super) fn policy_to_describe(p: &Policy) -> LxVal {
-  let shell_val = match &p.shell {
-    ShellPolicy::Deny => LxVal::Bool(false),
-    ShellPolicy::Allow => LxVal::Bool(true),
-    ShellPolicy::AllowList(cmds) => LxVal::list(cmds.iter().map(LxVal::str).collect()),
-  };
   let to_list = |v: &[String]| -> LxVal { LxVal::list(v.iter().map(LxVal::str).collect()) };
   record! {
       "fs_read" => to_list(&p.fs_read),
       "fs_write" => to_list(&p.fs_write),
       "net" => to_list(&p.net_allow),
-      "shell" => shell_val,
       "agent" => LxVal::Bool(p.agent),
       "mcp" => LxVal::Bool(p.mcp),
       "ai" => LxVal::Bool(p.ai),
@@ -205,11 +154,6 @@ pub(super) fn permits_check(p: &Policy, capability: &str, target: &str) -> bool 
     "fs_read" => path_matches(&p.fs_read, target),
     "fs_write" => path_matches(&p.fs_write, target),
     "net" => path_matches(&p.net_allow, target),
-    "shell" => match &p.shell {
-      ShellPolicy::Deny => false,
-      ShellPolicy::Allow => true,
-      ShellPolicy::AllowList(cmds) => cmds.iter().any(|c| c == target),
-    },
     "ai" => p.ai,
     "agent" => p.agent,
     "mcp" => p.mcp,

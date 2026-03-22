@@ -7,7 +7,7 @@ pub use walk_pattern::*;
 pub use walk_type::*;
 
 use crate::ast::{BindTarget, Binding, ClassDeclData, Expr, Program, SExpr, Stmt};
-use crate::span::Span;
+use miette::SourceSpan;
 
 use super::AstVisitor;
 
@@ -17,7 +17,7 @@ pub fn walk_program<V: AstVisitor + ?Sized>(v: &mut V, program: &Program) {
   }
 }
 
-pub fn walk_stmt<V: AstVisitor + ?Sized>(v: &mut V, stmt: &Stmt, span: Span) {
+pub fn walk_stmt<V: AstVisitor + ?Sized>(v: &mut V, stmt: &Stmt, span: SourceSpan) {
   match stmt {
     Stmt::Binding(binding) => v.visit_binding(binding, span),
     Stmt::TypeDef { name, variants, exported } => {
@@ -34,7 +34,7 @@ pub fn walk_stmt<V: AstVisitor + ?Sized>(v: &mut V, stmt: &Stmt, span: Span) {
   }
 }
 
-pub fn walk_binding<V: AstVisitor + ?Sized>(v: &mut V, binding: &Binding, _span: Span) {
+pub fn walk_binding<V: AstVisitor + ?Sized>(v: &mut V, binding: &Binding, _span: SourceSpan) {
   if let Some(ref ty) = binding.type_ann {
     v.visit_type_expr(&ty.node, ty.span);
   }
@@ -44,7 +44,7 @@ pub fn walk_binding<V: AstVisitor + ?Sized>(v: &mut V, binding: &Binding, _span:
   v.visit_expr(&binding.value.node, binding.value.span);
 }
 
-pub fn walk_class_decl<V: AstVisitor + ?Sized>(v: &mut V, data: &ClassDeclData, span: Span) {
+pub fn walk_class_decl<V: AstVisitor + ?Sized>(v: &mut V, data: &ClassDeclData, span: SourceSpan) {
   for f in &data.fields {
     v.visit_expr(&f.default.node, f.default.span);
   }
@@ -54,11 +54,11 @@ pub fn walk_class_decl<V: AstVisitor + ?Sized>(v: &mut V, data: &ClassDeclData, 
   v.visit_class_decl_post(data, span);
 }
 
-pub fn walk_field_update<V: AstVisitor + ?Sized>(v: &mut V, value: &SExpr, _span: Span) {
+pub fn walk_field_update<V: AstVisitor + ?Sized>(v: &mut V, value: &SExpr, _span: SourceSpan) {
   v.visit_expr(&value.node, value.span);
 }
 
-pub fn walk_expr<V: AstVisitor + ?Sized>(v: &mut V, expr: &Expr, span: Span) {
+pub fn walk_expr<V: AstVisitor + ?Sized>(v: &mut V, expr: &Expr, span: SourceSpan) {
   match expr {
     Expr::Literal(lit) => v.visit_literal(lit, span),
     Expr::Ident(name) => v.visit_ident(name, span),
@@ -103,6 +103,5 @@ pub fn walk_expr<V: AstVisitor + ?Sized>(v: &mut V, expr: &Expr, span: Span) {
     Expr::WithContext { fields, body } => {
       v.visit_with_context(fields, body, span);
     },
-    Expr::Shell { mode, parts } => v.visit_shell(*mode, parts, span),
   }
 }

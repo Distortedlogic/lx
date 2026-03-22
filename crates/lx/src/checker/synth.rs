@@ -147,7 +147,6 @@ impl Checker {
         Type::Unknown
       },
       Expr::NamedArg { value, .. } => self.synth(value),
-      Expr::Shell { .. } => Type::Result { ok: Box::new(Type::Str), err: Box::new(Type::Str) },
       Expr::Par(stmts) => {
         self.check_mutable_captures_stmts(stmts, expr.span);
         let result = self.check_stmts(stmts);

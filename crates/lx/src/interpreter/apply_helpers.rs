@@ -4,13 +4,13 @@ use num_traits::ToPrimitive;
 
 use crate::ast::{Expr, FieldKind, SExpr, Section, Spanned};
 use crate::error::LxError;
-use crate::span::Span;
 use crate::value::{LxFunc, LxVal};
+use miette::SourceSpan;
 
 use super::Interpreter;
 
 impl Interpreter {
-  fn make_section_func(&self, params: &[&str], body_expr: Expr, span: Span) -> LxVal {
+  fn make_section_func(&self, params: &[&str], body_expr: Expr, span: SourceSpan) -> LxVal {
     let body = Spanned::new(body_expr, span);
     let arity = params.len();
     LxVal::Func(Box::new(LxFunc {
@@ -25,7 +25,7 @@ impl Interpreter {
     }))
   }
 
-  pub(super) fn eval_section(&mut self, sec: &Section, span: Span) -> Result<LxVal, LxError> {
+  pub(super) fn eval_section(&mut self, sec: &Section, span: SourceSpan) -> Result<LxVal, LxError> {
     match sec {
       Section::Right { op, operand } => {
         let body = Expr::Binary { op: *op, left: Box::new(Spanned::new(Expr::Ident("_x".into()), span)), right: Box::new((**operand).clone()) };
@@ -51,7 +51,7 @@ impl Interpreter {
     }
   }
 
-  pub(super) async fn eval_field_access(&mut self, expr: &SExpr, field: &FieldKind, span: Span) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_field_access(&mut self, expr: &SExpr, field: &FieldKind, span: SourceSpan) -> Result<LxVal, LxError> {
     let val = self.eval(expr).await?;
     match field {
       FieldKind::Named(name) => match &val {
@@ -115,7 +115,7 @@ impl Interpreter {
     }
   }
 
-  pub(super) async fn eval_ternary(&mut self, cond: &SExpr, then_: &SExpr, else_: &Option<Box<SExpr>>, span: Span) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_ternary(&mut self, cond: &SExpr, then_: &SExpr, else_: &Option<Box<SExpr>>, span: SourceSpan) -> Result<LxVal, LxError> {
     let cv = self.eval(cond).await?;
     match cv.as_bool() {
       Some(true) => self.eval(then_).await,

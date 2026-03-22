@@ -8,24 +8,16 @@ use crate::builtins::mk;
 use crate::error::LxError;
 use crate::record;
 use crate::runtime::RuntimeCtx;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
 use super::sandbox_policy::{intersect_policies, make_preset, parse_policy, permits_check, policy_to_describe};
-
-#[derive(Clone)]
-pub(super) enum ShellPolicy {
-  Deny,
-  Allow,
-  AllowList(Vec<String>),
-}
 
 #[derive(Clone)]
 pub(super) struct Policy {
   pub fs_read: Vec<String>,
   pub fs_write: Vec<String>,
   pub net_allow: Vec<String>,
-  pub shell: ShellPolicy,
   pub agent: bool,
   pub mcp: bool,
   pub ai: bool,
@@ -37,7 +29,7 @@ pub(super) struct Policy {
 pub(super) static POLICIES: LazyLock<DashMap<u64, Policy>> = LazyLock::new(DashMap::new);
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
-pub(super) fn policy_id(v: &LxVal, span: Span) -> Result<u64, LxError> {
+pub(super) fn policy_id(v: &LxVal, span: SourceSpan) -> Result<u64, LxError> {
   match v {
     LxVal::Record(r) => {
       r.get("__policy_id").and_then(|v| v.as_int()).and_then(|n| n.try_into().ok()).ok_or_else(|| LxError::type_err("sandbox: expected policy handle", span))
@@ -65,7 +57,7 @@ pub fn build() -> IndexMap<String, LxVal> {
   m
 }
 
-fn bi_policy(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_policy(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let policy = match &args[0] {
     LxVal::Str(name) => make_preset(name),
     LxVal::Record(config) => parse_policy(config, span)?,
@@ -78,13 +70,13 @@ fn bi_policy(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal
   Ok(make_handle(id))
 }
 
-fn bi_describe(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_describe(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = policy_id(&args[0], span)?;
   let p = POLICIES.get(&id).ok_or_else(|| LxError::runtime("sandbox: policy not found", span))?;
   Ok(policy_to_describe(&p))
 }
 
-fn bi_permits(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_permits(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = policy_id(&args[0], span)?;
   let capability = match &args[1] {
     LxVal::Str(s) => s.to_string(),
@@ -102,7 +94,7 @@ fn bi_permits(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVa
   Ok(LxVal::Bool(permits_check(&p, &capability, &target)))
 }
 
-fn bi_merge(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_merge(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let LxVal::List(handles) = &args[0] else {
     return Err(LxError::type_err("sandbox.merge expects List of policy handles", span));
   };
@@ -118,7 +110,7 @@ fn bi_merge(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal,
   Ok(make_handle(id))
 }
 
-fn bi_attenuate(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_attenuate(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let parent_id = policy_id(&args[0], span)?;
   let LxVal::Record(overrides) = &args[1] else {
     return Err(LxError::type_err("sandbox.attenuate expects Record overrides", span));

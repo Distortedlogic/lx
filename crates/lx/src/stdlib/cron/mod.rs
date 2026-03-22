@@ -12,8 +12,8 @@ use indexmap::IndexMap;
 use crate::builtins::{call_value, mk};
 use crate::error::LxError;
 use crate::runtime::RuntimeCtx;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
 pub fn build() -> IndexMap<String, LxVal> {
   let mut m = IndexMap::new();
@@ -30,7 +30,7 @@ pub fn build() -> IndexMap<String, LxVal> {
   m
 }
 
-fn bi_schedule(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_schedule(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let expr = args[0].require_str("cron.schedule", span)?;
   let schedule = parse_schedule(expr, span)?;
   require_fn(&args[1], "cron.schedule", span)?;
@@ -59,7 +59,7 @@ fn bi_schedule(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVa
   Ok(LxVal::int(id))
 }
 
-fn bi_every(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_every(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let ms = positive_ms(&args[0], "cron.every", span)?;
   require_fn(&args[1], "cron.every", span)?;
   let callback = args[1].clone();
@@ -83,13 +83,13 @@ fn bi_every(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, 
   Ok(LxVal::int(id))
 }
 
-fn bi_after(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_after(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let ms = positive_ms(&args[0], "cron.after", span)?;
   require_fn(&args[1], "cron.after", span)?;
   Ok(spawn_oneshot(Duration::from_millis(ms), args[1].clone(), span, Arc::clone(ctx), "after"))
 }
 
-fn bi_at(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_at(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let time_str = args[0].require_str("cron.at", span)?;
   let target = DateTime::parse_from_rfc3339(time_str)
     .map(|dt| dt.with_timezone(&Utc))
@@ -103,7 +103,7 @@ fn bi_at(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxE
   Ok(spawn_oneshot(wait, args[1].clone(), span, Arc::clone(ctx), "at"))
 }
 
-fn bi_cancel(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_cancel(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = args[0].require_int("cron.cancel", span)?;
   let id: u64 = id.try_into().map_err(|_| LxError::type_err("cron.cancel: invalid handle", span))?;
   match JOBS.remove(&id) {
@@ -115,7 +115,7 @@ fn bi_cancel(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal
   }
 }
 
-fn bi_next(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_next(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let expr = args[0].require_str("cron.next", span)?;
   let schedule = match parse_schedule(expr, span) {
     Ok(s) => s,
@@ -129,7 +129,7 @@ fn bi_next(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, 
   }
 }
 
-fn bi_next_n(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_next_n(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let n = match &args[0] {
     LxVal::Int(n) => {
       let v: i64 = n.try_into().map_err(|_| LxError::type_err("cron.next_n: count too large", span))?;
@@ -153,18 +153,18 @@ fn bi_next_n(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal
   Ok(LxVal::list(times))
 }
 
-fn bi_list(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_list(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let _ = &args[0];
   let ids: Vec<LxVal> = JOBS.iter().map(|e| LxVal::int(*e.key())).collect();
   Ok(LxVal::list(ids))
 }
 
-fn bi_active(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_active(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let _ = &args[0];
   Ok(LxVal::int(JOBS.len()))
 }
 
-fn bi_run(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_run(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let _ = &args[0];
   loop {
     if JOBS.is_empty() {

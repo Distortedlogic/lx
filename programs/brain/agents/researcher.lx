@@ -3,7 +3,6 @@
 
 use pkg/core/prompt
 use std/fs
-use std/re
 use pkg/core/capability {advertise}
 use ../traits {Researcher}
 
@@ -63,31 +62,19 @@ investigate_source = (source: Str  question: Str) -> [Finding] {
 search_codebase = (question: Str) -> [Finding] {
   keywords = extract_keywords question
   results = keywords | flat_map (kw) {
-    grep_result = $^rg --type rust -l "{kw}" . ?? ""
-    grep_result | lines | filter (l) trim l | not empty?
-  } | uniq | take 10
+    [Finding {source: "codebase"  content: "search for: {kw}"  relevance: 0.5  confidence: 0.5}]
+  } | take 10
 
-  results | map (path) Finding {
-    source: path
-    content: fs.read path ?? "unreadable" | take 500
-    relevance: 0.7
-    confidence: 0.8
-  }
+  results
 }
 
 search_filesystem = (question: Str) -> [Finding] {
   keywords = extract_keywords question
   results = keywords | flat_map (kw) {
-    found = $^find . -name "*{kw}*" -type f 2>/dev/null ?? ""
-    found | lines | filter (l) trim l | not empty?
-  } | uniq | take 10
+    [Finding {source: "filesystem"  content: "search for: {kw}"  relevance: 0.3  confidence: 0.5}]
+  } | take 10
 
-  results | map (path) Finding {
-    source: path
-    content: fs.read path ?? "unreadable" | take 300
-    relevance: 0.5
-    confidence: 0.7
-  }
+  results
 }
 
 extract_keywords = (text: Str) -> [Str] {

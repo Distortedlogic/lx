@@ -1,11 +1,9 @@
-use std::sync::Arc;
-
 use num_traits::ToPrimitive;
 
 use crate::ast::{BinOp, Literal, SExpr, StrPart, UnaryOp};
 use crate::error::LxError;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
 use super::Interpreter;
 
@@ -29,17 +27,13 @@ fn dedent_string(s: &str) -> String {
 }
 
 impl Interpreter {
-  pub(super) async fn eval_literal(&mut self, lit: &Literal, span: Span) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_literal(&mut self, lit: &Literal, span: SourceSpan) -> Result<LxVal, LxError> {
     match lit {
       Literal::Int(n) => Ok(LxVal::Int(n.clone())),
       Literal::Float(f) => Ok(LxVal::Float(*f)),
       Literal::Bool(b) => Ok(LxVal::Bool(*b)),
       Literal::Str(parts) => self.eval_string_parts(parts).await,
       Literal::RawStr(s) => Ok(LxVal::str(s)),
-      Literal::Regex(s) => {
-        let re = regex::Regex::new(s).map_err(|e| LxError::runtime(format!("invalid regex: {e}"), span))?;
-        Ok(LxVal::Regex(Arc::new(re)))
-      },
       Literal::Unit => {
         let _ = span;
         Ok(LxVal::Unit)
@@ -47,7 +41,7 @@ impl Interpreter {
     }
   }
 
-  pub(super) fn binary_op(&self, op: &BinOp, lv: &LxVal, rv: &LxVal, span: Span) -> Result<LxVal, LxError> {
+  pub(super) fn binary_op(&self, op: &BinOp, lv: &LxVal, rv: &LxVal, span: SourceSpan) -> Result<LxVal, LxError> {
     match op {
       BinOp::Eq => return Ok(LxVal::Bool(lv == rv)),
       BinOp::NotEq => return Ok(LxVal::Bool(lv != rv)),
@@ -69,7 +63,7 @@ impl Interpreter {
         if b.sign() == num_bigint::Sign::NoSign {
           return Err(LxError::division_by_zero(span));
         }
-        let (q, r) = num_integer::div_rem(a.clone(), b.clone());
+        let (q, r) = (a.clone() / b.clone(), a.clone() % b.clone());
         if r.sign() != num_bigint::Sign::NoSign && (a.sign() != b.sign()) { Ok(LxVal::Int(q - 1)) } else { Ok(LxVal::Int(q)) }
       },
       (BinOp::Mod, LxVal::Int(a), LxVal::Int(b)) => {
@@ -131,7 +125,7 @@ impl Interpreter {
     }
   }
 
-  pub(super) async fn eval_unary(&mut self, op: &UnaryOp, operand: &SExpr, span: Span) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_unary(&mut self, op: &UnaryOp, operand: &SExpr, span: SourceSpan) -> Result<LxVal, LxError> {
     let v = self.eval(operand).await?;
     match (op, &v) {
       (UnaryOp::Neg, LxVal::Int(n)) => Ok(LxVal::Int(-n)),
@@ -159,7 +153,7 @@ impl Interpreter {
     Ok(LxVal::str(buf))
   }
 
-  pub(super) async fn eval_short_circuit(&mut self, left: &SExpr, right: &SExpr, is_and: bool, span: Span) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_short_circuit(&mut self, left: &SExpr, right: &SExpr, is_and: bool, span: SourceSpan) -> Result<LxVal, LxError> {
     let l = self.eval(left).await?;
     let l = self.force_defaults(l, span).await?;
     let short_circuit_on = !is_and;
@@ -174,7 +168,7 @@ impl Interpreter {
     }
   }
 
-  pub(super) async fn close_resource(&mut self, val: &LxVal, span: Span) {
+  pub(super) async fn close_resource(&mut self, val: &LxVal, span: SourceSpan) {
     if let LxVal::Record(fields) = val
       && let Some(close_fn) = fields.get("close")
       && let Err(e) = crate::builtins::call_value(close_fn, LxVal::Unit, span, &self.ctx).await

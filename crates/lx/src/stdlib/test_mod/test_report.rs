@@ -4,12 +4,12 @@ use indexmap::IndexMap;
 
 use crate::error::LxError;
 use crate::runtime::RuntimeCtx;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
 use super::{extract_record, score_to_f64};
 
-pub(crate) fn bi_report(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(crate) fn bi_report(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let results = extract_record(&args[0], "test.report", span)?;
   let spec_name = results.get("spec").and_then(|v| v.as_str()).unwrap_or("unnamed");
   let threshold = results.get("threshold").and_then(|v| v.as_float()).unwrap_or(0.75);

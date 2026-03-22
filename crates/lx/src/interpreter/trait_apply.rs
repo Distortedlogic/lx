@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
 use crate::error::LxError;
-use crate::span::Span;
 use crate::value::{FieldDef, LxVal};
+use miette::SourceSpan;
 
 use super::Interpreter;
 
 impl Interpreter {
-  pub(super) async fn apply_trait_fields(&mut self, name: &str, fields: &Arc<Vec<FieldDef>>, arg: &LxVal, _span: Span) -> Result<LxVal, LxError> {
+  pub(super) async fn apply_trait_fields(&mut self, name: &str, fields: &Arc<Vec<FieldDef>>, arg: &LxVal, _span: SourceSpan) -> Result<LxVal, LxError> {
     let LxVal::Record(rec) = arg else {
       return Ok(LxVal::Err(Box::new(LxVal::str(format!("Trait {name}: expected Record, got {}", arg.type_name())))));
     };
@@ -48,7 +48,7 @@ impl Interpreter {
     Ok(LxVal::record(result))
   }
 
-  pub(super) async fn apply_trait_union(&mut self, name: &str, variants: &Arc<Vec<Arc<str>>>, arg: &LxVal, span: Span) -> Result<LxVal, LxError> {
+  pub(super) async fn apply_trait_union(&mut self, name: &str, variants: &Arc<Vec<Arc<str>>>, arg: &LxVal, span: SourceSpan) -> Result<LxVal, LxError> {
     let LxVal::Record(rec) = arg else {
       return Ok(LxVal::Err(Box::new(LxVal::str(format!("Trait union {name}: expected Record, got {}", arg.type_name())))));
     };
@@ -76,7 +76,7 @@ impl Interpreter {
     Ok(LxVal::Err(Box::new(LxVal::str(format!("Trait union {name}: no variant matched. Tried: {}", variant_names.join(", "))))))
   }
 
-  fn try_match_variant(&mut self, fields: &Arc<Vec<FieldDef>>, rec: &Arc<indexmap::IndexMap<String, LxVal>>, span: Span) -> Result<(), LxError> {
+  fn try_match_variant(&mut self, fields: &Arc<Vec<FieldDef>>, rec: &Arc<indexmap::IndexMap<String, LxVal>>, span: SourceSpan) -> Result<(), LxError> {
     for field in fields.iter() {
       match rec.get(&field.name) {
         Some(val) => {

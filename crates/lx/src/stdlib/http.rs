@@ -5,8 +5,8 @@ use indexmap::IndexMap;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::runtime::{HttpOpts, RuntimeCtx};
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
 pub fn build() -> IndexMap<String, LxVal> {
   let mut m = IndexMap::new();
@@ -17,7 +17,7 @@ pub fn build() -> IndexMap<String, LxVal> {
   m
 }
 
-fn extract_opts(val: &LxVal, _span: Span) -> Result<HttpOpts, LxError> {
+fn extract_opts(val: &LxVal, _span: SourceSpan) -> Result<HttpOpts, LxError> {
   let LxVal::Record(fields) = val else {
     return Ok(HttpOpts::default());
   };
@@ -41,7 +41,7 @@ fn extract_opts(val: &LxVal, _span: Span) -> Result<HttpOpts, LxError> {
   Ok(HttpOpts { headers, query, body })
 }
 
-fn bi_get(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_get(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let (url, opts) = match &args[0] {
     LxVal::Str(s) => (s.to_string(), HttpOpts::default()),
     LxVal::Record(fields) => {
@@ -56,21 +56,21 @@ fn bi_get(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, Lx
   ctx.http.request("GET", &url, &opts, span)
 }
 
-fn bi_post(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_post(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let url = args[0].require_str("http.post", span)?;
   let body = serde_json::Value::from(&args[1]);
   let opts = HttpOpts { body: Some(body), ..Default::default() };
   ctx.http.request("POST", url, &opts, span)
 }
 
-fn bi_put(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_put(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let url = args[0].require_str("http.put", span)?;
   let body = serde_json::Value::from(&args[1]);
   let opts = HttpOpts { body: Some(body), ..Default::default() };
   ctx.http.request("PUT", url, &opts, span)
 }
 
-fn bi_delete(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_delete(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let url = args[0].require_str("http.delete", span)?;
   ctx.http.request("DELETE", url, &HttpOpts::default(), span)
 }

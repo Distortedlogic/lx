@@ -2,13 +2,13 @@ use std::sync::Arc;
 
 use crate::ast::{Param, SExpr};
 use crate::error::LxError;
-use crate::span::Span;
 use crate::value::{BuiltinKind, LxFunc, LxVal};
+use miette::SourceSpan;
 
 use super::Interpreter;
 
 impl Interpreter {
-  pub async fn apply_func(&mut self, func: LxVal, arg: LxVal, span: Span) -> Result<LxVal, LxError> {
+  pub async fn apply_func(&mut self, func: LxVal, arg: LxVal, span: SourceSpan) -> Result<LxVal, LxError> {
     match func {
       LxVal::Func(mut lf) => {
         if let LxVal::Unit = &arg
@@ -105,7 +105,7 @@ impl Interpreter {
     }
   }
 
-  pub(super) async fn force_defaults(&mut self, val: LxVal, _span: Span) -> Result<LxVal, LxError> {
+  pub(super) async fn force_defaults(&mut self, val: LxVal, _span: SourceSpan) -> Result<LxVal, LxError> {
     match val {
       LxVal::Func(ref lf) if lf.applied.len() < lf.arity && (lf.applied.len()..lf.arity).all(|i| matches!(lf.defaults.get(i), Some(Some(_)))) => {
         let LxVal::Func(lf) = val else { unreachable!() };
@@ -132,7 +132,7 @@ impl Interpreter {
     }
   }
 
-  pub(super) async fn eval_pipe(&mut self, left: &SExpr, right: &SExpr, span: Span) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_pipe(&mut self, left: &SExpr, right: &SExpr, span: SourceSpan) -> Result<LxVal, LxError> {
     let val = self.eval(left).await?;
     let val = self.force_defaults(val, span).await?;
     let func = self.eval(right).await?;

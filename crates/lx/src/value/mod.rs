@@ -12,7 +12,7 @@ use strum::IntoStaticStr;
 use crate::ast::SExpr;
 use crate::env::Env;
 use crate::error::LxError;
-use crate::span::Span;
+use miette::SourceSpan;
 
 #[derive(Debug, Clone, IntoStaticStr, derive_more::From)]
 pub enum LxVal {
@@ -24,7 +24,6 @@ pub enum LxVal {
   Bool(bool),
   #[from(Arc<str>, String)]
   Str(Arc<str>),
-  Regex(Arc<regex::Regex>),
   Unit,
 
   List(Arc<Vec<LxVal>>),
@@ -107,27 +106,27 @@ impl LxVal {
     LxVal::Tuple(Arc::new(items))
   }
 
-  pub fn require_str(&self, ctx: &str, span: Span) -> Result<&str, LxError> {
+  pub fn require_str(&self, ctx: &str, span: SourceSpan) -> Result<&str, LxError> {
     self.as_str().ok_or_else(|| LxError::type_err(format!("{ctx} expects Str, got {}", self.type_name()), span))
   }
 
-  pub fn require_int(&self, ctx: &str, span: Span) -> Result<&BigInt, LxError> {
+  pub fn require_int(&self, ctx: &str, span: SourceSpan) -> Result<&BigInt, LxError> {
     self.as_int().ok_or_else(|| LxError::type_err(format!("{ctx} expects Int, got {}", self.type_name()), span))
   }
 
-  pub fn require_float(&self, ctx: &str, span: Span) -> Result<f64, LxError> {
+  pub fn require_float(&self, ctx: &str, span: SourceSpan) -> Result<f64, LxError> {
     self.as_float().ok_or_else(|| LxError::type_err(format!("{ctx} expects Float, got {}", self.type_name()), span))
   }
 
-  pub fn require_bool(&self, ctx: &str, span: Span) -> Result<bool, LxError> {
+  pub fn require_bool(&self, ctx: &str, span: SourceSpan) -> Result<bool, LxError> {
     self.as_bool().ok_or_else(|| LxError::type_err(format!("{ctx} expects Bool, got {}", self.type_name()), span))
   }
 
-  pub fn require_list(&self, ctx: &str, span: Span) -> Result<&[LxVal], LxError> {
+  pub fn require_list(&self, ctx: &str, span: SourceSpan) -> Result<&[LxVal], LxError> {
     self.as_list().map(|l| l.as_slice()).ok_or_else(|| LxError::type_err(format!("{ctx} expects List, got {}", self.type_name()), span))
   }
 
-  pub fn require_record(&self, ctx: &str, span: Span) -> Result<&IndexMap<String, LxVal>, LxError> {
+  pub fn require_record(&self, ctx: &str, span: SourceSpan) -> Result<&IndexMap<String, LxVal>, LxError> {
     match self {
       LxVal::Record(r) => Ok(r.as_ref()),
       _ => Err(LxError::type_err(format!("{ctx} expects Record, got {}", self.type_name()), span)),
@@ -240,10 +239,10 @@ pub struct LxFunc {
   pub source_name: Arc<str>,
 }
 
-pub type SyncBuiltinFn = fn(&[LxVal], Span, &std::sync::Arc<crate::runtime::RuntimeCtx>) -> Result<LxVal, LxError>;
+pub type SyncBuiltinFn = fn(&[LxVal], SourceSpan, &std::sync::Arc<crate::runtime::RuntimeCtx>) -> Result<LxVal, LxError>;
 
 pub type AsyncBuiltinFn =
-  fn(Vec<LxVal>, Span, std::sync::Arc<crate::runtime::RuntimeCtx>) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<LxVal, LxError>>>>;
+  fn(Vec<LxVal>, SourceSpan, std::sync::Arc<crate::runtime::RuntimeCtx>) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<LxVal, LxError>>>>;
 
 #[derive(Clone, Copy)]
 pub enum BuiltinKind {

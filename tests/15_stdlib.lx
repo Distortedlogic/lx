@@ -166,46 +166,6 @@ assert (val_or_default == "fallback") "env.get with coalesce"
 wd = env.cwd ()
 assert (len wd > 0) "env.cwd returns non-empty string"
 
--- === std/re ===
-use std/re
-
--- is_match
-assert (re.is_match "\\d+" "abc123" == true) "re.is_match digits"
-assert (re.is_match "^\\d+$" "abc123" == false) "re.is_match full string"
-
--- match
-m = re.match "\\d+" "abc123def"
-assert (m == Some {text: "123" start: 3 end: 6}) "re.match result"
-
--- match failure
-assert (re.match "\\d+" "abcdef" == None) "re.match no match"
-
--- find_all
-found = re.find_all "\\d+" "a1b22c333"
-assert (found == ["1" "22" "333"]) "re.find_all"
-
--- replace (first only)
-r1 = re.replace "\\d+" "X" "a1b2c3"
-assert (r1 == "aXb2c3") "re.replace first"
-
--- replace_all
-r2 = re.replace_all "\\d+" "X" "a1b2c3"
-assert (r2 == "aXbXcX") "re.replace_all"
-
--- split
-parts = re.split "[,;]" "a,b;c,d"
-assert (parts == ["a" "b" "c" "d"]) "re.split"
-
--- works with string patterns
-assert (re.is_match "\\d+" "abc123" == true) "re with string pattern"
-found2 = re.find_all "(?i)[A-Z]+" "Hello World"
-assert (found2 == ["Hello" "World"]) "re with inline flags"
-
--- pipeline
-digits = "phone: 555-1234, ext: 42"
-  | re.find_all "\\d+"
-assert (digits == ["555" "1234" "42"]) "re in pipeline"
-
 -- === std/md ===
 use pkg/data/md
 

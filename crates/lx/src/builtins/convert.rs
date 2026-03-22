@@ -6,12 +6,12 @@ use num_traits::ToPrimitive;
 use crate::env::Env;
 use crate::error::LxError;
 use crate::runtime::RuntimeCtx;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
 use super::mk;
 
-fn bi_collect(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_collect(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Range { start, end, inclusive } => {
       let items: Vec<LxVal> = if *inclusive { (*start..=*end).map(LxVal::int).collect() } else { (*start..*end).map(LxVal::int).collect() };
@@ -21,7 +21,7 @@ fn bi_collect(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxV
   }
 }
 
-fn bi_step(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_step(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let step = args[0].require_int("step", span)?;
   let step = step.to_i64().ok_or_else(|| LxError::runtime("step: value too large", span))?;
   if step <= 0 {
@@ -46,7 +46,7 @@ fn bi_step(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, 
   }
 }
 
-fn bi_require(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_require(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   match &args[1] {
     LxVal::Some(v) => Ok(LxVal::Ok(v.clone())),
     LxVal::None => Ok(LxVal::Err(Box::new(args[0].clone()))),
@@ -54,7 +54,7 @@ fn bi_require(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxV
   }
 }
 
-fn bi_parse_int(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_parse_int(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Str(s) => match s.parse::<BigInt>() {
       Ok(n) => Ok(LxVal::Ok(Box::new(LxVal::Int(n)))),
@@ -64,7 +64,7 @@ fn bi_parse_int(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Lx
   }
 }
 
-fn bi_parse_float(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_parse_float(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Str(s) => match s.parse::<f64>() {
       Ok(f) => Ok(LxVal::Ok(Box::new(LxVal::Float(f)))),
@@ -74,7 +74,7 @@ fn bi_parse_float(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<
   }
 }
 
-fn bi_to_int(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_to_int(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Int(_) => Ok(args[0].clone()),
     LxVal::Float(f) => Ok(LxVal::int(*f as i64)),
@@ -84,7 +84,7 @@ fn bi_to_int(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal
   }
 }
 
-fn bi_to_float(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_to_float(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Float(_) => Ok(args[0].clone()),
     LxVal::Int(n) => n.to_f64().map(LxVal::Float).ok_or_else(|| LxError::runtime("to_float: int too large", span)),
@@ -93,7 +93,7 @@ fn bi_to_float(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxV
   }
 }
 
-fn bi_timeout(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_timeout(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let secs = match &args[0] {
     LxVal::Int(n) => n.to_f64().ok_or_else(|| LxError::runtime("timeout: value too large", span))?,
     LxVal::Float(f) => *f,

@@ -2,10 +2,10 @@ use std::sync::Arc;
 
 use crate::error::LxError;
 use crate::runtime::RuntimeCtx;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
-pub(super) fn invoke_flow(flow_path: &str, input: &LxVal, ctx: &Arc<RuntimeCtx>, span: Span) -> Result<LxVal, LxError> {
+pub(super) fn invoke_flow(flow_path: &str, input: &LxVal, ctx: &Arc<RuntimeCtx>, span: SourceSpan) -> Result<LxVal, LxError> {
   let path = if flow_path.starts_with("./") || flow_path.starts_with("../") {
     if let Some(ref dir) = *ctx.source_dir.lock() { dir.join(flow_path) } else { std::path::PathBuf::from(flow_path) }
   } else {

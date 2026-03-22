@@ -14,8 +14,8 @@ use indexmap::IndexMap;
 use smart_default::SmartDefault;
 
 use crate::error::LxError;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
 #[derive(SmartDefault)]
 pub struct RuntimeCtx {
@@ -23,8 +23,6 @@ pub struct RuntimeCtx {
   pub emit: Arc<dyn EmitBackend>,
   #[default(Arc::new(ReqwestHttpBackend))]
   pub http: Arc<dyn HttpBackend>,
-  #[default(Arc::new(ProcessShellBackend))]
-  pub shell: Arc<dyn ShellBackend>,
   #[default(Arc::new(StdinStdoutYieldBackend))]
   pub yield_: Arc<dyn YieldBackend>,
   #[default(Arc::new(StderrLogBackend))]
@@ -48,20 +46,15 @@ pub struct HttpOpts {
 }
 
 pub trait EmitBackend: Send + Sync {
-  fn emit(&self, value: &LxVal, span: Span) -> Result<(), LxError>;
+  fn emit(&self, value: &LxVal, span: SourceSpan) -> Result<(), LxError>;
 }
 
 pub trait HttpBackend: Send + Sync {
-  fn request(&self, method: &str, url: &str, opts: &HttpOpts, span: Span) -> Result<LxVal, LxError>;
-}
-
-pub trait ShellBackend: Send + Sync {
-  fn exec(&self, cmd: &str, span: Span) -> Result<LxVal, LxError>;
-  fn exec_capture(&self, cmd: &str, span: Span) -> Result<LxVal, LxError>;
+  fn request(&self, method: &str, url: &str, opts: &HttpOpts, span: SourceSpan) -> Result<LxVal, LxError>;
 }
 
 pub trait YieldBackend: Send + Sync {
-  fn yield_value(&self, value: LxVal, span: Span) -> Result<LxVal, LxError>;
+  fn yield_value(&self, value: LxVal, span: SourceSpan) -> Result<LxVal, LxError>;
 }
 
 #[derive(Debug, Clone, Copy)]

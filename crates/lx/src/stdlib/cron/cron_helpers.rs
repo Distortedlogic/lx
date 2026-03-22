@@ -11,8 +11,8 @@ use crate::builtins::call_value;
 use crate::error::LxError;
 use crate::record;
 use crate::runtime::RuntimeCtx;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
 pub(super) static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -31,12 +31,12 @@ pub(super) fn normalize_cron(expr: &str) -> String {
   }
 }
 
-pub(super) fn parse_schedule(expr: &str, span: Span) -> Result<Schedule, LxError> {
+pub(super) fn parse_schedule(expr: &str, span: SourceSpan) -> Result<Schedule, LxError> {
   let normalized = normalize_cron(expr);
   Schedule::from_str(&normalized).map_err(|e| LxError::runtime(format!("cron: invalid expression '{expr}': {e}"), span))
 }
 
-pub(super) fn positive_ms(val: &LxVal, name: &str, span: Span) -> Result<u64, LxError> {
+pub(super) fn positive_ms(val: &LxVal, name: &str, span: SourceSpan) -> Result<u64, LxError> {
   match val {
     LxVal::Int(n) => {
       let v: i64 = n.try_into().map_err(|_| LxError::type_err(format!("{name}: value too large"), span))?;
@@ -55,7 +55,7 @@ pub(super) fn positive_ms(val: &LxVal, name: &str, span: Span) -> Result<u64, Lx
   }
 }
 
-pub(super) fn require_fn(val: &LxVal, name: &str, span: Span) -> Result<(), LxError> {
+pub(super) fn require_fn(val: &LxVal, name: &str, span: SourceSpan) -> Result<(), LxError> {
   match val {
     LxVal::Func(_) | LxVal::BuiltinFunc(_) => Ok(()),
     _ => Err(LxError::type_err(format!("{name}: expected a function"), span)),
@@ -72,7 +72,7 @@ pub(super) fn sleep_cancellable(dur: Duration, cancel: &AtomicBool) -> bool {
   cancel.load(Ordering::Relaxed)
 }
 
-pub(super) fn spawn_oneshot(dur: Duration, callback: LxVal, span: Span, ctx: Arc<RuntimeCtx>, label: &'static str) -> LxVal {
+pub(super) fn spawn_oneshot(dur: Duration, callback: LxVal, span: SourceSpan, ctx: Arc<RuntimeCtx>, label: &'static str) -> LxVal {
   let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
   let cancel = Arc::new(AtomicBool::new(false));
   let flag = cancel.clone();

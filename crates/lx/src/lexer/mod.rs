@@ -1,14 +1,17 @@
 mod helpers;
-mod keywords;
-mod numbers;
+mod raw_token;
 mod strings;
 pub mod token;
 
 use crate::error::LxError;
-use crate::span::Span;
+use helpers::{ident_or_keyword, type_name_or_keyword};
+use logos::Logos;
+use miette::{SourceOffset, SourceSpan};
+use num_bigint::BigInt;
+use raw_token::RawToken;
 use token::{Token, TokenKind};
 
-struct Lexer<'src> {
+pub(crate) struct Lexer<'src> {
   source: &'src str,
   pos: usize,
   tokens: Vec<Token>,
@@ -19,32 +22,14 @@ struct Lexer<'src> {
 
 pub fn lex(source: &str) -> Result<Vec<Token>, LxError> {
   let mut lexer = Lexer { source, pos: 0, tokens: Vec::new(), depth: 0, last_was_semi: true, brace_stack: Vec::new() };
-  loop {
-    lexer.skip_whitespace_and_comments();
-    if lexer.pos >= source.len() {
-      break;
-    }
-    if let Some(tok) = lexer.next_token()? {
-      lexer.emit(tok);
-    }
-  }
-  lexer.tokens.push(Token::new(TokenKind::Eof, Span::new(source.len() as u32, 0)));
+  lexer.run()?;
+  lexer.tokens.push(Token::new(TokenKind::Eof, SourceSpan::new(SourceOffset::from(source.len()), 0)));
   Ok(lexer.tokens)
 }
 
 impl<'src> Lexer<'src> {
-  fn advance(&mut self) -> Option<char> {
-    let c = self.source[self.pos..].chars().next()?;
-    self.pos += c.len_utf8();
-    Some(c)
-  }
-
-  fn peek(&self) -> Option<char> {
-    self.source[self.pos..].chars().next()
-  }
-
-  fn peek_ahead(&self, n: usize) -> Option<char> {
-    self.source[self.pos..].chars().nth(n)
+  fn sp(&self, start: usize, end: usize) -> SourceSpan {
+    SourceSpan::new(SourceOffset::from(start), end - start)
   }
 
   fn emit(&mut self, tok: Token) {
@@ -57,34 +42,17 @@ impl<'src> Lexer<'src> {
   }
 
   fn push(&mut self, kind: TokenKind, start: usize, end: usize) {
-    let tok = Token::new(kind, Span::from_range(start as u32, end as u32));
-    self.emit(tok);
+    self.emit(Token::new(kind, self.sp(start, end)));
   }
 
-  fn skip_whitespace_and_comments(&mut self) {
-    loop {
-      while self.pos < self.source.len() {
-        let c = self.source[self.pos..].chars().next().unwrap_or('\0');
-        if c == ' ' || c == '\t' || c == '\r' {
-          self.pos += 1;
-        } else if c == '\n' {
-          self.pos += 1;
-          if self.depth <= 0 {
-            let span = Span::new(self.pos as u32 - 1, 1);
-            self.emit(Token::new(TokenKind::Semi, span));
-          }
-        } else {
-          break;
-        }
-      }
-      if self.source[self.pos..].starts_with("--") {
-        while self.pos < self.source.len() && !self.source[self.pos..].starts_with('\n') {
-          self.pos += self.source[self.pos..].chars().next().map_or(1, |c| c.len_utf8());
-        }
-      } else {
-        break;
-      }
-    }
+  fn advance(&mut self) -> Option<char> {
+    let c = self.source[self.pos..].chars().next()?;
+    self.pos += c.len_utf8();
+    Some(c)
+  }
+
+  fn peek(&self) -> Option<char> {
+    self.source[self.pos..].chars().next()
   }
 
   fn at_line_start(&self, pos: usize) -> bool {
@@ -92,155 +60,155 @@ impl<'src> Lexer<'src> {
       return true;
     }
     for c in self.source[..pos].chars().rev() {
-      if c == '\n' {
-        return true;
-      }
-      if c != ' ' && c != '\t' && c != '\r' {
-        return false;
+      match c {
+        '\n' => return true,
+        ' ' | '\t' | '\r' => continue,
+        _ => return false,
       }
     }
     true
   }
 
-  fn next_token(&mut self) -> Result<Option<Token>, LxError> {
-    if self.pos >= self.source.len() {
-      return Ok(None);
+  fn strip_underscores(s: &str) -> String {
+    s.chars().filter(|c| *c != '_').collect()
+  }
+
+  fn run(&mut self) -> Result<(), LxError> {
+    let mut base: usize = 0;
+    'outer: loop {
+      let mut logos_lex = RawToken::lexer(&self.source[base..]);
+      while let Some(result) = logos_lex.next() {
+        let rel = logos_lex.span();
+        let (start, end) = (base + rel.start, base + rel.end);
+        let slice = logos_lex.slice();
+        self.pos = end;
+        if self.dispatch(start, end, slice, result)? {
+          base = self.pos;
+          continue 'outer;
+        }
+      }
+      break;
     }
-    let start = self.pos;
-    let c = self.advance().expect("next_token called at end of source");
-    match c {
-      '"' => {
-        self.read_string(start)?;
-        Ok(None)
+    Ok(())
+  }
+
+  fn dispatch(&mut self, start: usize, end: usize, slice: &str, result: Result<RawToken, ()>) -> Result<bool, LxError> {
+    let raw = result.map_err(|()| {
+      let c = self.source[start..].chars().next().unwrap_or('?');
+      LxError::parse(format!("unexpected character: {c}"), self.sp(start, start + c.len_utf8()), None)
+    })?;
+    let span = self.sp(start, end);
+    match raw {
+      RawToken::Newline => {
+        if self.depth <= 0 {
+          self.emit(Token::new(TokenKind::Semi, span));
+        }
       },
-      '`' => self.read_raw_string(start).map(Some),
-      '(' => {
+      RawToken::Comment => {},
+      RawToken::LParen => {
         self.depth += 1;
-        Ok(Some(self.tok(TokenKind::LParen, start)))
+        self.emit(Token::new(TokenKind::LParen, span));
       },
-      ')' => {
+      RawToken::RParen => {
         self.depth -= 1;
-        Ok(Some(self.tok(TokenKind::RParen, start)))
+        self.emit(Token::new(TokenKind::RParen, span));
       },
-      '[' => {
+      RawToken::LBracket => {
         self.depth += 1;
-        Ok(Some(self.tok(TokenKind::LBracket, start)))
+        self.emit(Token::new(TokenKind::LBracket, span));
       },
-      ']' => {
+      RawToken::RBracket => {
         self.depth -= 1;
-        Ok(Some(self.tok(TokenKind::RBracket, start)))
+        self.emit(Token::new(TokenKind::RBracket, span));
       },
-      '{' => {
+      RawToken::LBrace => {
         self.brace_stack.push(false);
-        Ok(Some(self.tok(TokenKind::LBrace, start)))
+        self.emit(Token::new(TokenKind::LBrace, span));
       },
-      '}' => {
-        if let Some(suppresses) = self.brace_stack.pop()
-          && suppresses
-        {
+      RawToken::RBrace => {
+        if let Some(true) = self.brace_stack.pop() {
           self.depth -= 1;
         }
-        Ok(Some(self.tok(TokenKind::RBrace, start)))
+        self.emit(Token::new(TokenKind::RBrace, span));
       },
-      ';' | ',' => Ok(Some(self.tok(TokenKind::Semi, start))),
-      '^' => Ok(Some(self.tok(TokenKind::Caret, start))),
-      '~' => Ok(Some(self.tok(TokenKind::Bang, start))),
-      '?' => self.eat('?', TokenKind::QQ, TokenKind::Question, start),
-      '&' => self.eat('&', TokenKind::And, TokenKind::Amp, start),
-      '|' => self.eat('|', TokenKind::Or, TokenKind::Pipe, start),
-      '!' => self.eat('=', TokenKind::NotEq, TokenKind::Bang, start),
-      '=' => self.eat('=', TokenKind::Eq, TokenKind::Assign, start),
-      ':' => self.eat('=', TokenKind::DeclMut, TokenKind::Colon, start),
-      '*' => Ok(Some(self.tok(TokenKind::Star, start))),
-      '%' => {
-        if self.peek() == Some('{') {
-          self.advance();
-          self.depth += 1;
-          self.brace_stack.push(true);
-          Ok(Some(self.tok2(TokenKind::PercentLBrace, start)))
+      RawToken::PercentLBrace => {
+        self.depth += 1;
+        self.brace_stack.push(true);
+        self.emit(Token::new(TokenKind::PercentLBrace, span));
+      },
+      RawToken::Semi | RawToken::Comma => self.emit(Token::new(TokenKind::Semi, span)),
+      RawToken::Hash => return Err(LxError::parse("unexpected character: #", span, None)),
+      RawToken::Quote => {
+        self.read_string(start)?;
+        return Ok(true);
+      },
+      RawToken::Backtick => {
+        let tok = self.read_raw_string(start)?;
+        self.emit(tok);
+        return Ok(true);
+      },
+      RawToken::Ident if slice == "_" => self.emit(Token::new(TokenKind::Underscore, span)),
+      RawToken::Ident => self.emit(Token::new(ident_or_keyword(slice), span)),
+      RawToken::TypeName => self.emit(Token::new(type_name_or_keyword(slice), span)),
+      RawToken::Plus => {
+        let kind = if self.at_line_start(start) && self.source[end..].starts_with(|c: char| c.is_ascii_alphabetic() || c == '_') {
+          TokenKind::Export
         } else {
-          Ok(Some(self.tok(TokenKind::Percent, start)))
-        }
+          TokenKind::Plus
+        };
+        self.emit(Token::new(kind, span));
       },
-      '#' => Err(LxError::parse("unexpected character: #", Span::new(start as u32, 1), None)),
-      '+' => {
-        if self.peek() == Some('+') {
-          self.advance();
-          Ok(Some(self.tok2(TokenKind::PlusPlus, start)))
-        } else if self.at_line_start(start) && self.peek().is_some_and(|ch| ch.is_ascii_alphabetic() || ch == '_') {
-          Ok(Some(self.tok(TokenKind::Export, start)))
-        } else {
-          Ok(Some(self.tok(TokenKind::Plus, start)))
-        }
+      RawToken::DotDot if self.source[end..].starts_with('.') => {
+        self.emit(Token::new(TokenKind::Dot, self.sp(start, start + 1)));
+        self.pos = start + 1;
+        return Ok(true);
       },
-      '-' => {
-        if self.peek() == Some('>') {
-          self.advance();
-          Ok(Some(self.tok2(TokenKind::Arrow, start)))
-        } else {
-          Ok(Some(self.tok(TokenKind::Minus, start)))
-        }
+      RawToken::HexInt => {
+        self.emit_int(slice, 2, 16, span)?;
       },
-      '/' => {
-        if self.peek() == Some('/') {
-          self.advance();
-          Ok(Some(self.tok2(TokenKind::IntDiv, start)))
-        } else {
-          Ok(Some(self.tok(TokenKind::Slash, start)))
-        }
+      RawToken::BinInt => {
+        self.emit_int(slice, 2, 2, span)?;
       },
-      '<' => {
-        if self.peek() == Some('-') {
-          self.advance();
-          Ok(Some(self.tok2(TokenKind::Reassign, start)))
-        } else if self.peek() == Some('=') {
-          self.advance();
-          Ok(Some(self.tok2(TokenKind::LtEq, start)))
-        } else {
-          Ok(Some(self.tok(TokenKind::Lt, start)))
-        }
+      RawToken::OctInt => {
+        self.emit_int(slice, 2, 8, span)?;
       },
-      '>' => self.eat('=', TokenKind::GtEq, TokenKind::Gt, start),
-      '.' => {
-        if self.peek() == Some('.') {
-          if self.peek_ahead(1) == Some('.') {
-            Ok(Some(self.tok(TokenKind::Dot, start)))
-          } else {
-            self.advance();
-            if self.peek() == Some('=') {
-              self.advance();
-              Ok(Some(Token::new(TokenKind::DotDotEq, Span::from_range(start as u32, self.pos as u32))))
-            } else {
-              Ok(Some(self.tok2(TokenKind::DotDot, start)))
-            }
-          }
-        } else {
-          Ok(Some(self.tok(TokenKind::Dot, start)))
-        }
+      RawToken::FloatLit | RawToken::FloatExp => {
+        let v: f64 = Self::strip_underscores(slice).parse().map_err(|_| LxError::parse("invalid float literal", span, None))?;
+        self.emit(Token::new(TokenKind::Float(v), span));
       },
-      '$' => {
-        if self.peek() == Some('^') {
-          self.advance();
-          self.push(TokenKind::DollarCaret, start, self.pos);
-          self.read_shell_cmd()?;
-          Ok(None)
-        } else if self.peek() == Some('{') {
-          self.advance();
-          self.push(TokenKind::DollarBrace, start, self.pos);
-          self.read_shell_block()?;
-          Ok(None)
-        } else {
-          self.push(TokenKind::Dollar, start, start + 1);
-          self.read_shell_line(true)?;
-          Ok(None)
-        }
+      RawToken::DecInt => {
+        let v: BigInt = Self::strip_underscores(slice).parse().map_err(|_| LxError::parse("invalid integer literal", span, None))?;
+        self.emit(Token::new(TokenKind::Int(v), span));
       },
-      '_' if !self.peek().is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '\'') => Ok(Some(self.tok(TokenKind::Underscore, start))),
-      c if c.is_ascii_digit() => self.read_number(start).map(Some),
-      'r' if self.peek() == Some('/') => self.read_regex(start).map(Some),
-      c if c.is_ascii_lowercase() || c == '_' => self.read_ident_or_keyword(start).map(Some),
-      c if c.is_ascii_uppercase() => self.read_type_name(start).map(Some),
-      other => Err(LxError::parse(format!("unexpected character: {other}"), Span::new(start as u32, other.len_utf8() as u16), None)),
+      RawToken::Tilde | RawToken::BangExcl => self.emit(Token::new(TokenKind::Bang, span)),
+      RawToken::Caret => self.emit(Token::new(TokenKind::Caret, span)),
+      RawToken::QQ => self.emit(Token::new(TokenKind::QQ, span)),
+      RawToken::Question => self.emit(Token::new(TokenKind::Question, span)),
+      RawToken::And => self.emit(Token::new(TokenKind::And, span)),
+      RawToken::Amp => self.emit(Token::new(TokenKind::Amp, span)),
+      RawToken::Or => self.emit(Token::new(TokenKind::Or, span)),
+      RawToken::Pipe => self.emit(Token::new(TokenKind::Pipe, span)),
+      RawToken::NotEq => self.emit(Token::new(TokenKind::NotEq, span)),
+      RawToken::Eq => self.emit(Token::new(TokenKind::Eq, span)),
+      RawToken::Assign => self.emit(Token::new(TokenKind::Assign, span)),
+      RawToken::DeclMut => self.emit(Token::new(TokenKind::DeclMut, span)),
+      RawToken::Colon => self.emit(Token::new(TokenKind::Colon, span)),
+      RawToken::Star => self.emit(Token::new(TokenKind::Star, span)),
+      RawToken::Percent => self.emit(Token::new(TokenKind::Percent, span)),
+      RawToken::PlusPlus => self.emit(Token::new(TokenKind::PlusPlus, span)),
+      RawToken::Arrow => self.emit(Token::new(TokenKind::Arrow, span)),
+      RawToken::Minus => self.emit(Token::new(TokenKind::Minus, span)),
+      RawToken::IntDiv => self.emit(Token::new(TokenKind::IntDiv, span)),
+      RawToken::Slash => self.emit(Token::new(TokenKind::Slash, span)),
+      RawToken::Reassign => self.emit(Token::new(TokenKind::Reassign, span)),
+      RawToken::LtEq => self.emit(Token::new(TokenKind::LtEq, span)),
+      RawToken::Lt => self.emit(Token::new(TokenKind::Lt, span)),
+      RawToken::GtEq => self.emit(Token::new(TokenKind::GtEq, span)),
+      RawToken::Gt => self.emit(Token::new(TokenKind::Gt, span)),
+      RawToken::DotDotEq => self.emit(Token::new(TokenKind::DotDotEq, span)),
+      RawToken::DotDot => self.emit(Token::new(TokenKind::DotDot, span)),
+      RawToken::Dot => self.emit(Token::new(TokenKind::Dot, span)),
     }
+    Ok(false)
   }
 }

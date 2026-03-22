@@ -14,7 +14,6 @@ impl fmt::Display for Pattern {
         Literal::Unit => write!(f, "()"),
         Literal::RawStr(s) => write!(f, "\"{s}\""),
         Literal::Str(_) => write!(f, "\"...\""),
-        Literal::Regex(r) => write!(f, "r/{r}/"),
       },
       Pattern::Tuple(pats) => {
         write!(f, "(")?;

@@ -2,7 +2,6 @@
 -- Sub-module of pkg/agents/workspace.
 
 use std/time
-use std/re
 
 +claim = (ws region holder) {
   existing = ws.regions.get region
@@ -22,7 +21,7 @@ use std/re
   all_lines | enumerate | each (pair) {
     idx = pair.0
     line = pair.1
-    is_match = (re.is_match pattern line)
+    is_match = (line | contains? pattern)
     is_match ? {
       true -> { matched <- [..matched idx] }
       false -> ()

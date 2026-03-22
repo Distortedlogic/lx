@@ -6,8 +6,8 @@ use crate::builtins::call_value_sync;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::runtime::RuntimeCtx;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
 pub fn build() -> IndexMap<String, LxVal> {
   let mut m = IndexMap::new();
@@ -23,12 +23,12 @@ pub fn build() -> IndexMap<String, LxVal> {
   m
 }
 
-fn bi_confirm(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_confirm(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let msg = args[0].require_str("user.confirm", span)?;
   ctx.user.confirm(msg).map(LxVal::Bool).map_err(|e| LxError::runtime(format!("user.confirm: {e}"), span))
 }
 
-fn bi_choose(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_choose(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let msg = args[0].require_str("user.choose", span)?;
   let LxVal::List(items) = &args[1] else {
     return Err(LxError::type_err("user.choose: second arg must be List", span));
@@ -57,12 +57,12 @@ fn option_label(v: &LxVal) -> String {
   }
 }
 
-fn bi_ask(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_ask(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let msg = args[0].require_str("user.ask", span)?;
   ctx.user.ask(msg, None).map(LxVal::str).map_err(|e| LxError::runtime(format!("user.ask: {e}"), span))
 }
 
-fn bi_ask_with(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_ask_with(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let msg = args[0].require_str("user.ask_with", span)?;
   let LxVal::Record(opts) = &args[1] else {
     return Err(LxError::type_err("user.ask_with: second arg must be Record", span));
@@ -82,7 +82,7 @@ fn bi_ask_with(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVa
   }
 }
 
-fn bi_progress(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_progress(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let current = args[0].as_int().and_then(|n| usize::try_from(n).ok()).ok_or_else(|| LxError::type_err("user.progress: expected Int current", span))?;
   let total = args[1].as_int().and_then(|n| usize::try_from(n).ok()).ok_or_else(|| LxError::type_err("user.progress: expected Int total", span))?;
   let msg = args[2].require_str("user.progress", span)?;
@@ -90,7 +90,7 @@ fn bi_progress(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVa
   Ok(LxVal::Unit)
 }
 
-fn bi_progress_pct(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_progress_pct(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let pct = match &args[0] {
     LxVal::Float(f) => *f,
     LxVal::Int(n) => {
@@ -106,14 +106,14 @@ fn bi_progress_pct(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<
   Ok(LxVal::Unit)
 }
 
-fn bi_status(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_status(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let level = args[0].require_str("user.status", span)?;
   let msg = args[1].require_str("user.status", span)?;
   ctx.user.status(level, msg);
   Ok(LxVal::Unit)
 }
 
-fn bi_table(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_table(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let LxVal::List(hdrs) = &args[0] else {
     return Err(LxError::type_err("user.table: first arg must be List of Str", span));
   };
@@ -132,7 +132,7 @@ fn bi_table(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, 
   Ok(LxVal::Unit)
 }
 
-fn bi_check(_args: &[LxVal], _span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_check(_args: &[LxVal], _span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   match ctx.user.check_signal() {
     Some(signal) => Ok(LxVal::Some(Box::new(signal))),
     None => Ok(LxVal::None),

@@ -1,7 +1,5 @@
-use miette::Diagnostic;
+use miette::{Diagnostic, SourceSpan};
 use thiserror::Error;
-
-use crate::span::Span;
 
 pub type LxResult<T> = Result<T, LxError>;
 
@@ -12,7 +10,7 @@ pub enum LxError {
   Parse {
     msg: String,
     #[label("{msg}")]
-    span: Span,
+    span: SourceSpan,
     #[help]
     help: Option<String>,
   },
@@ -22,7 +20,7 @@ pub enum LxError {
   Runtime {
     msg: String,
     #[label("{msg}")]
-    span: Span,
+    span: SourceSpan,
   },
 
   #[error("assertion failed: {expr}")]
@@ -31,7 +29,7 @@ pub enum LxError {
     expr: String,
     message: Option<String>,
     #[label("assertion failed")]
-    span: Span,
+    span: SourceSpan,
   },
 
   #[error("type error: {msg}")]
@@ -39,7 +37,7 @@ pub enum LxError {
   Type {
     msg: String,
     #[label("{msg}")]
-    span: Span,
+    span: SourceSpan,
   },
 
   #[error("break")]
@@ -50,7 +48,7 @@ pub enum LxError {
   Propagate {
     value: Box<crate::value::LxVal>,
     #[label("error propagated here")]
-    span: Span,
+    span: SourceSpan,
   },
 
   #[error("{inner}")]
@@ -58,23 +56,23 @@ pub enum LxError {
 }
 
 impl LxError {
-  pub fn parse(msg: impl Into<String>, span: Span, help: Option<String>) -> Self {
+  pub fn parse(msg: impl Into<String>, span: SourceSpan, help: Option<String>) -> Self {
     Self::Parse { msg: msg.into(), span, help }
   }
 
-  pub fn runtime(msg: impl Into<String>, span: Span) -> Self {
+  pub fn runtime(msg: impl Into<String>, span: SourceSpan) -> Self {
     Self::Runtime { msg: msg.into(), span }
   }
 
-  pub fn assert_fail(expr: impl Into<String>, message: Option<String>, span: Span) -> Self {
+  pub fn assert_fail(expr: impl Into<String>, message: Option<String>, span: SourceSpan) -> Self {
     Self::Assert { expr: expr.into(), message, span }
   }
 
-  pub fn type_err(msg: impl Into<String>, span: Span) -> Self {
+  pub fn type_err(msg: impl Into<String>, span: SourceSpan) -> Self {
     Self::Type { msg: msg.into(), span }
   }
 
-  pub fn division_by_zero(span: Span) -> Self {
+  pub fn division_by_zero(span: SourceSpan) -> Self {
     Self::runtime("division by zero", span)
   }
 
@@ -82,7 +80,7 @@ impl LxError {
     Self::BreakSignal { value: Box::new(value) }
   }
 
-  pub fn propagate(value: crate::value::LxVal, span: Span) -> Self {
+  pub fn propagate(value: crate::value::LxVal, span: SourceSpan) -> Self {
     Self::Propagate { value: Box::new(value), span }
   }
 

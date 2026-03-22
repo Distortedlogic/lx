@@ -1,5 +1,4 @@
 use std::io::Write;
-use std::process::Command;
 
 use indexmap::IndexMap;
 use reqwest::Client;
@@ -7,15 +6,15 @@ use reqwest::header::CONTENT_TYPE;
 
 use crate::error::LxError;
 use crate::record;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
-use super::{EmitBackend, HttpBackend, HttpOpts, LogBackend, LogLevel, ShellBackend, YieldBackend};
+use super::{EmitBackend, HttpBackend, HttpOpts, LogBackend, LogLevel, YieldBackend};
 
 pub struct StdoutEmitBackend;
 
 impl EmitBackend for StdoutEmitBackend {
-  fn emit(&self, value: &LxVal, _span: Span) -> Result<(), LxError> {
+  fn emit(&self, value: &LxVal, _span: SourceSpan) -> Result<(), LxError> {
     println!("{value}");
     Ok(())
   }
@@ -24,7 +23,7 @@ impl EmitBackend for StdoutEmitBackend {
 pub struct ReqwestHttpBackend;
 
 impl HttpBackend for ReqwestHttpBackend {
-  fn request(&self, method: &str, url: &str, opts: &HttpOpts, span: Span) -> Result<LxVal, LxError> {
+  fn request(&self, method: &str, url: &str, opts: &HttpOpts, span: SourceSpan) -> Result<LxVal, LxError> {
     tokio::task::block_in_place(|| {
       tokio::runtime::Handle::current().block_on(async {
         let c = Client::builder().build().map_err(|e| LxError::runtime(format!("http: client: {e}"), span))?;
@@ -58,7 +57,7 @@ impl HttpBackend for ReqwestHttpBackend {
   }
 }
 
-async fn response_to_value(resp: reqwest::Response, span: Span) -> Result<LxVal, LxError> {
+async fn response_to_value(resp: reqwest::Response, span: SourceSpan) -> Result<LxVal, LxError> {
   let status = resp.status().as_u16();
   let mut headers = IndexMap::new();
   for (name, value) in resp.headers() {
@@ -74,59 +73,10 @@ async fn response_to_value(resp: reqwest::Response, span: Span) -> Result<LxVal,
   })))
 }
 
-pub struct ProcessShellBackend;
-
-impl ShellBackend for ProcessShellBackend {
-  fn exec(&self, cmd: &str, _span: Span) -> Result<LxVal, LxError> {
-    match Command::new("sh").arg("-c").arg(cmd).output() {
-      Ok(output) => {
-        let out = String::from_utf8_lossy(&output.stdout).into_owned();
-        let err = String::from_utf8_lossy(&output.stderr).into_owned();
-        let code = output.status.code().unwrap_or(-1);
-        Ok(LxVal::Ok(Box::new(record! {
-            "out" => LxVal::str(out),
-            "err" => LxVal::str(err),
-            "code" => LxVal::int(code),
-        })))
-      },
-      Err(e) => Ok(LxVal::Err(Box::new(record! {
-          "cmd" => LxVal::str(cmd),
-          "msg" => LxVal::str(e.to_string()),
-      }))),
-    }
-  }
-
-  fn exec_capture(&self, cmd: &str, span: Span) -> Result<LxVal, LxError> {
-    match Command::new("sh").arg("-c").arg(cmd).output() {
-      Ok(output) => {
-        let code = output.status.code().unwrap_or(-1);
-        if code == 0 {
-          let out = String::from_utf8_lossy(&output.stdout).into_owned();
-          Ok(LxVal::str(out))
-        } else {
-          let err = String::from_utf8_lossy(&output.stderr).into_owned();
-          let shell_err = LxVal::Err(Box::new(record! {
-              "cmd" => LxVal::str(cmd),
-              "msg" => LxVal::str(err),
-          }));
-          Err(LxError::propagate(shell_err, span))
-        }
-      },
-      Err(e) => {
-        let shell_err = LxVal::Err(Box::new(record! {
-            "cmd" => LxVal::str(cmd),
-            "msg" => LxVal::str(e.to_string()),
-        }));
-        Err(LxError::propagate(shell_err, span))
-      },
-    }
-  }
-}
-
 pub struct StdinStdoutYieldBackend;
 
 impl YieldBackend for StdinStdoutYieldBackend {
-  fn yield_value(&self, value: LxVal, span: Span) -> Result<LxVal, LxError> {
+  fn yield_value(&self, value: LxVal, span: SourceSpan) -> Result<LxVal, LxError> {
     use std::io::BufRead;
     let json = serde_json::Value::from(&value);
     let msg = serde_json::json!({"__yield": json});
@@ -159,7 +109,7 @@ impl LogBackend for StderrLogBackend {
 pub struct NoopEmitBackend;
 
 impl EmitBackend for NoopEmitBackend {
-  fn emit(&self, _value: &LxVal, _span: Span) -> Result<(), LxError> {
+  fn emit(&self, _value: &LxVal, _span: SourceSpan) -> Result<(), LxError> {
     Ok(())
   }
 }

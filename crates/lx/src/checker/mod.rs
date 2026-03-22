@@ -8,7 +8,7 @@ pub mod types;
 use std::collections::{HashMap, HashSet};
 
 use crate::ast::{Program, SType, TypeExpr};
-use crate::span::Span;
+use miette::SourceSpan;
 
 use types::{Type, UnificationTable};
 
@@ -21,7 +21,7 @@ pub enum DiagLevel {
 pub struct Diagnostic {
   pub level: DiagLevel,
   pub msg: String,
-  pub span: Span,
+  pub span: SourceSpan,
 }
 
 pub struct CheckResult {
@@ -34,7 +34,7 @@ pub(crate) struct Checker {
   pub(crate) diagnostics: Vec<Diagnostic>,
   pub(crate) type_defs: HashMap<String, Vec<String>>,
   pub(crate) mutables: HashSet<String>,
-  import_sources: HashMap<String, Span>,
+  import_sources: HashMap<String, SourceSpan>,
   pub(crate) trait_fields: HashMap<String, Vec<(String, Type)>>,
 }
 
@@ -74,11 +74,11 @@ impl Checker {
     self.scope.pop();
   }
 
-  pub(crate) fn emit(&mut self, msg: String, span: Span) {
+  pub(crate) fn emit(&mut self, msg: String, span: SourceSpan) {
     self.diagnostics.push(Diagnostic { level: DiagLevel::Error, msg, span });
   }
 
-  pub(crate) fn emit_warning(&mut self, msg: String, span: Span) {
+  pub(crate) fn emit_warning(&mut self, msg: String, span: SourceSpan) {
     self.diagnostics.push(Diagnostic { level: DiagLevel::Warning, msg, span });
   }
 
@@ -128,7 +128,6 @@ fn named_to_type(name: &str) -> Type {
     "Float" => Type::Float,
     "Bool" => Type::Bool,
     "Str" => Type::Str,
-    "Regex" => Type::Regex,
     "Unit" => Type::Unit,
     "Bytes" => Type::Bytes,
     _ => Type::Unknown,

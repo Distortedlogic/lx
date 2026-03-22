@@ -198,12 +198,6 @@ fn apply_manifest_backends(ctx: &mut RuntimeCtx) {
       other => eprintln!("warning: unknown ai backend '{other}'"),
     }
   }
-  if let Some(ref name) = backends.shell {
-    match name.as_str() {
-      "process" => {},
-      other => eprintln!("warning: unknown shell backend '{other}'"),
-    }
-  }
   if let Some(ref name) = backends.http {
     match name.as_str() {
       "reqwest" => {},

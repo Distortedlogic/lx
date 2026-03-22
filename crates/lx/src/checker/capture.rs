@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::ast::{Expr, ListElem, SExpr, SStmt, Section, Stmt, StrPart};
+use crate::ast::{Expr, ListElem, SExpr, SStmt, Section, Stmt};
 
 pub fn free_vars(expr: &SExpr) -> HashSet<String> {
   let mut vars = HashSet::new();
@@ -123,13 +123,6 @@ fn collect_free(expr: &Expr, vars: &mut HashSet<String>, bound: &mut HashSet<Str
         collect_free(&expr.node, vars, bound);
       }
       free_vars_stmts(body, vars, bound);
-    },
-    Expr::Shell { parts, .. } => {
-      for part in parts {
-        if let StrPart::Interp(e) = part {
-          collect_free(&e.node, vars, bound);
-        }
-      }
     },
     Expr::Par(stmts) => free_vars_stmts(stmts, vars, bound),
     Expr::Sel(arms) => {

@@ -2,13 +2,13 @@ use std::sync::Arc;
 
 use crate::ast::{BinOp, SExpr, SStmt, SelArm};
 use crate::error::LxError;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
 use super::Interpreter;
 
 impl Interpreter {
-  pub(super) async fn eval_binary(&mut self, op: &BinOp, left: &SExpr, right: &SExpr, span: Span) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_binary(&mut self, op: &BinOp, left: &SExpr, right: &SExpr, span: SourceSpan) -> Result<LxVal, LxError> {
     if *op == BinOp::And {
       return self.eval_short_circuit(left, right, true, span).await;
     }
@@ -54,7 +54,7 @@ impl Interpreter {
     }
   }
 
-  pub(super) async fn eval_slice(&mut self, expr: &SExpr, start: Option<&SExpr>, end: Option<&SExpr>, span: Span) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_slice(&mut self, expr: &SExpr, start: Option<&SExpr>, end: Option<&SExpr>, span: SourceSpan) -> Result<LxVal, LxError> {
     let val = self.eval(expr).await?;
     let items = match &val {
       LxVal::List(l) => l.as_ref(),
@@ -109,7 +109,7 @@ impl Interpreter {
     Ok(LxVal::tuple(vals))
   }
 
-  pub(super) async fn eval_sel(&mut self, arms: &[SelArm], span: Span) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_sel(&mut self, arms: &[SelArm], span: SourceSpan) -> Result<LxVal, LxError> {
     if arms.is_empty() {
       return Err(LxError::runtime("sel: no arms", span));
     }
@@ -145,7 +145,7 @@ impl Interpreter {
     result
   }
 
-  pub(super) async fn eval_with_resource(&mut self, resources: &[(SExpr, String)], body: &[SStmt], span: Span) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_with_resource(&mut self, resources: &[(SExpr, String)], body: &[SStmt], span: SourceSpan) -> Result<LxVal, LxError> {
     let mut acquired: Vec<(String, LxVal)> = Vec::new();
     for (expr, name) in resources {
       match self.eval(expr).await {
@@ -185,7 +185,7 @@ impl Interpreter {
     }
   }
 
-  pub(super) async fn eval_assert(&mut self, expr: &SExpr, msg: &Option<Box<SExpr>>, span: Span) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_assert(&mut self, expr: &SExpr, msg: &Option<Box<SExpr>>, span: SourceSpan) -> Result<LxVal, LxError> {
     let val = self.eval(expr).await?;
     let val = self.force_defaults(val, span).await?;
     match val.as_bool() {

@@ -5,8 +5,8 @@ use indexmap::IndexMap;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::runtime::RuntimeCtx;
-use crate::span::Span;
 use crate::value::{LxVal, TraitMethodDef};
+use miette::SourceSpan;
 
 pub fn build() -> IndexMap<String, LxVal> {
   let mut m = IndexMap::new();
@@ -33,7 +33,7 @@ fn method_to_record(m: &TraitMethodDef) -> LxVal {
   LxVal::record(rec)
 }
 
-fn bi_methods(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_methods(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let LxVal::Trait { methods, .. } = &args[0] else {
     return Err(LxError::type_err(format!("trait.methods: expected Trait, got {} `{}`", args[0].type_name(), args[0].short_display()), span));
   };
@@ -41,7 +41,7 @@ fn bi_methods(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVa
   Ok(LxVal::list(records))
 }
 
-fn bi_match(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_match(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let LxVal::Trait { methods, .. } = &args[0] else {
     return Err(LxError::type_err(format!("trait.match: expected Trait, got {} `{}`", args[0].type_name(), args[0].short_display()), span));
   };

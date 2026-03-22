@@ -7,8 +7,8 @@ use crate::builtins::mk;
 use crate::error::LxError;
 use crate::record;
 use crate::runtime::RuntimeCtx;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
 pub fn build() -> IndexMap<String, LxVal> {
   let mut m = IndexMap::new();
@@ -19,13 +19,13 @@ pub fn build() -> IndexMap<String, LxVal> {
   m
 }
 
-fn bi_now(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_now(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let _ = &args[0];
   let now = Utc::now();
   Ok(timestamp_to_record(now))
 }
 
-fn bi_sleep(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_sleep(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let ms = match &args[0] {
     LxVal::Int(n) => {
       let v: i64 = n.try_into().map_err(|_| LxError::type_err("time.sleep: ms too large", span))?;
@@ -48,14 +48,14 @@ fn bi_sleep(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal,
   Ok(LxVal::Unit)
 }
 
-fn bi_format(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_format(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let fmt = args[0].require_str("time.format", span)?;
   let ts = record_to_datetime(&args[1], span)?;
   let formatted = ts.format(fmt).to_string();
   Ok(LxVal::str(formatted))
 }
 
-fn bi_parse(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_parse(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let fmt = args[0].require_str("time.parse", span)?;
   let input = args[1].require_str("time.parse", span)?;
   match DateTime::parse_from_str(input, fmt) {
@@ -74,7 +74,7 @@ fn timestamp_to_record(dt: DateTime<Utc>) -> LxVal {
   }
 }
 
-fn record_to_datetime(val: &LxVal, span: Span) -> Result<DateTime<Utc>, LxError> {
+fn record_to_datetime(val: &LxVal, span: SourceSpan) -> Result<DateTime<Utc>, LxError> {
   match val {
     LxVal::Record(fields) => {
       if let Some(LxVal::Int(epoch)) = fields.get("epoch") {

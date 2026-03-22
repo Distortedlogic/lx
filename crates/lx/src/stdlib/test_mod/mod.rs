@@ -13,8 +13,8 @@ use crate::builtins::mk;
 use crate::error::LxError;
 use crate::record;
 use crate::runtime::RuntimeCtx;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
 pub fn build() -> IndexMap<String, LxVal> {
   let mut m = IndexMap::new();
@@ -26,14 +26,14 @@ pub fn build() -> IndexMap<String, LxVal> {
   m
 }
 
-pub(super) fn extract_record<'a>(v: &'a LxVal, name: &str, span: Span) -> Result<&'a IndexMap<String, LxVal>, LxError> {
+pub(super) fn extract_record<'a>(v: &'a LxVal, name: &str, span: SourceSpan) -> Result<&'a IndexMap<String, LxVal>, LxError> {
   match v {
     LxVal::Record(r) => Ok(r.as_ref()),
     _ => Err(LxError::type_err(format!("{name}: expected Record, got {}", v.type_name()), span)),
   }
 }
 
-pub(super) fn extract_str<'a>(r: &'a IndexMap<String, LxVal>, key: &str, name: &str, span: Span) -> Result<&'a str, LxError> {
+pub(super) fn extract_str<'a>(r: &'a IndexMap<String, LxVal>, key: &str, name: &str, span: SourceSpan) -> Result<&'a str, LxError> {
   r.get(key).and_then(|v| v.as_str()).ok_or_else(|| LxError::type_err(format!("{name}: '{key}' must be Str"), span))
 }
 
@@ -46,7 +46,7 @@ pub(super) fn score_to_f64(v: &LxVal) -> Option<f64> {
   }
 }
 
-fn bi_spec(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_spec(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let name = args[0].require_str("test.spec", span)?;
   let opts = extract_record(&args[1], "test.spec", span)?;
 
@@ -79,7 +79,7 @@ fn bi_spec(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, 
   Ok(LxVal::record(m))
 }
 
-fn bi_scenario(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_scenario(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let spec_fields = extract_record(&args[0], "test.scenario", span)?;
   let scenario_name = args[1].require_str("test.scenario", span)?;
   let opts = extract_record(&args[2], "test.scenario", span)?;

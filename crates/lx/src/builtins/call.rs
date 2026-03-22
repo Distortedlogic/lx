@@ -2,10 +2,10 @@ use std::sync::Arc;
 
 use crate::error::LxError;
 use crate::runtime::RuntimeCtx;
-use crate::span::Span;
 use crate::value::{BuiltinKind, LxVal};
+use miette::SourceSpan;
 
-pub(crate) async fn call_value(f: &LxVal, arg: LxVal, span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(crate) async fn call_value(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   match f {
     LxVal::Func(lf) => {
       let mut lf = lf.clone();

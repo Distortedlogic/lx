@@ -9,8 +9,8 @@ use crate::builtins::{call_value_sync, mk};
 use crate::error::LxError;
 use crate::record;
 use crate::runtime::RuntimeCtx;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
 pub(super) struct StoreState {
   pub(super) data: IndexMap<String, LxVal>,
@@ -37,7 +37,7 @@ pub fn build() -> IndexMap<String, LxVal> {
   m
 }
 
-pub(super) fn store_id(v: &LxVal, span: Span) -> Result<u64, LxError> {
+pub(super) fn store_id(v: &LxVal, span: SourceSpan) -> Result<u64, LxError> {
   match v {
     LxVal::Store { id } => Ok(*id),
     _ => Err(LxError::type_err("store: expected Store", span)),
@@ -66,7 +66,7 @@ fn load_from_disk(path: &std::path::Path) -> IndexMap<String, LxVal> {
   }
 }
 
-pub(super) fn bi_create(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_create(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let path = match &args[0] {
     LxVal::Record(r) => r.get("persist").and_then(|v| v.as_str()).map(PathBuf::from),
     LxVal::Unit => None,
@@ -80,7 +80,7 @@ pub(super) fn bi_create(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> R
   Ok(LxVal::Store { id })
 }
 
-pub(super) fn bi_set(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_set(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let key = args[1].require_str("store.set", span)?;
   let mut s = STORES.get_mut(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
@@ -89,14 +89,14 @@ pub(super) fn bi_set(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Resu
   Ok(LxVal::Unit)
 }
 
-pub(super) fn bi_get(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_get(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let key = args[1].require_str("store.get", span)?;
   let s = STORES.get(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
   Ok(s.data.get(key).cloned().unwrap_or(LxVal::None))
 }
 
-pub(super) fn bi_update(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_update(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let key = args[1].require_str("store.update", span)?;
   let f = &args[2];
@@ -111,7 +111,7 @@ pub(super) fn bi_update(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Re
   Ok(new_val)
 }
 
-pub(super) fn bi_remove(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_remove(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let key = args[1].require_str("store.remove", span)?;
   let mut s = STORES.get_mut(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
@@ -120,14 +120,14 @@ pub(super) fn bi_remove(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> R
   Ok(removed)
 }
 
-pub(super) fn bi_keys(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_keys(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let s = STORES.get(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
   let keys: Vec<LxVal> = s.data.keys().map(LxVal::str).collect();
   Ok(LxVal::list(keys))
 }
 
-pub(super) fn bi_entries(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_entries(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let s = STORES.get(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
   let entries: Vec<LxVal> = s
@@ -143,7 +143,7 @@ pub(super) fn bi_entries(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> 
   Ok(LxVal::list(entries))
 }
 
-pub(super) fn bi_query(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_query(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let pred = &args[1];
   let s = STORES.get(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
@@ -163,13 +163,13 @@ pub(super) fn bi_query(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Res
   Ok(LxVal::list(matched))
 }
 
-pub(super) fn bi_count(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_count(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let s = STORES.get(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
   Ok(LxVal::int(s.data.len()))
 }
 
-pub(super) fn bi_clear(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_clear(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let mut s = STORES.get_mut(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
   s.data.clear();
@@ -177,14 +177,14 @@ pub(super) fn bi_clear(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Re
   Ok(LxVal::Unit)
 }
 
-pub(super) fn bi_persist(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_persist(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let s = STORES.get(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
   persist(&s);
   Ok(LxVal::Unit)
 }
 
-pub(super) fn bi_load(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_load(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let mut s = STORES.get_mut(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
   if let Some(ref path) = s.path {

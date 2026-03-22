@@ -54,7 +54,6 @@ impl fmt::Display for LxVal {
       LxVal::Float(v) => write!(f, "{v}"),
       LxVal::Bool(b) => write!(f, "{b}"),
       LxVal::Str(s) => write!(f, "{s}"),
-      LxVal::Regex(r) => write!(f, "r/{}/", r.as_str()),
       LxVal::Unit => write!(f, "()"),
       LxVal::List(items) => {
         write!(f, "[")?;

@@ -6,13 +6,13 @@ use num_bigint::BigInt;
 use crate::env::Env;
 use crate::error::LxError;
 use crate::runtime::{LogLevel, RuntimeCtx};
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
 use super::mk;
 
 fn make_log_builtin(name: &'static str, level: LogLevel) -> LxVal {
-  fn log_fn(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>, level: LogLevel, name: &str) -> Result<LxVal, LxError> {
+  fn log_fn(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>, level: LogLevel, name: &str) -> Result<LxVal, LxError> {
     let s = args[0].require_str(&format!("log.{name}"), span)?;
     ctx.log.log(level, s);
     Ok(LxVal::Unit)
@@ -25,14 +25,14 @@ fn make_log_builtin(name: &'static str, level: LogLevel) -> LxVal {
   }
 }
 
-fn bi_not(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_not(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Bool(b) => Ok(LxVal::Bool(!b)),
     other => Err(LxError::type_err(format!("not expects Bool, got {}", other.type_name()), span)),
   }
 }
 
-fn bi_len(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_len(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let n = match &args[0] {
     LxVal::Str(s) => s.chars().count(),
     LxVal::List(l) => l.len(),
@@ -47,7 +47,7 @@ fn bi_len(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, L
   Ok(LxVal::int(n))
 }
 
-fn bi_empty(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_empty(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let empty = match &args[0] {
     LxVal::Str(s) => s.is_empty(),
     LxVal::List(l) => l.is_empty(),
@@ -62,50 +62,50 @@ fn bi_empty(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal,
   Ok(LxVal::Bool(empty))
 }
 
-fn bi_to_str(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_to_str(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   Ok(LxVal::str(format!("{}", args[0])))
 }
 
-fn bi_identity(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_identity(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   Ok(args[0].clone())
 }
 
-fn bi_dbg(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_dbg(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   eprintln!("[dbg] {}", args[0]);
   Ok(args[0].clone())
 }
 
-fn bi_ok_q(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_ok_q(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   Ok(LxVal::Bool(matches!(&args[0], LxVal::Ok(_))))
 }
 
-fn bi_err_q(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_err_q(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   Ok(LxVal::Bool(matches!(&args[0], LxVal::Err(_))))
 }
 
-fn bi_some_q(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_some_q(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   Ok(LxVal::Bool(matches!(&args[0], LxVal::Some(_))))
 }
 
-fn bi_even(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_even(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Int(n) => Ok(LxVal::Bool(n % BigInt::from(2) == BigInt::from(0))),
     other => Err(LxError::type_err(format!("even? expects Int, got {}", other.type_name()), span)),
   }
 }
 
-fn bi_odd(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_odd(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Int(n) => Ok(LxVal::Bool(n % BigInt::from(2) != BigInt::from(0))),
     other => Err(LxError::type_err(format!("odd? expects Int, got {}", other.type_name()), span)),
   }
 }
 
-fn bi_type_of(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_type_of(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   Ok(LxVal::str(args[0].type_name()))
 }
 
-fn bi_print(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_print(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   println!("{}", args[0]);
   Ok(LxVal::Unit)
 }
@@ -164,15 +164,15 @@ pub fn register(env: &mut Env) {
   env.bind("context".into(), LxVal::record(ctx_fields));
 }
 
-fn bi_agent_spawn_stub(_args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_agent_spawn_stub(_args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   Err(LxError::runtime("agent.spawn: subprocess agents not yet available in this build", span))
 }
 
-fn bi_agent_kill_stub(_args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_agent_kill_stub(_args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   Err(LxError::runtime("agent.kill: subprocess agents not yet available in this build", span))
 }
 
-fn bi_agent_implements(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_agent_implements(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let target_trait = match &args[1] {
     LxVal::Str(s) => s.to_string(),
     LxVal::Trait { name, .. } => name.to_string(),
@@ -192,7 +192,7 @@ fn bi_agent_implements(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> R
   Ok(LxVal::Bool(has))
 }
 
-fn bi_json_parse(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_json_parse(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let s = args[0].require_str("json.parse", span)?;
   match serde_json::from_str::<serde_json::Value>(s) {
     Ok(jv) => Ok(LxVal::Ok(Box::new(LxVal::from(jv)))),
@@ -200,17 +200,17 @@ fn bi_json_parse(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<L
   }
 }
 
-fn bi_json_encode(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_json_encode(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let s = serde_json::to_string(&args[0]).map_err(|e| LxError::runtime(e.to_string(), span))?;
   Ok(LxVal::str(s))
 }
 
-fn bi_json_encode_pretty(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_json_encode_pretty(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let s = serde_json::to_string_pretty(&args[0]).map_err(|e| LxError::runtime(e.to_string(), span))?;
   Ok(LxVal::str(s))
 }
 
-fn bi_method_of(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_method_of(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let name = match &args[1] {
     LxVal::Str(s) => s.as_ref(),
     _ => return Ok(LxVal::None),
@@ -236,15 +236,15 @@ fn inject_self_for_method(method: &LxVal, self_val: &LxVal) -> LxVal {
   }
 }
 
-fn bi_global_context_current(_args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_global_context_current(_args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   crate::interpreter::ambient::global_context_current()
 }
 
-fn bi_global_context_get(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_global_context_get(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   crate::interpreter::ambient::global_context_get(&args[0], span)
 }
 
-fn bi_resolve_handler(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_resolve_handler(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let agent = &args[0];
   if let LxVal::Record(r) = agent
     && let Some(h) = r.get("handler")
@@ -254,7 +254,7 @@ fn bi_resolve_handler(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Re
   Ok(LxVal::None)
 }
 
-fn bi_try(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_try(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let f = &args[0];
   let arg = args[1].clone();
   match crate::builtins::call_value_sync(f, arg, span, ctx) {
@@ -264,7 +264,7 @@ fn bi_try(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, Lx
   }
 }
 
-fn bi_methods_of(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_methods_of(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let names = match &args[0] {
     LxVal::Object { methods, .. } | LxVal::Class { methods, .. } => methods.keys().map(LxVal::str).collect(),
     _ => vec![],

@@ -6,8 +6,8 @@ use indexmap::IndexMap;
 use crate::ast::{SExpr, SStmt};
 use crate::builtins::mk;
 use crate::error::LxError;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
 use super::Interpreter;
 
@@ -29,12 +29,12 @@ fn build_context_record(fields: &IndexMap<String, LxVal>) -> LxVal {
   LxVal::record(rec)
 }
 
-fn bi_context_current(_args: &[LxVal], _span: Span, _ctx: &Arc<crate::runtime::RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_context_current(_args: &[LxVal], _span: SourceSpan, _ctx: &Arc<crate::runtime::RuntimeCtx>) -> Result<LxVal, LxError> {
   let fields = AMBIENT_SNAPSHOT.with(|s| s.borrow().clone());
   Ok(LxVal::record(fields))
 }
 
-fn bi_context_get(args: &[LxVal], span: Span, _ctx: &Arc<crate::runtime::RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_context_get(args: &[LxVal], span: SourceSpan, _ctx: &Arc<crate::runtime::RuntimeCtx>) -> Result<LxVal, LxError> {
   global_context_get(&args[0], span)
 }
 
@@ -43,7 +43,7 @@ pub fn global_context_current() -> Result<LxVal, LxError> {
   Ok(LxVal::record(fields))
 }
 
-pub fn global_context_get(key_val: &LxVal, span: Span) -> Result<LxVal, LxError> {
+pub fn global_context_get(key_val: &LxVal, span: SourceSpan) -> Result<LxVal, LxError> {
   let key = key_val.require_str("context.get", span)?;
   let fields = get_ambient_snapshot();
   match fields.get(key) {
@@ -69,7 +69,7 @@ fn get_ambient_snapshot() -> IndexMap<String, LxVal> {
 
 impl Interpreter {
   #[async_recursion(?Send)]
-  pub(super) async fn eval_with_context(&mut self, fields: &[(String, SExpr)], body: &[SStmt], _span: Span) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_with_context(&mut self, fields: &[(String, SExpr)], body: &[SStmt], _span: SourceSpan) -> Result<LxVal, LxError> {
     let mut new_fields = get_ambient(self);
     for (name, expr) in fields {
       let val = self.eval(expr).await?;

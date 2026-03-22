@@ -8,7 +8,6 @@ mod exec_stmt;
 mod hints;
 mod modules;
 mod patterns;
-mod shell;
 mod trait_apply;
 mod traits;
 mod type_apply;
@@ -202,7 +201,6 @@ impl Interpreter {
       },
       Expr::WithResource { resources, body } => self.eval_with_resource(resources, body, span).await,
       Expr::WithContext { fields, body } => self.eval_with_context(fields, body, span).await,
-      Expr::Shell { mode, parts } => self.eval_shell(mode, parts, span).await,
     }
   }
 }

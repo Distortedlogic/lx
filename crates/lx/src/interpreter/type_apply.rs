@@ -3,15 +3,15 @@ use std::sync::Arc;
 use super::Interpreter;
 use crate::ast::{FieldDecl, TraitEntry};
 use crate::error::LxError;
-use crate::span::Span;
 use crate::value::{FieldDef, LxVal};
+use miette::{SourceOffset, SourceSpan};
 
 impl Interpreter {
   pub async fn call(&mut self, func: LxVal, arg: LxVal) -> Result<LxVal, LxError> {
-    self.apply_func(func, arg, Span::default()).await
+    self.apply_func(func, arg, SourceSpan::new(SourceOffset::from(0), 0)).await
   }
 
-  pub(super) async fn eval_trait_fields(&mut self, name: &str, entries: &[TraitEntry], span: Span) -> Result<Vec<FieldDef>, LxError> {
+  pub(super) async fn eval_trait_fields(&mut self, name: &str, entries: &[TraitEntry], span: SourceSpan) -> Result<Vec<FieldDef>, LxError> {
     let mut fields = Vec::new();
     for entry in entries {
       match entry {
@@ -50,7 +50,7 @@ impl Interpreter {
     Ok(FieldDef { name: f.name.clone(), type_name: f.type_name.clone(), default, constraint })
   }
 
-  pub(super) fn eval_trait_union(&mut self, name: &str, variants: &[String], span: Span) -> Result<LxVal, LxError> {
+  pub(super) fn eval_trait_union(&mut self, name: &str, variants: &[String], span: SourceSpan) -> Result<LxVal, LxError> {
     for v in variants {
       let val = self.env.get(v).ok_or_else(|| LxError::runtime(format!("Trait union {name}: variant '{v}' not found"), span))?;
       if !matches!(val, LxVal::Trait { .. }) {
@@ -65,7 +65,7 @@ impl Interpreter {
     Ok(LxVal::Unit)
   }
 
-  pub(super) fn update_record_field(val: &LxVal, fields: &[String], new_val: LxVal, span: Span) -> Result<LxVal, LxError> {
+  pub(super) fn update_record_field(val: &LxVal, fields: &[String], new_val: LxVal, span: SourceSpan) -> Result<LxVal, LxError> {
     match (val, fields) {
       (LxVal::Record(rec), [field]) => {
         let mut new_rec = rec.as_ref().clone();

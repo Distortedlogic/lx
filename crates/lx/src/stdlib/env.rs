@@ -5,8 +5,8 @@ use indexmap::IndexMap;
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::runtime::RuntimeCtx;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
 pub fn build() -> IndexMap<String, LxVal> {
   let mut m = IndexMap::new();
@@ -18,7 +18,7 @@ pub fn build() -> IndexMap<String, LxVal> {
   m
 }
 
-fn bi_get(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_get(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let key = args[0].require_str("env.get", span)?;
   match std::env::var(key) {
     Ok(val) => Ok(LxVal::Some(Box::new(LxVal::str(val)))),
@@ -26,7 +26,7 @@ fn bi_get(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, L
   }
 }
 
-fn bi_vars(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_vars(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let _ = &args[0];
   let mut fields = IndexMap::new();
   for (k, v) in std::env::vars() {
@@ -35,13 +35,13 @@ fn bi_vars(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal,
   Ok(LxVal::record(fields))
 }
 
-fn bi_args(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_args(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let _ = &args[0];
   let items: Vec<LxVal> = std::env::args().map(LxVal::str).collect();
   Ok(LxVal::list(items))
 }
 
-fn bi_cwd(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_cwd(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let _ = &args[0];
   match std::env::current_dir() {
     Ok(p) => Ok(LxVal::str(p.to_string_lossy())),
@@ -49,7 +49,7 @@ fn bi_cwd(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, L
   }
 }
 
-fn bi_home(args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_home(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let _ = &args[0];
   match std::env::var("HOME") {
     Ok(h) => Ok(LxVal::Some(Box::new(LxVal::str(h)))),

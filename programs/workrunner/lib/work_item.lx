@@ -4,7 +4,6 @@
 
 use std/fs
 use pkg/data/md
-use std/re
 
 Class +Task = {
   num: 0

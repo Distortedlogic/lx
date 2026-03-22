@@ -2,13 +2,13 @@ use std::sync::Arc;
 
 use crate::error::LxError;
 use crate::runtime::RuntimeCtx;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
 use super::BoxFut;
 use super::hof::{call, get_list};
 
-pub(super) fn bi_pmap(args: Vec<LxVal>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
+pub(super) fn bi_pmap(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
   Box::pin(async move {
     let items = get_list(&args[1], "pmap", sp)?;
     let func = &args[0];
@@ -28,7 +28,7 @@ pub(super) fn bi_pmap(args: Vec<LxVal>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFu
   })
 }
 
-pub(super) fn bi_pmap_n(args: Vec<LxVal>, sp: Span, ctx: Arc<RuntimeCtx>) -> BoxFut {
+pub(super) fn bi_pmap_n(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
   Box::pin(async move {
     let items = get_list(&args[2], "pmap_n", sp)?;
     let n = args[0].as_int().and_then(|i| usize::try_from(i.clone()).ok()).ok_or_else(|| LxError::runtime("pmap_n: first arg must be a positive Int", sp))?;

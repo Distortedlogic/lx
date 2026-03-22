@@ -9,8 +9,8 @@ use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, T
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::runtime::RuntimeCtx;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
 pub fn build() -> IndexMap<String, LxVal> {
   let mut m = IndexMap::new();
@@ -136,7 +136,7 @@ fn parse_to_nodes(input: &str) -> Vec<LxVal> {
   nodes
 }
 
-fn bi_parse(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_parse(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let input = args[0].require_str("md.parse", span)?;
   Ok(LxVal::list(parse_to_nodes(input)))
 }
@@ -145,7 +145,7 @@ pub(super) fn field_str(rec: &IndexMap<String, LxVal>, field: &str) -> Option<St
   rec.get(field).and_then(|v| v.as_str()).map(|s| s.to_string())
 }
 
-pub(super) fn get_nodes(val: &LxVal, span: Span) -> Result<&[LxVal], LxError> {
+pub(super) fn get_nodes(val: &LxVal, span: SourceSpan) -> Result<&[LxVal], LxError> {
   val.as_list().map(|l| l.as_slice()).ok_or_else(|| LxError::type_err("md: expected List (parsed doc)", span))
 }
 

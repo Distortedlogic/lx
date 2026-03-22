@@ -2,20 +2,12 @@ use num_bigint::BigInt;
 
 use super::{BinOp, SExpr, SPattern, SType};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ShellMode {
-  Normal,
-  Propagate,
-  Block,
-}
-
 #[derive(Debug, Clone)]
 pub enum Literal {
   Int(BigInt),
   Float(f64),
   Str(Vec<StrPart>),
   RawStr(String),
-  Regex(String),
   Bool(bool),
   Unit,
 }

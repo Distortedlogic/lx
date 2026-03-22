@@ -5,8 +5,8 @@ use crate::builtins::{call_value_sync, mk};
 use crate::error::LxError;
 use crate::record;
 use crate::runtime::RuntimeCtx;
-use crate::span::Span;
 use crate::value::{BuiltinFunc, BuiltinKind, LxVal};
+use miette::SourceSpan;
 
 use super::store::{
   NEXT_ID, STORES, StoreState, bi_clear, bi_count, bi_create, bi_entries, bi_get, bi_keys, bi_load, bi_persist, bi_query, bi_remove, bi_set, bi_update,
@@ -103,28 +103,28 @@ pub fn build_constructor() -> LxVal {
   mk("Store", 1, bi_create)
 }
 
-fn bi_values(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_values(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let s = STORES.get(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
   let vals: Vec<LxVal> = s.data.values().cloned().collect();
   Ok(LxVal::list(vals))
 }
 
-fn bi_to_record(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_to_record(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let s = STORES.get(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
   let fields: indexmap::IndexMap<String, LxVal> = s.data.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
   Ok(LxVal::record(fields))
 }
 
-fn bi_has(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_has(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let key = args[1].require_str("store.has", span)?;
   let s = STORES.get(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
   Ok(LxVal::Bool(s.data.contains_key(key)))
 }
 
-fn bi_save_to(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_save_to(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let path = args[1].require_str("store.save", span)?;
   let s = STORES.get(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
@@ -135,7 +135,7 @@ fn bi_save_to(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVa
   Ok(LxVal::Unit)
 }
 
-fn bi_load_from(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_load_from(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let path = args[1].require_str("store.load", span)?;
   let content = std::fs::read_to_string(path).map_err(|e| LxError::runtime(format!("store.load: {e}"), span))?;
@@ -150,7 +150,7 @@ fn bi_load_from(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<Lx
   Ok(LxVal::Unit)
 }
 
-fn bi_merge(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_merge(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let entries: Vec<(String, LxVal)> = match &args[1] {
     LxVal::Store { id: src_id } => {
@@ -170,7 +170,7 @@ fn bi_merge(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal,
   Ok(LxVal::Unit)
 }
 
-fn bi_map(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_map(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let f = &args[1];
   let s = STORES.get(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;

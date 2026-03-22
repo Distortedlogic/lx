@@ -41,7 +41,6 @@ pub struct TestSection {
 #[derive(Deserialize)]
 pub struct BackendsSection {
   pub ai: Option<String>,
-  pub shell: Option<String>,
   pub http: Option<String>,
   pub emit: Option<String>,
   #[serde(rename = "yield")]

@@ -7,7 +7,6 @@ pub mod interpreter;
 pub mod lexer;
 pub mod parser;
 pub mod runtime;
-pub mod span;
 pub mod stdlib;
 pub mod value;
 pub mod visitor;

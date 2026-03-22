@@ -1,17 +1,12 @@
 use crate::ast::{Expr, SExpr};
-use crate::span::Span;
 use crate::visitor::{AstVisitor, walk_expr};
+use miette::SourceSpan;
 
 use super::Walker;
 use super::diag_helpers::{extract_field_call_parts, is_resource_action, is_resource_create, is_resource_module};
 
-pub(super) fn visit_expr_diag(w: &mut Walker, expr: &Expr, span: Span) {
+pub(super) fn visit_expr_diag(w: &mut Walker, expr: &Expr, span: SourceSpan) {
   match expr {
-    Expr::Shell { .. } => {
-      let id = w.add_node_at("io", "shell".into(), "io", Some(span));
-      let ctx = w.context.clone();
-      w.add_edge_typed(&ctx, &id, String::new(), "solid", "io");
-    },
     Expr::Apply { func, arg } => {
       if let Some((module, method, args)) = uncurry_call(expr) {
         if let Some(kind) = classify_call(module, method) {
@@ -96,7 +91,7 @@ fn classify_call(module: &str, method: &str) -> Option<&'static str> {
   }
 }
 
-fn handle_call(w: &mut Walker, module: &str, method: &str, kind: &str, args: &[&SExpr], span: Span) {
+fn handle_call(w: &mut Walker, module: &str, method: &str, kind: &str, args: &[&SExpr], span: SourceSpan) {
   if let ("cron", "every") = (module, method) {
     let id = w.add_node_at("loop", "cron".into(), "loop", Some(span));
     let ctx = w.context.clone();

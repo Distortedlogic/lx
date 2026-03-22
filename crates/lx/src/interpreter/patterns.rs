@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use crate::ast::{Literal, MatchArm, Pattern, SExpr};
 use crate::error::LxError;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
 impl super::Interpreter {
-  pub(super) async fn eval_match(&mut self, scrutinee: &SExpr, arms: &[MatchArm], span: Span) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_match(&mut self, scrutinee: &SExpr, arms: &[MatchArm], span: SourceSpan) -> Result<LxVal, LxError> {
     let val = self.eval(scrutinee).await?;
     for arm in arms {
       if let Some(bindings) = self.try_match_pattern(&arm.pattern.node, &val) {

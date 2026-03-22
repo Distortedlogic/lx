@@ -5,16 +5,16 @@ mod types;
 pub use expr_types::*;
 pub use types::*;
 
-use crate::span::Span;
+use miette::SourceSpan;
 
 #[derive(Debug, Clone)]
 pub struct Spanned<T> {
   pub node: T,
-  pub span: Span,
+  pub span: SourceSpan,
 }
 
 impl<T> Spanned<T> {
-  pub fn new(node: T, span: Span) -> Self {
+  pub fn new(node: T, span: SourceSpan) -> Self {
     Self { node, span }
   }
 }
@@ -101,5 +101,4 @@ pub enum Expr {
   With { name: String, value: Box<SExpr>, body: Vec<SStmt>, mutable: bool },
   WithResource { resources: Vec<(SExpr, String)>, body: Vec<SStmt> },
   WithContext { fields: Vec<(String, SExpr)>, body: Vec<SStmt> },
-  Shell { mode: ShellMode, parts: Vec<StrPart> },
 }

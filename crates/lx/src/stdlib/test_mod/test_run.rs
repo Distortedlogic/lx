@@ -7,8 +7,8 @@ use crate::builtins::call_value_sync;
 use crate::error::LxError;
 use crate::record;
 use crate::runtime::RuntimeCtx;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
 use super::test_invoke::invoke_flow;
 use super::{extract_record, extract_str, score_to_f64};
@@ -54,7 +54,7 @@ struct RunCtx<'a> {
   threshold: f64,
   setup: Option<&'a LxVal>,
   teardown: Option<&'a LxVal>,
-  span: Span,
+  span: SourceSpan,
   ctx: &'a Arc<RuntimeCtx>,
 }
 
@@ -114,7 +114,7 @@ fn run_one_scenario(scenario_val: &LxVal, rc: &RunCtx<'_>) -> Result<LxVal, LxEr
   })
 }
 
-fn run_scenarios(spec_fields: &IndexMap<String, LxVal>, scenarios: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn run_scenarios(spec_fields: &IndexMap<String, LxVal>, scenarios: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let flow_path = extract_str(spec_fields, "flow", "test.run", span)?.to_string();
   let grader = spec_fields.get("grader").ok_or_else(|| LxError::runtime("test.run: spec missing 'grader'", span))?;
   let threshold = spec_fields.get("threshold").and_then(|v| v.as_float()).unwrap_or(0.75);
@@ -163,7 +163,7 @@ fn run_scenarios(spec_fields: &IndexMap<String, LxVal>, scenarios: &[LxVal], spa
   })))
 }
 
-pub(crate) fn bi_run(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(crate) fn bi_run(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let spec_fields = extract_record(&args[0], "test.run", span)?;
   let scenarios = match spec_fields.get("scenarios") {
     Some(LxVal::List(list)) => list.as_ref().clone(),
@@ -172,7 +172,7 @@ pub(crate) fn bi_run(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Resul
   run_scenarios(spec_fields, &scenarios, span, ctx)
 }
 
-pub(crate) fn bi_run_scenario(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(crate) fn bi_run_scenario(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let spec_fields = extract_record(&args[0], "test.run_scenario", span)?;
   let target_name = args[1].require_str("test.run_scenario", span)?;
   let scenarios = match spec_fields.get("scenarios") {

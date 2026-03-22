@@ -3,7 +3,6 @@
 -- Provides: intent classification, entity extraction, complexity assessment, domain detection
 
 use pkg/core/prompt
-use std/re
 use pkg/kit/git
 
 Trait +Perception = {raw: Str  intent: Str  complexity: Str  entities: [Str]  domain: Str  urgency: Str = "normal"  requires_tools: Bool = false  requires_agents: Bool = false  ambiguity: Float = 0.0 where ambiguity >= 0.0 && ambiguity <= 1.0}
@@ -50,10 +49,10 @@ Trait +Perception = {raw: Str  intent: Str  complexity: Str  entities: [Str]  do
 +assess_complexity = (raw: Str) -> Str {
   score = [
     raw | split " " | len > 100
-    raw | re.find_all r/\?/ | len > 1
-    raw | re.is_match r/```/
-    raw | re.find_all r/\w+\.\w{1,4}/ | len > 2
-    raw | re.find_all r/\w+\.\w{1,4}/ | len > 2
+    raw | split "?" | len > 2
+    raw | contains? "```"
+    raw | split "." | len > 3
+    raw | split "." | len > 3
   ] | filter identity | len
 
   score ? {

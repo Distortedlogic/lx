@@ -12,8 +12,8 @@ use crate::builtins::mk;
 use crate::error::LxError;
 use crate::record;
 use crate::runtime::RuntimeCtx;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
 type WsSink = Arc<TokioMutex<futures::stream::SplitSink<tokio_tungstenite::WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>, Message>>>;
 
@@ -27,7 +27,7 @@ struct WsConn {
 static WS_CONNS: LazyLock<DashMap<u64, WsConn>> = LazyLock::new(DashMap::new);
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
-fn conn_id(v: &LxVal, span: Span) -> Result<u64, LxError> {
+fn conn_id(v: &LxVal, span: SourceSpan) -> Result<u64, LxError> {
   let LxVal::Record(fields) = v else {
     return Err(LxError::type_err("ws: expected connection handle Record", span));
   };
@@ -47,7 +47,7 @@ pub fn build() -> IndexMap<String, LxVal> {
   m
 }
 
-fn bi_connect(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_connect(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let url = args[0].require_str("ws.connect", span)?.to_string();
 
   tokio::task::block_in_place(|| {
@@ -68,7 +68,7 @@ fn bi_connect(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVa
   })
 }
 
-fn bi_close(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_close(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = conn_id(&args[0], span)?;
   match WS_CONNS.remove(&id) {
     Some((_, conn)) => {
@@ -86,7 +86,7 @@ fn bi_close(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal,
   }
 }
 
-fn bi_send(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_send(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = conn_id(&args[0], span)?;
   let msg = args[1].require_str("ws.send", span)?.to_string();
 
@@ -107,7 +107,7 @@ fn bi_send(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, 
   })
 }
 
-fn bi_recv(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_recv(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = conn_id(&args[0], span)?;
   let (sink, stream) = match WS_CONNS.get(&id) {
     Some(conn) => (conn.sink.clone(), conn.stream.clone()),
@@ -147,7 +147,7 @@ fn bi_recv(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, 
   })
 }
 
-fn bi_recv_json(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_recv_json(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let recv_result = bi_recv(args, span, _ctx)?;
   match recv_result {
     LxVal::Ok(inner) => {

@@ -1,5 +1,5 @@
 use crate::ast::{BindTarget, Binding, SStmt, Stmt, UseKind, UseStmt};
-use crate::span::Span;
+use miette::SourceSpan;
 
 use super::Checker;
 use super::types::{self, Type};
@@ -64,7 +64,7 @@ impl Checker {
     }
   }
 
-  fn resolve_use(&mut self, u: &UseStmt, span: Span) {
+  fn resolve_use(&mut self, u: &UseStmt, span: SourceSpan) {
     match &u.kind {
       UseKind::Whole => {
         if let Some(name) = u.path.last() {
@@ -84,9 +84,9 @@ impl Checker {
     }
   }
 
-  fn check_import_conflict(&mut self, name: &str, span: Span) {
+  fn check_import_conflict(&mut self, name: &str, span: SourceSpan) {
     if let Some(existing) = self.import_sources.get(name) {
-      self.emit_warning(format!("'{name}' already imported at offset {}", existing.offset), span);
+      self.emit_warning(format!("'{name}' already imported at offset {}", existing.offset()), span);
     } else {
       self.import_sources.insert(name.to_string(), span);
     }

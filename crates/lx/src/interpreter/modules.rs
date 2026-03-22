@@ -5,13 +5,13 @@ use indexmap::IndexMap;
 
 use crate::ast::{BindTarget, Program, Stmt, UseKind, UseStmt};
 use crate::error::LxError;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
 use super::{Interpreter, ModuleExports};
 
 impl Interpreter {
-  pub(super) async fn eval_use(&mut self, use_stmt: &UseStmt, span: Span) -> Result<(), LxError> {
+  pub(super) async fn eval_use(&mut self, use_stmt: &UseStmt, span: SourceSpan) -> Result<(), LxError> {
     let exports = if crate::stdlib::std_module_exists(&use_stmt.path) {
       crate::stdlib::get_std_module(&use_stmt.path).ok_or_else(|| LxError::runtime(format!("unknown stdlib module: {}", use_stmt.path.join("/")), span))?
     } else if let Some(file_path) = self.resolve_workspace_module(&use_stmt.path) {
@@ -87,7 +87,7 @@ impl Interpreter {
     if result.exists() { Some(result) } else { None }
   }
 
-  async fn load_module(&mut self, file_path: &PathBuf, span: Span) -> Result<ModuleExports, LxError> {
+  async fn load_module(&mut self, file_path: &PathBuf, span: SourceSpan) -> Result<ModuleExports, LxError> {
     let canonical = std::fs::canonicalize(file_path).map_err(|e| LxError::runtime(format!("cannot resolve module '{}': {e}", file_path.display()), span))?;
     {
       let cache = self.module_cache.lock();
@@ -116,7 +116,7 @@ impl Interpreter {
   }
 }
 
-fn resolve_module_path(source_dir: &std::path::Path, path: &[String], span: Span) -> Result<PathBuf, LxError> {
+fn resolve_module_path(source_dir: &std::path::Path, path: &[String], span: SourceSpan) -> Result<PathBuf, LxError> {
   if path.is_empty() {
     return Err(LxError::runtime("empty module path", span));
   }

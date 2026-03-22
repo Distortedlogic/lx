@@ -2,35 +2,22 @@ use std::sync::Arc;
 
 use crate::error::LxError;
 use crate::runtime::RuntimeCtx;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
-use super::sandbox::{POLICIES, ShellPolicy, policy_id};
+use super::sandbox::{POLICIES, policy_id};
 
-pub fn bi_exec(args: &[LxVal], span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let pid = policy_id(&args[0], span)?;
-  let cmd = match &args[1] {
+pub fn bi_exec(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+  let _pid = policy_id(&args[0], span)?;
+  let _cmd = match &args[1] {
     LxVal::Str(s) => s.to_string(),
     _ => return Err(LxError::type_err("sandbox.exec expects Str command", span)),
   };
 
-  let policy = POLICIES.get(&pid).ok_or_else(|| LxError::runtime("sandbox: policy not found", span))?;
-
-  match &policy.shell {
-    ShellPolicy::Deny => Ok(LxVal::Err(Box::new(LxVal::str("shell access denied by sandbox policy")))),
-    ShellPolicy::AllowList(cmds) => {
-      let first_word = cmd.split_whitespace().next().unwrap_or("");
-      if cmds.iter().any(|c| c == first_word) {
-        ctx.shell.exec(&cmd, span)
-      } else {
-        Ok(LxVal::Err(Box::new(LxVal::str(format!("command '{first_word}' not allowed by sandbox policy")))))
-      }
-    },
-    ShellPolicy::Allow => ctx.shell.exec(&cmd, span),
-  }
+  Ok(LxVal::Err(Box::new(LxVal::str("shell commands have been removed from lx"))))
 }
 
-pub fn bi_spawn(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub fn bi_spawn(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let pid = policy_id(&args[0], span)?;
   let policy = POLICIES.get(&pid).ok_or_else(|| LxError::runtime("sandbox: policy not found", span))?;
 

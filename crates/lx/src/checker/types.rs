@@ -9,7 +9,6 @@ pub enum Type {
   Float,
   Bool,
   Str,
-  Regex,
   Unit,
   Bytes,
 
@@ -174,7 +173,6 @@ impl fmt::Display for Type {
       Type::Float => write!(f, "Float"),
       Type::Bool => write!(f, "Bool"),
       Type::Str => write!(f, "Str"),
-      Type::Regex => write!(f, "Regex"),
       Type::Unit => write!(f, "()"),
       Type::Bytes => write!(f, "Bytes"),
       Type::List(inner) => write!(f, "[{inner}]"),

@@ -14,8 +14,8 @@ use std::sync::Arc;
 use crate::env::Env;
 use crate::error::LxError;
 use crate::runtime::RuntimeCtx;
-use crate::span::Span;
 use crate::value::{AsyncBuiltinFn, BuiltinFunc, BuiltinKind, LxVal, SyncBuiltinFn};
+use miette::SourceSpan;
 
 pub(crate) type BoxFut = Pin<Box<dyn std::future::Future<Output = Result<LxVal, LxError>>>>;
 
@@ -31,10 +31,10 @@ pub fn register(env: &mut Env) {
   register::register(env);
 }
 
-pub(crate) async fn call_value(f: &LxVal, arg: LxVal, span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(crate) async fn call_value(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   call::call_value(f, arg, span, ctx).await
 }
 
-pub(crate) fn call_value_sync(f: &LxVal, arg: LxVal, span: Span, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(crate) fn call_value_sync(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(call::call_value(f, arg, span, ctx)))
 }

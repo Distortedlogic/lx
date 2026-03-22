@@ -1,7 +1,9 @@
 use super::Lexer;
+use super::raw_token::RawToken;
 use super::token::{Token, TokenKind};
 use crate::error::LxError;
-use crate::span::Span;
+use logos::Logos;
+use miette::{SourceOffset, SourceSpan};
 
 impl<'src> Lexer<'src> {
   fn flush_buf(&mut self, buf: &mut String, chunk_start: usize, make_kind: fn(String) -> TokenKind) {
@@ -17,8 +19,7 @@ impl<'src> Lexer<'src> {
     loop {
       match self.peek() {
         None => {
-          let span = Span::from_range(start as u32, self.pos as u32);
-          return Err(LxError::parse("unterminated string", span, None));
+          return Err(LxError::parse("unterminated string", self.sp(start, self.pos), None));
         },
         Some('"') => {
           if !buf.is_empty() {
@@ -30,10 +31,7 @@ impl<'src> Lexer<'src> {
         },
         Some('\\') => {
           self.advance();
-          let esc = self.advance().ok_or_else(|| {
-            let span = Span::from_range(start as u32, self.pos as u32);
-            LxError::parse("unterminated escape sequence", span, None)
-          })?;
+          let esc = self.advance().ok_or_else(|| LxError::parse("unterminated escape sequence", self.sp(start, self.pos), None))?;
           match esc {
             'n' => buf.push('\n'),
             't' => buf.push('\t'),
@@ -42,8 +40,7 @@ impl<'src> Lexer<'src> {
             '{' => buf.push('{'),
             '0' => buf.push('\0'),
             other => {
-              let span = Span::from_range(self.pos as u32 - 2, self.pos as u32);
-              return Err(LxError::parse(format!("unknown escape: \\{other}"), span, None));
+              return Err(LxError::parse(format!("unknown escape: \\{other}"), SourceSpan::new(SourceOffset::from(self.pos - 2), 2), None));
             },
           }
         },
@@ -64,172 +61,35 @@ impl<'src> Lexer<'src> {
     }
   }
 
-  fn lex_interpolation(&mut self, str_start: usize) -> Result<(), LxError> {
+  pub(crate) fn lex_interpolation(&mut self, str_start: usize) -> Result<(), LxError> {
     let mut brace_depth = 1i32;
-    loop {
-      self.skip_whitespace_and_comments();
-      if self.pos >= self.source.len() {
-        let span = Span::from_range(str_start as u32, self.pos as u32);
-        return Err(LxError::parse("unterminated string interpolation", span, None));
-      }
-      let c = self.source[self.pos..].chars().next().unwrap_or('\0');
-      if c == '}' {
-        brace_depth -= 1;
-        if brace_depth == 0 {
-          self.advance();
-          return Ok(());
+    'restart: loop {
+      let base = self.pos;
+      let mut logos_lex = RawToken::lexer(&self.source[base..]);
+      while let Some(result) = logos_lex.next() {
+        let rel = logos_lex.span();
+        let (start, end) = (base + rel.start, base + rel.end);
+        let slice = logos_lex.slice();
+        self.pos = end;
+        let Ok(raw) = &result else {
+          let c = self.source[start..].chars().next().unwrap_or('?');
+          return Err(LxError::parse(format!("unexpected character: {c}"), self.sp(start, start + c.len_utf8()), None));
+        };
+        if matches!(raw, RawToken::RBrace) {
+          brace_depth -= 1;
+          if brace_depth == 0 {
+            return Ok(());
+          }
+        }
+        if matches!(raw, RawToken::LBrace) {
+          brace_depth += 1;
+        }
+        if self.dispatch(start, end, slice, result)? {
+          continue 'restart;
         }
       }
-      if c == '{' {
-        brace_depth += 1;
-      }
-      if let Some(tok) = self.next_token()? {
-        self.emit(tok)
-      }
+      return Err(LxError::parse("unterminated string interpolation", self.sp(str_start, self.pos), None));
     }
-  }
-
-  pub(super) fn read_shell_line(&mut self, interpolate: bool) -> Result<(), LxError> {
-    let stop_at_rparen = self.depth > 0;
-    let mut buf = String::new();
-    let mut chunk_start = self.pos;
-    loop {
-      match self.peek() {
-        None | Some('\n') => break,
-        Some(')') if stop_at_rparen => break,
-        Some('{') if interpolate => {
-          self.flush_buf(&mut buf, chunk_start, TokenKind::ShellText);
-          self.advance();
-          self.lex_interpolation(self.pos)?;
-          chunk_start = self.pos;
-        },
-        Some(c) => {
-          if buf.is_empty() {
-            chunk_start = self.pos;
-          }
-          self.advance();
-          buf.push(c);
-        },
-      }
-    }
-    if !buf.is_empty() {
-      self.push(TokenKind::ShellText(buf), chunk_start, self.pos);
-    }
-    self.push(TokenKind::ShellEnd, self.pos, self.pos);
-    Ok(())
-  }
-
-  pub(super) fn read_shell_cmd(&mut self) -> Result<(), LxError> {
-    let stop_at_rparen = self.depth > 0;
-    let mut buf = String::new();
-    let mut chunk_start = self.pos;
-    loop {
-      match self.peek() {
-        None | Some('\n') | Some('|') | Some(';') => break,
-        Some(')') if stop_at_rparen => break,
-        Some('{') => {
-          self.flush_buf(&mut buf, chunk_start, TokenKind::ShellText);
-          self.advance();
-          self.lex_interpolation(self.pos)?;
-          chunk_start = self.pos;
-        },
-        Some(c) => {
-          if buf.is_empty() {
-            chunk_start = self.pos;
-          }
-          self.advance();
-          buf.push(c);
-        },
-      }
-    }
-    if !buf.is_empty() {
-      let trimmed = buf.trim_end().to_string();
-      if !trimmed.is_empty() {
-        self.push(TokenKind::ShellText(trimmed), chunk_start, self.pos);
-      }
-    }
-    self.push(TokenKind::ShellEnd, self.pos, self.pos);
-    Ok(())
-  }
-
-  pub(super) fn read_shell_block(&mut self) -> Result<(), LxError> {
-    let start = self.pos;
-    let mut buf = String::new();
-    let mut chunk_start = self.pos;
-    loop {
-      match self.peek() {
-        None => {
-          let span = Span::from_range(start as u32, self.pos as u32);
-          return Err(LxError::parse("unterminated ${...} block", span, None));
-        },
-        Some('}') => {
-          if !buf.is_empty() {
-            self.push(TokenKind::ShellText(buf), chunk_start, self.pos);
-          }
-          self.advance();
-          self.push(TokenKind::ShellEnd, self.pos - 1, self.pos);
-          return Ok(());
-        },
-        Some('{') => {
-          self.flush_buf(&mut buf, chunk_start, TokenKind::ShellText);
-          self.advance();
-          self.lex_interpolation(self.pos)?;
-          chunk_start = self.pos;
-        },
-        Some(c) => {
-          if buf.is_empty() {
-            chunk_start = self.pos;
-          }
-          self.advance();
-          buf.push(c);
-        },
-      }
-    }
-  }
-
-  pub(super) fn read_regex(&mut self, start: usize) -> Result<Token, LxError> {
-    self.advance();
-    let mut pattern = String::new();
-    loop {
-      match self.peek() {
-        None | Some('\n') => {
-          return Err(LxError::parse("unterminated regex literal", Span::new(start as u32, 1), None));
-        },
-        Some('/') => {
-          self.advance();
-          break;
-        },
-        Some('\\') => {
-          self.advance();
-          match self.peek() {
-            Some('/') => {
-              self.advance();
-              pattern.push('/');
-            },
-            Some(c) => {
-              self.advance();
-              pattern.push('\\');
-              pattern.push(c);
-            },
-            None => {
-              return Err(LxError::parse("unterminated regex literal", Span::new(start as u32, 1), None));
-            },
-          }
-        },
-        Some(c) => {
-          self.advance();
-          pattern.push(c);
-        },
-      }
-    }
-    let mut flags = String::new();
-    while let Some(c @ ('i' | 'm' | 's' | 'x')) = self.peek() {
-      self.advance();
-      flags.push(c);
-    }
-    let full = if flags.is_empty() { pattern } else { format!("(?{flags}){pattern}") };
-    let span = Span::from_range(start as u32, self.pos as u32);
-    Ok(Token::new(TokenKind::Regex(full), span))
   }
 
   pub(super) fn read_raw_string(&mut self, start: usize) -> Result<Token, LxError> {
@@ -237,13 +97,11 @@ impl<'src> Lexer<'src> {
     loop {
       match self.peek() {
         None => {
-          let span = Span::from_range(start as u32, self.pos as u32);
-          return Err(LxError::parse("unterminated raw string", span, None));
+          return Err(LxError::parse("unterminated raw string", self.sp(start, self.pos), None));
         },
         Some('`') => {
           self.advance();
-          let span = Span::from_range(start as u32, self.pos as u32);
-          return Ok(Token::new(TokenKind::RawStr(buf), span));
+          return Ok(Token::new(TokenKind::RawStr(buf), self.sp(start, self.pos)));
         },
         Some(c) => {
           self.advance();

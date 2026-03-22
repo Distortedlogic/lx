@@ -3,8 +3,8 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 
 use crate::error::LxError;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
 use super::Interpreter;
 
@@ -15,7 +15,7 @@ impl Interpreter {
     env: &Arc<crate::env::Env>,
     kind: &str,
     name: &str,
-    span: Span,
+    span: SourceSpan,
   ) -> Result<(), LxError> {
     for tn in traits {
       let Some(LxVal::Trait { methods: req, defaults, .. }) = env.get(tn) else {

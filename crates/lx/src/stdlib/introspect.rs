@@ -6,8 +6,8 @@ use crate::builtins::mk;
 use crate::error::LxError;
 use crate::record;
 use crate::runtime::RuntimeCtx;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
 pub fn build() -> IndexMap<String, LxVal> {
   let mut m = IndexMap::new();
@@ -19,7 +19,7 @@ pub fn build() -> IndexMap<String, LxVal> {
   m
 }
 
-fn bi_system(_args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_system(_args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   Ok(LxVal::Ok(Box::new(record! {
       "agents" => LxVal::list(Vec::new()),
       "messages_in_flight" => LxVal::int(0),
@@ -28,18 +28,18 @@ fn bi_system(_args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxV
   })))
 }
 
-fn bi_agents(_args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_agents(_args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   Ok(LxVal::Ok(Box::new(LxVal::list(Vec::new()))))
 }
 
-fn bi_agent(_args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_agent(_args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   Ok(LxVal::Err(Box::new(LxVal::str("agent introspection unavailable (agent runtime removed)"))))
 }
 
-fn bi_messages(_args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_messages(_args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   Ok(LxVal::Ok(Box::new(LxVal::list(Vec::new()))))
 }
 
-fn bi_bottleneck(_args: &[LxVal], _span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_bottleneck(_args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   Ok(LxVal::None)
 }

@@ -6,8 +6,8 @@ use crate::builtins::mk;
 use crate::error::LxError;
 use crate::record;
 use crate::runtime::RuntimeCtx;
-use crate::span::Span;
 use crate::value::LxVal;
+use miette::SourceSpan;
 
 use crate::ast::Program;
 use crate::visitor::AstVisitor;
@@ -23,25 +23,25 @@ pub fn build() -> IndexMap<String, LxVal> {
   m
 }
 
-fn bi_extract(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_extract(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let src = args[0].require_str("diag.extract", span)?;
   let graph = extract_graph(src, span)?;
   Ok(graph_to_value(&graph))
 }
 
-fn bi_extract_file(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_extract_file(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let path = args[0].require_str("diag.extract_file", span)?;
   let src = std::fs::read_to_string(path).map_err(|e| LxError::runtime(format!("diag.extract_file: {e}"), span))?;
   let graph = extract_graph(&src, span)?;
   Ok(graph_to_value(&graph))
 }
 
-fn bi_to_mermaid(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_to_mermaid(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let graph = value_to_graph(&args[0], span)?;
   Ok(LxVal::str(to_mermaid(&graph).as_str()))
 }
 
-fn bi_to_graph_chart(args: &[LxVal], span: Span, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_to_graph_chart(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let graph = value_to_graph(&args[0], span)?;
   Ok(LxVal::str(graph_to_echart_json(&graph).as_str()))
 }
@@ -193,7 +193,7 @@ pub fn graph_to_echart_json(graph: &Graph) -> String {
   .to_string()
 }
 
-fn extract_graph(src: &str, span: Span) -> Result<Graph, LxError> {
+fn extract_graph(src: &str, span: SourceSpan) -> Result<Graph, LxError> {
   let tokens = crate::lexer::lex(src).map_err(|e| LxError::runtime(format!("diag: lex error: {e}"), span))?;
   let program = crate::parser::parse(tokens).map_err(|e| LxError::runtime(format!("diag: parse error: {e}"), span))?;
   let mut walker = Walker::new();
@@ -235,7 +235,7 @@ fn graph_to_value(graph: &Graph) -> LxVal {
   }
 }
 
-fn value_to_graph(val: &LxVal, span: Span) -> Result<Graph, LxError> {
+fn value_to_graph(val: &LxVal, span: SourceSpan) -> Result<Graph, LxError> {
   let LxVal::Record(rec) = val else {
     return Err(LxError::type_err("diag.to_mermaid expects Graph record", span));
   };
@@ -252,7 +252,7 @@ fn value_to_graph(val: &LxVal, span: Span) -> Result<Graph, LxError> {
   Ok(Graph { nodes, edges, subgraphs: vec![] })
 }
 
-fn value_to_node(val: &LxVal, span: Span) -> Result<DiagNode, LxError> {
+fn value_to_node(val: &LxVal, span: SourceSpan) -> Result<DiagNode, LxError> {
   let LxVal::Record(rec) = val else {
     return Err(LxError::type_err("node must be Record", span));
   };
@@ -274,7 +274,7 @@ fn value_to_node(val: &LxVal, span: Span) -> Result<DiagNode, LxError> {
   Ok(DiagNode { id: str_field("id")?, label: str_field("label")?, kind: str_field("kind")?, source_offset, children })
 }
 
-fn value_to_edge(val: &LxVal, span: Span) -> Result<DiagEdge, LxError> {
+fn value_to_edge(val: &LxVal, span: SourceSpan) -> Result<DiagEdge, LxError> {
   let LxVal::Record(rec) = val else {
     return Err(LxError::type_err("edge must be Record", span));
   };

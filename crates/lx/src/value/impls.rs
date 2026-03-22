@@ -38,7 +38,6 @@ impl LxVal {
       (LxVal::Float(a), LxVal::Float(b)) => a.to_bits() == b.to_bits(),
       (LxVal::Bool(a), LxVal::Bool(b)) => a == b,
       (LxVal::Str(a), LxVal::Str(b)) => a == b,
-      (LxVal::Regex(a), LxVal::Regex(b)) => a.as_str() == b.as_str(),
       (LxVal::Unit, LxVal::Unit) => true,
       (LxVal::List(a), LxVal::List(b)) => a == b,
       (LxVal::Tuple(a), LxVal::Tuple(b)) => a == b,
@@ -77,7 +76,6 @@ impl LxVal {
       LxVal::Float(f) => f.to_bits().hash(state),
       LxVal::Bool(b) => b.hash(state),
       LxVal::Str(s) => s.hash(state),
-      LxVal::Regex(r) => r.as_str().hash(state),
       LxVal::Unit => {},
       LxVal::List(items) | LxVal::Tuple(items) => {
         items.len().hash(state);

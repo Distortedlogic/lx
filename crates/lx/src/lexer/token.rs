@@ -1,14 +1,14 @@
-use crate::span::Span;
+use miette::SourceSpan;
 use num_bigint::BigInt;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
   pub kind: TokenKind,
-  pub span: Span,
+  pub span: SourceSpan,
 }
 
 impl Token {
-  pub fn new(kind: TokenKind, span: Span) -> Self {
+  pub fn new(kind: TokenKind, span: SourceSpan) -> Self {
     Self { kind, span }
   }
 }
@@ -21,7 +21,6 @@ pub enum TokenKind {
   StrChunk(String),
   StrEnd,
   RawStr(String),
-  Regex(String),
   True,
   False,
   Unit,
@@ -66,12 +65,6 @@ pub enum TokenKind {
   LBrace,
   RBrace,
   PercentLBrace,
-
-  Dollar,
-  DollarCaret,
-  DollarBrace,
-  ShellText(String),
-  ShellEnd,
 
   Use,
   Loop,

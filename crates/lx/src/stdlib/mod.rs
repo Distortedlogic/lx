@@ -8,7 +8,6 @@ mod http;
 mod introspect;
 mod math;
 mod md;
-mod re;
 mod sandbox;
 #[path = "sandbox/sandbox_exec.rs"]
 mod sandbox_exec;
@@ -38,7 +37,6 @@ pub(crate) fn get_std_module(path: &[String]) -> Option<ModuleExports> {
     "math" => math::build(),
     "fs" => fs::build(),
     "env" => env::build(),
-    "re" => re::build(),
     "md" => md::build(),
     "http" => http::build(),
     "introspect" => introspect::build(),
@@ -62,6 +60,6 @@ pub(crate) fn std_module_exists(path: &[String]) -> bool {
   }
   matches!(
     path[1].as_str(),
-    "math" | "fs" | "env" | "re" | "md" | "http" | "introspect" | "time" | "cron" | "diag" | "sandbox" | "store" | "test" | "trait" | "user" | "ws"
+    "math" | "fs" | "env" | "md" | "http" | "introspect" | "time" | "cron" | "diag" | "sandbox" | "store" | "test" | "trait" | "user" | "ws"
   )
 }
