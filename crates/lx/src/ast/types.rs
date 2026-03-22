@@ -1,6 +1,6 @@
 use strum::Display;
 
-use super::{Literal, SExpr, SPattern, SType};
+use super::{ExprId, Literal, PatternId, TypeExprId};
 use crate::sym::Sym;
 
 #[derive(Debug, Clone)]
@@ -21,7 +21,7 @@ pub enum Pattern {
   Literal(Literal),
   Bind(Sym),
   Wildcard,
-  Tuple(Vec<SPattern>),
+  Tuple(Vec<PatternId>),
   List(PatternList),
   Record(PatternRecord),
   Constructor(PatternConstructor),
@@ -41,7 +41,7 @@ pub struct Field<D, C> {
   pub constraint: Option<C>,
 }
 
-pub type FieldDecl = Field<SExpr, SExpr>;
+pub type FieldDecl = Field<ExprId, ExprId>;
 
 #[derive(Debug, Clone)]
 pub struct TraitUnionDef {
@@ -62,13 +62,13 @@ pub type TraitMethodDecl = MethodSpec<FieldDecl>;
 #[derive(Debug, Clone)]
 pub struct AgentMethod {
   pub name: Sym,
-  pub handler: SExpr,
+  pub handler: ExprId,
 }
 
 #[derive(Debug, Clone)]
 pub struct ClassField {
   pub name: Sym,
-  pub default: SExpr,
+  pub default: ExprId,
 }
 
 #[derive(Debug, Clone)]
@@ -95,26 +95,26 @@ pub struct ClassDeclData {
 #[derive(Debug, Clone)]
 pub struct FieldPattern {
   pub name: Sym,
-  pub pattern: Option<SPattern>,
+  pub pattern: Option<PatternId>,
 }
 
 #[derive(Debug, Clone)]
 pub enum TypeExpr {
   Named(Sym),
   Var(Sym),
-  Applied(Sym, Vec<SType>),
-  List(Box<SType>),
-  Map { key: Box<SType>, value: Box<SType> },
+  Applied(Sym, Vec<TypeExprId>),
+  List(TypeExprId),
+  Map { key: TypeExprId, value: TypeExprId },
   Record(Vec<TypeField>),
-  Tuple(Vec<SType>),
-  Func { param: Box<SType>, ret: Box<SType> },
-  Fallible { ok: Box<SType>, err: Box<SType> },
+  Tuple(Vec<TypeExprId>),
+  Func { param: TypeExprId, ret: TypeExprId },
+  Fallible { ok: TypeExprId, err: TypeExprId },
 }
 
 #[derive(Debug, Clone)]
 pub struct TypeField {
   pub name: Sym,
-  pub ty: SType,
+  pub ty: TypeExprId,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
@@ -174,12 +174,12 @@ pub struct StmtTypeDef {
 pub struct StmtFieldUpdate {
   pub name: Sym,
   pub fields: Vec<Sym>,
-  pub value: SExpr,
+  pub value: ExprId,
 }
 
 #[derive(Debug, Clone)]
 pub struct PatternList {
-  pub elems: Vec<SPattern>,
+  pub elems: Vec<PatternId>,
   pub rest: Option<Sym>,
 }
 
@@ -192,5 +192,5 @@ pub struct PatternRecord {
 #[derive(Debug, Clone)]
 pub struct PatternConstructor {
   pub name: Sym,
-  pub args: Vec<SPattern>,
+  pub args: Vec<PatternId>,
 }

@@ -163,7 +163,7 @@ fn bi_merge(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<
   };
   let mut s = get_store_mut(id, span)?;
   s.data.extend(source_data);
-  persist(&s);
+  persist(&s, span)?;
   Ok(LxVal::Unit)
 }
 

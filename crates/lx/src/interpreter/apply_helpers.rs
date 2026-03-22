@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use num_traits::ToPrimitive;
 
-use crate::ast::{Expr, ExprBinary, ExprFieldAccess, FieldKind, SExpr, Section, Spanned};
+use crate::ast::{AstArena, Expr, ExprBinary, ExprFieldAccess, ExprId, FieldKind, Section};
 use crate::error::LxError;
 use crate::value::{LxFunc, LxVal};
 use miette::SourceSpan;
@@ -11,14 +11,16 @@ use miette::SourceSpan;
 use super::Interpreter;
 
 impl Interpreter {
-  fn make_section_func(&self, params: &[&str], body_expr: Expr, span: SourceSpan) -> LxVal {
-    let body = Spanned::new(body_expr, span);
+  fn build_section_func(&self, params: &[&str], mut arena: AstArena, body_expr: Expr, span: SourceSpan) -> LxVal {
+    let body = arena.alloc_expr(body_expr, span);
+    let arena = Arc::new(arena);
     let arity = params.len();
     LxVal::Func(Box::new(LxFunc {
       params: params.iter().map(|p| crate::sym::intern(p)).collect(),
       defaults: vec![None; arity],
       guard: None,
-      body: Arc::new(body),
+      body,
+      arena,
       closure: Arc::clone(&self.env),
       arity,
       applied: vec![],
@@ -30,33 +32,40 @@ impl Interpreter {
   pub(super) fn eval_section(&mut self, sec: &Section, span: SourceSpan) -> Result<LxVal, LxError> {
     match sec {
       Section::Right { op, operand } => {
-        let body = Expr::Binary(ExprBinary { op: *op, left: Box::new(Spanned::new(Expr::Ident(intern("_x")), span)), right: Box::new((**operand).clone()) });
-        Ok(self.make_section_func(&["_x"], body, span))
+        let mut arena = (*self.arena).clone();
+        let x_ident = arena.alloc_expr(Expr::Ident(intern("_x")), span);
+        let body = Expr::Binary(ExprBinary { op: *op, left: x_ident, right: *operand });
+        Ok(self.build_section_func(&["_x"], arena, body, span))
       },
       Section::Left { operand, op } => {
-        let body = Expr::Binary(ExprBinary { op: *op, left: Box::new((**operand).clone()), right: Box::new(Spanned::new(Expr::Ident(intern("_x")), span)) });
-        Ok(self.make_section_func(&["_x"], body, span))
+        let mut arena = (*self.arena).clone();
+        let x_ident = arena.alloc_expr(Expr::Ident(intern("_x")), span);
+        let body = Expr::Binary(ExprBinary { op: *op, left: *operand, right: x_ident });
+        Ok(self.build_section_func(&["_x"], arena, body, span))
       },
       Section::Field(name) => {
-        let body = Expr::FieldAccess(ExprFieldAccess { expr: Box::new(Spanned::new(Expr::Ident(intern("_x")), span)), field: FieldKind::Named(*name) });
-        Ok(self.make_section_func(&["_x"], body, span))
+        let mut arena = (*self.arena).clone();
+        let x_ident = arena.alloc_expr(Expr::Ident(intern("_x")), span);
+        let body = Expr::FieldAccess(ExprFieldAccess { expr: x_ident, field: FieldKind::Named(*name) });
+        Ok(self.build_section_func(&["_x"], arena, body, span))
       },
       Section::Index(idx) => {
-        let body = Expr::FieldAccess(ExprFieldAccess { expr: Box::new(Spanned::new(Expr::Ident(intern("_x")), span)), field: FieldKind::Index(*idx) });
-        Ok(self.make_section_func(&["_x"], body, span))
+        let mut arena = (*self.arena).clone();
+        let x_ident = arena.alloc_expr(Expr::Ident(intern("_x")), span);
+        let body = Expr::FieldAccess(ExprFieldAccess { expr: x_ident, field: FieldKind::Index(*idx) });
+        Ok(self.build_section_func(&["_x"], arena, body, span))
       },
       Section::BinOp(op) => {
-        let body = Expr::Binary(ExprBinary {
-          op: *op,
-          left: Box::new(Spanned::new(Expr::Ident(intern("_a")), span)),
-          right: Box::new(Spanned::new(Expr::Ident(intern("_b")), span)),
-        });
-        Ok(self.make_section_func(&["_a", "_b"], body, span))
+        let mut arena = (*self.arena).clone();
+        let a_ident = arena.alloc_expr(Expr::Ident(intern("_a")), span);
+        let b_ident = arena.alloc_expr(Expr::Ident(intern("_b")), span);
+        let body = Expr::Binary(ExprBinary { op: *op, left: a_ident, right: b_ident });
+        Ok(self.build_section_func(&["_a", "_b"], arena, body, span))
       },
     }
   }
 
-  pub(super) async fn eval_field_access(&mut self, expr: &SExpr, field: &FieldKind, span: SourceSpan) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_field_access(&mut self, expr: ExprId, field: &FieldKind, span: SourceSpan) -> Result<LxVal, LxError> {
     let val = self.eval(expr).await?;
     match field {
       FieldKind::Named(name) => match &val {
@@ -91,8 +100,8 @@ impl Interpreter {
         let i = if *idx < 0 { items.len() as i64 + idx } else { *idx } as usize;
         items.get(i).cloned().ok_or_else(|| LxError::runtime(format!("index {idx} out of bounds"), span))
       },
-      FieldKind::Computed(key_expr) => {
-        let key = self.eval(key_expr).await?;
+      FieldKind::Computed(key_eid) => {
+        let key = self.eval(*key_eid).await?;
         match (&val, &key) {
           (LxVal::Record(r), LxVal::Str(s)) => Ok(r.get(&crate::sym::intern(s)).cloned().unwrap_or(LxVal::None)),
           (LxVal::Map(m), LxVal::Str(s)) => {
@@ -136,12 +145,12 @@ impl Interpreter {
     }
   }
 
-  pub(super) async fn eval_ternary(&mut self, cond: &SExpr, then_: &SExpr, else_: &Option<Box<SExpr>>, span: SourceSpan) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_ternary(&mut self, cond: ExprId, then_: ExprId, else_: &Option<ExprId>, span: SourceSpan) -> Result<LxVal, LxError> {
     let cv = self.eval(cond).await?;
     match cv.as_bool() {
       Some(true) => self.eval(then_).await,
       Some(false) => match else_ {
-        Some(e) => self.eval(e).await,
+        Some(e) => self.eval(*e).await,
         None => Ok(LxVal::Unit),
       },
       _ => Err(LxError::type_err(format!("ternary `?` condition must be Bool, got {} `{}`", cv.type_name(), cv.short_display()), span, None)),

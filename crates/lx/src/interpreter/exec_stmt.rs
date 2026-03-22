@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_recursion::async_recursion;
 use indexmap::IndexMap;
 
-use crate::ast::{BindTarget, SStmt, Stmt, StmtFieldUpdate, StmtTypeDef};
+use crate::ast::{BindTarget, Stmt, StmtId, StmtTypeDef};
 use crate::env::Env;
 use crate::error::LxError;
 use crate::sym::Sym;
@@ -21,16 +21,18 @@ fn binding_pattern_hint(pat_str: &str) -> Option<&'static str> {
 
 impl Interpreter {
   #[async_recursion(?Send)]
-  pub(crate) async fn eval_stmt(&mut self, stmt: &SStmt) -> Result<LxVal, LxError> {
-    match &stmt.node {
+  pub(crate) async fn eval_stmt(&mut self, sid: StmtId) -> Result<LxVal, LxError> {
+    let span = self.arena.stmt_span(sid);
+    let stmt = self.arena.stmt(sid).clone();
+    match &stmt {
       Stmt::Binding(b) => {
-        let val = self.eval(&b.value).await?;
-        let val = self.force_defaults(val, stmt.span).await?;
+        let val = self.eval(b.value).await?;
+        let val = self.force_defaults(val, span).await?;
         match &b.target {
           BindTarget::Name(name) => {
             if self.env.has_mut(*name) {
               let val = Self::maybe_combine_clauses(&self.env, *name, val);
-              self.env.reassign(*name, val).map_err(|e| LxError::runtime(e, stmt.span))?;
+              self.env.reassign(*name, val).map_err(|e| LxError::runtime(e, span))?;
             } else {
               let val = Self::maybe_combine_clauses(&self.env, *name, val);
               let env = self.env.child();
@@ -39,17 +41,18 @@ impl Interpreter {
             }
           },
           BindTarget::Reassign(name) => {
-            self.env.reassign(*name, val).map_err(|e| LxError::runtime(e, stmt.span))?;
+            self.env.reassign(*name, val).map_err(|e| LxError::runtime(e, span))?;
           },
-          BindTarget::Pattern(pat) => {
-            let bindings = self.try_match_pattern(&pat.node, &val).ok_or_else(|| {
-              let pat_str = pat.node.to_string();
+          BindTarget::Pattern(pid) => {
+            let pat = self.arena.pattern(*pid).clone();
+            let bindings = self.try_match_pattern(&pat, &val).ok_or_else(|| {
+              let pat_str = pat.to_string();
               let hint = binding_pattern_hint(&pat_str);
               let msg = match hint {
                 Some(h) => format!("cannot bind {} `{}` to pattern `{pat_str}` — {h}", val.type_name(), val.short_display(),),
                 None => format!("cannot bind {} `{}` to pattern `{pat_str}`", val.type_name(), val.short_display(),),
               };
-              LxError::runtime(msg, stmt.span)
+              LxError::runtime(msg, span)
             })?;
             let env = self.env.child();
             for (sym, v) in bindings {
@@ -61,7 +64,7 @@ impl Interpreter {
         Ok(LxVal::Unit)
       },
       Stmt::Use(use_stmt) => {
-        self.eval_use(use_stmt, stmt.span).await?;
+        self.eval_use(use_stmt, span).await?;
         Ok(LxVal::Unit)
       },
       Stmt::TypeDef(StmtTypeDef { variants, .. }) => {
@@ -76,14 +79,14 @@ impl Interpreter {
         self.env = Arc::new(env);
         Ok(LxVal::Unit)
       },
-      Stmt::TraitUnion(def) => self.eval_trait_union(def.name, &def.variants, stmt.span),
+      Stmt::TraitUnion(def) => self.eval_trait_union(def.name, &def.variants, span),
       Stmt::TraitDecl(data) => {
-        let trait_fields = self.eval_trait_fields(data.name.as_str(), &data.entries, stmt.span).await?;
+        let trait_fields = self.eval_trait_fields(data.name.as_str(), &data.entries, span).await?;
         let mut method_defs = Vec::new();
         for m in &data.methods {
           let mut input = Vec::new();
           for f in &m.input {
-            let default = match &f.default {
+            let default = match f.default {
               Some(e) => Some(self.eval(e).await?),
               None => None,
             };
@@ -93,7 +96,7 @@ impl Interpreter {
         }
         let mut default_impls = IndexMap::new();
         for d in &data.defaults {
-          let handler = self.eval(&d.handler).await?;
+          let handler = self.eval(d.handler).await?;
           default_impls.insert(d.name, handler);
         }
         let val = LxVal::Trait(Box::new(LxTrait {
@@ -113,15 +116,15 @@ impl Interpreter {
       Stmt::ClassDecl(data) => {
         let mut defaults_map = IndexMap::new();
         for f in &data.fields {
-          let val = self.eval(&f.default).await?;
+          let val = self.eval(f.default).await?;
           defaults_map.insert(f.name, val);
         }
         let mut method_map = IndexMap::new();
         for m in &data.methods {
-          let handler = self.eval(&m.handler).await?;
+          let handler = self.eval(m.handler).await?;
           method_map.insert(m.name, handler);
         }
-        Self::inject_traits(&mut method_map, &data.traits, &self.env, "Class", data.name.as_str(), stmt.span)?;
+        Self::inject_traits(&mut method_map, &data.traits, &self.env, "Class", data.name.as_str(), span)?;
         let val = LxVal::Class(Box::new(LxClass {
           name: data.name,
           traits: Arc::new(data.traits.clone()),
@@ -133,18 +136,18 @@ impl Interpreter {
         self.env = Arc::new(env);
         Ok(LxVal::Unit)
       },
-      Stmt::FieldUpdate(StmtFieldUpdate { name, fields, value }) => {
-        let new_val = self.eval(value).await?;
-        let current = self.env.get(*name).ok_or_else(|| LxError::runtime(format!("undefined variable '{name}'"), stmt.span))?;
+      Stmt::FieldUpdate(fu) => {
+        let new_val = self.eval(fu.value).await?;
+        let current = self.env.get(fu.name).ok_or_else(|| LxError::runtime(format!("undefined variable '{}'", fu.name), span))?;
         if let LxVal::Object(o) = &current {
-          crate::stdlib::object_update_nested(o.id, fields, new_val).map_err(|e| LxError::runtime(e, stmt.span))?;
+          crate::stdlib::object_update_nested(o.id, &fu.fields, new_val).map_err(|e| LxError::runtime(e, span))?;
           return Ok(LxVal::Unit);
         }
-        let updated = Self::update_record_field(&current, fields, new_val, stmt.span)?;
-        self.env.reassign(*name, updated).map_err(|e| LxError::runtime(e, stmt.span))?;
+        let updated = Self::update_record_field(&current, &fu.fields, new_val, span)?;
+        self.env.reassign(fu.name, updated).map_err(|e| LxError::runtime(e, span))?;
         Ok(LxVal::Unit)
       },
-      Stmt::Expr(e) => self.eval(e).await,
+      Stmt::Expr(e) => self.eval(*e).await,
     }
   }
 

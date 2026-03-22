@@ -4,7 +4,7 @@ use super::Interpreter;
 use crate::ast::{FieldDecl, TraitEntry};
 use crate::error::LxError;
 use crate::sym::Sym;
-use crate::value::{FieldDef, LxVal};
+use crate::value::{ConstraintExpr, FieldDef, LxVal};
 use miette::{SourceOffset, SourceSpan};
 
 impl Interpreter {
@@ -43,11 +43,11 @@ impl Interpreter {
   }
 
   async fn eval_field_decl(&mut self, f: &FieldDecl) -> Result<FieldDef, LxError> {
-    let default = match &f.default {
-      Some(e) => Some(self.eval(e).await?),
+    let default = match f.default {
+      Some(eid) => Some(self.eval(eid).await?),
       None => None,
     };
-    let constraint = f.constraint.as_ref().map(|e| Arc::new(e.clone()));
+    let constraint = f.constraint.map(|eid| ConstraintExpr { expr_id: eid, arena: Arc::clone(&self.arena) });
     Ok(FieldDef { name: f.name, type_name: f.type_name, default, constraint })
   }
 

@@ -1,7 +1,7 @@
 use num_integer::Integer;
 use num_traits::ToPrimitive;
 
-use crate::ast::{BinOp, Literal, SExpr, StrPart, UnaryOp};
+use crate::ast::{BinOp, ExprId, Literal, StrPart, UnaryOp};
 use crate::error::LxError;
 use crate::value::LxVal;
 use miette::SourceSpan;
@@ -116,7 +116,7 @@ impl Interpreter {
     }
   }
 
-  pub(super) async fn eval_unary(&mut self, op: &UnaryOp, operand: &SExpr, span: SourceSpan) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_unary(&mut self, op: &UnaryOp, operand: ExprId, span: SourceSpan) -> Result<LxVal, LxError> {
     let v = self.eval(operand).await?;
     match (op, &v) {
       (UnaryOp::Neg, LxVal::Int(n)) => Ok(LxVal::Int(-n)),
@@ -131,9 +131,10 @@ impl Interpreter {
     for part in parts {
       match part {
         StrPart::Text(t) => buf.push_str(t),
-        StrPart::Interp(e) => {
-          let v = self.eval(e).await?;
-          let v = self.force_defaults(v, e.span).await?;
+        StrPart::Interp(eid) => {
+          let espan = self.arena.expr_span(*eid);
+          let v = self.eval(*eid).await?;
+          let v = self.force_defaults(v, espan).await?;
           buf.push_str(&v.to_string());
         },
       }
@@ -144,7 +145,7 @@ impl Interpreter {
     Ok(LxVal::str(buf))
   }
 
-  pub(super) async fn eval_short_circuit(&mut self, left: &SExpr, right: &SExpr, is_and: bool, span: SourceSpan) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_short_circuit(&mut self, left: ExprId, right: ExprId, is_and: bool, span: SourceSpan) -> Result<LxVal, LxError> {
     let l = self.eval(left).await?;
     let l = self.force_defaults(l, span).await?;
     let short_circuit_on = !is_and;

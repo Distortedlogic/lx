@@ -30,14 +30,17 @@ impl Interpreter {
       }
     }
     for field in fields.iter() {
-      if let Some(ref constraint_expr) = field.constraint {
+      if let Some(ref constraint) = field.constraint {
         let val = result.get(&field.name).cloned().unwrap_or(LxVal::Unit);
         let saved = Arc::clone(&self.env);
+        let saved_arena = Arc::clone(&self.arena);
         let scope = self.env.child();
         scope.bind(field.name, val);
         self.env = Arc::new(scope);
-        let ok = self.eval(constraint_expr).await?;
+        self.arena = Arc::clone(&constraint.arena);
+        let ok = self.eval(constraint.expr_id).await?;
         self.env = saved;
+        self.arena = saved_arena;
         match ok.as_bool() {
           Some(true) => {},
           _ => {

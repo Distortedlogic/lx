@@ -1,6 +1,6 @@
 use num_bigint::BigInt;
 
-use super::{BinOp, SExpr, SPattern, SStmt, SType, UnaryOp, WithKind};
+use super::{BinOp, ExprId, PatternId, StmtId, TypeExprId, UnaryOp, WithKind};
 use crate::sym::Sym;
 
 #[derive(Debug, Clone)]
@@ -16,13 +16,13 @@ pub enum Literal {
 #[derive(Debug, Clone)]
 pub enum StrPart {
   Text(String),
-  Interp(SExpr),
+  Interp(ExprId),
 }
 
 #[derive(Debug, Clone)]
 pub enum Section {
-  Right { op: BinOp, operand: Box<SExpr> },
-  Left { operand: Box<SExpr>, op: BinOp },
+  Right { op: BinOp, operand: ExprId },
+  Left { operand: ExprId, op: BinOp },
   Field(Sym),
   Index(i64),
   BinOp(BinOp),
@@ -32,144 +32,142 @@ pub enum Section {
 pub enum FieldKind {
   Named(Sym),
   Index(i64),
-  Computed(Box<SExpr>),
+  Computed(ExprId),
 }
 
 #[derive(Debug, Clone)]
 pub enum ListElem {
-  Single(SExpr),
-  Spread(SExpr),
+  Single(ExprId),
+  Spread(ExprId),
 }
 
 #[derive(Debug, Clone)]
-pub struct RecordField {
-  pub name: Option<Sym>,
-  pub value: SExpr,
-  pub is_spread: bool,
+pub enum RecordField {
+  Named { name: Sym, value: ExprId },
+  Spread(ExprId),
 }
 
 #[derive(Debug, Clone)]
-pub struct MapEntry {
-  pub key: Option<SExpr>,
-  pub value: SExpr,
-  pub is_spread: bool,
+pub enum MapEntry {
+  Keyed { key: ExprId, value: ExprId },
+  Spread(ExprId),
 }
 
 #[derive(Debug, Clone)]
 pub struct Param {
   pub name: Sym,
-  pub type_ann: Option<SType>,
-  pub default: Option<SExpr>,
+  pub type_ann: Option<TypeExprId>,
+  pub default: Option<ExprId>,
 }
 
 #[derive(Debug, Clone)]
 pub struct MatchArm {
-  pub pattern: SPattern,
-  pub guard: Option<SExpr>,
-  pub body: SExpr,
+  pub pattern: PatternId,
+  pub guard: Option<ExprId>,
+  pub body: ExprId,
 }
 
 #[derive(Debug, Clone)]
 pub struct SelArm {
-  pub expr: SExpr,
-  pub handler: SExpr,
+  pub expr: ExprId,
+  pub handler: ExprId,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ExprBinary {
   pub op: BinOp,
-  pub left: Box<SExpr>,
-  pub right: Box<SExpr>,
+  pub left: ExprId,
+  pub right: ExprId,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ExprUnary {
   pub op: UnaryOp,
-  pub operand: Box<SExpr>,
+  pub operand: ExprId,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ExprPipe {
-  pub left: Box<SExpr>,
-  pub right: Box<SExpr>,
+  pub left: ExprId,
+  pub right: ExprId,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ExprApply {
-  pub func: Box<SExpr>,
-  pub arg: Box<SExpr>,
+  pub func: ExprId,
+  pub arg: ExprId,
 }
 
 #[derive(Debug, Clone)]
 pub struct ExprFieldAccess {
-  pub expr: Box<SExpr>,
+  pub expr: ExprId,
   pub field: FieldKind,
 }
 
 #[derive(Debug, Clone)]
 pub struct ExprFunc {
   pub params: Vec<Param>,
-  pub ret_type: Option<SType>,
-  pub guard: Option<Box<SExpr>>,
-  pub body: Box<SExpr>,
+  pub ret_type: Option<TypeExprId>,
+  pub guard: Option<ExprId>,
+  pub body: ExprId,
 }
 
 #[derive(Debug, Clone)]
 pub struct ExprMatch {
-  pub scrutinee: Box<SExpr>,
+  pub scrutinee: ExprId,
   pub arms: Vec<MatchArm>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ExprTernary {
-  pub cond: Box<SExpr>,
-  pub then_: Box<SExpr>,
-  pub else_: Option<Box<SExpr>>,
+  pub cond: ExprId,
+  pub then_: ExprId,
+  pub else_: Option<ExprId>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ExprCoalesce {
-  pub expr: Box<SExpr>,
-  pub default: Box<SExpr>,
+  pub expr: ExprId,
+  pub default: ExprId,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ExprSlice {
-  pub expr: Box<SExpr>,
-  pub start: Option<Box<SExpr>>,
-  pub end: Option<Box<SExpr>>,
+  pub expr: ExprId,
+  pub start: Option<ExprId>,
+  pub end: Option<ExprId>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ExprNamedArg {
   pub name: Sym,
-  pub value: Box<SExpr>,
+  pub value: ExprId,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ExprAssert {
-  pub expr: Box<SExpr>,
-  pub msg: Option<Box<SExpr>>,
+  pub expr: ExprId,
+  pub msg: Option<ExprId>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ExprTimeout {
-  pub ms: Box<SExpr>,
-  pub body: Box<SExpr>,
+  pub ms: ExprId,
+  pub body: ExprId,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ExprEmit {
-  pub value: Box<SExpr>,
+  pub value: ExprId,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ExprYield {
-  pub value: Box<SExpr>,
+  pub value: ExprId,
 }
 
 #[derive(Debug, Clone)]
 pub struct ExprWith {
   pub kind: WithKind,
-  pub body: Vec<SStmt>,
+  pub body: Vec<StmtId>,
 }

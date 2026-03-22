@@ -29,10 +29,7 @@ pub const CHART_SECONDARY: &str = "#4EDEA3";
 pub const CHART_LABEL_PRIMARY: &str = GRAY_200;
 pub const CHART_LABEL_SECONDARY: &str = GRAY_400;
 
-pub const LAYER_COLORS: [&str; 10] = [
-    "#2dd4bf", "#38bdf8", "#818cf8", "#a78bfa", "#c084fc",
-    "#e879f9", "#fb7185", "#f97316", "#facc15", "#4ade80",
-];
+pub const LAYER_COLORS: [&str; 10] = ["#2dd4bf", "#38bdf8", "#818cf8", "#a78bfa", "#c084fc", "#e879f9", "#fb7185", "#f97316", "#facc15", "#4ade80"];
 pub const LAYER_COLOR_DEFAULT: &str = "#818cf8";
 
 pub const FLAMEGRAPH_COLORS: [&str; 5] = [GREEN, BLUE, ORANGE, PINK, PURPLE];

@@ -1,0 +1,11 @@
+#:schema ./dioxus.schema.json
+
+[application]
+name = "lx-desktop"
+
+[web.app]
+title = "lx desktop"
+
+[web.resource.dev]
+style = []
+script = []

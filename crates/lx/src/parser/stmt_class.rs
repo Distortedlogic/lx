@@ -1,13 +1,14 @@
 use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 
+use super::ExprId;
 use super::Span;
 use super::expr::{name_or_type, type_name};
-use crate::ast::{AgentMethod, ClassDeclData, ClassField, SExpr};
+use crate::ast::{AgentMethod, ClassDeclData, ClassField};
 use crate::lexer::token::TokenKind;
 
 pub(super) fn class_parser<'a, I>(
-  expr: impl Parser<'a, I, SExpr, extra::Err<Rich<'a, TokenKind, Span>>> + Clone,
+  expr: impl Parser<'a, I, ExprId, extra::Err<Rich<'a, TokenKind, Span>>> + Clone,
 ) -> impl Parser<'a, I, ClassDeclData, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
 where
   I: ValueInput<'a, Token = TokenKind, Span = Span>,

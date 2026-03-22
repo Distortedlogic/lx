@@ -2,18 +2,29 @@ use crate::sym::Sym;
 mod capture;
 pub mod diagnostics;
 mod exhaust;
-mod stmts;
-mod synth;
-mod synth_helpers;
+mod exhaust_core;
+mod exhaust_types;
+mod leave_expr;
+mod resolve;
+mod symbol_table;
+mod type_ops;
 pub mod types;
+pub mod unification;
+mod visit_expr;
+mod visit_stmt;
 
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::{Program, SType, TypeExpr};
-use diagnostics::DiagnosticKind;
-use miette::SourceSpan;
+use std::sync::Arc;
 
-use types::{Type, UnificationTable};
+use crate::ast::{AstArena, Core, Program, TypeExpr, TypeExprId};
+use crate::visitor::AstVisitor;
+use diagnostics::{DiagnosticKind, Fix};
+use miette::SourceSpan;
+use symbol_table::SymbolTable;
+
+use types::Type;
+use unification::{TypeError, UnificationTable};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiagLevel {
@@ -26,32 +37,54 @@ pub struct Diagnostic {
   pub kind: DiagnosticKind,
   pub span: SourceSpan,
   pub secondary: Vec<(SourceSpan, String)>,
+  pub fix: Option<Fix>,
 }
 
 pub struct CheckResult {
   pub diagnostics: Vec<Diagnostic>,
+  pub source: Arc<str>,
 }
 
-pub(crate) struct Checker {
+pub(crate) struct Checker<'a> {
   pub(crate) table: UnificationTable,
   scope: Vec<HashMap<Sym, Type>>,
   pub(crate) diagnostics: Vec<Diagnostic>,
   pub(crate) type_defs: HashMap<Sym, Vec<Sym>>,
-  pub(crate) mutables: HashSet<Sym>,
   import_sources: HashMap<Sym, SourceSpan>,
   pub(crate) trait_fields: HashMap<Sym, Vec<(Sym, Type)>>,
+  pub(crate) arena: &'a AstArena,
+  mutables: HashSet<Sym>,
+  symbols: SymbolTable,
+  type_stack: Vec<Type>,
 }
 
-impl Checker {
-  fn new() -> Self {
+impl<'a> Checker<'a> {
+  fn new(arena: &'a AstArena, symbols: SymbolTable) -> Self {
     Self {
       table: UnificationTable::new(),
       scope: vec![HashMap::new()],
       diagnostics: Vec::new(),
       type_defs: HashMap::new(),
-      mutables: HashSet::new(),
       import_sources: HashMap::new(),
       trait_fields: HashMap::new(),
+      arena,
+      mutables: HashSet::new(),
+      symbols,
+      type_stack: Vec::new(),
+    }
+  }
+
+  pub(crate) fn push_type(&mut self, ty: Type) {
+    self.type_stack.push(ty);
+  }
+
+  pub(crate) fn pop_type(&mut self) -> Type {
+    match self.type_stack.pop() {
+      Some(ty) => ty,
+      None => {
+        eprintln!("internal compiler error: type stack underflow");
+        Type::Error
+      },
     }
   }
 
@@ -70,6 +103,10 @@ impl Checker {
     None
   }
 
+  pub(crate) fn is_mutable(&self, name: Sym) -> bool {
+    self.mutables.contains(&name)
+  }
+
   pub(crate) fn push_scope(&mut self) {
     self.scope.push(HashMap::new());
   }
@@ -79,24 +116,31 @@ impl Checker {
   }
 
   pub(crate) fn emit(&mut self, level: DiagLevel, kind: DiagnosticKind, span: SourceSpan) {
-    self.diagnostics.push(Diagnostic { level, kind, span, secondary: Vec::new() });
+    let fix = kind.suggest_fix(span);
+    self.diagnostics.push(Diagnostic { level, kind, span, secondary: Vec::new(), fix });
   }
 
-  pub(crate) fn emit_type_error(&mut self, te: &types::TypeError, span: SourceSpan) {
+  pub(crate) fn emit_type_error(&mut self, te: &TypeError, span: SourceSpan) {
     let kind = DiagnosticKind::TypeMismatch { error: te.clone() };
-    self.diagnostics.push(Diagnostic { level: DiagLevel::Error, kind, span, secondary: Vec::new() });
+    let fix = kind.suggest_fix(span);
+    let mut secondary = Vec::new();
+    if let Some(origin) = te.expected_origin {
+      secondary.push((origin, "expected type declared here".into()));
+    }
+    self.diagnostics.push(Diagnostic { level: DiagLevel::Error, kind, span, secondary, fix });
   }
 
   pub(crate) fn fresh(&mut self) -> Type {
     self.table.fresh_var()
   }
 
-  pub(crate) fn resolve_type_ann(&mut self, ty: &SType) -> Type {
-    match &ty.node {
+  pub(crate) fn resolve_type_ann(&mut self, ty_id: TypeExprId) -> Type {
+    match self.arena.type_expr(ty_id) {
       TypeExpr::Named(name) => named_to_type(name.as_str()),
       TypeExpr::Var(_) => self.fresh(),
       TypeExpr::Applied(name, args) => {
-        let resolved: Vec<Type> = args.iter().map(|a| self.resolve_type_ann(a)).collect();
+        let args = args.clone();
+        let resolved: Vec<Type> = args.iter().map(|a| self.resolve_type_ann(*a)).collect();
         match name.as_str() {
           "Maybe" if resolved.len() == 1 => Type::Maybe(Box::new(resolved.into_iter().next().unwrap_or(Type::Unknown))),
           "Result" if resolved.len() == 2 => {
@@ -106,25 +150,40 @@ impl Checker {
           _ => Type::Unknown,
         }
       },
-      TypeExpr::List(inner) => Type::List(Box::new(self.resolve_type_ann(inner))),
-      TypeExpr::Map { key, value } => Type::Map { key: Box::new(self.resolve_type_ann(key)), value: Box::new(self.resolve_type_ann(value)) },
+      TypeExpr::List(inner) => {
+        let inner = *inner;
+        Type::List(Box::new(self.resolve_type_ann(inner)))
+      },
+      TypeExpr::Map { key, value } => {
+        let (key, value) = (*key, *value);
+        Type::Map { key: Box::new(self.resolve_type_ann(key)), value: Box::new(self.resolve_type_ann(value)) }
+      },
       TypeExpr::Record(fields) => {
-        let fs = fields.iter().map(|f| (f.name, self.resolve_type_ann(&f.ty))).collect();
+        let fields = fields.clone();
+        let fs = fields.iter().map(|f| (f.name, self.resolve_type_ann(f.ty))).collect();
         Type::Record(fs)
       },
-      TypeExpr::Tuple(elems) => Type::Tuple(elems.iter().map(|e| self.resolve_type_ann(e)).collect()),
-      TypeExpr::Func { param, ret } => Type::Func { param: Box::new(self.resolve_type_ann(param)), ret: Box::new(self.resolve_type_ann(ret)) },
-      TypeExpr::Fallible { ok, err } => Type::Result { ok: Box::new(self.resolve_type_ann(ok)), err: Box::new(self.resolve_type_ann(err)) },
+      TypeExpr::Tuple(elems) => {
+        let elems = elems.clone();
+        Type::Tuple(elems.iter().map(|e| self.resolve_type_ann(*e)).collect())
+      },
+      TypeExpr::Func { param, ret } => {
+        let (param, ret) = (*param, *ret);
+        Type::Func { params: vec![self.resolve_type_ann(param)], ret: Box::new(self.resolve_type_ann(ret)) }
+      },
+      TypeExpr::Fallible { ok, err } => {
+        let (ok, err) = (*ok, *err);
+        Type::Result { ok: Box::new(self.resolve_type_ann(ok)), err: Box::new(self.resolve_type_ann(err)) }
+      },
     }
   }
 }
 
-pub fn check(program: &Program) -> CheckResult {
-  let mut checker = Checker::new();
-  for stmt in &program.stmts {
-    checker.check_stmt(stmt);
-  }
-  CheckResult { diagnostics: checker.diagnostics }
+pub fn check(program: &Program<Core>, source: Arc<str>) -> CheckResult {
+  let symbols = resolve::resolve(program);
+  let mut checker = Checker::new(&program.arena, symbols);
+  checker.visit_program(program);
+  CheckResult { diagnostics: checker.diagnostics, source }
 }
 
 fn named_to_type(name: &str) -> Type {

@@ -2,8 +2,12 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": ".",
-    "verbatimModuleSyntax": false
+    "rootDir": "..",
+    "verbatimModuleSyntax": false,
+    "paths": {
+      "@lx/audio-capture": ["../audio-capture/src/index.ts"],
+      "@lx/audio-playback": ["../audio-playback/src/index.ts"]
+    }
   },
   "include": ["src", "widgets"]
 }

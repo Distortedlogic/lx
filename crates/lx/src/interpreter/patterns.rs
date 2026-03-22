@@ -1,23 +1,24 @@
 use std::sync::Arc;
 
-use crate::ast::{Literal, MatchArm, Pattern, PatternConstructor, PatternList, PatternRecord, SExpr, StrPart};
+use crate::ast::{ExprId, Literal, MatchArm, Pattern, PatternConstructor, PatternList, PatternRecord, StrPart};
 use crate::error::LxError;
 use crate::sym::Sym;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
 impl super::Interpreter {
-  pub(super) async fn eval_match(&mut self, scrutinee: &SExpr, arms: &[MatchArm], span: SourceSpan) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_match(&mut self, scrutinee: ExprId, arms: &[MatchArm], span: SourceSpan) -> Result<LxVal, LxError> {
     let val = self.eval(scrutinee).await?;
     for arm in arms {
-      if let Some(bindings) = self.try_match_pattern(&arm.pattern.node, &val) {
+      let pat = self.arena.pattern(arm.pattern).clone();
+      if let Some(bindings) = self.try_match_pattern(&pat, &val) {
         let saved = Arc::clone(&self.env);
         let scope = self.env.child();
         for (sym, v) in bindings {
           scope.bind(sym, v);
         }
         self.env = Arc::new(scope);
-        if let Some(guard) = &arm.guard {
+        if let Some(guard) = arm.guard {
           let gv = self.eval(guard).await?;
           match gv.as_bool() {
             Some(false) => {
@@ -31,7 +32,7 @@ impl super::Interpreter {
             },
           }
         }
-        let result = self.eval(&arm.body).await;
+        let result = self.eval(arm.body).await;
         self.env = saved;
         return result;
       }
@@ -72,8 +73,9 @@ impl super::Interpreter {
           return None;
         }
         let mut bindings = vec![];
-        for (p, v) in pats.iter().zip(items.as_ref()) {
-          bindings.extend(self.try_match_pattern(&p.node, v)?);
+        for (pid, v) in pats.iter().zip(items.as_ref()) {
+          let pat = self.arena.pattern(*pid).clone();
+          bindings.extend(self.try_match_pattern(&pat, v)?);
         }
         Some(bindings)
       },
@@ -89,8 +91,9 @@ impl super::Interpreter {
           return None;
         }
         let mut bindings = vec![];
-        for (p, v) in elems.iter().zip(items.as_ref()) {
-          bindings.extend(self.try_match_pattern(&p.node, v)?);
+        for (pid, v) in elems.iter().zip(items.as_ref()) {
+          let pat = self.arena.pattern(*pid).clone();
+          bindings.extend(self.try_match_pattern(&pat, v)?);
         }
         if let Some(rest_name) = rest {
           let remaining = items[elems.len()..].to_vec();
@@ -105,8 +108,9 @@ impl super::Interpreter {
         let mut bindings = vec![];
         for fp in fields {
           let val = rec.get(&fp.name)?;
-          if let Some(sub_pat) = &fp.pattern {
-            bindings.extend(self.try_match_pattern(&sub_pat.node, val)?);
+          if let Some(sub_pid) = fp.pattern {
+            let sub_pat = self.arena.pattern(sub_pid).clone();
+            bindings.extend(self.try_match_pattern(&sub_pat, val)?);
           } else {
             bindings.push((fp.name, val.clone()));
           }
@@ -119,14 +123,24 @@ impl super::Interpreter {
         Some(bindings)
       },
       Pattern::Constructor(PatternConstructor { name, args }) => match (name.as_str(), value) {
-        ("Ok", LxVal::Ok(v)) if args.len() == 1 => self.try_match_pattern(&args[0].node, v),
-        ("Err", LxVal::Err(v)) if args.len() == 1 => self.try_match_pattern(&args[0].node, v),
-        ("Some", LxVal::Some(v)) if args.len() == 1 => self.try_match_pattern(&args[0].node, v),
+        ("Ok", LxVal::Ok(v)) if args.len() == 1 => {
+          let pat = self.arena.pattern(args[0]).clone();
+          self.try_match_pattern(&pat, v)
+        },
+        ("Err", LxVal::Err(v)) if args.len() == 1 => {
+          let pat = self.arena.pattern(args[0]).clone();
+          self.try_match_pattern(&pat, v)
+        },
+        ("Some", LxVal::Some(v)) if args.len() == 1 => {
+          let pat = self.arena.pattern(args[0]).clone();
+          self.try_match_pattern(&pat, v)
+        },
         ("None", LxVal::None) if args.is_empty() => Some(vec![]),
         (tag, LxVal::Tagged { tag: vtag, values }) if tag == vtag.as_str() && args.len() == values.len() => {
           let mut bindings = vec![];
-          for (p, v) in args.iter().zip(values.as_ref()) {
-            bindings.extend(self.try_match_pattern(&p.node, v)?);
+          for (pid, v) in args.iter().zip(values.as_ref()) {
+            let pat = self.arena.pattern(*pid).clone();
+            bindings.extend(self.try_match_pattern(&pat, v)?);
           }
           Some(bindings)
         },

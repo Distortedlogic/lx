@@ -11,6 +11,7 @@ chumsky.workspace = true
 cron.workspace = true
 dashmap.workspace = true
 derive_more.workspace = true
+ena.workspace = true
 fastrand.workspace = true
 futures.workspace = true
 indexmap.workspace = true

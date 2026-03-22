@@ -1,0 +1,383 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DioxusConfig",
+  "description": "Dioxus v0.7.3 configuration (Dioxus.toml)",
+  "type": "object",
+  "required": ["application"],
+  "additionalProperties": false,
+  "properties": {
+    "application": { "$ref": "#/$defs/ApplicationConfig" },
+    "web": { "$ref": "#/$defs/WebConfig" },
+    "bundle": { "$ref": "#/$defs/BundleConfig" },
+    "components": { "$ref": "#/$defs/ComponentConfig" }
+  },
+  "$defs": {
+    "ApplicationConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "asset_dir": { "type": "string" },
+        "out_dir": { "type": "string" },
+        "public_dir": { "type": "string", "default": "public" },
+        "tailwind_input": { "type": "string" },
+        "tailwind_output": { "type": "string" },
+        "ios_info_plist": { "type": "string" },
+        "macos_info_plist": { "type": "string" },
+        "ios_entitlements": { "type": "string" },
+        "macos_entitlements": { "type": "string" },
+        "android_manifest": { "type": "string" },
+        "android_main_activity": { "type": "string" },
+        "android_min_sdk_version": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "WebConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "app": { "$ref": "#/$defs/WebAppConfig" },
+        "proxy": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WebProxyConfig" },
+          "default": []
+        },
+        "watcher": { "$ref": "#/$defs/WebWatcherConfig" },
+        "resource": { "$ref": "#/$defs/WebResourceConfig" },
+        "https": { "$ref": "#/$defs/WebHttpsConfig" },
+        "pre_compress": { "type": "boolean", "default": false },
+        "wasm_opt": { "$ref": "#/$defs/WasmOptConfig" }
+      }
+    },
+    "WebAppConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string", "default": "dioxus | ⛺" },
+        "base_path": { "type": "string" }
+      }
+    },
+    "WebProxyConfig": {
+      "type": "object",
+      "required": ["backend"],
+      "additionalProperties": false,
+      "properties": {
+        "backend": { "type": "string" }
+      }
+    },
+    "WebWatcherConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "watch_path": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["src", "examples"]
+        },
+        "reload_html": { "type": "boolean", "default": false },
+        "index_on_404": { "type": "boolean", "default": true }
+      }
+    },
+    "WebResourceConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dev": { "$ref": "#/$defs/WebDevResourceConfig" },
+        "style": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "script": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "WebDevResourceConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "style": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "script": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        }
+      }
+    },
+    "WebHttpsConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "mkcert": { "type": "boolean" },
+        "key_path": { "type": "string" },
+        "cert_path": { "type": "string" }
+      }
+    },
+    "WasmOptConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "$ref": "#/$defs/WasmOptLevel"
+        },
+        "debug": { "type": "boolean", "default": false },
+        "memory_packing": { "type": "boolean", "default": false },
+        "extra_features": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        }
+      }
+    },
+    "WasmOptLevel": {
+      "type": "string",
+      "enum": ["z", "s", "0", "1", "2", "3", "4"],
+      "default": "z"
+    },
+    "BundleConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "identifier": { "type": "string" },
+        "publisher": { "type": "string" },
+        "icon": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "resources": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "copyright": { "type": "string" },
+        "category": { "type": "string" },
+        "short_description": { "type": "string" },
+        "long_description": { "type": "string" },
+        "external_bin": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "deb": { "$ref": "#/$defs/DebianSettings" },
+        "macos": { "$ref": "#/$defs/MacOsSettings" },
+        "windows": { "$ref": "#/$defs/WindowsSettings" },
+        "android": { "$ref": "#/$defs/AndroidSettings" }
+      }
+    },
+    "DebianSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "depends": { "type": "array", "items": { "type": "string" } },
+        "recommends": { "type": "array", "items": { "type": "string" } },
+        "provides": { "type": "array", "items": { "type": "string" } },
+        "conflicts": { "type": "array", "items": { "type": "string" } },
+        "replaces": { "type": "array", "items": { "type": "string" } },
+        "files": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "desktop_template": { "type": "string" },
+        "section": { "type": "string" },
+        "priority": { "type": "string" },
+        "changelog": { "type": "string" },
+        "pre_install_script": { "type": "string" },
+        "post_install_script": { "type": "string" },
+        "pre_remove_script": { "type": "string" },
+        "post_remove_script": { "type": "string" }
+      }
+    },
+    "MacOsSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "bundle_version": { "type": "string" },
+        "frameworks": { "type": "array", "items": { "type": "string" } },
+        "minimum_system_version": { "type": "string" },
+        "license": { "type": "string" },
+        "exception_domain": { "type": "string" },
+        "signing_identity": { "type": "string" },
+        "provider_short_name": { "type": "string" },
+        "entitlements": { "type": "string" },
+        "info_plist_path": { "type": "string" },
+        "bundle_name": { "type": "string" },
+        "files": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "hardened_runtime": { "type": "boolean", "default": true }
+      }
+    },
+    "WindowsSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "digest_algorithm": { "type": "string" },
+        "certificate_thumbprint": { "type": "string" },
+        "timestamp_url": { "type": "string" },
+        "tsp": { "type": "boolean", "default": false },
+        "wix": { "$ref": "#/$defs/WixSettings" },
+        "icon_path": { "type": "string" },
+        "webview_install_mode": { "$ref": "#/$defs/WebviewInstallMode" },
+        "webview_fixed_runtime_path": { "type": "string" },
+        "allow_downgrades": { "type": "boolean", "default": false },
+        "nsis": { "$ref": "#/$defs/NsisSettings" },
+        "sign_command": { "$ref": "#/$defs/CustomSignCommandSettings" }
+      }
+    },
+    "WixSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "language": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": [
+              { "type": "string" },
+              { "type": ["string", "null"] }
+            ],
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        "template": { "type": "string" },
+        "fragment_paths": { "type": "array", "items": { "type": "string" } },
+        "component_group_refs": { "type": "array", "items": { "type": "string" } },
+        "component_refs": { "type": "array", "items": { "type": "string" } },
+        "feature_group_refs": { "type": "array", "items": { "type": "string" } },
+        "feature_refs": { "type": "array", "items": { "type": "string" } },
+        "merge_refs": { "type": "array", "items": { "type": "string" } },
+        "skip_webview_install": { "type": "boolean", "default": false },
+        "license": { "type": "string" },
+        "enable_elevated_update_task": { "type": "boolean", "default": false },
+        "banner_path": { "type": "string" },
+        "dialog_image_path": { "type": "string" },
+        "fips_compliant": { "type": "boolean", "default": false },
+        "version": { "type": "string" },
+        "upgrade_code": { "type": "string", "format": "uuid" }
+      }
+    },
+    "NsisSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "template": { "type": "string" },
+        "license": { "type": "string" },
+        "header_image": { "type": "string" },
+        "sidebar_image": { "type": "string" },
+        "installer_icon": { "type": "string" },
+        "install_mode": {
+          "type": "string",
+          "enum": ["CurrentUser", "PerMachine", "Both"],
+          "default": "CurrentUser"
+        },
+        "languages": { "type": "array", "items": { "type": "string" } },
+        "custom_language_files": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "display_language_selector": { "type": "boolean", "default": false },
+        "start_menu_folder": { "type": "string" },
+        "installer_hooks": { "type": "string" },
+        "minimum_webview2_version": { "type": "string" }
+      }
+    },
+    "WebviewInstallMode": {
+      "oneOf": [
+        { "const": "Skip" },
+        {
+          "type": "object",
+          "required": ["DownloadBootstrapper"],
+          "additionalProperties": false,
+          "properties": {
+            "DownloadBootstrapper": {
+              "type": "object",
+              "required": ["silent"],
+              "additionalProperties": false,
+              "properties": { "silent": { "type": "boolean" } }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["EmbedBootstrapper"],
+          "additionalProperties": false,
+          "properties": {
+            "EmbedBootstrapper": {
+              "type": "object",
+              "required": ["silent"],
+              "additionalProperties": false,
+              "properties": { "silent": { "type": "boolean" } }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["OfflineInstaller"],
+          "additionalProperties": false,
+          "properties": {
+            "OfflineInstaller": {
+              "type": "object",
+              "required": ["silent"],
+              "additionalProperties": false,
+              "properties": { "silent": { "type": "boolean" } }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["FixedRuntime"],
+          "additionalProperties": false,
+          "properties": {
+            "FixedRuntime": {
+              "type": "object",
+              "required": ["path"],
+              "additionalProperties": false,
+              "properties": { "path": { "type": "string" } }
+            }
+          }
+        }
+      ]
+    },
+    "CustomSignCommandSettings": {
+      "type": "object",
+      "required": ["cmd", "args"],
+      "additionalProperties": false,
+      "properties": {
+        "cmd": { "type": "string" },
+        "args": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "AndroidSettings": {
+      "type": "object",
+      "required": ["jks_file", "jks_password", "key_alias", "key_password"],
+      "additionalProperties": false,
+      "properties": {
+        "jks_file": { "type": "string" },
+        "jks_password": { "type": "string" },
+        "key_alias": { "type": "string" },
+        "key_password": { "type": "string" }
+      }
+    },
+    "ComponentConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "registry": { "$ref": "#/$defs/ComponentRegistry" },
+        "components_dir": { "type": "string" }
+      }
+    },
+    "ComponentRegistry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "git": { "type": "string" },
+        "rev": { "type": "string" },
+        "path": { "type": "string" }
+      }
+    }
+  }
+}

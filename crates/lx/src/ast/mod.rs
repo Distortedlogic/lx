@@ -1,50 +1,24 @@
-use std::sync::atomic::{AtomicU32, Ordering};
-
-use crate::sym::Sym;
+pub mod arena;
 mod display;
 mod expr_types;
 mod types;
 
+use std::marker::PhantomData;
+
+use crate::sym::Sym;
+
+pub use arena::{AstArena, AstNode, ExprId, NodeId, PatternId, Spanned, StmtId, TypeExprId};
 pub use expr_types::*;
 pub use types::*;
 
-use miette::SourceSpan;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct NodeId(pub u32);
-
-static NEXT_NODE_ID: AtomicU32 = AtomicU32::new(0);
-
-pub fn reset_node_ids() {
-  NEXT_NODE_ID.store(0, Ordering::Relaxed);
-}
+pub struct Surface;
+pub struct Core;
 
 #[derive(Debug, Clone)]
-pub struct Spanned<T> {
-  pub node: T,
-  pub span: SourceSpan,
-  pub id: NodeId,
-}
-
-impl<T> Spanned<T> {
-  pub fn new(node: T, span: SourceSpan) -> Self {
-    let id = NodeId(NEXT_NODE_ID.fetch_add(1, Ordering::Relaxed));
-    Self { node, span, id }
-  }
-
-  pub fn with_id(node: T, span: SourceSpan, id: NodeId) -> Self {
-    Self { node, span, id }
-  }
-}
-
-pub type SExpr = Spanned<Expr>;
-pub type SStmt = Spanned<Stmt>;
-pub type SPattern = Spanned<Pattern>;
-pub type SType = Spanned<TypeExpr>;
-
-#[derive(Debug, Clone)]
-pub struct Program {
-  pub stmts: Vec<SStmt>,
+pub struct Program<Phase = Surface> {
+  pub stmts: Vec<StmtId>,
+  pub arena: AstArena,
+  pub _phase: PhantomData<Phase>,
 }
 
 #[derive(Debug, Clone)]
@@ -56,7 +30,7 @@ pub enum Stmt {
   ClassDecl(ClassDeclData),
   FieldUpdate(StmtFieldUpdate),
   Use(UseStmt),
-  Expr(SExpr),
+  Expr(ExprId),
 }
 
 #[derive(Debug, Clone)]
@@ -64,15 +38,15 @@ pub struct Binding {
   pub exported: bool,
   pub mutable: bool,
   pub target: BindTarget,
-  pub type_ann: Option<SType>,
-  pub value: SExpr,
+  pub type_ann: Option<TypeExprId>,
+  pub value: ExprId,
 }
 
 #[derive(Debug, Clone)]
 pub enum BindTarget {
   Name(Sym),
   Reassign(Sym),
-  Pattern(SPattern),
+  Pattern(PatternId),
 }
 
 #[derive(Debug, Clone)]
@@ -90,8 +64,8 @@ pub enum Expr {
 
   FieldAccess(ExprFieldAccess),
 
-  Block(Vec<SStmt>),
-  Tuple(Vec<SExpr>),
+  Block(Vec<StmtId>),
+  Tuple(Vec<ExprId>),
 
   List(Vec<ListElem>),
   Record(Vec<RecordField>),
@@ -101,17 +75,17 @@ pub enum Expr {
   Match(ExprMatch),
   Ternary(ExprTernary),
 
-  Propagate(Box<SExpr>),
+  Propagate(ExprId),
   Coalesce(ExprCoalesce),
 
   Slice(ExprSlice),
   NamedArg(ExprNamedArg),
 
-  Loop(Vec<SStmt>),
-  Break(Option<Box<SExpr>>),
+  Loop(Vec<StmtId>),
+  Break(Option<ExprId>),
   Assert(ExprAssert),
 
-  Par(Vec<SStmt>),
+  Par(Vec<StmtId>),
   Sel(Vec<SelArm>),
   Timeout(ExprTimeout),
 
@@ -122,7 +96,7 @@ pub enum Expr {
 
 #[derive(Debug, Clone)]
 pub enum WithKind {
-  Binding { name: Sym, value: Box<SExpr>, mutable: bool },
-  Resources { resources: Vec<(SExpr, Sym)> },
-  Context { fields: Vec<(Sym, SExpr)> },
+  Binding { name: Sym, value: ExprId, mutable: bool },
+  Resources { resources: Vec<(ExprId, Sym)> },
+  Context { fields: Vec<(Sym, ExprId)> },
 }

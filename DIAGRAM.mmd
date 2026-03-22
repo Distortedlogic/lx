@@ -1,0 +1,34 @@
+%%{init: {'theme': 'dark', 'themeVariables': {'primaryColor': '#2a2a4a', 'primaryTextColor': '#e0e0e0', 'primaryBorderColor': '#555', 'lineColor': '#888', 'fontSize': '14px', 'fontFamily': 'monospace'}}}%%
+
+graph TD
+    source[".lx source"]
+
+    subgraph FRONTEND ["FRONTEND · sugared, LLM-friendly"]
+        lexer["Lexer"] --> parser["Parser → Surface AST"]
+        parser --> desugar["Desugar · Folder → Core AST<br>─────────────────────<br>Agent → Class+Trait<br>pipes → nested apply<br>sections → lambdas<br>ternary/??/^ → match<br>interp → concat<br>with-bind → block"]
+    end
+
+    source --> lexer
+    desugar --> checker["Checker · Visitor<br>─────────────────────<br>inference<br>unification<br>exhaustiveness<br>diagnostics"]
+    checker --> interpreter["Interpreter<br>─────────────────────<br>async tree-walk eval"]
+
+    interpreter --> backends["Core Backends #40;swappable#41;<br>─────────────────────<br>Ai<br>Fs"]
+    interpreter --> events["Runtime Events<br>─────────────────────<br>agent: spawned<br>agent: msg<br>agent: done<br>agent: error<br>pipeline: progress<br>emit<br>log"]
+
+    backends --> tools["Tool Ecosystem<br>─────────────────────<br>DEFAULTS<br>fs · shell · search · browse<br>─────────────────────<br>ADD-ONS<br>git · http · db<br>email · slack · ..."]
+
+    events --> subs["Subscribers<br>─────────────────────<br>lx-desktop<br>stdio<br>headless"]
+
+    style FRONTEND fill:#1e1e3a,stroke:#e94560,color:#eee,stroke-width:2px
+    style source fill:#2a2a4a,stroke:#888,color:#fff
+    style lexer fill:#2a1a3e,stroke:#e94560,color:#eee
+    style parser fill:#2a1a3e,stroke:#e94560,color:#eee
+    style desugar fill:#2a1a3e,stroke:#e94560,color:#eee
+    style checker fill:#1a2a4e,stroke:#4a9eff,color:#eee
+    style interpreter fill:#1a1a3e,stroke:#7c5cbf,color:#eee
+    style backends fill:#0f3460,stroke:#53a8b6,color:#eee
+    style tools fill:#1a2a3e,stroke:#888,color:#ccc
+    style events fill:#1a2e1a,stroke:#4ecca3,color:#eee
+    style subs fill:#1a2e1a,stroke:#4ecca3,color:#eee
+
+    linkStyle default stroke:#888,stroke-width:1.5px

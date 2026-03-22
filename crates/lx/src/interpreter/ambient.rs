@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_recursion::async_recursion;
 use indexmap::IndexMap;
 
-use crate::ast::{SExpr, SStmt};
+use crate::ast::{ExprId, StmtId};
 use crate::builtins::mk;
 use crate::error::LxError;
 use crate::value::LxVal;
@@ -69,11 +69,11 @@ fn get_ambient_snapshot() -> IndexMap<crate::sym::Sym, LxVal> {
 
 impl Interpreter {
   #[async_recursion(?Send)]
-  pub(super) async fn eval_with_context(&mut self, fields: &[(crate::sym::Sym, SExpr)], body: &[SStmt], _span: SourceSpan) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_with_context(&mut self, fields: &[(crate::sym::Sym, ExprId)], body: &[StmtId], _span: SourceSpan) -> Result<LxVal, LxError> {
     let mut new_fields = get_ambient(self);
-    for (name, expr) in fields {
-      let val = self.eval(expr).await?;
-      new_fields.insert(*name, val);
+    for &(name, eid) in fields {
+      let val = self.eval(eid).await?;
+      new_fields.insert(name, val);
     }
     let saved_env = Arc::clone(&self.env);
     let saved_snapshot = get_ambient_snapshot();
@@ -84,8 +84,8 @@ impl Interpreter {
     child.bind_str("context", context_record);
     self.env = Arc::new(child);
     let mut result = LxVal::Unit;
-    for stmt in body {
-      match self.eval_stmt(stmt).await {
+    for &sid in body {
+      match self.eval_stmt(sid).await {
         Ok(v) => result = v,
         Err(e) => {
           self.env = saved_env;

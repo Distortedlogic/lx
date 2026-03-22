@@ -1,149 +1,219 @@
+use std::ops::ControlFlow;
+
+use crate::ast::{AstArena, BindTarget, Binding, ClassDeclData, Expr, Program, Stmt, StmtFieldUpdate, StmtId, TraitDeclData, TraitEntry};
+use miette::SourceSpan;
+
+use super::{AstVisitor, VisitAction};
+
+macro_rules! walk_dispatch {
+  ($dispatch_name:ident, $walk_name:ident, $visit:ident, $leave:ident, $node_ty:ty) => {
+    pub(crate) fn $dispatch_name<V: AstVisitor + ?Sized>(v: &mut V, node: &$node_ty, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+      let action = v.$visit(node, span, arena);
+      match action {
+        VisitAction::Stop => ControlFlow::Break(()),
+        VisitAction::Skip => v.$leave(node, span, arena),
+        VisitAction::Descend => $walk_name(v, node, span, arena),
+      }
+    }
+  };
+}
+
+macro_rules! walk_dispatch_slice {
+  ($dispatch_name:ident, $walk_name:ident, $visit:ident, $leave:ident, $elem_ty:ty) => {
+    pub(crate) fn $dispatch_name<V: AstVisitor + ?Sized>(v: &mut V, elems: &[$elem_ty], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+      let action = v.$visit(elems, span, arena);
+      match action {
+        VisitAction::Stop => ControlFlow::Break(()),
+        VisitAction::Skip => v.$leave(elems, span, arena),
+        VisitAction::Descend => $walk_name(v, elems, span, arena),
+      }
+    }
+  };
+}
+
 mod walk_expr;
+mod walk_expr2;
 mod walk_pattern;
 mod walk_type;
 
 pub use walk_expr::*;
+pub use walk_expr2::*;
 pub use walk_pattern::*;
 pub use walk_type::*;
 
-use std::ops::ControlFlow;
+walk_dispatch!(walk_trait_decl_dispatch, walk_trait_decl, visit_trait_decl, leave_trait_decl, TraitDeclData);
+walk_dispatch!(walk_class_decl_dispatch, walk_class_decl, visit_class_decl, leave_class_decl, ClassDeclData);
+walk_dispatch!(walk_field_update_dispatch, walk_field_update, visit_field_update, leave_field_update, StmtFieldUpdate);
 
-use crate::ast::{
-  BindTarget, Binding, ClassDeclData, Expr, ExprApply, ExprAssert, ExprBinary, ExprCoalesce, ExprEmit, ExprFieldAccess, ExprFunc, ExprMatch, ExprNamedArg,
-  ExprPipe, ExprSlice, ExprTernary, ExprTimeout, ExprUnary, ExprWith, ExprYield, Program, SExpr, Stmt, StmtFieldUpdate, StmtTypeDef, TraitDeclData,
-  TraitEntry, WithKind,
-};
-use crate::sym::Sym;
-use miette::SourceSpan;
-
-use super::AstVisitor;
-
-pub fn walk_program<V: AstVisitor + ?Sized>(v: &mut V, program: &Program) -> ControlFlow<()> {
-  for stmt in &program.stmts {
-    v.visit_stmt(&stmt.node, stmt.span)?;
+pub fn walk_program<V: AstVisitor + ?Sized, P>(v: &mut V, program: &Program<P>) -> ControlFlow<()> {
+  let arena = &program.arena;
+  for &sid in &program.stmts {
+    dispatch_stmt(v, sid, arena)?;
   }
   v.leave_program(program)
 }
 
-pub fn walk_stmt<V: AstVisitor + ?Sized>(v: &mut V, stmt: &Stmt, span: SourceSpan) -> ControlFlow<()> {
+pub fn dispatch_stmt<V: AstVisitor + ?Sized>(v: &mut V, id: StmtId, arena: &AstArena) -> ControlFlow<()> {
+  let span = arena.stmt_span(id);
+  let stmt = arena.stmt(id);
+  let action = v.on_stmt(stmt, span, arena);
+  match action {
+    VisitAction::Stop => return ControlFlow::Break(()),
+    VisitAction::Skip => return v.leave_stmt(stmt, span, arena),
+    VisitAction::Descend => {},
+  }
+  walk_stmt(v, id, arena)?;
+  v.leave_stmt(stmt, span, arena)
+}
+
+pub fn walk_stmt<V: AstVisitor + ?Sized>(v: &mut V, id: StmtId, arena: &AstArena) -> ControlFlow<()> {
+  let span = arena.stmt_span(id);
+  let stmt = arena.stmt(id);
   match stmt {
-    Stmt::Binding(binding) => v.visit_binding(binding, span)?,
-    Stmt::TypeDef(StmtTypeDef { name, variants, exported }) => {
-      v.visit_type_def(*name, variants, *exported, span)?;
+    Stmt::Binding(binding) => {
+      let action = v.visit_binding(binding, span, arena);
+      match action {
+        VisitAction::Stop => return ControlFlow::Break(()),
+        VisitAction::Skip => {},
+        VisitAction::Descend => {
+          walk_binding(v, binding, span, arena)?;
+        },
+      }
     },
-    Stmt::TraitUnion(def) => v.visit_trait_union(def, span)?,
-    Stmt::TraitDecl(data) => v.visit_trait_decl(data, span)?,
-    Stmt::ClassDecl(data) => v.visit_class_decl(data, span)?,
-    Stmt::FieldUpdate(StmtFieldUpdate { name, fields, value }) => {
-      v.visit_field_update(*name, fields, value, span)?;
+    Stmt::TypeDef(def) => {
+      let action = v.visit_type_def(def, span, arena);
+      if action.is_stop() {
+        return ControlFlow::Break(());
+      }
     },
-    Stmt::Use(use_stmt) => v.visit_use(use_stmt, span)?,
-    Stmt::Expr(sexpr) => v.visit_expr(&sexpr.node, sexpr.span)?,
+    Stmt::TraitUnion(def) => {
+      let action = v.visit_trait_union(def, span, arena);
+      if action.is_stop() {
+        return ControlFlow::Break(());
+      }
+    },
+    Stmt::TraitDecl(data) => walk_trait_decl_dispatch(v, data, span, arena)?,
+    Stmt::ClassDecl(data) => walk_class_decl_dispatch(v, data, span, arena)?,
+    Stmt::FieldUpdate(fu) => walk_field_update_dispatch(v, fu, span, arena)?,
+    Stmt::Use(use_stmt) => {
+      let action = v.visit_use(use_stmt, span, arena);
+      if action.is_stop() {
+        return ControlFlow::Break(());
+      }
+    },
+    Stmt::Expr(eid) => {
+      let espan = arena.expr_span(*eid);
+      dispatch_expr(v, arena.expr(*eid), espan, arena)?;
+    },
   }
-  v.leave_stmt(stmt, span)
+  ControlFlow::Continue(())
 }
 
-pub fn walk_binding<V: AstVisitor + ?Sized>(v: &mut V, binding: &Binding, span: SourceSpan) -> ControlFlow<()> {
-  if let Some(ref ty) = binding.type_ann {
-    v.visit_type_expr(&ty.node, ty.span)?;
+pub fn walk_binding<V: AstVisitor + ?Sized>(v: &mut V, binding: &Binding, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  if let Some(ty_id) = binding.type_ann {
+    walk_type_expr_dispatch(v, ty_id, arena)?;
   }
-  if let BindTarget::Pattern(pat) = &binding.target {
-    v.visit_pattern(&pat.node, pat.span)?;
+  if let BindTarget::Pattern(pid) = &binding.target {
+    walk_pattern_dispatch(v, *pid, arena)?;
   }
-  v.visit_expr(&binding.value.node, binding.value.span)?;
-  v.leave_binding(binding, span)
+  let val_span = arena.expr_span(binding.value);
+  dispatch_expr(v, arena.expr(binding.value), val_span, arena)?;
+  v.leave_binding(binding, span, arena)
 }
 
-pub fn walk_trait_decl<V: AstVisitor + ?Sized>(v: &mut V, data: &TraitDeclData, span: SourceSpan) -> ControlFlow<()> {
+pub fn dispatch_expr<V: AstVisitor + ?Sized>(v: &mut V, expr: &Expr, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  let action = v.on_expr(expr, span, arena);
+  match action {
+    VisitAction::Stop => ControlFlow::Break(()),
+    VisitAction::Skip => v.leave_expr(expr, span, arena),
+    VisitAction::Descend => walk_expr(v, expr, span, arena),
+  }
+}
+
+pub fn walk_expr<V: AstVisitor + ?Sized>(v: &mut V, expr: &Expr, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  match expr {
+    Expr::Literal(lit) => walk_literal_dispatch(v, lit, span, arena)?,
+    Expr::Ident(name) => {
+      let action = v.visit_ident(*name, span, arena);
+      if action.is_stop() {
+        return ControlFlow::Break(());
+      }
+    },
+    Expr::TypeConstructor(name) => {
+      let action = v.visit_type_constructor(*name, span, arena);
+      if action.is_stop() {
+        return ControlFlow::Break(());
+      }
+    },
+    Expr::Binary(binary) => walk_binary_dispatch(v, binary, span, arena)?,
+    Expr::Unary(unary) => walk_unary_dispatch(v, unary, span, arena)?,
+    Expr::Pipe(pipe) => walk_pipe_dispatch(v, pipe, span, arena)?,
+    Expr::Apply(apply) => walk_apply_dispatch(v, apply, span, arena)?,
+    Expr::Section(section) => walk_section_dispatch(v, section, span, arena)?,
+    Expr::FieldAccess(fa) => walk_field_access_dispatch(v, fa, span, arena)?,
+    Expr::Block(stmts) => walk_block_dispatch(v, stmts, span, arena)?,
+    Expr::Tuple(elems) => walk_tuple_dispatch(v, elems, span, arena)?,
+    Expr::List(elems) => walk_list_dispatch(v, elems, span, arena)?,
+    Expr::Record(fields) => walk_record_dispatch(v, fields, span, arena)?,
+    Expr::Map(entries) => walk_map_dispatch(v, entries, span, arena)?,
+    Expr::Func(func) => walk_func_dispatch(v, func, span, arena)?,
+    Expr::Match(m) => walk_match_dispatch(v, m, span, arena)?,
+    Expr::Ternary(ternary) => walk_ternary_dispatch(v, ternary, span, arena)?,
+    Expr::Propagate(inner) => walk_propagate_dispatch(v, *inner, span, arena)?,
+    Expr::Coalesce(coalesce) => walk_coalesce_dispatch(v, coalesce, span, arena)?,
+    Expr::Slice(slice) => walk_slice_dispatch(v, slice, span, arena)?,
+    Expr::NamedArg(na) => walk_named_arg_dispatch(v, na, span, arena)?,
+    Expr::Loop(stmts) => walk_loop_dispatch(v, stmts, span, arena)?,
+    Expr::Break(val) => walk_break_dispatch(v, *val, span, arena)?,
+    Expr::Assert(assert) => walk_assert_dispatch(v, assert, span, arena)?,
+    Expr::Par(stmts) => walk_par_dispatch(v, stmts, span, arena)?,
+    Expr::Sel(arms) => walk_sel_dispatch(v, arms, span, arena)?,
+    Expr::Timeout(timeout) => walk_timeout_dispatch(v, timeout, span, arena)?,
+    Expr::Emit(emit) => walk_emit_dispatch(v, emit, span, arena)?,
+    Expr::Yield(yld) => walk_yield_dispatch(v, yld, span, arena)?,
+    Expr::With(with) => walk_with_dispatch(v, with, span, arena)?,
+  }
+  v.leave_expr(expr, span, arena)
+}
+
+pub fn walk_trait_decl<V: AstVisitor + ?Sized>(v: &mut V, data: &TraitDeclData, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
   for entry in &data.entries {
     if let TraitEntry::Field(field) = entry {
-      if let Some(ref default) = field.default {
-        v.visit_expr(&default.node, default.span)?;
+      if let Some(default) = field.default {
+        dispatch_expr(v, arena.expr(default), arena.expr_span(default), arena)?;
       }
-      if let Some(ref constraint) = field.constraint {
-        v.visit_expr(&constraint.node, constraint.span)?;
+      if let Some(constraint) = field.constraint {
+        dispatch_expr(v, arena.expr(constraint), arena.expr_span(constraint), arena)?;
       }
     }
   }
   for method in &data.methods {
     for input in &method.input {
-      if let Some(ref d) = input.default {
-        v.visit_expr(&d.node, d.span)?;
+      if let Some(d) = input.default {
+        dispatch_expr(v, arena.expr(d), arena.expr_span(d), arena)?;
       }
-      if let Some(ref c) = input.constraint {
-        v.visit_expr(&c.node, c.span)?;
+      if let Some(c) = input.constraint {
+        dispatch_expr(v, arena.expr(c), arena.expr_span(c), arena)?;
       }
     }
   }
   for method in &data.defaults {
-    v.visit_expr(&method.handler.node, method.handler.span)?;
+    dispatch_expr(v, arena.expr(method.handler), arena.expr_span(method.handler), arena)?;
   }
-  v.leave_trait_decl(data, span)
+  v.leave_trait_decl(data, span, arena)
 }
 
-pub fn walk_class_decl<V: AstVisitor + ?Sized>(v: &mut V, data: &ClassDeclData, span: SourceSpan) -> ControlFlow<()> {
+pub fn walk_class_decl<V: AstVisitor + ?Sized>(v: &mut V, data: &ClassDeclData, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
   for f in &data.fields {
-    v.visit_expr(&f.default.node, f.default.span)?;
+    dispatch_expr(v, arena.expr(f.default), arena.expr_span(f.default), arena)?;
   }
   for m in &data.methods {
-    v.visit_expr(&m.handler.node, m.handler.span)?;
+    dispatch_expr(v, arena.expr(m.handler), arena.expr_span(m.handler), arena)?;
   }
-  v.leave_class_decl(data, span)
+  v.leave_class_decl(data, span, arena)
 }
 
-pub fn walk_field_update<V: AstVisitor + ?Sized>(v: &mut V, name: Sym, fields: &[Sym], value: &SExpr, span: SourceSpan) -> ControlFlow<()> {
-  v.visit_expr(&value.node, value.span)?;
-  v.leave_field_update(name, fields, value, span)
-}
-
-pub fn walk_expr<V: AstVisitor + ?Sized>(v: &mut V, expr: &Expr, span: SourceSpan) -> ControlFlow<()> {
-  match expr {
-    Expr::Literal(lit) => v.visit_literal(lit, span)?,
-    Expr::Ident(name) => v.visit_ident(*name, span)?,
-    Expr::TypeConstructor(name) => v.visit_type_constructor(*name, span)?,
-    Expr::Binary(ExprBinary { op, left, right }) => v.visit_binary(*op, left, right, span)?,
-    Expr::Unary(ExprUnary { op, operand }) => v.visit_unary(*op, operand, span)?,
-    Expr::Pipe(ExprPipe { left, right }) => v.visit_pipe(left, right, span)?,
-    Expr::Apply(ExprApply { func, arg }) => v.visit_apply(func, arg, span)?,
-    Expr::Section(section) => v.visit_section(section, span)?,
-    Expr::FieldAccess(ExprFieldAccess { expr: e, field }) => v.visit_field_access(e, field, span)?,
-    Expr::Block(stmts) => v.visit_block(stmts, span)?,
-    Expr::Tuple(elems) => v.visit_tuple(elems, span)?,
-    Expr::List(elems) => v.visit_list(elems, span)?,
-    Expr::Record(fields) => v.visit_record(fields, span)?,
-    Expr::Map(entries) => v.visit_map(entries, span)?,
-    Expr::Func(ExprFunc { params, ret_type, guard, body }) => {
-      v.visit_func(params, ret_type.as_ref(), guard.as_deref(), body, span)?;
-    },
-    Expr::Match(ExprMatch { scrutinee, arms }) => v.visit_match(scrutinee, arms, span)?,
-    Expr::Ternary(ExprTernary { cond, then_, else_ }) => {
-      v.visit_ternary(cond, then_, else_.as_deref(), span)?;
-    },
-    Expr::Propagate(inner) => v.visit_propagate(inner, span)?,
-    Expr::Coalesce(ExprCoalesce { expr: e, default }) => v.visit_coalesce(e, default, span)?,
-    Expr::Slice(ExprSlice { expr: e, start, end }) => {
-      v.visit_slice(e, start.as_deref(), end.as_deref(), span)?;
-    },
-    Expr::NamedArg(ExprNamedArg { name, value }) => v.visit_named_arg(*name, value, span)?,
-    Expr::Loop(stmts) => v.visit_loop(stmts, span)?,
-    Expr::Break(val) => v.visit_break(val.as_deref(), span)?,
-    Expr::Assert(ExprAssert { expr: e, msg }) => v.visit_assert(e, msg.as_deref(), span)?,
-    Expr::Par(stmts) => v.visit_par(stmts, span)?,
-    Expr::Sel(arms) => v.visit_sel(arms, span)?,
-    Expr::Timeout(ExprTimeout { ms, body }) => v.visit_timeout(ms, body, span)?,
-    Expr::Emit(ExprEmit { value }) => v.visit_emit(value, span)?,
-    Expr::Yield(ExprYield { value }) => v.visit_yield(value, span)?,
-    Expr::With(ExprWith { kind, body }) => match kind {
-      WithKind::Binding { name, value, mutable } => {
-        v.visit_with(*name, value, body, *mutable, span)?;
-      },
-      WithKind::Resources { resources } => {
-        v.visit_with_resource(resources, body, span)?;
-      },
-      WithKind::Context { fields } => {
-        v.visit_with_context(fields, body, span)?;
-      },
-    },
-  }
-  v.leave_expr(expr, span)
+pub fn walk_field_update<V: AstVisitor + ?Sized>(v: &mut V, fu: &StmtFieldUpdate, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  dispatch_expr(v, arena.expr(fu.value), arena.expr_span(fu.value), arena)?;
+  v.leave_field_update(fu, span, arena)
 }

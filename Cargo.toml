@@ -11,6 +11,7 @@ members = [
   "crates/kokoro-client",
   "crates/audio-core",
   "crates/voice-agent",
+  "crates/lx-desktop",
 ]
 exclude = ["reference/chumsky"]
 resolver = "2"
@@ -43,6 +44,7 @@ chumsky = { version = "0.12", features = ["pratt"] }
 clap = { version = "4", features = ["derive"] }
 cron = { version = "0.15.0" }
 dashmap = { version = "6.1.0" }
+ena = { version = "0.14" }
 derive_more = { version = "2.1.1", features = ["deref", "display", "from", "try_from"] }
 fastrand = { version = "2" }
 futures = { version = "0.3.32" }

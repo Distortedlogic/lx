@@ -53,12 +53,12 @@ pub(super) fn get_store_mut(id: u64, span: SourceSpan) -> Result<dashmap::mapref
   STORES.get_mut(&id).ok_or_else(|| LxError::runtime("store: not found", span))
 }
 
-pub(super) fn persist(state: &StoreState) {
-  let Some(ref path) = state.path else { return };
+pub(super) fn persist(state: &StoreState, span: SourceSpan) -> Result<(), LxError> {
+  let Some(ref path) = state.path else { return Ok(()) };
   let record = LxVal::record(state.data.clone());
   let json_val = serde_json::Value::from(&record);
-  let pretty = serde_json::to_string_pretty(&json_val).unwrap_or_default();
-  let _ = std::fs::write(path, pretty);
+  let pretty = serde_json::to_string_pretty(&json_val).map_err(|e| LxError::runtime(format!("store: failed to serialize: {e}"), span))?;
+  std::fs::write(path, pretty).map_err(|e| LxError::runtime(format!("store: failed to persist to {}: {e}", path.display()), span))
 }
 
 fn load_from_disk(path: &std::path::Path) -> IndexMap<crate::sym::Sym, LxVal> {
@@ -94,7 +94,7 @@ pub(super) fn bi_set(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -
   let key = args[1].require_str("store.set", span)?;
   let mut s = get_store_mut(id, span)?;
   s.data.insert(crate::sym::intern(key), args[2].clone());
-  persist(&s);
+  persist(&s, span)?;
   Ok(LxVal::Unit)
 }
 
@@ -116,7 +116,7 @@ pub(super) fn bi_update(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>)
     return Ok(new_val);
   }
   s.data.insert(crate::sym::intern(key), new_val.clone());
-  persist(&s);
+  persist(&s, span)?;
   Ok(new_val)
 }
 
@@ -125,7 +125,7 @@ pub(super) fn bi_remove(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>
   let key = args[1].require_str("store.remove", span)?;
   let mut s = get_store_mut(id, span)?;
   let removed = s.data.shift_remove(&crate::sym::intern(key)).unwrap_or(LxVal::None);
-  persist(&s);
+  persist(&s, span)?;
   Ok(removed)
 }
 
@@ -182,14 +182,14 @@ pub(super) fn bi_clear(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>)
   let id = store_id(&args[0], span)?;
   let mut s = get_store_mut(id, span)?;
   s.data.clear();
-  persist(&s);
+  persist(&s, span)?;
   Ok(LxVal::Unit)
 }
 
 pub(super) fn bi_persist(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let s = get_store(id, span)?;
-  persist(&s);
+  persist(&s, span)?;
   Ok(LxVal::Unit)
 }
 

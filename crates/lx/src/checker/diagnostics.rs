@@ -1,8 +1,37 @@
 use std::fmt;
 
+use miette::SourceSpan;
+
 use crate::sym::Sym;
 
-use super::types::TypeError;
+use super::unification::TypeError;
+
+pub struct TextEdit {
+  pub range: SourceSpan,
+  pub replacement: String,
+}
+
+pub enum Applicability {
+  MachineApplicable,
+  MaybeIncorrect,
+  DisplayOnly,
+}
+
+impl fmt::Display for Applicability {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Self::MachineApplicable => write!(f, "machine-applicable"),
+      Self::MaybeIncorrect => write!(f, "maybe-incorrect"),
+      Self::DisplayOnly => write!(f, "display-only"),
+    }
+  }
+}
+
+pub struct Fix {
+  pub description: String,
+  pub edits: Vec<TextEdit>,
+  pub applicability: Applicability,
+}
 
 pub enum DiagnosticKind {
   NegationRequiresNumeric,
@@ -11,8 +40,8 @@ pub enum DiagnosticKind {
   TimeoutMsNotNumeric,
   LogicalOpRequiresBool,
   MutableCaptureInConcurrent { name: Sym },
-  NonExhaustiveMatch { type_name: Sym, missing_variant: Sym },
-  DuplicateImport { name: Sym, original_offset: usize },
+  NonExhaustiveMatch { type_name: Sym, missing_pattern: String },
+  DuplicateImport { name: Sym, original_span: SourceSpan },
   TypeMismatch { error: TypeError },
 }
 
@@ -20,6 +49,20 @@ impl DiagnosticKind {
   pub fn help(&self) -> Option<String> {
     match self {
       Self::TypeMismatch { error } => error.help(),
+      _ => None,
+    }
+  }
+
+  pub fn suggest_fix(&self, span: SourceSpan) -> Option<Fix> {
+    match self {
+      Self::DuplicateImport { .. } => Some(Fix {
+        description: "remove duplicate import".into(),
+        edits: vec![TextEdit { range: span, replacement: String::new() }],
+        applicability: Applicability::MachineApplicable,
+      }),
+      Self::TypeMismatch { error } => {
+        error.help().map(|help_text| Fix { description: help_text, edits: Vec::new(), applicability: Applicability::DisplayOnly })
+      },
       _ => None,
     }
   }
@@ -36,11 +79,11 @@ impl fmt::Display for DiagnosticKind {
       Self::MutableCaptureInConcurrent { name } => {
         write!(f, "cannot capture mutable binding `{name}` in concurrent context")
       },
-      Self::NonExhaustiveMatch { type_name, missing_variant } => {
-        write!(f, "non-exhaustive match on {type_name}: missing {missing_variant}")
+      Self::NonExhaustiveMatch { type_name, missing_pattern } => {
+        write!(f, "non-exhaustive match on {type_name}: missing {missing_pattern}")
       },
-      Self::DuplicateImport { name, original_offset } => {
-        write!(f, "'{name}' already imported at offset {original_offset}")
+      Self::DuplicateImport { name, .. } => {
+        write!(f, "'{name}' already imported")
       },
       Self::TypeMismatch { error } => write!(f, "{}", error.to_message()),
     }

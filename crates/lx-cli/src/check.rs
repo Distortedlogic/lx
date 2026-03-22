@@ -1,7 +1,8 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::sync::Arc;
 
-use lx::checker::{check, DiagLevel};
+use lx::checker::{DiagLevel, Diagnostic, check};
 use lx::error::LxError;
 use miette::{NamedSource, Report};
 
@@ -13,7 +14,8 @@ pub fn check_file(path: &str, strict: bool) -> ExitCode {
     Ok(sp) => sp,
     Err(code) => return code,
   };
-  let result = check(&program);
+  let source_arc: Arc<str> = Arc::from(source.as_str());
+  let result = check(&program, source_arc);
   if result.diagnostics.is_empty() {
     println!("ok: {path}");
     ExitCode::SUCCESS
@@ -35,6 +37,7 @@ pub fn check_file(path: &str, strict: bool) -> ExitCode {
       let named = NamedSource::new(path, source.clone());
       let report = Report::new(err).with_source_code(named);
       eprintln!("{report:?}");
+      print_fix(d);
     }
     let fail_count = if strict { errors + warnings } else { errors };
     if fail_count > 0 { ExitCode::from(1) } else { ExitCode::SUCCESS }
@@ -83,10 +86,9 @@ pub fn check_workspace(member_filter: Option<&str>, strict: bool) -> ExitCode {
       let path_str = file.display().to_string();
       match run::read_and_parse(&path_str) {
         Ok((source, program)) => {
-          let result = check(&program);
-          let file_errors: u32 =
-            result.diagnostics.iter().filter(|d| d.level == DiagLevel::Error || (strict && d.level == DiagLevel::Warning)).count()
-              as u32;
+          let source_arc: Arc<str> = Arc::from(source.as_str());
+          let result = check(&program, source_arc);
+          let file_errors: u32 = result.diagnostics.iter().filter(|d| d.level == DiagLevel::Error || (strict && d.level == DiagLevel::Warning)).count() as u32;
           if file_errors == 0 && result.diagnostics.is_empty() {
             member_ok += 1;
           } else if file_errors == 0 {
@@ -96,6 +98,7 @@ pub fn check_workspace(member_filter: Option<&str>, strict: bool) -> ExitCode {
               let named = NamedSource::new(path_str.clone(), source.clone());
               let report = Report::new(err).with_source_code(named);
               eprintln!("{report:?}");
+              print_fix(d);
             }
           } else {
             member_err += 1;
@@ -108,6 +111,7 @@ pub fn check_workspace(member_filter: Option<&str>, strict: bool) -> ExitCode {
               let named = NamedSource::new(path_str.clone(), source.clone());
               let report = Report::new(err).with_source_code(named);
               eprintln!("{report:?}");
+              print_fix(d);
             }
           }
         },
@@ -146,6 +150,12 @@ pub fn check_workspace(member_filter: Option<&str>, strict: bool) -> ExitCode {
   if any_failure { ExitCode::from(1) } else { ExitCode::SUCCESS }
 }
 
+fn print_fix(d: &Diagnostic) {
+  if let Some(fix) = &d.fix {
+    eprintln!("  fix: {} ({})", fix.description, fix.applicability);
+  }
+}
+
 fn collect_lx_files(dir: &Path) -> Vec<PathBuf> {
   let mut files = Vec::new();
   collect_lx_files_rec(dir, &mut files);
@@ -157,7 +167,13 @@ fn collect_lx_files_rec(dir: &Path, files: &mut Vec<PathBuf>) {
   let Ok(read_dir) = std::fs::read_dir(dir) else {
     return;
   };
-  for entry in read_dir.filter_map(|e| e.ok()) {
+  for entry in read_dir.filter_map(|e| match e {
+    Ok(entry) => Some(entry),
+    Err(err) => {
+      eprintln!("warning: failed to read directory entry in {}: {err}", dir.display());
+      None
+    },
+  }) {
     let path = entry.path();
     if path.is_dir() {
       collect_lx_files_rec(&path, files);

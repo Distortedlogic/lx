@@ -12,12 +12,18 @@ use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use strum::IntoStaticStr;
 
-use crate::ast::{Field, MethodSpec, SExpr};
+use crate::ast::{AstArena, ExprId, Field, MethodSpec};
 use crate::error::LxError;
 use crate::sym::Sym;
 use miette::SourceSpan;
 
-pub type FieldDef = Field<LxVal, Arc<SExpr>>;
+pub type FieldDef = Field<LxVal, ConstraintExpr>;
+
+#[derive(Debug, Clone)]
+pub struct ConstraintExpr {
+  pub expr_id: ExprId,
+  pub arena: Arc<AstArena>,
+}
 pub type TraitMethodDef = MethodSpec<FieldDef>;
 
 #[derive(Debug, Clone)]

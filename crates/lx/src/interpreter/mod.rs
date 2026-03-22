@@ -23,8 +23,8 @@ use parking_lot::Mutex;
 use indexmap::IndexMap;
 
 use crate::ast::{
-  BindTarget, Expr, ExprApply, ExprAssert, ExprBinary, ExprCoalesce, ExprEmit, ExprFieldAccess, ExprFunc, ExprMatch, ExprNamedArg, ExprPipe, ExprSlice,
-  ExprTernary, ExprTimeout, ExprUnary, ExprWith, ExprYield, Program, SExpr, Stmt, WithKind,
+  AstArena, BindTarget, Core, Expr, ExprApply, ExprAssert, ExprBinary, ExprCoalesce, ExprEmit, ExprFieldAccess, ExprFunc, ExprId, ExprMatch, ExprNamedArg,
+  ExprPipe, ExprSlice, ExprTernary, ExprTimeout, ExprUnary, ExprWith, ExprYield, Program, Stmt, WithKind,
 };
 use crate::env::Env;
 use crate::error::LxError;
@@ -44,6 +44,7 @@ pub struct Interpreter {
   pub(crate) module_cache: Arc<Mutex<HashMap<PathBuf, ModuleExports>>>,
   pub(crate) loading: Arc<Mutex<HashSet<PathBuf>>>,
   pub(crate) ctx: Arc<RuntimeCtx>,
+  pub(crate) arena: Arc<AstArena>,
 }
 
 impl Interpreter {
@@ -58,10 +59,11 @@ impl Interpreter {
       module_cache: Arc::new(Mutex::new(HashMap::new())),
       loading: Arc::new(Mutex::new(HashSet::new())),
       ctx,
+      arena: Arc::new(AstArena::new()),
     }
   }
 
-  pub fn with_env(env: &Env, ctx: Arc<RuntimeCtx>) -> Self {
+  pub fn with_env(env: &Env, arena: Arc<AstArena>, ctx: Arc<RuntimeCtx>) -> Self {
     Self {
       env: Arc::new(env.clone()),
       source: String::new(),
@@ -69,6 +71,7 @@ impl Interpreter {
       module_cache: Arc::new(Mutex::new(HashMap::new())),
       loading: Arc::new(Mutex::new(HashSet::new())),
       ctx,
+      arena,
     }
   }
 
@@ -76,17 +79,18 @@ impl Interpreter {
     self.env = Arc::new(env);
   }
 
-  pub async fn eval_expr(&mut self, expr: &SExpr) -> Result<LxVal, LxError> {
-    self.eval(expr).await
+  pub async fn eval_expr(&mut self, eid: ExprId) -> Result<LxVal, LxError> {
+    self.eval(eid).await
   }
 
-  pub async fn exec(&mut self, program: &Program) -> Result<LxVal, LxError> {
+  pub async fn exec(&mut self, program: &Program<Core>) -> Result<LxVal, LxError> {
+    self.arena = Arc::new(program.arena.clone());
     let mut forward_names = Vec::new();
-    for stmt in &program.stmts {
-      if let Stmt::Binding(b) = &stmt.node
+    for &sid in &program.stmts {
+      if let Stmt::Binding(b) = self.arena.stmt(sid)
         && !b.exported
         && let BindTarget::Name(name) = b.target
-        && matches!(b.value.node, Expr::Func(_))
+        && matches!(self.arena.expr(b.value), Expr::Func(_))
       {
         forward_names.push(name);
       }
@@ -99,18 +103,20 @@ impl Interpreter {
       self.env = Arc::new(env);
     }
     let mut result = LxVal::Unit;
-    for stmt in &program.stmts {
-      result = self.eval_stmt(stmt).await?;
+    let stmts = program.stmts.clone();
+    for sid in &stmts {
+      result = self.eval_stmt(*sid).await?;
     }
     Ok(result)
   }
 
   #[async_recursion(?Send)]
-  pub(crate) async fn eval(&mut self, expr: &SExpr) -> Result<LxVal, LxError> {
-    let span = expr.span;
-    match &expr.node {
-      Expr::Literal(lit) => self.eval_literal(lit, span).await,
-      Expr::Ident(name) => self.env.get(*name).ok_or_else(|| {
+  pub(crate) async fn eval(&mut self, eid: ExprId) -> Result<LxVal, LxError> {
+    let span = self.arena.expr_span(eid);
+    let expr = self.arena.expr(eid).clone();
+    match expr {
+      Expr::Literal(ref lit) => self.eval_literal(lit, span).await,
+      Expr::Ident(name) => self.env.get(name).ok_or_else(|| {
         let hint = hints::keyword_hint(name.as_str());
         let msg = match hint {
           Some(h) => format!("undefined variable '{name}' — {h}"),
@@ -118,13 +124,15 @@ impl Interpreter {
         };
         LxError::runtime(msg, span)
       }),
-      Expr::TypeConstructor(name) => self.env.get(*name).ok_or_else(|| LxError::runtime(format!("undefined constructor '{name}'"), span)),
-      Expr::Binary(ExprBinary { op, left, right }) => self.eval_binary(op, left, right, span).await,
-      Expr::Unary(ExprUnary { op, operand }) => self.eval_unary(op, operand, span).await,
+      Expr::TypeConstructor(name) => self.env.get(name).ok_or_else(|| LxError::runtime(format!("undefined constructor '{name}'"), span)),
+      Expr::Binary(ExprBinary { op, left, right }) => self.eval_binary(&op, left, right, span).await,
+      Expr::Unary(ExprUnary { op, operand }) => self.eval_unary(&op, operand, span).await,
       Expr::Pipe(ExprPipe { left, right }) => self.eval_pipe(left, right, span).await,
       Expr::Apply(ExprApply { func, arg }) => {
         let f = self.eval(func).await?;
-        if let Expr::NamedArg(ExprNamedArg { name, value }) = &arg.node {
+        if let Expr::NamedArg(ExprNamedArg { name, value }) = self.arena.expr(arg) {
+          let name = *name;
+          let value = *value;
           let v = self.eval(value).await?;
           let named = LxVal::Tagged { tag: intern("__named"), values: Arc::new(vec![LxVal::str(name.as_str()), v]) };
           self.apply_func(f, named, span).await
@@ -133,16 +141,16 @@ impl Interpreter {
           self.apply_func(f, a, span).await
         }
       },
-      Expr::Section(sec) => self.eval_section(sec, span),
-      Expr::FieldAccess(ExprFieldAccess { expr: e, field }) => self.eval_field_access(e, field, span).await,
-      Expr::Block(stmts) => self.eval_block(stmts).await,
-      Expr::Tuple(elems) => self.eval_tuple(elems).await,
-      Expr::List(elems) => self.eval_list(elems).await,
-      Expr::Record(fields) => self.eval_record(fields).await,
-      Expr::Map(entries) => self.eval_map(entries).await,
-      Expr::Func(ExprFunc { params, guard, body, .. }) => self.eval_func(params, guard.as_deref(), body).await,
-      Expr::Match(ExprMatch { scrutinee, arms }) => self.eval_match(scrutinee, arms, span).await,
-      Expr::Ternary(ExprTernary { cond, then_, else_ }) => self.eval_ternary(cond, then_, else_, span).await,
+      Expr::Section(ref sec) => self.eval_section(sec, span),
+      Expr::FieldAccess(ExprFieldAccess { expr: e, ref field }) => self.eval_field_access(e, field, span).await,
+      Expr::Block(ref stmts) => self.eval_block(stmts).await,
+      Expr::Tuple(ref elems) => self.eval_tuple(elems).await,
+      Expr::List(ref elems) => self.eval_list(elems).await,
+      Expr::Record(ref fields) => self.eval_record(fields).await,
+      Expr::Map(ref entries) => self.eval_map(entries).await,
+      Expr::Func(ExprFunc { ref params, guard, body, .. }) => self.eval_func(params, guard, body).await,
+      Expr::Match(ExprMatch { scrutinee, ref arms }) => self.eval_match(scrutinee, arms, span).await,
+      Expr::Ternary(ExprTernary { cond, then_, else_ }) => self.eval_ternary(cond, then_, &else_, span).await,
       Expr::Assert(ExprAssert { expr: e, msg }) => self.eval_assert(e, msg, span).await,
       Expr::Propagate(inner) => {
         let v = self.eval(inner).await?;
@@ -162,12 +170,9 @@ impl Interpreter {
           other => Ok(other),
         }
       },
-      Expr::Slice(ExprSlice { expr: e, start: s, end: en }) => self.eval_slice(e, s.as_deref(), en.as_deref(), span).await,
-      Expr::NamedArg(ExprNamedArg { name, value }) => {
-        let _ = name;
-        self.eval(value).await
-      },
-      Expr::Loop(stmts) => self.eval_loop(stmts).await,
+      Expr::Slice(ExprSlice { expr: e, start: s, end: en }) => self.eval_slice(e, s, en, span).await,
+      Expr::NamedArg(ExprNamedArg { value, .. }) => self.eval(value).await,
+      Expr::Loop(ref stmts) => self.eval_loop(stmts).await,
       Expr::Break(val) => {
         let v = match val {
           Some(e) => self.eval(e).await?,
@@ -175,8 +180,8 @@ impl Interpreter {
         };
         Err(LxError::break_signal(v))
       },
-      Expr::Par(stmts) => self.eval_par(stmts).await,
-      Expr::Sel(arms) => self.eval_sel(arms, span).await,
+      Expr::Par(ref stmts) => self.eval_par(stmts).await,
+      Expr::Sel(ref arms) => self.eval_sel(arms, span).await,
       Expr::Timeout(ExprTimeout { ms, body }) => self.eval_timeout(ms, body, span).await,
       Expr::Emit(ExprEmit { value }) => {
         let v = self.eval(value).await?;
@@ -187,26 +192,33 @@ impl Interpreter {
         let v = self.eval(value).await?;
         self.ctx.yield_.yield_value(v, span)
       },
-      Expr::With(ExprWith { kind, body }) => match kind {
+      Expr::With(ExprWith { ref kind, ref body }) => match kind.clone() {
         WithKind::Binding { name, value, mutable } => {
           let val = self.eval(value).await?;
           let saved = Arc::clone(&self.env);
           let child = self.env.child();
-          if *mutable {
-            child.bind_mut(*name, val);
+          if mutable {
+            child.bind_mut(name, val);
           } else {
-            child.bind(*name, val);
+            child.bind(name, val);
           }
           self.env = Arc::new(child);
+          let body = body.clone();
           let mut result = LxVal::Unit;
-          for stmt in body {
-            result = self.eval_stmt(stmt).await?;
+          for sid in &body {
+            result = self.eval_stmt(*sid).await?;
           }
           self.env = saved;
           Ok(result)
         },
-        WithKind::Resources { resources } => self.eval_with_resource(resources, body, span).await,
-        WithKind::Context { fields } => self.eval_with_context(fields, body, span).await,
+        WithKind::Resources { resources } => {
+          let body = body.clone();
+          self.eval_with_resource(&resources, &body, span).await
+        },
+        WithKind::Context { fields } => {
+          let body = body.clone();
+          self.eval_with_context(&fields, &body, span).await
+        },
       },
     }
   }

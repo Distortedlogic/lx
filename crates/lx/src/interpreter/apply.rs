@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::ast::{Param, SExpr};
+use crate::ast::{AstArena, ExprId, Param};
 use crate::env::Env;
 use crate::error::LxError;
 use crate::value::{BuiltinKind, LxFunc, LxVal};
@@ -15,10 +15,13 @@ impl Interpreter {
     let fn_source_name = Arc::clone(&lf.source_name);
     let saved = Arc::clone(&self.env);
     let saved_source = std::mem::replace(&mut self.source, lf.source_text.to_string());
+    let saved_arena = Arc::clone(&self.arena);
     self.env = call_env;
-    let result = self.eval(&lf.body).await;
+    self.arena = Arc::clone(&lf.arena);
+    let result = self.eval(lf.body).await;
     self.env = saved;
     self.source = saved_source;
+    self.arena = saved_arena;
     match result {
       Err(LxError::Propagate { value, .. }) => Ok(*value),
       Err(e) if is_cross_module => Err(e.with_source(fn_source_name.to_string(), fn_source_text)),
@@ -50,8 +53,8 @@ impl Interpreter {
         let call_env = lf.closure.child();
         call_env.bind_params(&lf.params, &lf.applied, &lf.defaults);
         let call_env = Arc::new(call_env);
-        if let Some(ref guard) = lf.guard
-          && !self.eval_guard(guard, &call_env).await?
+        if let Some(guard_eid) = lf.guard
+          && !self.eval_guard(guard_eid, &lf.arena, &call_env).await?
         {
           return Ok(LxVal::err_str("guard condition failed"));
         }
@@ -110,7 +113,7 @@ impl Interpreter {
     }
   }
 
-  pub(super) async fn eval_pipe(&mut self, left: &SExpr, right: &SExpr, span: SourceSpan) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_pipe(&mut self, left: ExprId, right: ExprId, span: SourceSpan) -> Result<LxVal, LxError> {
     let val = self.eval(left).await?;
     let val = self.force_defaults(val, span).await?;
     let func = self.eval(right).await?;
@@ -140,14 +143,18 @@ impl Interpreter {
     }
   }
 
-  async fn eval_guard(&mut self, guard: &SExpr, guard_env: &Arc<Env>) -> Result<bool, LxError> {
+  async fn eval_guard(&mut self, guard_eid: ExprId, guard_arena: &Arc<AstArena>, guard_env: &Arc<Env>) -> Result<bool, LxError> {
     let saved = Arc::clone(&self.env);
+    let saved_arena = Arc::clone(&self.arena);
     self.env = Arc::clone(guard_env);
-    let result = self.eval(guard).await;
+    self.arena = Arc::clone(guard_arena);
+    let guard_span = self.arena.expr_span(guard_eid);
+    let result = self.eval(guard_eid).await;
     self.env = saved;
+    self.arena = saved_arena;
     match result {
       Ok(LxVal::Bool(b)) => Ok(b),
-      Ok(other) => Err(LxError::type_err(format!("guard must return Bool, got {}", other.type_name()), guard.span, None)),
+      Ok(other) => Err(LxError::type_err(format!("guard must return Bool, got {}", other.type_name()), guard_span, None)),
       Err(e) => Err(e),
     }
   }
@@ -171,9 +178,9 @@ impl Interpreter {
       let call_env = clause.closure.child();
       call_env.bind_params(&clause.params, &clause.applied, &clause.defaults);
       let call_env = Arc::new(call_env);
-      match &clause.guard {
-        Some(guard) => {
-          if self.eval_guard(guard, &call_env).await? {
+      match clause.guard {
+        Some(guard_eid) => {
+          if self.eval_guard(guard_eid, &clause.arena, &call_env).await? {
             return self.call_in_closure(clause, call_env, true).await;
           }
         },
@@ -183,12 +190,12 @@ impl Interpreter {
     Ok(LxVal::err_str("no matching clause for function"))
   }
 
-  pub(super) async fn eval_func(&mut self, params: &[Param], guard: Option<&SExpr>, body: &SExpr) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_func(&mut self, params: &[Param], guard: Option<ExprId>, body: ExprId) -> Result<LxVal, LxError> {
     let param_names: Vec<_> = params.iter().map(|p| p.name).collect();
     let mut defaults = Vec::new();
     for p in params {
-      let d = match &p.default {
-        Some(d) => {
+      let d = match p.default {
+        Some(d_eid) => {
           let mut tmp = Interpreter {
             env: Arc::clone(&self.env),
             source: self.source.clone(),
@@ -196,8 +203,9 @@ impl Interpreter {
             module_cache: Arc::clone(&self.module_cache),
             loading: Arc::clone(&self.loading),
             ctx: Arc::clone(&self.ctx),
+            arena: Arc::clone(&self.arena),
           };
-          Some(tmp.eval(d).await?)
+          Some(tmp.eval(d_eid).await?)
         },
         None => None,
       };
@@ -208,8 +216,9 @@ impl Interpreter {
     Ok(LxVal::Func(Box::new(LxFunc {
       params: param_names,
       defaults,
-      guard: guard.map(|g| Arc::new(g.clone())),
-      body: Arc::new(body.clone()),
+      guard,
+      body,
+      arena: Arc::clone(&self.arena),
       closure: Arc::clone(&self.env),
       arity,
       applied: vec![],

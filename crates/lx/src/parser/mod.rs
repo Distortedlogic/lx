@@ -1,19 +1,26 @@
 mod expr;
+mod expr_compound;
+mod expr_helpers;
 mod expr_pratt;
 mod pattern;
 mod stmt;
 mod stmt_class;
 mod type_ann;
 
+use std::cell::RefCell;
+use std::marker::PhantomData;
+use std::rc::Rc;
+
 use chumsky::input::{Input as _, Stream};
 use chumsky::prelude::*;
 use miette::SourceSpan;
 
-use crate::ast::{BinOp, Program};
+use crate::ast::{AstArena, BinOp, ExprId, PatternId, Program, StmtId, Surface, TypeExprId};
 use crate::error::LxError;
 use crate::lexer::token::{Token, TokenKind};
 
 type Span = SimpleSpan;
+type ArenaRef = Rc<RefCell<AstArena>>;
 
 fn ss(s: Span) -> SourceSpan {
   (s.start, s.end - s.start).into()
@@ -42,7 +49,7 @@ pub(crate) fn token_to_binop(kind: &TokenKind) -> Option<BinOp> {
   }
 }
 
-pub fn parse(tokens: Vec<Token>) -> Result<Program, LxError> {
+pub fn parse(tokens: Vec<Token>) -> Result<Program<Surface>, LxError> {
   let len = tokens.last().map(|t| t.span.offset() + t.span.len()).unwrap_or(0);
   let eoi: Span = (len..len).into();
 
@@ -56,9 +63,13 @@ pub fn parse(tokens: Vec<Token>) -> Result<Program, LxError> {
     .collect();
 
   let input = Stream::from_iter(spanned).map(eoi, |(t, s)| (t, s));
+  let arena = Rc::new(RefCell::new(AstArena::new()));
 
-  match stmt::program_parser().parse(input).into_result() {
-    Ok(prog) => Ok(prog),
+  match stmt::program_parser(arena.clone()).parse(input).into_result() {
+    Ok(stmts) => {
+      let arena = Rc::try_unwrap(arena).expect("arena still borrowed").into_inner();
+      Ok(Program { stmts, arena, _phase: PhantomData })
+    },
     Err(errs) => {
       let e = &errs[0];
       let sp = ss(*e.span());

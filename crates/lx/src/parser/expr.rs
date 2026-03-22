@@ -1,9 +1,9 @@
-use crate::sym::intern;
 use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 
-use super::{Span, ss};
-use crate::ast::{Expr, ExprAssert, ExprEmit, ExprTimeout, ExprYield, ListElem, Literal, MapEntry, Param, RecordField, SExpr, SStmt, SelArm};
+use super::expr_helpers::{block_or_record_parser, list_parser, map_parser};
+use super::{ArenaRef, ExprId, Span, StmtId, ss};
+use crate::ast::{Expr, ExprAssert, ExprEmit, ExprTimeout, ExprYield, Literal, SelArm};
 use crate::lexer::token::TokenKind;
 use crate::sym::Sym;
 
@@ -42,70 +42,106 @@ where
   just(TokenKind::Semi).repeated().at_least(1).ignored()
 }
 
-pub(super) fn expr_parser<'a, I>() -> impl Parser<'a, I, SExpr, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
+pub(super) fn expr_parser<'a, I>(arena: ArenaRef) -> impl Parser<'a, I, ExprId, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
 where
   I: ValueInput<'a, Token = TokenKind, Span = Span>,
 {
-  recursive(|expr| {
+  recursive(move |expr| {
+    let a = arena.clone();
+    let a2 = arena.clone();
+    let a3 = arena.clone();
+    let a4 = arena.clone();
+    let a5 = arena.clone();
+    let a6 = arena.clone();
+    let a7 = arena.clone();
+    let a8 = arena.clone();
+    let a9 = arena.clone();
+    let a10 = arena.clone();
+    let a11 = arena.clone();
+
     let literal = select! {
-        TokenKind::Int(n) => Expr::Literal(Literal::Int(n)),
-        TokenKind::Float(f) => Expr::Literal(Literal::Float(f)),
-        TokenKind::True => Expr::Literal(Literal::Bool(true)),
-        TokenKind::False => Expr::Literal(Literal::Bool(false)),
-        TokenKind::Unit => Expr::Literal(Literal::Unit),
-        TokenKind::RawStr(s) => Expr::Literal(Literal::RawStr(s)),
+        TokenKind::Int(n) => Literal::Int(n),
+        TokenKind::Float(f) => Literal::Float(f),
+        TokenKind::True => Literal::Bool(true),
+        TokenKind::False => Literal::Bool(false),
+        TokenKind::Unit => Literal::Unit,
+        TokenKind::RawStr(s) => Literal::RawStr(s),
     }
-    .map_with(|node, e| SExpr::new(node, ss(e.span())));
+    .map_with(move |lit, e| a.borrow_mut().alloc_expr(Expr::Literal(lit), ss(e.span())));
 
-    let string_lit = super::expr_pratt::string_parser(expr.clone());
-    let ident_expr = ident().map_with(|n, e| SExpr::new(Expr::Ident(n), ss(e.span())));
-    let type_ctor = type_name().map_with(|n, e| SExpr::new(Expr::TypeConstructor(n), ss(e.span())));
-    let list = list_parser(expr.clone());
-    let block_or_record = block_or_record_parser(expr.clone());
-    let map = map_parser(expr.clone());
-    let paren = super::expr_pratt::paren_parser(expr.clone());
+    let string_lit = super::expr_pratt::string_parser(expr.clone(), a2.clone());
+    let ident_expr = ident().map_with(move |n, e| a3.borrow_mut().alloc_expr(Expr::Ident(n), ss(e.span())));
+    let type_ctor = type_name().map_with(move |n, e| a4.borrow_mut().alloc_expr(Expr::TypeConstructor(n), ss(e.span())));
+    let list = list_parser(expr.clone(), a5.clone());
+    let block_or_record = block_or_record_parser(expr.clone(), a6.clone());
+    let map = map_parser(expr.clone(), a7.clone());
+    let paren = super::expr_pratt::paren_parser(expr.clone(), a8.clone());
 
-    let loop_expr = just(TokenKind::Loop)
-      .ignore_then(just(TokenKind::LBrace))
-      .ignore_then(stmts_block(expr.clone()))
-      .then_ignore(just(TokenKind::RBrace))
-      .map_with(|stmts, e| SExpr::new(Expr::Loop(stmts), ss(e.span())));
+    let loop_expr = {
+      let al = a9.clone();
+      just(TokenKind::Loop)
+        .ignore_then(just(TokenKind::LBrace))
+        .ignore_then(stmts_block(expr.clone(), a9.clone()))
+        .then_ignore(just(TokenKind::RBrace))
+        .map_with(move |stmts, e| al.borrow_mut().alloc_expr(Expr::Loop(stmts), ss(e.span())))
+    };
 
-    let par_expr = just(TokenKind::Par)
-      .ignore_then(just(TokenKind::LBrace))
-      .ignore_then(stmts_block(expr.clone()))
-      .then_ignore(just(TokenKind::RBrace))
-      .map_with(|stmts, e| SExpr::new(Expr::Par(stmts), ss(e.span())));
+    let par_expr = {
+      let al = a10.clone();
+      just(TokenKind::Par)
+        .ignore_then(just(TokenKind::LBrace))
+        .ignore_then(stmts_block(expr.clone(), a10.clone()))
+        .then_ignore(just(TokenKind::RBrace))
+        .map_with(move |stmts, e| al.borrow_mut().alloc_expr(Expr::Par(stmts), ss(e.span())))
+    };
 
     let sel_arm = expr.clone().then_ignore(just(TokenKind::Arrow)).then(expr.clone()).map(|(ex, handler)| SelArm { expr: ex, handler });
 
-    let sel_expr = just(TokenKind::Sel)
-      .ignore_then(just(TokenKind::LBrace))
-      .ignore_then(skip_semis())
-      .ignore_then(sel_arm.separated_by(semi_sep()).allow_trailing().collect::<Vec<_>>())
-      .then_ignore(skip_semis())
-      .then_ignore(just(TokenKind::RBrace))
-      .map_with(|arms, e| SExpr::new(Expr::Sel(arms), ss(e.span())));
+    let sel_expr = {
+      let al = a11.clone();
+      just(TokenKind::Sel)
+        .ignore_then(just(TokenKind::LBrace))
+        .ignore_then(skip_semis())
+        .ignore_then(sel_arm.separated_by(semi_sep()).allow_trailing().collect::<Vec<_>>())
+        .then_ignore(skip_semis())
+        .then_ignore(just(TokenKind::RBrace))
+        .map_with(move |arms, e| al.borrow_mut().alloc_expr(Expr::Sel(arms), ss(e.span())))
+    };
 
-    let break_expr = just(TokenKind::Break).ignore_then(expr.clone().or_not()).map_with(|val, e| SExpr::new(Expr::Break(val.map(Box::new)), ss(e.span())));
+    let break_expr = {
+      let al = arena.clone();
+      just(TokenKind::Break).ignore_then(expr.clone().or_not()).map_with(move |val, e| al.borrow_mut().alloc_expr(Expr::Break(val), ss(e.span())))
+    };
 
-    let assert_expr = just(TokenKind::Assert)
-      .ignore_then(expr.clone())
-      .then(expr.clone().or_not())
-      .map_with(|(ex, msg), e| SExpr::new(Expr::Assert(ExprAssert { expr: Box::new(ex), msg: msg.map(Box::new) }), ss(e.span())));
+    let assert_expr = {
+      let al = arena.clone();
+      just(TokenKind::Assert)
+        .ignore_then(expr.clone())
+        .then(expr.clone().or_not())
+        .map_with(move |(ex, msg), e| al.borrow_mut().alloc_expr(Expr::Assert(ExprAssert { expr: ex, msg }), ss(e.span())))
+    };
 
-    let emit_expr = just(TokenKind::Emit).ignore_then(expr.clone()).map_with(|v, e| SExpr::new(Expr::Emit(ExprEmit { value: Box::new(v) }), ss(e.span())));
+    let emit_expr = {
+      let al = arena.clone();
+      just(TokenKind::Emit).ignore_then(expr.clone()).map_with(move |v, e| al.borrow_mut().alloc_expr(Expr::Emit(ExprEmit { value: v }), ss(e.span())))
+    };
 
-    let yield_expr = just(TokenKind::Yield).ignore_then(expr.clone()).map_with(|v, e| SExpr::new(Expr::Yield(ExprYield { value: Box::new(v) }), ss(e.span())));
+    let yield_expr = {
+      let al = arena.clone();
+      just(TokenKind::Yield).ignore_then(expr.clone()).map_with(move |v, e| al.borrow_mut().alloc_expr(Expr::Yield(ExprYield { value: v }), ss(e.span())))
+    };
 
-    let timeout_ms = choice((literal, ident_expr.clone(), paren.clone()));
+    let timeout_ms = choice((literal.clone(), ident_expr.clone(), paren.clone()));
 
-    let timeout_expr = just(TokenKind::Timeout)
-      .ignore_then(timeout_ms)
-      .then(expr.clone())
-      .map_with(|(ms, body), e| SExpr::new(Expr::Timeout(ExprTimeout { ms: Box::new(ms), body: Box::new(body) }), ss(e.span())));
+    let timeout_expr = {
+      let al = arena.clone();
+      just(TokenKind::Timeout)
+        .ignore_then(timeout_ms)
+        .then(expr.clone())
+        .map_with(move |(ms, body), e| al.borrow_mut().alloc_expr(Expr::Timeout(ExprTimeout { ms, body }), ss(e.span())))
+    };
 
-    let with_expr = super::expr_pratt::with_parser(expr.clone());
+    let with_expr = super::expr_pratt::with_parser(expr.clone(), arena.clone());
 
     let atom = choice((
       literal,
@@ -128,121 +164,16 @@ where
     .or(timeout_expr)
     .boxed();
 
-    super::expr_pratt::pratt_expr(atom, expr)
+    super::expr_pratt::pratt_expr(atom, expr, arena.clone())
   })
 }
 
-fn list_parser<'a, I>(
-  expr: impl Parser<'a, I, SExpr, extra::Err<Rich<'a, TokenKind, Span>>> + Clone,
-) -> impl Parser<'a, I, SExpr, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
-where
-  I: ValueInput<'a, Token = TokenKind, Span = Span>,
-{
-  let spread = just(TokenKind::DotDot).ignore_then(expr.clone()).map(ListElem::Spread);
-  let single = expr.map(ListElem::Single);
-  let elem = spread.or(single);
-
-  elem
-    .separated_by(just(TokenKind::Semi).or_not())
-    .allow_trailing()
-    .collect::<Vec<_>>()
-    .delimited_by(just(TokenKind::LBracket), just(TokenKind::RBracket))
-    .map_with(|elems, e| SExpr::new(Expr::List(elems), ss(e.span())))
-}
-
-fn block_or_record_parser<'a, I>(
-  expr: impl Parser<'a, I, SExpr, extra::Err<Rich<'a, TokenKind, Span>>> + Clone,
-) -> impl Parser<'a, I, SExpr, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
-where
-  I: ValueInput<'a, Token = TokenKind, Span = Span>,
-{
-  let empty_record = just(TokenKind::LBrace)
-    .then(skip_semis())
-    .then(just(TokenKind::Colon))
-    .then(just(TokenKind::RBrace))
-    .map_with(|_, e| SExpr::new(Expr::Record(vec![]), ss(e.span())));
-
-  let record = just(TokenKind::LBrace)
-    .then(skip_semis())
-    .then(looks_like_record().rewind())
-    .ignore_then(record_fields(expr.clone()))
-    .then_ignore(just(TokenKind::RBrace))
-    .map_with(|fields, e| SExpr::new(Expr::Record(fields), ss(e.span())));
-
-  let block = just(TokenKind::LBrace)
-    .ignore_then(stmts_block(expr))
-    .then_ignore(just(TokenKind::RBrace))
-    .map_with(|stmts, e| SExpr::new(Expr::Block(stmts), ss(e.span())));
-
-  choice((empty_record, record, block))
-}
-
-fn looks_like_record<'a, I>() -> impl Parser<'a, I, (), extra::Err<Rich<'a, TokenKind, Span>>> + Clone
-where
-  I: ValueInput<'a, Token = TokenKind, Span = Span>,
-{
-  choice((ident().then_ignore(just(TokenKind::Colon)).ignored(), just(TokenKind::DotDot).ignored()))
-}
-
-fn record_fields<'a, I>(
-  expr: impl Parser<'a, I, SExpr, extra::Err<Rich<'a, TokenKind, Span>>> + Clone,
-) -> impl Parser<'a, I, Vec<RecordField>, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
-where
-  I: ValueInput<'a, Token = TokenKind, Span = Span>,
-{
-  let spread_field = just(TokenKind::DotDot).ignore_then(expr.clone()).map(|value| RecordField { name: None, value, is_spread: true });
-
-  let named_field = ident().then(just(TokenKind::Colon).ignore_then(expr).or_not()).map_with(|(name, val), e| {
-    let value = val.unwrap_or_else(|| SExpr::new(Expr::Ident(name), ss(e.span())));
-    RecordField { name: Some(name), value, is_spread: false }
-  });
-
-  let field = spread_field.or(named_field);
-
-  skip_semis().ignore_then(field.separated_by(skip_semis()).allow_trailing().collect::<Vec<_>>()).then_ignore(skip_semis())
-}
-
-fn map_parser<'a, I>(
-  expr: impl Parser<'a, I, SExpr, extra::Err<Rich<'a, TokenKind, Span>>> + Clone,
-) -> impl Parser<'a, I, SExpr, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
-where
-  I: ValueInput<'a, Token = TokenKind, Span = Span>,
-{
-  let spread = just(TokenKind::DotDot).ignore_then(expr.clone()).map(|v| MapEntry { key: None, value: v, is_spread: true });
-
-  let kv = expr.clone().then_ignore(just(TokenKind::Colon)).then(expr).map(|(k, v)| MapEntry { key: Some(k), value: v, is_spread: false });
-
-  let entry = spread.or(kv);
-
-  entry
-    .separated_by(just(TokenKind::Semi).or_not())
-    .allow_trailing()
-    .collect::<Vec<_>>()
-    .delimited_by(just(TokenKind::PercentLBrace), just(TokenKind::RBrace))
-    .map_with(|entries, e| SExpr::new(Expr::Map(entries), ss(e.span())))
-}
-
 pub(super) fn stmts_block<'a, I>(
-  expr: impl Parser<'a, I, SExpr, extra::Err<Rich<'a, TokenKind, Span>>> + Clone,
-) -> impl Parser<'a, I, Vec<SStmt>, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
+  expr: impl Parser<'a, I, ExprId, extra::Err<Rich<'a, TokenKind, Span>>> + Clone,
+  arena: ArenaRef,
+) -> impl Parser<'a, I, Vec<StmtId>, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
 where
   I: ValueInput<'a, Token = TokenKind, Span = Span>,
 {
-  skip_semis().ignore_then(super::stmt::stmt_parser(expr).separated_by(semi_sep()).allow_trailing().collect::<Vec<_>>().then_ignore(skip_semis()))
-}
-
-pub(super) fn param_parser<'a, I>(
-  expr: impl Parser<'a, I, SExpr, extra::Err<Rich<'a, TokenKind, Span>>> + Clone,
-) -> impl Parser<'a, I, Param, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
-where
-  I: ValueInput<'a, Token = TokenKind, Span = Span>,
-{
-  let typed = ident()
-    .then(just(TokenKind::Colon).ignore_then(super::type_ann::type_parser()).or_not())
-    .then(just(TokenKind::Assign).ignore_then(expr).or_not())
-    .map(|((name, type_ann), default)| Param { name, type_ann, default });
-
-  let underscore = just(TokenKind::Underscore).to(Param { name: intern("_"), type_ann: None, default: None });
-
-  typed.or(underscore)
+  skip_semis().ignore_then(super::stmt::stmt_parser(expr, arena).separated_by(semi_sep()).allow_trailing().collect::<Vec<_>>().then_ignore(skip_semis()))
 }

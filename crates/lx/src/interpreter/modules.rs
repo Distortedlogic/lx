@@ -3,7 +3,8 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
-use crate::ast::{BindTarget, Program, Stmt, StmtTypeDef, UseKind, UseStmt};
+use crate::ast::{BindTarget, Core, Program, Stmt, StmtTypeDef, UseKind, UseStmt};
+use crate::folder::desugar;
 use crate::error::LxError;
 use crate::value::LxVal;
 use miette::SourceSpan;
@@ -104,7 +105,8 @@ impl Interpreter {
     }
     let source = std::fs::read_to_string(file_path).map_err(|e| LxError::runtime(format!("cannot read module '{}': {e}", file_path.display()), span))?;
     let tokens = crate::lexer::lex(&source).map_err(|e| LxError::runtime(format!("module '{}': {e}", file_path.display()), span))?;
-    let program = crate::parser::parse(tokens).map_err(|e| LxError::runtime(format!("module '{}': {e}", file_path.display()), span))?;
+    let surface = crate::parser::parse(tokens).map_err(|e| LxError::runtime(format!("module '{}': {e}", file_path.display()), span))?;
+    let program = desugar(surface);
     let module_dir = file_path.parent().map(|p| p.to_path_buf());
     let mut mod_interp = Interpreter::new(&source, module_dir, Arc::clone(&self.ctx));
     mod_interp.module_cache = Arc::clone(&self.module_cache);
@@ -142,11 +144,12 @@ fn resolve_module_path(source_dir: &std::path::Path, path: &[&str], span: Source
   Ok(result)
 }
 
-fn collect_exports(program: &Program, interp: &Interpreter) -> ModuleExports {
+fn collect_exports(program: &Program<Core>, interp: &Interpreter) -> ModuleExports {
   let mut bindings = IndexMap::new();
   let mut variant_ctors = Vec::new();
-  for stmt in &program.stmts {
-    match &stmt.node {
+  for &sid in &program.stmts {
+    let stmt = program.arena.stmt(sid);
+    match stmt {
       Stmt::Binding(b) if b.exported => {
         if let BindTarget::Name(name) = &b.target
           && let Some(val) = interp.env.get(*name)

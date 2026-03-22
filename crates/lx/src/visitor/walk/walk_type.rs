@@ -1,66 +1,150 @@
 use std::ops::ControlFlow;
 
-use crate::ast::{SType, TypeExpr, TypeField};
+use crate::ast::{AstArena, TypeExpr, TypeExprId, TypeField};
 use crate::sym::Sym;
 use miette::SourceSpan;
 
-use crate::visitor::AstVisitor;
+use crate::visitor::{AstVisitor, VisitAction};
 
-pub fn walk_type_expr<V: AstVisitor + ?Sized>(v: &mut V, type_expr: &TypeExpr, span: SourceSpan) -> ControlFlow<()> {
+pub(crate) fn walk_type_expr_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: TypeExprId, arena: &AstArena) -> ControlFlow<()> {
+  let span = arena.type_expr_span(id);
+  let type_expr = arena.type_expr(id);
+  let action = v.visit_type_expr(type_expr, span, arena);
+  match action {
+    VisitAction::Stop => ControlFlow::Break(()),
+    VisitAction::Skip => v.leave_type_expr(type_expr, span, arena),
+    VisitAction::Descend => walk_type_expr(v, type_expr, span, arena),
+  }
+}
+
+pub fn walk_type_expr<V: AstVisitor + ?Sized>(v: &mut V, type_expr: &TypeExpr, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
   match type_expr {
-    TypeExpr::Named(name) => v.visit_type_named(*name, span)?,
-    TypeExpr::Var(name) => v.visit_type_var(*name, span)?,
-    TypeExpr::Applied(name, args) => v.visit_type_applied(*name, args, span)?,
-    TypeExpr::List(inner) => v.visit_type_list(inner, span)?,
-    TypeExpr::Map { key, value } => v.visit_type_map(key, value, span)?,
-    TypeExpr::Record(fields) => v.visit_type_record(fields, span)?,
-    TypeExpr::Tuple(elems) => v.visit_type_tuple(elems, span)?,
-    TypeExpr::Func { param, ret } => v.visit_type_func(param, ret, span)?,
-    TypeExpr::Fallible { ok, err } => v.visit_type_fallible(ok, err, span)?,
+    TypeExpr::Named(name) => {
+      let action = v.visit_type_named(*name, span, arena);
+      if action.is_stop() {
+        return ControlFlow::Break(());
+      }
+    },
+    TypeExpr::Var(name) => {
+      let action = v.visit_type_var(*name, span, arena);
+      if action.is_stop() {
+        return ControlFlow::Break(());
+      }
+    },
+    TypeExpr::Applied(name, args) => walk_type_applied_dispatch(v, *name, args, span, arena)?,
+    TypeExpr::List(inner) => walk_type_list_dispatch(v, *inner, span, arena)?,
+    TypeExpr::Map { key, value } => walk_type_map_dispatch(v, *key, *value, span, arena)?,
+    TypeExpr::Record(fields) => walk_type_record_dispatch(v, fields, span, arena)?,
+    TypeExpr::Tuple(elems) => walk_type_tuple_dispatch(v, elems, span, arena)?,
+    TypeExpr::Func { param, ret } => walk_type_func_dispatch(v, *param, *ret, span, arena)?,
+    TypeExpr::Fallible { ok, err } => walk_type_fallible_dispatch(v, *ok, *err, span, arena)?,
   }
-  v.leave_type_expr(type_expr, span)
+  v.leave_type_expr(type_expr, span, arena)
 }
 
-pub fn walk_type_applied<V: AstVisitor + ?Sized>(v: &mut V, name: Sym, args: &[SType], span: SourceSpan) -> ControlFlow<()> {
-  for a in args {
-    v.visit_type_expr(&a.node, a.span)?;
+fn walk_type_applied_dispatch<V: AstVisitor + ?Sized>(v: &mut V, name: Sym, args: &[TypeExprId], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  let action = v.visit_type_applied(name, args, span, arena);
+  match action {
+    VisitAction::Stop => ControlFlow::Break(()),
+    VisitAction::Skip => v.leave_type_applied(name, args, span, arena),
+    VisitAction::Descend => walk_type_applied(v, name, args, span, arena),
   }
-  v.leave_type_applied(name, args, span)
 }
 
-pub fn walk_type_list<V: AstVisitor + ?Sized>(v: &mut V, inner: &SType, span: SourceSpan) -> ControlFlow<()> {
-  v.visit_type_expr(&inner.node, inner.span)?;
-  v.leave_type_list(inner, span)
+pub fn walk_type_applied<V: AstVisitor + ?Sized>(v: &mut V, name: Sym, args: &[TypeExprId], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  for &a in args {
+    walk_type_expr_dispatch(v, a, arena)?;
+  }
+  v.leave_type_applied(name, args, span, arena)
 }
 
-pub fn walk_type_map<V: AstVisitor + ?Sized>(v: &mut V, key: &SType, value: &SType, span: SourceSpan) -> ControlFlow<()> {
-  v.visit_type_expr(&key.node, key.span)?;
-  v.visit_type_expr(&value.node, value.span)?;
-  v.leave_type_map(key, value, span)
+fn walk_type_list_dispatch<V: AstVisitor + ?Sized>(v: &mut V, inner: TypeExprId, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  let action = v.visit_type_list(inner, span, arena);
+  match action {
+    VisitAction::Stop => ControlFlow::Break(()),
+    VisitAction::Skip => v.leave_type_list(inner, span, arena),
+    VisitAction::Descend => walk_type_list(v, inner, span, arena),
+  }
 }
 
-pub fn walk_type_record<V: AstVisitor + ?Sized>(v: &mut V, fields: &[TypeField], span: SourceSpan) -> ControlFlow<()> {
+pub fn walk_type_list<V: AstVisitor + ?Sized>(v: &mut V, inner: TypeExprId, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  walk_type_expr_dispatch(v, inner, arena)?;
+  v.leave_type_list(inner, span, arena)
+}
+
+fn walk_type_map_dispatch<V: AstVisitor + ?Sized>(v: &mut V, key: TypeExprId, value: TypeExprId, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  let action = v.visit_type_map(key, value, span, arena);
+  match action {
+    VisitAction::Stop => ControlFlow::Break(()),
+    VisitAction::Skip => v.leave_type_map(key, value, span, arena),
+    VisitAction::Descend => walk_type_map(v, key, value, span, arena),
+  }
+}
+
+pub fn walk_type_map<V: AstVisitor + ?Sized>(v: &mut V, key: TypeExprId, value: TypeExprId, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  walk_type_expr_dispatch(v, key, arena)?;
+  walk_type_expr_dispatch(v, value, arena)?;
+  v.leave_type_map(key, value, span, arena)
+}
+
+fn walk_type_record_dispatch<V: AstVisitor + ?Sized>(v: &mut V, fields: &[TypeField], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  let action = v.visit_type_record(fields, span, arena);
+  match action {
+    VisitAction::Stop => ControlFlow::Break(()),
+    VisitAction::Skip => v.leave_type_record(fields, span, arena),
+    VisitAction::Descend => walk_type_record(v, fields, span, arena),
+  }
+}
+
+pub fn walk_type_record<V: AstVisitor + ?Sized>(v: &mut V, fields: &[TypeField], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
   for f in fields {
-    v.visit_type_expr(&f.ty.node, f.ty.span)?;
+    walk_type_expr_dispatch(v, f.ty, arena)?;
   }
-  v.leave_type_record(fields, span)
+  v.leave_type_record(fields, span, arena)
 }
 
-pub fn walk_type_tuple<V: AstVisitor + ?Sized>(v: &mut V, elems: &[SType], span: SourceSpan) -> ControlFlow<()> {
-  for e in elems {
-    v.visit_type_expr(&e.node, e.span)?;
+fn walk_type_tuple_dispatch<V: AstVisitor + ?Sized>(v: &mut V, elems: &[TypeExprId], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  let action = v.visit_type_tuple(elems, span, arena);
+  match action {
+    VisitAction::Stop => ControlFlow::Break(()),
+    VisitAction::Skip => v.leave_type_tuple(elems, span, arena),
+    VisitAction::Descend => walk_type_tuple(v, elems, span, arena),
   }
-  v.leave_type_tuple(elems, span)
 }
 
-pub fn walk_type_func<V: AstVisitor + ?Sized>(v: &mut V, param: &SType, ret: &SType, span: SourceSpan) -> ControlFlow<()> {
-  v.visit_type_expr(&param.node, param.span)?;
-  v.visit_type_expr(&ret.node, ret.span)?;
-  v.leave_type_func(param, ret, span)
+pub fn walk_type_tuple<V: AstVisitor + ?Sized>(v: &mut V, elems: &[TypeExprId], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  for &e in elems {
+    walk_type_expr_dispatch(v, e, arena)?;
+  }
+  v.leave_type_tuple(elems, span, arena)
 }
 
-pub fn walk_type_fallible<V: AstVisitor + ?Sized>(v: &mut V, ok: &SType, err: &SType, span: SourceSpan) -> ControlFlow<()> {
-  v.visit_type_expr(&ok.node, ok.span)?;
-  v.visit_type_expr(&err.node, err.span)?;
-  v.leave_type_fallible(ok, err, span)
+fn walk_type_func_dispatch<V: AstVisitor + ?Sized>(v: &mut V, param: TypeExprId, ret: TypeExprId, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  let action = v.visit_type_func(param, ret, span, arena);
+  match action {
+    VisitAction::Stop => ControlFlow::Break(()),
+    VisitAction::Skip => v.leave_type_func(param, ret, span, arena),
+    VisitAction::Descend => walk_type_func(v, param, ret, span, arena),
+  }
+}
+
+pub fn walk_type_func<V: AstVisitor + ?Sized>(v: &mut V, param: TypeExprId, ret: TypeExprId, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  walk_type_expr_dispatch(v, param, arena)?;
+  walk_type_expr_dispatch(v, ret, arena)?;
+  v.leave_type_func(param, ret, span, arena)
+}
+
+fn walk_type_fallible_dispatch<V: AstVisitor + ?Sized>(v: &mut V, ok: TypeExprId, err: TypeExprId, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  let action = v.visit_type_fallible(ok, err, span, arena);
+  match action {
+    VisitAction::Stop => ControlFlow::Break(()),
+    VisitAction::Skip => v.leave_type_fallible(ok, err, span, arena),
+    VisitAction::Descend => walk_type_fallible(v, ok, err, span, arena),
+  }
+}
+
+pub fn walk_type_fallible<V: AstVisitor + ?Sized>(v: &mut V, ok: TypeExprId, err: TypeExprId, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  walk_type_expr_dispatch(v, ok, arena)?;
+  walk_type_expr_dispatch(v, err, arena)?;
+  v.leave_type_fallible(ok, err, span, arena)
 }

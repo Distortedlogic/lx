@@ -11,3 +11,4 @@ import "../widgets/agent";
 import "../widgets/log-viewer";
 import "../widgets/markdown";
 import "../widgets/json-viewer";
+import "../widgets/voice";

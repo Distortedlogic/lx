@@ -6,22 +6,24 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
+use crate::ast::Program;
 use crate::error::LxError;
+use crate::lexer::lex;
+use crate::parser::parse;
 use crate::record;
 use crate::runtime::RuntimeCtx;
 use crate::std_module;
 use crate::stdlib::helpers::require_str_field;
+use crate::sym::{Sym, intern};
 use crate::value::LxVal;
-use miette::SourceSpan;
-
-use crate::ast::Program;
 use crate::visitor::AstVisitor;
+use miette::SourceSpan;
 
 use diag_walk::{DiagEdge, DiagNode, EdgeStyle, EdgeType, Graph, NodeKind, Walker};
 use echart::graph_to_echart_json;
 use mermaid::to_mermaid;
 
-pub fn build() -> IndexMap<crate::sym::Sym, LxVal> {
+pub fn build() -> IndexMap<Sym, LxVal> {
   std_module! {
     "extract"        => "diag.extract",        1, bi_extract;
     "extract_file"   => "diag.extract_file",   1, bi_extract_file;
@@ -53,24 +55,24 @@ fn bi_to_graph_chart(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -
   Ok(LxVal::str(graph_to_echart_json(&graph).as_str()))
 }
 
-pub fn extract_mermaid(program: &Program) -> String {
+pub fn extract_mermaid<P>(program: &Program<P>) -> String {
   let mut walker = Walker::new();
-  drop(walker.visit_program(program));
+  let _ = walker.visit_program(program);
   to_mermaid(&walker.into_graph())
 }
 
-pub fn extract_echart_json(program: &Program) -> String {
+pub fn extract_echart_json<P>(program: &Program<P>) -> String {
   let mut walker = Walker::new();
-  drop(walker.visit_program(program));
+  let _ = walker.visit_program(program);
   let graph = walker.into_graph();
   graph_to_echart_json(&graph)
 }
 
 fn extract_graph(src: &str, span: SourceSpan) -> Result<Graph, LxError> {
-  let tokens = crate::lexer::lex(src).map_err(|e| LxError::runtime(format!("diag: lex error: {e}"), span))?;
-  let program = crate::parser::parse(tokens).map_err(|e| LxError::runtime(format!("diag: parse error: {e}"), span))?;
+  let tokens = lex(src).map_err(|e| LxError::runtime(format!("diag: lex error: {e}"), span))?;
+  let program = parse(tokens).map_err(|e| LxError::runtime(format!("diag: parse error: {e}"), span))?;
   let mut walker = Walker::new();
-  drop(walker.visit_program(&program));
+  let _ = walker.visit_program(&program);
   Ok(walker.into_graph())
 }
 
@@ -145,8 +147,8 @@ fn value_to_graph(val: &LxVal, span: SourceSpan) -> Result<Graph, LxError> {
   let LxVal::Record(rec) = val else {
     return Err(LxError::type_err("diag.to_mermaid expects Graph record", span, None));
   };
-  let nodes_val = rec.get(&crate::sym::intern("nodes")).ok_or_else(|| LxError::type_err("graph missing 'nodes'", span, None))?;
-  let edges_val = rec.get(&crate::sym::intern("edges")).ok_or_else(|| LxError::type_err("graph missing 'edges'", span, None))?;
+  let nodes_val = rec.get(&intern("nodes")).ok_or_else(|| LxError::type_err("graph missing 'nodes'", span, None))?;
+  let edges_val = rec.get(&intern("edges")).ok_or_else(|| LxError::type_err("graph missing 'edges'", span, None))?;
   let nodes = match nodes_val {
     LxVal::List(l) => l.iter().map(|v| value_to_node(v, span)).collect::<Result<_, _>>()?,
     _ => return Err(LxError::type_err("graph.nodes must be List", span, None)),
@@ -162,11 +164,11 @@ fn value_to_node(val: &LxVal, span: SourceSpan) -> Result<DiagNode, LxError> {
   let LxVal::Record(rec) = val else {
     return Err(LxError::type_err("node must be Record", span, None));
   };
-  let children = match rec.get(&crate::sym::intern("children")) {
+  let children = match rec.get(&intern("children")) {
     Some(LxVal::List(l)) => l.iter().map(|v| value_to_node(v, span)).collect::<Result<_, _>>()?,
     _ => vec![],
   };
-  let source_offset = rec.get(&crate::sym::intern("source_offset")).and_then(|v| v.as_int()).and_then(|n| {
+  let source_offset = rec.get(&intern("source_offset")).and_then(|v| v.as_int()).and_then(|n| {
     use num_traits::ToPrimitive;
     n.to_u32()
   });
@@ -187,7 +189,7 @@ fn value_to_edge(val: &LxVal, span: SourceSpan) -> Result<DiagEdge, LxError> {
   };
   let style_str = require_str_field(rec, "style", "diag.edge", span)?;
   let style = parse_edge_style(&style_str).map_err(|e| LxError::type_err(e, span, None))?;
-  let edge_type_str = rec.get(&crate::sym::intern("edge_type")).and_then(|v| v.as_str()).unwrap_or("exec");
+  let edge_type_str = rec.get(&intern("edge_type")).and_then(|v| v.as_str()).unwrap_or("exec");
   let edge_type = parse_edge_type(edge_type_str).map_err(|e| LxError::type_err(e, span, None))?;
   Ok(DiagEdge {
     from: require_str_field(rec, "from", "diag.edge", span)?.to_string(),

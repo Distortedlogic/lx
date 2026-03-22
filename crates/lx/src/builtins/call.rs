@@ -21,11 +21,11 @@ pub(crate) async fn call_value(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Ar
       if lf.applied.len() < lf.arity {
         return Ok(LxVal::Func(lf));
       }
-      let mut interp = crate::interpreter::Interpreter::with_env(&lf.closure, Arc::clone(ctx));
+      let mut interp = crate::interpreter::Interpreter::with_env(&lf.closure, Arc::clone(&lf.arena), Arc::clone(ctx));
       let call_env = lf.closure.child();
       call_env.bind_params(&lf.params, &lf.applied, &lf.defaults);
       interp.set_env(call_env);
-      let result = interp.eval_expr(&lf.body).await;
+      let result = interp.eval_expr(lf.body).await;
       match result {
         Err(LxError::Propagate { value, .. }) => Ok(*value),
         other => other,
@@ -43,7 +43,8 @@ pub(crate) async fn call_value(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Ar
       }
     },
     LxVal::MultiFunc(clauses) => {
-      let mut interp = crate::interpreter::Interpreter::with_env(&crate::env::Env::default(), Arc::clone(ctx));
+      let arena = clauses.first().map(|c| Arc::clone(&c.arena)).unwrap_or_else(|| Arc::new(crate::ast::AstArena::new()));
+      let mut interp = crate::interpreter::Interpreter::with_env(&crate::env::Env::default(), arena, Arc::clone(ctx));
       interp.apply_func(LxVal::MultiFunc(clauses.clone()), arg, span).await
     },
     LxVal::TaggedCtor { tag, arity, applied } => {

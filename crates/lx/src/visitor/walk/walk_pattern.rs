@@ -1,56 +1,136 @@
 use std::ops::ControlFlow;
 
-use crate::ast::{FieldPattern, Pattern, PatternConstructor, PatternList, PatternRecord, SPattern};
+use crate::ast::{AstArena, FieldPattern, Pattern, PatternConstructor, PatternId, PatternList, PatternRecord};
 use crate::sym::Sym;
 use miette::SourceSpan;
 
-use crate::visitor::AstVisitor;
+use crate::visitor::{AstVisitor, VisitAction};
 
-pub fn walk_pattern<V: AstVisitor + ?Sized>(v: &mut V, pattern: &Pattern, span: SourceSpan) -> ControlFlow<()> {
+pub(crate) fn walk_pattern_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: PatternId, arena: &AstArena) -> ControlFlow<()> {
+  let span = arena.pattern_span(id);
+  let pattern = arena.pattern(id);
+  let action = v.visit_pattern(pattern, span, arena);
+  match action {
+    VisitAction::Stop => ControlFlow::Break(()),
+    VisitAction::Skip => v.leave_pattern(pattern, span, arena),
+    VisitAction::Descend => walk_pattern(v, pattern, span, arena),
+  }
+}
+
+pub fn walk_pattern<V: AstVisitor + ?Sized>(v: &mut V, pattern: &Pattern, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
   match pattern {
-    Pattern::Literal(lit) => v.visit_pattern_literal(lit, span)?,
-    Pattern::Bind(name) => v.visit_pattern_bind(*name, span)?,
-    Pattern::Wildcard => v.visit_pattern_wildcard(span)?,
-    Pattern::Tuple(elems) => v.visit_pattern_tuple(elems, span)?,
+    Pattern::Literal(lit) => {
+      let action = v.visit_pattern_literal(lit, span, arena);
+      if action.is_stop() {
+        return ControlFlow::Break(());
+      }
+    },
+    Pattern::Bind(name) => {
+      let action = v.visit_pattern_bind(*name, span, arena);
+      if action.is_stop() {
+        return ControlFlow::Break(());
+      }
+    },
+    Pattern::Wildcard => {
+      let action = v.visit_pattern_wildcard(span, arena);
+      if action.is_stop() {
+        return ControlFlow::Break(());
+      }
+    },
+    Pattern::Tuple(elems) => walk_pattern_tuple_dispatch(v, elems, span, arena)?,
     Pattern::List(PatternList { elems, rest }) => {
-      v.visit_pattern_list(elems, *rest, span)?;
+      walk_pattern_list_dispatch(v, elems, *rest, span, arena)?;
     },
     Pattern::Record(PatternRecord { fields, rest }) => {
-      v.visit_pattern_record(fields, *rest, span)?;
+      walk_pattern_record_dispatch(v, fields, *rest, span, arena)?;
     },
     Pattern::Constructor(PatternConstructor { name, args }) => {
-      v.visit_pattern_constructor(*name, args, span)?;
+      walk_pattern_constructor_dispatch(v, *name, args, span, arena)?;
     },
   }
-  v.leave_pattern(pattern, span)
+  v.leave_pattern(pattern, span, arena)
 }
 
-pub fn walk_pattern_tuple<V: AstVisitor + ?Sized>(v: &mut V, elems: &[SPattern], span: SourceSpan) -> ControlFlow<()> {
-  for e in elems {
-    v.visit_pattern(&e.node, e.span)?;
+fn walk_pattern_tuple_dispatch<V: AstVisitor + ?Sized>(v: &mut V, elems: &[PatternId], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  let action = v.visit_pattern_tuple(elems, span, arena);
+  match action {
+    VisitAction::Stop => ControlFlow::Break(()),
+    VisitAction::Skip => v.leave_pattern_tuple(elems, span, arena),
+    VisitAction::Descend => walk_pattern_tuple(v, elems, span, arena),
   }
-  v.leave_pattern_tuple(elems, span)
 }
 
-pub fn walk_pattern_list<V: AstVisitor + ?Sized>(v: &mut V, elems: &[SPattern], rest: Option<Sym>, span: SourceSpan) -> ControlFlow<()> {
-  for e in elems {
-    v.visit_pattern(&e.node, e.span)?;
+pub fn walk_pattern_tuple<V: AstVisitor + ?Sized>(v: &mut V, elems: &[PatternId], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  for &e in elems {
+    walk_pattern_dispatch(v, e, arena)?;
   }
-  v.leave_pattern_list(elems, rest, span)
+  v.leave_pattern_tuple(elems, span, arena)
 }
 
-pub fn walk_pattern_record<V: AstVisitor + ?Sized>(v: &mut V, fields: &[FieldPattern], rest: Option<Sym>, span: SourceSpan) -> ControlFlow<()> {
+fn walk_pattern_list_dispatch<V: AstVisitor + ?Sized>(
+  v: &mut V,
+  elems: &[PatternId],
+  rest: Option<Sym>,
+  span: SourceSpan,
+  arena: &AstArena,
+) -> ControlFlow<()> {
+  let action = v.visit_pattern_list(elems, rest, span, arena);
+  match action {
+    VisitAction::Stop => ControlFlow::Break(()),
+    VisitAction::Skip => v.leave_pattern_list(elems, rest, span, arena),
+    VisitAction::Descend => walk_pattern_list(v, elems, rest, span, arena),
+  }
+}
+
+pub fn walk_pattern_list<V: AstVisitor + ?Sized>(v: &mut V, elems: &[PatternId], rest: Option<Sym>, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  for &e in elems {
+    walk_pattern_dispatch(v, e, arena)?;
+  }
+  v.leave_pattern_list(elems, rest, span, arena)
+}
+
+fn walk_pattern_record_dispatch<V: AstVisitor + ?Sized>(
+  v: &mut V,
+  fields: &[FieldPattern],
+  rest: Option<Sym>,
+  span: SourceSpan,
+  arena: &AstArena,
+) -> ControlFlow<()> {
+  let action = v.visit_pattern_record(fields, rest, span, arena);
+  match action {
+    VisitAction::Stop => ControlFlow::Break(()),
+    VisitAction::Skip => v.leave_pattern_record(fields, rest, span, arena),
+    VisitAction::Descend => walk_pattern_record(v, fields, rest, span, arena),
+  }
+}
+
+pub fn walk_pattern_record<V: AstVisitor + ?Sized>(
+  v: &mut V,
+  fields: &[FieldPattern],
+  rest: Option<Sym>,
+  span: SourceSpan,
+  arena: &AstArena,
+) -> ControlFlow<()> {
   for f in fields {
-    if let Some(ref p) = f.pattern {
-      v.visit_pattern(&p.node, p.span)?;
+    if let Some(pid) = f.pattern {
+      walk_pattern_dispatch(v, pid, arena)?;
     }
   }
-  v.leave_pattern_record(fields, rest, span)
+  v.leave_pattern_record(fields, rest, span, arena)
 }
 
-pub fn walk_pattern_constructor<V: AstVisitor + ?Sized>(v: &mut V, name: Sym, args: &[SPattern], span: SourceSpan) -> ControlFlow<()> {
-  for a in args {
-    v.visit_pattern(&a.node, a.span)?;
+fn walk_pattern_constructor_dispatch<V: AstVisitor + ?Sized>(v: &mut V, name: Sym, args: &[PatternId], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  let action = v.visit_pattern_constructor(name, args, span, arena);
+  match action {
+    VisitAction::Stop => ControlFlow::Break(()),
+    VisitAction::Skip => v.leave_pattern_constructor(name, args, span, arena),
+    VisitAction::Descend => walk_pattern_constructor(v, name, args, span, arena),
   }
-  v.leave_pattern_constructor(name, args, span)
+}
+
+pub fn walk_pattern_constructor<V: AstVisitor + ?Sized>(v: &mut V, name: Sym, args: &[PatternId], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  for &a in args {
+    walk_pattern_dispatch(v, a, arena)?;
+  }
+  v.leave_pattern_constructor(name, args, span, arena)
 }

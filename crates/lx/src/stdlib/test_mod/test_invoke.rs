@@ -13,7 +13,8 @@ pub(super) fn invoke_flow(flow_path: &str, input: &LxVal, ctx: &Arc<RuntimeCtx>,
   };
   let source = std::fs::read_to_string(&path).map_err(|e| LxError::runtime(format!("test.run: cannot read flow '{flow_path}': {e}"), span))?;
   let tokens = crate::lexer::lex(&source).map_err(|e| LxError::runtime(format!("test.run: lex error in '{flow_path}': {e}"), span))?;
-  let program = crate::parser::parse(tokens).map_err(|e| LxError::runtime(format!("test.run: parse error in '{flow_path}': {e}"), span))?;
+  let surface = crate::parser::parse(tokens).map_err(|e| LxError::runtime(format!("test.run: parse error in '{flow_path}': {e}"), span))?;
+  let program = crate::folder::desugar(surface);
   let module_dir = path.parent().map(|p| p.to_path_buf());
   let mut interp = crate::interpreter::Interpreter::new(&source, module_dir, Arc::clone(ctx));
   tokio::task::block_in_place(|| {
@@ -31,12 +32,12 @@ pub(super) fn invoke_flow(flow_path: &str, input: &LxVal, ctx: &Arc<RuntimeCtx>,
   })
 }
 
-fn find_flow_entry_name(program: &crate::ast::Program) -> Option<String> {
+fn find_flow_entry_name<P>(program: &crate::ast::Program<P>) -> Option<String> {
   use crate::ast::{BindTarget, Stmt};
   let mut has_run = false;
   let mut has_main = false;
-  for stmt in &program.stmts {
-    if let Stmt::Binding(b) = &stmt.node
+  for &sid in &program.stmts {
+    if let Stmt::Binding(b) = program.arena.stmt(sid)
       && b.exported
       && let BindTarget::Name(ref name) = b.target
     {

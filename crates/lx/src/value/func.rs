@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::ast::SExpr;
+use crate::ast::{AstArena, ExprId};
 use crate::env::Env;
 use crate::error::LxError;
 use crate::sym::Sym;
@@ -10,8 +10,9 @@ use crate::value::LxVal;
 pub struct LxFunc {
   pub params: Vec<Sym>,
   pub defaults: Vec<Option<LxVal>>,
-  pub guard: Option<Arc<SExpr>>,
-  pub body: Arc<SExpr>,
+  pub guard: Option<ExprId>,
+  pub body: ExprId,
+  pub arena: Arc<AstArena>,
   pub closure: Arc<Env>,
   pub arity: usize,
   pub applied: Vec<LxVal>,

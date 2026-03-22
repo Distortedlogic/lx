@@ -1,249 +1,160 @@
 use std::ops::ControlFlow;
 
 use crate::ast::{
-  BinOp, FieldKind, ListElem, Literal, MapEntry, MatchArm, Param, RecordField, SExpr, SStmt, SType, Section, SelArm, StrPart, UnaryOp,
+  AstArena, ExprApply, ExprBinary, ExprFieldAccess, ExprFunc, ExprId, ExprMatch, ExprPipe, ExprUnary, FieldKind, ListElem, Literal, MapEntry, RecordField,
+  Section, StmtId, StrPart,
 };
-use crate::sym::Sym;
 use miette::SourceSpan;
 
-use super::super::AstVisitor;
+use super::super::{AstVisitor, VisitAction};
+use super::dispatch_expr;
+use super::walk_pattern::walk_pattern_dispatch;
+use super::walk_type::walk_type_expr_dispatch;
 
-pub fn walk_literal<V: AstVisitor + ?Sized>(v: &mut V, lit: &Literal, span: SourceSpan) -> ControlFlow<()> {
+walk_dispatch!(walk_literal_dispatch, walk_literal, visit_literal, leave_literal, Literal);
+walk_dispatch!(walk_binary_dispatch, walk_binary, visit_binary, leave_binary, ExprBinary);
+walk_dispatch!(walk_unary_dispatch, walk_unary, visit_unary, leave_unary, ExprUnary);
+walk_dispatch!(walk_pipe_dispatch, walk_pipe, visit_pipe, leave_pipe, ExprPipe);
+walk_dispatch!(walk_apply_dispatch, walk_apply, visit_apply, leave_apply, ExprApply);
+walk_dispatch!(walk_section_dispatch, walk_section, visit_section, leave_section, Section);
+walk_dispatch!(walk_field_access_dispatch, walk_field_access, visit_field_access, leave_field_access, ExprFieldAccess);
+walk_dispatch!(walk_func_dispatch, walk_func, visit_func, leave_func, ExprFunc);
+walk_dispatch!(walk_match_dispatch, walk_match, visit_match, leave_match, ExprMatch);
+
+walk_dispatch_slice!(walk_block_dispatch, walk_block, visit_block, leave_block, StmtId);
+walk_dispatch_slice!(walk_tuple_dispatch, walk_tuple, visit_tuple, leave_tuple, ExprId);
+walk_dispatch_slice!(walk_list_dispatch, walk_list, visit_list, leave_list, ListElem);
+walk_dispatch_slice!(walk_record_dispatch, walk_record, visit_record, leave_record, RecordField);
+walk_dispatch_slice!(walk_map_dispatch, walk_map, visit_map, leave_map, MapEntry);
+
+pub fn walk_literal<V: AstVisitor + ?Sized>(v: &mut V, lit: &Literal, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
   if let Literal::Str(parts) = lit {
     for part in parts {
-      if let StrPart::Interp(e) = part {
-        v.visit_expr(&e.node, e.span)?;
+      if let StrPart::Interp(eid) = part {
+        dispatch_expr(v, arena.expr(*eid), arena.expr_span(*eid), arena)?;
       }
     }
   }
-  v.leave_literal(lit, span)
+  v.leave_literal(lit, span, arena)
 }
 
-pub fn walk_binary<V: AstVisitor + ?Sized>(v: &mut V, op: BinOp, left: &SExpr, right: &SExpr, span: SourceSpan) -> ControlFlow<()> {
-  v.visit_expr(&left.node, left.span)?;
-  v.visit_expr(&right.node, right.span)?;
-  v.leave_binary(op, left, right, span)
+pub fn walk_binary<V: AstVisitor + ?Sized>(v: &mut V, binary: &ExprBinary, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  dispatch_expr(v, arena.expr(binary.left), arena.expr_span(binary.left), arena)?;
+  dispatch_expr(v, arena.expr(binary.right), arena.expr_span(binary.right), arena)?;
+  v.leave_binary(binary, span, arena)
 }
 
-pub fn walk_unary<V: AstVisitor + ?Sized>(v: &mut V, op: UnaryOp, operand: &SExpr, span: SourceSpan) -> ControlFlow<()> {
-  v.visit_expr(&operand.node, operand.span)?;
-  v.leave_unary(op, operand, span)
+pub fn walk_unary<V: AstVisitor + ?Sized>(v: &mut V, unary: &ExprUnary, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  dispatch_expr(v, arena.expr(unary.operand), arena.expr_span(unary.operand), arena)?;
+  v.leave_unary(unary, span, arena)
 }
 
-pub fn walk_pipe<V: AstVisitor + ?Sized>(v: &mut V, left: &SExpr, right: &SExpr, span: SourceSpan) -> ControlFlow<()> {
-  v.visit_expr(&left.node, left.span)?;
-  v.visit_expr(&right.node, right.span)?;
-  v.leave_pipe(left, right, span)
+pub fn walk_pipe<V: AstVisitor + ?Sized>(v: &mut V, pipe: &ExprPipe, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  dispatch_expr(v, arena.expr(pipe.left), arena.expr_span(pipe.left), arena)?;
+  dispatch_expr(v, arena.expr(pipe.right), arena.expr_span(pipe.right), arena)?;
+  v.leave_pipe(pipe, span, arena)
 }
 
-pub fn walk_apply<V: AstVisitor + ?Sized>(v: &mut V, func: &SExpr, arg: &SExpr, span: SourceSpan) -> ControlFlow<()> {
-  v.visit_expr(&func.node, func.span)?;
-  v.visit_expr(&arg.node, arg.span)?;
-  v.leave_apply(func, arg, span)
+pub fn walk_apply<V: AstVisitor + ?Sized>(v: &mut V, apply: &ExprApply, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  dispatch_expr(v, arena.expr(apply.func), arena.expr_span(apply.func), arena)?;
+  dispatch_expr(v, arena.expr(apply.arg), arena.expr_span(apply.arg), arena)?;
+  v.leave_apply(apply, span, arena)
 }
 
-pub fn walk_section<V: AstVisitor + ?Sized>(v: &mut V, section: &Section, span: SourceSpan) -> ControlFlow<()> {
+pub fn walk_section<V: AstVisitor + ?Sized>(v: &mut V, section: &Section, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
   match section {
     Section::Right { operand, .. } | Section::Left { operand, .. } => {
-      v.visit_expr(&operand.node, operand.span)?;
+      dispatch_expr(v, arena.expr(*operand), arena.expr_span(*operand), arena)?;
     },
     _ => {},
   }
-  v.leave_section(section, span)
+  v.leave_section(section, span, arena)
 }
 
-pub fn walk_field_access<V: AstVisitor + ?Sized>(v: &mut V, expr: &SExpr, field: &FieldKind, span: SourceSpan) -> ControlFlow<()> {
-  v.visit_expr(&expr.node, expr.span)?;
-  if let FieldKind::Computed(c) = field {
-    v.visit_expr(&c.node, c.span)?;
+pub fn walk_field_access<V: AstVisitor + ?Sized>(v: &mut V, fa: &ExprFieldAccess, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  dispatch_expr(v, arena.expr(fa.expr), arena.expr_span(fa.expr), arena)?;
+  if let FieldKind::Computed(c) = &fa.field {
+    dispatch_expr(v, arena.expr(*c), arena.expr_span(*c), arena)?;
   }
-  v.leave_field_access(expr, field, span)
+  v.leave_field_access(fa, span, arena)
 }
 
-pub fn walk_block<V: AstVisitor + ?Sized>(v: &mut V, stmts: &[SStmt], span: SourceSpan) -> ControlFlow<()> {
-  for s in stmts {
-    v.visit_stmt(&s.node, s.span)?;
+pub fn walk_block<V: AstVisitor + ?Sized>(v: &mut V, stmts: &[StmtId], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  for &s in stmts {
+    super::dispatch_stmt(v, s, arena)?;
   }
-  v.leave_block(stmts, span)
+  v.leave_block(stmts, span, arena)
 }
 
-pub fn walk_tuple<V: AstVisitor + ?Sized>(v: &mut V, elems: &[SExpr], span: SourceSpan) -> ControlFlow<()> {
+pub fn walk_tuple<V: AstVisitor + ?Sized>(v: &mut V, elems: &[ExprId], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  for &e in elems {
+    dispatch_expr(v, arena.expr(e), arena.expr_span(e), arena)?;
+  }
+  v.leave_tuple(elems, span, arena)
+}
+
+pub fn walk_list<V: AstVisitor + ?Sized>(v: &mut V, elems: &[ListElem], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
   for e in elems {
-    v.visit_expr(&e.node, e.span)?;
-  }
-  v.leave_tuple(elems, span)
-}
-
-pub fn walk_list<V: AstVisitor + ?Sized>(v: &mut V, elems: &[ListElem], span: SourceSpan) -> ControlFlow<()> {
-  for e in elems {
-    match e {
-      ListElem::Single(se) | ListElem::Spread(se) => v.visit_expr(&se.node, se.span)?,
+    let eid = match e {
+      ListElem::Single(eid) | ListElem::Spread(eid) => *eid,
     };
+    dispatch_expr(v, arena.expr(eid), arena.expr_span(eid), arena)?;
   }
-  v.leave_list(elems, span)
+  v.leave_list(elems, span, arena)
 }
 
-pub fn walk_record<V: AstVisitor + ?Sized>(v: &mut V, fields: &[RecordField], span: SourceSpan) -> ControlFlow<()> {
+pub fn walk_record<V: AstVisitor + ?Sized>(v: &mut V, fields: &[RecordField], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
   for f in fields {
-    v.visit_expr(&f.value.node, f.value.span)?;
+    let eid = match f {
+      RecordField::Named { value, .. } | RecordField::Spread(value) => *value,
+    };
+    dispatch_expr(v, arena.expr(eid), arena.expr_span(eid), arena)?;
   }
-  v.leave_record(fields, span)
+  v.leave_record(fields, span, arena)
 }
 
-pub fn walk_map<V: AstVisitor + ?Sized>(v: &mut V, entries: &[MapEntry], span: SourceSpan) -> ControlFlow<()> {
-  for e in entries {
-    if let Some(ref k) = e.key {
-      v.visit_expr(&k.node, k.span)?;
-    }
-    v.visit_expr(&e.value.node, e.value.span)?;
-  }
-  v.leave_map(entries, span)
-}
-
-pub fn walk_func<V: AstVisitor + ?Sized>(v: &mut V, params: &[Param], ret_type: Option<&SType>, guard: Option<&SExpr>, body: &SExpr, span: SourceSpan) -> ControlFlow<()> {
-  for p in params {
-    if let Some(ref d) = p.default {
-      v.visit_expr(&d.node, d.span)?;
-    }
-    if let Some(ref ty) = p.type_ann {
-      v.visit_type_expr(&ty.node, ty.span)?;
+pub fn walk_map<V: AstVisitor + ?Sized>(v: &mut V, entries: &[MapEntry], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  for entry in entries {
+    match entry {
+      MapEntry::Keyed { key, value } => {
+        dispatch_expr(v, arena.expr(*key), arena.expr_span(*key), arena)?;
+        dispatch_expr(v, arena.expr(*value), arena.expr_span(*value), arena)?;
+      },
+      MapEntry::Spread(value) => {
+        dispatch_expr(v, arena.expr(*value), arena.expr_span(*value), arena)?;
+      },
     }
   }
-  if let Some(rt) = ret_type {
-    v.visit_type_expr(&rt.node, rt.span)?;
-  }
-  if let Some(g) = guard {
-    v.visit_expr(&g.node, g.span)?;
-  }
-  v.visit_expr(&body.node, body.span)?;
-  v.leave_func(params, ret_type, guard, body, span)
+  v.leave_map(entries, span, arena)
 }
 
-pub fn walk_match<V: AstVisitor + ?Sized>(v: &mut V, scrutinee: &SExpr, arms: &[MatchArm], span: SourceSpan) -> ControlFlow<()> {
-  v.visit_expr(&scrutinee.node, scrutinee.span)?;
-  for arm in arms {
-    v.visit_pattern(&arm.pattern.node, arm.pattern.span)?;
-    if let Some(ref g) = arm.guard {
-      v.visit_expr(&g.node, g.span)?;
+pub fn walk_func<V: AstVisitor + ?Sized>(v: &mut V, func: &ExprFunc, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  for p in &func.params {
+    if let Some(d) = p.default {
+      dispatch_expr(v, arena.expr(d), arena.expr_span(d), arena)?;
     }
-    v.visit_expr(&arm.body.node, arm.body.span)?;
+    if let Some(ty) = p.type_ann {
+      walk_type_expr_dispatch(v, ty, arena)?;
+    }
   }
-  v.leave_match(scrutinee, arms, span)
-}
-
-pub fn walk_ternary<V: AstVisitor + ?Sized>(v: &mut V, cond: &SExpr, then_: &SExpr, else_: Option<&SExpr>, span: SourceSpan) -> ControlFlow<()> {
-  v.visit_expr(&cond.node, cond.span)?;
-  v.visit_expr(&then_.node, then_.span)?;
-  if let Some(e) = else_ {
-    v.visit_expr(&e.node, e.span)?;
+  if let Some(rt) = func.ret_type {
+    walk_type_expr_dispatch(v, rt, arena)?;
   }
-  v.leave_ternary(cond, then_, else_, span)
-}
-
-pub fn walk_propagate<V: AstVisitor + ?Sized>(v: &mut V, inner: &SExpr, span: SourceSpan) -> ControlFlow<()> {
-  v.visit_expr(&inner.node, inner.span)?;
-  v.leave_propagate(inner, span)
-}
-
-pub fn walk_coalesce<V: AstVisitor + ?Sized>(v: &mut V, expr: &SExpr, default: &SExpr, span: SourceSpan) -> ControlFlow<()> {
-  v.visit_expr(&expr.node, expr.span)?;
-  v.visit_expr(&default.node, default.span)?;
-  v.leave_coalesce(expr, default, span)
-}
-
-pub fn walk_slice<V: AstVisitor + ?Sized>(v: &mut V, expr: &SExpr, start: Option<&SExpr>, end: Option<&SExpr>, span: SourceSpan) -> ControlFlow<()> {
-  v.visit_expr(&expr.node, expr.span)?;
-  if let Some(s) = start {
-    v.visit_expr(&s.node, s.span)?;
+  if let Some(g) = func.guard {
+    dispatch_expr(v, arena.expr(g), arena.expr_span(g), arena)?;
   }
-  if let Some(e) = end {
-    v.visit_expr(&e.node, e.span)?;
+  dispatch_expr(v, arena.expr(func.body), arena.expr_span(func.body), arena)?;
+  v.leave_func(func, span, arena)
+}
+
+pub fn walk_match<V: AstVisitor + ?Sized>(v: &mut V, m: &ExprMatch, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  dispatch_expr(v, arena.expr(m.scrutinee), arena.expr_span(m.scrutinee), arena)?;
+  for arm in &m.arms {
+    walk_pattern_dispatch(v, arm.pattern, arena)?;
+    if let Some(g) = arm.guard {
+      dispatch_expr(v, arena.expr(g), arena.expr_span(g), arena)?;
+    }
+    dispatch_expr(v, arena.expr(arm.body), arena.expr_span(arm.body), arena)?;
   }
-  v.leave_slice(expr, start, end, span)
-}
-
-pub fn walk_named_arg<V: AstVisitor + ?Sized>(v: &mut V, name: Sym, value: &SExpr, span: SourceSpan) -> ControlFlow<()> {
-  v.visit_expr(&value.node, value.span)?;
-  v.leave_named_arg(name, value, span)
-}
-
-pub fn walk_loop<V: AstVisitor + ?Sized>(v: &mut V, stmts: &[SStmt], span: SourceSpan) -> ControlFlow<()> {
-  for s in stmts {
-    v.visit_stmt(&s.node, s.span)?;
-  }
-  v.leave_loop(stmts, span)
-}
-
-pub fn walk_break<V: AstVisitor + ?Sized>(v: &mut V, value: Option<&SExpr>, span: SourceSpan) -> ControlFlow<()> {
-  if let Some(val) = value {
-    v.visit_expr(&val.node, val.span)?;
-  }
-  v.leave_break(value, span)
-}
-
-pub fn walk_assert<V: AstVisitor + ?Sized>(v: &mut V, expr: &SExpr, msg: Option<&SExpr>, span: SourceSpan) -> ControlFlow<()> {
-  v.visit_expr(&expr.node, expr.span)?;
-  if let Some(m) = msg {
-    v.visit_expr(&m.node, m.span)?;
-  }
-  v.leave_assert(expr, msg, span)
-}
-
-pub fn walk_par<V: AstVisitor + ?Sized>(v: &mut V, stmts: &[SStmt], span: SourceSpan) -> ControlFlow<()> {
-  for s in stmts {
-    v.visit_stmt(&s.node, s.span)?;
-  }
-  v.leave_par(stmts, span)
-}
-
-pub fn walk_timeout<V: AstVisitor + ?Sized>(v: &mut V, ms: &SExpr, body: &SExpr, span: SourceSpan) -> ControlFlow<()> {
-  v.visit_expr(&ms.node, ms.span)?;
-  v.visit_expr(&body.node, body.span)?;
-  v.leave_timeout(ms, body, span)
-}
-
-pub fn walk_sel<V: AstVisitor + ?Sized>(v: &mut V, arms: &[SelArm], span: SourceSpan) -> ControlFlow<()> {
-  for arm in arms {
-    v.visit_expr(&arm.expr.node, arm.expr.span)?;
-    v.visit_expr(&arm.handler.node, arm.handler.span)?;
-  }
-  v.leave_sel(arms, span)
-}
-
-pub fn walk_emit<V: AstVisitor + ?Sized>(v: &mut V, value: &SExpr, span: SourceSpan) -> ControlFlow<()> {
-  v.visit_expr(&value.node, value.span)?;
-  v.leave_emit(value, span)
-}
-
-pub fn walk_yield<V: AstVisitor + ?Sized>(v: &mut V, value: &SExpr, span: SourceSpan) -> ControlFlow<()> {
-  v.visit_expr(&value.node, value.span)?;
-  v.leave_yield(value, span)
-}
-
-pub fn walk_with<V: AstVisitor + ?Sized>(v: &mut V, name: Sym, value: &SExpr, body: &[SStmt], mutable: bool, span: SourceSpan) -> ControlFlow<()> {
-  v.visit_expr(&value.node, value.span)?;
-  for s in body {
-    v.visit_stmt(&s.node, s.span)?;
-  }
-  v.leave_with(name, value, body, mutable, span)
-}
-
-pub fn walk_with_resource<V: AstVisitor + ?Sized>(v: &mut V, resources: &[(SExpr, Sym)], body: &[SStmt], span: SourceSpan) -> ControlFlow<()> {
-  for (r, _) in resources {
-    v.visit_expr(&r.node, r.span)?;
-  }
-  for s in body {
-    v.visit_stmt(&s.node, s.span)?;
-  }
-  v.leave_with_resource(resources, body, span)
-}
-
-pub fn walk_with_context<V: AstVisitor + ?Sized>(v: &mut V, fields: &[(Sym, SExpr)], body: &[SStmt], span: SourceSpan) -> ControlFlow<()> {
-  for (_, expr) in fields {
-    v.visit_expr(&expr.node, expr.span)?;
-  }
-  for s in body {
-    v.visit_stmt(&s.node, s.span)?;
-  }
-  v.leave_with_context(fields, body, span)
+  v.leave_match(m, span, arena)
 }

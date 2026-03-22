@@ -1,18 +1,18 @@
-use crate::ast::{Expr, ExprBinary, ExprFieldAccess, FieldKind, Literal, StrPart};
+use crate::ast::{AstArena, Expr, ExprBinary, ExprFieldAccess, FieldKind, Literal, StrPart};
 
-pub(super) fn extract_field_call_parts(expr: &Expr) -> Option<(&str, &str)> {
+pub(super) fn extract_field_call_parts<'a>(expr: &'a Expr, arena: &'a AstArena) -> Option<(&'a str, &'a str)> {
   let Expr::FieldAccess(ExprFieldAccess { expr: e, field: FieldKind::Named(f) }) = expr else {
     return None;
   };
-  let Expr::Ident(name) = &e.node else {
+  let Expr::Ident(name) = arena.expr(*e) else {
     return None;
   };
   Some((name.as_str(), f.as_str()))
 }
 
-pub(super) fn unwrap_propagate(expr: &Expr) -> &Expr {
+pub(super) fn unwrap_propagate<'a>(expr: &'a Expr, arena: &'a AstArena) -> &'a Expr {
   match expr {
-    Expr::Propagate(inner) => unwrap_propagate(&inner.node),
+    Expr::Propagate(inner) => unwrap_propagate(arena.expr(*inner), arena),
     other => other,
   }
 }
@@ -30,14 +30,14 @@ pub(super) fn extract_str_literal(expr: &Expr) -> Option<String> {
   Some(t.clone())
 }
 
-pub(super) fn expr_label(expr: &Expr) -> String {
+pub(super) fn expr_label(expr: &Expr, arena: &AstArena) -> String {
   match expr {
     Expr::Ident(name) => name.to_string(),
     Expr::FieldAccess(ExprFieldAccess { expr: e, field: FieldKind::Named(f) }) => {
-      format!("{}.{f}", expr_label(&e.node))
+      format!("{}.{f}", expr_label(arena.expr(*e), arena))
     },
     Expr::Binary(ExprBinary { op, left, right }) => {
-      format!("{} {op} {}", expr_label(&left.node), expr_label(&right.node))
+      format!("{} {op} {}", expr_label(arena.expr(*left), arena), expr_label(arena.expr(*right), arena))
     },
     Expr::Literal(Literal::Int(n)) => n.to_string(),
     Expr::Literal(Literal::Bool(b)) => b.to_string(),
