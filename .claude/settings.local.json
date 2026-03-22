@@ -39,6 +39,7 @@
     "deny": [
       "Bash(git stash:*)",
       "TaskCreate",
+      "Bash(git checkout:*)",
       "TaskGet",
       "TaskList",
       "TaskOutput",

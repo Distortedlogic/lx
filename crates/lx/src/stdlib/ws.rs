@@ -99,7 +99,7 @@ fn bi_send(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<L
 
   tokio::task::block_in_place(|| {
     tokio::runtime::Handle::current().block_on(async {
-      match sink.lock().await.send(Message::Text(msg)).await {
+      match sink.lock().await.send(Message::Text(msg.into())).await {
         Ok(()) => Ok(LxVal::Ok(Box::new(LxVal::Unit))),
         Err(e) => Ok(LxVal::Err(Box::new(LxVal::str(format!("ws.send: {e}"))))),
       }

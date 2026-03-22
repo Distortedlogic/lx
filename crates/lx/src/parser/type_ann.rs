@@ -1,122 +1,90 @@
-use crate::ast::{SType, TypeExpr, TypeField};
-use crate::error::LxError;
+use chumsky::prelude::*;
+
+use super::TInput;
+use super::ss;
+use crate::ast::*;
 use crate::lexer::token::TokenKind;
-use miette::SourceSpan;
 
-impl super::Parser {
-  pub(crate) fn parse_type(&mut self) -> Result<SType, LxError> {
-    let left = self.parse_type_app()?;
-    if *self.peek() == TokenKind::Caret {
-      self.advance();
-      let err = self.parse_type_app()?;
-      let span = Span::from_range(left.span.offset(), err.span.end());
-      let fallible = TypeExpr::Fallible { ok: Box::new(left), err: Box::new(err) };
-      if *self.peek() == TokenKind::Arrow {
-        self.advance();
-        let ret = self.parse_type()?;
-        let fspan = Span::from_range(span.offset, ret.span.end());
-        return Ok(SType::new(TypeExpr::Func { param: Box::new(SType::new(fallible, span)), ret: Box::new(ret) }, fspan));
-      }
-      return Ok(SType::new(fallible, span));
-    }
-    if *self.peek() == TokenKind::Arrow {
-      self.advance();
-      let ret = self.parse_type()?;
-      let span = Span::from_range(left.span.offset(), ret.span.end());
-      return Ok(SType::new(TypeExpr::Func { param: Box::new(left), ret: Box::new(ret) }, span));
-    }
-    Ok(left)
-  }
+pub(super) fn type_parser<'a>() -> impl Parser<'a, TInput<'a>, SType, extra::Err<Rich<'a, TokenKind>>> + Clone {
+  recursive(|ty| {
+    let type_atom = type_atom_parser(ty.clone());
+    let type_app = type_app_parser(ty.clone(), type_atom.clone());
 
-  fn parse_type_app(&mut self) -> Result<SType, LxError> {
-    if let TokenKind::TypeName(name) = self.peek().clone() {
-      let tok = self.advance().clone();
-      let mut args = Vec::new();
-      while self.is_type_app_arg_start() {
-        args.push(self.parse_type_atom()?);
-      }
-      if let Some(last) = args.last() {
-        let end = last.span.end();
-        Ok(SType::new(TypeExpr::Applied(name, args), Span::from_range(tok.span.offset(), end)))
+    type_app.clone().then(just(TokenKind::Caret).ignore_then(type_app.clone()).or_not()).then(just(TokenKind::Arrow).ignore_then(ty.clone()).or_not()).map_with(
+      |((left, err_opt), ret_opt), e| match (err_opt, ret_opt) {
+        (Some(err), Some(ret)) => {
+          let fallible = TypeExpr::Fallible { ok: Box::new(left), err: Box::new(err) };
+          let fspan = ss(e.span());
+          SType::new(TypeExpr::Func { param: Box::new(SType::new(fallible, fspan)), ret: Box::new(ret) }, fspan)
+        },
+        (Some(err), None) => SType::new(TypeExpr::Fallible { ok: Box::new(left), err: Box::new(err) }, ss(e.span())),
+        (None, Some(ret)) => SType::new(TypeExpr::Func { param: Box::new(left), ret: Box::new(ret) }, ss(e.span())),
+        (None, None) => left,
+      },
+    )
+  })
+}
+
+fn type_app_parser<'a>(
+  ty: impl Parser<'a, TInput<'a>, SType, extra::Err<Rich<'a, TokenKind>>> + Clone,
+  atom: impl Parser<'a, TInput<'a>, SType, extra::Err<Rich<'a, TokenKind>>> + Clone,
+) -> impl Parser<'a, TInput<'a>, SType, extra::Err<Rich<'a, TokenKind>>> + Clone {
+  select! { TokenKind::TypeName(n) => n }
+    .map_with(|n, e| (n, ss(e.span())))
+    .then(atom.clone().repeated().collect::<Vec<_>>())
+    .map(|((name, span), args)| {
+      if args.is_empty() {
+        SType::new(TypeExpr::Named(name), span)
       } else {
-        Ok(SType::new(TypeExpr::Named(name), tok.span))
+        let end = args.last().map(|a| a.span.offset() + a.span.len()).unwrap_or(span.offset() + span.len());
+        SType::new(TypeExpr::Applied(name, args), (span.offset(), end - span.offset()).into())
       }
-    } else {
-      self.parse_type_atom()
-    }
-  }
+    })
+    .or(atom)
+}
 
-  fn parse_type_atom(&mut self) -> Result<SType, LxError> {
-    match self.peek().clone() {
-      TokenKind::TypeName(name) => {
-        let tok = self.advance().clone();
-        Ok(SType::new(TypeExpr::Named(name), tok.span))
-      },
-      TokenKind::Ident(name) => {
-        let tok = self.advance().clone();
-        Ok(SType::new(TypeExpr::Var(name), tok.span))
-      },
-      TokenKind::LBracket => {
-        let start = self.advance().span.offset();
-        let inner = self.parse_type()?;
-        let end = self.expect_kind(&TokenKind::RBracket)?.span.end();
-        Ok(SType::new(TypeExpr::List(Box::new(inner)), Span::from_range(start, end)))
-      },
-      TokenKind::LBrace => {
-        let start = self.advance().span.offset();
-        let mut fields = Vec::new();
-        self.skip_semis();
-        while *self.peek() != TokenKind::RBrace {
-          let field_name = match self.peek().clone() {
-            TokenKind::Ident(n) => {
-              self.advance();
-              n
-            },
-            _ => {
-              return Err(LxError::parse("expected field name in record type", self.tokens[self.pos].span, None));
-            },
-          };
-          self.expect_kind(&TokenKind::Colon)?;
-          let ty = self.parse_type()?;
-          fields.push(TypeField { name: field_name, ty });
-          self.skip_semis();
-        }
-        let end = self.expect_kind(&TokenKind::RBrace)?.span.end();
-        Ok(SType::new(TypeExpr::Record(fields), Span::from_range(start, end)))
-      },
-      TokenKind::PercentLBrace => {
-        let start = self.advance().span.offset();
-        let key = self.parse_type()?;
-        self.expect_kind(&TokenKind::Colon)?;
-        let value = self.parse_type()?;
-        let end = self.expect_kind(&TokenKind::RBrace)?.span.end();
-        Ok(SType::new(TypeExpr::Map { key: Box::new(key), value: Box::new(value) }, Span::from_range(start, end)))
-      },
-      TokenKind::LParen => {
-        let start = self.advance().span.offset();
-        if *self.peek() == TokenKind::RParen {
-          let end = self.advance().span.end();
-          return Ok(SType::new(TypeExpr::Named("Unit".into()), Span::from_range(start, end)));
-        }
-        let first = self.parse_type()?;
-        if *self.peek() == TokenKind::RParen {
-          let end = self.advance().span.end();
-          let mut grouped = first;
-          grouped.span = Span::from_range(start, end);
-          return Ok(grouped);
-        }
-        let mut types = vec![first];
-        while *self.peek() != TokenKind::RParen {
-          types.push(self.parse_type()?);
-        }
-        let end = self.expect_kind(&TokenKind::RParen)?.span.end();
-        Ok(SType::new(TypeExpr::Tuple(types), Span::from_range(start, end)))
-      },
-      _ => Err(LxError::parse("expected type", self.tokens[self.pos].span, None)),
-    }
-  }
+fn type_atom_parser<'a>(
+  ty: impl Parser<'a, TInput<'a>, SType, extra::Err<Rich<'a, TokenKind>>> + Clone,
+) -> impl Parser<'a, TInput<'a>, SType, extra::Err<Rich<'a, TokenKind>>> + Clone {
+  let named = select! { TokenKind::TypeName(n) => n }.map_with(|n, e| SType::new(TypeExpr::Named(n), ss(e.span())));
 
-  fn is_type_app_arg_start(&self) -> bool {
-    matches!(self.peek(), TokenKind::TypeName(_) | TokenKind::LBracket | TokenKind::PercentLBrace | TokenKind::LParen)
-  }
+  let var = select! { TokenKind::Ident(n) => n }.map_with(|n, e| SType::new(TypeExpr::Var(n), ss(e.span())));
+
+  let list_ty = just(TokenKind::LBracket)
+    .ignore_then(ty.clone())
+    .then_ignore(just(TokenKind::RBracket))
+    .map_with(|inner, e| SType::new(TypeExpr::List(Box::new(inner)), ss(e.span())));
+
+  let record_field = select! { TokenKind::Ident(n) => n }.then_ignore(just(TokenKind::Colon)).then(ty.clone()).map(|(name, ty)| TypeField { name, ty });
+
+  let record_ty = just(TokenKind::LBrace)
+    .ignore_then(just(TokenKind::Semi).repeated())
+    .ignore_then(record_field.separated_by(just(TokenKind::Semi).repeated().at_least(1)).allow_trailing().collect::<Vec<_>>())
+    .then_ignore(just(TokenKind::Semi).repeated())
+    .then_ignore(just(TokenKind::RBrace))
+    .map_with(|fields, e| SType::new(TypeExpr::Record(fields), ss(e.span())));
+
+  let map_ty = just(TokenKind::PercentLBrace)
+    .ignore_then(ty.clone())
+    .then_ignore(just(TokenKind::Colon))
+    .then(ty.clone())
+    .then_ignore(just(TokenKind::RBrace))
+    .map_with(|(key, value), e| SType::new(TypeExpr::Map { key: Box::new(key), value: Box::new(value) }, ss(e.span())));
+
+  let unit_ty = just(TokenKind::LParen).then(just(TokenKind::RParen)).map_with(|_, e| SType::new(TypeExpr::Named("Unit".into()), ss(e.span())));
+
+  let grouped_or_tuple = just(TokenKind::LParen)
+    .ignore_then(ty.clone().separated_by(empty()).at_least(1).collect::<Vec<_>>())
+    .then_ignore(just(TokenKind::RParen))
+    .map_with(|types, e| {
+      if types.len() == 1 {
+        let mut t = types.into_iter().next().unwrap();
+        t.span = ss(e.span());
+        t
+      } else {
+        SType::new(TypeExpr::Tuple(types), ss(e.span()))
+      }
+    });
+
+  choice((list_ty, record_ty, map_ty, unit_ty, grouped_or_tuple, named, var))
 }

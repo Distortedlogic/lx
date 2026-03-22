@@ -89,7 +89,7 @@ pub(super) enum RawToken {
   Hash,
   #[token("\n")]
   Newline,
-  #[regex("--[^\n]*")]
+  #[regex("--[^\n]*", allow_greedy = true)]
   Comment,
   #[regex(r"0[xX][0-9a-fA-F][0-9a-fA-F_]*", priority = 10)]
   HexInt,

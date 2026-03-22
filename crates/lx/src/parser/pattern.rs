@@ -1,211 +1,95 @@
-use crate::ast::{Expr, FieldPattern, Literal, Pattern, SExpr, SPattern, StrPart};
-use crate::error::LxError;
+use chumsky::prelude::*;
+
+use super::TInput;
+use super::ss;
+use crate::ast::*;
 use crate::lexer::token::TokenKind;
-use miette::SourceSpan;
 
-impl super::Parser {
-  pub(crate) fn parse_pattern(&mut self) -> Result<SPattern, LxError> {
-    let tok = self.advance().clone();
-    match tok.kind {
-      TokenKind::Underscore => Ok(SPattern::new(Pattern::Wildcard, tok.span)),
-      TokenKind::Ident(name) => Ok(SPattern::new(Pattern::Bind(name), tok.span)),
-      TokenKind::Int(n) => Ok(SPattern::new(Pattern::Literal(Literal::Int(n)), tok.span)),
-      TokenKind::Float(f) => Ok(SPattern::new(Pattern::Literal(Literal::Float(f)), tok.span)),
-      TokenKind::True => Ok(SPattern::new(Pattern::Literal(Literal::Bool(true)), tok.span)),
-      TokenKind::False => Ok(SPattern::new(Pattern::Literal(Literal::Bool(false)), tok.span)),
-      TokenKind::RawStr(s) => Ok(SPattern::new(Pattern::Literal(Literal::RawStr(s)), tok.span)),
-      TokenKind::Minus => {
-        let next = self.advance().clone();
-        match next.kind {
-          TokenKind::Int(n) => Ok(SPattern::new(Pattern::Literal(Literal::Int(-n)), Span::from_range(tok.span.offset(), next.span.end()))),
-          TokenKind::Float(f) => Ok(SPattern::new(Pattern::Literal(Literal::Float(-f)), Span::from_range(tok.span.offset(), next.span.end()))),
-          _ => Err(LxError::parse("expected number after '-' in pattern", next.span, None)),
-        }
-      },
-      TokenKind::StrStart => self.parse_str_pattern(tok.span.offset()),
-      TokenKind::LParen => self.parse_tuple_pattern(tok.span.offset()),
-      TokenKind::LBrace => self.parse_record_pattern(tok.span.offset()),
-      TokenKind::LBracket => self.parse_list_pattern(tok.span.offset()),
-      TokenKind::TypeName(name) => self.parse_constructor_pattern(name, tok.span),
-      _ => Err(LxError::parse(format!("unexpected token in pattern: {:?}", tok.kind), tok.span, None)),
-    }
-  }
+pub(super) fn pattern_parser<'a>() -> impl Parser<'a, TInput<'a>, SPattern, extra::Err<Rich<'a, TokenKind>>> + Clone {
+  recursive(|pat| {
+    let wildcard = just(TokenKind::Underscore).map_with(|_, e| SPattern::new(Pattern::Wildcard, ss(e.span())));
 
-  fn parse_str_pattern(&mut self, start: usize) -> Result<SPattern, LxError> {
-    let mut parts = Vec::new();
-    loop {
-      match self.peek().clone() {
-        TokenKind::StrChunk(s) => {
-          self.advance();
-          parts.push(StrPart::Text(s));
-        },
-        TokenKind::StrEnd => {
-          let end = self.advance().span.end();
-          return Ok(SPattern::new(Pattern::Literal(Literal::Str(parts)), Span::from_range(start, end)));
-        },
-        _ => {
-          return Err(LxError::parse("string patterns cannot contain interpolation", self.tokens[self.pos].span, None));
-        },
-      }
-    }
-  }
+    let bind = select! { TokenKind::Ident(n) => n }.map_with(|n, e| SPattern::new(Pattern::Bind(n), ss(e.span())));
 
-  pub(super) fn parse_tuple_pattern(&mut self, start: usize) -> Result<SPattern, LxError> {
-    let mut pats = Vec::new();
-    while *self.peek() != TokenKind::RParen {
-      pats.push(self.parse_pattern()?);
-      if *self.peek() == TokenKind::Semi {
-        self.advance();
-      }
-    }
-    let end = self.expect_kind(&TokenKind::RParen)?.span.end();
-    Ok(SPattern::new(Pattern::Tuple(pats), Span::from_range(start, end)))
-  }
+    let int_lit = select! { TokenKind::Int(n) => n }.map_with(|n, e| SPattern::new(Pattern::Literal(Literal::Int(n)), ss(e.span())));
 
-  fn parse_record_pattern(&mut self, start: usize) -> Result<SPattern, LxError> {
-    let mut fields = Vec::new();
-    let mut rest = None;
-    while *self.peek() != TokenKind::RBrace {
-      self.skip_semis();
-      if *self.peek() == TokenKind::DotDot {
-        self.advance();
-        if let TokenKind::Ident(name) = self.peek().clone() {
-          self.advance();
-          rest = Some(name);
-        }
-        break;
-      }
-      let name = self.expect_ident("record pattern field")?;
-      let pattern = if *self.peek() == TokenKind::Colon {
-        self.advance();
-        Some(self.parse_pattern()?)
-      } else {
-        None
-      };
-      fields.push(FieldPattern { name, pattern });
-      self.skip_semis();
-    }
-    let end = self.expect_kind(&TokenKind::RBrace)?.span.end();
-    Ok(SPattern::new(Pattern::Record { fields, rest }, Span::from_range(start, end)))
-  }
+    let float_lit = select! { TokenKind::Float(f) => f }.map_with(|f, e| SPattern::new(Pattern::Literal(Literal::Float(f)), ss(e.span())));
 
-  fn parse_list_pattern(&mut self, start: usize) -> Result<SPattern, LxError> {
-    let mut elems = Vec::new();
-    let mut rest = None;
-    while *self.peek() != TokenKind::RBracket {
-      if *self.peek() == TokenKind::DotDot {
-        self.advance();
-        match self.peek().clone() {
-          TokenKind::Ident(name) => {
-            self.advance();
-            rest = Some(name);
-          },
-          TokenKind::Underscore => {
-            self.advance();
-            rest = Some("_".into());
-          },
-          _ => {},
-        }
-        break;
-      }
-      elems.push(self.parse_pattern()?);
-      if *self.peek() == TokenKind::Semi {
-        self.advance();
-      }
-    }
-    let end = self.expect_kind(&TokenKind::RBracket)?.span.end();
-    Ok(SPattern::new(Pattern::List { elems, rest }, Span::from_range(start, end)))
-  }
+    let true_lit = just(TokenKind::True).map_with(|_, e| SPattern::new(Pattern::Literal(Literal::Bool(true)), ss(e.span())));
 
-  fn parse_constructor_pattern(&mut self, name: String, name_span: Span) -> Result<SPattern, LxError> {
-    let mut args = Vec::new();
-    while matches!(
-      self.peek(),
-      TokenKind::Ident(_)
-        | TokenKind::Int(_)
-        | TokenKind::Float(_)
-        | TokenKind::True
-        | TokenKind::False
-        | TokenKind::LParen
-        | TokenKind::LBracket
-        | TokenKind::LBrace
-        | TokenKind::StrStart
-        | TokenKind::RawStr(_)
-        | TokenKind::Underscore
-        | TokenKind::TypeName(_)
-        | TokenKind::Minus
-    ) {
-      args.push(self.parse_pattern()?);
-    }
-    let end = args.last().map(|a| a.span.end()).unwrap_or(name_span.end());
-    Ok(SPattern::new(Pattern::Constructor { name, args }, Span::from_range(name_span.offset, end)))
-  }
+    let false_lit = just(TokenKind::False).map_with(|_, e| SPattern::new(Pattern::Literal(Literal::Bool(false)), ss(e.span())));
 
-  pub(super) fn expr_to_pattern(&self, expr: &SExpr) -> Result<SPattern, LxError> {
-    let span = expr.span;
-    match &expr.node {
-      Expr::Ident(name) => Ok(SPattern::new(Pattern::Bind(name.clone()), span)),
-      Expr::Literal(Literal::Unit) => Ok(SPattern::new(Pattern::Wildcard, span)),
-      Expr::Tuple(elems) => {
-        let mut pats = Vec::new();
-        for e in elems {
-          pats.push(self.expr_to_pattern(e)?);
-        }
-        Ok(SPattern::new(Pattern::Tuple(pats), span))
-      },
-      Expr::Apply { .. } => {
-        let mut parts = vec![];
-        self.flatten_apply(expr, &mut parts)?;
-        Ok(SPattern::new(Pattern::Tuple(parts), span))
-      },
-      Expr::Record(fields) => {
-        let mut fps = Vec::new();
-        for f in fields {
-          if f.is_spread {
-            continue;
-          }
-          if let Some(ref name) = f.name {
-            let pattern = if let Expr::Ident(ref id) = f.value.node
-              && id == name
-            {
-              None
-            } else {
-              Some(self.expr_to_pattern(&f.value)?)
-            };
-            fps.push(FieldPattern { name: name.clone(), pattern });
-          }
-        }
-        Ok(SPattern::new(Pattern::Record { fields: fps, rest: None }, span))
-      },
-      Expr::List(elems) => {
-        let mut pats = Vec::new();
-        let mut rest = None;
-        for e in elems {
-          match e {
-            crate::ast::ListElem::Single(e) => pats.push(self.expr_to_pattern(e)?),
-            crate::ast::ListElem::Spread(e) => {
-              if let Expr::Ident(name) = &e.node {
-                rest = Some(name.clone());
-              }
-            },
-          }
-        }
-        Ok(SPattern::new(Pattern::List { elems: pats, rest }, span))
-      },
-      _ => Err(LxError::parse("expected pattern on left side of '='", span, None)),
-    }
-  }
+    let raw_str_lit = select! { TokenKind::RawStr(s) => s }.map_with(|s, e| SPattern::new(Pattern::Literal(Literal::RawStr(s)), ss(e.span())));
 
-  fn flatten_apply(&self, expr: &SExpr, out: &mut Vec<SPattern>) -> Result<(), LxError> {
-    match &expr.node {
-      Expr::Apply { func, arg } => {
-        self.flatten_apply(func, out)?;
-        out.push(self.expr_to_pattern(arg)?);
-      },
-      _ => {
-        out.push(self.expr_to_pattern(expr)?);
-      },
-    }
-    Ok(())
-  }
+    let neg_num = just(TokenKind::Minus)
+      .ignore_then(select! { TokenKind::Int(n) => Literal::Int(-n) }.or(select! { TokenKind::Float(f) => Literal::Float(-f) }))
+      .map_with(|lit, e| SPattern::new(Pattern::Literal(lit), ss(e.span())));
+
+    let str_pat = str_pattern_parser();
+
+    let tuple_pat = just(TokenKind::LParen)
+      .ignore_then(pat.clone().separated_by(just(TokenKind::Semi).or_not()).collect::<Vec<_>>())
+      .then_ignore(just(TokenKind::RParen))
+      .map_with(|pats, e| SPattern::new(Pattern::Tuple(pats), ss(e.span())));
+
+    let record_pat = record_pattern_parser(pat.clone());
+    let list_pat = list_pattern_parser(pat.clone());
+    let ctor_pat = constructor_pattern_parser(pat.clone());
+
+    choice((wildcard, neg_num, int_lit, float_lit, true_lit, false_lit, raw_str_lit, str_pat, tuple_pat, record_pat, list_pat, ctor_pat, bind))
+  })
+}
+
+fn str_pattern_parser<'a>() -> impl Parser<'a, TInput<'a>, SPattern, extra::Err<Rich<'a, TokenKind>>> + Clone {
+  let chunk = select! { TokenKind::StrChunk(s) => StrPart::Text(s) };
+
+  just(TokenKind::StrStart)
+    .ignore_then(chunk.repeated().collect::<Vec<_>>())
+    .then_ignore(just(TokenKind::StrEnd))
+    .map_with(|parts, e| SPattern::new(Pattern::Literal(Literal::Str(parts)), ss(e.span())))
+}
+
+fn record_pattern_parser<'a>(
+  pat: impl Parser<'a, TInput<'a>, SPattern, extra::Err<Rich<'a, TokenKind>>> + Clone,
+) -> impl Parser<'a, TInput<'a>, SPattern, extra::Err<Rich<'a, TokenKind>>> + Clone {
+  let rest = just(TokenKind::DotDot).ignore_then(select! { TokenKind::Ident(n) => n }.or_not());
+
+  let field =
+    select! { TokenKind::Ident(n) => n }.then(just(TokenKind::Colon).ignore_then(pat.clone()).or_not()).map(|(name, pattern)| FieldPattern { name, pattern });
+
+  just(TokenKind::LBrace)
+    .ignore_then(super::expr::skip_semis_pub())
+    .ignore_then(field.separated_by(super::expr::skip_semis_pub()).collect::<Vec<_>>())
+    .then(super::expr::skip_semis_pub().ignore_then(rest).or_not())
+    .then_ignore(super::expr::skip_semis_pub())
+    .then_ignore(just(TokenKind::RBrace))
+    .map_with(|(fields, rest), e| {
+      let rest = rest.flatten();
+      SPattern::new(Pattern::Record { fields, rest }, ss(e.span()))
+    })
+}
+
+fn list_pattern_parser<'a>(
+  pat: impl Parser<'a, TInput<'a>, SPattern, extra::Err<Rich<'a, TokenKind>>> + Clone,
+) -> impl Parser<'a, TInput<'a>, SPattern, extra::Err<Rich<'a, TokenKind>>> + Clone {
+  let rest = just(TokenKind::DotDot).ignore_then(select! { TokenKind::Ident(n) => n }.or(just(TokenKind::Underscore).to("_".to_string())).or_not());
+
+  let elem = pat.clone();
+
+  just(TokenKind::LBracket)
+    .ignore_then(elem.separated_by(just(TokenKind::Semi).or_not()).collect::<Vec<_>>())
+    .then(rest.or_not())
+    .then_ignore(just(TokenKind::RBracket))
+    .map_with(|(elems, rest), e| {
+      let rest = rest.flatten();
+      SPattern::new(Pattern::List { elems, rest }, ss(e.span()))
+    })
+}
+
+fn constructor_pattern_parser<'a>(
+  pat: impl Parser<'a, TInput<'a>, SPattern, extra::Err<Rich<'a, TokenKind>>> + Clone,
+) -> impl Parser<'a, TInput<'a>, SPattern, extra::Err<Rich<'a, TokenKind>>> + Clone {
+  select! { TokenKind::TypeName(n) => n }
+    .then(pat.repeated().collect::<Vec<_>>())
+    .map_with(|(name, args), e| SPattern::new(Pattern::Constructor { name, args }, ss(e.span())))
 }
