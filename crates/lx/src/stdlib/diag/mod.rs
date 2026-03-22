@@ -1,3 +1,6 @@
+mod echart;
+mod mermaid;
+
 use std::sync::Arc;
 
 use indexmap::IndexMap;
@@ -12,7 +15,9 @@ use miette::SourceSpan;
 use crate::ast::Program;
 use crate::visitor::AstVisitor;
 
-use super::diag_walk::{DiagEdge, DiagNode, Graph, Subgraph, Walker};
+use super::diag_walk::{DiagEdge, DiagNode, EdgeStyle, EdgeType, Graph, NodeKind, Walker};
+use echart::graph_to_echart_json;
+use mermaid::to_mermaid;
 
 pub fn build() -> IndexMap<String, LxVal> {
   let mut m = IndexMap::new();
@@ -59,140 +64,6 @@ pub fn extract_echart_json(program: &Program) -> String {
   graph_to_echart_json(&graph)
 }
 
-pub fn graph_to_echart_json(graph: &Graph) -> String {
-  let mut in_degree: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
-  let mut adj: std::collections::HashMap<&str, Vec<&str>> = std::collections::HashMap::new();
-  for node in &graph.nodes {
-    in_degree.entry(&node.id).or_insert(0);
-  }
-  for edge in &graph.edges {
-    adj.entry(edge.from.as_str()).or_default().push(&edge.to);
-    *in_degree.entry(edge.to.as_str()).or_insert(0) += 1;
-  }
-  let mut layers: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
-  let mut queue: std::collections::VecDeque<&str> = in_degree.iter().filter(|(_, d)| **d == 0).map(|(id, _)| *id).collect();
-  for &id in &queue {
-    layers.insert(id, 0);
-  }
-  while let Some(id) = queue.pop_front() {
-    let layer = layers[id];
-    if let Some(neighbors) = adj.get(id) {
-      for &next in neighbors {
-        let next_layer = layers.entry(next).or_insert(0);
-        if layer + 1 > *next_layer {
-          *next_layer = layer + 1;
-        }
-        let deg = in_degree.get_mut(next).expect("node in in_degree");
-        *deg -= 1;
-        if *deg == 0 {
-          queue.push_back(next);
-        }
-      }
-    }
-  }
-  for node in &graph.nodes {
-    layers.entry(&node.id).or_insert(0);
-  }
-  let mut layer_positions: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
-  let kind_to_category = |k: &str| -> usize {
-    match k {
-      "agent" => 0,
-      "tool" => 1,
-      "decision" => 2,
-      "fork" | "join" => 3,
-      "loop" => 4,
-      "resource" => 5,
-      "user" => 6,
-      "io" => 7,
-      "type" => 8,
-      _ => 9,
-    }
-  };
-  let kind_to_symbol = |k: &str| -> &str {
-    match k {
-      "agent" => "roundRect",
-      "tool" => "circle",
-      "decision" => "diamond",
-      "fork" | "join" => "rect",
-      "loop" => "roundRect",
-      "resource" => "circle",
-      "user" => "triangle",
-      "io" => "arrow",
-      "type" => "circle",
-      _ => "circle",
-    }
-  };
-  let categories = serde_json::json!([
-      {"name": "agent", "itemStyle": {"color": "#e1f5fe", "borderColor": "#0288d1"}},
-      {"name": "tool", "itemStyle": {"color": "#f3e5f5", "borderColor": "#7b1fa2"}},
-      {"name": "decision", "itemStyle": {"color": "#fff3e0", "borderColor": "#ef6c00"}},
-      {"name": "fork", "itemStyle": {"color": "#e1f5fe", "borderColor": "#0288d1"}},
-      {"name": "loop", "itemStyle": {"color": "#e8f5e9", "borderColor": "#388e3c"}},
-      {"name": "resource", "itemStyle": {"color": "#fce4ec", "borderColor": "#c62828"}},
-      {"name": "user", "itemStyle": {"color": "#ede7f6", "borderColor": "#4527a0"}},
-      {"name": "io", "itemStyle": {"color": "#e0f2f1", "borderColor": "#00695c"}},
-      {"name": "type", "itemStyle": {"color": "#f5f5f5", "borderColor": "#616161"}},
-      {"name": "default", "itemStyle": {"color": "#f5f5f5", "borderColor": "#616161"}}
-  ]);
-  let nodes_json: Vec<serde_json::Value> = graph
-    .nodes
-    .iter()
-    .map(|n| {
-      let layer = layers.get(n.id.as_str()).copied().unwrap_or(0);
-      let pos = layer_positions.entry(layer).or_insert(0);
-      let y_pos = *pos;
-      *pos += 1;
-      let symbol_size = if matches!(n.kind.as_str(), "fork" | "join") { serde_json::json!([40, 10]) } else { serde_json::json!(40) };
-      serde_json::json!({
-          "name": n.id,
-          "x": layer as f64 * 200.0,
-          "y": y_pos as f64 * 120.0,
-          "symbol": kind_to_symbol(&n.kind),
-          "symbolSize": symbol_size,
-          "category": kind_to_category(&n.kind),
-          "label": {"show": true, "formatter": n.label, "position": "bottom", "fontSize": 11},
-          "value": {"kind": n.kind, "label": n.label, "sourceOffset": n.source_offset}
-      })
-    })
-    .collect();
-  let edges_json: Vec<serde_json::Value> = graph
-    .edges
-    .iter()
-    .map(|e| {
-      let (line_type, color, width) = match e.edge_type.as_str() {
-        "agent" => ("solid", "#f97316", 2),
-        "stream" => ("dashed", "#06b6d4", 2),
-        "data" => ("solid", "#9ca3af", 1),
-        "io" => ("solid", "#00695c", 1),
-        _ => ("solid", "#666666", 1),
-      };
-      let mut edge = serde_json::json!({
-          "source": e.from,
-          "target": e.to,
-          "lineStyle": {"type": line_type, "color": color, "width": width, "curveness": 0.2}
-      });
-      if !e.label.is_empty() {
-        edge["label"] = serde_json::json!({"show": true, "formatter": e.label, "fontSize": 10});
-      }
-      edge
-    })
-    .collect();
-  serde_json::json!({
-      "tooltip": {"trigger": "item"},
-      "series": [{
-          "type": "graph",
-          "layout": "none",
-          "roam": true,
-          "label": {"show": true},
-          "categories": categories,
-          "data": nodes_json,
-          "links": edges_json,
-          "lineStyle": {"curveness": 0.2}
-      }]
-  })
-  .to_string()
-}
-
 fn extract_graph(src: &str, span: SourceSpan) -> Result<Graph, LxError> {
   let tokens = crate::lexer::lex(src).map_err(|e| LxError::runtime(format!("diag: lex error: {e}"), span))?;
   let program = crate::parser::parse(tokens).map_err(|e| LxError::runtime(format!("diag: parse error: {e}"), span))?;
@@ -232,6 +103,42 @@ fn graph_to_value(graph: &Graph) -> LxVal {
   }
 }
 
+fn parse_node_kind(s: &str) -> Result<NodeKind, String> {
+  match s {
+    "agent" => Ok(NodeKind::Agent),
+    "tool" => Ok(NodeKind::Tool),
+    "decision" => Ok(NodeKind::Decision),
+    "fork" => Ok(NodeKind::Fork),
+    "join" => Ok(NodeKind::Join),
+    "loop" => Ok(NodeKind::Loop),
+    "resource" => Ok(NodeKind::Resource),
+    "user" => Ok(NodeKind::User),
+    "io" => Ok(NodeKind::Io),
+    "type" => Ok(NodeKind::Type),
+    other => Err(format!("unknown node kind: {other}")),
+  }
+}
+
+fn parse_edge_style(s: &str) -> Result<EdgeStyle, String> {
+  match s {
+    "solid" => Ok(EdgeStyle::Solid),
+    "dashed" => Ok(EdgeStyle::Dashed),
+    "double" => Ok(EdgeStyle::Double),
+    other => Err(format!("unknown edge style: {other}")),
+  }
+}
+
+fn parse_edge_type(s: &str) -> Result<EdgeType, String> {
+  match s {
+    "agent" => Ok(EdgeType::Agent),
+    "stream" => Ok(EdgeType::Stream),
+    "data" => Ok(EdgeType::Data),
+    "io" => Ok(EdgeType::Io),
+    "exec" => Ok(EdgeType::Exec),
+    other => Err(format!("unknown edge type: {other}")),
+  }
+}
+
 fn value_to_graph(val: &LxVal, span: SourceSpan) -> Result<Graph, LxError> {
   let LxVal::Record(rec) = val else {
     return Err(LxError::type_err("diag.to_mermaid expects Graph record", span));
@@ -264,7 +171,9 @@ fn value_to_node(val: &LxVal, span: SourceSpan) -> Result<DiagNode, LxError> {
     use num_traits::ToPrimitive;
     n.to_u32()
   });
-  Ok(DiagNode { id: str_field("id")?, label: str_field("label")?, kind: str_field("kind")?, source_offset, children })
+  let kind_str = str_field("kind")?;
+  let kind = parse_node_kind(&kind_str).map_err(|e| LxError::type_err(e, span))?;
+  Ok(DiagNode { id: str_field("id")?, label: str_field("label")?, kind, source_offset, children })
 }
 
 fn value_to_edge(val: &LxVal, span: SourceSpan) -> Result<DiagEdge, LxError> {
@@ -274,77 +183,9 @@ fn value_to_edge(val: &LxVal, span: SourceSpan) -> Result<DiagEdge, LxError> {
   let str_field = |k: &str| -> Result<String, LxError> {
     rec.get(k).and_then(|v| v.as_str()).map(String::from).ok_or_else(|| LxError::type_err(format!("edge missing '{k}'"), span))
   };
-  let edge_type = rec.get("edge_type").and_then(|v| v.as_str()).map(String::from).unwrap_or_else(|| "exec".into());
-  Ok(DiagEdge { from: str_field("from")?, to: str_field("to")?, label: str_field("label")?, style: str_field("style")?, edge_type })
-}
-
-fn node_shape(node: &DiagNode, indent: &str) -> String {
-  match node.kind.as_str() {
-    "agent" => format!("{indent}{}[\"{}\"]", node.id, node.label),
-    "tool" => format!("{indent}{}([\"{}\"])", node.id, node.label),
-    "decision" => format!("{indent}{}{{\"{}\"}}", node.id, node.label),
-    "fork" | "join" => format!("{indent}{}[[\"{}\"]]", node.id, node.label),
-    "loop" => format!("{indent}{}{{{{\"{}\"}}}}", node.id, node.label),
-    "resource" => format!("{indent}{}[(\"{}\")]", node.id, node.label),
-    "user" => format!("{indent}{}[/\"{}\"\\]", node.id, node.label),
-    "io" => format!("{indent}{}>\"{}\"]", node.id, node.label),
-    "type" => format!("{indent}{}((\"{}\"))", node.id, node.label),
-    _ => format!("{indent}{}[\"{}\"]", node.id, node.label),
-  }
-}
-
-fn to_mermaid(graph: &Graph) -> String {
-  let mut out = String::from("flowchart TD\n");
-  let sg_ids: std::collections::HashSet<&str> = graph.subgraphs.iter().flat_map(|sg| sg.node_ids.iter().map(|s| s.as_str())).collect();
-  for sg in &graph.subgraphs {
-    emit_subgraph(&mut out, sg, &graph.nodes);
-  }
-  for node in &graph.nodes {
-    if !sg_ids.contains(node.id.as_str()) {
-      out.push_str(&node_shape(node, "    "));
-      out.push('\n');
-    }
-  }
-  for edge in &graph.edges {
-    let arrow = match edge.style.as_str() {
-      "dashed" => "-.->",
-      "double" => "==>",
-      _ => "-->",
-    };
-    if edge.label.is_empty() {
-      out.push_str(&format!("    {} {} {}\n", edge.from, arrow, edge.to));
-    } else {
-      out.push_str(&format!("    {} {}|\"{}\"| {}\n", edge.from, arrow, edge.label, edge.to));
-    }
-  }
-  out.push_str("    classDef agent fill:#e1f5fe,stroke:#0288d1\n");
-  out.push_str("    classDef tool fill:#f3e5f5,stroke:#7b1fa2\n");
-  out.push_str("    classDef decision fill:#fff3e0,stroke:#ef6c00\n");
-  out.push_str("    classDef loop fill:#e8f5e9,stroke:#388e3c\n");
-  out.push_str("    classDef resource fill:#fce4ec,stroke:#c62828\n");
-  out.push_str("    classDef user fill:#ede7f6,stroke:#4527a0\n");
-  out.push_str("    classDef io fill:#e0f2f1,stroke:#00695c\n");
-  out.push_str("    classDef type fill:#f5f5f5,stroke:#616161\n");
-  for node in &graph.nodes {
-    let class = match node.kind.as_str() {
-      "agent" | "tool" | "decision" | "loop" | "resource" | "user" | "io" | "type" => Some(node.kind.as_str()),
-      "fork" | "join" => Some("agent"),
-      _ => None,
-    };
-    if let Some(c) = class {
-      out.push_str(&format!("    class {} {c}\n", node.id));
-    }
-  }
-  out
-}
-
-fn emit_subgraph(out: &mut String, sg: &Subgraph, nodes: &[DiagNode]) {
-  out.push_str(&format!("    subgraph sg_{} [\"{}\"]\n", sg.label, sg.label));
-  for nid in &sg.node_ids {
-    if let Some(node) = nodes.iter().find(|n| n.id == *nid) {
-      out.push_str(&node_shape(node, "        "));
-      out.push('\n');
-    }
-  }
-  out.push_str("    end\n");
+  let style_str = str_field("style")?;
+  let style = parse_edge_style(&style_str).map_err(|e| LxError::type_err(e, span))?;
+  let edge_type_str = rec.get("edge_type").and_then(|v| v.as_str()).unwrap_or("exec");
+  let edge_type = parse_edge_type(edge_type_str).map_err(|e| LxError::type_err(e, span))?;
+  Ok(DiagEdge { from: str_field("from")?, to: str_field("to")?, label: str_field("label")?, style, edge_type })
 }

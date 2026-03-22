@@ -2,8 +2,8 @@ use crate::ast::{Expr, SExpr};
 use crate::visitor::{AstVisitor, walk_expr};
 use miette::SourceSpan;
 
-use super::{EdgeStyle, NodeKind, Walker};
 use super::diag_helpers::{extract_field_call_parts, is_resource_action, is_resource_create, is_resource_module};
+use super::{EdgeStyle, NodeKind, Walker};
 
 pub(super) fn visit_expr_diag(w: &mut Walker, expr: &Expr, span: SourceSpan) {
   match expr {
