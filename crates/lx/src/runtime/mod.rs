@@ -1,10 +1,10 @@
 mod defaults;
+mod noop;
 mod restricted;
-mod user;
 
 pub use defaults::*;
+pub use noop::*;
 pub use restricted::*;
-pub use user::*;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -27,8 +27,6 @@ pub struct RuntimeCtx {
   pub yield_: Arc<dyn YieldBackend>,
   #[default(Arc::new(StderrLogBackend))]
   pub log: Arc<dyn LogBackend>,
-  #[default(Arc::new(NoopUserBackend))]
-  pub user: Arc<dyn UserBackend>,
   pub source_dir: parking_lot::Mutex<Option<PathBuf>>,
   pub workspace_members: HashMap<String, PathBuf>,
   pub dep_dirs: HashMap<String, PathBuf>,

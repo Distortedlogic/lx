@@ -1,11 +1,12 @@
 use crate::ast::{MatchArm, Pattern};
+use crate::sym::Sym;
 
-pub fn check_exhaustiveness(_type_name: &str, variants: &[String], arms: &[MatchArm]) -> Vec<String> {
+pub fn check_exhaustiveness(_type_name: Sym, variants: &[Sym], arms: &[MatchArm]) -> Vec<Sym> {
   let mut covered = std::collections::HashSet::new();
   for arm in arms {
     match &arm.pattern.node {
       Pattern::Constructor { name, .. } => {
-        covered.insert(name.as_str());
+        covered.insert(*name);
       },
       Pattern::Wildcard | Pattern::Bind(_) => {
         return Vec::new();
@@ -13,5 +14,5 @@ pub fn check_exhaustiveness(_type_name: &str, variants: &[String], arms: &[Match
       _ => {},
     }
   }
-  variants.iter().filter(|v| !covered.contains(v.as_str())).cloned().collect()
+  variants.iter().filter(|v| !covered.contains(v)).copied().collect()
 }

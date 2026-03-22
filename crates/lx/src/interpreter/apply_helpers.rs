@@ -1,3 +1,4 @@
+use crate::sym::intern;
 use std::sync::Arc;
 
 use num_traits::ToPrimitive;
@@ -36,7 +37,7 @@ impl Interpreter {
         Ok(self.make_section_func(&["_x"], body, span))
       },
       Section::Field(name) => {
-        let body = Expr::FieldAccess { expr: Box::new(Spanned::new(Expr::Ident(intern("_x")), span)), field: FieldKind::Named(name.clone()) };
+        let body = Expr::FieldAccess { expr: Box::new(Spanned::new(Expr::Ident(intern("_x")), span)), field: FieldKind::Named(*name) };
         Ok(self.make_section_func(&["_x"], body, span))
       },
       Section::Index(idx) => {
@@ -70,10 +71,10 @@ impl Interpreter {
           if let Some(method) = o.methods.get(name) {
             Ok(Self::inject_self(method, &val))
           } else {
-            Ok(crate::stdlib::object_get_field(o.id, name).unwrap_or(LxVal::None))
+            Ok(crate::stdlib::object_get_field(o.id, name.as_str()).unwrap_or(LxVal::None))
           }
         },
-        LxVal::Store { .. } => crate::stdlib::store_method(name, &val).ok_or_else(|| LxError::type_err(format!("Store has no method '{name}'"), span)),
+        LxVal::Store { .. } => crate::stdlib::store_method(name.as_str(), &val).ok_or_else(|| LxError::type_err(format!("Store has no method '{name}'"), span)),
         other => Err(LxError::type_err(format!("field access on {}, not Record", other.type_name()), span)),
       },
       FieldKind::Index(idx) => {
@@ -90,7 +91,7 @@ impl Interpreter {
       FieldKind::Computed(key_expr) => {
         let key = self.eval(key_expr).await?;
         match (&val, &key) {
-          (LxVal::Record(r), LxVal::Str(s)) => Ok(r.get(s.as_ref()).cloned().unwrap_or(LxVal::None)),
+          (LxVal::Record(r), LxVal::Str(s)) => Ok(r.get(&crate::sym::intern(s)).cloned().unwrap_or(LxVal::None)),
           (LxVal::Map(m), LxVal::Str(s)) => {
             let vk = crate::value::ValueKey(LxVal::Str(s.clone()));
             Ok(m.get(&vk).cloned().unwrap_or(LxVal::None))
@@ -108,10 +109,10 @@ impl Interpreter {
 
   fn inject_self(method: &LxVal, self_val: &LxVal) -> LxVal {
     if let LxVal::Func(lf) = method {
-      let mut method_env = lf.closure.child();
+      let method_env = lf.closure.child();
       method_env.bind_str("self", self_val.clone());
       let mut lf = lf.clone();
-      lf.closure = method_env.into_arc();
+      lf.closure = Arc::new(method_env);
       LxVal::Func(lf)
     } else {
       method.clone()

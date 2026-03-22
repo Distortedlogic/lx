@@ -6,21 +6,21 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 
-use crate::builtins::mk;
 use crate::error::LxError;
 use crate::runtime::RuntimeCtx;
+use crate::std_module;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
-pub fn build() -> IndexMap<String, LxVal> {
-  let mut m = IndexMap::new();
-  m.insert("parse".into(), mk("md.parse", 1, bi_parse));
-  m.insert("sections".into(), mk("md.sections", 1, md_parse::bi_sections));
-  m.insert("code_blocks".into(), mk("md.code_blocks", 1, md_parse::bi_code_blocks));
-  m.insert("headings".into(), mk("md.headings", 1, md_parse::bi_headings));
-  m.insert("links".into(), mk("md.links", 1, md_parse::bi_links));
-  m.insert("to_text".into(), mk("md.to_text", 1, md_parse::bi_to_text));
-  m
+pub fn build() -> IndexMap<crate::sym::Sym, LxVal> {
+  std_module! {
+    "parse"       => "md.parse",       1, bi_parse;
+    "sections"    => "md.sections",    1, md_parse::bi_sections;
+    "code_blocks" => "md.code_blocks", 1, md_parse::bi_code_blocks;
+    "headings"    => "md.headings",    1, md_parse::bi_headings;
+    "links"       => "md.links",       1, md_parse::bi_links;
+    "to_text"     => "md.to_text",     1, md_parse::bi_to_text
+  }
 }
 
 fn h_level(level: HeadingLevel) -> i64 {
@@ -36,7 +36,7 @@ fn h_level(level: HeadingLevel) -> i64 {
 
 pub(super) fn node_rec(type_str: &str, fields: Vec<(&str, LxVal)>) -> LxVal {
   let mut rec = IndexMap::new();
-  rec.insert("type".into(), LxVal::str(type_str));
+  rec.insert(crate::sym::intern("type"), LxVal::str(type_str));
   for (k, v) in fields {
     rec.insert(k.into(), v);
   }
@@ -141,8 +141,8 @@ fn bi_parse(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<
   Ok(LxVal::list(parse_to_nodes(input)))
 }
 
-pub(super) fn field_str(rec: &IndexMap<String, LxVal>, field: &str) -> Option<String> {
-  rec.get(field).and_then(|v| v.as_str()).map(|s| s.to_string())
+pub(super) fn field_str(rec: &IndexMap<crate::sym::Sym, LxVal>, field: &str) -> Option<String> {
+  rec.get(&crate::sym::intern(field)).and_then(|v| v.as_str()).map(|s| s.to_string())
 }
 
 pub(super) fn get_nodes(val: &LxVal, span: SourceSpan) -> Result<&[LxVal], LxError> {

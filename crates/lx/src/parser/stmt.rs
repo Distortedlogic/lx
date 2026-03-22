@@ -2,12 +2,14 @@ use crate::sym::intern;
 use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 
+use super::expr::{ident, name_or_type, type_name};
 use super::{Span, ss};
 use crate::ast::{
-  AgentMethod, BindTarget, Binding, ClassDeclData, ClassField, Expr, FieldDecl, FieldKind, Program, SExpr, SStmt, Stmt, TraitDeclData, TraitEntry,
-  TraitMethodDecl, TraitUnionDef, UseKind, UseStmt,
+  AgentMethod, BindTarget, Binding, Expr, FieldDecl, FieldKind, Program, SExpr, SStmt, Stmt, TraitDeclData, TraitEntry, TraitMethodDecl, TraitUnionDef,
+  UseKind, UseStmt,
 };
 use crate::lexer::token::TokenKind;
+use crate::sym::Sym;
 
 pub(super) fn program_parser<'a, I>() -> impl Parser<'a, I, Program, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
 where
@@ -31,7 +33,7 @@ where
   let exported = just(TokenKind::Export).or_not().map(|e| e.is_some());
 
   let trait_stmt = trait_parser(expr.clone());
-  let class_stmt = class_parser(expr.clone());
+  let class_stmt = super::stmt_class::class_parser(expr.clone());
   let type_def = type_def_parser();
   let binding = binding_parser(expr.clone());
   let field_update = field_update_parser(expr.clone());
@@ -68,12 +70,12 @@ where
 {
   let path_seg = select! {
       TokenKind::Ident(n) => n,
-      TokenKind::Yield => "yield".to_string(),
+      TokenKind::Yield => intern("yield"),
   };
 
-  let dotdot_prefix = just(TokenKind::DotDot).then_ignore(just(TokenKind::Slash)).to("..".to_string());
+  let dotdot_prefix = just(TokenKind::DotDot).then_ignore(just(TokenKind::Slash)).to(intern(".."));
 
-  let dot_prefix = just(TokenKind::Dot).then_ignore(just(TokenKind::Slash)).to(".".to_string());
+  let dot_prefix = just(TokenKind::Dot).then_ignore(just(TokenKind::Slash)).to(intern("."));
 
   let prefix_parts = dotdot_prefix.repeated().collect::<Vec<_>>().then(dot_prefix.or_not()).map(|(mut dd, dot)| {
     if let Some(d) = dot {
@@ -84,9 +86,9 @@ where
 
   let segments = path_seg.separated_by(just(TokenKind::Slash)).at_least(1).collect::<Vec<_>>();
 
-  let alias = just(TokenKind::Colon).ignore_then(select! { TokenKind::Ident(n) => n }).map(UseKind::Alias);
+  let alias = just(TokenKind::Colon).ignore_then(ident()).map(UseKind::Alias);
 
-  let selective = select! { TokenKind::Ident(n) => n, TokenKind::TypeName(n) => n }
+  let selective = name_or_type()
     .separated_by(just(TokenKind::Semi).or_not())
     .collect::<Vec<_>>()
     .delimited_by(just(TokenKind::LBrace), just(TokenKind::RBrace))
@@ -106,14 +108,14 @@ fn binding_parser<'a, I>(
 where
   I: ValueInput<'a, Token = TokenKind, Span = Span>,
 {
-  let typed = select! { TokenKind::Ident(n) => n }
+  let typed = ident()
     .then_ignore(just(TokenKind::Colon))
     .then(super::type_ann::type_parser())
     .then_ignore(just(TokenKind::Assign))
     .then(expr.clone())
     .map(|((name, type_ann), value)| Binding { exported: false, mutable: false, target: BindTarget::Name(name), type_ann: Some(type_ann), value });
 
-  let reassign = select! { TokenKind::Ident(n) => n }.then_ignore(just(TokenKind::Reassign)).then(expr.clone()).map(|(name, value)| Binding {
+  let reassign = ident().then_ignore(just(TokenKind::Reassign)).then(expr.clone()).map(|(name, value)| Binding {
     exported: false,
     mutable: false,
     target: BindTarget::Reassign(name),
@@ -121,10 +123,13 @@ where
     value,
   });
 
-  let simple = select! { TokenKind::Ident(n) => n }
-    .then(just(TokenKind::DeclMut).to(true).or(just(TokenKind::Assign).to(false)))
-    .then(expr)
-    .map(|((name, mutable), value)| Binding { exported: false, mutable, target: BindTarget::Name(name), type_ann: None, value });
+  let simple = ident().then(just(TokenKind::DeclMut).to(true).or(just(TokenKind::Assign).to(false))).then(expr).map(|((name, mutable), value)| Binding {
+    exported: false,
+    mutable,
+    target: BindTarget::Name(name),
+    type_ann: None,
+    value,
+  });
 
   choice((typed, reassign, simple))
 }
@@ -141,13 +146,13 @@ where
   })
 }
 
-fn expr_to_field_chain(expr: &SExpr) -> Result<(String, Vec<String>), ()> {
+fn expr_to_field_chain(expr: &SExpr) -> Result<(Sym, Vec<Sym>), ()> {
   match &expr.node {
     Expr::FieldAccess { expr: inner, field: FieldKind::Named(f) } => match &inner.node {
-      Expr::Ident(name) => Ok((name.clone(), vec![f.clone()])),
+      Expr::Ident(name) => Ok((*name, vec![*f])),
       Expr::FieldAccess { .. } => {
         let (name, mut fields) = expr_to_field_chain(inner)?;
-        fields.push(f.clone());
+        fields.push(*f);
         Ok((name, fields))
       },
       _ => Err(()),
@@ -156,11 +161,11 @@ fn expr_to_field_chain(expr: &SExpr) -> Result<(String, Vec<String>), ()> {
   }
 }
 
-fn type_def_parser<'a, I>() -> impl Parser<'a, I, (String, Vec<(String, usize)>), extra::Err<Rich<'a, TokenKind, Span>>> + Clone
+fn type_def_parser<'a, I>() -> impl Parser<'a, I, (Sym, Vec<(Sym, usize)>), extra::Err<Rich<'a, TokenKind, Span>>> + Clone
 where
   I: ValueInput<'a, Token = TokenKind, Span = Span>,
 {
-  let variant = just(TokenKind::Pipe).ignore_then(select! { TokenKind::TypeName(n) => n }).then(
+  let variant = just(TokenKind::Pipe).ignore_then(type_name()).then(
     any()
       .filter(|k: &TokenKind| !matches!(k, TokenKind::Pipe | TokenKind::Semi | TokenKind::Eof | TokenKind::RBrace))
       .repeated()
@@ -168,8 +173,8 @@ where
       .map(|toks| toks.len()),
   );
 
-  select! { TokenKind::TypeName(n) => n }
-    .then(select! { TokenKind::Ident(_) => () }.repeated())
+  type_name()
+    .then(ident().ignored().repeated())
     .then_ignore(just(TokenKind::Assign))
     .then_ignore(super::expr::skip_semis())
     .then(variant.separated_by(super::expr::skip_semis()).at_least(1).collect::<Vec<_>>())
@@ -184,14 +189,14 @@ where
 {
   let trait_union = just(TokenKind::Trait)
     .ignore_then(just(TokenKind::Export).or_not())
-    .ignore_then(select! { TokenKind::TypeName(n) => n })
+    .ignore_then(type_name())
     .then_ignore(just(TokenKind::Assign))
-    .then(select! { TokenKind::TypeName(n) => n }.separated_by(just(TokenKind::Pipe)).at_least(1).collect::<Vec<_>>())
+    .then(type_name().separated_by(just(TokenKind::Pipe)).at_least(1).collect::<Vec<_>>())
     .map(|(name, variants)| Stmt::TraitUnion(TraitUnionDef { name, variants, exported: false }));
 
   let trait_decl = just(TokenKind::Trait)
     .ignore_then(just(TokenKind::Export).or_not())
-    .ignore_then(select! { TokenKind::TypeName(n) => n })
+    .ignore_then(type_name())
     .then_ignore(just(TokenKind::Assign))
     .then_ignore(just(TokenKind::LBrace))
     .then(trait_body(expr))
@@ -203,7 +208,7 @@ where
   trait_union.or(trait_decl)
 }
 
-type TraitBodyResult = (Vec<TraitEntry>, Vec<TraitMethodDecl>, Vec<AgentMethod>, Vec<String>, Option<String>, Vec<String>);
+type TraitBodyResult = (Vec<TraitEntry>, Vec<TraitMethodDecl>, Vec<AgentMethod>, Vec<Sym>, Option<Sym>, Vec<Sym>);
 
 fn trait_body<'a, I>(
   expr: impl Parser<'a, I, SExpr, extra::Err<Rich<'a, TokenKind, Span>>> + Clone,
@@ -211,18 +216,16 @@ fn trait_body<'a, I>(
 where
   I: ValueInput<'a, Token = TokenKind, Span = Span>,
 {
-  let spread_entry = just(TokenKind::DotDot).ignore_then(select! { TokenKind::TypeName(n) => n }).map(TraitEntry::Spread);
+  let spread_entry = just(TokenKind::DotDot).ignore_then(type_name()).map(TraitEntry::Spread);
 
-  let default_method = select! { TokenKind::Ident(n) => n }
-    .then_ignore(just(TokenKind::Assign))
-    .then(expr.clone())
-    .map(|(name, handler)| TraitBodyItem::Default(AgentMethod { name, handler }));
+  let default_method =
+    ident().then_ignore(just(TokenKind::Assign)).then(expr.clone()).map(|(name, handler)| TraitBodyItem::Default(AgentMethod { name, handler }));
 
-  let field_entry = select! { TokenKind::Ident(n) => n }
+  let field_entry = ident()
     .then_ignore(just(TokenKind::Colon))
-    .then(select! { TokenKind::TypeName(n) => n })
+    .then(type_name())
     .then(just(TokenKind::Assign).ignore_then(expr.clone()).or_not())
-    .map(|((name, type_name), default)| TraitBodyItem::Field(FieldDecl { name, type_name, default, constraint: None }));
+    .map(|((name, typ), default)| TraitBodyItem::Field(FieldDecl { name, type_name: typ, default, constraint: None }));
 
   let item = spread_entry.map(TraitBodyItem::Entry).or(default_method).or(field_entry);
 
@@ -246,59 +249,4 @@ enum TraitBodyItem {
   Entry(TraitEntry),
   Default(AgentMethod),
   Field(FieldDecl),
-}
-
-fn class_parser<'a, I>(
-  expr: impl Parser<'a, I, SExpr, extra::Err<Rich<'a, TokenKind, Span>>> + Clone,
-) -> impl Parser<'a, I, ClassDeclData, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
-where
-  I: ValueInput<'a, Token = TokenKind, Span = Span>,
-{
-  let trait_list = just(TokenKind::Colon).ignore_then(
-    select! { TokenKind::TypeName(n) => n, TokenKind::Ident(n) => n }
-      .separated_by(super::expr::skip_semis())
-      .collect::<Vec<_>>()
-      .delimited_by(just(TokenKind::LBracket), just(TokenKind::RBracket))
-      .or(select! { TokenKind::TypeName(n) => n, TokenKind::Ident(n) => n }.map(|n| vec![n])),
-  );
-
-  let class_field = select! { TokenKind::Ident(n) => n, TokenKind::TypeName(n) => n }
-    .then_ignore(just(TokenKind::Colon))
-    .then(expr.clone())
-    .map(|(name, default)| ClassMember::Field(ClassField { name, default }));
-
-  let class_method = select! { TokenKind::Ident(n) => n, TokenKind::TypeName(n) => n }
-    .then_ignore(just(TokenKind::Assign))
-    .then(expr)
-    .map(|(name, handler)| ClassMember::Method(AgentMethod { name, handler }));
-
-  let member = class_field.or(class_method);
-
-  just(TokenKind::ClassKw)
-    .ignore_then(just(TokenKind::Export).or_not())
-    .ignore_then(select! { TokenKind::TypeName(n) => n })
-    .then(trait_list.or_not().map(|t| t.unwrap_or_default()))
-    .then_ignore(just(TokenKind::Assign))
-    .then_ignore(just(TokenKind::LBrace))
-    .then_ignore(super::expr::skip_semis())
-    .then(member.separated_by(super::expr::skip_semis()).collect::<Vec<_>>())
-    .then_ignore(super::expr::skip_semis())
-    .then_ignore(just(TokenKind::RBrace))
-    .map(|((name, traits), members)| {
-      let mut fields = Vec::new();
-      let mut methods = Vec::new();
-      for m in members {
-        match m {
-          ClassMember::Field(f) => fields.push(f),
-          ClassMember::Method(m) => methods.push(m),
-        }
-      }
-      ClassDeclData { name, traits, fields, methods, exported: false }
-    })
-}
-
-#[derive(Clone)]
-enum ClassMember {
-  Field(ClassField),
-  Method(AgentMethod),
 }

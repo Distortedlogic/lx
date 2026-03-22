@@ -13,7 +13,7 @@ use std::io::IsTerminal;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use lx::runtime::{NoopEmitBackend, NoopLogBackend, NoopUserBackend, RuntimeCtx, StdinStdoutUserBackend};
+use lx::runtime::{NoopEmitBackend, NoopLogBackend, RuntimeCtx};
 
 use clap::{Parser, Subcommand};
 
@@ -133,8 +133,7 @@ fn run_file(path: &str, _json: bool) -> ExitCode {
   };
   let ws_members = manifest::try_load_workspace_members();
   let dep_dirs = manifest::try_load_dep_dirs_no_dev();
-  let mut ctx_val =
-    if std::io::stdin().is_terminal() { RuntimeCtx { user: Arc::new(StdinStdoutUserBackend), ..RuntimeCtx::default() } } else { RuntimeCtx::default() };
+  let mut ctx_val = if std::io::stdin().is_terminal() { RuntimeCtx { ..RuntimeCtx::default() } } else { RuntimeCtx::default() };
   ctx_val.workspace_members = ws_members;
   ctx_val.dep_dirs = dep_dirs;
   apply_manifest_backends(&mut ctx_val);
@@ -183,13 +182,6 @@ fn apply_manifest_backends(ctx: &mut RuntimeCtx) {
       "noop" => ctx.log = Arc::new(NoopLogBackend),
       "stderr" => {},
       other => eprintln!("warning: unknown log backend '{other}'"),
-    }
-  }
-  if let Some(ref name) = backends.user {
-    match name.as_str() {
-      "noop" => ctx.user = Arc::new(NoopUserBackend),
-      "stdin-stdout" => ctx.user = Arc::new(StdinStdoutUserBackend),
-      other => eprintln!("warning: unknown user backend '{other}'"),
     }
   }
   if let Some(ref name) = backends.ai {

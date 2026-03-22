@@ -2,6 +2,7 @@ use crate::sym::intern;
 use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 
+use super::expr::{ident, type_name};
 use super::{Span, ss};
 use crate::ast::{FieldPattern, Literal, Pattern, SPattern, StrPart};
 use crate::lexer::token::TokenKind;
@@ -13,7 +14,7 @@ where
   recursive(|pat| {
     let wildcard = just(TokenKind::Underscore).map_with(|_, e| SPattern::new(Pattern::Wildcard, ss(e.span())));
 
-    let bind = select! { TokenKind::Ident(n) => n }.map_with(|n, e| SPattern::new(Pattern::Bind(n), ss(e.span())));
+    let bind = ident().map_with(|n, e| SPattern::new(Pattern::Bind(n), ss(e.span())));
 
     let int_lit = select! { TokenKind::Int(n) => n }.map_with(|n, e| SPattern::new(Pattern::Literal(Literal::Int(n)), ss(e.span())));
 
@@ -64,9 +65,9 @@ fn record_pattern<'a, I>(
 where
   I: ValueInput<'a, Token = TokenKind, Span = Span>,
 {
-  let rest = just(TokenKind::DotDot).ignore_then(select! { TokenKind::Ident(n) => n }.or_not());
+  let rest = just(TokenKind::DotDot).ignore_then(ident().or_not());
 
-  let field = select! { TokenKind::Ident(n) => n }.then(just(TokenKind::Colon).ignore_then(pat).or_not()).map(|(name, pattern)| FieldPattern { name, pattern });
+  let field = ident().then(just(TokenKind::Colon).ignore_then(pat).or_not()).map(|(name, pattern)| FieldPattern { name, pattern });
 
   just(TokenKind::LBrace)
     .ignore_then(super::expr::skip_semis())
@@ -83,7 +84,7 @@ fn list_pattern<'a, I>(
 where
   I: ValueInput<'a, Token = TokenKind, Span = Span>,
 {
-  let rest = just(TokenKind::DotDot).ignore_then(select! { TokenKind::Ident(n) => n }.or(just(TokenKind::Underscore).to("_".to_string())).or_not());
+  let rest = just(TokenKind::DotDot).ignore_then(ident().or(just(TokenKind::Underscore).to(intern("_"))).or_not());
 
   just(TokenKind::LBracket)
     .ignore_then(pat.separated_by(just(TokenKind::Semi).or_not()).collect::<Vec<_>>())
@@ -98,7 +99,5 @@ fn ctor_pattern<'a, I>(
 where
   I: ValueInput<'a, Token = TokenKind, Span = Span>,
 {
-  select! { TokenKind::TypeName(n) => n }
-    .then(pat.repeated().collect::<Vec<_>>())
-    .map_with(|(name, args), e| SPattern::new(Pattern::Constructor { name, args }, ss(e.span())))
+  type_name().then(pat.repeated().collect::<Vec<_>>()).map_with(|(name, args), e| SPattern::new(Pattern::Constructor { name, args }, ss(e.span())))
 }

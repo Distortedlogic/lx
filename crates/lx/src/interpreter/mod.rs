@@ -1,4 +1,4 @@
-use crate::sym::intern;
+use crate::sym::{Sym, intern};
 pub(crate) mod ambient;
 mod apply;
 mod apply_helpers;
@@ -22,7 +22,7 @@ use parking_lot::Mutex;
 
 use indexmap::IndexMap;
 
-use crate::ast::{BindTarget, Expr, Program, SExpr, Stmt};
+use crate::ast::{BindTarget, Expr, Program, SExpr, Stmt, WithKind};
 use crate::env::Env;
 use crate::error::LxError;
 use crate::runtime::RuntimeCtx;
@@ -45,11 +45,11 @@ pub struct Interpreter {
 
 impl Interpreter {
   pub fn new(source: &str, source_dir: Option<PathBuf>, ctx: Arc<RuntimeCtx>) -> Self {
-    let mut env = Env::new();
-    crate::builtins::register(&mut env);
+    let env = Env::default();
+    crate::builtins::register(&env);
     *ctx.source_dir.lock() = source_dir.clone();
     Self {
-      env: env.into_arc(),
+      env: Arc::new(env),
       source: source.to_string(),
       source_dir,
       module_cache: Arc::new(Mutex::new(HashMap::new())),
@@ -70,7 +70,7 @@ impl Interpreter {
   }
 
   pub fn set_env(&mut self, env: Env) {
-    self.env = env.into_arc();
+    self.env = Arc::new(env);
   }
 
   pub async fn eval_expr(&mut self, expr: &SExpr) -> Result<LxVal, LxError> {
@@ -82,18 +82,18 @@ impl Interpreter {
     for stmt in &program.stmts {
       if let Stmt::Binding(b) = &stmt.node
         && !b.exported
-        && let BindTarget::Name(ref name) = b.target
+        && let BindTarget::Name(name) = b.target
         && matches!(b.value.node, Expr::Func { .. })
       {
-        forward_names.push(name.clone());
+        forward_names.push(name);
       }
     }
     if !forward_names.is_empty() {
-      let mut env = self.env.child();
+      let env = self.env.child();
       for name in &forward_names {
         env.bind_mut(*name, LxVal::Unit);
       }
-      self.env = env.into_arc();
+      self.env = Arc::new(env);
     }
     let mut result = LxVal::Unit;
     for stmt in &program.stmts {
@@ -108,7 +108,7 @@ impl Interpreter {
     match &expr.node {
       Expr::Literal(lit) => self.eval_literal(lit, span).await,
       Expr::Ident(name) => self.env.get(*name).ok_or_else(|| {
-        let hint = hints::keyword_hint(name);
+        let hint = hints::keyword_hint(name.as_str());
         let msg = match hint {
           Some(h) => format!("undefined variable '{name}' — {h}"),
           None => format!("undefined variable '{name}'"),
@@ -123,7 +123,7 @@ impl Interpreter {
         let f = self.eval(func).await?;
         if let Expr::NamedArg { name, value } = &arg.node {
           let v = self.eval(value).await?;
-          let named = LxVal::Tagged { tag: Arc::from("__named"), values: Arc::new(vec![LxVal::str(name), v]) };
+          let named = LxVal::Tagged { tag: intern("__named"), values: Arc::new(vec![LxVal::str(name.as_str()), v]) };
           self.apply_func(f, named, span).await
         } else {
           let a = self.eval(arg).await?;
@@ -183,25 +183,27 @@ impl Interpreter {
         let v = self.eval(value).await?;
         self.ctx.yield_.yield_value(v, span)
       },
-      Expr::With { name, value, body, mutable } => {
-        let val = self.eval(value).await?;
-        let saved = Arc::clone(&self.env);
-        let mut child = self.env.child();
-        if *mutable {
-          child.bind_mut(*name, val);
-        } else {
-          child.bind(*name, val);
-        }
-        self.env = child.into_arc();
-        let mut result = LxVal::Unit;
-        for stmt in body {
-          result = self.eval_stmt(stmt).await?;
-        }
-        self.env = saved;
-        Ok(result)
+      Expr::With { kind, body } => match kind {
+        WithKind::Binding { name, value, mutable } => {
+          let val = self.eval(value).await?;
+          let saved = Arc::clone(&self.env);
+          let child = self.env.child();
+          if *mutable {
+            child.bind_mut(*name, val);
+          } else {
+            child.bind(*name, val);
+          }
+          self.env = Arc::new(child);
+          let mut result = LxVal::Unit;
+          for stmt in body {
+            result = self.eval_stmt(stmt).await?;
+          }
+          self.env = saved;
+          Ok(result)
+        },
+        WithKind::Resources { resources } => self.eval_with_resource(resources, body, span).await,
+        WithKind::Context { fields } => self.eval_with_context(fields, body, span).await,
       },
-      Expr::WithResource { resources, body } => self.eval_with_resource(resources, body, span).await,
-      Expr::WithContext { fields, body } => self.eval_with_context(fields, body, span).await,
     }
   }
 }

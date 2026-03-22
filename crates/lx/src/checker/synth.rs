@@ -1,9 +1,9 @@
-use crate::ast::{Expr, SExpr};
+use crate::ast::{Expr, SExpr, WithKind};
 use crate::sym::intern;
 
-use super::Checker;
 use super::synth_helpers::synth_literal;
 use super::types::Type;
+use super::{Checker, DiagLevel};
 
 impl Checker {
   pub(super) fn synth(&mut self, expr: &SExpr) -> Type {
@@ -21,7 +21,7 @@ impl Checker {
         match self.table.resolve(&t) {
           Type::Int | Type::Float => t,
           _ => {
-            self.emit("negation requires Int or Float".into(), expr.span);
+            self.emit(DiagLevel::Error, "negation requires Int or Float".into(), expr.span);
             Type::Unknown
           },
         }
@@ -47,7 +47,7 @@ impl Checker {
         }
       },
       Expr::Record(fields) => {
-        let fs: Vec<_> = fields.iter().filter_map(|f| f.name.as_ref().map(|n| (n.clone(), self.synth(&f.value)))).collect();
+        let fs: Vec<_> = fields.iter().filter_map(|f| f.name.as_ref().map(|n| (*n, self.synth(&f.value)))).collect();
         Type::Record(fs)
       },
       Expr::Propagate(inner) => {
@@ -57,7 +57,7 @@ impl Checker {
           Type::Maybe(inner) => *inner,
           Type::Unknown => Type::Unknown,
           _ => {
-            self.emit("^ requires Result or Maybe".into(), expr.span);
+            self.emit(DiagLevel::Error, "^ requires Result or Maybe".into(), expr.span);
             Type::Unknown
           },
         }
@@ -71,7 +71,7 @@ impl Checker {
         let ct = self.synth(cond);
         let resolved = self.table.resolve(&ct);
         if resolved != Type::Bool && resolved != Type::Unknown {
-          self.emit("ternary condition must be Bool".into(), cond.span);
+          self.emit(DiagLevel::Error, "ternary condition must be Bool".into(), cond.span);
         }
         let tt = self.synth(then_);
         if let Some(e) = else_ {
@@ -81,33 +81,35 @@ impl Checker {
           tt
         }
       },
-      Expr::With { value, body, name, mutable: _ } => {
-        let vt = self.synth(value);
-        self.push_scope();
-        self.bind(*name, vt);
-        let result = self.check_stmts(body);
-        self.pop_scope();
-        result
-      },
-      Expr::WithResource { resources, body } => {
-        self.push_scope();
-        for (expr, name) in resources {
-          let vt = self.synth(expr);
+      Expr::With { kind, body } => match kind {
+        WithKind::Binding { name, value, mutable: _ } => {
+          let vt = self.synth(value);
+          self.push_scope();
           self.bind(*name, vt);
-        }
-        let result = self.check_stmts(body);
-        self.pop_scope();
-        result
-      },
-      Expr::WithContext { fields, body } => {
-        self.push_scope();
-        for (_, expr) in fields {
-          self.synth(expr);
-        }
-        self.bind(intern("context"), Type::Unknown);
-        let result = self.check_stmts(body);
-        self.pop_scope();
-        result
+          let result = self.check_stmts(body);
+          self.pop_scope();
+          result
+        },
+        WithKind::Resources { resources } => {
+          self.push_scope();
+          for (expr, name) in resources {
+            let vt = self.synth(expr);
+            self.bind(*name, vt);
+          }
+          let result = self.check_stmts(body);
+          self.pop_scope();
+          result
+        },
+        WithKind::Context { fields } => {
+          self.push_scope();
+          for (_, expr) in fields {
+            self.synth(expr);
+          }
+          self.bind(intern("context"), Type::Unknown);
+          let result = self.check_stmts(body);
+          self.pop_scope();
+          result
+        },
       },
       Expr::Yield { .. } => Type::Unknown,
       Expr::Emit { value } => {
@@ -149,7 +151,11 @@ impl Checker {
       },
       Expr::NamedArg { value, .. } => self.synth(value),
       Expr::Par(stmts) => {
-        self.check_mutable_captures_stmts(stmts, expr.span);
+        for s in stmts {
+          if let crate::ast::Stmt::Expr(e) = &s.node {
+            self.check_mutable_captures(e, expr.span);
+          }
+        }
         let result = self.check_stmts(stmts);
         Type::List(Box::new(result))
       },

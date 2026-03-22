@@ -1,6 +1,6 @@
 use std::collections::{HashMap, VecDeque};
 
-use super::diag_walk::{DiagEdge, DiagNode, EdgeType, Graph, NodeKind};
+use super::diag_walk::{EdgeType, Graph, NodeKind};
 
 pub(crate) fn graph_to_echart_json(graph: &Graph) -> String {
   let mut in_degree: HashMap<&str, usize> = HashMap::new();

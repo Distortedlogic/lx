@@ -38,9 +38,12 @@ On first run, all 3 steps execute and checkpoint. If the process crashes after "
 
 ## Serialization
 
-Checkpoint values are serialized via `serde_json`. `LxVal` implements `Serialize` and `Deserialize` (in `crates/lx/src/value/mod.rs`). However, serialization is lossy for non-data variants:
-- `Func`/`BuiltinFunc` serialize as the string `"<Func>"` without erroring — `checkpoint.step` must explicitly check the return value type and return an error if it contains a Func, rather than relying on serde to fail.
-- `Ok`/`Err`/`Some`/`Tagged`/`Store`/`Object` serialize with `__err`/`__tag`/`__store`/`__object` marker keys, but deserialization (via `serde_json::Value -> LxVal`) does not reconstruct these — they round-trip as plain Records. For simple data checkpoints (Int, Float, Bool, Str, List, Record) this is fine.
+Checkpoint values are serialized via `serde_json`. `LxVal` implements `Serialize` and `Deserialize` manually in `crates/lx/src/value/serde_impl.rs` (not via derive). However, serialization is lossy for non-data variants:
+- `Func`/`BuiltinFunc`/`Trait`/`Class` serialize as the string `"<{type_name}>"` via the catch-all arm without erroring — `checkpoint.step` must explicitly check the return value type and return an error if it contains a Func, rather than relying on serde to fail.
+- `Ok(v)` and `Some(v)` serialize as their inner value (unwrapped, no marker key) — they lose their wrapper on round-trip.
+- `Err(v)` serializes with `__err` marker, `Tagged` with `__tag`/`__values`, `Store` with `__store`, `Object` with `__object`/`__class` — but deserialization (via `serde_json::Value -> LxVal`) does not reconstruct these marker-keyed types. They round-trip as plain Records.
+- `Range` serializes with `start`/`end`/`inclusive` keys but likewise deserializes as a plain Record.
+- For simple data checkpoints (Int, Float, Bool, Str, List, Record) round-tripping is lossless.
 - Functions and closures cannot be checkpointed — `checkpoint.step` must return an error if the body returns a value containing `Func` or `BuiltinFunc`.
 
 ## Storage
@@ -51,10 +54,10 @@ Checkpoints are stored as JSON files in `.lx-checkpoints/{scope_name}/{step_name
 
 **New files:**
 - `crates/lx/src/stdlib/checkpoint.rs` — scope, step, clear implementation
-- `tests/79_checkpoint.lx` — unit tests for checkpoint/replay behavior
+- `tests/79_checkpoint.lx` — unit tests for checkpoint/replay behavior (note: `tests/` directory does not exist yet and must be created; `just test` runs `cargo run -p lx-cli -- test tests/` which discovers `*.lx` files in that directory)
 
 **Modified files:**
-- `crates/lx/src/stdlib/mod.rs` — register `mod checkpoint;`, add `"checkpoint" => checkpoint::build()` to `get_std_module` match and `"checkpoint"` to `std_module_exists` match
+- `crates/lx/src/stdlib/mod.rs` — add `mod checkpoint;` declaration, add `"checkpoint" => checkpoint::build()` to the `get_std_module` match, and add `"checkpoint"` to the `std_module_exists` `matches!` macro
 
 # Task List
 
@@ -62,7 +65,7 @@ Checkpoints are stored as JSON files in `.lx-checkpoints/{scope_name}/{step_name
 
 **Subject:** Create checkpoint file storage with read/write/clear operations
 
-**Description:** Create `crates/lx/src/stdlib/checkpoint.rs`. Implement internal helpers: `checkpoint_dir(store_path, scope_name) -> PathBuf`, `write_checkpoint(dir, step_name, value: &LxVal) -> Result<(), LxError>` (serialize to JSON, write atomically via temp file + rename), `read_checkpoint(dir, step_name) -> Option<LxVal>` (read + deserialize, return None if file doesn't exist), `clear_checkpoints(dir) -> Result<(), LxError>` (remove the directory). Implement `bi_clear(name)` that calls `clear_checkpoints`. Register the module in `stdlib/mod.rs`: add `mod checkpoint;` declaration, add `"checkpoint" => checkpoint::build()` to the `get_std_module` match, and add `"checkpoint"` to the `std_module_exists` match. Add `"clear"` to the `build()` map in checkpoint.rs.
+**Description:** Create `crates/lx/src/stdlib/checkpoint.rs`. Implement internal helpers: `checkpoint_dir(store_path, scope_name) -> PathBuf`, `write_checkpoint(dir, step_name, value: &LxVal) -> Result<(), LxError>` (serialize to JSON, write atomically via temp file + rename), `read_checkpoint(dir, step_name) -> Option<LxVal>` (read + deserialize, return None if file doesn't exist), `clear_checkpoints(dir) -> Result<(), LxError>` (remove the directory). Implement `bi_clear(name)` that calls `clear_checkpoints`. Register the module in `stdlib/mod.rs`: add `mod checkpoint;` declaration, add `"checkpoint" => checkpoint::build()` to the `get_std_module` match, and add `"checkpoint"` to the `std_module_exists` `matches!` macro. Add `"clear"` to the `build()` map in checkpoint.rs.
 
 Run `just diagnose`.
 
@@ -77,7 +80,7 @@ Run `just diagnose`.
 **Description:** In `crates/lx/src/stdlib/checkpoint.rs`, implement `bi_scope(name, opts, body)`:
 1. Parse `store_path` from opts (default `.lx-checkpoints/`).
 2. Compute the checkpoint directory.
-3. Create a `step` closure (as an `LxVal::BuiltinFunc` — see `crate::builtins::mk` for the constructor pattern) that captures the checkpoint directory. The step closure takes `(step_name, body_fn)`:
+3. Create a `step` builtin as `LxVal::BuiltinFunc` with arity 3 and the checkpoint directory path pre-applied as the first argument (stored in the `applied` vec). `SyncBuiltinFn` is a plain function pointer (`fn(...)`) — it cannot capture state — so use partial application to pass the directory. The step function `bi_step(args)` receives `args[0]` = dir path (Str), `args[1]` = step_name (Str), `args[2]` = body_fn (Func):
    a. Check if `read_checkpoint(dir, step_name)` returns Some — if so, return the stored value.
    b. Otherwise, call `body_fn()` via `call_value_sync` (from `crate::builtins`), serialize the result, call `write_checkpoint`, return the result.
    c. If the result contains `Func` or `BuiltinFunc`, return an error (serde Serialize won't fail — it silently produces `"<Func>"` — so check explicitly before writing).
@@ -96,7 +99,7 @@ Run `just diagnose`.
 
 **Subject:** Test checkpoint, replay, and clear behavior
 
-**Description:** Create `tests/79_checkpoint.lx`. Tests:
+**Description:** Create the `tests/` directory if it does not exist, then create `tests/79_checkpoint.lx`. Tests:
 1. **Basic checkpoint** — scope with 2 steps, verify both execute and return correct values.
 2. **Replay behavior** — scope with 2 steps where step 1 writes a counter file. Run scope twice. On second run, step 1 should replay (counter file not written again). Verify by checking counter.
 3. **Clear** — run scope, call `checkpoint.clear`, run scope again, verify all steps re-execute.

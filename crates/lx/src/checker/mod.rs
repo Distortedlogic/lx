@@ -33,10 +33,10 @@ pub(crate) struct Checker {
   pub(crate) table: UnificationTable,
   scope: Vec<HashMap<Sym, Type>>,
   pub(crate) diagnostics: Vec<Diagnostic>,
-  pub(crate) type_defs: HashMap<String, Vec<String>>,
-  pub(crate) mutables: HashSet<String>,
-  import_sources: HashMap<String, SourceSpan>,
-  pub(crate) trait_fields: HashMap<String, Vec<(String, Type)>>,
+  pub(crate) type_defs: HashMap<Sym, Vec<Sym>>,
+  pub(crate) mutables: HashSet<Sym>,
+  import_sources: HashMap<Sym, SourceSpan>,
+  pub(crate) trait_fields: HashMap<Sym, Vec<(Sym, Type)>>,
 }
 
 impl Checker {
@@ -75,12 +75,8 @@ impl Checker {
     self.scope.pop();
   }
 
-  pub(crate) fn emit(&mut self, msg: String, span: SourceSpan) {
-    self.diagnostics.push(Diagnostic { level: DiagLevel::Error, msg, span });
-  }
-
-  pub(crate) fn emit_warning(&mut self, msg: String, span: SourceSpan) {
-    self.diagnostics.push(Diagnostic { level: DiagLevel::Warning, msg, span });
+  pub(crate) fn emit(&mut self, level: DiagLevel, msg: String, span: SourceSpan) {
+    self.diagnostics.push(Diagnostic { level, msg, span });
   }
 
   pub(crate) fn fresh(&mut self) -> Type {
@@ -89,7 +85,7 @@ impl Checker {
 
   pub(crate) fn resolve_type_ann(&mut self, ty: &SType) -> Type {
     match &ty.node {
-      TypeExpr::Named(name) => named_to_type(name),
+      TypeExpr::Named(name) => named_to_type(name.as_str()),
       TypeExpr::Var(_) => self.fresh(),
       TypeExpr::Applied(name, args) => {
         let resolved: Vec<Type> = args.iter().map(|a| self.resolve_type_ann(a)).collect();
@@ -105,7 +101,7 @@ impl Checker {
       TypeExpr::List(inner) => Type::List(Box::new(self.resolve_type_ann(inner))),
       TypeExpr::Map { key, value } => Type::Map { key: Box::new(self.resolve_type_ann(key)), value: Box::new(self.resolve_type_ann(value)) },
       TypeExpr::Record(fields) => {
-        let fs = fields.iter().map(|f| (f.name.clone(), self.resolve_type_ann(&f.ty))).collect();
+        let fs = fields.iter().map(|f| (f.name, self.resolve_type_ann(&f.ty))).collect();
         Type::Record(fs)
       },
       TypeExpr::Tuple(elems) => Type::Tuple(elems.iter().map(|e| self.resolve_type_ann(e)).collect()),

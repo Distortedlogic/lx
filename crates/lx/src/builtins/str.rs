@@ -77,7 +77,7 @@ fn bi_join(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<L
   Ok(LxVal::str(parts?.join(sep)))
 }
 
-pub(super) fn register(env: &mut Env) {
+pub(super) fn register(env: &Env) {
   super::register_builtins!(env, {
     "trim"/1 => bi_trim, "trim_start"/1 => bi_trim_start, "trim_end"/1 => bi_trim_end,
     "upper"/1 => bi_upper, "lower"/1 => bi_lower, "lines"/1 => bi_lines,

@@ -6,7 +6,7 @@ pub use walk_expr::*;
 pub use walk_pattern::*;
 pub use walk_type::*;
 
-use crate::ast::{BindTarget, Binding, ClassDeclData, Expr, Program, SExpr, Stmt};
+use crate::ast::{BindTarget, Binding, ClassDeclData, Expr, Program, SExpr, Stmt, WithKind};
 use miette::SourceSpan;
 
 use super::AstVisitor;
@@ -21,13 +21,13 @@ pub fn walk_stmt<V: AstVisitor + ?Sized>(v: &mut V, stmt: &Stmt, span: SourceSpa
   match stmt {
     Stmt::Binding(binding) => v.visit_binding(binding, span),
     Stmt::TypeDef { name, variants, exported } => {
-      v.visit_type_def(name, variants, *exported, span);
+      v.visit_type_def(*name, variants, *exported, span);
     },
     Stmt::TraitUnion(def) => v.visit_trait_union(def, span),
     Stmt::TraitDecl(data) => v.visit_trait_decl(data, span),
     Stmt::ClassDecl(data) => v.visit_class_decl(data, span),
     Stmt::FieldUpdate { name, fields, value } => {
-      v.visit_field_update(name, fields, value, span);
+      v.visit_field_update(*name, fields, value, span);
     },
     Stmt::Use(use_stmt) => v.visit_use(use_stmt, span),
     Stmt::Expr(sexpr) => v.visit_expr(&sexpr.node, sexpr.span),
@@ -86,7 +86,7 @@ pub fn walk_expr<V: AstVisitor + ?Sized>(v: &mut V, expr: &Expr, span: SourceSpa
     Expr::Slice { expr: e, start, end } => {
       v.visit_slice(e, start.as_deref(), end.as_deref(), span);
     },
-    Expr::NamedArg { name, value } => v.visit_named_arg(name, value, span),
+    Expr::NamedArg { name, value } => v.visit_named_arg(*name, value, span),
     Expr::Loop(stmts) => v.visit_loop(stmts, span),
     Expr::Break(val) => v.visit_break(val.as_deref(), span),
     Expr::Assert { expr: e, msg } => v.visit_assert(e, msg.as_deref(), span),
@@ -94,14 +94,16 @@ pub fn walk_expr<V: AstVisitor + ?Sized>(v: &mut V, expr: &Expr, span: SourceSpa
     Expr::Sel(arms) => v.visit_sel(arms, span),
     Expr::Emit { value } => v.visit_emit(value, span),
     Expr::Yield { value } => v.visit_yield(value, span),
-    Expr::With { name, value, body, mutable } => {
-      v.visit_with(name, value, body, *mutable, span);
-    },
-    Expr::WithResource { resources, body } => {
-      v.visit_with_resource(resources, body, span);
-    },
-    Expr::WithContext { fields, body } => {
-      v.visit_with_context(fields, body, span);
+    Expr::With { kind, body } => match kind {
+      WithKind::Binding { name, value, mutable } => {
+        v.visit_with(*name, value, body, *mutable, span);
+      },
+      WithKind::Resources { resources } => {
+        v.visit_with_resource(resources, body, span);
+      },
+      WithKind::Context { fields } => {
+        v.visit_with_context(fields, body, span);
+      },
     },
   }
 }

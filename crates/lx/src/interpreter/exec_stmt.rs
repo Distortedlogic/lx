@@ -1,4 +1,3 @@
-use crate::sym::intern;
 use std::sync::Arc;
 
 use async_recursion::async_recursion;
@@ -30,13 +29,9 @@ impl Interpreter {
             if self.env.has_mut(*name) {
               self.env.reassign(*name, val).map_err(|e| LxError::runtime(e, stmt.span))?;
             } else {
-              let mut env = self.env.child();
-              if b.mutable {
-                env.bind_mut(*name, val);
-              } else {
-                env.bind(*name, val);
-              }
-              self.env = env.into_arc();
+              let env = self.env.child();
+              env.bind_with_mutability(*name, val, b.mutable);
+              self.env = Arc::new(env);
             }
           },
           BindTarget::Reassign(name) => {
@@ -52,15 +47,11 @@ impl Interpreter {
               };
               LxError::runtime(msg, stmt.span)
             })?;
-            let mut env = self.env.child();
-            for (name, v) in bindings {
-              if b.mutable {
-                env.bind_mut(intern(&name), v);
-              } else {
-                env.bind(intern(&name), v);
-              }
+            let env = self.env.child();
+            for (sym, v) in bindings {
+              env.bind_with_mutability(sym, v, b.mutable);
             }
-            self.env = env.into_arc();
+            self.env = Arc::new(env);
           },
         }
         Ok(LxVal::Unit)
@@ -70,21 +61,20 @@ impl Interpreter {
         Ok(LxVal::Unit)
       },
       Stmt::TypeDef { variants, .. } => {
-        let mut env = self.env.child();
+        let env = self.env.child();
         for (ctor_name, arity) in variants {
-          let tag = intern(ctor_name);
           if *arity == 0 {
-            env.bind(*ctor_name, LxVal::Tagged { tag, values: Arc::new(vec![]) });
+            env.bind(*ctor_name, LxVal::Tagged { tag: *ctor_name, values: Arc::new(vec![]) });
           } else {
-            env.bind(*ctor_name, LxVal::TaggedCtor { tag, arity: *arity, applied: vec![] });
+            env.bind(*ctor_name, LxVal::TaggedCtor { tag: *ctor_name, arity: *arity, applied: vec![] });
           }
         }
-        self.env = env.into_arc();
+        self.env = Arc::new(env);
         Ok(LxVal::Unit)
       },
-      Stmt::TraitUnion(def) => self.eval_trait_union(&def.name, &def.variants, stmt.span),
+      Stmt::TraitUnion(def) => self.eval_trait_union(def.name, &def.variants, stmt.span),
       Stmt::TraitDecl(data) => {
-        let trait_fields = self.eval_trait_fields(&data.name, &data.entries, stmt.span).await?;
+        let trait_fields = self.eval_trait_fields(data.name.as_str(), &data.entries, stmt.span).await?;
         let mut method_defs = Vec::new();
         for m in &data.methods {
           let mut input = Vec::new();
@@ -93,50 +83,50 @@ impl Interpreter {
               Some(e) => Some(self.eval(e).await?),
               None => None,
             };
-            input.push(crate::value::FieldDef { name: f.name.clone(), type_name: f.type_name.clone(), default, constraint: None });
+            input.push(crate::value::FieldDef { name: f.name, type_name: f.type_name, default, constraint: None });
           }
-          method_defs.push(crate::value::TraitMethodDef { name: m.name.clone(), input, output: m.output.clone() });
+          method_defs.push(crate::value::TraitMethodDef { name: m.name, input, output: m.output });
         }
         let mut default_impls = IndexMap::new();
         for d in &data.defaults {
           let handler = self.eval(&d.handler).await?;
-          default_impls.insert(d.name.clone(), handler);
+          default_impls.insert(d.name, handler);
         }
         let val = LxVal::Trait(Box::new(LxTrait {
-          name: intern(&data.name),
+          name: data.name,
           fields: Arc::new(trait_fields),
           methods: Arc::new(method_defs),
           defaults: Arc::new(default_impls),
-          requires: Arc::new(data.requires.iter().map(|s| intern(s)).collect()),
-          description: data.description.as_ref().map(|s| intern(s)),
-          tags: Arc::new(data.tags.iter().map(|s| intern(s)).collect()),
+          requires: Arc::new(data.requires.clone()),
+          description: data.description,
+          tags: Arc::new(data.tags.clone()),
         }));
-        let mut env = self.env.child();
+        let env = self.env.child();
         env.bind(data.name, val);
-        self.env = env.into_arc();
+        self.env = Arc::new(env);
         Ok(LxVal::Unit)
       },
       Stmt::ClassDecl(data) => {
         let mut defaults_map = IndexMap::new();
         for f in &data.fields {
           let val = self.eval(&f.default).await?;
-          defaults_map.insert(f.name.clone(), val);
+          defaults_map.insert(f.name, val);
         }
         let mut method_map = IndexMap::new();
         for m in &data.methods {
           let handler = self.eval(&m.handler).await?;
-          method_map.insert(m.name.clone(), handler);
+          method_map.insert(m.name, handler);
         }
-        Self::inject_traits(&mut method_map, &data.traits, &self.env, "Class", &data.name, stmt.span)?;
+        Self::inject_traits(&mut method_map, &data.traits, &self.env, "Class", data.name.as_str(), stmt.span)?;
         let val = LxVal::Class(Box::new(LxClass {
-          name: intern(&data.name),
-          traits: Arc::new(data.traits.iter().map(|s| intern(s)).collect()),
+          name: data.name,
+          traits: Arc::new(data.traits.clone()),
           defaults: Arc::new(defaults_map),
           methods: Arc::new(method_map),
         }));
-        let mut env = self.env.child();
+        let env = self.env.child();
         env.bind(data.name, val);
-        self.env = env.into_arc();
+        self.env = Arc::new(env);
         Ok(LxVal::Unit)
       },
       Stmt::FieldUpdate { name, fields, value } => {

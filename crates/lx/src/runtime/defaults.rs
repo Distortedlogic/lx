@@ -62,7 +62,7 @@ async fn response_to_value(resp: reqwest::Response, span: SourceSpan) -> Result<
   let mut headers = IndexMap::new();
   for (name, value) in resp.headers() {
     let v = value.to_str().unwrap_or("").to_string();
-    headers.insert(name.to_string(), LxVal::str(v));
+    headers.insert(crate::sym::intern(name.as_str()), LxVal::str(v));
   }
   let body_str = resp.text().await.map_err(|e| LxError::runtime(format!("http: body: {e}"), span))?;
   let body = if let Ok(jv) = serde_json::from_str::<serde_json::Value>(&body_str) { LxVal::from(jv) } else { LxVal::str(body_str) };
@@ -104,18 +104,4 @@ impl LogBackend for StderrLogBackend {
     };
     eprintln!("[{tag}] {msg}");
   }
-}
-
-pub struct NoopEmitBackend;
-
-impl EmitBackend for NoopEmitBackend {
-  fn emit(&self, _value: &LxVal, _span: SourceSpan) -> Result<(), LxError> {
-    Ok(())
-  }
-}
-
-pub struct NoopLogBackend;
-
-impl LogBackend for NoopLogBackend {
-  fn log(&self, _level: LogLevel, _msg: &str) {}
 }

@@ -2,21 +2,21 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
-use crate::builtins::mk;
 use crate::error::LxError;
 use crate::record;
 use crate::runtime::RuntimeCtx;
+use crate::std_module;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
-pub fn build() -> IndexMap<String, LxVal> {
-  let mut m = IndexMap::new();
-  m.insert("system".into(), mk("introspect.system", 1, bi_system));
-  m.insert("agents".into(), mk("introspect.agents", 1, bi_agents));
-  m.insert("agent".into(), mk("introspect.agent", 1, bi_agent));
-  m.insert("messages".into(), mk("introspect.messages", 1, bi_messages));
-  m.insert("bottleneck".into(), mk("introspect.bottleneck", 1, bi_bottleneck));
-  m
+pub fn build() -> IndexMap<crate::sym::Sym, LxVal> {
+  std_module! {
+    "system"     => "introspect.system",     1, bi_system;
+    "agents"     => "introspect.agents",     1, bi_agents;
+    "agent"      => "introspect.agent",      1, bi_agent;
+    "messages"   => "introspect.messages",   1, bi_messages;
+    "bottleneck" => "introspect.bottleneck", 1, bi_bottleneck
+  }
 }
 
 fn bi_system(_args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {

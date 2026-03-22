@@ -1,8 +1,8 @@
-use crate::sym::intern;
 use std::sync::Arc;
 
 use crate::ast::{Literal, MatchArm, Pattern, SExpr};
 use crate::error::LxError;
+use crate::sym::Sym;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
@@ -12,11 +12,11 @@ impl super::Interpreter {
     for arm in arms {
       if let Some(bindings) = self.try_match_pattern(&arm.pattern.node, &val) {
         let saved = Arc::clone(&self.env);
-        let mut scope = self.env.child();
-        for (name, v) in bindings {
-          scope.bind(intern(&name), v);
+        let scope = self.env.child();
+        for (sym, v) in bindings {
+          scope.bind(sym, v);
         }
-        self.env = scope.into_arc();
+        self.env = Arc::new(scope);
         if let Some(guard) = &arm.guard {
           let gv = self.eval(guard).await?;
           match gv.as_bool() {
@@ -39,10 +39,10 @@ impl super::Interpreter {
     Err(LxError::runtime(format!("no matching pattern for {} `{}`", val.type_name(), val.short_display()), span))
   }
 
-  pub(super) fn try_match_pattern(&self, pattern: &Pattern, value: &LxVal) -> Option<Vec<(String, LxVal)>> {
+  pub(super) fn try_match_pattern(&self, pattern: &Pattern, value: &LxVal) -> Option<Vec<(Sym, LxVal)>> {
     match pattern {
       Pattern::Wildcard => Some(vec![]),
-      Pattern::Bind(name) => Some(vec![(name.clone(), value.clone())]),
+      Pattern::Bind(name) => Some(vec![(*name, value.clone())]),
       Pattern::Literal(lit) => {
         let matches = match (lit, value) {
           (Literal::Int(a), LxVal::Int(b)) => a == b,
@@ -94,7 +94,7 @@ impl super::Interpreter {
         }
         if let Some(rest_name) = rest {
           let remaining = items[elems.len()..].to_vec();
-          bindings.push((rest_name.clone(), LxVal::list(remaining)));
+          bindings.push((*rest_name, LxVal::list(remaining)));
         }
         Some(bindings)
       },
@@ -108,14 +108,13 @@ impl super::Interpreter {
           if let Some(sub_pat) = &fp.pattern {
             bindings.extend(self.try_match_pattern(&sub_pat.node, val)?);
           } else {
-            bindings.push((fp.name.clone(), val.clone()));
+            bindings.push((fp.name, val.clone()));
           }
         }
         if let Some(rest_name) = rest {
-          let matched_keys: std::collections::HashSet<&str> = fields.iter().map(|f| f.name.as_str()).collect();
-          let remaining: indexmap::IndexMap<String, LxVal> =
-            rec.iter().filter(|(k, _)| !matched_keys.contains(k.as_str())).map(|(k, v)| (k.clone(), v.clone())).collect();
-          bindings.push((rest_name.clone(), LxVal::record(remaining)));
+          let matched_keys: std::collections::HashSet<Sym> = fields.iter().map(|f| f.name).collect();
+          let remaining: indexmap::IndexMap<Sym, LxVal> = rec.iter().filter(|(k, _)| !matched_keys.contains(k)).map(|(k, v)| (*k, v.clone())).collect();
+          bindings.push((*rest_name, LxVal::record(remaining)));
         }
         Some(bindings)
       },
@@ -124,7 +123,7 @@ impl super::Interpreter {
         ("Err", LxVal::Err(v)) if args.len() == 1 => self.try_match_pattern(&args[0].node, v),
         ("Some", LxVal::Some(v)) if args.len() == 1 => self.try_match_pattern(&args[0].node, v),
         ("None", LxVal::None) if args.is_empty() => Some(vec![]),
-        (tag, LxVal::Tagged { tag: vtag, values }) if tag == vtag.as_ref() && args.len() == values.len() => {
+        (tag, LxVal::Tagged { tag: vtag, values }) if tag == vtag.as_str() && args.len() == values.len() => {
           let mut bindings = vec![];
           for (p, v) in args.iter().zip(values.as_ref()) {
             bindings.extend(self.try_match_pattern(&p.node, v)?);

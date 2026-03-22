@@ -30,14 +30,14 @@ impl super::Interpreter {
       if f.is_spread {
         let v = self.eval(&f.value).await?;
         match v {
-          LxVal::Record(r) => map.extend(r.iter().map(|(k, v)| (k.clone(), v.clone()))),
+          LxVal::Record(r) => map.extend(r.iter().map(|(k, v)| (*k, v.clone()))),
           other => {
             return Err(LxError::type_err(format!("spread requires Record, got {}", other.type_name()), f.value.span));
           },
         }
       } else {
         let val = self.eval(&f.value).await?;
-        let name = f.name.clone().unwrap_or_else(|| if let Expr::Ident(n) = &f.value.node { n.clone() } else { "_".into() });
+        let name = f.name.unwrap_or_else(|| if let Expr::Ident(n) = &f.value.node { *n } else { "_".into() });
         map.insert(name, val);
       }
     }

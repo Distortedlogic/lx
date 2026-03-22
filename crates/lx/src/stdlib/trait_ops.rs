@@ -2,18 +2,18 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
-use crate::builtins::mk;
 use crate::error::LxError;
 use crate::record;
 use crate::runtime::RuntimeCtx;
+use crate::std_module;
 use crate::value::{LxVal, TraitMethodDef};
 use miette::SourceSpan;
 
-pub fn build() -> IndexMap<String, LxVal> {
-  let mut m = IndexMap::new();
-  m.insert("methods".into(), mk("trait.methods", 1, bi_methods));
-  m.insert("match".into(), mk("trait.match", 2, bi_match));
-  m
+pub fn build() -> IndexMap<crate::sym::Sym, LxVal> {
+  std_module! {
+    "methods" => "trait.methods", 1, bi_methods;
+    "match"   => "trait.match",   2, bi_match
+  }
 }
 
 fn method_to_record(m: &TraitMethodDef) -> LxVal {
@@ -21,13 +21,13 @@ fn method_to_record(m: &TraitMethodDef) -> LxVal {
     .input
     .iter()
     .map(|f| {
-      record! { "name" => LxVal::str(&f.name), "type" => LxVal::str(&f.type_name) }
+      record! { "name" => LxVal::str(f.name), "type" => LxVal::str(f.type_name) }
     })
     .collect();
   record! {
-      "name" => LxVal::str(&m.name),
+      "name" => LxVal::str(m.name),
       "input" => LxVal::list(input_fields),
-      "output" => LxVal::str(&m.output),
+      "output" => LxVal::str(m.output),
   }
 }
 
@@ -48,10 +48,10 @@ fn bi_match(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<
     .ok_or_else(|| LxError::type_err(format!("trait.match: expected Str query, got {} `{}`", args[1].type_name(), args[1].short_display()), span))?;
   let query_lower = query.to_lowercase();
   let words: Vec<&str> = query_lower.split_whitespace().collect();
-  let mut best_name = String::new();
+  let mut best_name = "";
   let mut best_score = 0.0_f64;
   for m in t.methods.iter() {
-    let name_lower = m.name.to_lowercase();
+    let name_lower = m.name.as_str().to_lowercase();
     let mut hits = 0;
     for w in &words {
       if name_lower.contains(w) {
@@ -61,7 +61,7 @@ fn bi_match(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<
     let score = if words.is_empty() { 0.0 } else { hits as f64 / words.len() as f64 };
     if score > best_score {
       best_score = score;
-      best_name = m.name.clone();
+      best_name = m.name.as_str();
     }
   }
   if best_score > 0.0 { Ok(record! { "method" => LxVal::str(best_name), "score" => LxVal::Float(best_score) }) } else { Ok(LxVal::None) }

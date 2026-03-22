@@ -1,26 +1,27 @@
 use std::collections::HashSet;
 
-use crate::ast::{Expr, ListElem, SExpr, SStmt, Section, Stmt};
+use crate::ast::{Expr, ListElem, SExpr, SStmt, Section, Stmt, WithKind};
+use crate::sym::Sym;
 
-pub fn free_vars(expr: &SExpr) -> HashSet<String> {
+pub fn free_vars(expr: &SExpr) -> HashSet<Sym> {
   let mut vars = HashSet::new();
   let mut bound = HashSet::new();
   collect_free(&expr.node, &mut vars, &mut bound);
   vars
 }
 
-fn free_vars_stmts(stmts: &[SStmt], vars: &mut HashSet<String>, bound: &mut HashSet<String>) {
+fn free_vars_stmts(stmts: &[SStmt], vars: &mut HashSet<Sym>, bound: &mut HashSet<Sym>) {
   for s in stmts {
     match &s.node {
       Stmt::Binding(b) => {
         collect_free(&b.value.node, vars, bound);
         match &b.target {
           crate::ast::BindTarget::Name(n) => {
-            bound.insert(n.clone());
+            bound.insert(*n);
           },
           crate::ast::BindTarget::Reassign(n) => {
             if !bound.contains(n) {
-              vars.insert(n.clone());
+              vars.insert(*n);
             }
           },
           crate::ast::BindTarget::Pattern(_) => {},
@@ -33,17 +34,17 @@ fn free_vars_stmts(stmts: &[SStmt], vars: &mut HashSet<String>, bound: &mut Hash
   }
 }
 
-fn collect_free(expr: &Expr, vars: &mut HashSet<String>, bound: &mut HashSet<String>) {
+fn collect_free(expr: &Expr, vars: &mut HashSet<Sym>, bound: &mut HashSet<Sym>) {
   match expr {
     Expr::Ident(name) => {
       if !bound.contains(name) {
-        vars.insert(name.clone());
+        vars.insert(*name);
       }
     },
     Expr::Func { params, body, .. } => {
       let mut inner_bound = bound.clone();
       for p in params {
-        inner_bound.insert(p.name.clone());
+        inner_bound.insert(p.name);
       }
       collect_free(&body.node, vars, &mut inner_bound);
     },
@@ -104,25 +105,27 @@ fn collect_free(expr: &Expr, vars: &mut HashSet<String>, bound: &mut HashSet<Str
         collect_free(&e.node, vars, bound);
       }
     },
-    Expr::With { name, value, body, .. } => {
-      collect_free(&value.node, vars, bound);
-      let mut inner = bound.clone();
-      inner.insert(name.clone());
-      free_vars_stmts(body, vars, &mut inner);
-    },
-    Expr::WithResource { resources, body } => {
-      let mut inner = bound.clone();
-      for (r, name) in resources {
-        collect_free(&r.node, vars, bound);
-        inner.insert(name.clone());
-      }
-      free_vars_stmts(body, vars, &mut inner);
-    },
-    Expr::WithContext { fields, body } => {
-      for (_, expr) in fields {
-        collect_free(&expr.node, vars, bound);
-      }
-      free_vars_stmts(body, vars, bound);
+    Expr::With { kind, body } => match kind {
+      WithKind::Binding { name, value, .. } => {
+        collect_free(&value.node, vars, bound);
+        let mut inner = bound.clone();
+        inner.insert(*name);
+        free_vars_stmts(body, vars, &mut inner);
+      },
+      WithKind::Resources { resources } => {
+        let mut inner = bound.clone();
+        for (r, name) in resources {
+          collect_free(&r.node, vars, bound);
+          inner.insert(*name);
+        }
+        free_vars_stmts(body, vars, &mut inner);
+      },
+      WithKind::Context { fields } => {
+        for (_, expr) in fields {
+          collect_free(&expr.node, vars, bound);
+        }
+        free_vars_stmts(body, vars, bound);
+      },
     },
     Expr::Par(stmts) => free_vars_stmts(stmts, vars, bound),
     Expr::Sel(arms) => {

@@ -9,7 +9,7 @@ use miette::SourceSpan;
 
 use super::BoxFut;
 
-pub(super) fn register(env: &mut crate::env::Env) {
+pub(super) fn register(env: &crate::env::Env) {
   super::register_builtins!(env, {
     "take"/2 => bi_take, "drop"/2 => bi_drop, "zip"/2 => bi_zip,
     "enumerate"/1 => bi_enumerate,
@@ -40,6 +40,10 @@ pub(super) fn register(env: &mut crate::env::Env) {
 
 pub(super) async fn call(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   crate::builtins::call_value(f, arg, span, ctx).await
+}
+
+pub(super) async fn call_predicate(f: &LxVal, arg: LxVal, sp: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<bool, LxError> {
+  Ok(call(f, arg, sp, ctx).await?.as_bool() == Some(true))
 }
 
 fn range_to_list(start: i64, end: i64, inclusive: bool) -> Vec<LxVal> {
@@ -167,8 +171,7 @@ fn bi_find(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
   Box::pin(async move {
     let items = get_list(&args[1], "find", sp)?;
     for v in items.iter() {
-      let result = call(&args[0], v.clone(), sp, &ctx).await?;
-      if result.as_bool() == Some(true) {
+      if call_predicate(&args[0], v.clone(), sp, &ctx).await? {
         return Ok(LxVal::some(v.clone()));
       }
     }
@@ -180,7 +183,7 @@ fn bi_any(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
   Box::pin(async move {
     let items = get_list(&args[1], "any?", sp)?;
     for v in items.iter() {
-      if call(&args[0], v.clone(), sp, &ctx).await?.as_bool() == Some(true) {
+      if call_predicate(&args[0], v.clone(), sp, &ctx).await? {
         return Ok(LxVal::Bool(true));
       }
     }
@@ -192,7 +195,7 @@ fn bi_all(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
   Box::pin(async move {
     let items = get_list(&args[1], "all?", sp)?;
     for v in items.iter() {
-      if call(&args[0], v.clone(), sp, &ctx).await?.as_bool() != Some(true) {
+      if !call_predicate(&args[0], v.clone(), sp, &ctx).await? {
         return Ok(LxVal::Bool(false));
       }
     }
@@ -204,7 +207,7 @@ fn bi_none_q(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
   Box::pin(async move {
     let items = get_list(&args[1], "none?", sp)?;
     for v in items.iter() {
-      if call(&args[0], v.clone(), sp, &ctx).await?.as_bool() == Some(true) {
+      if call_predicate(&args[0], v.clone(), sp, &ctx).await? {
         return Ok(LxVal::Bool(false));
       }
     }

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::ast::{Param, SExpr};
+use crate::env::Env;
 use crate::error::LxError;
 use crate::value::{BuiltinKind, LxFunc, LxVal};
 use miette::SourceSpan;
@@ -8,6 +9,23 @@ use miette::SourceSpan;
 use super::Interpreter;
 
 impl Interpreter {
+  async fn call_in_closure(&mut self, lf: &LxFunc, call_env: Arc<Env>, cross_module_errors: bool) -> Result<LxVal, LxError> {
+    let is_cross_module = cross_module_errors && self.source != lf.source_text.as_ref();
+    let fn_source_text = Arc::clone(&lf.source_text);
+    let fn_source_name = Arc::clone(&lf.source_name);
+    let saved = Arc::clone(&self.env);
+    let saved_source = std::mem::replace(&mut self.source, lf.source_text.to_string());
+    self.env = call_env;
+    let result = self.eval(&lf.body).await;
+    self.env = saved;
+    self.source = saved_source;
+    match result {
+      Err(LxError::Propagate { value, .. }) => Ok(*value),
+      Err(e) if is_cross_module => Err(e.with_source(fn_source_name.to_string(), fn_source_text)),
+      other => other,
+    }
+  }
+
   pub async fn apply_func(&mut self, func: LxVal, arg: LxVal, span: SourceSpan) -> Result<LxVal, LxError> {
     match func {
       LxVal::Func(mut lf) => {
@@ -15,20 +33,7 @@ impl Interpreter {
           && lf.arity == 0
           && lf.applied.is_empty()
         {
-          let is_cross_module = self.source != lf.source_text.as_ref();
-          let fn_source_text = Arc::clone(&lf.source_text);
-          let fn_source_name = Arc::clone(&lf.source_name);
-          let saved = Arc::clone(&self.env);
-          let saved_source = std::mem::replace(&mut self.source, lf.source_text.to_string());
-          self.env = Arc::clone(&lf.closure);
-          let result = self.eval(&lf.body).await;
-          self.env = saved;
-          self.source = saved_source;
-          return match result {
-            Err(LxError::Propagate { value, .. }) => Ok(*value),
-            Err(e) if is_cross_module => Err(e.with_source(fn_source_name.to_string(), fn_source_text)),
-            other => other,
-          };
+          return self.call_in_closure(&lf, Arc::clone(&lf.closure), true).await;
         }
         self.apply_named_args(&mut lf, arg);
         if lf.applied.len() == 1
@@ -42,28 +47,9 @@ impl Interpreter {
         if lf.applied.len() < lf.arity {
           return Ok(LxVal::Func(lf));
         }
-        let is_cross_module = self.source != lf.source_text.as_ref();
-        let fn_source_text = Arc::clone(&lf.source_text);
-        let fn_source_name = Arc::clone(&lf.source_name);
-        let saved = Arc::clone(&self.env);
-        let saved_source = std::mem::replace(&mut self.source, lf.source_text.to_string());
-        let mut call_env = lf.closure.child();
-        for (i, &sym) in lf.params.iter().enumerate() {
-          if i < lf.applied.len() {
-            call_env.bind(sym, lf.applied[i].clone());
-          } else if let Some(Some(def)) = lf.defaults.get(i) {
-            call_env.bind(sym, def.clone());
-          }
-        }
-        self.env = call_env.into_arc();
-        let result = self.eval(&lf.body).await;
-        self.env = saved;
-        self.source = saved_source;
-        match result {
-          Err(LxError::Propagate { value, .. }) => Ok(*value),
-          Err(e) if is_cross_module => Err(e.with_source(fn_source_name.to_string(), fn_source_text)),
-          other => other,
-        }
+        let call_env = lf.closure.child();
+        call_env.bind_params(&lf.params, &lf.applied, &lf.defaults);
+        self.call_in_closure(&lf, Arc::new(call_env), true).await
       },
       LxVal::BuiltinFunc(mut bf) => {
         bf.applied.push(arg);
@@ -79,14 +65,14 @@ impl Interpreter {
         applied.push(arg);
         if applied.len() < arity { Ok(LxVal::TaggedCtor { tag, arity, applied }) } else { Ok(LxVal::Tagged { tag, values: Arc::new(applied) }) }
       },
-      LxVal::Trait(ref t) if !t.fields.is_empty() => self.apply_trait_fields(crate::sym::resolve(t.name), &t.fields, &arg, span).await,
-      LxVal::TraitUnion { name, variants } => self.apply_trait_union(&name, &variants, &arg, span).await,
+      LxVal::Trait(ref t) if !t.fields.is_empty() => self.apply_trait_fields(t.name.as_str(), &t.fields, &arg, span).await,
+      LxVal::TraitUnion { name, variants } => self.apply_trait_union(name.as_str(), &variants, &arg, span).await,
       LxVal::Class(c) => {
         let overrides = match &arg {
           LxVal::Record(r) => r.as_ref().clone(),
           LxVal::Unit => indexmap::IndexMap::new(),
           _ => {
-            return Err(LxError::type_err(format!("Class {} constructor expects Record or (), got {}", crate::sym::resolve(c.name), arg.type_name()), span));
+            return Err(LxError::type_err(format!("Class {} constructor expects Record or (), got {}", c.name, arg.type_name()), span));
           },
         };
         let mut fields = c.defaults.as_ref().clone();
@@ -109,24 +95,9 @@ impl Interpreter {
     match val {
       LxVal::Func(ref lf) if lf.applied.len() < lf.arity && (lf.applied.len()..lf.arity).all(|i| matches!(lf.defaults.get(i), Some(Some(_)))) => {
         let LxVal::Func(lf) = val else { unreachable!() };
-        let saved = Arc::clone(&self.env);
-        let saved_source = std::mem::replace(&mut self.source, lf.source_text.to_string());
-        let mut call_env = lf.closure.child();
-        for (i, &sym) in lf.params.iter().enumerate() {
-          if i < lf.applied.len() {
-            call_env.bind(sym, lf.applied[i].clone());
-          } else if let Some(Some(def)) = lf.defaults.get(i) {
-            call_env.bind(sym, def.clone());
-          }
-        }
-        self.env = call_env.into_arc();
-        let result = self.eval(&lf.body).await;
-        self.env = saved;
-        self.source = saved_source;
-        match result {
-          Err(LxError::Propagate { value, .. }) => Ok(*value),
-          other => other,
-        }
+        let call_env = lf.closure.child();
+        call_env.bind_params(&lf.params, &lf.applied, &lf.defaults);
+        self.call_in_closure(&lf, Arc::new(call_env), false).await
       },
       other => Ok(other),
     }
@@ -141,11 +112,11 @@ impl Interpreter {
 
   fn apply_named_args(&self, lf: &mut LxFunc, arg: LxVal) {
     if let LxVal::Tagged { ref tag, ref values } = arg
-      && tag.as_ref() == "__named"
+      && *tag == "__named"
       && values.len() == 2
       && let LxVal::Str(ref name) = values[0]
     {
-      if let Some(idx) = lf.params.iter().position(|p| crate::sym::resolve(*p) == name.as_ref()) {
+      if let Some(idx) = lf.params.iter().position(|p| p.as_str() == name.as_ref()) {
         while lf.applied.len() < idx {
           lf.applied.push(LxVal::Unit);
         }
@@ -163,7 +134,7 @@ impl Interpreter {
   }
 
   pub(super) async fn eval_func(&mut self, params: &[Param], body: &SExpr) -> Result<LxVal, LxError> {
-    let param_names: Vec<crate::sym::Sym> = params.iter().map(|p| crate::sym::intern(&p.name)).collect();
+    let param_names: Vec<_> = params.iter().map(|p| p.name).collect();
     let mut defaults = Vec::new();
     for p in params {
       let d = match &p.default {

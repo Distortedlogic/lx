@@ -1,4 +1,3 @@
-use crate::sym::intern;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -13,49 +12,50 @@ use super::{Interpreter, ModuleExports};
 
 impl Interpreter {
   pub(super) async fn eval_use(&mut self, use_stmt: &UseStmt, span: SourceSpan) -> Result<(), LxError> {
-    let exports = if crate::stdlib::std_module_exists(&use_stmt.path) {
-      crate::stdlib::get_std_module(&use_stmt.path).ok_or_else(|| LxError::runtime(format!("unknown stdlib module: {}", use_stmt.path.join("/")), span))?
-    } else if let Some(file_path) = self.resolve_workspace_module(&use_stmt.path) {
+    let str_path: Vec<&str> = use_stmt.path.iter().map(|s| s.as_str()).collect();
+    let exports = if crate::stdlib::std_module_exists(&str_path) {
+      crate::stdlib::get_std_module(&str_path).ok_or_else(|| LxError::runtime(format!("unknown stdlib module: {}", str_path.join("/")), span))?
+    } else if let Some(file_path) = self.resolve_workspace_module(&str_path) {
       self.load_module(&file_path, span).await?
-    } else if let Some(file_path) = self.resolve_dep_module(&use_stmt.path) {
+    } else if let Some(file_path) = self.resolve_dep_module(&str_path) {
       self.load_module(&file_path, span).await?
     } else {
       let source_dir = self.source_dir.as_ref().ok_or_else(|| LxError::runtime("cannot resolve module path: no source directory", span))?.clone();
-      let file_path = resolve_module_path(&source_dir, &use_stmt.path, span)?;
+      let file_path = resolve_module_path(&source_dir, &str_path, span)?;
       self.load_module(&file_path, span).await?
     };
-    let mut env = self.env.child();
+    let env = self.env.child();
     for name in &exports.variant_ctors {
       if let Some(val) = exports.bindings.get(name) {
-        env.bind_str(&name, val.clone());
+        env.bind(*name, val.clone());
       }
     }
     match &use_stmt.kind {
       UseKind::Whole => {
         let module_name = use_stmt.path.last().ok_or_else(|| LxError::runtime("empty module path", span))?;
         let record = LxVal::record(exports.bindings.clone());
-        env.bind_str(&module_name, record);
+        env.bind(*module_name, record);
       },
       UseKind::Alias(alias) => {
         let record = LxVal::record(exports.bindings.clone());
-        env.bind_str(&alias, record);
+        env.bind(*alias, record);
       },
       UseKind::Selective(names) => {
         for name in names {
           let val = exports.bindings.get(name).ok_or_else(|| LxError::runtime(format!("'{name}' not exported by module"), span))?;
-          env.bind_str(&name, val.clone());
+          env.bind(*name, val.clone());
         }
       },
     }
-    self.env = env.into_arc();
+    self.env = Arc::new(env);
     Ok(())
   }
 
-  fn resolve_workspace_module(&self, path: &[String]) -> Option<PathBuf> {
+  fn resolve_workspace_module(&self, path: &[&str]) -> Option<PathBuf> {
     if path.len() < 2 {
       return None;
     }
-    let member_dir = self.ctx.workspace_members.get(&path[0])?;
+    let member_dir = self.ctx.workspace_members.get(path[0])?;
     let mut result = member_dir.clone();
     for segment in &path[1..] {
       result.push(segment);
@@ -64,11 +64,11 @@ impl Interpreter {
     Some(result)
   }
 
-  fn resolve_dep_module(&self, path: &[String]) -> Option<PathBuf> {
+  fn resolve_dep_module(&self, path: &[&str]) -> Option<PathBuf> {
     if path.is_empty() {
       return None;
     }
-    let dep_dir = self.ctx.dep_dirs.get(&path[0])?;
+    let dep_dir = self.ctx.dep_dirs.get(path[0])?;
     if path.len() == 1 {
       let entry = dep_dir.join("main.lx");
       if entry.exists() {
@@ -117,7 +117,7 @@ impl Interpreter {
   }
 }
 
-fn resolve_module_path(source_dir: &std::path::Path, path: &[String], span: SourceSpan) -> Result<PathBuf, LxError> {
+fn resolve_module_path(source_dir: &std::path::Path, path: &[&str], span: SourceSpan) -> Result<PathBuf, LxError> {
   if path.is_empty() {
     return Err(LxError::runtime("empty module path", span));
   }
@@ -149,32 +149,32 @@ fn collect_exports(program: &Program, interp: &Interpreter) -> ModuleExports {
     match &stmt.node {
       Stmt::Binding(b) if b.exported => {
         if let BindTarget::Name(name) = &b.target
-          && let Some(val) = interp.env.get_str(name)
+          && let Some(val) = interp.env.get(*name)
         {
-          bindings.insert(name.clone(), val);
+          bindings.insert(*name, val);
         }
       },
       Stmt::TypeDef { exported: true, variants, .. } => {
         for (ctor_name, _) in variants {
-          if let Some(val) = interp.env.get_str(ctor_name) {
-            variant_ctors.push(ctor_name.clone());
-            bindings.insert(ctor_name.clone(), val);
+          if let Some(val) = interp.env.get(*ctor_name) {
+            variant_ctors.push(*ctor_name);
+            bindings.insert(*ctor_name, val);
           }
         }
       },
       Stmt::TraitDecl(data) if data.exported => {
-        if let Some(val) = interp.env.get_str(&data.name) {
-          bindings.insert(data.name.clone(), val);
+        if let Some(val) = interp.env.get(data.name) {
+          bindings.insert(data.name, val);
         }
       },
       Stmt::ClassDecl(data) if data.exported => {
-        if let Some(val) = interp.env.get_str(&data.name) {
-          bindings.insert(data.name.clone(), val);
+        if let Some(val) = interp.env.get(data.name) {
+          bindings.insert(data.name, val);
         }
       },
       Stmt::TraitUnion(def) if def.exported => {
-        if let Some(val) = interp.env.get_str(&def.name) {
-          bindings.insert(def.name.clone(), val);
+        if let Some(val) = interp.env.get(def.name) {
+          bindings.insert(def.name, val);
         }
       },
       _ => {},

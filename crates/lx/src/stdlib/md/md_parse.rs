@@ -19,7 +19,7 @@ pub(super) fn bi_sections(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCt
         if let Some((lv, title, content)) = cur.take() {
           sections.push(node_rec("section", vec![("level", LxVal::int(lv)), ("title", LxVal::str(title)), ("content", LxVal::str(content.trim()))]));
         }
-        let lv: i64 = r.get("level").and_then(|v| v.as_int()).and_then(|n| n.try_into().ok()).unwrap_or(1);
+        let lv: i64 = r.get(&crate::sym::intern("level")).and_then(|v| v.as_int()).and_then(|n| n.try_into().ok()).unwrap_or(1);
         let title = field_str(r, "text").unwrap_or_default();
         cur = Some((lv, title, String::new()));
       } else if let Some((_, _, ref mut content)) = cur

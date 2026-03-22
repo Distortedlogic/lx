@@ -46,7 +46,6 @@ pub struct BackendsSection {
   #[serde(rename = "yield")]
   pub yield_backend: Option<String>,
   pub log: Option<String>,
-  pub user: Option<String>,
 }
 
 #[derive(Deserialize)]

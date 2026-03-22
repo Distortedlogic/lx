@@ -112,7 +112,7 @@ fn bi_has_key(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resul
     LxVal::Map(m) => Ok(LxVal::Bool(m.contains_key(&ValueKey(args[0].clone())))),
     LxVal::Record(r) => {
       let key = args[0].require_str("has_key?", span)?;
-      Ok(LxVal::Bool(r.contains_key(key)))
+      Ok(LxVal::Bool(r.contains_key(&crate::sym::intern(key))))
     },
     other => Err(LxError::type_err(format!("has_key? expects Map/Record, got {}", other.type_name()), span)),
   }
@@ -141,7 +141,7 @@ fn bi_merge(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<
   }
 }
 
-pub(super) fn register(env: &mut Env) {
+pub(super) fn register(env: &Env) {
   super::register_builtins!(env, {
     "sort"/1 => bi_sort, "sorted?"/1 => bi_sorted_q, "rev"/1 => bi_rev,
     "sum"/1 => bi_sum, "product"/1 => bi_product, "min"/1 => bi_min,

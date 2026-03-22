@@ -1,27 +1,29 @@
 use std::sync::Arc;
 
 use indexmap::IndexMap;
+
 use num_traits::ToPrimitive;
 
-use crate::builtins::mk;
 use crate::error::LxError;
 use crate::runtime::RuntimeCtx;
+use crate::std_module;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
-pub fn build() -> IndexMap<String, LxVal> {
-  let mut m = IndexMap::new();
-  m.insert("abs".into(), mk("math.abs", 1, bi_abs));
-  m.insert("ceil".into(), mk("math.ceil", 1, bi_ceil));
-  m.insert("floor".into(), mk("math.floor", 1, bi_floor));
-  m.insert("round".into(), mk("math.round", 1, bi_round));
-  m.insert("pow".into(), mk("math.pow", 2, bi_pow));
-  m.insert("sqrt".into(), mk("math.sqrt", 1, bi_sqrt));
-  m.insert("min".into(), mk("math.min", 2, bi_min));
-  m.insert("max".into(), mk("math.max", 2, bi_max));
-  m.insert("pi".into(), LxVal::Float(std::f64::consts::PI));
-  m.insert("e".into(), LxVal::Float(std::f64::consts::E));
-  m.insert("inf".into(), LxVal::Float(f64::INFINITY));
+pub fn build() -> IndexMap<crate::sym::Sym, LxVal> {
+  let mut m = std_module! {
+    "abs"   => "math.abs",   1, bi_abs;
+    "ceil"  => "math.ceil",  1, bi_ceil;
+    "floor" => "math.floor", 1, bi_floor;
+    "round" => "math.round", 1, bi_round;
+    "pow"   => "math.pow",   2, bi_pow;
+    "sqrt"  => "math.sqrt",  1, bi_sqrt;
+    "min"   => "math.min",   2, bi_min;
+    "max"   => "math.max",   2, bi_max
+  };
+  m.insert(crate::sym::intern("pi"), LxVal::Float(std::f64::consts::PI));
+  m.insert(crate::sym::intern("e"), LxVal::Float(std::f64::consts::E));
+  m.insert(crate::sym::intern("inf"), LxVal::Float(f64::INFINITY));
   m
 }
 

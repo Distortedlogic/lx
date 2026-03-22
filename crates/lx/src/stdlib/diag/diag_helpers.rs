@@ -32,7 +32,7 @@ pub(super) fn extract_str_literal(expr: &Expr) -> Option<String> {
 
 pub(super) fn expr_label(expr: &Expr) -> String {
   match expr {
-    Expr::Ident(name) => name.clone(),
+    Expr::Ident(name) => name.to_string(),
     Expr::FieldAccess { expr: e, field: FieldKind::Named(f) } => {
       format!("{}.{f}", expr_label(&e.node))
     },

@@ -9,32 +9,28 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
-use crate::builtins::mk;
 use crate::error::LxError;
 use crate::record;
 use crate::runtime::RuntimeCtx;
+use crate::std_module;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
-pub fn build() -> IndexMap<String, LxVal> {
-  let mut m = IndexMap::new();
-  m.insert("spec".into(), mk("test.spec", 2, bi_spec));
-  m.insert("scenario".into(), mk("test.scenario", 3, bi_scenario));
-  m.insert("run".into(), mk("test.run", 1, test_run::bi_run));
-  m.insert("run_scenario".into(), mk("test.run_scenario", 2, test_run::bi_run_scenario));
-  m.insert("report".into(), mk("test.report", 1, test_report::bi_report));
-  m
+pub fn build() -> IndexMap<crate::sym::Sym, LxVal> {
+  std_module! {
+    "spec"         => "test.spec",         2, bi_spec;
+    "scenario"     => "test.scenario",     3, bi_scenario;
+    "run"          => "test.run",          1, test_run::bi_run;
+    "run_scenario" => "test.run_scenario", 2, test_run::bi_run_scenario;
+    "report"       => "test.report",       1, test_report::bi_report
+  }
 }
 
-pub(super) fn extract_record<'a>(v: &'a LxVal, name: &str, span: SourceSpan) -> Result<&'a IndexMap<String, LxVal>, LxError> {
+pub(super) fn extract_record<'a>(v: &'a LxVal, name: &str, span: SourceSpan) -> Result<&'a IndexMap<crate::sym::Sym, LxVal>, LxError> {
   match v {
     LxVal::Record(r) => Ok(r.as_ref()),
     _ => Err(LxError::type_err(format!("{name}: expected Record, got {}", v.type_name()), span)),
   }
-}
-
-pub(super) fn extract_str<'a>(r: &'a IndexMap<String, LxVal>, key: &str, name: &str, span: SourceSpan) -> Result<&'a str, LxError> {
-  r.get(key).and_then(|v| v.as_str()).ok_or_else(|| LxError::type_err(format!("{name}: '{key}' must be Str"), span))
 }
 
 pub(super) fn score_to_f64(v: &LxVal) -> Option<f64> {
@@ -50,32 +46,32 @@ fn bi_spec(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<L
   let name = args[0].require_str("test.spec", span)?;
   let opts = extract_record(&args[1], "test.spec", span)?;
 
-  let flow = opts.get("flow").ok_or_else(|| LxError::type_err("test.spec: 'flow' is required", span))?.clone();
+  let flow = opts.get(&crate::sym::intern("flow")).ok_or_else(|| LxError::type_err("test.spec: 'flow' is required", span))?.clone();
   if flow.as_str().is_none() {
     return Err(LxError::type_err("test.spec: 'flow' must be Str", span));
   }
 
-  let grader = opts.get("grader").ok_or_else(|| LxError::type_err("test.spec: 'grader' is required", span))?.clone();
+  let grader = opts.get(&crate::sym::intern("grader")).ok_or_else(|| LxError::type_err("test.spec: 'grader' is required", span))?.clone();
 
-  let threshold = opts.get("threshold").and_then(|v| v.as_float()).unwrap_or(0.75);
+  let threshold = opts.get(&crate::sym::intern("threshold")).and_then(|v| v.as_float()).unwrap_or(0.75);
 
-  let weights = opts.get("weights").cloned().unwrap_or_else(|| LxVal::record(IndexMap::new()));
+  let weights = opts.get(&crate::sym::intern("weights")).cloned().unwrap_or_else(|| LxVal::record(IndexMap::new()));
 
-  let setup = opts.get("setup").cloned().unwrap_or(LxVal::None);
-  let teardown = opts.get("teardown").cloned().unwrap_or(LxVal::None);
+  let setup = opts.get(&crate::sym::intern("setup")).cloned().unwrap_or(LxVal::None);
+  let teardown = opts.get(&crate::sym::intern("teardown")).cloned().unwrap_or(LxVal::None);
 
-  let timeout = opts.get("timeout").and_then(|v| v.as_int()).and_then(|n| i64::try_from(n).ok()).unwrap_or(300);
+  let timeout = opts.get(&crate::sym::intern("timeout")).and_then(|v| v.as_int()).and_then(|n| i64::try_from(n).ok()).unwrap_or(300);
 
   let mut m = IndexMap::new();
-  m.insert("name".into(), LxVal::str(name));
-  m.insert("flow".into(), flow);
-  m.insert("grader".into(), grader);
-  m.insert("threshold".into(), LxVal::Float(threshold));
-  m.insert("weights".into(), weights);
-  m.insert("setup".into(), setup);
-  m.insert("teardown".into(), teardown);
-  m.insert("timeout".into(), LxVal::int(timeout));
-  m.insert("scenarios".into(), LxVal::list(Vec::new()));
+  m.insert(crate::sym::intern("name"), LxVal::str(name));
+  m.insert(crate::sym::intern("flow"), flow);
+  m.insert(crate::sym::intern("grader"), grader);
+  m.insert(crate::sym::intern("threshold"), LxVal::Float(threshold));
+  m.insert(crate::sym::intern("weights"), weights);
+  m.insert(crate::sym::intern("setup"), setup);
+  m.insert(crate::sym::intern("teardown"), teardown);
+  m.insert(crate::sym::intern("timeout"), LxVal::int(timeout));
+  m.insert(crate::sym::intern("scenarios"), LxVal::list(Vec::new()));
   Ok(LxVal::record(m))
 }
 
@@ -84,12 +80,12 @@ fn bi_scenario(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resu
   let scenario_name = args[1].require_str("test.scenario", span)?;
   let opts = extract_record(&args[2], "test.scenario", span)?;
 
-  let input = opts.get("input").ok_or_else(|| LxError::type_err("test.scenario: 'input' is required", span))?.clone();
+  let input = opts.get(&crate::sym::intern("input")).ok_or_else(|| LxError::type_err("test.scenario: 'input' is required", span))?.clone();
 
-  let rubric = opts.get("rubric").cloned().unwrap_or_else(|| LxVal::list(Vec::new()));
-  let runs = opts.get("runs").and_then(|v| v.as_int()).and_then(|n| i64::try_from(n).ok()).unwrap_or(3);
-  let expect = opts.get("expect").cloned().unwrap_or(LxVal::None);
-  let tags = opts.get("tags").cloned().unwrap_or_else(|| LxVal::list(Vec::new()));
+  let rubric = opts.get(&crate::sym::intern("rubric")).cloned().unwrap_or_else(|| LxVal::list(Vec::new()));
+  let runs = opts.get(&crate::sym::intern("runs")).and_then(|v| v.as_int()).and_then(|n| i64::try_from(n).ok()).unwrap_or(3);
+  let expect = opts.get(&crate::sym::intern("expect")).cloned().unwrap_or(LxVal::None);
+  let tags = opts.get(&crate::sym::intern("tags")).cloned().unwrap_or_else(|| LxVal::list(Vec::new()));
 
   let scenario = record! {
       "name" => LxVal::str(scenario_name),
@@ -101,7 +97,7 @@ fn bi_scenario(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resu
   };
 
   let mut new_spec = spec_fields.clone();
-  let scenarios = match new_spec.get("scenarios") {
+  let scenarios = match new_spec.get(&crate::sym::intern("scenarios")) {
     Some(LxVal::List(list)) => {
       let mut new_list = list.as_ref().clone();
       new_list.push(scenario);
@@ -109,6 +105,6 @@ fn bi_scenario(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resu
     },
     _ => LxVal::list(vec![scenario]),
   };
-  new_spec.insert("scenarios".into(), scenarios);
+  new_spec.insert(crate::sym::intern("scenarios"), scenarios);
   Ok(LxVal::record(new_spec))
 }

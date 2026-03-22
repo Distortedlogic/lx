@@ -9,7 +9,7 @@ fn interner() -> &'static ThreadedRodeo {
   INTERNER.get_or_init(ThreadedRodeo::default)
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Sym(Spur);
 
 impl Sym {
@@ -68,8 +68,4 @@ impl From<&String> for Sym {
 
 pub fn intern(s: &str) -> Sym {
   Sym(interner().get_or_intern(s))
-}
-
-pub fn resolve(sym: Sym) -> &'static str {
-  sym.as_str()
 }

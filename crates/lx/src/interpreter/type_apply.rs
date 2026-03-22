@@ -1,9 +1,9 @@
-use crate::sym::intern;
 use std::sync::Arc;
 
 use super::Interpreter;
 use crate::ast::{FieldDecl, TraitEntry};
 use crate::error::LxError;
+use crate::sym::Sym;
 use crate::value::{FieldDef, LxVal};
 use miette::{SourceOffset, SourceSpan};
 
@@ -17,7 +17,7 @@ impl Interpreter {
     for entry in entries {
       match entry {
         TraitEntry::Spread(base_name) => {
-          let base = self.env.get_str(base_name).ok_or_else(|| LxError::runtime(format!("Trait {name}: spread base '{base_name}' not found"), span))?;
+          let base = self.env.get(*base_name).ok_or_else(|| LxError::runtime(format!("Trait {name}: spread base '{base_name}' not found"), span))?;
           let LxVal::Trait(ref base_trait) = base else {
             return Err(LxError::runtime(format!("Trait {name}: '{base_name}' is not a Trait, got {}", base.type_name()), span));
           };
@@ -48,36 +48,35 @@ impl Interpreter {
       None => None,
     };
     let constraint = f.constraint.as_ref().map(|e| Arc::new(e.clone()));
-    Ok(FieldDef { name: f.name.clone(), type_name: f.type_name.clone(), default, constraint })
+    Ok(FieldDef { name: f.name, type_name: f.type_name, default, constraint })
   }
 
-  pub(super) fn eval_trait_union(&mut self, name: &str, variants: &[String], span: SourceSpan) -> Result<LxVal, LxError> {
+  pub(super) fn eval_trait_union(&mut self, name: Sym, variants: &[Sym], span: SourceSpan) -> Result<LxVal, LxError> {
     for v in variants {
-      let val = self.env.get_str(v).ok_or_else(|| LxError::runtime(format!("Trait union {name}: variant '{v}' not found"), span))?;
+      let val = self.env.get(*v).ok_or_else(|| LxError::runtime(format!("Trait union {name}: variant '{v}' not found"), span))?;
       if !matches!(val, LxVal::Trait(_)) {
         return Err(LxError::runtime(format!("Trait union {name}: variant '{v}' is not a Trait, got {}", val.type_name()), span));
       }
     }
-    let variant_syms: Vec<crate::sym::Sym> = variants.iter().map(|v| intern(v)).collect();
-    let val = LxVal::TraitUnion { name: intern(name), variants: Arc::new(variant_syms) };
-    let mut env = self.env.child();
-    env.bind_str(name, val);
-    self.env = env.into_arc();
+    let val = LxVal::TraitUnion { name, variants: Arc::new(variants.to_vec()) };
+    let env = self.env.child();
+    env.bind(name, val);
+    self.env = Arc::new(env);
     Ok(LxVal::Unit)
   }
 
-  pub(super) fn update_record_field(val: &LxVal, fields: &[String], new_val: LxVal, span: SourceSpan) -> Result<LxVal, LxError> {
+  pub(super) fn update_record_field(val: &LxVal, fields: &[Sym], new_val: LxVal, span: SourceSpan) -> Result<LxVal, LxError> {
     match (val, fields) {
       (LxVal::Record(rec), [field]) => {
         let mut new_rec = rec.as_ref().clone();
-        new_rec.insert(field.clone(), new_val);
+        new_rec.insert(*field, new_val);
         Ok(LxVal::record(new_rec))
       },
       (LxVal::Record(rec), [field, rest @ ..]) => {
         let inner = rec.get(field).ok_or_else(|| LxError::runtime(format!("field '{field}' not found"), span))?;
         let updated = Self::update_record_field(inner, rest, new_val, span)?;
         let mut new_rec = rec.as_ref().clone();
-        new_rec.insert(field.clone(), updated);
+        new_rec.insert(*field, updated);
         Ok(LxVal::record(new_rec))
       },
       (other, _) => Err(LxError::type_err(format!("field update requires Record, got {}", other.type_name()), span)),

@@ -1,7 +1,6 @@
-use std::collections::HashSet;
 use std::sync::Arc;
 
-use dashmap::DashMap;
+use dashmap::{DashMap, DashSet};
 
 use crate::sym::{Sym, intern};
 use crate::value::LxVal;
@@ -9,15 +8,11 @@ use crate::value::LxVal;
 #[derive(Debug, Clone, Default)]
 pub struct Env {
   bindings: DashMap<Sym, LxVal>,
-  mutables: HashSet<Sym>,
+  mutables: DashSet<Sym>,
   parent: Option<Arc<Env>>,
 }
 
 impl Env {
-  pub fn new() -> Self {
-    Self::default()
-  }
-
   pub fn with_parent(parent: Arc<Env>) -> Self {
     Self { parent: Some(parent), ..Self::default() }
   }
@@ -26,16 +21,34 @@ impl Env {
     Self::with_parent(Arc::clone(self))
   }
 
-  pub fn bind(&mut self, name: Sym, value: LxVal) {
+  pub fn bind(&self, name: Sym, value: LxVal) {
     self.bindings.insert(name, value);
   }
 
-  pub fn bind_mut(&mut self, name: Sym, value: LxVal) {
+  pub fn bind_mut(&self, name: Sym, value: LxVal) {
     self.mutables.insert(name);
     self.bindings.insert(name, value);
   }
 
-  pub fn bind_str(&mut self, name: &str, value: LxVal) {
+  pub fn bind_with_mutability(&self, name: Sym, value: LxVal, mutable: bool) {
+    if mutable {
+      self.bind_mut(name, value);
+    } else {
+      self.bind(name, value);
+    }
+  }
+
+  pub fn bind_params(&self, params: &[Sym], applied: &[LxVal], defaults: &[Option<LxVal>]) {
+    for (i, &sym) in params.iter().enumerate() {
+      if i < applied.len() {
+        self.bind(sym, applied[i].clone());
+      } else if let Some(Some(def)) = defaults.get(i) {
+        self.bind(sym, def.clone());
+      }
+    }
+  }
+
+  pub fn bind_str(&self, name: &str, value: LxVal) {
     self.bindings.insert(intern(name), value);
   }
 
@@ -45,12 +58,12 @@ impl Env {
         self.bindings.insert(name, value);
         return Ok(());
       }
-      return Err(format!("cannot reassign immutable binding '{}'", crate::sym::resolve(name)));
+      return Err(format!("cannot reassign immutable binding '{}'", name.as_str()));
     }
     if let Some(parent) = &self.parent {
       return parent.reassign(name, value);
     }
-    Err(format!("undefined variable '{}'", crate::sym::resolve(name)))
+    Err(format!("undefined variable '{}'", name.as_str()))
   }
 
   pub fn get(&self, name: Sym) -> Option<LxVal> {
@@ -69,9 +82,5 @@ impl Env {
       return self.mutables.contains(&name);
     }
     self.parent.as_ref().is_some_and(|p| p.has_mut(name))
-  }
-
-  pub fn into_arc(self) -> Arc<Self> {
-    Arc::new(self)
   }
 }

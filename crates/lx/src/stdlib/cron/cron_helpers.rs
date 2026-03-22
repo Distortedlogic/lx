@@ -3,13 +3,11 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 
-use chrono::{DateTime, Local, Utc};
 use cron::Schedule;
 use dashmap::DashMap;
 
 use crate::builtins::call_value;
 use crate::error::LxError;
-use crate::record;
 use crate::runtime::RuntimeCtx;
 use crate::value::LxVal;
 use miette::SourceSpan;
@@ -86,14 +84,4 @@ pub(super) fn spawn_oneshot(dur: Duration, callback: LxVal, span: SourceSpan, ct
     JOBS.remove(&id);
   });
   LxVal::int(id)
-}
-
-pub(super) fn dt_to_record(dt: DateTime<Utc>) -> LxVal {
-  let local: DateTime<Local> = dt.with_timezone(&Local);
-  record! {
-      "epoch" => LxVal::int(dt.timestamp()),
-      "ms" => LxVal::int(dt.timestamp_millis()),
-      "iso" => LxVal::str(dt.to_rfc3339()),
-      "local" => LxVal::str(local.to_rfc3339()),
-  }
 }

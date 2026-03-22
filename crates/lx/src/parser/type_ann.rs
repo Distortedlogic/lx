@@ -2,6 +2,7 @@ use crate::sym::intern;
 use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 
+use super::expr::{ident, type_name};
 use super::{Span, ss};
 use crate::ast::{SType, TypeExpr, TypeField};
 use crate::lexer::token::TokenKind;
@@ -36,7 +37,7 @@ fn type_app<'a, I>(
 where
   I: ValueInput<'a, Token = TokenKind, Span = Span>,
 {
-  select! { TokenKind::TypeName(n) => n }
+  type_name()
     .map_with(|n, e| (n, ss(e.span())))
     .then(atom.clone().repeated().collect::<Vec<_>>())
     .map(|((name, span), args)| {
@@ -56,16 +57,16 @@ fn type_atom<'a, I>(
 where
   I: ValueInput<'a, Token = TokenKind, Span = Span>,
 {
-  let named = select! { TokenKind::TypeName(n) => n }.map_with(|n, e| SType::new(TypeExpr::Named(n), ss(e.span())));
+  let named = type_name().map_with(|n, e| SType::new(TypeExpr::Named(n), ss(e.span())));
 
-  let var = select! { TokenKind::Ident(n) => n }.map_with(|n, e| SType::new(TypeExpr::Var(n), ss(e.span())));
+  let var = ident().map_with(|n, e| SType::new(TypeExpr::Var(n), ss(e.span())));
 
   let list_ty = ty
     .clone()
     .delimited_by(just(TokenKind::LBracket), just(TokenKind::RBracket))
     .map_with(|inner, e| SType::new(TypeExpr::List(Box::new(inner)), ss(e.span())));
 
-  let record_field = select! { TokenKind::Ident(n) => n }.then_ignore(just(TokenKind::Colon)).then(ty.clone()).map(|(name, ty)| TypeField { name, ty });
+  let record_field = ident().then_ignore(just(TokenKind::Colon)).then(ty.clone()).map(|(name, ty)| TypeField { name, ty });
 
   let record_ty = just(TokenKind::Semi)
     .repeated()
@@ -81,7 +82,7 @@ where
     .then_ignore(just(TokenKind::RBrace))
     .map_with(|(key, value), e| SType::new(TypeExpr::Map { key: Box::new(key), value: Box::new(value) }, ss(e.span())));
 
-  let unit_ty = just(TokenKind::LParen).then(just(TokenKind::RParen)).map_with(|_, e| SType::new(TypeExpr::Named("Unit".into()), ss(e.span())));
+  let unit_ty = just(TokenKind::LParen).then(just(TokenKind::RParen)).map_with(|_, e| SType::new(TypeExpr::Named(intern("Unit")), ss(e.span())));
 
   let grouped_or_tuple =
     just(TokenKind::LParen).ignore_then(ty.separated_by(empty()).at_least(1).collect::<Vec<_>>()).then_ignore(just(TokenKind::RParen)).map_with(|types, e| {

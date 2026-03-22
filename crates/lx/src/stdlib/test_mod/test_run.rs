@@ -11,9 +11,10 @@ use crate::value::LxVal;
 use miette::SourceSpan;
 
 use super::test_invoke::invoke_flow;
-use super::{extract_record, extract_str, score_to_f64};
+use super::{extract_record, score_to_f64};
+use crate::stdlib::helpers::require_str_field;
 
-fn compute_weighted_score(scores: &IndexMap<String, LxVal>, weights: &IndexMap<String, LxVal>) -> f64 {
+fn compute_weighted_score(scores: &IndexMap<crate::sym::Sym, LxVal>, weights: &IndexMap<crate::sym::Sym, LxVal>) -> f64 {
   if scores.is_empty() {
     return 0.0;
   }
@@ -41,7 +42,7 @@ fn filter_by_tag(scenarios: &[LxVal]) -> Vec<&LxVal> {
     .iter()
     .filter(|s| {
       matches!(s, LxVal::Record(r)
-            if matches!(r.get("tags"), Some(LxVal::List(tags))
+            if matches!(r.get(&crate::sym::intern("tags")), Some(LxVal::List(tags))
                 if tags.iter().any(|t| t.as_str().is_some_and(|s| s == tag))))
     })
     .collect()
@@ -50,7 +51,7 @@ fn filter_by_tag(scenarios: &[LxVal]) -> Vec<&LxVal> {
 struct RunCtx<'a> {
   flow_path: &'a str,
   grader: &'a LxVal,
-  weights: &'a IndexMap<String, LxVal>,
+  weights: &'a IndexMap<crate::sym::Sym, LxVal>,
   threshold: f64,
   setup: Option<&'a LxVal>,
   teardown: Option<&'a LxVal>,
@@ -61,9 +62,9 @@ struct RunCtx<'a> {
 fn run_one_scenario(scenario_val: &LxVal, rc: &RunCtx<'_>) -> Result<LxVal, LxError> {
   let span = rc.span;
   let scenario_fields = extract_record(scenario_val, "test.run", span)?;
-  let s_name = extract_str(scenario_fields, "name", "test.run", span)?;
-  let input = scenario_fields.get("input").cloned().unwrap_or(LxVal::Unit);
-  let runs: i64 = scenario_fields.get("runs").and_then(|v| v.as_int()).and_then(|n| i64::try_from(n).ok()).unwrap_or(3);
+  let s_name = require_str_field(scenario_fields, "name", "test.run", span)?;
+  let input = scenario_fields.get(&crate::sym::intern("input")).cloned().unwrap_or(LxVal::Unit);
+  let runs: i64 = scenario_fields.get(&crate::sym::intern("runs")).and_then(|v| v.as_int()).and_then(|n| i64::try_from(n).ok()).unwrap_or(3);
 
   let mut run_results = Vec::new();
   let mut run_scores = Vec::new();
@@ -114,17 +115,17 @@ fn run_one_scenario(scenario_val: &LxVal, rc: &RunCtx<'_>) -> Result<LxVal, LxEr
   })
 }
 
-fn run_scenarios(spec_fields: &IndexMap<String, LxVal>, scenarios: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let flow_path = extract_str(spec_fields, "flow", "test.run", span)?.to_string();
-  let grader = spec_fields.get("grader").ok_or_else(|| LxError::runtime("test.run: spec missing 'grader'", span))?;
-  let threshold = spec_fields.get("threshold").and_then(|v| v.as_float()).unwrap_or(0.75);
-  let weights_map = match spec_fields.get("weights") {
+fn run_scenarios(spec_fields: &IndexMap<crate::sym::Sym, LxVal>, scenarios: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+  let flow_path = require_str_field(spec_fields, "flow", "test.run", span)?.to_string();
+  let grader = spec_fields.get(&crate::sym::intern("grader")).ok_or_else(|| LxError::runtime("test.run: spec missing 'grader'", span))?;
+  let threshold = spec_fields.get(&crate::sym::intern("threshold")).and_then(|v| v.as_float()).unwrap_or(0.75);
+  let weights_map = match spec_fields.get(&crate::sym::intern("weights")) {
     Some(LxVal::Record(r)) => r.as_ref().clone(),
     _ => IndexMap::new(),
   };
-  let setup = spec_fields.get("setup").filter(|v| !matches!(v, LxVal::None));
-  let teardown = spec_fields.get("teardown").filter(|v| !matches!(v, LxVal::None));
-  let spec_name = spec_fields.get("name").and_then(|v| v.as_str()).unwrap_or("unnamed");
+  let setup = spec_fields.get(&crate::sym::intern("setup")).filter(|v| !matches!(v, LxVal::None));
+  let teardown = spec_fields.get(&crate::sym::intern("teardown")).filter(|v| !matches!(v, LxVal::None));
+  let spec_name = spec_fields.get(&crate::sym::intern("name")).and_then(|v| v.as_str()).unwrap_or("unnamed");
 
   let rc = RunCtx { flow_path: &flow_path, grader, weights: &weights_map, threshold, setup, teardown, span, ctx };
   let filtered = filter_by_tag(scenarios);
@@ -134,7 +135,7 @@ fn run_scenarios(spec_fields: &IndexMap<String, LxVal>, scenarios: &[LxVal], spa
   for scenario_val in &filtered {
     let result = run_one_scenario(scenario_val, &rc)?;
     if let LxVal::Record(r) = &result
-      && r.get("passed").and_then(|v| v.as_bool()) != Some(true)
+      && r.get(&crate::sym::intern("passed")).and_then(|v| v.as_bool()) != Some(true)
     {
       all_passed = false;
     }
@@ -147,7 +148,7 @@ fn run_scenarios(spec_fields: &IndexMap<String, LxVal>, scenarios: &[LxVal], spa
     let sum: f64 = scenario_results
       .iter()
       .filter_map(|s| match s {
-        LxVal::Record(r) => r.get("score").and_then(|v| v.as_float()),
+        LxVal::Record(r) => r.get(&crate::sym::intern("score")).and_then(|v| v.as_float()),
         _ => None,
       })
       .sum();
@@ -165,7 +166,7 @@ fn run_scenarios(spec_fields: &IndexMap<String, LxVal>, scenarios: &[LxVal], spa
 
 pub(crate) fn bi_run(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let spec_fields = extract_record(&args[0], "test.run", span)?;
-  let scenarios = match spec_fields.get("scenarios") {
+  let scenarios = match spec_fields.get(&crate::sym::intern("scenarios")) {
     Some(LxVal::List(list)) => list.as_ref().clone(),
     _ => Vec::new(),
   };
@@ -175,14 +176,14 @@ pub(crate) fn bi_run(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) ->
 pub(crate) fn bi_run_scenario(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let spec_fields = extract_record(&args[0], "test.run_scenario", span)?;
   let target_name = args[1].require_str("test.run_scenario", span)?;
-  let scenarios = match spec_fields.get("scenarios") {
+  let scenarios = match spec_fields.get(&crate::sym::intern("scenarios")) {
     Some(LxVal::List(list)) => list.as_ref().clone(),
     _ => Vec::new(),
   };
   let matching: Vec<LxVal> = scenarios
     .into_iter()
     .filter(|s| match s {
-      LxVal::Record(r) => r.get("name").and_then(|v| v.as_str()).is_some_and(|n| n == target_name),
+      LxVal::Record(r) => r.get(&crate::sym::intern("name")).and_then(|v| v.as_str()).is_some_and(|n| n == target_name),
       _ => false,
     })
     .collect();

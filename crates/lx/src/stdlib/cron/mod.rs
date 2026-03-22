@@ -1,6 +1,6 @@
 #[path = "cron_helpers.rs"]
 mod cron_helpers;
-use cron_helpers::{CronJob, JOBS, NEXT_ID, dt_to_record, parse_schedule, positive_ms, require_fn, sleep_cancellable, spawn_oneshot};
+use cron_helpers::{CronJob, JOBS, NEXT_ID, parse_schedule, positive_ms, require_fn, sleep_cancellable, spawn_oneshot};
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -9,25 +9,27 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 
-use crate::builtins::{call_value, mk};
+use crate::builtins::call_value;
 use crate::error::LxError;
 use crate::runtime::RuntimeCtx;
+use crate::std_module;
+use crate::stdlib::helpers::datetime_to_record;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
-pub fn build() -> IndexMap<String, LxVal> {
-  let mut m = IndexMap::new();
-  m.insert("schedule".into(), mk("cron.schedule", 2, bi_schedule));
-  m.insert("every".into(), mk("cron.every", 2, bi_every));
-  m.insert("after".into(), mk("cron.after", 2, bi_after));
-  m.insert("at".into(), mk("cron.at", 2, bi_at));
-  m.insert("cancel".into(), mk("cron.cancel", 1, bi_cancel));
-  m.insert("next".into(), mk("cron.next", 1, bi_next));
-  m.insert("next_n".into(), mk("cron.next_n", 2, bi_next_n));
-  m.insert("list".into(), mk("cron.list", 1, bi_list));
-  m.insert("active".into(), mk("cron.active", 1, bi_active));
-  m.insert("run".into(), mk("cron.run", 1, bi_run));
-  m
+pub fn build() -> IndexMap<crate::sym::Sym, LxVal> {
+  std_module! {
+    "schedule" => "cron.schedule", 2, bi_schedule;
+    "every"    => "cron.every",    2, bi_every;
+    "after"    => "cron.after",    2, bi_after;
+    "at"       => "cron.at",       2, bi_at;
+    "cancel"   => "cron.cancel",   1, bi_cancel;
+    "next"     => "cron.next",     1, bi_next;
+    "next_n"   => "cron.next_n",   2, bi_next_n;
+    "list"     => "cron.list",     1, bi_list;
+    "active"   => "cron.active",   1, bi_active;
+    "run"      => "cron.run",      1, bi_run
+  }
 }
 
 fn bi_schedule(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
@@ -124,7 +126,7 @@ fn bi_next(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<L
     },
   };
   match schedule.upcoming(Utc).next() {
-    Some(dt) => Ok(LxVal::ok(dt_to_record(dt))),
+    Some(dt) => Ok(LxVal::ok(datetime_to_record(dt))),
     None => Ok(LxVal::err_str("no upcoming occurrence")),
   }
 }
@@ -149,7 +151,7 @@ fn bi_next_n(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result
       return Ok(LxVal::err_str(e.to_string()));
     },
   };
-  let times: Vec<LxVal> = schedule.upcoming(Utc).take(n).map(dt_to_record).collect();
+  let times: Vec<LxVal> = schedule.upcoming(Utc).take(n).map(datetime_to_record).collect();
   Ok(LxVal::list(times))
 }
 

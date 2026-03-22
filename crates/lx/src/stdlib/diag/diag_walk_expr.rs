@@ -13,7 +13,7 @@ pub(super) fn visit_expr_diag(w: &mut Walker, expr: &Expr, span: SourceSpan) {
           handle_call(w, module, method, kind, &args, span);
           return;
         }
-        if w.imported_modules.contains(module) {
+        if w.imported_modules.contains(&crate::sym::intern(module)) {
           let label = format!("{module}.{method}");
           let id = w.add_node_at("tool", label, NodeKind::Tool, Some(span));
           let ctx = w.context.clone();
@@ -25,7 +25,7 @@ pub(super) fn visit_expr_diag(w: &mut Walker, expr: &Expr, span: SourceSpan) {
         }
       }
       if let Some((name, fn_args)) = uncurry_fn_call(expr)
-        && let Some(node_id) = w.fn_nodes.get(name).cloned()
+        && let Some(node_id) = w.fn_nodes.get(&crate::sym::intern(name)).cloned()
       {
         let ctx = w.context.clone();
         w.add_edge(&ctx, &node_id, String::new(), EdgeStyle::Solid);

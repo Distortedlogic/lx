@@ -37,7 +37,7 @@ pub fn mk_async(name: &'static str, arity: usize, func: AsyncBuiltinFn) -> LxVal
   LxVal::BuiltinFunc(BuiltinFunc { name, arity, kind: BuiltinKind::Async(func), applied: Vec::new() })
 }
 
-pub fn register(env: &mut Env) {
+pub fn register(env: &Env) {
   register::register(env);
 }
 

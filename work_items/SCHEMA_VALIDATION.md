@@ -59,13 +59,13 @@ handle_message = (raw_msg) {
 
 ## Implementation
 
-Schemas are stored as `LxVal::Tagged { tag: "__schema", values: [name_str, constraint_record] }`. The constraint record is a `LxVal::Record` mapping field names to their parsed constraint records. Validation iterates the schema spec fields, checks each against the data record, applies defaults, runs custom `check` functions (via `crate::builtins::call_value_sync`), and validates `one_of` constraints. Records use `IndexMap<String, LxVal>` wrapped in `Arc`, constructed via the `record!` macro.
+Schemas are stored as `LxVal::Tagged { tag: intern("__schema"), values: Arc::new(vec![name_str, constraint_record]) }`. The `tag` field is `Sym` (interned string via `crate::sym::intern`), not a raw string. The constraint record is a `LxVal::Record` mapping field names to their parsed constraint records. Validation iterates the schema spec fields, checks each against the data record, applies defaults, runs custom `check` functions (via `crate::builtins::call_value_sync`), and validates `one_of` constraints. Records use `IndexMap<Sym, LxVal>` wrapped in `Arc`, constructed via the `record!` macro.
 
 # Files Affected
 
 **New files:**
 - `crates/lx/src/stdlib/schema.rs` — schema define/validate/validate_all/check
-- `tests/schema.lx` — tests for schema validation (create `tests/` directory if it does not exist)
+- `tests/schema.lx` — tests for schema validation (the `tests/` directory does not exist yet — create it first)
 
 **Modified files:**
 - `crates/lx/src/stdlib/mod.rs` — register `mod schema;`, add `"schema" => schema::build()` to `get_std_module`, add `"schema"` to `std_module_exists` match
@@ -82,7 +82,7 @@ Schemas are stored as `LxVal::Tagged { tag: "__schema", values: [name_str, const
    - If value is `LxVal::Bool(true)`, create `FieldConstraint { required: true, default: None, check: None, one_of: None }`.
    - If value is a `LxVal::Record`, extract `required` (Bool, default false), `default` (Any, optional), `check` (Func, optional), `one_of` (List, optional).
    - If value is any other value, treat it as `{ default: value }` (optional field with that default).
-2. Store each `FieldConstraint` as a `LxVal::Record` in a constraints `IndexMap`. Return a `LxVal::Tagged { tag: "__schema", values: [name_str, constraints_record] }`.
+2. Store each `FieldConstraint` as a `LxVal::Record` in a constraints `IndexMap<Sym, LxVal>`. Return a `LxVal::Tagged { tag: crate::sym::intern("__schema"), values: Arc::new(vec![name_str, constraints_record]) }`.
 
 Register module in `stdlib/mod.rs`: add `mod schema;`, add `"schema" => schema::build()` to `get_std_module`, add `"schema"` to `std_module_exists`. Add `"define"` to `build()`. Use `crate::builtins::mk` for sync builtins.
 
@@ -99,7 +99,7 @@ Run `just diagnose`.
 **Description:** In `crates/lx/src/stdlib/schema.rs`:
 
 `bi_validate(schema, data)`:
-1. Extract the schema by matching `args[0]` against `LxVal::Tagged { tag, values }` where `tag == "__schema"`. The constraint record is `values[1]`.
+1. Extract the schema by matching `args[0]` against `LxVal::Tagged { tag, values }` where `tag == crate::sym::intern("__schema")`. The constraint record is `values[1]`.
 2. For each field in the constraint record:
    a. If required and missing from data (or None): return `Err {field: name, reason: "required field missing"}`.
    b. If missing but has default: add default to result record.

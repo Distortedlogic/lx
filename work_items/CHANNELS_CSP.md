@@ -8,6 +8,8 @@ Add channel-based communication (CSP style) as an alternative to the existing as
 - The research in `research/concurrency/design-patterns.md` covers Go's CSP model. Channels complement ask/reply — they're not a replacement but an addition for different concurrency shapes.
 - `par` runs tasks concurrently but they can't communicate mid-flight. Channels let parallel branches exchange data during execution.
 
+**Reference modules:** `store/mod.rs`, `sandbox/mod.rs`, `cron/cron_helpers.rs` use the `LazyLock<DashMap<u64, ...>>` + `AtomicU64` registry pattern. For `block_in_place`/`block_on` (needed for async mpsc operations in sync builtins), see `builtins/mod.rs::call_value_sync` and `runtime/defaults.rs`.
+
 # What Changes
 
 ## New stdlib module: `std/channel`
@@ -49,17 +51,17 @@ par {
 
 ## Runtime representation
 
-Sender and Receiver are stored in a global `LazyLock<DashMap<u64, ChannelEntry>>` registry (same pattern as `ws.rs` uses for WebSocket connections), keyed by a unique `u64` channel ID generated via `AtomicU64`. `channel.create` returns a tuple of two records containing the channel ID and role:
+Sender and Receiver are stored in a global `LazyLock<DashMap<u64, ChannelEntry>>` registry (same pattern as `store/mod.rs` uses for Store handles), keyed by a unique `u64` channel ID generated via `AtomicU64`. `channel.create` returns a tuple of two records containing the channel ID and role:
 - `{__chan_id: 1, _role: "sender"}`
 - `{__chan_id: 1, _role: "receiver"}`
 
-`send`/`recv` extract `__chan_id` from the record and look up the underlying `tokio::sync::mpsc` channel by ID from the registry. For async operations, use `tokio::task::block_in_place` + `block_on` (same approach as `ws.rs`). This avoids adding new variants to `LxVal`.
+`send`/`recv` extract `__chan_id` from the record and look up the underlying `tokio::sync::mpsc` channel by ID from the registry. For async operations, use `tokio::task::block_in_place` + `tokio::runtime::Handle::current().block_on(...)` (same approach as `builtins/mod.rs::call_value_sync` and `runtime/defaults.rs`). This avoids adding new variants to `LxVal`.
 
 # Files Affected
 
 **New files:**
 - `crates/lx/src/stdlib/channel.rs` — channel create/send/recv/try_recv/close
-- `tests/82_channels.lx` — tests for channel communication
+- `tests/82_channels.lx` — tests for channel communication (the `tests/` directory and its `lx.toml` must be re-created first; it is a workspace member in the root `lx.toml` but was deleted from disk)
 
 **Modified files:**
 - `crates/lx/src/stdlib/mod.rs` — register `mod channel;`, add `"channel" => channel::build()` to `get_std_module`, add `"channel"` to the `matches!` in `std_module_exists`
@@ -70,9 +72,9 @@ Sender and Receiver are stored in a global `LazyLock<DashMap<u64, ChannelEntry>>
 
 **Subject:** Create channel pairs with mpsc and store in global registry
 
-**Description:** Create `crates/lx/src/stdlib/channel.rs`. Use the same registry pattern as `ws.rs`: a global `static CHANNELS: LazyLock<DashMap<u64, ChannelEntry>>` where `ChannelEntry` holds `Arc<tokio::sync::mpsc::Sender<LxVal>>` and `Arc<tokio::sync::Mutex<tokio::sync::mpsc::Receiver<LxVal>>>`, plus a `static NEXT_ID: AtomicU64` for ID generation. DashMap is already a dependency in `crates/lx/Cargo.toml`. tokio's `sync` feature is already enabled.
+**Description:** Create `crates/lx/src/stdlib/channel.rs`. Use the same registry pattern as `store/mod.rs`: a global `static CHANNELS: LazyLock<DashMap<u64, ChannelEntry>>` where `ChannelEntry` holds `Arc<tokio::sync::mpsc::Sender<LxVal>>` and `Arc<tokio::sync::Mutex<tokio::sync::mpsc::Receiver<LxVal>>>`, plus a `static NEXT_ID: AtomicU64` for ID generation. DashMap is already a dependency in `crates/lx/Cargo.toml`. tokio's `sync` feature is already enabled.
 
-Implement `bi_create(args, span, ctx)` as a sync builtin (`SyncBuiltinFn` signature: `fn(&[LxVal], SourceSpan, &Arc<RuntimeCtx>) -> Result<LxVal, LxError>`):
+Implement `bi_create(args, span, ctx)` as a sync builtin (`SyncBuiltinFn` signature: `fn(&[LxVal], miette::SourceSpan, &Arc<crate::runtime::RuntimeCtx>) -> Result<LxVal, LxError>`):
 1. Parse capacity from `args[0]` as usize (0 maps to a large default like 1_000_000 for "unbounded").
 2. Create `tokio::sync::mpsc::channel(capacity)`.
 3. Generate a unique ID via `NEXT_ID.fetch_add(1, Ordering::Relaxed)`.
@@ -84,7 +86,7 @@ Register the module in `stdlib/mod.rs`:
 - Add `"channel" => channel::build()` arm in `get_std_module`
 - Add `"channel"` to the `matches!` in `std_module_exists`
 
-In `channel.rs`, define `pub fn build() -> IndexMap<String, LxVal>` using `crate::builtins::mk` to register sync builtins (same pattern as store and ws modules). Add `"create"` to the map.
+In `channel.rs`, define `pub fn build() -> IndexMap<crate::sym::Sym, LxVal>` using `crate::builtins::mk` to register sync builtins with `crate::sym::intern` for keys (same pattern as `store/mod.rs` and other stdlib modules). Add `"create"` to the map.
 
 Run `just diagnose`.
 
@@ -128,7 +130,7 @@ Implement `bi_close(args, span, ctx)` (sync builtin) — extract `__chan_id` fro
 
 Add `"try_recv"` and `"close"` to the `build()` map.
 
-Create `tests/82_channels.lx` (create the `tests/` directory if it does not exist) with tests:
+Create the `tests/` workspace member directory if it does not exist (it is listed in root `lx.toml` but was deleted from disk — create `tests/lx.toml` with appropriate workspace member config first). Then create `tests/82_channels.lx` with tests:
 1. **Basic send/recv** — create channel, send 3 values, recv 3 values, verify order.
 2. **Close behavior** — send 2 values, close sender, recv 2 values, recv again returns Err.
 3. **Par producer/consumer** — `par` block where one branch sends, another receives.

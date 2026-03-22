@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::sync::Arc;
 
 use indexmap::IndexMap;
@@ -9,14 +10,14 @@ use crate::value::LxVal;
 use miette::SourceSpan;
 
 use super::BoxFut;
-use super::hof::{call, get_list};
+use super::hof::{call, call_predicate, get_list};
 
 pub(super) fn bi_take_while(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
   Box::pin(async move {
     let items = get_list(&args[1], "take_while", sp)?;
     let mut out = Vec::new();
     for v in items.iter() {
-      if call(&args[0], v.clone(), sp, &ctx).await?.as_bool() != Some(true) {
+      if !call_predicate(&args[0], v.clone(), sp, &ctx).await? {
         break;
       }
       out.push(v.clone());
@@ -31,7 +32,7 @@ pub(super) fn bi_drop_while(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCt
     let mut dropping = true;
     let mut out = Vec::new();
     for v in items.iter() {
-      if dropping && call(&args[0], v.clone(), sp, &ctx).await?.as_bool() == Some(true) {
+      if dropping && call_predicate(&args[0], v.clone(), sp, &ctx).await? {
         continue;
       }
       dropping = false;
@@ -54,41 +55,40 @@ pub(super) fn bi_sort_by(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>)
   })
 }
 
+async fn extremum_by(
+  items: &[LxVal],
+  f: &LxVal,
+  pick_first: fn(Ordering) -> bool,
+  name: &str,
+  sp: SourceSpan,
+  ctx: &Arc<RuntimeCtx>,
+) -> Result<LxVal, LxError> {
+  if items.is_empty() {
+    return Err(LxError::runtime(format!("{name}: empty list"), sp));
+  }
+  let mut best = items[0].clone();
+  let mut best_key = call(f, best.clone(), sp, ctx).await?;
+  for v in &items[1..] {
+    let k = call(f, v.clone(), sp, ctx).await?;
+    if pick_first(super::coll::cmp_values(&k, &best_key)) {
+      best = v.clone();
+      best_key = k;
+    }
+  }
+  Ok(best)
+}
+
 pub(super) fn bi_min_by(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
   Box::pin(async move {
     let items = get_list(&args[1], "min_by", sp)?;
-    if items.is_empty() {
-      return Err(LxError::runtime("min_by: empty list", sp));
-    }
-    let mut best = items[0].clone();
-    let mut best_key = call(&args[0], best.clone(), sp, &ctx).await?;
-    for v in &items[1..] {
-      let k = call(&args[0], v.clone(), sp, &ctx).await?;
-      if super::coll::cmp_values(&k, &best_key).is_lt() {
-        best = v.clone();
-        best_key = k;
-      }
-    }
-    Ok(best)
+    extremum_by(&items, &args[0], Ordering::is_lt, "min_by", sp, &ctx).await
   })
 }
 
 pub(super) fn bi_max_by(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
   Box::pin(async move {
     let items = get_list(&args[1], "max_by", sp)?;
-    if items.is_empty() {
-      return Err(LxError::runtime("max_by: empty list", sp));
-    }
-    let mut best = items[0].clone();
-    let mut best_key = call(&args[0], best.clone(), sp, &ctx).await?;
-    for v in &items[1..] {
-      let k = call(&args[0], v.clone(), sp, &ctx).await?;
-      if super::coll::cmp_values(&k, &best_key).is_gt() {
-        best = v.clone();
-        best_key = k;
-      }
-    }
-    Ok(best)
+    extremum_by(&items, &args[0], Ordering::is_gt, "max_by", sp, &ctx).await
   })
 }
 
@@ -97,7 +97,7 @@ pub(super) fn bi_partition(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx
     let items = get_list(&args[1], "partition", sp)?;
     let (mut yes, mut no) = (Vec::new(), Vec::new());
     for v in items.iter() {
-      if call(&args[0], v.clone(), sp, &ctx).await?.as_bool() == Some(true) {
+      if call_predicate(&args[0], v.clone(), sp, &ctx).await? {
         yes.push(v.clone());
       } else {
         no.push(v.clone());
@@ -176,8 +176,7 @@ pub(super) fn bi_find_index(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCt
   Box::pin(async move {
     let items = get_list(&args[1], "find_index", sp)?;
     for (i, v) in items.iter().enumerate() {
-      let result = call(&args[0], v.clone(), sp, &ctx).await?;
-      if result.as_bool() == Some(true) {
+      if call_predicate(&args[0], v.clone(), sp, &ctx).await? {
         return Ok(LxVal::some(LxVal::int(i)));
       }
     }
@@ -190,7 +189,7 @@ pub(super) fn bi_count(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -
     let items = get_list(&args[1], "count", sp)?;
     let mut n = 0usize;
     for v in items.iter() {
-      if call(&args[0], v.clone(), sp, &ctx).await?.as_bool() == Some(true) {
+      if call_predicate(&args[0], v.clone(), sp, &ctx).await? {
         n += 1;
       }
     }

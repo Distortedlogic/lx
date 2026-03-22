@@ -35,9 +35,9 @@ New file `crates/lx/src/stdlib/stream.rs` implementing 8 functions:
 
 ## Stream representation
 
-A Stream is a record `{_type: :stream, _id: Int}` backed by a global registry of stream states (following the same pattern as `std/store`, which uses `LazyLock<DashMap<u64, StoreState>>` + `AtomicU64`). Each stream state holds the source data, current index, and any transformation chain. The `_next` operation is performed by Rust-side `bi_collect`/`bi_each`/`bi_fold` consuming the stream, not by an lx-level `_next` function field.
+A Stream is an `LxVal::Stream { id: u64 }` variant backed by a global registry of stream states (following the same pattern as `std/store`, which uses `LazyLock<DashMap<u64, StoreState>>` + `AtomicU64` and returns `LxVal::Store { id }`). Each stream state holds the source data, current index, and any transformation chain. The `_next` operation is performed by Rust-side `bi_collect`/`bi_each`/`bi_fold` consuming the stream, not by an lx-level `_next` function field.
 
-**Why not record-with-`_next`-function:** `SyncBuiltinFn` is a plain `fn` pointer (`fn(&[LxVal], SourceSpan, &Arc<RuntimeCtx>) -> Result<LxVal, LxError>`) — it cannot capture per-stream state like `Arc<AtomicUsize>`. The store module solves this same problem with global `DashMap` keyed by ID, and streams should follow suit.
+**Why a dedicated variant instead of record-with-`_next`-function:** `SyncBuiltinFn` is a plain `fn` pointer (`fn(&[LxVal], miette::SourceSpan, &Arc<crate::runtime::RuntimeCtx>) -> Result<LxVal, LxError>`) — it cannot capture per-stream state like `Arc<AtomicUsize>`. The store module solves this same problem with a dedicated `LxVal::Store { id }` variant + global `DashMap` keyed by ID, and streams follow suit with `LxVal::Stream { id }`.
 
 Stream combinators (`map`, `filter`, `take`, `batch`) create new stream IDs whose state references the inner stream ID plus the transformation function. Terminal operations (`collect`, `each`, `fold`) drive the pull loop from Rust.
 
@@ -49,10 +49,11 @@ Streams work with the existing pipe operator: `stream.from list | stream.map f |
 
 **New files:**
 - `crates/lx/src/stdlib/stream.rs` — all stream functions
-- `tests/86_streams.lx` — tests for lazy stream behavior
+- `tests/86_streams.lx` — tests for lazy stream behavior (the `tests/` directory at repo root must be created if it does not exist; `just test` expects it)
 
 **Modified files:**
 - `crates/lx/src/stdlib/mod.rs` — register `mod stream;`, add `"stream" => stream::build()` to `get_std_module`, add `"stream"` to `std_module_exists`
+- `crates/lx/src/value/mod.rs` — add `Stream { id: u64 }` variant to the `LxVal` enum (following the `Store { id: u64 }` pattern at line 99)
 
 # Task List
 
@@ -70,15 +71,22 @@ Define `StreamState` enum variants:
 - `Take { inner_id: u64, remaining: AtomicUsize }` — take n (Task 2)
 - `Batch { inner_id: u64, size: usize }` — batch (Task 3)
 
-Implement `bi_from(source)`:
-- If source is `LxVal::List`: allocate a new stream ID, insert `FromList` state, return `record!{"_type" => LxVal::str("stream"), "_id" => LxVal::int(id)}`.
-- If source is `LxVal::Func` or `LxVal::BuiltinFunc`: allocate ID, insert `FromFunc` state, return stream record.
+Add `Stream { id: u64 }` variant to `LxVal` in `crates/lx/src/value/mod.rs` (after the `Store` variant). Update all trait impls that match on `LxVal` variants — follow the `Store` pattern in each file:
+- `crates/lx/src/value/display.rs` — add `LxVal::Stream { id } => write!(f, "<Stream#{id}>")`
+- `crates/lx/src/value/impls.rs` — add `PartialEq` arm `(LxVal::Stream { id: i1 }, LxVal::Stream { id: i2 }) => i1 == i2` and `Hash` arm `LxVal::Stream { id } => id.hash(state)`
+- `crates/lx/src/value/serde_impl.rs` — add `LxVal::Stream { id } => marker_map!(serializer, ("__stream", id))`
 
-Implement internal `fn pull_next(id: u64, span, ctx) -> Result<LxVal, LxError>` that matches on the `StreamState` variant and returns `Some val` or `None`.
+Implement `bi_from(source)`:
+- If source is `LxVal::List`: allocate a new stream ID, insert `FromList` state, return `LxVal::Stream { id }`.
+- If source is `LxVal::Func` or `LxVal::BuiltinFunc`: allocate ID, insert `FromFunc` state, return `LxVal::Stream { id }`.
+
+Implement a helper `fn stream_id(v: &LxVal, span: SourceSpan) -> Result<u64, LxError>` that extracts `id` from `LxVal::Stream { id }` (following the `store_id` helper pattern in `store/mod.rs`).
+
+Implement internal `fn pull_next(id: u64, span, ctx) -> Result<LxVal, LxError>` that matches on the `StreamState` variant and returns `LxVal::Some(val)` or `LxVal::None`.
 
 Implement `bi_collect(stream)`:
-- Extract `_id` from the stream record.
-- Loop: call `pull_next(id, ...)`, if `Some val` append to result list, if `None` return the list.
+- Extract `id` via `stream_id`.
+- Loop: call `pull_next(id, ...)`, if `LxVal::Some(val)` append to result list, if `LxVal::None` return the list.
 
 Register module in `stdlib/mod.rs`: add `mod stream;`, add `"stream" => stream::build()` to `get_std_module`, add `"stream"` to `std_module_exists`. Add `"from"` and `"collect"` to `build()`.
 
@@ -95,16 +103,16 @@ Run `just diagnose`.
 **Description:** In `crates/lx/src/stdlib/stream.rs`:
 
 `bi_map(stream, f)`:
-- Extract `_id` from stream record. Allocate new stream ID, insert `Map { inner_id, func: f }` state. Return new stream record.
-- Update `pull_next` to handle `Map`: call `pull_next(inner_id, ...)`, if `Some val`, call `call_value_sync(&func, val, span, ctx)` and wrap in `Some`, else return `None`.
+- Extract `id` via `stream_id`. Allocate new stream ID, insert `Map { inner_id, func: f }` state. Return `LxVal::Stream { id: new_id }`.
+- Update `pull_next` to handle `Map`: call `pull_next(inner_id, ...)`, if `LxVal::Some(val)`, call `call_value_sync(&func, val, span, ctx)` and wrap in `LxVal::Some`, else return `LxVal::None`.
 
 `bi_filter(stream, pred)`:
-- Extract `_id`, allocate new ID, insert `Filter { inner_id, pred }` state.
-- In `pull_next`: loop — call `pull_next(inner_id, ...)`, if `Some val` and `call_value_sync(&pred, val, span, ctx)` is truthy, return `Some val`. If not truthy, continue loop. If `None`, return `None`.
+- Extract `id` via `stream_id`, allocate new ID, insert `Filter { inner_id, pred }` state. Return `LxVal::Stream { id: new_id }`.
+- In `pull_next`: loop — call `pull_next(inner_id, ...)`, if `LxVal::Some(val)` and `call_value_sync(&pred, val, span, ctx)` is truthy, return `LxVal::Some(val)`. If not truthy, continue loop. If `LxVal::None`, return `LxVal::None`.
 
 `bi_take(stream, n)`:
-- Extract `_id`, allocate new ID with `Take { inner_id, remaining: AtomicUsize::new(n) }`.
-- In `pull_next`: if `remaining.load() > 0`, decrement and delegate to `pull_next(inner_id, ...)`, else return `None`.
+- Extract `id` via `stream_id`, allocate new ID with `Take { inner_id, remaining: AtomicUsize::new(n) }`. Return `LxVal::Stream { id: new_id }`.
+- In `pull_next`: if `remaining.load() > 0`, decrement and delegate to `pull_next(inner_id, ...)`, else return `LxVal::None`.
 
 Add `"map"`, `"filter"`, `"take"` to `build()`.
 
@@ -120,15 +128,15 @@ Run `just diagnose`.
 
 **Description:** Implement:
 
-`bi_batch(stream, size)`: Extract `_id`, allocate new ID with `Batch { inner_id, size }`. In `pull_next`: collect up to `size` elements from `pull_next(inner_id, ...)` into a list, return `Some [batch]` or `None` if inner is exhausted and batch is empty. Partial last batch returns `Some [partial]`.
+`bi_batch(stream, size)`: Extract `id` via `stream_id`, allocate new ID with `Batch { inner_id, size }`. Return `LxVal::Stream { id: new_id }`. In `pull_next`: collect up to `size` elements from `pull_next(inner_id, ...)` into a list, return `LxVal::Some(LxVal::list(batch))` or `LxVal::None` if inner is exhausted and batch is empty. Partial last batch returns `LxVal::Some(LxVal::list(partial))`.
 
-`bi_each(stream, f)`: extract `_id`, loop `pull_next(id, ...)`, call `call_value_sync(&f, elem, span, ctx)` for each `Some val`. Return `Unit`.
+`bi_each(stream, f)`: extract `id` via `stream_id`, loop `pull_next(id, ...)`, call `call_value_sync(&f, elem, span, ctx)` for each `LxVal::Some(val)`. Return `LxVal::Unit`.
 
-`bi_fold(stream, init, f)`: extract `_id`, loop `pull_next(id, ...)`, accumulate with `call_value_sync(&f, Tuple(acc, elem), span, ctx)`. Return final accumulator.
+`bi_fold(stream, init, f)`: extract `id` via `stream_id`, loop `pull_next(id, ...)`, accumulate with `call_value_sync(&f, LxVal::Tuple(Arc::new(vec![acc, elem])), span, ctx)`. Return final accumulator.
 
 Add all to `build()`.
 
-Create `tests/86_streams.lx`:
+Create `tests/` directory at repo root if it does not exist (it currently does not; `just test` expects `tests/`). Then create `tests/86_streams.lx`:
 1. **from + collect roundtrip** — `stream.from [1 2 3] | stream.collect` equals `[1 2 3]`.
 2. **Lazy map** — `stream.from [1 2 3] | stream.map (x) x * 2 | stream.collect` equals `[2 4 6]`.
 3. **Lazy filter** — filter evens from `[1 2 3 4 5]`, collect, equals `[2 4]`.

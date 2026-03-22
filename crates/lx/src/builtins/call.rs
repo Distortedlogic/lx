@@ -22,14 +22,8 @@ pub(crate) async fn call_value(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Ar
         return Ok(LxVal::Func(lf));
       }
       let mut interp = crate::interpreter::Interpreter::with_env(&lf.closure, Arc::clone(ctx));
-      let mut call_env = lf.closure.child();
-      for (i, &sym) in lf.params.iter().enumerate() {
-        if i < lf.applied.len() {
-          call_env.bind(sym, lf.applied[i].clone());
-        } else if let Some(Some(def)) = lf.defaults.get(i) {
-          call_env.bind(sym, def.clone());
-        }
-      }
+      let call_env = lf.closure.child();
+      call_env.bind_params(&lf.params, &lf.applied, &lf.defaults);
       interp.set_env(call_env);
       let result = interp.eval_expr(&lf.body).await;
       match result {
@@ -52,9 +46,9 @@ pub(crate) async fn call_value(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Ar
       let mut applied = applied.clone();
       applied.push(arg);
       if applied.len() < *arity {
-        Ok(LxVal::TaggedCtor { tag: tag.clone(), arity: *arity, applied })
+        Ok(LxVal::TaggedCtor { tag: *tag, arity: *arity, applied })
       } else {
-        Ok(LxVal::Tagged { tag: tag.clone(), values: Arc::new(applied) })
+        Ok(LxVal::Tagged { tag: *tag, values: Arc::new(applied) })
       }
     },
     other => Err(LxError::type_err(format!("cannot call {}, not a function", other.type_name()), span)),

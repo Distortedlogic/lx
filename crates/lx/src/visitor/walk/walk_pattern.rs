@@ -10,13 +10,13 @@ pub fn walk_pattern<V: AstVisitor + ?Sized>(v: &mut V, pattern: &Pattern, span: 
     Pattern::Wildcard => v.visit_pattern_wildcard(span),
     Pattern::Tuple(elems) => v.visit_pattern_tuple(elems, span),
     Pattern::List { elems, rest } => {
-      v.visit_pattern_list(elems, rest.as_deref(), span);
+      v.visit_pattern_list(elems, *rest, span);
     },
     Pattern::Record { fields, rest } => {
-      v.visit_pattern_record(fields, rest.as_deref(), span);
+      v.visit_pattern_record(fields, *rest, span);
     },
     Pattern::Constructor { name, args } => {
-      v.visit_pattern_constructor(name, args, span);
+      v.visit_pattern_constructor(*name, args, span);
     },
   }
 }

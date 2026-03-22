@@ -57,7 +57,7 @@ fn bi_get(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<Lx
     },
     LxVal::Record(r) => {
       let key = args[0].require_str("get", span)?;
-      Ok(maybe(r.get(key)))
+      Ok(maybe(r.get(&crate::sym::intern(key))))
     },
     LxVal::Map(m) => Ok(maybe(m.get(&ValueKey(args[0].clone())))),
     other => Err(LxError::type_err(format!("get expects List/Record/Map, got {}", other.type_name()), span)),
@@ -106,7 +106,7 @@ fn bi_to_record(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Res
   let mut r = IndexMap::new();
   for (k, v) in m.iter() {
     let key = k.0.require_str("to_record", span)?;
-    r.insert(key.to_string(), v.clone());
+    r.insert(crate::sym::intern(key), v.clone());
   }
   Ok(LxVal::record(r))
 }
@@ -135,7 +135,7 @@ fn bi_entries(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resul
   }
 }
 
-pub(super) fn register(env: &mut Env) {
+pub(super) fn register(env: &Env) {
   super::register_builtins!(env, {
     "first"/1 => bi_first, "last"/1 => bi_last, "contains?"/2 => bi_contains,
     "get"/2 => bi_get, "to_list"/1 => bi_to_list, "to_map"/1 => bi_to_map,

@@ -99,7 +99,12 @@ pub enum Expr {
 
   Emit { value: Box<SExpr> },
   Yield { value: Box<SExpr> },
-  With { name: Sym, value: Box<SExpr>, body: Vec<SStmt>, mutable: bool },
-  WithResource { resources: Vec<(SExpr, Sym)>, body: Vec<SStmt> },
-  WithContext { fields: Vec<(Sym, SExpr)>, body: Vec<SStmt> },
+  With { kind: WithKind, body: Vec<SStmt> },
+}
+
+#[derive(Debug, Clone)]
+pub enum WithKind {
+  Binding { name: Sym, value: Box<SExpr>, mutable: bool },
+  Resources { resources: Vec<(SExpr, Sym)> },
+  Context { fields: Vec<(Sym, SExpr)> },
 }

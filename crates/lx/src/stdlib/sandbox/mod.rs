@@ -4,10 +4,11 @@ use std::sync::{Arc, LazyLock};
 use dashmap::DashMap;
 use indexmap::IndexMap;
 
-use crate::builtins::mk;
 use crate::error::LxError;
 use crate::record;
 use crate::runtime::RuntimeCtx;
+use crate::std_module;
+use crate::stdlib::helpers::extract_handle_id;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
@@ -30,12 +31,7 @@ pub(super) static POLICIES: LazyLock<DashMap<u64, Policy>> = LazyLock::new(DashM
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
 pub(super) fn policy_id(v: &LxVal, span: SourceSpan) -> Result<u64, LxError> {
-  match v {
-    LxVal::Record(r) => {
-      r.get("__policy_id").and_then(|v| v.as_int()).and_then(|n| n.try_into().ok()).ok_or_else(|| LxError::type_err("sandbox: expected policy handle", span))
-    },
-    _ => Err(LxError::type_err("sandbox: expected policy Record", span)),
-  }
+  extract_handle_id(v, "__policy_id", "sandbox", span)
 }
 
 fn make_handle(id: u64) -> LxVal {
@@ -44,17 +40,17 @@ fn make_handle(id: u64) -> LxVal {
   }
 }
 
-pub fn build() -> IndexMap<String, LxVal> {
-  let mut m = IndexMap::new();
-  m.insert("policy".into(), mk("sandbox.policy", 1, bi_policy));
-  m.insert("describe".into(), mk("sandbox.describe", 1, bi_describe));
-  m.insert("permits".into(), mk("sandbox.permits", 3, bi_permits));
-  m.insert("merge".into(), mk("sandbox.merge", 1, bi_merge));
-  m.insert("attenuate".into(), mk("sandbox.attenuate", 2, bi_attenuate));
-  m.insert("scope".into(), mk("sandbox.scope", 2, super::sandbox_scope::bi_scope));
-  m.insert("exec".into(), mk("sandbox.exec", 2, super::sandbox_exec::bi_exec));
-  m.insert("spawn".into(), mk("sandbox.spawn", 2, super::sandbox_exec::bi_spawn));
-  m
+pub fn build() -> IndexMap<crate::sym::Sym, LxVal> {
+  std_module! {
+    "policy"    => "sandbox.policy",    1, bi_policy;
+    "describe"  => "sandbox.describe",  1, bi_describe;
+    "permits"   => "sandbox.permits",   3, bi_permits;
+    "merge"     => "sandbox.merge",     1, bi_merge;
+    "attenuate" => "sandbox.attenuate", 2, bi_attenuate;
+    "scope"     => "sandbox.scope",     2, super::sandbox_scope::bi_scope;
+    "exec"      => "sandbox.exec",      2, super::sandbox_exec::bi_exec;
+    "spawn"     => "sandbox.spawn",     2, super::sandbox_exec::bi_spawn
+  }
 }
 
 fn bi_policy(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {

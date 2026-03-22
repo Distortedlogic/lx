@@ -1,17 +1,18 @@
-use crate::sym::resolve;
 mod display;
+mod func;
 mod impls;
+mod serde_impl;
+
+pub use func::{AsyncBuiltinFn, BuiltinFunc, BuiltinKind, LxFunc, SyncBuiltinFn};
 
 use std::sync::Arc;
 
 use indexmap::IndexMap;
 use num_bigint::BigInt;
-use serde::ser::SerializeMap;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use num_traits::ToPrimitive;
 use strum::IntoStaticStr;
 
 use crate::ast::{Field, MethodSpec, SExpr};
-use crate::env::Env;
 use crate::error::LxError;
 use crate::sym::Sym;
 use miette::SourceSpan;
@@ -103,6 +104,36 @@ pub enum LxVal {
 #[derive(Debug, Clone)]
 pub struct ValueKey(pub LxVal);
 
+pub enum KeyedRef<'a> {
+  Record(&'a IndexMap<Sym, LxVal>),
+  Map(&'a IndexMap<ValueKey, LxVal>),
+}
+
+macro_rules! require_methods {
+  ($($name:ident, $as_method:ident, $type_label:expr, $ret:ty);+ $(;)?) => {
+    $(
+      pub fn $name(&self, ctx: &str, span: SourceSpan) -> Result<$ret, LxError> {
+        self.$as_method().ok_or_else(|| LxError::type_err(
+          format!("{ctx} expects {}, got {}", $type_label, self.type_name()), span,
+        ))
+      }
+    )+
+  };
+}
+
+macro_rules! typed_field_methods {
+  ($($name:ident, $as_method:ident, $ret:ty);+ $(;)?) => {
+    $(
+      pub fn $name(&self, key: &str) -> Option<$ret> {
+        match self {
+          LxVal::Record(fields) => fields.get(&crate::sym::intern(key)).and_then(|v| v.$as_method()),
+          _ => ::std::option::Option::None,
+        }
+      }
+    )+
+  };
+}
+
 impl LxVal {
   pub fn int(n: impl Into<BigInt>) -> Self {
     LxVal::Int(n.into())
@@ -133,33 +164,6 @@ impl LxVal {
   }
   pub fn err_str(s: impl AsRef<str>) -> Self {
     LxVal::Err(Box::new(LxVal::str(s)))
-  }
-
-  pub fn require_str(&self, ctx: &str, span: SourceSpan) -> Result<&str, LxError> {
-    self.as_str().ok_or_else(|| LxError::type_err(format!("{ctx} expects Str, got {}", self.type_name()), span))
-  }
-
-  pub fn require_int(&self, ctx: &str, span: SourceSpan) -> Result<&BigInt, LxError> {
-    self.as_int().ok_or_else(|| LxError::type_err(format!("{ctx} expects Int, got {}", self.type_name()), span))
-  }
-
-  pub fn require_float(&self, ctx: &str, span: SourceSpan) -> Result<f64, LxError> {
-    self.as_float().ok_or_else(|| LxError::type_err(format!("{ctx} expects Float, got {}", self.type_name()), span))
-  }
-
-  pub fn require_bool(&self, ctx: &str, span: SourceSpan) -> Result<bool, LxError> {
-    self.as_bool().ok_or_else(|| LxError::type_err(format!("{ctx} expects Bool, got {}", self.type_name()), span))
-  }
-
-  pub fn require_list(&self, ctx: &str, span: SourceSpan) -> Result<&[LxVal], LxError> {
-    self.as_list().map(|l| l.as_slice()).ok_or_else(|| LxError::type_err(format!("{ctx} expects List, got {}", self.type_name()), span))
-  }
-
-  pub fn require_record(&self, ctx: &str, span: SourceSpan) -> Result<&IndexMap<Sym, LxVal>, LxError> {
-    match self {
-      LxVal::Record(r) => Ok(r.as_ref()),
-      _ => Err(LxError::type_err(format!("{ctx} expects Record, got {}", self.type_name()), span)),
-    }
   }
 
   pub fn as_int(&self) -> Option<&BigInt> {
@@ -197,38 +201,48 @@ impl LxVal {
     }
   }
 
-  pub fn str_field(&self, key: &str) -> Option<&str> {
+  require_methods! {
+    require_str, as_str, "Str", &str;
+    require_int, as_int, "Int", &BigInt;
+    require_float, as_float, "Float", f64;
+    require_bool, as_bool, "Bool", bool;
+  }
+
+  pub fn require_list(&self, ctx: &str, span: SourceSpan) -> Result<&[LxVal], LxError> {
+    self.as_list().map(|l| l.as_slice()).ok_or_else(|| LxError::type_err(format!("{ctx} expects List, got {}", self.type_name()), span))
+  }
+
+  pub fn require_record(&self, ctx: &str, span: SourceSpan) -> Result<&IndexMap<Sym, LxVal>, LxError> {
     match self {
-      LxVal::Record(fields) => fields.get(&crate::sym::intern(key)).and_then(|v| v.as_str()),
-      _ => None,
+      LxVal::Record(r) => Ok(r.as_ref()),
+      _ => Err(LxError::type_err(format!("{ctx} expects Record, got {}", self.type_name()), span)),
     }
   }
 
-  pub fn int_field(&self, key: &str) -> Option<&BigInt> {
+  pub fn require_usize(&self, ctx: &str, span: SourceSpan) -> Result<usize, LxError> {
+    let n = self.require_int(ctx, span)?;
+    n.to_usize().ok_or_else(|| LxError::type_err(format!("{ctx} expects non-negative Int that fits usize, got {n}"), span))
+  }
+
+  pub fn require_keyed(&self, ctx: &str, span: SourceSpan) -> Result<KeyedRef<'_>, LxError> {
     match self {
-      LxVal::Record(fields) => fields.get(&crate::sym::intern(key)).and_then(|v| v.as_int()),
-      _ => None,
+      LxVal::Record(r) => Ok(KeyedRef::Record(r.as_ref())),
+      LxVal::Map(m) => Ok(KeyedRef::Map(m.as_ref())),
+      _ => Err(LxError::type_err(format!("{ctx} expects Record or Map, got {}", self.type_name()), span)),
     }
   }
 
-  pub fn float_field(&self, key: &str) -> Option<f64> {
-    match self {
-      LxVal::Record(fields) => fields.get(&crate::sym::intern(key)).and_then(|v| v.as_float()),
-      _ => None,
-    }
-  }
-
-  pub fn bool_field(&self, key: &str) -> Option<bool> {
-    match self {
-      LxVal::Record(fields) => fields.get(&crate::sym::intern(key)).and_then(|v| v.as_bool()),
-      _ => None,
-    }
+  typed_field_methods! {
+    str_field, as_str, &str;
+    int_field, as_int, &BigInt;
+    float_field, as_float, f64;
+    bool_field, as_bool, bool;
   }
 
   pub fn list_field(&self, key: &str) -> Option<&[LxVal]> {
     match self {
       LxVal::Record(fields) => fields.get(&crate::sym::intern(key)).and_then(|v| v.as_list()).map(|l| l.as_slice()),
-      _ => None,
+      _ => ::std::option::Option::None,
     }
   }
 
@@ -236,9 +250,16 @@ impl LxVal {
     match self {
       LxVal::Record(fields) => fields.get(&crate::sym::intern(key)).and_then(|v| match v {
         LxVal::Record(inner) => Some(inner.as_ref()),
-        _ => None,
+        _ => ::std::option::Option::None,
       }),
-      _ => None,
+      _ => ::std::option::Option::None,
+    }
+  }
+
+  pub fn get_field(&self, key: &str) -> Option<&LxVal> {
+    match self {
+      LxVal::Record(fields) => fields.get(&crate::sym::intern(key)),
+      _ => ::std::option::Option::None,
     }
   }
 
@@ -253,140 +274,5 @@ impl LxVal {
   pub fn short_display(&self) -> String {
     let s = self.to_string();
     if s.len() > 80 { format!("{}...", &s[..77]) } else { s }
-  }
-}
-
-#[derive(Debug, Clone)]
-pub struct LxFunc {
-  pub params: Vec<Sym>,
-  pub defaults: Vec<Option<LxVal>>,
-  pub body: Arc<SExpr>,
-  pub closure: Arc<Env>,
-  pub arity: usize,
-  pub applied: Vec<LxVal>,
-  pub source_text: Arc<str>,
-  pub source_name: Arc<str>,
-}
-
-pub type SyncBuiltinFn = fn(&[LxVal], SourceSpan, &std::sync::Arc<crate::runtime::RuntimeCtx>) -> Result<LxVal, LxError>;
-
-pub type AsyncBuiltinFn =
-  fn(Vec<LxVal>, SourceSpan, std::sync::Arc<crate::runtime::RuntimeCtx>) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<LxVal, LxError>>>>;
-
-#[derive(Clone, Copy)]
-pub enum BuiltinKind {
-  Sync(SyncBuiltinFn),
-  Async(AsyncBuiltinFn),
-}
-
-#[derive(Clone)]
-pub struct BuiltinFunc {
-  pub name: &'static str,
-  pub arity: usize,
-  pub kind: BuiltinKind,
-  pub applied: Vec<LxVal>,
-}
-
-impl Serialize for LxVal {
-  fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-    match self {
-      LxVal::Int(n) => {
-        if let Ok(i) = i64::try_from(n) {
-          serializer.serialize_i64(i)
-        } else {
-          serializer.serialize_str(&n.to_string())
-        }
-      },
-      LxVal::Float(f) => serializer.serialize_f64(*f),
-      LxVal::Bool(b) => serializer.serialize_bool(*b),
-      LxVal::Str(s) => serializer.serialize_str(s),
-      LxVal::Unit | LxVal::None => serializer.serialize_none(),
-      LxVal::List(items) => items.serialize(serializer),
-      LxVal::Tuple(items) => items.serialize(serializer),
-      LxVal::Record(fields) => {
-        let mut map = serializer.serialize_map(Some(fields.len()))?;
-        for (k, v) in fields.as_ref() {
-          map.serialize_entry(k, v)?;
-        }
-        map.end()
-      },
-      LxVal::Map(entries) => {
-        let mut map = serializer.serialize_map(Some(entries.len()))?;
-        for (k, v) in entries.as_ref() {
-          map.serialize_entry(&k.0.to_string(), v)?;
-        }
-        map.end()
-      },
-      LxVal::Ok(v) => v.serialize(serializer),
-      LxVal::Some(v) => v.serialize(serializer),
-      LxVal::Err(v) => {
-        let mut map = serializer.serialize_map(Some(1))?;
-        map.serialize_entry("__err", v.as_ref())?;
-        map.end()
-      },
-      LxVal::Tagged { tag, values } => {
-        let mut map = serializer.serialize_map(Some(2))?;
-        map.serialize_entry("__tag", resolve(*tag))?;
-        map.serialize_entry("__values", values.as_ref())?;
-        map.end()
-      },
-      LxVal::Range { start, end, inclusive } => {
-        let mut map = serializer.serialize_map(Some(3))?;
-        map.serialize_entry("start", start)?;
-        map.serialize_entry("end", end)?;
-        map.serialize_entry("inclusive", inclusive)?;
-        map.end()
-      },
-      LxVal::Store { id } => {
-        let mut map = serializer.serialize_map(Some(1))?;
-        map.serialize_entry("__store", id)?;
-        map.end()
-      },
-      LxVal::Object(o) => {
-        let mut map = serializer.serialize_map(Some(2))?;
-        map.serialize_entry("__object", &o.id)?;
-        map.serialize_entry("__class", resolve(o.class_name))?;
-        map.end()
-      },
-      _ => serializer.serialize_str(&format!("<{}>", self.type_name())),
-    }
-  }
-}
-
-impl<'de> Deserialize<'de> for LxVal {
-  fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-    let json = serde_json::Value::deserialize(deserializer)?;
-    Ok(LxVal::from(json))
-  }
-}
-
-impl From<serde_json::Value> for LxVal {
-  fn from(v: serde_json::Value) -> Self {
-    match v {
-      serde_json::Value::Null => LxVal::None,
-      serde_json::Value::Bool(b) => LxVal::Bool(b),
-      serde_json::Value::Number(n) => {
-        if let Some(i) = n.as_i64() {
-          LxVal::Int(BigInt::from(i))
-        } else {
-          LxVal::Float(n.as_f64().unwrap_or(0.0))
-        }
-      },
-      serde_json::Value::String(s) => LxVal::Str(Arc::from(s.as_str())),
-      serde_json::Value::Array(arr) => LxVal::List(Arc::new(arr.into_iter().map(LxVal::from).collect())),
-      serde_json::Value::Object(obj) => {
-        let mut rec = IndexMap::new();
-        for (k, v) in obj {
-          rec.insert(k, LxVal::from(v));
-        }
-        LxVal::Record(Arc::new(rec))
-      },
-    }
-  }
-}
-
-impl From<&LxVal> for serde_json::Value {
-  fn from(v: &LxVal) -> Self {
-    serde_json::to_value(v).unwrap_or(serde_json::Value::Null)
   }
 }

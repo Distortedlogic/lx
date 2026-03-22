@@ -1,8 +1,8 @@
-use crate::sym::intern;
 use std::sync::Arc;
 
 use crate::ast::{BinOp, SExpr, SStmt, SelArm};
 use crate::error::LxError;
+use crate::sym::Sym;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
@@ -126,7 +126,7 @@ impl Interpreter {
         let mut interp = Interpreter { env, source, source_dir, module_cache, loading, ctx };
         let v = interp.eval(&arm_expr).await?;
         let saved = Arc::clone(&interp.env);
-        let mut child = interp.env.child();
+        let child = interp.env.child();
         child.bind_str("it", v);
         interp.env = Arc::new(child);
         let r = interp.eval(&arm_handler).await;
@@ -138,11 +138,11 @@ impl Interpreter {
     result
   }
 
-  pub(super) async fn eval_with_resource(&mut self, resources: &[(SExpr, String)], body: &[SStmt], span: SourceSpan) -> Result<LxVal, LxError> {
-    let mut acquired: Vec<(String, LxVal)> = Vec::new();
+  pub(super) async fn eval_with_resource(&mut self, resources: &[(SExpr, Sym)], body: &[SStmt], span: SourceSpan) -> Result<LxVal, LxError> {
+    let mut acquired: Vec<(Sym, LxVal)> = Vec::new();
     for (expr, name) in resources {
       match self.eval(expr).await {
-        Ok(val) => acquired.push((name.clone(), val)),
+        Ok(val) => acquired.push((*name, val)),
         Err(e) => {
           for (_, val) in acquired.iter().rev() {
             self.close_resource(val, span).await;
@@ -152,11 +152,11 @@ impl Interpreter {
       }
     }
     let saved = Arc::clone(&self.env);
-    let mut child = self.env.child();
+    let child = self.env.child();
     for (name, val) in &acquired {
       child.bind(*name, val.clone());
     }
-    self.env = child.into_arc();
+    self.env = Arc::new(child);
     let mut result = LxVal::Unit;
     let mut body_err = None;
     for stmt in body {

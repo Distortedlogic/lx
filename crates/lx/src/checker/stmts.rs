@@ -1,9 +1,9 @@
 use crate::ast::{BindTarget, Binding, SStmt, Stmt, UseKind, UseStmt};
-use crate::sym::intern;
+use crate::sym::Sym;
 use miette::SourceSpan;
 
-use super::Checker;
 use super::types::{self, Type};
+use super::{Checker, DiagLevel};
 
 impl Checker {
   pub(crate) fn check_stmts(&mut self, stmts: &[SStmt]) -> Type {
@@ -21,11 +21,10 @@ impl Checker {
         Type::Unit
       },
       Stmt::TypeDef { name, variants, .. } => {
-        let variant_names: Vec<String> = variants.iter().map(|(n, _)| n.clone()).collect();
-        let variant_types: Vec<types::Variant> =
-          variants.iter().map(|(n, arity)| types::Variant { name: n.clone(), fields: vec![Type::Unknown; *arity] }).collect();
-        self.type_defs.insert(name.clone(), variant_names);
-        let union_type = Type::Union { name: name.clone(), variants: variant_types };
+        let variant_names: Vec<Sym> = variants.iter().map(|(n, _)| *n).collect();
+        let variant_types: Vec<types::Variant> = variants.iter().map(|(n, arity)| types::Variant { name: *n, fields: vec![Type::Unknown; *arity] }).collect();
+        self.type_defs.insert(*name, variant_names);
+        let union_type = Type::Union { name: *name, variants: variant_types };
         for (ctor_name, _) in variants {
           self.bind(*ctor_name, union_type.clone());
         }
@@ -33,13 +32,13 @@ impl Checker {
       },
       Stmt::TraitUnion(_) => Type::Unit,
       Stmt::TraitDecl(data) => {
-        let fields: Vec<(String, Type)> = data
+        let fields: Vec<(Sym, Type)> = data
           .entries
           .iter()
-          .filter_map(|e| if let crate::ast::TraitEntry::Field(f) = e { Some((f.name.clone(), super::named_to_type(&f.type_name))) } else { None })
+          .filter_map(|e| if let crate::ast::TraitEntry::Field(f) = e { Some((f.name, super::named_to_type(f.type_name.as_str()))) } else { None })
           .collect();
         if !fields.is_empty() {
-          self.trait_fields.insert(data.name.clone(), fields);
+          self.trait_fields.insert(data.name, fields);
         }
         self.bind(data.name, Type::Unknown);
         Type::Unit
@@ -69,7 +68,7 @@ impl Checker {
     match &u.kind {
       UseKind::Whole => {
         if let Some(name) = u.path.last() {
-          self.check_import_conflict(name, span);
+          self.check_import_conflict(*name, span);
           self.bind(*name, Type::Unknown);
         }
       },
@@ -78,18 +77,18 @@ impl Checker {
       },
       UseKind::Selective(names) => {
         for name in names {
-          self.check_import_conflict(name, span);
+          self.check_import_conflict(*name, span);
           self.bind(*name, Type::Unknown);
         }
       },
     }
   }
 
-  fn check_import_conflict(&mut self, name: &str, span: SourceSpan) {
-    if let Some(existing) = self.import_sources.get(name) {
-      self.emit_warning(format!("'{name}' already imported at offset {}", existing.offset()), span);
+  fn check_import_conflict(&mut self, name: Sym, span: SourceSpan) {
+    if let Some(existing) = self.import_sources.get(&name) {
+      self.emit(DiagLevel::Warning, format!("'{name}' already imported at offset {}", existing.offset()), span);
     } else {
-      self.import_sources.insert(name.to_string(), span);
+      self.import_sources.insert(name, span);
     }
   }
 
@@ -98,21 +97,21 @@ impl Checker {
     if let Some(ann) = &b.type_ann {
       let expected = self.resolve_type_ann(ann);
       if let Err(msg) = self.table.unify(&expected, &val_type) {
-        self.emit(format!("binding type mismatch: {msg}"), b.value.span);
+        self.emit(DiagLevel::Error, format!("binding type mismatch: {msg}"), b.value.span);
       }
     }
     match &b.target {
       BindTarget::Name(name) => {
         if b.mutable {
-          self.mutables.insert(name.clone());
+          self.mutables.insert(*name);
         }
         self.bind(*name, val_type);
       },
       BindTarget::Reassign(name) => {
         if let Some(existing) = self.lookup(*name) {
-          let resolved = self.table.resolve_deep(&existing);
+          let resolved = self.table.resolve(&existing);
           if let Err(msg) = self.table.unify(&resolved, &val_type) {
-            self.emit(format!("reassignment type mismatch: {msg}"), b.value.span);
+            self.emit(DiagLevel::Error, format!("reassignment type mismatch: {msg}"), b.value.span);
           }
         }
       },

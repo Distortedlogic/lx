@@ -18,14 +18,14 @@ pub trait AstVisitor {
   fn visit_binding(&mut self, binding: &Binding, span: SourceSpan) {
     walk_binding(self, binding, span);
   }
-  fn visit_type_def(&mut self, _name: &str, _variants: &[(String, usize)], _exported: bool, _span: SourceSpan) {}
+  fn visit_type_def(&mut self, _name: Sym, _variants: &[(Sym, usize)], _exported: bool, _span: SourceSpan) {}
   fn visit_trait_decl(&mut self, _data: &TraitDeclData, _span: SourceSpan) {}
   fn visit_class_decl(&mut self, data: &ClassDeclData, span: SourceSpan) {
     walk_class_decl(self, data, span);
   }
   fn visit_class_decl_post(&mut self, _data: &ClassDeclData, _span: SourceSpan) {}
   fn visit_trait_union(&mut self, _def: &TraitUnionDef, _span: SourceSpan) {}
-  fn visit_field_update(&mut self, _name: &str, _fields: &[String], value: &SExpr, span: SourceSpan) {
+  fn visit_field_update(&mut self, _name: Sym, _fields: &[Sym], value: &SExpr, span: SourceSpan) {
     walk_field_update(self, value, span);
   }
   fn visit_use(&mut self, _stmt: &UseStmt, _span: SourceSpan) {}
@@ -92,7 +92,7 @@ pub trait AstVisitor {
   fn visit_slice(&mut self, expr: &SExpr, start: Option<&SExpr>, end: Option<&SExpr>, span: SourceSpan) {
     walk_slice(self, expr, start, end, span);
   }
-  fn visit_named_arg(&mut self, _name: &str, value: &SExpr, span: SourceSpan) {
+  fn visit_named_arg(&mut self, _name: Sym, value: &SExpr, span: SourceSpan) {
     walk_named_arg(self, value, span);
   }
   fn visit_loop(&mut self, stmts: &[crate::ast::SStmt], span: SourceSpan) {
@@ -119,18 +119,18 @@ pub trait AstVisitor {
   fn visit_yield(&mut self, value: &SExpr, span: SourceSpan) {
     walk_yield(self, value, span);
   }
-  fn visit_with(&mut self, _name: &str, value: &SExpr, body: &[crate::ast::SStmt], _mutable: bool, span: SourceSpan) {
+  fn visit_with(&mut self, _name: Sym, value: &SExpr, body: &[crate::ast::SStmt], _mutable: bool, span: SourceSpan) {
     walk_with(self, value, body, span);
   }
-  fn visit_with_post(&mut self, _name: &str, _value: &SExpr, _body: &[crate::ast::SStmt], _mutable: bool, _span: SourceSpan) {}
-  fn visit_with_resource(&mut self, resources: &[(SExpr, String)], body: &[crate::ast::SStmt], span: SourceSpan) {
+  fn visit_with_post(&mut self, _name: Sym, _value: &SExpr, _body: &[crate::ast::SStmt], _mutable: bool, _span: SourceSpan) {}
+  fn visit_with_resource(&mut self, resources: &[(SExpr, Sym)], body: &[crate::ast::SStmt], span: SourceSpan) {
     walk_with_resource(self, resources, body, span);
   }
-  fn visit_with_resource_post(&mut self, _resources: &[(SExpr, String)], _body: &[crate::ast::SStmt], _span: SourceSpan) {}
-  fn visit_with_context(&mut self, fields: &[(String, SExpr)], body: &[crate::ast::SStmt], span: SourceSpan) {
+  fn visit_with_resource_post(&mut self, _resources: &[(SExpr, Sym)], _body: &[crate::ast::SStmt], _span: SourceSpan) {}
+  fn visit_with_context(&mut self, fields: &[(Sym, SExpr)], body: &[crate::ast::SStmt], span: SourceSpan) {
     walk_with_context(self, fields, body, span);
   }
-  fn visit_with_context_post(&mut self, _fields: &[(String, SExpr)], _body: &[crate::ast::SStmt], _span: SourceSpan) {}
+  fn visit_with_context_post(&mut self, _fields: &[(Sym, SExpr)], _body: &[crate::ast::SStmt], _span: SourceSpan) {}
   fn visit_pattern(&mut self, pattern: &Pattern, span: SourceSpan) {
     walk_pattern(self, pattern, span);
   }
@@ -140,13 +140,13 @@ pub trait AstVisitor {
   fn visit_pattern_tuple(&mut self, elems: &[SPattern], span: SourceSpan) {
     walk_pattern_tuple(self, elems, span);
   }
-  fn visit_pattern_list(&mut self, elems: &[SPattern], _rest: Option<&str>, span: SourceSpan) {
+  fn visit_pattern_list(&mut self, elems: &[SPattern], _rest: Option<Sym>, span: SourceSpan) {
     walk_pattern_list(self, elems, span);
   }
-  fn visit_pattern_record(&mut self, fields: &[FieldPattern], _rest: Option<&str>, span: SourceSpan) {
+  fn visit_pattern_record(&mut self, fields: &[FieldPattern], _rest: Option<Sym>, span: SourceSpan) {
     walk_pattern_record(self, fields, span);
   }
-  fn visit_pattern_constructor(&mut self, _name: &str, args: &[SPattern], span: SourceSpan) {
+  fn visit_pattern_constructor(&mut self, _name: Sym, args: &[SPattern], span: SourceSpan) {
     walk_pattern_constructor(self, args, span);
   }
   fn visit_type_expr(&mut self, type_expr: &TypeExpr, span: SourceSpan) {

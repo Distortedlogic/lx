@@ -5,36 +5,37 @@ use std::sync::{Arc, LazyLock};
 use dashmap::DashMap;
 use indexmap::IndexMap;
 
-use crate::builtins::{call_value_sync, mk};
+use crate::builtins::call_value_sync;
 use crate::error::LxError;
 use crate::record;
 use crate::runtime::RuntimeCtx;
+use crate::std_module;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
 pub(super) struct StoreState {
-  pub(super) data: IndexMap<String, LxVal>,
+  pub(super) data: IndexMap<crate::sym::Sym, LxVal>,
   pub(super) path: Option<PathBuf>,
 }
 
 pub(super) static STORES: LazyLock<DashMap<u64, StoreState>> = LazyLock::new(DashMap::new);
 pub(super) static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
-pub fn build() -> IndexMap<String, LxVal> {
-  let mut m = IndexMap::new();
-  m.insert("create".into(), mk("store.create", 1, bi_create));
-  m.insert("set".into(), mk("store.set", 3, bi_set));
-  m.insert("get".into(), mk("store.get", 2, bi_get));
-  m.insert("update".into(), mk("store.update", 3, bi_update));
-  m.insert("remove".into(), mk("store.remove", 2, bi_remove));
-  m.insert("keys".into(), mk("store.keys", 1, bi_keys));
-  m.insert("entries".into(), mk("store.entries", 1, bi_entries));
-  m.insert("query".into(), mk("store.query", 2, bi_query));
-  m.insert("count".into(), mk("store.count", 1, bi_count));
-  m.insert("clear".into(), mk("store.clear", 1, bi_clear));
-  m.insert("persist".into(), mk("store.persist", 1, bi_persist));
-  m.insert("load".into(), mk("store.load", 1, bi_load));
-  m
+pub fn build() -> IndexMap<crate::sym::Sym, LxVal> {
+  std_module! {
+    "create"  => "store.create",  1, bi_create;
+    "set"     => "store.set",     3, bi_set;
+    "get"     => "store.get",     2, bi_get;
+    "update"  => "store.update",  3, bi_update;
+    "remove"  => "store.remove",  2, bi_remove;
+    "keys"    => "store.keys",    1, bi_keys;
+    "entries" => "store.entries",  1, bi_entries;
+    "query"   => "store.query",   2, bi_query;
+    "count"   => "store.count",   1, bi_count;
+    "clear"   => "store.clear",   1, bi_clear;
+    "persist" => "store.persist",  1, bi_persist;
+    "load"    => "store.load",    1, bi_load
+  }
 }
 
 pub(super) fn store_id(v: &LxVal, span: SourceSpan) -> Result<u64, LxError> {
@@ -60,7 +61,7 @@ pub(super) fn persist(state: &StoreState) {
   let _ = std::fs::write(path, pretty);
 }
 
-fn load_from_disk(path: &std::path::Path) -> IndexMap<String, LxVal> {
+fn load_from_disk(path: &std::path::Path) -> IndexMap<crate::sym::Sym, LxVal> {
   let Ok(content) = std::fs::read_to_string(path) else {
     return IndexMap::new();
   };
@@ -76,7 +77,7 @@ fn load_from_disk(path: &std::path::Path) -> IndexMap<String, LxVal> {
 
 pub(super) fn bi_create(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let path = match &args[0] {
-    LxVal::Record(r) => r.get("persist").and_then(|v| v.as_str()).map(PathBuf::from),
+    LxVal::Record(r) => r.get(&crate::sym::intern("persist")).and_then(|v| v.as_str()).map(PathBuf::from),
     LxVal::Unit => None,
     _ => {
       return Err(LxError::type_err("store.create: opts must be Record or ()", span));
@@ -92,7 +93,7 @@ pub(super) fn bi_set(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -
   let id = store_id(&args[0], span)?;
   let key = args[1].require_str("store.set", span)?;
   let mut s = get_store_mut(id, span)?;
-  s.data.insert(key.to_string(), args[2].clone());
+  s.data.insert(crate::sym::intern(key), args[2].clone());
   persist(&s);
   Ok(LxVal::Unit)
 }
@@ -101,7 +102,7 @@ pub(super) fn bi_get(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -
   let id = store_id(&args[0], span)?;
   let key = args[1].require_str("store.get", span)?;
   let s = get_store(id, span)?;
-  Ok(s.data.get(key).cloned().unwrap_or(LxVal::None))
+  Ok(s.data.get(&crate::sym::intern(key)).cloned().unwrap_or(LxVal::None))
 }
 
 pub(super) fn bi_update(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
@@ -109,12 +110,12 @@ pub(super) fn bi_update(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>)
   let key = args[1].require_str("store.update", span)?;
   let f = &args[2];
   let mut s = get_store_mut(id, span)?;
-  let old = s.data.get(key).cloned().unwrap_or(LxVal::None);
+  let old = s.data.get(&crate::sym::intern(key)).cloned().unwrap_or(LxVal::None);
   let new_val = call_value_sync(f, old, span, ctx)?;
   if matches!(new_val, LxVal::Err(_)) {
     return Ok(new_val);
   }
-  s.data.insert(key.to_string(), new_val.clone());
+  s.data.insert(crate::sym::intern(key), new_val.clone());
   persist(&s);
   Ok(new_val)
 }
@@ -123,7 +124,7 @@ pub(super) fn bi_remove(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>
   let id = store_id(&args[0], span)?;
   let key = args[1].require_str("store.remove", span)?;
   let mut s = get_store_mut(id, span)?;
-  let removed = s.data.shift_remove(key).unwrap_or(LxVal::None);
+  let removed = s.data.shift_remove(&crate::sym::intern(key)).unwrap_or(LxVal::None);
   persist(&s);
   Ok(removed)
 }
@@ -131,7 +132,7 @@ pub(super) fn bi_remove(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>
 pub(super) fn bi_keys(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let s = get_store(id, span)?;
-  let keys: Vec<LxVal> = s.data.keys().map(LxVal::str).collect();
+  let keys: Vec<LxVal> = s.data.keys().map(|k| LxVal::str(k.as_str())).collect();
   Ok(LxVal::list(keys))
 }
 
@@ -143,7 +144,7 @@ pub(super) fn bi_entries(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx
     .iter()
     .map(|(k, v)| {
       record! {
-          "key" => LxVal::str(k),
+          "key" => LxVal::str(k.as_str()),
           "value" => v.clone(),
       }
     })
@@ -160,7 +161,7 @@ pub(super) fn bi_query(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) 
   let mut matched = Vec::new();
   for (k, v) in snapshot {
     let entry = record! {
-        "key" => LxVal::str(k),
+        "key" => LxVal::str(k.as_str()),
         "value" => v,
     };
     let result = call_value_sync(pred, entry.clone(), span, ctx)?;

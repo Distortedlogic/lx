@@ -7,7 +7,7 @@ Add supervision tree primitives to lx so agents can declare restart policies and
 - Every non-trivial agentic workflow has agents that crash — network failures, LLM timeouts, OOM. Without supervision, every caller manually wraps spawn/ask/kill in retry logic.
 - The research in `research/concurrency/design-patterns.md` covers Erlang/OTP supervision trees (one-for-one, one-for-all, rest-for-one strategies, intensity thresholds) — the theory is done, the implementation isn't.
 - `pkg/core/retry.lx` and `pkg/core/circuit.lx` are user-space workarounds for what should be a language-level primitive.
-- `pkg/agents/supervise.lx` implements a user-space supervisor using `Store` and `agent.kill`, but `agent.spawn` and `agent.kill` are stubs that return errors — the lx-level implementation cannot actually manage processes.
+- `pkg/agents/supervise.lx` implements a user-space supervisor using `Store` and `agent.kill`, but `agent.spawn` and `agent.kill` are stubs in `crates/lx/src/builtins/register.rs` (lines 150-167) that return errors ("subprocess agents not yet available in this build") — the lx-level implementation cannot actually manage processes.
 - Supervision composes — a supervised group of agents can itself be supervised, creating a hierarchy that isolates failure domains.
 
 # What Changes
@@ -52,7 +52,7 @@ The supervisor runs as a tokio task that monitors child process exit codes. On c
 2. Check restart intensity (count within window)
 3. If within limits, respawn. If exceeded, call `on_max` or propagate error.
 
-**Prerequisite:** `tokio` in `crates/lx/Cargo.toml` must add the `"process"` feature (currently only has `macros`, `rt-multi-thread`, `sync`, `time`). The `agent.spawn` and `agent.kill` stubs in `crates/lx/src/builtins/register.rs` must be replaced with real implementations or the supervisor must spawn child processes directly via `tokio::process::Command`.
+**Prerequisite:** `tokio` in the workspace `Cargo.toml` must add the `"process"` feature (currently only has `macros`, `rt-multi-thread`, `sync`, `time`; the crate-level `crates/lx/Cargo.toml` uses `tokio.workspace = true`). The `agent.spawn` and `agent.kill` stubs in `crates/lx/src/builtins/register.rs` must be replaced with real implementations or the supervisor must spawn child processes directly via `tokio::process::Command`.
 
 # Files Affected
 
@@ -62,8 +62,8 @@ The supervisor runs as a tokio task that monitors child process exit codes. On c
 - `tests/supervise.lx` — unit tests for supervision (the `tests/` directory must be created; it is a workspace member in `lx.toml` but does not yet exist on disk)
 
 **Modified files:**
-- `crates/lx/src/stdlib/mod.rs` — register `mod supervise;`, add to `get_std_module` match and `std_module_exists` matches list
-- `crates/lx/Cargo.toml` — add `"process"` to tokio features
+- `crates/lx/src/stdlib/mod.rs` — register `mod supervise;`, add `"supervise" => supervise::build()` to the `get_std_module` match, add `"supervise"` to the `std_module_exists` matches list
+- `Cargo.toml` (workspace root) — add `"process"` to tokio features (the crate-level `crates/lx/Cargo.toml` inherits via `tokio.workspace = true`)
 - `crates/lx/src/builtins/register.rs` — replace `agent.spawn`/`agent.kill` stubs with real process management (or the supervisor bypasses these entirely)
 
 # Task List
@@ -72,7 +72,7 @@ The supervisor runs as a tokio task that monitors child process exit codes. On c
 
 **Subject:** Define ChildSpec and SupervisorState structs for supervision
 
-**Description:** First, add `"process"` to the tokio features list in `crates/lx/Cargo.toml` (current features: `macros`, `rt-multi-thread`, `sync`, `time`).
+**Description:** First, add `"process"` to the tokio features list in the workspace root `Cargo.toml` (current features: `macros`, `rt-multi-thread`, `sync`, `time`; the crate-level `crates/lx/Cargo.toml` inherits via `tokio.workspace = true`).
 
 Create `crates/lx/src/stdlib/supervise/mod.rs`. Define internal structs: `ChildSpec { id, command, args, restart_policy, shutdown_ms }` and `SupervisorState { children, max_restarts, window_secs, restart_log }`. Implement `parse_child_spec(val: &LxVal) -> Result<ChildSpec, LxError>` to extract fields from an lx record value. Implement `parse_opts(val: &LxVal) -> SupervisorOpts` for supervisor-level options.
 
@@ -81,7 +81,7 @@ Register the module in `crates/lx/src/stdlib/mod.rs`:
 2. Add `"supervise" => supervise::build()` to the `get_std_module` match.
 3. Add `"supervise"` to the `std_module_exists` matches list.
 
-Create the `build()` function returning an empty `IndexMap` for now. The `build()` signature is `pub fn build() -> IndexMap<String, LxVal>` and uses `crate::builtins::mk` to create builtin function values.
+Create the `build()` function returning an empty `IndexMap` for now. The `build()` signature is `pub fn build() -> IndexMap<crate::sym::Sym, LxVal>` and uses `crate::builtins::mk` to create builtin function values, with keys inserted via `crate::sym::intern("name")`.
 
 Run `just diagnose`.
 
@@ -100,7 +100,7 @@ Run `just diagnose`.
 4. On child exit: check restart policy (permanent/transient/temporary), check restart intensity (track restart timestamps, count within window), respawn if allowed, call `on_max` if limit exceeded.
 5. Returns a `SupervisorHandle` as an `LxVal::Record` containing the supervisor task handle and child list.
 
-Add `"one_for_one"` to the `build()` map via `m.insert("one_for_one".into(), mk("supervise.one_for_one", 2, bi_one_for_one))`.
+Add `"one_for_one"` to the `build()` map via `m.insert(crate::sym::intern("one_for_one"), mk("supervise.one_for_one", 2, bi_one_for_one))`.
 
 Run `just diagnose`.
 

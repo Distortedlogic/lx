@@ -194,7 +194,7 @@ pub fn walk_with<V: AstVisitor + ?Sized>(v: &mut V, value: &SExpr, body: &[SStmt
   }
 }
 
-pub fn walk_with_resource<V: AstVisitor + ?Sized>(v: &mut V, resources: &[(SExpr, String)], body: &[SStmt], _span: SourceSpan) {
+pub fn walk_with_resource<V: AstVisitor + ?Sized>(v: &mut V, resources: &[(SExpr, crate::sym::Sym)], body: &[SStmt], _span: SourceSpan) {
   for (r, _) in resources {
     v.visit_expr(&r.node, r.span);
   }
@@ -203,7 +203,7 @@ pub fn walk_with_resource<V: AstVisitor + ?Sized>(v: &mut V, resources: &[(SExpr
   }
 }
 
-pub fn walk_with_context<V: AstVisitor + ?Sized>(v: &mut V, fields: &[(String, SExpr)], body: &[SStmt], _span: SourceSpan) {
+pub fn walk_with_context<V: AstVisitor + ?Sized>(v: &mut V, fields: &[(crate::sym::Sym, SExpr)], body: &[SStmt], _span: SourceSpan) {
   for (_, expr) in fields {
     v.visit_expr(&expr.node, expr.span);
   }

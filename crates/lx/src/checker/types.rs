@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fmt;
 
+use crate::sym::Sym;
 use itertools::Itertools;
 
 pub type TypeVarId = u32;
@@ -16,14 +17,14 @@ pub enum Type {
 
   List(Box<Type>),
   Map { key: Box<Type>, value: Box<Type> },
-  Record(Vec<(String, Type)>),
+  Record(Vec<(Sym, Type)>),
   Tuple(Vec<Type>),
 
   Func { param: Box<Type>, ret: Box<Type> },
   Result { ok: Box<Type>, err: Box<Type> },
   Maybe(Box<Type>),
 
-  Union { name: String, variants: Vec<Variant> },
+  Union { name: Sym, variants: Vec<Variant> },
 
   Var(TypeVarId),
   Unknown,
@@ -31,7 +32,7 @@ pub enum Type {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Variant {
-  pub name: String,
+  pub name: Sym,
   pub fields: Vec<Type>,
 }
 
@@ -57,23 +58,13 @@ impl UnificationTable {
         Some(Some(bound)) => self.resolve(bound),
         _ => ty.clone(),
       },
-      _ => ty.clone(),
-    }
-  }
-
-  pub fn resolve_deep(&self, ty: &Type) -> Type {
-    match ty {
-      Type::Var(id) => match self.bindings.get(*id as usize) {
-        Some(Some(bound)) => self.resolve_deep(bound),
-        _ => ty.clone(),
-      },
-      Type::List(inner) => Type::List(Box::new(self.resolve_deep(inner))),
-      Type::Map { key, value } => Type::Map { key: Box::new(self.resolve_deep(key)), value: Box::new(self.resolve_deep(value)) },
-      Type::Record(fields) => Type::Record(fields.iter().map(|(n, t)| (n.clone(), self.resolve_deep(t))).collect()),
-      Type::Tuple(elems) => Type::Tuple(elems.iter().map(|t| self.resolve_deep(t)).collect()),
-      Type::Func { param, ret } => Type::Func { param: Box::new(self.resolve_deep(param)), ret: Box::new(self.resolve_deep(ret)) },
-      Type::Result { ok, err } => Type::Result { ok: Box::new(self.resolve_deep(ok)), err: Box::new(self.resolve_deep(err)) },
-      Type::Maybe(inner) => Type::Maybe(Box::new(self.resolve_deep(inner))),
+      Type::List(inner) => Type::List(Box::new(self.resolve(inner))),
+      Type::Map { key, value } => Type::Map { key: Box::new(self.resolve(key)), value: Box::new(self.resolve(value)) },
+      Type::Record(fields) => Type::Record(fields.iter().map(|(n, t)| (*n, self.resolve(t))).collect()),
+      Type::Tuple(elems) => Type::Tuple(elems.iter().map(|t| self.resolve(t)).collect()),
+      Type::Func { param, ret } => Type::Func { param: Box::new(self.resolve(param)), ret: Box::new(self.resolve(ret)) },
+      Type::Result { ok, err } => Type::Result { ok: Box::new(self.resolve(ok)), err: Box::new(self.resolve(err)) },
+      Type::Maybe(inner) => Type::Maybe(Box::new(self.resolve(inner))),
       _ => ty.clone(),
     }
   }
@@ -127,20 +118,20 @@ impl UnificationTable {
     }
   }
 
-  fn unify_records(&mut self, a: &[(String, Type)], b: &[(String, Type)]) -> Result<Type, String> {
-    let a_map: HashMap<&str, &Type> = a.iter().map(|(n, t)| (n.as_str(), t)).collect();
-    let b_map: HashMap<&str, &Type> = b.iter().map(|(n, t)| (n.as_str(), t)).collect();
+  fn unify_records(&mut self, a: &[(Sym, Type)], b: &[(Sym, Type)]) -> Result<Type, String> {
+    let a_map: HashMap<Sym, &Type> = a.iter().map(|(n, t)| (*n, t)).collect();
+    let b_map: HashMap<Sym, &Type> = b.iter().map(|(n, t)| (*n, t)).collect();
     let mut fields = Vec::new();
     for (name, a_ty) in &a_map {
       if let Some(b_ty) = b_map.get(name) {
-        fields.push((name.to_string(), self.unify(a_ty, b_ty)?));
+        fields.push((*name, self.unify(a_ty, b_ty)?));
       } else {
-        fields.push((name.to_string(), (*a_ty).clone()));
+        fields.push((*name, (*a_ty).clone()));
       }
     }
     for (name, b_ty) in &b_map {
       if !a_map.contains_key(name) {
-        fields.push((name.to_string(), (*b_ty).clone()));
+        fields.push((*name, (*b_ty).clone()));
       }
     }
     Ok(Type::Record(fields))

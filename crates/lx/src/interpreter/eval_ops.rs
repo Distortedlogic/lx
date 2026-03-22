@@ -161,7 +161,7 @@ impl Interpreter {
 
   pub(super) async fn close_resource(&mut self, val: &LxVal, span: SourceSpan) {
     if let LxVal::Record(fields) = val
-      && let Some(close_fn) = fields.get("close")
+      && let Some(close_fn) = fields.get(&crate::sym::intern("close"))
       && let Err(e) = crate::builtins::call_value(close_fn, LxVal::Unit, span, &self.ctx).await
     {
       eprintln!("close_resource: close callback failed: {e}");

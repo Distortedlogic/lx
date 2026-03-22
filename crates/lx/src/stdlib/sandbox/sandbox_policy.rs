@@ -63,41 +63,41 @@ fn extract_string_list(v: &LxVal) -> Vec<String> {
   }
 }
 
-pub(super) fn parse_policy(config: &IndexMap<String, LxVal>, span: SourceSpan) -> Result<Policy, LxError> {
+pub(super) fn parse_policy(config: &IndexMap<crate::sym::Sym, LxVal>, span: SourceSpan) -> Result<Policy, LxError> {
   let mut p = make_preset("pure");
 
-  if let Some(LxVal::Record(fs)) = config.get("fs") {
-    if let Some(v) = fs.get("read") {
+  if let Some(LxVal::Record(fs)) = config.get(&crate::sym::intern("fs")) {
+    if let Some(v) = fs.get(&crate::sym::intern("read")) {
       p.fs_read = extract_string_list(v);
     }
-    if let Some(v) = fs.get("write") {
+    if let Some(v) = fs.get(&crate::sym::intern("write")) {
       p.fs_write = extract_string_list(v);
     }
   }
 
-  if let Some(LxVal::Record(net)) = config.get("net")
-    && let Some(v) = net.get("allow")
+  if let Some(LxVal::Record(net)) = config.get(&crate::sym::intern("net"))
+    && let Some(v) = net.get(&crate::sym::intern("allow"))
   {
     p.net_allow = extract_string_list(v);
   }
 
-  if let Some(LxVal::Bool(b)) = config.get("agent") {
+  if let Some(LxVal::Bool(b)) = config.get(&crate::sym::intern("agent")) {
     p.agent = *b;
   }
-  if let Some(LxVal::Bool(b)) = config.get("mcp") {
+  if let Some(LxVal::Bool(b)) = config.get(&crate::sym::intern("mcp")) {
     p.mcp = *b;
   }
-  if let Some(LxVal::Bool(b)) = config.get("ai") {
+  if let Some(LxVal::Bool(b)) = config.get(&crate::sym::intern("ai")) {
     p.ai = *b;
   }
-  if let Some(LxVal::Bool(b)) = config.get("embed") {
+  if let Some(LxVal::Bool(b)) = config.get(&crate::sym::intern("embed")) {
     p.embed = *b;
   }
-  if let Some(LxVal::Bool(b)) = config.get("pane") {
+  if let Some(LxVal::Bool(b)) = config.get(&crate::sym::intern("pane")) {
     p.pane = *b;
   }
 
-  if let Some(v) = config.get("max_time_ms") {
+  if let Some(v) = config.get(&crate::sym::intern("max_time_ms")) {
     match v {
       LxVal::Int(n) => p.max_time_ms = n.try_into().map_err(|_| LxError::type_err("sandbox: max_time_ms must be positive", span))?,
       _ => return Err(LxError::type_err("sandbox: max_time_ms must be Int", span)),

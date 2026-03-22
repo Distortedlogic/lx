@@ -1,4 +1,3 @@
-use crate::sym::resolve;
 use std::fmt;
 
 use itertools::Itertools;

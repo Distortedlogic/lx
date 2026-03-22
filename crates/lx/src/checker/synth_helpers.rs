@@ -1,10 +1,10 @@
-use crate::sym::intern;
+use crate::sym::Sym;
 use miette::SourceSpan;
 
-use crate::ast::{BinOp, Expr, Literal, MapEntry, MatchArm, Param, Pattern, SExpr, SPattern, SStmt, SType};
+use crate::ast::{BinOp, Expr, Literal, MapEntry, MatchArm, Param, Pattern, SExpr, SPattern, SType};
 
-use super::Checker;
 use super::types::Type;
+use super::{Checker, DiagLevel};
 
 impl Checker {
   pub(super) fn synth_func(&mut self, params: &[Param], ret_type: &Option<SType>, body: &SExpr) -> Type {
@@ -22,7 +22,7 @@ impl Checker {
     if let Some(ret_ann) = ret_type {
       let expected = self.resolve_type_ann(ret_ann);
       if let Err(msg) = self.table.unify(&expected, &body_type) {
-        self.emit(format!("return type mismatch: {msg}"), body.span);
+        self.emit(DiagLevel::Error, format!("return type mismatch: {msg}"), body.span);
       }
     }
     self.pop_scope();
@@ -79,15 +79,7 @@ impl Checker {
     let fv = super::capture::free_vars(expr);
     for name in &fv {
       if self.mutables.contains(name) {
-        self.emit(format!("cannot capture mutable binding `{name}` in concurrent context"), span);
-      }
-    }
-  }
-
-  pub(super) fn check_mutable_captures_stmts(&mut self, stmts: &[SStmt], span: SourceSpan) {
-    for s in stmts {
-      if let crate::ast::Stmt::Expr(e) = &s.node {
-        self.check_mutable_captures(e, span);
+        self.emit(DiagLevel::Error, format!("cannot capture mutable binding `{name}` in concurrent context"), span);
       }
     }
   }
@@ -98,10 +90,10 @@ impl Checker {
     {
       for (trait_name, trait_type) in &fields {
         for rf in rec_fields {
-          if rf.name.as_deref() == Some(trait_name.as_str()) {
+          if rf.name == Some(*trait_name) {
             let val_t = self.synth(&rf.value);
             if let Err(msg) = self.table.unify(trait_type, &val_t) {
-              self.emit(format!("Trait field `{trait_name}` type mismatch: {msg}"), rf.value.span);
+              self.emit(DiagLevel::Error, format!("Trait field `{trait_name}` type mismatch: {msg}"), rf.value.span);
             }
           }
         }
@@ -120,10 +112,10 @@ impl Checker {
     let scrut_t = self.synth(scrutinee);
     let resolved_scrut = self.table.resolve(&scrut_t);
     if let Type::Union { ref name, ref variants } = resolved_scrut {
-      let variant_names: Vec<String> = variants.iter().map(|v| v.name.clone()).collect();
-      let missing = super::exhaust::check_exhaustiveness(name, &variant_names, arms);
+      let variant_names: Vec<Sym> = variants.iter().map(|v| v.name).collect();
+      let missing = super::exhaust::check_exhaustiveness(*name, &variant_names, arms);
       for v in &missing {
-        self.emit_warning(format!("non-exhaustive match on {name}: missing {v}"), span);
+        self.emit(DiagLevel::Warning, format!("non-exhaustive match on {name}: missing {v}"), span);
       }
     }
     let result = self.fresh();
@@ -136,7 +128,7 @@ impl Checker {
       let body_t = self.synth(&arm.body);
       self.pop_scope();
       if let Err(msg) = self.table.unify(&result, &body_t) {
-        self.emit(format!("match arm type mismatch: {msg}"), arm.body.span);
+        self.emit(DiagLevel::Error, format!("match arm type mismatch: {msg}"), arm.body.span);
       }
     }
     self.table.resolve(&result)
@@ -170,7 +162,7 @@ impl Checker {
       BinOp::Eq | BinOp::NotEq | BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq => Type::Bool,
       BinOp::And | BinOp::Or => {
         if lt != Type::Bool && lt != Type::Unknown {
-          self.emit("logical operator requires Bool".into(), span);
+          self.emit(DiagLevel::Error, "logical operator requires Bool".into(), span);
         }
         Type::Bool
       },

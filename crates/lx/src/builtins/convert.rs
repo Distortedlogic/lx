@@ -103,7 +103,7 @@ fn bi_timeout(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resul
   Ok(LxVal::Unit)
 }
 
-pub(super) fn register(env: &mut Env) {
+pub(super) fn register(env: &Env) {
   super::register_builtins!(env, {
     "collect"/1 => bi_collect, "step"/2 => bi_step, "require"/2 => bi_require,
     "parse_int"/1 => bi_parse_int, "parse_float"/1 => bi_parse_float,

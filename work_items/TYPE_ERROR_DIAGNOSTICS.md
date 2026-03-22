@@ -140,11 +140,11 @@ Run `just diagnose`.
 
 In `crates/lx/src/checker/synth_helpers.rs`, find all calls to `self.table.unify()` and replace with `self.table.unify_with_context()` where context is available:
 
-- Function return type (line ~23): pass `TypeContext::FuncReturn` with function name.
-- Trait field type check (line ~102): pass `TypeContext::RecordField` with field name.
-- Match arm unification (line ~137): pass `TypeContext::MatchArm` with arm index.
-- Map key/value unification (lines ~153, ~157): use `TypeContext::General`.
-- Binary operators (line ~167): pass `TypeContext::BinaryOp` with the operator string.
+- Function return type (line ~24): pass `TypeContext::FuncReturn` with function name.
+- Trait field type check (line ~103): pass `TypeContext::RecordField` with field name.
+- Match arm unification (line ~138): pass `TypeContext::MatchArm` with arm index.
+- Map key/value unification (lines ~154, ~158): use `TypeContext::General`.
+- Binary operators (line ~168): pass `TypeContext::BinaryOp` with the operator string.
 
 In `crates/lx/src/checker/stmts.rs`:
 - Binding type annotations (line ~99): pass `TypeContext::Binding` with the binding name.

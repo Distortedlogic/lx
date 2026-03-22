@@ -8,22 +8,26 @@ use miette::SourceSpan;
 use super::BoxFut;
 use super::hof::{call, get_list};
 
+async fn parallel_map_batch(items: &[LxVal], func: &LxVal, sp: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<Vec<LxVal>, LxError> {
+  let mut futures = Vec::with_capacity(items.len());
+  for v in items.iter() {
+    let f = func.clone();
+    let v = v.clone();
+    let ctx = Arc::clone(ctx);
+    futures.push(async move { call(&f, v, sp, &ctx).await });
+  }
+  let results = futures::future::join_all(futures).await;
+  let mut out = Vec::with_capacity(results.len());
+  for r in results {
+    out.push(r?);
+  }
+  Ok(out)
+}
+
 pub(super) fn bi_pmap(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
   Box::pin(async move {
     let items = get_list(&args[1], "pmap", sp)?;
-    let func = &args[0];
-    let mut futures = Vec::with_capacity(items.len());
-    for v in items.iter() {
-      let f = func.clone();
-      let v = v.clone();
-      let ctx = Arc::clone(&ctx);
-      futures.push(async move { call(&f, v, sp, &ctx).await });
-    }
-    let results = futures::future::join_all(futures).await;
-    let mut out = Vec::with_capacity(results.len());
-    for r in results {
-      out.push(r?);
-    }
+    let out = parallel_map_batch(&items, &args[0], sp, &ctx).await?;
     Ok(LxVal::list(out))
   })
 }
@@ -35,20 +39,10 @@ pub(super) fn bi_pmap_n(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) 
     if n == 0 {
       return Err(LxError::runtime("pmap_n: concurrency limit must be > 0", sp));
     }
-    let func = &args[1];
     let mut out = Vec::with_capacity(items.len());
     for chunk in items.chunks(n) {
-      let mut futures = Vec::with_capacity(chunk.len());
-      for v in chunk.iter() {
-        let f = func.clone();
-        let v = v.clone();
-        let ctx = Arc::clone(&ctx);
-        futures.push(async move { call(&f, v, sp, &ctx).await });
-      }
-      let results = futures::future::join_all(futures).await;
-      for r in results {
-        out.push(r?);
-      }
+      let batch = parallel_map_batch(chunk, &args[1], sp, &ctx).await?;
+      out.extend(batch);
     }
     Ok(LxVal::list(out))
   })

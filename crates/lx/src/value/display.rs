@@ -1,4 +1,3 @@
-use crate::sym::resolve;
 use std::fmt;
 use std::sync::Arc;
 
@@ -19,34 +18,26 @@ impl<T: Into<LxVal>> From<Vec<T>> for LxVal {
   }
 }
 
-impl TryFrom<&LxVal> for BigInt {
-  type Error = &'static str;
-  fn try_from(v: &LxVal) -> Result<Self, Self::Error> {
-    match v {
-      LxVal::Int(n) => Ok(n.clone()),
-      _ => Result::Err("expected Int"),
-    }
-  }
+macro_rules! try_from_lxval {
+  ($($target:ty, $variant:ident, $bind:ident => $extract:expr, $msg:expr);+ $(;)?) => {
+    $(
+      impl TryFrom<&LxVal> for $target {
+        type Error = &'static str;
+        fn try_from(v: &LxVal) -> Result<Self, Self::Error> {
+          match v {
+            LxVal::$variant($bind) => Ok($extract),
+            _ => Result::Err($msg),
+          }
+        }
+      }
+    )+
+  };
 }
 
-impl TryFrom<&LxVal> for f64 {
-  type Error = &'static str;
-  fn try_from(v: &LxVal) -> Result<Self, Self::Error> {
-    match v {
-      LxVal::Float(f) => Ok(*f),
-      _ => Result::Err("expected Float"),
-    }
-  }
-}
-
-impl TryFrom<&LxVal> for bool {
-  type Error = &'static str;
-  fn try_from(v: &LxVal) -> Result<Self, Self::Error> {
-    match v {
-      LxVal::Bool(b) => Ok(*b),
-      _ => Result::Err("expected Bool"),
-    }
-  }
+try_from_lxval! {
+  BigInt, Int, n => n.clone(), "expected Int";
+  f64, Float, f => *f, "expected Float";
+  bool, Bool, b => *b, "expected Bool";
 }
 
 impl fmt::Display for LxVal {
@@ -73,18 +64,18 @@ impl fmt::Display for LxVal {
       LxVal::Err(v) => write!(f, "Err {v}"),
       LxVal::Some(v) => write!(f, "Some {v}"),
       LxVal::None => write!(f, "None"),
-      LxVal::Tagged { tag, values } if values.is_empty() => write!(f, "{}", resolve(*tag)),
-      LxVal::Tagged { tag, values } => write!(f, "{} {}", resolve(*tag), values.iter().format(" ")),
-      LxVal::TaggedCtor { tag, .. } => write!(f, "<ctor {}>", resolve(*tag)),
+      LxVal::Tagged { tag, values } if values.is_empty() => write!(f, "{tag}"),
+      LxVal::Tagged { tag, values } => write!(f, "{} {}", tag, values.iter().format(" ")),
+      LxVal::TaggedCtor { tag, .. } => write!(f, "<ctor {tag}>"),
       LxVal::Range { start, end, inclusive: true } => write!(f, "{start}..={end}"),
       LxVal::Range { start, end, inclusive: false } => write!(f, "{start}..{end}"),
-      LxVal::TraitUnion { name, .. } => write!(f, "<Trait {}>", resolve(*name)),
-      LxVal::Trait(t) => write!(f, "<Trait {}>", resolve(t.name)),
-      LxVal::Class(c) if c.traits.iter().any(|t| resolve(*t) == "Agent") => {
-        write!(f, "<Agent {}>", resolve(c.name))
+      LxVal::TraitUnion { name, .. } => write!(f, "<Trait {name}>"),
+      LxVal::Trait(t) => write!(f, "<Trait {}>", t.name),
+      LxVal::Class(c) if c.traits.iter().any(|t| t == "Agent") => {
+        write!(f, "<Agent {}>", c.name)
       },
-      LxVal::Class(c) => write!(f, "<Class {}>", resolve(c.name)),
-      LxVal::Object(o) => write!(f, "<{}#{}>", resolve(o.class_name), o.id),
+      LxVal::Class(c) => write!(f, "<Class {}>", c.name),
+      LxVal::Object(o) => write!(f, "<{}#{}>", o.class_name, o.id),
       LxVal::Store { id } => write!(f, "<Store#{id}>"),
     }
   }

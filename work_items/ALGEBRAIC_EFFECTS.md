@@ -39,10 +39,10 @@ handle {
 
 ## AST additions
 
-- `Stmt::EffectDecl { name: String, params: Vec<Param>, ret_type: Option<SType> }` — effect type declaration
-- `Expr::Perform { effect: String, args: Vec<SExpr> }` — perform an effect
+- `Stmt::EffectDecl { name: Sym, params: Vec<Param>, ret_type: Option<SType> }` — effect type declaration
+- `Expr::Perform { effect: Sym, args: Vec<SExpr> }` — perform an effect
 - `Expr::Handle { body: Box<SExpr>, handlers: Vec<EffectHandler> }` — handle effects from body
-- `EffectHandler { effect: String, params: Vec<String>, body: SExpr }` — handler arm
+- `EffectHandler { effect: Sym, params: Vec<Sym>, body: SExpr }` — handler arm
 
 ## Runtime
 
@@ -64,13 +64,14 @@ Implementation approach: each `handle` block installs an effect handler table in
 - `crates/lx/src/parser/expr.rs` — parse `perform` and `handle` expressions
 - `crates/lx/src/parser/stmt.rs` — parse `effect` declarations
 - `crates/lx/src/error.rs` — add `EffectSignal` variant to `LxError` enum (alongside existing `BreakSignal`, `Propagate`)
-- `crates/lx/src/interpreter/eval.rs` — evaluate Perform and Handle (add arms to the `eval` match)
-- `crates/lx/src/interpreter/mod.rs` — add effect handler table to `Interpreter` struct (fields: `env`, `source`, `source_dir`, `module_cache`, `loading`, `ctx`)
-- `crates/lx/src/env.rs` — store effect handlers in `Env` struct (fields: `bindings: DashMap<String, LxVal>`, `mutables: HashSet<String>`, `parent: Option<Arc<Env>>`)
+- `crates/lx/src/interpreter/mod.rs` — add `Expr::Perform` and `Expr::Handle` arms to the `eval` match (the main dispatch is in `mod.rs`, not `eval.rs`); the `Interpreter` struct fields are: `env: Arc<Env>`, `source: String`, `source_dir: Option<PathBuf>`, `module_cache`, `loading`, `ctx: Arc<RuntimeCtx>`
+- `crates/lx/src/interpreter/eval.rs` — add `eval_perform` and `eval_handle` helper methods (this file holds eval helper methods like `eval_binary`, `eval_block`, etc.)
+- `crates/lx/src/interpreter/exec_stmt.rs` — add `Stmt::EffectDecl` arm to `eval_stmt` match (registers the effect declaration at runtime)
+- `crates/lx/src/env.rs` — store effect handlers in `Env` struct (fields: `bindings: DashMap<Sym, LxVal>`, `mutables: DashSet<Sym>`, `parent: Option<Arc<Env>>`)
 - `crates/lx/src/checker/stmts.rs` — type-check effect declarations
 - `crates/lx/src/checker/synth.rs` — type-check Perform and Handle expressions
-- `crates/lx/src/visitor/walk/mod.rs` — walk new Stmt variant in `walk_stmt`
-- `crates/lx/src/visitor/walk/walk_expr.rs` — walk new Expr variants in `walk_expr`
+- `crates/lx/src/visitor/walk/mod.rs` — walk new Stmt variant in `walk_stmt` and new Expr variants in `walk_expr` (both dispatch matches are in this file)
+- `crates/lx/src/visitor/walk/walk_expr.rs` — add `walk_perform` and `walk_handle` helper functions (individual walk helpers live here)
 - `crates/lx/src/visitor/mod.rs` — add visitor trait methods for new nodes
 
 **New files:**
@@ -85,15 +86,15 @@ Implementation approach: each `handle` block installs an effect handler table in
 
 **Description:** In `crates/lx/src/lexer/token.rs`, add `Effect`, `Perform`, `Handle`, `Resume` variants to the `TokenKind` enum. In `crates/lx/src/lexer/helpers.rs`, add `"effect"`, `"perform"`, `"handle"`, `"resume"` mappings to the `ident_or_keyword` function.
 
-In `crates/lx/src/ast/mod.rs`, add to the `Stmt` enum: `EffectDecl { name: String, params: Vec<Param>, ret_type: Option<SType> }`. (No `span` field -- spans are stored in the `Spanned<Stmt>` wrapper.)
+In `crates/lx/src/ast/mod.rs`, add to the `Stmt` enum: `EffectDecl { name: Sym, params: Vec<Param>, ret_type: Option<SType> }`. (No `span` field -- spans are stored in the `Spanned<Stmt>` wrapper. The codebase uses `Sym` (interned strings) for all names, not `String`.)
 
-In `crates/lx/src/ast/expr_types.rs`, add: `EffectHandler { effect: String, params: Vec<String>, body: SExpr }`.
+In `crates/lx/src/ast/expr_types.rs`, add: `EffectHandler { effect: Sym, params: Vec<Sym>, body: SExpr }`.
 
 In `crates/lx/src/ast/mod.rs`, add to the `Expr` enum:
-- `Perform { effect: String, args: Vec<SExpr> }`
+- `Perform { effect: Sym, args: Vec<SExpr> }`
 - `Handle { body: Box<SExpr>, handlers: Vec<EffectHandler> }`
 
-Update visitor walker to walk new node children.
+Update visitor: in `crates/lx/src/visitor/walk/mod.rs`, add `Stmt::EffectDecl` arm to `walk_stmt` and `Expr::Perform`/`Expr::Handle` arms to `walk_expr`. Add corresponding `walk_perform`/`walk_handle` helpers in `crates/lx/src/visitor/walk/walk_expr.rs`. Add `visit_effect_decl`, `visit_perform`, `visit_handle` default methods to the `AstVisitor` trait in `crates/lx/src/visitor/mod.rs`.
 
 Run `just diagnose`.
 
@@ -121,9 +122,9 @@ Run `just diagnose`.
 
 **Subject:** Runtime effect handler installation and lookup
 
-**Description:** Create `crates/lx/src/interpreter/effects.rs`. Define `EffectHandlerEntry { effect_name: String, params: Vec<String>, body: SExpr, env: Arc<Env> }`.
+**Description:** Create `crates/lx/src/interpreter/effects.rs`. Define `EffectHandlerEntry { effect_name: Sym, params: Vec<Sym>, body: SExpr, env: Arc<Env> }`.
 
-In `crates/lx/src/env.rs`, add `effect_handlers: Option<Vec<EffectHandlerEntry>>` to the `Env` struct (alongside existing `bindings`, `mutables`, `parent` fields). The `handle` expression installs handlers in a child env. `perform` walks the env chain (via `parent: Option<Arc<Env>>` pointers) to find the nearest handler for the named effect.
+In `crates/lx/src/env.rs`, add `effect_handlers: Option<Vec<EffectHandlerEntry>>` to the `Env` struct (alongside existing `bindings: DashMap<Sym, LxVal>`, `mutables: DashSet<Sym>`, `parent: Option<Arc<Env>>` fields). The `handle` expression installs handlers in a child env. `perform` walks the env chain (via `parent: Option<Arc<Env>>` pointers) to find the nearest handler for the named effect.
 
 In the interpreter, `Expr::Handle` evaluation:
 1. Create child env with the handler entries.
@@ -166,7 +167,7 @@ Run `just diagnose` and `just test`.
 
 **Subject:** Type-check effect declarations, perform, and handle expressions
 
-**Description:** In `crates/lx/src/checker/stmts.rs`, add a `Stmt::EffectDecl` arm to `check_stmt`: register the effect name with its parameter types and return type in the checker's scope (the `Checker` struct has `scope: Vec<HashMap<String, Type>>` — use `self.bind()`).
+**Description:** In `crates/lx/src/checker/stmts.rs`, add a `Stmt::EffectDecl` arm to `check_stmt`: register the effect name with its parameter types and return type in the checker's scope (the `Checker` struct has `scope: Vec<HashMap<Sym, Type>>` — use `self.bind()`).
 
 In `crates/lx/src/checker/synth.rs`, add arms to the `synth` match:
 - `Expr::Perform`: look up the effect name in scope, check args against param types, return the declared return type.

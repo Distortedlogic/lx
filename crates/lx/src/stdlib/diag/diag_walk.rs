@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 use crate::ast::{BindTarget, Binding, Expr, MatchArm, Program, SExpr, SStmt, SelArm, Stmt, TraitDeclData, UseStmt};
+use crate::sym::Sym;
 use crate::visitor::{AstVisitor, walk_loop, walk_par, walk_program};
 use miette::SourceSpan;
 
@@ -23,13 +24,13 @@ pub(crate) struct Walker {
   pub nodes: Vec<DiagNode>,
   pub edges: Vec<DiagEdge>,
   pub(super) next_id: usize,
-  pub(super) fn_nodes: HashMap<String, String>,
-  pub(super) handler_maps: HashMap<String, Vec<String>>,
-  pub(super) resource_vars: HashMap<String, String>,
-  pub(super) imported_modules: HashSet<String>,
+  pub(super) fn_nodes: HashMap<Sym, String>,
+  pub(super) handler_maps: HashMap<Sym, Vec<Sym>>,
+  pub(super) resource_vars: HashMap<Sym, String>,
+  pub(super) imported_modules: HashSet<Sym>,
   pub(super) context: String,
   pub(super) context_stack: Vec<String>,
-  current_fn: Option<String>,
+  current_fn: Option<Sym>,
   subgraph_nodes: HashMap<String, Vec<String>>,
 }
 
@@ -46,7 +47,7 @@ impl Walker {
       imported_modules: HashSet::new(),
       context: "main".into(),
       context_stack: Vec::new(),
-      current_fn: Some("main".into()),
+      current_fn: Some(crate::sym::intern("main")),
       subgraph_nodes: HashMap::from([("main".into(), vec!["main".into()])]),
     }
   }
@@ -60,7 +61,7 @@ impl Walker {
     self.next_id += 1;
     self.nodes.push(DiagNode { id: id.clone(), label, kind, children: vec![], source_offset: span.map(|s| s.offset() as u32) });
     if let Some(ref fn_name) = self.current_fn {
-      self.subgraph_nodes.entry(fn_name.clone()).or_default().push(id.clone());
+      self.subgraph_nodes.entry(fn_name.to_string()).or_default().push(id.clone());
     }
     id
   }
@@ -86,11 +87,11 @@ impl AstVisitor for Walker {
       if let Stmt::Binding(b) = &stmt.node
         && let BindTarget::Name(name) | BindTarget::Reassign(name) = &b.target
         && let Expr::Func { .. } = &b.value.node
-        && name != "main"
+        && *name != "main"
         && !self.fn_nodes.contains_key(name)
       {
-        let id = self.add_node("agent", name.clone(), NodeKind::Agent);
-        self.fn_nodes.insert(name.clone(), id);
+        let id = self.add_node("agent", name.to_string(), NodeKind::Agent);
+        self.fn_nodes.insert(*name, id);
       }
     }
     self.current_fn = saved_fn;
@@ -99,25 +100,25 @@ impl AstVisitor for Walker {
 
   fn visit_binding(&mut self, binding: &Binding, _span: SourceSpan) {
     let name = match &binding.target {
-      BindTarget::Name(n) | BindTarget::Reassign(n) => Some(n.clone()),
+      BindTarget::Name(n) | BindTarget::Reassign(n) => Some(*n),
       _ => None,
     };
-    if let Some(ref var_name) = name {
+    if let Some(var_name) = name {
       if let Expr::Func { body, .. } = &binding.value.node
         && var_name != "main"
       {
-        let id = if let Some(existing) = self.fn_nodes.get(var_name) {
+        let id = if let Some(existing) = self.fn_nodes.get(&var_name) {
           existing.clone()
         } else {
-          let id = self.add_node("agent", var_name.clone(), NodeKind::Agent);
-          self.fn_nodes.insert(var_name.clone(), id.clone());
+          let id = self.add_node("agent", var_name.to_string(), NodeKind::Agent);
+          self.fn_nodes.insert(var_name, id.clone());
           id
         };
         let saved_ctx = self.context.clone();
-        let saved_fn = self.current_fn.clone();
+        let saved_fn = self.current_fn;
         self.context = id.clone();
-        self.current_fn = Some(var_name.clone());
-        self.subgraph_nodes.entry(var_name.clone()).or_default().push(id);
+        self.current_fn = Some(var_name);
+        self.subgraph_nodes.entry(var_name.to_string()).or_default().push(id);
         self.visit_expr(&body.node, body.span);
         self.context = saved_ctx;
         self.current_fn = saved_fn;
@@ -132,12 +133,12 @@ impl AstVisitor for Walker {
         let id = self.add_node("resource", module.to_string(), NodeKind::Resource);
         let ctx = self.context.clone();
         self.add_edge(&ctx, &id, "create".into(), EdgeStyle::Solid);
-        self.resource_vars.insert(var_name.clone(), id);
+        self.resource_vars.insert(var_name, id);
       }
       if let Expr::Map(entries) = &binding.value.node {
-        let idents: Vec<String> = entries.iter().filter_map(|e| if let Expr::Ident(n) = &e.value.node { Some(n.clone()) } else { None }).collect();
+        let idents: Vec<Sym> = entries.iter().filter_map(|e| if let Expr::Ident(n) = &e.value.node { Some(*n) } else { None }).collect();
         if !idents.is_empty() {
-          self.handler_maps.insert(var_name.clone(), idents);
+          self.handler_maps.insert(var_name, idents);
         }
       }
     }
@@ -145,18 +146,18 @@ impl AstVisitor for Walker {
   }
 
   fn visit_use(&mut self, stmt: &UseStmt, _span: SourceSpan) {
-    let is_base_std = stmt.path.first().is_some_and(|p| p == "std") && stmt.path.len() == 2;
+    let is_base_std = stmt.path.first().is_some_and(|p| *p == "std") && stmt.path.len() == 2;
     if !is_base_std && let Some(last) = stmt.path.last() {
-      self.imported_modules.insert(last.clone());
+      self.imported_modules.insert(*last);
     }
   }
 
-  fn visit_type_def(&mut self, name: &str, _variants: &[(String, usize)], _exported: bool, _span: SourceSpan) {
+  fn visit_type_def(&mut self, name: Sym, _variants: &[(Sym, usize)], _exported: bool, _span: SourceSpan) {
     self.add_node("type", name.to_string(), NodeKind::Type);
   }
 
   fn visit_trait_decl(&mut self, data: &TraitDeclData, _span: SourceSpan) {
-    self.add_node("type", data.name.clone(), NodeKind::Type);
+    self.add_node("type", data.name.to_string(), NodeKind::Type);
   }
 
   fn visit_par(&mut self, stmts: &[SStmt], span: SourceSpan) {

@@ -2,20 +2,20 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
-use crate::builtins::mk;
 use crate::error::LxError;
 use crate::runtime::RuntimeCtx;
+use crate::std_module;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
-pub fn build() -> IndexMap<String, LxVal> {
-  let mut m = IndexMap::new();
-  m.insert("get".into(), mk("env.get", 1, bi_get));
-  m.insert("vars".into(), mk("env.vars", 1, bi_vars));
-  m.insert("args".into(), mk("env.args", 1, bi_args));
-  m.insert("cwd".into(), mk("env.cwd", 1, bi_cwd));
-  m.insert("home".into(), mk("env.home", 1, bi_home));
-  m
+pub fn build() -> IndexMap<crate::sym::Sym, LxVal> {
+  std_module! {
+    "get"  => "env.get",  1, bi_get;
+    "vars" => "env.vars", 1, bi_vars;
+    "args" => "env.args", 1, bi_args;
+    "cwd"  => "env.cwd",  1, bi_cwd;
+    "home" => "env.home", 1, bi_home
+  }
 }
 
 fn bi_get(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
@@ -30,7 +30,7 @@ fn bi_vars(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<
   let _ = &args[0];
   let mut fields = IndexMap::new();
   for (k, v) in std::env::vars() {
-    fields.insert(k, LxVal::str(v));
+    fields.insert(crate::sym::intern(&k), LxVal::str(v));
   }
   Ok(LxVal::record(fields))
 }
