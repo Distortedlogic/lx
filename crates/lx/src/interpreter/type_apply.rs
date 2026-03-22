@@ -61,7 +61,7 @@ impl Interpreter {
     let variant_syms: Vec<crate::sym::Sym> = variants.iter().map(|v| intern(v)).collect();
     let val = LxVal::TraitUnion { name: intern(name), variants: Arc::new(variant_syms) };
     let mut env = self.env.child();
-    env.bind(intern(name), val);
+    env.bind_str(name, val);
     self.env = env.into_arc();
     Ok(LxVal::Unit)
   }

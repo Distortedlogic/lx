@@ -2,7 +2,7 @@ use crate::ast::{Expr, SExpr};
 use crate::visitor::{AstVisitor, walk_expr};
 use miette::SourceSpan;
 
-use super::Walker;
+use super::{EdgeStyle, NodeKind, Walker};
 use super::diag_helpers::{extract_field_call_parts, is_resource_action, is_resource_create, is_resource_module};
 
 pub(super) fn visit_expr_diag(w: &mut Walker, expr: &Expr, span: SourceSpan) {
@@ -15,9 +15,9 @@ pub(super) fn visit_expr_diag(w: &mut Walker, expr: &Expr, span: SourceSpan) {
         }
         if w.imported_modules.contains(module) {
           let label = format!("{module}.{method}");
-          let id = w.add_node_at("tool", label, "tool", Some(span));
+          let id = w.add_node_at("tool", label, NodeKind::Tool, Some(span));
           let ctx = w.context.clone();
-          w.add_edge(&ctx, &id, String::new(), "solid");
+          w.add_edge(&ctx, &id, String::new(), EdgeStyle::Solid);
           for a in &args {
             w.visit_expr(&a.node, a.span);
           }
@@ -28,7 +28,7 @@ pub(super) fn visit_expr_diag(w: &mut Walker, expr: &Expr, span: SourceSpan) {
         && let Some(node_id) = w.fn_nodes.get(name).cloned()
       {
         let ctx = w.context.clone();
-        w.add_edge(&ctx, &node_id, String::new(), "solid");
+        w.add_edge(&ctx, &node_id, String::new(), EdgeStyle::Solid);
         for a in &fn_args {
           w.visit_expr(&a.node, a.span);
         }
@@ -67,35 +67,35 @@ fn uncurry_fn_call(expr: &Expr) -> Option<(&str, Vec<&SExpr>)> {
   Some((name.as_str(), args))
 }
 
-fn classify_call(module: &str, method: &str) -> Option<&'static str> {
+fn classify_call(module: &str, method: &str) -> Option<NodeKind> {
   match module {
-    "pool" => Some("fork"),
-    "saga" => Some("fork"),
-    "plan" => Some("fork"),
-    "retry" => Some("loop"),
-    "cron" => Some("loop"),
+    "pool" => Some(NodeKind::Fork),
+    "saga" => Some(NodeKind::Fork),
+    "plan" => Some(NodeKind::Fork),
+    "retry" => Some(NodeKind::Loop),
+    "cron" => Some(NodeKind::Loop),
     "circuit" => Some(match method {
-      "check" => "decision",
-      _ => "resource",
+      "check" => NodeKind::Decision,
+      _ => NodeKind::Resource,
     }),
-    "user" => Some("user"),
+    "user" => Some(NodeKind::User),
     "trace" | "knowledge" | "memory" | "budget" | "context" | "tasks" | "profile" => {
       if is_resource_create(method) {
         None
       } else {
-        Some("resource")
+        Some(NodeKind::Resource)
       }
     },
-    "http" | "fs" | "git" => Some("io"),
+    "http" | "fs" | "git" => Some(NodeKind::Io),
     _ => None,
   }
 }
 
-fn handle_call(w: &mut Walker, module: &str, method: &str, kind: &str, args: &[&SExpr], span: SourceSpan) {
+fn handle_call(w: &mut Walker, module: &str, method: &str, kind: NodeKind, args: &[&SExpr], span: SourceSpan) {
   if let ("cron", "every") = (module, method) {
-    let id = w.add_node_at("loop", "cron".into(), "loop", Some(span));
+    let id = w.add_node_at("loop", "cron".into(), NodeKind::Loop, Some(span));
     let ctx = w.context.clone();
-    w.add_edge(&ctx, &id, String::new(), "solid");
+    w.add_edge(&ctx, &id, String::new(), EdgeStyle::Solid);
     if let Some(last) = args.last() {
       w.context_stack.push(w.context.clone());
       w.context = id;
@@ -110,16 +110,16 @@ fn handle_call(w: &mut Walker, module: &str, method: &str, kind: &str, args: &[&
         && let Some(node_id) = w.resource_vars.get(var).cloned()
       {
         let ctx = w.context.clone();
-        w.add_edge(&ctx, &node_id, method.to_string(), "dashed");
+        w.add_edge(&ctx, &node_id, method.to_string(), EdgeStyle::Dashed);
         return;
       }
     }
   }
 
   let label = format!("{module}.{method}");
-  let id = w.add_node_at(kind, label, kind, Some(span));
+  let id = w.add_node_at(kind.as_str(), label, kind, Some(span));
   let ctx = w.context.clone();
-  w.add_edge(&ctx, &id, String::new(), "solid");
+  w.add_edge(&ctx, &id, String::new(), EdgeStyle::Solid);
   for arg in args {
     w.visit_expr(&arg.node, arg.span);
   }

@@ -35,7 +35,7 @@ pub(crate) struct Walker {
 
 impl Walker {
   pub fn new() -> Self {
-    let main = DiagNode { id: "main".into(), label: "main".into(), kind: "agent".into(), children: vec![], source_offset: None };
+    let main = DiagNode { id: "main".into(), label: "main".into(), kind: NodeKind::Agent, children: vec![], source_offset: None };
     Self {
       nodes: vec![main],
       edges: vec![],
@@ -51,26 +51,26 @@ impl Walker {
     }
   }
 
-  pub(super) fn add_node(&mut self, prefix: &str, label: String, kind: &str) -> String {
+  pub(super) fn add_node(&mut self, prefix: &str, label: String, kind: NodeKind) -> String {
     self.add_node_at(prefix, label, kind, None)
   }
 
-  pub(super) fn add_node_at(&mut self, prefix: &str, label: String, kind: &str, span: Option<SourceSpan>) -> String {
+  pub(super) fn add_node_at(&mut self, prefix: &str, label: String, kind: NodeKind, span: Option<SourceSpan>) -> String {
     let id = format!("{prefix}_{}", self.next_id);
     self.next_id += 1;
-    self.nodes.push(DiagNode { id: id.clone(), label, kind: kind.into(), children: vec![], source_offset: span.map(|s| s.offset() as u32) });
+    self.nodes.push(DiagNode { id: id.clone(), label, kind, children: vec![], source_offset: span.map(|s| s.offset() as u32) });
     if let Some(ref fn_name) = self.current_fn {
       self.subgraph_nodes.entry(fn_name.clone()).or_default().push(id.clone());
     }
     id
   }
 
-  pub(super) fn add_edge(&mut self, from: &str, to: &str, label: String, style: &str) {
-    self.add_edge_typed(from, to, label, style, "exec");
+  pub(super) fn add_edge(&mut self, from: &str, to: &str, label: String, style: EdgeStyle) {
+    self.add_edge_typed(from, to, label, style, EdgeType::Exec);
   }
 
-  pub(super) fn add_edge_typed(&mut self, from: &str, to: &str, label: String, style: &str, edge_type: &str) {
-    self.edges.push(DiagEdge { from: from.into(), to: to.into(), label, style: style.into(), edge_type: edge_type.into() });
+  pub(super) fn add_edge_typed(&mut self, from: &str, to: &str, label: String, style: EdgeStyle, edge_type: EdgeType) {
+    self.edges.push(DiagEdge { from: from.into(), to: to.into(), label, style, edge_type });
   }
 
   pub fn into_graph(self) -> Graph {
@@ -89,7 +89,7 @@ impl AstVisitor for Walker {
         && name != "main"
         && !self.fn_nodes.contains_key(name)
       {
-        let id = self.add_node("agent", name.clone(), "agent");
+        let id = self.add_node("agent", name.clone(), NodeKind::Agent);
         self.fn_nodes.insert(name.clone(), id);
       }
     }
@@ -109,7 +109,7 @@ impl AstVisitor for Walker {
         let id = if let Some(existing) = self.fn_nodes.get(var_name) {
           existing.clone()
         } else {
-          let id = self.add_node("agent", var_name.clone(), "agent");
+          let id = self.add_node("agent", var_name.clone(), NodeKind::Agent);
           self.fn_nodes.insert(var_name.clone(), id.clone());
           id
         };
@@ -129,9 +129,9 @@ impl AstVisitor for Walker {
         && is_resource_create(method)
         && is_resource_module(module)
       {
-        let id = self.add_node("resource", module.to_string(), "resource");
+        let id = self.add_node("resource", module.to_string(), NodeKind::Resource);
         let ctx = self.context.clone();
-        self.add_edge(&ctx, &id, "create".into(), "solid");
+        self.add_edge(&ctx, &id, "create".into(), EdgeStyle::Solid);
         self.resource_vars.insert(var_name.clone(), id);
       }
       if let Expr::Map(entries) = &binding.value.node {
@@ -152,17 +152,17 @@ impl AstVisitor for Walker {
   }
 
   fn visit_type_def(&mut self, name: &str, _variants: &[(String, usize)], _exported: bool, _span: SourceSpan) {
-    self.add_node("type", name.to_string(), "type");
+    self.add_node("type", name.to_string(), NodeKind::Type);
   }
 
   fn visit_trait_decl(&mut self, data: &TraitDeclData, _span: SourceSpan) {
-    self.add_node("type", data.name.clone(), "type");
+    self.add_node("type", data.name.clone(), NodeKind::Type);
   }
 
   fn visit_par(&mut self, stmts: &[SStmt], span: SourceSpan) {
-    let fork_id = self.add_node_at("fork", "par".into(), "fork", Some(span));
+    let fork_id = self.add_node_at("fork", "par".into(), NodeKind::Fork, Some(span));
     let ctx = self.context.clone();
-    self.add_edge(&ctx, &fork_id, String::new(), "solid");
+    self.add_edge(&ctx, &fork_id, String::new(), EdgeStyle::Solid);
     self.context_stack.push(self.context.clone());
     self.context = fork_id;
     walk_par(self, stmts, span);
@@ -173,9 +173,9 @@ impl AstVisitor for Walker {
   }
 
   fn visit_sel(&mut self, arms: &[SelArm], span: SourceSpan) {
-    let dec_id = self.add_node_at("sel", "sel".into(), "decision", Some(span));
+    let dec_id = self.add_node_at("sel", "sel".into(), NodeKind::Decision, Some(span));
     let ctx = self.context.clone();
-    self.add_edge(&ctx, &dec_id, String::new(), "solid");
+    self.add_edge(&ctx, &dec_id, String::new(), EdgeStyle::Solid);
     self.context_stack.push(self.context.clone());
     self.context = dec_id;
     for arm in arms {
@@ -190,9 +190,9 @@ impl AstVisitor for Walker {
 
   fn visit_match(&mut self, scrutinee: &SExpr, arms: &[MatchArm], span: SourceSpan) {
     let label = format!("{}?", diag_helpers::expr_label(&scrutinee.node));
-    let dec_id = self.add_node_at("match", label, "decision", Some(span));
+    let dec_id = self.add_node_at("match", label, NodeKind::Decision, Some(span));
     let ctx = self.context.clone();
-    self.add_edge(&ctx, &dec_id, String::new(), "solid");
+    self.add_edge(&ctx, &dec_id, String::new(), EdgeStyle::Solid);
     self.context_stack.push(self.context.clone());
     self.context = dec_id;
     for arm in arms {
@@ -207,9 +207,9 @@ impl AstVisitor for Walker {
 
   fn visit_ternary(&mut self, cond: &SExpr, then_: &SExpr, else_: Option<&SExpr>, span: SourceSpan) {
     let label = format!("{}?", diag_helpers::expr_label(&cond.node));
-    let dec_id = self.add_node_at("cond", label, "decision", Some(span));
+    let dec_id = self.add_node_at("cond", label, NodeKind::Decision, Some(span));
     let ctx = self.context.clone();
-    self.add_edge(&ctx, &dec_id, String::new(), "solid");
+    self.add_edge(&ctx, &dec_id, String::new(), EdgeStyle::Solid);
     self.context_stack.push(self.context.clone());
     self.context = dec_id.clone();
     self.visit_expr(&then_.node, then_.span);
@@ -225,9 +225,9 @@ impl AstVisitor for Walker {
   }
 
   fn visit_loop(&mut self, stmts: &[SStmt], span: SourceSpan) {
-    let loop_id = self.add_node_at("loop", "loop".into(), "loop", Some(span));
+    let loop_id = self.add_node_at("loop", "loop".into(), NodeKind::Loop, Some(span));
     let ctx = self.context.clone();
-    self.add_edge(&ctx, &loop_id, String::new(), "solid");
+    self.add_edge(&ctx, &loop_id, String::new(), EdgeStyle::Solid);
     self.context_stack.push(self.context.clone());
     self.context = loop_id;
     walk_loop(self, stmts, span);

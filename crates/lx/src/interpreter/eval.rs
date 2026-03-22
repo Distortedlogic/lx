@@ -154,7 +154,7 @@ impl Interpreter {
     let saved = Arc::clone(&self.env);
     let mut child = self.env.child();
     for (name, val) in &acquired {
-      child.bind(intern(&name), val.clone());
+      child.bind(*name, val.clone());
     }
     self.env = child.into_arc();
     let mut result = LxVal::Unit;

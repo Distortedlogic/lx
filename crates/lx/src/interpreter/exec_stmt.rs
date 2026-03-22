@@ -27,20 +27,20 @@ impl Interpreter {
         let val = self.force_defaults(val, stmt.span).await?;
         match &b.target {
           BindTarget::Name(name) => {
-            if self.env.has_mut(intern(name)) {
-              self.env.reassign(intern(name), val).map_err(|e| LxError::runtime(e, stmt.span))?;
+            if self.env.has_mut(*name) {
+              self.env.reassign(*name, val).map_err(|e| LxError::runtime(e, stmt.span))?;
             } else {
               let mut env = self.env.child();
               if b.mutable {
-                env.bind_mut(intern(name), val);
+                env.bind_mut(*name, val);
               } else {
-                env.bind(intern(name), val);
+                env.bind(*name, val);
               }
               self.env = env.into_arc();
             }
           },
           BindTarget::Reassign(name) => {
-            self.env.reassign(intern(name), val).map_err(|e| LxError::runtime(e, stmt.span))?;
+            self.env.reassign(*name, val).map_err(|e| LxError::runtime(e, stmt.span))?;
           },
           BindTarget::Pattern(pat) => {
             let bindings = self.try_match_pattern(&pat.node, &val).ok_or_else(|| {
@@ -74,9 +74,9 @@ impl Interpreter {
         for (ctor_name, arity) in variants {
           let tag = intern(ctor_name);
           if *arity == 0 {
-            env.bind(intern(ctor_name), LxVal::Tagged { tag, values: Arc::new(vec![]) });
+            env.bind(*ctor_name, LxVal::Tagged { tag, values: Arc::new(vec![]) });
           } else {
-            env.bind(intern(ctor_name), LxVal::TaggedCtor { tag, arity: *arity, applied: vec![] });
+            env.bind(*ctor_name, LxVal::TaggedCtor { tag, arity: *arity, applied: vec![] });
           }
         }
         self.env = env.into_arc();
@@ -112,7 +112,7 @@ impl Interpreter {
           tags: Arc::new(data.tags.iter().map(|s| intern(s)).collect()),
         }));
         let mut env = self.env.child();
-        env.bind(intern(&data.name), val);
+        env.bind(data.name, val);
         self.env = env.into_arc();
         Ok(LxVal::Unit)
       },
@@ -135,19 +135,19 @@ impl Interpreter {
           methods: Arc::new(method_map),
         }));
         let mut env = self.env.child();
-        env.bind(intern(&data.name), val);
+        env.bind(data.name, val);
         self.env = env.into_arc();
         Ok(LxVal::Unit)
       },
       Stmt::FieldUpdate { name, fields, value } => {
         let new_val = self.eval(value).await?;
-        let current = self.env.get_str(name).ok_or_else(|| LxError::runtime(format!("undefined variable '{name}'"), stmt.span))?;
+        let current = self.env.get(*name).ok_or_else(|| LxError::runtime(format!("undefined variable '{name}'"), stmt.span))?;
         if let LxVal::Object(o) = &current {
           crate::stdlib::object_update_nested(o.id, fields, new_val).map_err(|e| LxError::runtime(e, stmt.span))?;
           return Ok(LxVal::Unit);
         }
         let updated = Self::update_record_field(&current, fields, new_val, stmt.span)?;
-        self.env.reassign(intern(name), updated).map_err(|e| LxError::runtime(e, stmt.span))?;
+        self.env.reassign(*name, updated).map_err(|e| LxError::runtime(e, stmt.span))?;
         Ok(LxVal::Unit)
       },
       Stmt::Expr(e) => self.eval(e).await,

@@ -36,7 +36,7 @@ impl Interpreter {
         let val = result.get(&field.name).cloned().unwrap_or(LxVal::Unit);
         let saved = Arc::clone(&self.env);
         let mut scope = self.env.child();
-        scope.bind(intern(&field.name), val);
+        scope.bind(field.name, val);
         self.env = scope.into_arc();
         let ok = self.eval(constraint_expr).await?;
         self.env = saved;

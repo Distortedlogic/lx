@@ -27,23 +27,23 @@ impl Interpreter {
     let mut env = self.env.child();
     for name in &exports.variant_ctors {
       if let Some(val) = exports.bindings.get(name) {
-        env.bind(intern(&name), val.clone());
+        env.bind_str(&name, val.clone());
       }
     }
     match &use_stmt.kind {
       UseKind::Whole => {
         let module_name = use_stmt.path.last().ok_or_else(|| LxError::runtime("empty module path", span))?;
         let record = LxVal::record(exports.bindings.clone());
-        env.bind(intern(&module_name), record);
+        env.bind_str(&module_name, record);
       },
       UseKind::Alias(alias) => {
         let record = LxVal::record(exports.bindings.clone());
-        env.bind(intern(&alias), record);
+        env.bind_str(&alias, record);
       },
       UseKind::Selective(names) => {
         for name in names {
           let val = exports.bindings.get(name).ok_or_else(|| LxError::runtime(format!("'{name}' not exported by module"), span))?;
-          env.bind(intern(&name), val.clone());
+          env.bind_str(&name, val.clone());
         }
       },
     }
