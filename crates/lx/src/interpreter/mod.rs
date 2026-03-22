@@ -1,3 +1,4 @@
+use crate::sym::intern;
 pub(crate) mod ambient;
 mod apply;
 mod apply_helpers;
@@ -90,7 +91,7 @@ impl Interpreter {
     if !forward_names.is_empty() {
       let mut env = self.env.child();
       for name in &forward_names {
-        env.bind_mut(name.clone(), LxVal::Unit);
+        env.bind_mut(intern(&name), LxVal::Unit);
       }
       self.env = env.into_arc();
     }
@@ -106,7 +107,7 @@ impl Interpreter {
     let span = expr.span;
     match &expr.node {
       Expr::Literal(lit) => self.eval_literal(lit, span).await,
-      Expr::Ident(name) => self.env.get(name).ok_or_else(|| {
+      Expr::Ident(name) => self.env.get_str(name).ok_or_else(|| {
         let hint = hints::keyword_hint(name);
         let msg = match hint {
           Some(h) => format!("undefined variable '{name}' — {h}"),
@@ -114,7 +115,7 @@ impl Interpreter {
         };
         LxError::runtime(msg, span)
       }),
-      Expr::TypeConstructor(name) => self.env.get(name).ok_or_else(|| LxError::runtime(format!("undefined constructor '{name}'"), span)),
+      Expr::TypeConstructor(name) => self.env.get_str(name).ok_or_else(|| LxError::runtime(format!("undefined constructor '{name}'"), span)),
       Expr::Binary { op, left, right } => self.eval_binary(op, left, right, span).await,
       Expr::Unary { op, operand } => self.eval_unary(op, operand, span).await,
       Expr::Pipe { left, right } => self.eval_pipe(left, right, span).await,
@@ -146,7 +147,7 @@ impl Interpreter {
           LxVal::Ok(v) => Ok(*v),
           LxVal::Err(_) => Err(LxError::propagate(v, span)),
           LxVal::Some(v) => Ok(*v),
-          LxVal::None => Err(LxError::propagate(LxVal::Err(Box::new(LxVal::str("unwrapped None"))), span)),
+          LxVal::None => Err(LxError::propagate(LxVal::err_str("unwrapped None"), span)),
           other => Err(LxError::type_err(format!("^ expects Result or Maybe, got {}", other.type_name()), span)),
         }
       },
@@ -187,9 +188,9 @@ impl Interpreter {
         let saved = Arc::clone(&self.env);
         let mut child = self.env.child();
         if *mutable {
-          child.bind_mut(name.clone(), val);
+          child.bind_mut(intern(name), val);
         } else {
-          child.bind(name.clone(), val);
+          child.bind(intern(name), val);
         }
         self.env = child.into_arc();
         let mut result = LxVal::Unit;

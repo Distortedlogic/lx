@@ -2,6 +2,7 @@ use crate::ast::{
   BinOp, Binding, ClassDeclData, Expr, FieldKind, FieldPattern, ListElem, Literal, MapEntry, MatchArm, Param, Pattern, Program, RecordField, SExpr, SPattern,
   SType, Section, SelArm, Stmt, TraitDeclData, TraitUnionDef, TypeExpr, TypeField, UnaryOp, UseStmt,
 };
+use crate::sym::Sym;
 use miette::SourceSpan;
 
 mod walk;
@@ -34,8 +35,8 @@ pub trait AstVisitor {
   fn visit_literal(&mut self, lit: &Literal, span: SourceSpan) {
     walk_literal(self, lit, span);
   }
-  fn visit_ident(&mut self, _name: &str, _span: SourceSpan) {}
-  fn visit_type_constructor(&mut self, _name: &str, _span: SourceSpan) {}
+  fn visit_ident(&mut self, _name: Sym, _span: SourceSpan) {}
+  fn visit_type_constructor(&mut self, _name: Sym, _span: SourceSpan) {}
   fn visit_binary(&mut self, _op: BinOp, left: &SExpr, right: &SExpr, span: SourceSpan) {
     walk_binary(self, left, right, span);
   }
@@ -134,7 +135,7 @@ pub trait AstVisitor {
     walk_pattern(self, pattern, span);
   }
   fn visit_pattern_literal(&mut self, _lit: &Literal, _span: SourceSpan) {}
-  fn visit_pattern_bind(&mut self, _name: &str, _span: SourceSpan) {}
+  fn visit_pattern_bind(&mut self, _name: Sym, _span: SourceSpan) {}
   fn visit_pattern_wildcard(&mut self, _span: SourceSpan) {}
   fn visit_pattern_tuple(&mut self, elems: &[SPattern], span: SourceSpan) {
     walk_pattern_tuple(self, elems, span);
@@ -151,9 +152,9 @@ pub trait AstVisitor {
   fn visit_type_expr(&mut self, type_expr: &TypeExpr, span: SourceSpan) {
     walk_type_expr(self, type_expr, span);
   }
-  fn visit_type_named(&mut self, _name: &str, _span: SourceSpan) {}
-  fn visit_type_var(&mut self, _name: &str, _span: SourceSpan) {}
-  fn visit_type_applied(&mut self, _name: &str, args: &[SType], span: SourceSpan) {
+  fn visit_type_named(&mut self, _name: Sym, _span: SourceSpan) {}
+  fn visit_type_var(&mut self, _name: Sym, _span: SourceSpan) {}
+  fn visit_type_applied(&mut self, _name: Sym, args: &[SType], span: SourceSpan) {
     walk_type_applied(self, args, span);
   }
   fn visit_type_list(&mut self, inner: &SType, span: SourceSpan) {

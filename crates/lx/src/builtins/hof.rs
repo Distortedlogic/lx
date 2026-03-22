@@ -10,36 +10,32 @@ use miette::SourceSpan;
 use super::BoxFut;
 
 pub(super) fn register(env: &mut crate::env::Env) {
-  use super::{mk, mk_async};
-  env.bind("map".into(), mk_async("map", 2, bi_map));
-  env.bind("filter".into(), mk_async("filter", 2, bi_filter));
-  env.bind("fold".into(), mk_async("fold", 3, bi_fold));
-  env.bind("flat_map".into(), mk_async("flat_map", 2, bi_flat_map));
-  env.bind("each".into(), mk_async("each", 2, bi_each));
-  env.bind("take".into(), mk("take", 2, bi_take));
-  env.bind("drop".into(), mk("drop", 2, bi_drop));
-  env.bind("zip".into(), mk("zip", 2, bi_zip));
-  env.bind("enumerate".into(), mk("enumerate", 1, bi_enumerate));
-  env.bind("find".into(), mk_async("find", 2, bi_find));
-  env.bind("any?".into(), mk_async("any?", 2, bi_any));
-  env.bind("all?".into(), mk_async("all?", 2, bi_all));
-  env.bind("none?".into(), mk_async("none?", 2, bi_none_q));
-  env.bind("count".into(), mk_async("count", 2, super::hof_extra::bi_count));
-  env.bind("take_while".into(), mk_async("take_while", 2, super::hof_extra::bi_take_while));
-  env.bind("drop_while".into(), mk_async("drop_while", 2, super::hof_extra::bi_drop_while));
-  env.bind("sort_by".into(), mk_async("sort_by", 2, super::hof_extra::bi_sort_by));
-  env.bind("min_by".into(), mk_async("min_by", 2, super::hof_extra::bi_min_by));
-  env.bind("max_by".into(), mk_async("max_by", 2, super::hof_extra::bi_max_by));
-  env.bind("partition".into(), mk_async("partition", 2, super::hof_extra::bi_partition));
-  env.bind("group_by".into(), mk_async("group_by", 2, super::hof_extra::bi_group_by));
-  env.bind("chunks".into(), mk("chunks", 2, super::hof_extra::bi_chunks));
-  env.bind("windows".into(), mk("windows", 2, super::hof_extra::bi_windows));
-  env.bind("intersperse".into(), mk("intersperse", 2, super::hof_extra::bi_intersperse));
-  env.bind("scan".into(), mk_async("scan", 3, super::hof_extra::bi_scan));
-  env.bind("tap".into(), mk_async("tap", 2, super::hof_extra::bi_tap));
-  env.bind("find_index".into(), mk_async("find_index", 2, super::hof_extra::bi_find_index));
-  env.bind("pmap".into(), mk_async("pmap", 2, super::hof_parallel::bi_pmap));
-  env.bind("pmap_n".into(), mk_async("pmap_n", 3, super::hof_parallel::bi_pmap_n));
+  super::register_builtins!(env, {
+    "take"/2 => bi_take, "drop"/2 => bi_drop, "zip"/2 => bi_zip,
+    "enumerate"/1 => bi_enumerate,
+    "chunks"/2 => super::hof_extra::bi_chunks,
+    "windows"/2 => super::hof_extra::bi_windows,
+    "intersperse"/2 => super::hof_extra::bi_intersperse,
+  });
+  super::register_builtins!(env, async {
+    "map"/2 => bi_map, "filter"/2 => bi_filter, "fold"/3 => bi_fold,
+    "flat_map"/2 => bi_flat_map, "each"/2 => bi_each,
+    "find"/2 => bi_find, "any?"/2 => bi_any, "all?"/2 => bi_all,
+    "none?"/2 => bi_none_q,
+    "count"/2 => super::hof_extra::bi_count,
+    "take_while"/2 => super::hof_extra::bi_take_while,
+    "drop_while"/2 => super::hof_extra::bi_drop_while,
+    "sort_by"/2 => super::hof_extra::bi_sort_by,
+    "min_by"/2 => super::hof_extra::bi_min_by,
+    "max_by"/2 => super::hof_extra::bi_max_by,
+    "partition"/2 => super::hof_extra::bi_partition,
+    "group_by"/2 => super::hof_extra::bi_group_by,
+    "scan"/3 => super::hof_extra::bi_scan,
+    "tap"/2 => super::hof_extra::bi_tap,
+    "find_index"/2 => super::hof_extra::bi_find_index,
+    "pmap"/2 => super::hof_parallel::bi_pmap,
+    "pmap_n"/3 => super::hof_parallel::bi_pmap_n,
+  });
 }
 
 pub(super) async fn call(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
@@ -173,7 +169,7 @@ fn bi_find(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
     for v in items.iter() {
       let result = call(&args[0], v.clone(), sp, &ctx).await?;
       if result.as_bool() == Some(true) {
-        return Ok(LxVal::Some(Box::new(v.clone())));
+        return Ok(LxVal::some(v.clone()));
       }
     }
     Ok(LxVal::None)

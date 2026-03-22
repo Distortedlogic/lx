@@ -1,87 +1,92 @@
 use strum::Display;
 
 use super::{Literal, SExpr, SPattern, SType};
+use crate::sym::Sym;
 
 #[derive(Debug, Clone)]
 pub struct UseStmt {
-  pub path: Vec<String>,
+  pub path: Vec<Sym>,
   pub kind: UseKind,
 }
 
 #[derive(Debug, Clone)]
 pub enum UseKind {
   Whole,
-  Alias(String),
-  Selective(Vec<String>),
+  Alias(Sym),
+  Selective(Vec<Sym>),
 }
 
 #[derive(Debug, Clone)]
 pub enum Pattern {
   Literal(Literal),
-  Bind(String),
+  Bind(Sym),
   Wildcard,
   Tuple(Vec<SPattern>),
-  List { elems: Vec<SPattern>, rest: Option<String> },
-  Record { fields: Vec<FieldPattern>, rest: Option<String> },
-  Constructor { name: String, args: Vec<SPattern> },
+  List { elems: Vec<SPattern>, rest: Option<Sym> },
+  Record { fields: Vec<FieldPattern>, rest: Option<Sym> },
+  Constructor { name: Sym, args: Vec<SPattern> },
 }
 
 #[derive(Debug, Clone)]
 pub enum TraitEntry {
   Field(Box<FieldDecl>),
-  Spread(String),
+  Spread(Sym),
 }
 
 #[derive(Debug, Clone)]
-pub struct FieldDecl {
-  pub name: String,
-  pub type_name: String,
-  pub default: Option<SExpr>,
-  pub constraint: Option<SExpr>,
+pub struct Field<D, C> {
+  pub name: Sym,
+  pub type_name: Sym,
+  pub default: Option<D>,
+  pub constraint: Option<C>,
 }
+
+pub type FieldDecl = Field<SExpr, SExpr>;
 
 #[derive(Debug, Clone)]
 pub struct TraitUnionDef {
-  pub name: String,
-  pub variants: Vec<String>,
+  pub name: Sym,
+  pub variants: Vec<Sym>,
   pub exported: bool,
 }
 
 #[derive(Debug, Clone)]
-pub struct TraitMethodDecl {
-  pub name: String,
-  pub input: Vec<FieldDecl>,
-  pub output: String,
+pub struct MethodSpec<F> {
+  pub name: Sym,
+  pub input: Vec<F>,
+  pub output: Sym,
 }
+
+pub type TraitMethodDecl = MethodSpec<FieldDecl>;
 
 #[derive(Debug, Clone)]
 pub struct AgentMethod {
-  pub name: String,
+  pub name: Sym,
   pub handler: SExpr,
 }
 
 #[derive(Debug, Clone)]
 pub struct ClassField {
-  pub name: String,
+  pub name: Sym,
   pub default: SExpr,
 }
 
 #[derive(Debug, Clone)]
 pub struct TraitDeclData {
-  pub name: String,
+  pub name: Sym,
   pub entries: Vec<TraitEntry>,
   pub methods: Vec<TraitMethodDecl>,
   pub defaults: Vec<AgentMethod>,
-  pub requires: Vec<String>,
-  pub description: Option<String>,
-  pub tags: Vec<String>,
+  pub requires: Vec<Sym>,
+  pub description: Option<Sym>,
+  pub tags: Vec<Sym>,
   pub exported: bool,
 }
 
 #[derive(Debug, Clone)]
 pub struct ClassDeclData {
-  pub name: String,
-  pub traits: Vec<String>,
+  pub name: Sym,
+  pub traits: Vec<Sym>,
   pub fields: Vec<ClassField>,
   pub methods: Vec<AgentMethod>,
   pub exported: bool,
@@ -89,15 +94,15 @@ pub struct ClassDeclData {
 
 #[derive(Debug, Clone)]
 pub struct FieldPattern {
-  pub name: String,
+  pub name: Sym,
   pub pattern: Option<SPattern>,
 }
 
 #[derive(Debug, Clone)]
 pub enum TypeExpr {
-  Named(String),
-  Var(String),
-  Applied(String, Vec<SType>),
+  Named(Sym),
+  Var(Sym),
+  Applied(Sym, Vec<SType>),
   List(Box<SType>),
   Map { key: Box<SType>, value: Box<SType> },
   Record(Vec<TypeField>),
@@ -108,7 +113,7 @@ pub enum TypeExpr {
 
 #[derive(Debug, Clone)]
 pub struct TypeField {
-  pub name: String,
+  pub name: Sym,
   pub ty: SType,
 }
 

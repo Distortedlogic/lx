@@ -14,7 +14,7 @@ use super::Interpreter;
 const AMBIENT_KEY: &str = "__ambient_context";
 
 pub fn get_ambient(interp: &Interpreter) -> IndexMap<String, LxVal> {
-  match interp.env.get(AMBIENT_KEY) {
+  match interp.env.get_str(AMBIENT_KEY) {
     Some(LxVal::Record(r)) => r.as_ref().clone(),
     _ => IndexMap::new(),
   }
@@ -47,7 +47,7 @@ pub fn global_context_get(key_val: &LxVal, span: SourceSpan) -> Result<LxVal, Lx
   let key = key_val.require_str("context.get", span)?;
   let fields = get_ambient_snapshot();
   match fields.get(key) {
-    Some(v) => Ok(LxVal::Some(Box::new(v.clone()))),
+    Some(v) => Ok(LxVal::some(v.clone())),
     None => Ok(LxVal::None),
   }
 }
@@ -80,8 +80,8 @@ impl Interpreter {
     set_ambient_snapshot(&new_fields);
     let context_record = build_context_record(&new_fields);
     let mut child = self.env.child();
-    child.bind(AMBIENT_KEY.into(), LxVal::record(new_fields));
-    child.bind("context".into(), context_record);
+    child.bind_str(AMBIENT_KEY, LxVal::record(new_fields));
+    child.bind_str("context", context_record);
     self.env = child.into_arc();
     let mut result = LxVal::Unit;
     for stmt in body {

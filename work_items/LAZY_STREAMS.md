@@ -6,7 +6,7 @@ Add lazy stream abstractions to lx so pipeline operations (`map`, `filter`, `fol
 
 # Why
 
-- The research in `research/pipes/` covers lazy evaluation across 15+ languages (Haskell, Clojure, Elixir, Rust iterators). All emphasize lazy pipelines for performance.
+- Lazy evaluation is well-established across languages (Haskell, Clojure, Elixir, Rust iterators). All emphasize lazy pipelines for performance.
 - LLM responses can be thousands of tokens. Processing them as a stream (line by line, chunk by chunk) lets downstream consumers start working immediately.
 - `channel.recv` (from CHANNELS_CSP work item) naturally produces streams — lazy streams would compose with channels.
 - Current eager pipelines hit memory limits on large datasets (e.g., processing all files in a repository).
@@ -35,16 +35,11 @@ New file `crates/lx/src/stdlib/stream.rs` implementing 8 functions:
 
 ## Stream representation
 
-A Stream is a record with an internal `_next` function: `{_type: :stream, _next: Func}`. The `_next` function returns `Some value` for the next element or `None` when exhausted. Stream combinators wrap the inner `_next` with transformation logic:
+A Stream is a record `{_type: :stream, _id: Int}` backed by a global registry of stream states (following the same pattern as `std/store`, which uses `LazyLock<DashMap<u64, StoreState>>` + `AtomicU64`). Each stream state holds the source data, current index, and any transformation chain. The `_next` operation is performed by Rust-side `bi_collect`/`bi_each`/`bi_fold` consuming the stream, not by an lx-level `_next` function field.
 
-```
-stream.map s f = {
-  _type: :stream
-  _next: () { s._next () ? { Some val -> Some (f val); None -> None } }
-}
-```
+**Why not record-with-`_next`-function:** `SyncBuiltinFn` is a plain `fn` pointer (`fn(&[LxVal], SourceSpan, &Arc<RuntimeCtx>) -> Result<LxVal, LxError>`) — it cannot capture per-stream state like `Arc<AtomicUsize>`. The store module solves this same problem with global `DashMap` keyed by ID, and streams should follow suit.
 
-This keeps streams as pure lx values — no new Rust types needed.
+Stream combinators (`map`, `filter`, `take`, `batch`) create new stream IDs whose state references the inner stream ID plus the transformation function. Terminal operations (`collect`, `each`, `fold`) drive the pull loop from Rust.
 
 ## Integration with pipes
 
@@ -54,10 +49,10 @@ Streams work with the existing pipe operator: `stream.from list | stream.map f |
 
 **New files:**
 - `crates/lx/src/stdlib/stream.rs` — all stream functions
-- `tests/83_streams.lx` — tests for lazy stream behavior
+- `tests/86_streams.lx` — tests for lazy stream behavior
 
 **Modified files:**
-- `crates/lx/src/stdlib/mod.rs` — register `mod stream;`, add to `get_std_module`
+- `crates/lx/src/stdlib/mod.rs` — register `mod stream;`, add `"stream" => stream::build()` to `get_std_module`, add `"stream"` to `std_module_exists`
 
 # Task List
 
@@ -65,17 +60,27 @@ Streams work with the existing pipe operator: `stream.from list | stream.map f |
 
 **Subject:** Create streams from lists and functions, force evaluation with collect
 
-**Description:** Create `crates/lx/src/stdlib/stream.rs`. Implement:
+**Description:** Create `crates/lx/src/stdlib/stream.rs`. Set up a global stream registry following the `std/store` pattern: `static STREAMS: LazyLock<DashMap<u64, StreamState>>` and `static NEXT_ID: AtomicU64`.
 
-`bi_from(source)`:
-- If source is `LxVal::List`: create an internal index counter, return a stream record where `_next` returns `Some list[i]` and increments i, or `None` when exhausted. The index state is held in a `Arc<AtomicUsize>` captured by the closure.
-- If source is `LxVal::Func` or `LxVal::BuiltinFunc`: return a stream record where `_next` calls the function with no args and returns the result directly (caller's function should return `Some val` or `None`).
+Define `StreamState` enum variants:
+- `FromList { items: Arc<Vec<LxVal>>, index: AtomicUsize }` — iterates a list
+- `FromFunc { func: LxVal }` — calls func repeatedly until None
+- `Map { inner_id: u64, func: LxVal }` — lazy map (Task 2)
+- `Filter { inner_id: u64, pred: LxVal }` — lazy filter (Task 2)
+- `Take { inner_id: u64, remaining: AtomicUsize }` — take n (Task 2)
+- `Batch { inner_id: u64, size: usize }` — batch (Task 3)
 
-`bi_collect(stream)`:
-- Extract `_next` from the stream record.
-- Loop: call `_next()`, if `Some val` append to result list, if `None` return the list.
+Implement `bi_from(source)`:
+- If source is `LxVal::List`: allocate a new stream ID, insert `FromList` state, return `record!{"_type" => LxVal::str("stream"), "_id" => LxVal::int(id)}`.
+- If source is `LxVal::Func` or `LxVal::BuiltinFunc`: allocate ID, insert `FromFunc` state, return stream record.
 
-Register module in `stdlib/mod.rs`. Add `"from"` and `"collect"` to `build()`.
+Implement internal `fn pull_next(id: u64, span, ctx) -> Result<LxVal, LxError>` that matches on the `StreamState` variant and returns `Some val` or `None`.
+
+Implement `bi_collect(stream)`:
+- Extract `_id` from the stream record.
+- Loop: call `pull_next(id, ...)`, if `Some val` append to result list, if `None` return the list.
+
+Register module in `stdlib/mod.rs`: add `mod stream;`, add `"stream" => stream::build()` to `get_std_module`, add `"stream"` to `std_module_exists`. Add `"from"` and `"collect"` to `build()`.
 
 Run `just diagnose`.
 
@@ -90,13 +95,16 @@ Run `just diagnose`.
 **Description:** In `crates/lx/src/stdlib/stream.rs`:
 
 `bi_map(stream, f)`:
-- Create a new stream where `_next` calls the inner stream's `_next`, and if `Some val`, returns `Some (f val)`, else `None`.
+- Extract `_id` from stream record. Allocate new stream ID, insert `Map { inner_id, func: f }` state. Return new stream record.
+- Update `pull_next` to handle `Map`: call `pull_next(inner_id, ...)`, if `Some val`, call `call_value_sync(&func, val, span, ctx)` and wrap in `Some`, else return `None`.
 
 `bi_filter(stream, pred)`:
-- Create a new stream where `_next` loops: call inner `_next`, if `Some val` and `pred val` is truthy, return `Some val`. If `Some val` but pred is false, continue loop. If `None`, return `None`.
+- Extract `_id`, allocate new ID, insert `Filter { inner_id, pred }` state.
+- In `pull_next`: loop — call `pull_next(inner_id, ...)`, if `Some val` and `call_value_sync(&pred, val, span, ctx)` is truthy, return `Some val`. If not truthy, continue loop. If `None`, return `None`.
 
 `bi_take(stream, n)`:
-- Track count in `Arc<AtomicUsize>`. `_next` checks count < n, if so increment and delegate to inner `_next`, else return `None`.
+- Extract `_id`, allocate new ID with `Take { inner_id, remaining: AtomicUsize::new(n) }`.
+- In `pull_next`: if `remaining.load() > 0`, decrement and delegate to `pull_next(inner_id, ...)`, else return `None`.
 
 Add `"map"`, `"filter"`, `"take"` to `build()`.
 
@@ -112,15 +120,15 @@ Run `just diagnose`.
 
 **Description:** Implement:
 
-`bi_batch(stream, size)`: `_next` collects up to `size` elements from inner stream into a list, returns `Some [batch]` or `None` if inner is exhausted and batch is empty. Partial last batch returns `Some [partial]`.
+`bi_batch(stream, size)`: Extract `_id`, allocate new ID with `Batch { inner_id, size }`. In `pull_next`: collect up to `size` elements from `pull_next(inner_id, ...)` into a list, return `Some [batch]` or `None` if inner is exhausted and batch is empty. Partial last batch returns `Some [partial]`.
 
-`bi_each(stream, f)`: consume stream, call `f(elem)` for each. Return `Unit`.
+`bi_each(stream, f)`: extract `_id`, loop `pull_next(id, ...)`, call `call_value_sync(&f, elem, span, ctx)` for each `Some val`. Return `Unit`.
 
-`bi_fold(stream, init, f)`: consume stream, accumulate with `f(acc, elem)`. Return final accumulator.
+`bi_fold(stream, init, f)`: extract `_id`, loop `pull_next(id, ...)`, accumulate with `call_value_sync(&f, Tuple(acc, elem), span, ctx)`. Return final accumulator.
 
 Add all to `build()`.
 
-Create `tests/83_streams.lx`:
+Create `tests/86_streams.lx`:
 1. **from + collect roundtrip** — `stream.from [1 2 3] | stream.collect` equals `[1 2 3]`.
 2. **Lazy map** — `stream.from [1 2 3] | stream.map (x) x * 2 | stream.collect` equals `[2 4 6]`.
 3. **Lazy filter** — filter evens from `[1 2 3 4 5]`, collect, equals `[2 4]`.

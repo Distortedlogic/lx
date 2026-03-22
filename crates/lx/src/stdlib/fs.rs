@@ -25,28 +25,28 @@ pub fn build() -> IndexMap<String, LxVal> {
 fn bi_read(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let path = args[0].require_str("fs.read", span)?;
   match std::fs::read_to_string(path) {
-    Ok(contents) => Ok(LxVal::Ok(Box::new(LxVal::str(contents)))),
-    Err(e) => Ok(LxVal::Err(Box::new(LxVal::str(e.to_string())))),
+    Ok(contents) => Ok(LxVal::ok(LxVal::str(contents))),
+    Err(e) => Ok(LxVal::err_str(e.to_string())),
   }
 }
 
 fn bi_write(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let path = args[0].require_str("fs.write", span)?;
-  let content = format!("{}", args[1]);
+  let content = args[1].to_string();
   match std::fs::write(path, content) {
-    Ok(()) => Ok(LxVal::Ok(Box::new(LxVal::Unit))),
-    Err(e) => Ok(LxVal::Err(Box::new(LxVal::str(e.to_string())))),
+    Ok(()) => Ok(LxVal::ok_unit()),
+    Err(e) => Ok(LxVal::err_str(e.to_string())),
   }
 }
 
 fn bi_append(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   use std::io::Write;
   let path = args[0].require_str("fs.append", span)?;
-  let content = format!("{}", args[1]);
+  let content = args[1].to_string();
   let result = std::fs::OpenOptions::new().create(true).append(true).open(path).and_then(|mut f| f.write_all(content.as_bytes()));
   match result {
-    Ok(()) => Ok(LxVal::Ok(Box::new(LxVal::Unit))),
-    Err(e) => Ok(LxVal::Err(Box::new(LxVal::str(e.to_string())))),
+    Ok(()) => Ok(LxVal::ok_unit()),
+    Err(e) => Ok(LxVal::err_str(e.to_string())),
   }
 }
 
@@ -60,16 +60,16 @@ fn bi_remove(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result
   let path = std::path::Path::new(path_str);
   let result = if path.is_dir() { std::fs::remove_dir_all(path) } else { std::fs::remove_file(path) };
   match result {
-    Ok(()) => Ok(LxVal::Ok(Box::new(LxVal::Unit))),
-    Err(e) => Ok(LxVal::Err(Box::new(LxVal::str(e.to_string())))),
+    Ok(()) => Ok(LxVal::ok_unit()),
+    Err(e) => Ok(LxVal::err_str(e.to_string())),
   }
 }
 
 fn bi_mkdir(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let path = args[0].require_str("fs.mkdir", span)?;
   match std::fs::create_dir_all(path) {
-    Ok(()) => Ok(LxVal::Ok(Box::new(LxVal::Unit))),
-    Err(e) => Ok(LxVal::Err(Box::new(LxVal::str(e.to_string())))),
+    Ok(()) => Ok(LxVal::ok_unit()),
+    Err(e) => Ok(LxVal::err_str(e.to_string())),
   }
 }
 
@@ -77,35 +77,29 @@ fn bi_ls(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxV
   let path = args[0].require_str("fs.ls", span)?;
   match std::fs::read_dir(path) {
     Ok(entries) => {
-      let mut items = Vec::new();
+      let mut names: Vec<String> = Vec::new();
       for entry in entries {
         match entry {
-          Ok(e) => items.push(LxVal::str(e.file_name().to_string_lossy())),
-          Err(e) => {
-            return Ok(LxVal::Err(Box::new(LxVal::str(e.to_string()))));
-          },
+          Ok(e) => names.push(e.file_name().to_string_lossy().into_owned()),
+          Err(e) => return Ok(LxVal::err_str(e.to_string())),
         }
       }
-      items.sort_by(|a, b| {
-        let a_str = a.as_str().unwrap_or("");
-        let b_str = b.as_str().unwrap_or("");
-        a_str.cmp(b_str)
-      });
-      Ok(LxVal::Ok(Box::new(LxVal::list(items))))
+      names.sort();
+      Ok(LxVal::ok(LxVal::list(names.into_iter().map(LxVal::str).collect())))
     },
-    Err(e) => Ok(LxVal::Err(Box::new(LxVal::str(e.to_string())))),
+    Err(e) => Ok(LxVal::err_str(e.to_string())),
   }
 }
 
 fn bi_stat(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let path = args[0].require_str("fs.stat", span)?;
   match std::fs::metadata(path) {
-    Ok(meta) => Ok(LxVal::Ok(Box::new(record! {
+    Ok(meta) => Ok(LxVal::ok(record! {
         "size" => LxVal::int(meta.len()),
         "is_file" => LxVal::Bool(meta.is_file()),
         "is_dir" => LxVal::Bool(meta.is_dir()),
         "readonly" => LxVal::Bool(meta.permissions().readonly()),
-    }))),
-    Err(e) => Ok(LxVal::Err(Box::new(LxVal::str(e.to_string())))),
+    })),
+    Err(e) => Ok(LxVal::err_str(e.to_string())),
   }
 }

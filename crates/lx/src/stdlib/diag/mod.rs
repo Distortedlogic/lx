@@ -203,10 +203,7 @@ fn extract_graph(src: &str, span: SourceSpan) -> Result<Graph, LxError> {
 
 fn node_to_value(node: &DiagNode) -> LxVal {
   let children: Vec<LxVal> = node.children.iter().map(node_to_value).collect();
-  let offset_val = match node.source_offset {
-    Some(o) => LxVal::int(o),
-    None => LxVal::None,
-  };
+  let offset_val = node.source_offset.map_or(LxVal::None, LxVal::int);
   record! {
       "id" => LxVal::str(node.id.as_str()),
       "label" => LxVal::str(node.label.as_str()),
@@ -263,13 +260,9 @@ fn value_to_node(val: &LxVal, span: SourceSpan) -> Result<DiagNode, LxError> {
     Some(LxVal::List(l)) => l.iter().map(|v| value_to_node(v, span)).collect::<Result<_, _>>()?,
     _ => vec![],
   };
-  let source_offset = rec.get("source_offset").and_then(|v| {
-    if let LxVal::Int(i) = v {
-      use num_traits::ToPrimitive;
-      i.to_u32()
-    } else {
-      None
-    }
+  let source_offset = rec.get("source_offset").and_then(|v| v.as_int()).and_then(|n| {
+    use num_traits::ToPrimitive;
+    n.to_u32()
   });
   Ok(DiagNode { id: str_field("id")?, label: str_field("label")?, kind: str_field("kind")?, source_offset, children })
 }

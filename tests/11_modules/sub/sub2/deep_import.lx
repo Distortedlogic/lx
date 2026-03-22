@@ -1,2 +1,0 @@
-use ../../lib_math
-assert (lib_math.add 1 2 == 3) "multi-level parent import works"

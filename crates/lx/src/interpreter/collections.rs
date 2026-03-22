@@ -30,11 +30,7 @@ impl super::Interpreter {
       if f.is_spread {
         let v = self.eval(&f.value).await?;
         match v {
-          LxVal::Record(r) => {
-            for (k, v) in r.as_ref() {
-              map.insert(k.clone(), v.clone());
-            }
-          },
+          LxVal::Record(r) => map.extend(r.iter().map(|(k, v)| (k.clone(), v.clone()))),
           other => {
             return Err(LxError::type_err(format!("spread requires Record, got {}", other.type_name()), f.value.span));
           },
@@ -62,11 +58,7 @@ impl super::Interpreter {
       if entry.is_spread {
         let v = self.eval(&entry.value).await?;
         match v {
-          LxVal::Map(m) => {
-            for (k, v) in m.as_ref() {
-              map.insert(k.clone(), v.clone());
-            }
-          },
+          LxVal::Map(m) => map.extend(m.iter().map(|(k, v)| (k.clone(), v.clone()))),
           other => {
             return Err(LxError::type_err(format!("spread requires Map, got {}", other.type_name()), entry.value.span));
           },

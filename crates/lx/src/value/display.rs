@@ -1,6 +1,8 @@
+use crate::sym::resolve;
 use std::fmt;
 use std::sync::Arc;
 
+use itertools::Itertools;
 use num_bigint::BigInt;
 
 use super::{BuiltinFunc, LxVal};
@@ -55,45 +57,15 @@ impl fmt::Display for LxVal {
       LxVal::Bool(b) => write!(f, "{b}"),
       LxVal::Str(s) => write!(f, "{s}"),
       LxVal::Unit => write!(f, "()"),
-      LxVal::List(items) => {
-        write!(f, "[")?;
-        for (i, item) in items.iter().enumerate() {
-          if i > 0 {
-            write!(f, " ")?;
-          }
-          write!(f, "{item}")?;
-        }
-        write!(f, "]")
-      },
-      LxVal::Tuple(items) => {
-        write!(f, "(")?;
-        for (i, item) in items.iter().enumerate() {
-          if i > 0 {
-            write!(f, " ")?;
-          }
-          write!(f, "{item}")?;
-        }
-        write!(f, ")")
-      },
+      LxVal::List(items) => write!(f, "[{}]", items.iter().format(" ")),
+      LxVal::Tuple(items) => write!(f, "({})", items.iter().format(" ")),
       LxVal::Record(fields) => {
-        write!(f, "{{")?;
-        for (i, (k, v)) in fields.iter().enumerate() {
-          if i > 0 {
-            write!(f, "  ")?;
-          }
-          write!(f, "{k}: {v}")?;
-        }
-        write!(f, "}}")
+        let inner = fields.iter().format_with("  ", |(k, v), g| g(&format_args!("{k}: {v}")));
+        write!(f, "{{{inner}}}")
       },
       LxVal::Map(entries) => {
-        write!(f, "Map{{")?;
-        for (i, (k, v)) in entries.iter().enumerate() {
-          if i > 0 {
-            write!(f, "  ")?;
-          }
-          write!(f, "{}: {v}", k.0)?;
-        }
-        write!(f, "}}")
+        let inner = entries.iter().format_with("  ", |(k, v), g| g(&format_args!("{}: {v}", k.0)));
+        write!(f, "Map{{{inner}}}")
       },
       LxVal::Func(_) => write!(f, "<func>"),
       LxVal::BuiltinFunc(b) => write!(f, "<builtin {}/{}>", b.name, b.arity),
@@ -101,31 +73,18 @@ impl fmt::Display for LxVal {
       LxVal::Err(v) => write!(f, "Err {v}"),
       LxVal::Some(v) => write!(f, "Some {v}"),
       LxVal::None => write!(f, "None"),
-      LxVal::Tagged { tag, values } => {
-        write!(f, "{tag}")?;
-        for v in values.iter() {
-          write!(f, " {v}")?;
-        }
-        Ok(())
+      LxVal::Tagged { tag, values } if values.is_empty() => write!(f, "{}", resolve(*tag)),
+      LxVal::Tagged { tag, values } => write!(f, "{} {}", resolve(*tag), values.iter().format(" ")),
+      LxVal::TaggedCtor { tag, .. } => write!(f, "<ctor {}>", resolve(*tag)),
+      LxVal::Range { start, end, inclusive: true } => write!(f, "{start}..={end}"),
+      LxVal::Range { start, end, inclusive: false } => write!(f, "{start}..{end}"),
+      LxVal::TraitUnion { name, .. } => write!(f, "<Trait {}>", resolve(*name)),
+      LxVal::Trait(t) => write!(f, "<Trait {}>", resolve(t.name)),
+      LxVal::Class(c) if c.traits.iter().any(|t| resolve(*t) == "Agent") => {
+        write!(f, "<Agent {}>", resolve(c.name))
       },
-      LxVal::TaggedCtor { tag, .. } => write!(f, "<ctor {tag}>"),
-      LxVal::Range { start, end, inclusive } => {
-        if *inclusive {
-          write!(f, "{start}..={end}")
-        } else {
-          write!(f, "{start}..{end}")
-        }
-      },
-      LxVal::TraitUnion { name, .. } => write!(f, "<Trait {name}>"),
-      LxVal::Trait { name, .. } => write!(f, "<Trait {name}>"),
-      LxVal::Class { name, traits, .. } => {
-        if traits.iter().any(|t| t.as_ref() == "Agent") {
-          write!(f, "<Agent {name}>")
-        } else {
-          write!(f, "<Class {name}>")
-        }
-      },
-      LxVal::Object { class_name, id, .. } => write!(f, "<{class_name}#{id}>"),
+      LxVal::Class(c) => write!(f, "<Class {}>", resolve(c.name)),
+      LxVal::Object(o) => write!(f, "<{}#{}>", resolve(o.class_name), o.id),
       LxVal::Store { id } => write!(f, "<Store#{id}>"),
     }
   }

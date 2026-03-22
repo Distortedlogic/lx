@@ -111,7 +111,7 @@ fn bi_cancel(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result
       job.cancel.store(true, Ordering::Relaxed);
       Ok(LxVal::Unit)
     },
-    None => Ok(LxVal::Err(Box::new(LxVal::str(format!("cron.cancel: no job with id {id}"))))),
+    None => Ok(LxVal::err_str(format!("cron.cancel: no job with id {id}"))),
   }
 }
 
@@ -120,12 +120,12 @@ fn bi_next(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<L
   let schedule = match parse_schedule(expr, span) {
     Ok(s) => s,
     Err(e) => {
-      return Ok(LxVal::Err(Box::new(LxVal::str(e.to_string()))));
+      return Ok(LxVal::err_str(e.to_string()));
     },
   };
   match schedule.upcoming(Utc).next() {
-    Some(dt) => Ok(LxVal::Ok(Box::new(dt_to_record(dt)))),
-    None => Ok(LxVal::Err(Box::new(LxVal::str("no upcoming occurrence")))),
+    Some(dt) => Ok(LxVal::ok(dt_to_record(dt))),
+    None => Ok(LxVal::err_str("no upcoming occurrence")),
   }
 }
 
@@ -146,7 +146,7 @@ fn bi_next_n(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result
   let schedule = match parse_schedule(expr, span) {
     Ok(s) => s,
     Err(e) => {
-      return Ok(LxVal::Err(Box::new(LxVal::str(e.to_string()))));
+      return Ok(LxVal::err_str(e.to_string()));
     },
   };
   let times: Vec<LxVal> = schedule.upcoming(Utc).take(n).map(dt_to_record).collect();

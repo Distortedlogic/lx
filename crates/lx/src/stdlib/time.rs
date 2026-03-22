@@ -59,8 +59,8 @@ fn bi_parse(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<
   let fmt = args[0].require_str("time.parse", span)?;
   let input = args[1].require_str("time.parse", span)?;
   match DateTime::parse_from_str(input, fmt) {
-    Ok(dt) => Ok(LxVal::Ok(Box::new(timestamp_to_record(dt.with_timezone(&Utc))))),
-    Err(e) => Ok(LxVal::Err(Box::new(LxVal::str(format!("time.parse: {e}"))))),
+    Ok(dt) => Ok(LxVal::ok(timestamp_to_record(dt.with_timezone(&Utc)))),
+    Err(e) => Ok(LxVal::err_str(format!("time.parse: {e}"))),
   }
 }
 

@@ -12,7 +12,6 @@ use crate::value::{LxVal, ValueKey};
 use miette::SourceSpan;
 
 use super::coll::cmp_values;
-use super::mk;
 
 fn bi_sort(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let l = args[0].require_list("sort", span)?;
@@ -135,9 +134,7 @@ fn bi_merge(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<
   match (&args[0], &args[1]) {
     (LxVal::Map(m1), LxVal::Map(m2)) => {
       let mut merged: IndexMap<ValueKey, LxVal> = m1.as_ref().clone();
-      for (k, v) in m2.iter() {
-        merged.insert(k.clone(), v.clone());
-      }
+      merged.extend(m2.iter().map(|(k, v)| (k.clone(), v.clone())));
       Ok(LxVal::Map(Arc::new(merged)))
     },
     _ => Err(LxError::type_err(format!("merge expects two Maps, got {} and {}", args[0].type_name(), args[1].type_name()), span)),
@@ -145,16 +142,10 @@ fn bi_merge(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<
 }
 
 pub(super) fn register(env: &mut Env) {
-  env.bind("sort".into(), mk("sort", 1, bi_sort));
-  env.bind("sorted?".into(), mk("sorted?", 1, bi_sorted_q));
-  env.bind("rev".into(), mk("rev", 1, bi_rev));
-  env.bind("sum".into(), mk("sum", 1, bi_sum));
-  env.bind("product".into(), mk("product", 1, bi_product));
-  env.bind("min".into(), mk("min", 1, bi_min));
-  env.bind("max".into(), mk("max", 1, bi_max));
-  env.bind("uniq".into(), mk("uniq", 1, bi_uniq));
-  env.bind("flatten".into(), mk("flatten", 1, bi_flatten));
-  env.bind("has_key?".into(), mk("has_key?", 2, bi_has_key));
-  env.bind("remove".into(), mk("remove", 2, bi_remove));
-  env.bind("merge".into(), mk("merge", 2, bi_merge));
+  super::register_builtins!(env, {
+    "sort"/1 => bi_sort, "sorted?"/1 => bi_sorted_q, "rev"/1 => bi_rev,
+    "sum"/1 => bi_sum, "product"/1 => bi_product, "min"/1 => bi_min,
+    "max"/1 => bi_max, "uniq"/1 => bi_uniq, "flatten"/1 => bi_flatten,
+    "has_key?"/2 => bi_has_key, "remove"/2 => bi_remove, "merge"/2 => bi_merge,
+  });
 }

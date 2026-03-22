@@ -51,9 +51,9 @@ fn option_label(v: &LxVal) -> String {
         }
         return label.to_string();
       }
-      format!("{v}")
+      v.to_string()
     },
-    _ => format!("{v}"),
+    _ => v.to_string(),
   }
 }
 
@@ -117,15 +117,15 @@ fn bi_table(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<L
   let LxVal::List(hdrs) = &args[0] else {
     return Err(LxError::type_err("user.table: first arg must be List of Str", span));
   };
-  let headers: Vec<String> = hdrs.iter().map(|v| format!("{v}")).collect();
+  let headers: Vec<String> = hdrs.iter().map(|v| v.to_string()).collect();
   let LxVal::List(row_vals) = &args[1] else {
     return Err(LxError::type_err("user.table: second arg must be List of Lists", span));
   };
   let rows: Vec<Vec<String>> = row_vals
     .iter()
     .map(|row| match row {
-      LxVal::List(cells) => cells.iter().map(|c| format!("{c}")).collect(),
-      _ => vec![format!("{row}")],
+      LxVal::List(cells) => cells.iter().map(|c| c.to_string()).collect(),
+      _ => vec![row.to_string()],
     })
     .collect();
   ctx.user.table(&headers, &rows);
@@ -134,7 +134,7 @@ fn bi_table(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<L
 
 fn bi_check(_args: &[LxVal], _span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   match ctx.user.check_signal() {
-    Some(signal) => Ok(LxVal::Some(Box::new(signal))),
+    Some(signal) => Ok(LxVal::some(signal)),
     None => Ok(LxVal::None),
   }
 }

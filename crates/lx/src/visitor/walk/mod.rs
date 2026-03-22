@@ -61,8 +61,8 @@ pub fn walk_field_update<V: AstVisitor + ?Sized>(v: &mut V, value: &SExpr, _span
 pub fn walk_expr<V: AstVisitor + ?Sized>(v: &mut V, expr: &Expr, span: SourceSpan) {
   match expr {
     Expr::Literal(lit) => v.visit_literal(lit, span),
-    Expr::Ident(name) => v.visit_ident(name, span),
-    Expr::TypeConstructor(name) => v.visit_type_constructor(name, span),
+    Expr::Ident(name) => v.visit_ident(*name, span),
+    Expr::TypeConstructor(name) => v.visit_type_constructor(*name, span),
     Expr::Binary { op, left, right } => v.visit_binary(*op, left, right, span),
     Expr::Unary { op, operand } => v.visit_unary(*op, operand, span),
     Expr::Pipe { left, right } => v.visit_pipe(left, right, span),

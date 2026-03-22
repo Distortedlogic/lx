@@ -9,8 +9,6 @@ use crate::runtime::RuntimeCtx;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
-use super::mk;
-
 fn bi_collect(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Range { start, end, inclusive } => {
@@ -48,17 +46,17 @@ fn bi_step(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<L
 
 fn bi_require(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   match &args[1] {
-    LxVal::Some(v) => Ok(LxVal::Ok(v.clone())),
-    LxVal::None => Ok(LxVal::Err(Box::new(args[0].clone()))),
-    other => Ok(LxVal::Ok(Box::new(other.clone()))),
+    LxVal::Some(v) => Ok(LxVal::ok(*v.clone())),
+    LxVal::None => Ok(LxVal::err(args[0].clone())),
+    other => Ok(LxVal::ok(other.clone())),
   }
 }
 
 fn bi_parse_int(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Str(s) => match s.parse::<BigInt>() {
-      Ok(n) => Ok(LxVal::Ok(Box::new(LxVal::Int(n)))),
-      Err(e) => Ok(LxVal::Err(Box::new(LxVal::str(e.to_string())))),
+      Ok(n) => Ok(LxVal::ok(LxVal::Int(n))),
+      Err(e) => Ok(LxVal::err_str(e.to_string())),
     },
     other => Err(LxError::type_err(format!("parse_int expects Str, got {}", other.type_name()), span)),
   }
@@ -67,8 +65,8 @@ fn bi_parse_int(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Res
 fn bi_parse_float(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Str(s) => match s.parse::<f64>() {
-      Ok(f) => Ok(LxVal::Ok(Box::new(LxVal::Float(f)))),
-      Err(e) => Ok(LxVal::Err(Box::new(LxVal::str(e.to_string())))),
+      Ok(f) => Ok(LxVal::ok(LxVal::Float(f))),
+      Err(e) => Ok(LxVal::err_str(e.to_string())),
     },
     other => Err(LxError::type_err(format!("parse_float expects Str, got {}", other.type_name()), span)),
   }
@@ -106,12 +104,9 @@ fn bi_timeout(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resul
 }
 
 pub(super) fn register(env: &mut Env) {
-  env.bind("collect".into(), mk("collect", 1, bi_collect));
-  env.bind("step".into(), mk("step", 2, bi_step));
-  env.bind("require".into(), mk("require", 2, bi_require));
-  env.bind("parse_int".into(), mk("parse_int", 1, bi_parse_int));
-  env.bind("parse_float".into(), mk("parse_float", 1, bi_parse_float));
-  env.bind("to_int".into(), mk("to_int", 1, bi_to_int));
-  env.bind("to_float".into(), mk("to_float", 1, bi_to_float));
-  env.bind("timeout".into(), mk("timeout", 1, bi_timeout));
+  super::register_builtins!(env, {
+    "collect"/1 => bi_collect, "step"/2 => bi_step, "require"/2 => bi_require,
+    "parse_int"/1 => bi_parse_int, "parse_float"/1 => bi_parse_float,
+    "to_int"/1 => bi_to_int, "to_float"/1 => bi_to_float, "timeout"/1 => bi_timeout,
+  });
 }

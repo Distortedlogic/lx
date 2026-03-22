@@ -1,3 +1,4 @@
+use crate::sym::Sym;
 mod capture;
 mod exhaust;
 mod stmts;
@@ -30,7 +31,7 @@ pub struct CheckResult {
 
 pub(crate) struct Checker {
   pub(crate) table: UnificationTable,
-  scope: Vec<HashMap<String, Type>>,
+  scope: Vec<HashMap<Sym, Type>>,
   pub(crate) diagnostics: Vec<Diagnostic>,
   pub(crate) type_defs: HashMap<String, Vec<String>>,
   pub(crate) mutables: HashSet<String>,
@@ -51,15 +52,15 @@ impl Checker {
     }
   }
 
-  pub(crate) fn bind(&mut self, name: String, ty: Type) {
+  pub(crate) fn bind(&mut self, name: Sym, ty: Type) {
     if let Some(scope) = self.scope.last_mut() {
       scope.insert(name, ty);
     }
   }
 
-  pub(crate) fn lookup(&self, name: &str) -> Option<Type> {
+  pub(crate) fn lookup(&self, name: Sym) -> Option<Type> {
     for scope in self.scope.iter().rev() {
-      if let Some(ty) = scope.get(name) {
+      if let Some(ty) = scope.get(&name) {
         return Some(ty.clone());
       }
     }

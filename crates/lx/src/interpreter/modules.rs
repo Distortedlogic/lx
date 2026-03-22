@@ -1,3 +1,4 @@
+use crate::sym::intern;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -26,23 +27,23 @@ impl Interpreter {
     let mut env = self.env.child();
     for name in &exports.variant_ctors {
       if let Some(val) = exports.bindings.get(name) {
-        env.bind(name.clone(), val.clone());
+        env.bind(intern(&name), val.clone());
       }
     }
     match &use_stmt.kind {
       UseKind::Whole => {
         let module_name = use_stmt.path.last().ok_or_else(|| LxError::runtime("empty module path", span))?;
         let record = LxVal::record(exports.bindings.clone());
-        env.bind(module_name.clone(), record);
+        env.bind(intern(&module_name), record);
       },
       UseKind::Alias(alias) => {
         let record = LxVal::record(exports.bindings.clone());
-        env.bind(alias.clone(), record);
+        env.bind(intern(&alias), record);
       },
       UseKind::Selective(names) => {
         for name in names {
           let val = exports.bindings.get(name).ok_or_else(|| LxError::runtime(format!("'{name}' not exported by module"), span))?;
-          env.bind(name.clone(), val.clone());
+          env.bind(intern(&name), val.clone());
         }
       },
     }
@@ -148,31 +149,31 @@ fn collect_exports(program: &Program, interp: &Interpreter) -> ModuleExports {
     match &stmt.node {
       Stmt::Binding(b) if b.exported => {
         if let BindTarget::Name(name) = &b.target
-          && let Some(val) = interp.env.get(name)
+          && let Some(val) = interp.env.get_str(name)
         {
           bindings.insert(name.clone(), val);
         }
       },
       Stmt::TypeDef { exported: true, variants, .. } => {
         for (ctor_name, _) in variants {
-          if let Some(val) = interp.env.get(ctor_name) {
+          if let Some(val) = interp.env.get_str(ctor_name) {
             variant_ctors.push(ctor_name.clone());
             bindings.insert(ctor_name.clone(), val);
           }
         }
       },
       Stmt::TraitDecl(data) if data.exported => {
-        if let Some(val) = interp.env.get(&data.name) {
+        if let Some(val) = interp.env.get_str(&data.name) {
           bindings.insert(data.name.clone(), val);
         }
       },
       Stmt::ClassDecl(data) if data.exported => {
-        if let Some(val) = interp.env.get(&data.name) {
+        if let Some(val) = interp.env.get_str(&data.name) {
           bindings.insert(data.name.clone(), val);
         }
       },
       Stmt::TraitUnion(def) if def.exported => {
-        if let Some(val) = interp.env.get(&def.name) {
+        if let Some(val) = interp.env.get_str(&def.name) {
           bindings.insert(def.name.clone(), val);
         }
       },

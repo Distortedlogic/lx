@@ -1,4 +1,5 @@
 use crate::ast::{BindTarget, Binding, SStmt, Stmt, UseKind, UseStmt};
+use crate::sym::intern;
 use miette::SourceSpan;
 
 use super::Checker;
@@ -26,7 +27,7 @@ impl Checker {
         self.type_defs.insert(name.clone(), variant_names);
         let union_type = Type::Union { name: name.clone(), variants: variant_types };
         for (ctor_name, _) in variants {
-          self.bind(ctor_name.clone(), union_type.clone());
+          self.bind(*ctor_name, union_type.clone());
         }
         Type::Unit
       },
@@ -40,7 +41,7 @@ impl Checker {
         if !fields.is_empty() {
           self.trait_fields.insert(data.name.clone(), fields);
         }
-        self.bind(data.name.clone(), Type::Unknown);
+        self.bind(data.name, Type::Unknown);
         Type::Unit
       },
       Stmt::ClassDecl(data) => {
@@ -69,16 +70,16 @@ impl Checker {
       UseKind::Whole => {
         if let Some(name) = u.path.last() {
           self.check_import_conflict(name, span);
-          self.bind(name.clone(), Type::Unknown);
+          self.bind(*name, Type::Unknown);
         }
       },
       UseKind::Alias(alias) => {
-        self.bind(alias.clone(), Type::Unknown);
+        self.bind(*alias, Type::Unknown);
       },
       UseKind::Selective(names) => {
         for name in names {
           self.check_import_conflict(name, span);
-          self.bind(name.clone(), Type::Unknown);
+          self.bind(*name, Type::Unknown);
         }
       },
     }
@@ -105,10 +106,10 @@ impl Checker {
         if b.mutable {
           self.mutables.insert(name.clone());
         }
-        self.bind(name.clone(), val_type);
+        self.bind(*name, val_type);
       },
       BindTarget::Reassign(name) => {
-        if let Some(existing) = self.lookup(name) {
+        if let Some(existing) = self.lookup(*name) {
           let resolved = self.table.resolve_deep(&existing);
           if let Err(msg) = self.table.unify(&resolved, &val_type) {
             self.emit(format!("reassignment type mismatch: {msg}"), b.value.span);

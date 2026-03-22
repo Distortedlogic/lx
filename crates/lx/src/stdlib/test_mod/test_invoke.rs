@@ -22,8 +22,10 @@ pub(super) fn invoke_flow(flow_path: &str, input: &LxVal, ctx: &Arc<RuntimeCtx>,
 
       let entry_name =
         find_flow_entry_name(&program).ok_or_else(|| LxError::runtime(format!("test.run: flow '{flow_path}' must export +run or +main"), span))?;
-      let entry =
-        interp.env.get(&entry_name).ok_or_else(|| LxError::runtime(format!("test.run: flow '{flow_path}' exported +{entry_name} not found in env"), span))?;
+      let entry = interp
+        .env
+        .get_str(&entry_name)
+        .ok_or_else(|| LxError::runtime(format!("test.run: flow '{flow_path}' exported +{entry_name} not found in env"), span))?;
       interp.apply_func(entry, input.clone(), span).await
     })
   })

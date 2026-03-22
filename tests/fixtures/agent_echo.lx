@@ -1,1 +1,0 @@
-(msg) {value: msg.value * 2  echoed: true}

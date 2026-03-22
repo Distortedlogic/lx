@@ -19,6 +19,16 @@ use miette::SourceSpan;
 
 pub(crate) type BoxFut = Pin<Box<dyn std::future::Future<Output = Result<LxVal, LxError>>>>;
 
+macro_rules! register_builtins {
+  ($env:expr, { $( $name:literal / $arity:literal => $func:expr ),* $(,)? }) => {{
+    $( $env.bind_str($name, $crate::builtins::mk($name, $arity, $func)); )*
+  }};
+  ($env:expr, async { $( $name:literal / $arity:literal => $func:expr ),* $(,)? }) => {{
+    $( $env.bind_str($name, $crate::builtins::mk_async($name, $arity, $func)); )*
+  }};
+}
+pub(crate) use register_builtins;
+
 pub fn mk(name: &'static str, arity: usize, func: SyncBuiltinFn) -> LxVal {
   LxVal::BuiltinFunc(BuiltinFunc { name, arity, kind: BuiltinKind::Sync(func), applied: Vec::new() })
 }

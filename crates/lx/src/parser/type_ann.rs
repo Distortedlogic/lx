@@ -1,21 +1,25 @@
+use crate::sym::intern;
+use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 
-use super::TInput;
-use super::ss;
-use crate::ast::*;
+use super::{Span, ss};
+use crate::ast::{SType, TypeExpr, TypeField};
 use crate::lexer::token::TokenKind;
 
-pub(super) fn type_parser<'a>() -> impl Parser<'a, TInput<'a>, SType, extra::Err<Rich<'a, TokenKind>>> + Clone {
+pub(super) fn type_parser<'a, I>() -> impl Parser<'a, I, SType, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
+where
+  I: ValueInput<'a, Token = TokenKind, Span = Span>,
+{
   recursive(|ty| {
-    let type_atom = type_atom_parser(ty.clone());
-    let type_app = type_app_parser(ty.clone(), type_atom.clone());
+    let atom = type_atom(ty.clone());
+    let app = type_app(ty.clone(), atom);
 
-    type_app.clone().then(just(TokenKind::Caret).ignore_then(type_app.clone()).or_not()).then(just(TokenKind::Arrow).ignore_then(ty.clone()).or_not()).map_with(
+    app.clone().then(just(TokenKind::Caret).ignore_then(app.clone()).or_not()).then(just(TokenKind::Arrow).ignore_then(ty).or_not()).map_with(
       |((left, err_opt), ret_opt), e| match (err_opt, ret_opt) {
         (Some(err), Some(ret)) => {
-          let fallible = TypeExpr::Fallible { ok: Box::new(left), err: Box::new(err) };
           let fspan = ss(e.span());
-          SType::new(TypeExpr::Func { param: Box::new(SType::new(fallible, fspan)), ret: Box::new(ret) }, fspan)
+          let fallible = SType::new(TypeExpr::Fallible { ok: Box::new(left), err: Box::new(err) }, fspan);
+          SType::new(TypeExpr::Func { param: Box::new(fallible), ret: Box::new(ret) }, fspan)
         },
         (Some(err), None) => SType::new(TypeExpr::Fallible { ok: Box::new(left), err: Box::new(err) }, ss(e.span())),
         (None, Some(ret)) => SType::new(TypeExpr::Func { param: Box::new(left), ret: Box::new(ret) }, ss(e.span())),
@@ -25,10 +29,13 @@ pub(super) fn type_parser<'a>() -> impl Parser<'a, TInput<'a>, SType, extra::Err
   })
 }
 
-fn type_app_parser<'a>(
-  ty: impl Parser<'a, TInput<'a>, SType, extra::Err<Rich<'a, TokenKind>>> + Clone,
-  atom: impl Parser<'a, TInput<'a>, SType, extra::Err<Rich<'a, TokenKind>>> + Clone,
-) -> impl Parser<'a, TInput<'a>, SType, extra::Err<Rich<'a, TokenKind>>> + Clone {
+fn type_app<'a, I>(
+  _ty: impl Parser<'a, I, SType, extra::Err<Rich<'a, TokenKind, Span>>> + Clone,
+  atom: impl Parser<'a, I, SType, extra::Err<Rich<'a, TokenKind, Span>>> + Clone,
+) -> impl Parser<'a, I, SType, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
+where
+  I: ValueInput<'a, Token = TokenKind, Span = Span>,
+{
   select! { TokenKind::TypeName(n) => n }
     .map_with(|n, e| (n, ss(e.span())))
     .then(atom.clone().repeated().collect::<Vec<_>>())
@@ -43,25 +50,28 @@ fn type_app_parser<'a>(
     .or(atom)
 }
 
-fn type_atom_parser<'a>(
-  ty: impl Parser<'a, TInput<'a>, SType, extra::Err<Rich<'a, TokenKind>>> + Clone,
-) -> impl Parser<'a, TInput<'a>, SType, extra::Err<Rich<'a, TokenKind>>> + Clone {
+fn type_atom<'a, I>(
+  ty: impl Parser<'a, I, SType, extra::Err<Rich<'a, TokenKind, Span>>> + Clone,
+) -> impl Parser<'a, I, SType, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
+where
+  I: ValueInput<'a, Token = TokenKind, Span = Span>,
+{
   let named = select! { TokenKind::TypeName(n) => n }.map_with(|n, e| SType::new(TypeExpr::Named(n), ss(e.span())));
 
   let var = select! { TokenKind::Ident(n) => n }.map_with(|n, e| SType::new(TypeExpr::Var(n), ss(e.span())));
 
-  let list_ty = just(TokenKind::LBracket)
-    .ignore_then(ty.clone())
-    .then_ignore(just(TokenKind::RBracket))
+  let list_ty = ty
+    .clone()
+    .delimited_by(just(TokenKind::LBracket), just(TokenKind::RBracket))
     .map_with(|inner, e| SType::new(TypeExpr::List(Box::new(inner)), ss(e.span())));
 
   let record_field = select! { TokenKind::Ident(n) => n }.then_ignore(just(TokenKind::Colon)).then(ty.clone()).map(|(name, ty)| TypeField { name, ty });
 
-  let record_ty = just(TokenKind::LBrace)
-    .ignore_then(just(TokenKind::Semi).repeated())
+  let record_ty = just(TokenKind::Semi)
+    .repeated()
     .ignore_then(record_field.separated_by(just(TokenKind::Semi).repeated().at_least(1)).allow_trailing().collect::<Vec<_>>())
     .then_ignore(just(TokenKind::Semi).repeated())
-    .then_ignore(just(TokenKind::RBrace))
+    .delimited_by(just(TokenKind::LBrace), just(TokenKind::RBrace))
     .map_with(|fields, e| SType::new(TypeExpr::Record(fields), ss(e.span())));
 
   let map_ty = just(TokenKind::PercentLBrace)
@@ -73,12 +83,10 @@ fn type_atom_parser<'a>(
 
   let unit_ty = just(TokenKind::LParen).then(just(TokenKind::RParen)).map_with(|_, e| SType::new(TypeExpr::Named("Unit".into()), ss(e.span())));
 
-  let grouped_or_tuple = just(TokenKind::LParen)
-    .ignore_then(ty.clone().separated_by(empty()).at_least(1).collect::<Vec<_>>())
-    .then_ignore(just(TokenKind::RParen))
-    .map_with(|types, e| {
+  let grouped_or_tuple =
+    just(TokenKind::LParen).ignore_then(ty.separated_by(empty()).at_least(1).collect::<Vec<_>>()).then_ignore(just(TokenKind::RParen)).map_with(|types, e| {
       if types.len() == 1 {
-        let mut t = types.into_iter().next().unwrap();
+        let mut t = types.into_iter().next().expect("at_least(1)");
         t.span = ss(e.span());
         t
       } else {

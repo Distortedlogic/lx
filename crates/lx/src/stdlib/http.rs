@@ -17,26 +17,18 @@ pub fn build() -> IndexMap<String, LxVal> {
   m
 }
 
+fn record_to_string_map(val: &LxVal) -> Option<IndexMap<String, String>> {
+  let LxVal::Record(fields) = val else { return None };
+  let map: IndexMap<String, String> = fields.iter().filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string()))).collect();
+  if map.is_empty() { None } else { Some(map) }
+}
+
 fn extract_opts(val: &LxVal, _span: SourceSpan) -> Result<HttpOpts, LxError> {
   let LxVal::Record(fields) = val else {
     return Ok(HttpOpts::default());
   };
-  let headers = fields.get("headers").and_then(|v| {
-    if let LxVal::Record(hdr_fields) = v {
-      let map: IndexMap<String, String> = hdr_fields.iter().filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string()))).collect();
-      if map.is_empty() { None } else { Some(map) }
-    } else {
-      None
-    }
-  });
-  let query = fields.get("query").and_then(|v| {
-    if let LxVal::Record(q_fields) = v {
-      let map: IndexMap<String, String> = q_fields.iter().filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string()))).collect();
-      if map.is_empty() { None } else { Some(map) }
-    } else {
-      None
-    }
-  });
+  let headers = fields.get("headers").and_then(record_to_string_map);
+  let query = fields.get("query").and_then(record_to_string_map);
   let body = fields.get("body").map(serde_json::Value::from);
   Ok(HttpOpts { headers, query, body })
 }

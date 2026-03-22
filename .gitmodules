@@ -1,0 +1,3 @@
+[submodule "reference/chumsky"]
+	path = reference/chumsky
+	url = https://github.com/zesterer/chumsky.git

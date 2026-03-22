@@ -53,15 +53,15 @@ fn bi_connect(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resul
   tokio::task::block_in_place(|| {
     tokio::runtime::Handle::current().block_on(async {
       match connect_async(&url).await {
-        Err(e) => Ok(LxVal::Err(Box::new(LxVal::str(format!("ws.connect: {e}"))))),
+        Err(e) => Ok(LxVal::err_str(format!("ws.connect: {e}"))),
         Ok((ws_stream, _response)) => {
           let (sink, stream) = ws_stream.split();
           let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
           WS_CONNS.insert(id, WsConn { sink: Arc::new(TokioMutex::new(sink)), stream: Arc::new(TokioMutex::new(stream)) });
-          Ok(LxVal::Ok(Box::new(record! {
+          Ok(LxVal::ok(record! {
               "__ws_id" => LxVal::int(id),
               "url" => LxVal::str(url)
-          })))
+          }))
         },
       }
     })
@@ -75,14 +75,14 @@ fn bi_close(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<
       let val = tokio::task::block_in_place(|| {
         tokio::runtime::Handle::current().block_on(async {
           match conn.sink.lock().await.close().await {
-            Ok(()) => LxVal::Ok(Box::new(LxVal::Unit)),
-            Err(e) => LxVal::Err(Box::new(LxVal::str(format!("ws.close: {e}")))),
+            Ok(()) => LxVal::ok_unit(),
+            Err(e) => LxVal::err_str(format!("ws.close: {e}")),
           }
         })
       });
       Ok(val)
     },
-    None => Ok(LxVal::Err(Box::new(LxVal::str("ws.close: connection not found")))),
+    None => Ok(LxVal::err_str("ws.close: connection not found")),
   }
 }
 
@@ -93,15 +93,15 @@ fn bi_send(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<L
   let sink = match WS_CONNS.get(&id) {
     Some(conn) => conn.sink.clone(),
     None => {
-      return Ok(LxVal::Err(Box::new(LxVal::str("ws.send: connection not found"))));
+      return Ok(LxVal::err_str("ws.send: connection not found"));
     },
   };
 
   tokio::task::block_in_place(|| {
     tokio::runtime::Handle::current().block_on(async {
       match sink.lock().await.send(Message::Text(msg.into())).await {
-        Ok(()) => Ok(LxVal::Ok(Box::new(LxVal::Unit))),
-        Err(e) => Ok(LxVal::Err(Box::new(LxVal::str(format!("ws.send: {e}"))))),
+        Ok(()) => Ok(LxVal::ok_unit()),
+        Err(e) => Ok(LxVal::err_str(format!("ws.send: {e}"))),
       }
     })
   })
@@ -112,7 +112,7 @@ fn bi_recv(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<L
   let (sink, stream) = match WS_CONNS.get(&id) {
     Some(conn) => (conn.sink.clone(), conn.stream.clone()),
     None => {
-      return Ok(LxVal::Err(Box::new(LxVal::str("ws.recv: connection not found"))));
+      return Ok(LxVal::err_str("ws.recv: connection not found"));
     },
   };
 
@@ -121,21 +121,21 @@ fn bi_recv(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<L
       loop {
         match stream.lock().await.next().await {
           None => {
-            return Ok(LxVal::Err(Box::new(LxVal::str("connection closed"))));
+            return Ok(LxVal::err_str("connection closed"));
           },
           Some(Err(e)) => {
-            return Ok(LxVal::Err(Box::new(LxVal::str(format!("ws.recv: {e}")))));
+            return Ok(LxVal::err_str(format!("ws.recv: {e}")));
           },
           Some(Ok(Message::Text(t))) => {
-            return Ok(LxVal::Ok(Box::new(LxVal::str(&t))));
+            return Ok(LxVal::ok(LxVal::str(&t)));
           },
           Some(Ok(Message::Binary(b))) => {
             let hex: String = b.iter().map(|byte| format!("{byte:02x}")).collect();
-            return Ok(LxVal::Ok(Box::new(LxVal::str(hex))));
+            return Ok(LxVal::ok(LxVal::str(hex)));
           },
           Some(Ok(Message::Close(_))) => {
             WS_CONNS.remove(&id);
-            return Ok(LxVal::Err(Box::new(LxVal::str("connection closed"))));
+            return Ok(LxVal::err_str("connection closed"));
           },
           Some(Ok(Message::Ping(payload))) => {
             let _ = sink.lock().await.send(Message::Pong(payload)).await;
@@ -153,11 +153,11 @@ fn bi_recv_json(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Res
     LxVal::Ok(inner) => {
       if let LxVal::Str(s) = *inner {
         match serde_json::from_str::<serde_json::Value>(&s) {
-          Ok(json_val) => Ok(LxVal::Ok(Box::new(LxVal::from(json_val)))),
-          Err(e) => Ok(LxVal::Err(Box::new(LxVal::str(format!("ws.recv_json: parse error: {e}"))))),
+          Ok(json_val) => Ok(LxVal::ok(LxVal::from(json_val))),
+          Err(e) => Ok(LxVal::err_str(format!("ws.recv_json: parse error: {e}"))),
         }
       } else {
-        Ok(LxVal::Err(Box::new(LxVal::str("ws.recv_json: expected Str from recv"))))
+        Ok(LxVal::err_str("ws.recv_json: expected Str from recv"))
       }
     },
     other => Ok(other),

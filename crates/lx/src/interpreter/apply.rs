@@ -48,11 +48,11 @@ impl Interpreter {
         let saved = Arc::clone(&self.env);
         let saved_source = std::mem::replace(&mut self.source, lf.source_text.to_string());
         let mut call_env = lf.closure.child();
-        for (i, name) in lf.params.iter().enumerate() {
+        for (i, &sym) in lf.params.iter().enumerate() {
           if i < lf.applied.len() {
-            call_env.bind(name.clone(), lf.applied[i].clone());
+            call_env.bind(sym, lf.applied[i].clone());
           } else if let Some(Some(def)) = lf.defaults.get(i) {
-            call_env.bind(name.clone(), def.clone());
+            call_env.bind(sym, def.clone());
           }
         }
         self.env = call_env.into_arc();
@@ -79,17 +79,17 @@ impl Interpreter {
         applied.push(arg);
         if applied.len() < arity { Ok(LxVal::TaggedCtor { tag, arity, applied }) } else { Ok(LxVal::Tagged { tag, values: Arc::new(applied) }) }
       },
-      LxVal::Trait { name, fields, .. } if !fields.is_empty() => self.apply_trait_fields(&name, &fields, &arg, span).await,
+      LxVal::Trait(ref t) if !t.fields.is_empty() => self.apply_trait_fields(crate::sym::resolve(t.name), &t.fields, &arg, span).await,
       LxVal::TraitUnion { name, variants } => self.apply_trait_union(&name, &variants, &arg, span).await,
-      LxVal::Class { name, traits, defaults, methods } => {
+      LxVal::Class(c) => {
         let overrides = match &arg {
           LxVal::Record(r) => r.as_ref().clone(),
           LxVal::Unit => indexmap::IndexMap::new(),
           _ => {
-            return Err(LxError::type_err(format!("Class {name} constructor expects Record or (), got {}", arg.type_name()), span));
+            return Err(LxError::type_err(format!("Class {} constructor expects Record or (), got {}", crate::sym::resolve(c.name), arg.type_name()), span));
           },
         };
-        let mut fields = defaults.as_ref().clone();
+        let mut fields = c.defaults.as_ref().clone();
         for (k, v) in overrides {
           fields.insert(k, v);
         }
@@ -99,7 +99,7 @@ impl Interpreter {
           }
         }
         let id = crate::stdlib::object_insert(fields);
-        Ok(LxVal::Object { class_name: name, id, traits, methods })
+        Ok(LxVal::Object(Box::new(crate::value::LxObject { class_name: c.name, id, traits: c.traits, methods: c.methods })))
       },
       other => Err(LxError::type_err(format!("cannot call {}, not a function", other.type_name()), span)),
     }
@@ -112,11 +112,11 @@ impl Interpreter {
         let saved = Arc::clone(&self.env);
         let saved_source = std::mem::replace(&mut self.source, lf.source_text.to_string());
         let mut call_env = lf.closure.child();
-        for (i, name) in lf.params.iter().enumerate() {
+        for (i, &sym) in lf.params.iter().enumerate() {
           if i < lf.applied.len() {
-            call_env.bind(name.clone(), lf.applied[i].clone());
+            call_env.bind(sym, lf.applied[i].clone());
           } else if let Some(Some(def)) = lf.defaults.get(i) {
-            call_env.bind(name.clone(), def.clone());
+            call_env.bind(sym, def.clone());
           }
         }
         self.env = call_env.into_arc();
@@ -145,7 +145,7 @@ impl Interpreter {
       && values.len() == 2
       && let LxVal::Str(ref name) = values[0]
     {
-      if let Some(idx) = lf.params.iter().position(|p| p == name.as_ref()) {
+      if let Some(idx) = lf.params.iter().position(|p| crate::sym::resolve(*p) == name.as_ref()) {
         while lf.applied.len() < idx {
           lf.applied.push(LxVal::Unit);
         }
@@ -163,7 +163,7 @@ impl Interpreter {
   }
 
   pub(super) async fn eval_func(&mut self, params: &[Param], body: &SExpr) -> Result<LxVal, LxError> {
-    let param_names: Vec<String> = params.iter().map(|p| p.name.clone()).collect();
+    let param_names: Vec<crate::sym::Sym> = params.iter().map(|p| crate::sym::intern(&p.name)).collect();
     let mut defaults = Vec::new();
     for p in params {
       let d = match &p.default {

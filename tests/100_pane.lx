@@ -1,7 +1,0 @@
-
-assert (type_of pane.open == "Func") "pane.open is a function"
-assert (type_of pane.update == "Func") "pane.update is a function"
-assert (type_of pane.close == "Func") "pane.close is a function"
-assert (type_of pane.list == "Func") "pane.list is a function"
-
-log.info "100_pane: all passed"

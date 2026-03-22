@@ -21,7 +21,7 @@ pub fn build() -> IndexMap<String, LxVal> {
 fn bi_get(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let key = args[0].require_str("env.get", span)?;
   match std::env::var(key) {
-    Ok(val) => Ok(LxVal::Some(Box::new(LxVal::str(val)))),
+    Ok(val) => Ok(LxVal::some(LxVal::str(val))),
     Err(_) => Ok(LxVal::None),
   }
 }
@@ -52,7 +52,7 @@ fn bi_cwd(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<Lx
 fn bi_home(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let _ = &args[0];
   match std::env::var("HOME") {
-    Ok(h) => Ok(LxVal::Some(Box::new(LxVal::str(h)))),
+    Ok(h) => Ok(LxVal::some(LxVal::str(h))),
     Err(_) => Ok(LxVal::None),
   }
 }

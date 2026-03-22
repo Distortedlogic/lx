@@ -14,7 +14,7 @@ impl Interpreter {
     let body = Spanned::new(body_expr, span);
     let arity = params.len();
     LxVal::Func(Box::new(LxFunc {
-      params: params.iter().map(|p| (*p).into()).collect(),
+      params: params.iter().map(|p| crate::sym::intern(p)).collect(),
       defaults: vec![None; arity],
       body: Arc::new(body),
       closure: Arc::clone(&self.env),
@@ -28,24 +28,27 @@ impl Interpreter {
   pub(super) fn eval_section(&mut self, sec: &Section, span: SourceSpan) -> Result<LxVal, LxError> {
     match sec {
       Section::Right { op, operand } => {
-        let body = Expr::Binary { op: *op, left: Box::new(Spanned::new(Expr::Ident("_x".into()), span)), right: Box::new((**operand).clone()) };
+        let body = Expr::Binary { op: *op, left: Box::new(Spanned::new(Expr::Ident(intern("_x")), span)), right: Box::new((**operand).clone()) };
         Ok(self.make_section_func(&["_x"], body, span))
       },
       Section::Left { operand, op } => {
-        let body = Expr::Binary { op: *op, left: Box::new((**operand).clone()), right: Box::new(Spanned::new(Expr::Ident("_x".into()), span)) };
+        let body = Expr::Binary { op: *op, left: Box::new((**operand).clone()), right: Box::new(Spanned::new(Expr::Ident(intern("_x")), span)) };
         Ok(self.make_section_func(&["_x"], body, span))
       },
       Section::Field(name) => {
-        let body = Expr::FieldAccess { expr: Box::new(Spanned::new(Expr::Ident("_x".into()), span)), field: FieldKind::Named(name.clone()) };
+        let body = Expr::FieldAccess { expr: Box::new(Spanned::new(Expr::Ident(intern("_x")), span)), field: FieldKind::Named(name.clone()) };
         Ok(self.make_section_func(&["_x"], body, span))
       },
       Section::Index(idx) => {
-        let body = Expr::FieldAccess { expr: Box::new(Spanned::new(Expr::Ident("_x".into()), span)), field: FieldKind::Index(*idx) };
+        let body = Expr::FieldAccess { expr: Box::new(Spanned::new(Expr::Ident(intern("_x")), span)), field: FieldKind::Index(*idx) };
         Ok(self.make_section_func(&["_x"], body, span))
       },
       Section::BinOp(op) => {
-        let body =
-          Expr::Binary { op: *op, left: Box::new(Spanned::new(Expr::Ident("_a".into()), span)), right: Box::new(Spanned::new(Expr::Ident("_b".into()), span)) };
+        let body = Expr::Binary {
+          op: *op,
+          left: Box::new(Spanned::new(Expr::Ident(intern("_a")), span)),
+          right: Box::new(Spanned::new(Expr::Ident(intern("_b")), span)),
+        };
         Ok(self.make_section_func(&["_a", "_b"], body, span))
       },
     }
@@ -56,18 +59,18 @@ impl Interpreter {
     match field {
       FieldKind::Named(name) => match &val {
         LxVal::Record(r) => Ok(r.get(name).cloned().unwrap_or(LxVal::None)),
-        LxVal::Class { methods, .. } => {
-          if let Some(method) = methods.get(name) {
+        LxVal::Class(c) => {
+          if let Some(method) = c.methods.get(name) {
             Ok(Self::inject_self(method, &val))
           } else {
             Ok(LxVal::None)
           }
         },
-        LxVal::Object { id, methods, .. } => {
-          if let Some(method) = methods.get(name) {
+        LxVal::Object(o) => {
+          if let Some(method) = o.methods.get(name) {
             Ok(Self::inject_self(method, &val))
           } else {
-            Ok(crate::stdlib::object_get_field(*id, name).unwrap_or(LxVal::None))
+            Ok(crate::stdlib::object_get_field(o.id, name).unwrap_or(LxVal::None))
           }
         },
         LxVal::Store { .. } => crate::stdlib::store_method(name, &val).ok_or_else(|| LxError::type_err(format!("Store has no method '{name}'"), span)),
@@ -106,7 +109,7 @@ impl Interpreter {
   fn inject_self(method: &LxVal, self_val: &LxVal) -> LxVal {
     if let LxVal::Func(lf) = method {
       let mut method_env = lf.closure.child();
-      method_env.bind("self".to_string(), self_val.clone());
+      method_env.bind_str("self", self_val.clone());
       let mut lf = lf.clone();
       lf.closure = method_env.into_arc();
       LxVal::Func(lf)

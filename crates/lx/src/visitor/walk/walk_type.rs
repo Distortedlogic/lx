@@ -5,9 +5,9 @@ use crate::visitor::AstVisitor;
 
 pub fn walk_type_expr<V: AstVisitor + ?Sized>(v: &mut V, type_expr: &TypeExpr, span: SourceSpan) {
   match type_expr {
-    TypeExpr::Named(name) => v.visit_type_named(name, span),
-    TypeExpr::Var(name) => v.visit_type_var(name, span),
-    TypeExpr::Applied(name, args) => v.visit_type_applied(name, args, span),
+    TypeExpr::Named(name) => v.visit_type_named(*name, span),
+    TypeExpr::Var(name) => v.visit_type_var(*name, span),
+    TypeExpr::Applied(name, args) => v.visit_type_applied(*name, args, span),
     TypeExpr::List(inner) => v.visit_type_list(inner, span),
     TypeExpr::Map { key, value } => v.visit_type_map(key, value, span),
     TypeExpr::Record(fields) => v.visit_type_record(fields, span),

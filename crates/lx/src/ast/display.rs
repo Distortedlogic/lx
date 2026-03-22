@@ -1,5 +1,7 @@
 use std::fmt;
 
+use itertools::Itertools;
+
 use super::{Literal, Pattern};
 
 impl fmt::Display for Pattern {
@@ -15,24 +17,9 @@ impl fmt::Display for Pattern {
         Literal::RawStr(s) => write!(f, "\"{s}\""),
         Literal::Str(_) => write!(f, "\"...\""),
       },
-      Pattern::Tuple(pats) => {
-        write!(f, "(")?;
-        for (i, p) in pats.iter().enumerate() {
-          if i > 0 {
-            write!(f, ", ")?;
-          }
-          write!(f, "{}", p.node)?;
-        }
-        write!(f, ")")
-      },
+      Pattern::Tuple(pats) => write!(f, "({})", pats.iter().map(|p| &p.node).format(", ")),
       Pattern::List { elems, rest } => {
-        write!(f, "[")?;
-        for (i, p) in elems.iter().enumerate() {
-          if i > 0 {
-            write!(f, " ")?;
-          }
-          write!(f, "{}", p.node)?;
-        }
+        write!(f, "[{}", elems.iter().map(|p| &p.node).format(" "))?;
         if let Some(r) = rest {
           if !elems.is_empty() {
             write!(f, " ")?;
@@ -42,16 +29,13 @@ impl fmt::Display for Pattern {
         write!(f, "]")
       },
       Pattern::Record { fields, rest } => {
-        write!(f, "{{")?;
-        for (i, fp) in fields.iter().enumerate() {
-          if i > 0 {
-            write!(f, " ")?;
-          }
-          write!(f, "{}", fp.name)?;
-          if let Some(sub) = &fp.pattern {
-            write!(f, ": {}", sub.node)?;
-          }
-        }
+        write!(
+          f,
+          "{{{}",
+          fields.iter().format_with(" ", |fp, g| {
+            if let Some(sub) = &fp.pattern { g(&format_args!("{}: {}", fp.name, sub.node)) } else { g(&format_args!("{}", fp.name)) }
+          })
+        )?;
         if let Some(r) = rest {
           if !fields.is_empty() {
             write!(f, " ")?;
@@ -60,13 +44,8 @@ impl fmt::Display for Pattern {
         }
         write!(f, "}}")
       },
-      Pattern::Constructor { name, args } => {
-        write!(f, "{name}")?;
-        for a in args {
-          write!(f, " {}", a.node)?;
-        }
-        Ok(())
-      },
+      Pattern::Constructor { name, args } if args.is_empty() => write!(f, "{name}"),
+      Pattern::Constructor { name, args } => write!(f, "{name} {}", args.iter().map(|a| &a.node).format(" ")),
     }
   }
 }

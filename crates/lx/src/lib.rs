@@ -8,5 +8,6 @@ pub mod lexer;
 pub mod parser;
 pub mod runtime;
 pub mod stdlib;
+pub mod sym;
 pub mod value;
 pub mod visitor;

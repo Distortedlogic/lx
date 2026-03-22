@@ -1,4 +1,5 @@
 use crate::ast::{Expr, SExpr};
+use crate::sym::intern;
 
 use super::Checker;
 use super::synth_helpers::synth_literal;
@@ -8,7 +9,7 @@ impl Checker {
   pub(super) fn synth(&mut self, expr: &SExpr) -> Type {
     match &expr.node {
       Expr::Literal(lit) => synth_literal(lit),
-      Expr::Ident(name) => self.lookup(name).unwrap_or(Type::Unknown),
+      Expr::Ident(name) => self.lookup(*name).unwrap_or(Type::Unknown),
       Expr::TypeConstructor(_) => Type::Unknown,
       Expr::Binary { op, left, right } => {
         let lt = self.synth(left);
@@ -83,7 +84,7 @@ impl Checker {
       Expr::With { value, body, name, mutable: _ } => {
         let vt = self.synth(value);
         self.push_scope();
-        self.bind(name.clone(), vt);
+        self.bind(*name, vt);
         let result = self.check_stmts(body);
         self.pop_scope();
         result
@@ -92,7 +93,7 @@ impl Checker {
         self.push_scope();
         for (expr, name) in resources {
           let vt = self.synth(expr);
-          self.bind(name.clone(), vt);
+          self.bind(*name, vt);
         }
         let result = self.check_stmts(body);
         self.pop_scope();
@@ -103,7 +104,7 @@ impl Checker {
         for (_, expr) in fields {
           self.synth(expr);
         }
-        self.bind("context".into(), Type::Unknown);
+        self.bind(intern("context"), Type::Unknown);
         let result = self.check_stmts(body);
         self.pop_scope();
         result

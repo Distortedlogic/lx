@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 
 use crate::builtins::mk;
 use crate::error::LxError;
+use crate::record;
 use crate::runtime::RuntimeCtx;
 use crate::value::{LxVal, TraitMethodDef};
 use miette::SourceSpan;
@@ -16,33 +17,30 @@ pub fn build() -> IndexMap<String, LxVal> {
 }
 
 fn method_to_record(m: &TraitMethodDef) -> LxVal {
-  let mut rec = IndexMap::new();
-  rec.insert("name".into(), LxVal::str(&m.name));
   let input_fields: Vec<LxVal> = m
     .input
     .iter()
     .map(|f| {
-      let mut fr = IndexMap::new();
-      fr.insert("name".into(), LxVal::str(&f.name));
-      fr.insert("type".into(), LxVal::str(&f.type_name));
-      LxVal::record(fr)
+      record! { "name" => LxVal::str(&f.name), "type" => LxVal::str(&f.type_name) }
     })
     .collect();
-  rec.insert("input".into(), LxVal::list(input_fields));
-  rec.insert("output".into(), LxVal::str(&m.output));
-  LxVal::record(rec)
+  record! {
+      "name" => LxVal::str(&m.name),
+      "input" => LxVal::list(input_fields),
+      "output" => LxVal::str(&m.output),
+  }
 }
 
 fn bi_methods(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let LxVal::Trait { methods, .. } = &args[0] else {
+  let LxVal::Trait(t) = &args[0] else {
     return Err(LxError::type_err(format!("trait.methods: expected Trait, got {} `{}`", args[0].type_name(), args[0].short_display()), span));
   };
-  let records: Vec<LxVal> = methods.iter().map(method_to_record).collect();
+  let records: Vec<LxVal> = t.methods.iter().map(method_to_record).collect();
   Ok(LxVal::list(records))
 }
 
 fn bi_match(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let LxVal::Trait { methods, .. } = &args[0] else {
+  let LxVal::Trait(t) = &args[0] else {
     return Err(LxError::type_err(format!("trait.match: expected Trait, got {} `{}`", args[0].type_name(), args[0].short_display()), span));
   };
   let query = args[1]
@@ -52,7 +50,7 @@ fn bi_match(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<
   let words: Vec<&str> = query_lower.split_whitespace().collect();
   let mut best_name = String::new();
   let mut best_score = 0.0_f64;
-  for m in methods.iter() {
+  for m in t.methods.iter() {
     let name_lower = m.name.to_lowercase();
     let mut hits = 0;
     for w in &words {
@@ -66,12 +64,5 @@ fn bi_match(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<
       best_name = m.name.clone();
     }
   }
-  if best_score > 0.0 {
-    let mut rec = IndexMap::new();
-    rec.insert("method".into(), LxVal::str(best_name));
-    rec.insert("score".into(), LxVal::Float(best_score));
-    Ok(LxVal::record(rec))
-  } else {
-    Ok(LxVal::None)
-  }
+  if best_score > 0.0 { Ok(record! { "method" => LxVal::str(best_name), "score" => LxVal::Float(best_score) }) } else { Ok(LxVal::None) }
 }

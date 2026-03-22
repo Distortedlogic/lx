@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::fmt;
 
+use itertools::Itertools;
+
 pub type TypeVarId = u32;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -178,25 +180,9 @@ impl fmt::Display for Type {
       Type::List(inner) => write!(f, "[{inner}]"),
       Type::Map { key, value } => write!(f, "%{{{key}: {value}}}"),
       Type::Record(fields) => {
-        write!(f, "{{")?;
-        for (i, (n, t)) in fields.iter().enumerate() {
-          if i > 0 {
-            write!(f, "  ")?;
-          }
-          write!(f, "{n}: {t}")?;
-        }
-        write!(f, "}}")
+        write!(f, "{{{}}}", fields.iter().format_with("  ", |(n, t), g| g(&format_args!("{n}: {t}"))))
       },
-      Type::Tuple(elems) => {
-        write!(f, "(")?;
-        for (i, t) in elems.iter().enumerate() {
-          if i > 0 {
-            write!(f, ", ")?;
-          }
-          write!(f, "{t}")?;
-        }
-        write!(f, ")")
-      },
+      Type::Tuple(elems) => write!(f, "({})", elems.iter().format(", ")),
       Type::Func { param, ret } => write!(f, "{param} -> {ret}"),
       Type::Result { ok, err } => write!(f, "{ok} ^ {err}"),
       Type::Maybe(inner) => write!(f, "Maybe {inner}"),

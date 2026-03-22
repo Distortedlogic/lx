@@ -1,3 +1,4 @@
+use crate::sym::intern;
 use std::sync::Arc;
 
 use super::Interpreter;
@@ -16,11 +17,11 @@ impl Interpreter {
     for entry in entries {
       match entry {
         TraitEntry::Spread(base_name) => {
-          let base = self.env.get(base_name).ok_or_else(|| LxError::runtime(format!("Trait {name}: spread base '{base_name}' not found"), span))?;
-          let LxVal::Trait { fields: base_fields, .. } = &base else {
+          let base = self.env.get_str(base_name).ok_or_else(|| LxError::runtime(format!("Trait {name}: spread base '{base_name}' not found"), span))?;
+          let LxVal::Trait(ref base_trait) = base else {
             return Err(LxError::runtime(format!("Trait {name}: '{base_name}' is not a Trait, got {}", base.type_name()), span));
           };
-          for f in base_fields.iter() {
+          for f in base_trait.fields.iter() {
             if let Some(pos) = fields.iter().position(|pf: &FieldDef| pf.name == f.name) {
               fields[pos] = f.clone();
             } else {
@@ -52,15 +53,15 @@ impl Interpreter {
 
   pub(super) fn eval_trait_union(&mut self, name: &str, variants: &[String], span: SourceSpan) -> Result<LxVal, LxError> {
     for v in variants {
-      let val = self.env.get(v).ok_or_else(|| LxError::runtime(format!("Trait union {name}: variant '{v}' not found"), span))?;
-      if !matches!(val, LxVal::Trait { .. }) {
+      let val = self.env.get_str(v).ok_or_else(|| LxError::runtime(format!("Trait union {name}: variant '{v}' not found"), span))?;
+      if !matches!(val, LxVal::Trait(_)) {
         return Err(LxError::runtime(format!("Trait union {name}: variant '{v}' is not a Trait, got {}", val.type_name()), span));
       }
     }
-    let variant_arcs: Vec<Arc<str>> = variants.iter().map(|v| Arc::from(v.as_str())).collect();
-    let val = LxVal::TraitUnion { name: Arc::from(name), variants: Arc::new(variant_arcs) };
+    let variant_syms: Vec<crate::sym::Sym> = variants.iter().map(|v| intern(v)).collect();
+    let val = LxVal::TraitUnion { name: intern(name), variants: Arc::new(variant_syms) };
     let mut env = self.env.child();
-    env.bind(name.to_string(), val);
+    env.bind(intern(name), val);
     self.env = env.into_arc();
     Ok(LxVal::Unit)
   }

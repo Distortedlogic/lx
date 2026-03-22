@@ -10,7 +10,7 @@ use miette::SourceSpan;
 
 use super::store::{
   NEXT_ID, STORES, StoreState, bi_clear, bi_count, bi_create, bi_entries, bi_get, bi_keys, bi_load, bi_persist, bi_query, bi_remove, bi_set, bi_update,
-  persist, store_id,
+  get_store, get_store_mut, persist, store_id,
 };
 
 pub fn store_method(name: &str, store_val: &LxVal) -> Option<LxVal> {
@@ -105,29 +105,28 @@ pub fn build_constructor() -> LxVal {
 
 fn bi_values(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
-  let s = STORES.get(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
+  let s = get_store(id, span)?;
   let vals: Vec<LxVal> = s.data.values().cloned().collect();
   Ok(LxVal::list(vals))
 }
 
 fn bi_to_record(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
-  let s = STORES.get(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
-  let fields: indexmap::IndexMap<String, LxVal> = s.data.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-  Ok(LxVal::record(fields))
+  let s = get_store(id, span)?;
+  Ok(LxVal::record(s.data.clone()))
 }
 
 fn bi_has(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let key = args[1].require_str("store.has", span)?;
-  let s = STORES.get(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
+  let s = get_store(id, span)?;
   Ok(LxVal::Bool(s.data.contains_key(key)))
 }
 
 fn bi_save_to(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let path = args[1].require_str("store.save", span)?;
-  let s = STORES.get(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
+  let s = get_store(id, span)?;
   let record = LxVal::record(s.data.clone());
   let json_val = serde_json::Value::from(&record);
   let pretty = serde_json::to_string_pretty(&json_val).unwrap_or_default();
@@ -145,27 +144,25 @@ fn bi_load_from(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Res
     LxVal::Record(r) => r.as_ref().clone(),
     _ => return Err(LxError::runtime("store.load: expected JSON object", span)),
   };
-  let mut s = STORES.get_mut(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
+  let mut s = get_store_mut(id, span)?;
   s.data = data;
   Ok(LxVal::Unit)
 }
 
 fn bi_merge(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
-  let entries: Vec<(String, LxVal)> = match &args[1] {
+  let source_data: indexmap::IndexMap<String, LxVal> = match &args[1] {
     LxVal::Store { id: src_id } => {
-      let src = STORES.get(src_id).ok_or_else(|| LxError::runtime("store.merge: source store not found", span))?;
-      src.data.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+      let src = get_store(*src_id, span)?;
+      src.data.clone()
     },
-    LxVal::Record(r) => r.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+    LxVal::Record(r) => r.as_ref().clone(),
     other => {
       return Err(LxError::type_err(format!("store.merge: expected Store or Record, got {}", other.type_name()), span));
     },
   };
-  let mut s = STORES.get_mut(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
-  for (k, v) in entries {
-    s.data.insert(k, v);
-  }
+  let mut s = get_store_mut(id, span)?;
+  s.data.extend(source_data);
   persist(&s);
   Ok(LxVal::Unit)
 }
@@ -173,8 +170,8 @@ fn bi_merge(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<
 fn bi_map(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let f = &args[1];
-  let s = STORES.get(&id).ok_or_else(|| LxError::runtime("store: not found", span))?;
-  let snapshot: Vec<_> = s.data.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+  let s = get_store(id, span)?;
+  let snapshot = s.data.clone();
   drop(s);
   let mut results = Vec::new();
   for (k, v) in snapshot {

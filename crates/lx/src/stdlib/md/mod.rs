@@ -106,7 +106,7 @@ fn parse_to_nodes(input: &str) -> Vec<LxVal> {
           },
           TagEnd::CodeBlock => {
             let lang = match code_lang.take() {
-              Some(l) => LxVal::Some(Box::new(LxVal::str(l))),
+              Some(l) => LxVal::some(LxVal::str(l)),
               None => LxVal::None,
             };
             nodes.push(node_rec("code", vec![("lang", lang), ("code", LxVal::str(text.trim_end()))]));

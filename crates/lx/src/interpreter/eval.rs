@@ -1,3 +1,4 @@
+use crate::sym::intern;
 use std::sync::Arc;
 
 use crate::ast::{BinOp, SExpr, SStmt, SelArm};
@@ -102,11 +103,8 @@ impl Interpreter {
       });
     }
     let results = futures::future::join_all(futures).await;
-    let mut vals = Vec::with_capacity(results.len());
-    for r in results {
-      vals.push(r?);
-    }
-    Ok(LxVal::tuple(vals))
+    let vals: Result<Vec<_>, _> = results.into_iter().collect();
+    Ok(LxVal::tuple(vals?))
   }
 
   pub(super) async fn eval_sel(&mut self, arms: &[SelArm], span: SourceSpan) -> Result<LxVal, LxError> {
@@ -126,19 +124,14 @@ impl Interpreter {
       let arm_handler = arm.handler.clone();
       futures.push(Box::pin(async move {
         let mut interp = Interpreter { env, source, source_dir, module_cache, loading, ctx };
-        let val = interp.eval(&arm_expr).await;
-        match val {
-          Ok(v) => {
-            let saved = Arc::clone(&interp.env);
-            let mut child = interp.env.child();
-            child.bind("it".into(), v);
-            interp.env = Arc::new(child);
-            let r = interp.eval(&arm_handler).await;
-            interp.env = saved;
-            r
-          },
-          Err(e) => Err(e),
-        }
+        let v = interp.eval(&arm_expr).await?;
+        let saved = Arc::clone(&interp.env);
+        let mut child = interp.env.child();
+        child.bind_str("it", v);
+        interp.env = Arc::new(child);
+        let r = interp.eval(&arm_handler).await;
+        interp.env = saved;
+        r
       }));
     }
     let (result, _idx, _remaining) = futures::future::select_all(futures).await;
@@ -161,7 +154,7 @@ impl Interpreter {
     let saved = Arc::clone(&self.env);
     let mut child = self.env.child();
     for (name, val) in &acquired {
-      child.bind(name.clone(), val.clone());
+      child.bind(intern(&name), val.clone());
     }
     self.env = child.into_arc();
     let mut result = LxVal::Unit;
@@ -194,7 +187,7 @@ impl Interpreter {
         let message = match msg {
           Some(m) => {
             let mv = self.eval(m).await?;
-            Some(format!("{mv}"))
+            Some(mv.to_string())
           },
           None => None,
         };

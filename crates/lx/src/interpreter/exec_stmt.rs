@@ -1,3 +1,4 @@
+use crate::sym::intern;
 use std::sync::Arc;
 
 use async_recursion::async_recursion;
@@ -5,7 +6,7 @@ use indexmap::IndexMap;
 
 use crate::ast::{BindTarget, Stmt};
 use crate::error::LxError;
-use crate::value::LxVal;
+use crate::value::{LxClass, LxTrait, LxVal};
 
 use super::Interpreter;
 
@@ -26,24 +27,24 @@ impl Interpreter {
         let val = self.force_defaults(val, stmt.span).await?;
         match &b.target {
           BindTarget::Name(name) => {
-            if self.env.has_mut(name) {
-              self.env.reassign(name, val).map_err(|e| LxError::runtime(e, stmt.span))?;
+            if self.env.has_mut(intern(name)) {
+              self.env.reassign(intern(name), val).map_err(|e| LxError::runtime(e, stmt.span))?;
             } else {
               let mut env = self.env.child();
               if b.mutable {
-                env.bind_mut(name.clone(), val);
+                env.bind_mut(intern(name), val);
               } else {
-                env.bind(name.clone(), val);
+                env.bind(intern(name), val);
               }
               self.env = env.into_arc();
             }
           },
           BindTarget::Reassign(name) => {
-            self.env.reassign(name, val).map_err(|e| LxError::runtime(e, stmt.span))?;
+            self.env.reassign(intern(name), val).map_err(|e| LxError::runtime(e, stmt.span))?;
           },
           BindTarget::Pattern(pat) => {
             let bindings = self.try_match_pattern(&pat.node, &val).ok_or_else(|| {
-              let pat_str = format!("{}", pat.node);
+              let pat_str = pat.node.to_string();
               let hint = binding_pattern_hint(&pat_str);
               let msg = match hint {
                 Some(h) => format!("cannot bind {} `{}` to pattern `{pat_str}` — {h}", val.type_name(), val.short_display(),),
@@ -54,9 +55,9 @@ impl Interpreter {
             let mut env = self.env.child();
             for (name, v) in bindings {
               if b.mutable {
-                env.bind_mut(name, v);
+                env.bind_mut(intern(&name), v);
               } else {
-                env.bind(name, v);
+                env.bind(intern(&name), v);
               }
             }
             self.env = env.into_arc();
@@ -71,11 +72,11 @@ impl Interpreter {
       Stmt::TypeDef { variants, .. } => {
         let mut env = self.env.child();
         for (ctor_name, arity) in variants {
-          let tag: Arc<str> = Arc::from(ctor_name.as_str());
+          let tag = intern(ctor_name);
           if *arity == 0 {
-            env.bind(ctor_name.clone(), LxVal::Tagged { tag, values: Arc::new(vec![]) });
+            env.bind(intern(ctor_name), LxVal::Tagged { tag, values: Arc::new(vec![]) });
           } else {
-            env.bind(ctor_name.clone(), LxVal::TaggedCtor { tag, arity: *arity, applied: vec![] });
+            env.bind(intern(ctor_name), LxVal::TaggedCtor { tag, arity: *arity, applied: vec![] });
           }
         }
         self.env = env.into_arc();
@@ -101,17 +102,17 @@ impl Interpreter {
           let handler = self.eval(&d.handler).await?;
           default_impls.insert(d.name.clone(), handler);
         }
-        let val = LxVal::Trait {
-          name: Arc::from(data.name.as_str()),
+        let val = LxVal::Trait(Box::new(LxTrait {
+          name: intern(&data.name),
           fields: Arc::new(trait_fields),
           methods: Arc::new(method_defs),
           defaults: Arc::new(default_impls),
-          requires: Arc::new(data.requires.iter().map(|s| Arc::from(s.as_str())).collect()),
-          description: data.description.as_ref().map(|s| Arc::from(s.as_str())),
-          tags: Arc::new(data.tags.iter().map(|s| Arc::from(s.as_str())).collect()),
-        };
+          requires: Arc::new(data.requires.iter().map(|s| intern(s)).collect()),
+          description: data.description.as_ref().map(|s| intern(s)),
+          tags: Arc::new(data.tags.iter().map(|s| intern(s)).collect()),
+        }));
         let mut env = self.env.child();
-        env.bind(data.name.clone(), val);
+        env.bind(intern(&data.name), val);
         self.env = env.into_arc();
         Ok(LxVal::Unit)
       },
@@ -127,26 +128,26 @@ impl Interpreter {
           method_map.insert(m.name.clone(), handler);
         }
         Self::inject_traits(&mut method_map, &data.traits, &self.env, "Class", &data.name, stmt.span)?;
-        let val = LxVal::Class {
-          name: Arc::from(data.name.as_str()),
-          traits: Arc::new(data.traits.iter().map(|s| Arc::from(s.as_str())).collect()),
+        let val = LxVal::Class(Box::new(LxClass {
+          name: intern(&data.name),
+          traits: Arc::new(data.traits.iter().map(|s| intern(s)).collect()),
           defaults: Arc::new(defaults_map),
           methods: Arc::new(method_map),
-        };
+        }));
         let mut env = self.env.child();
-        env.bind(data.name.clone(), val);
+        env.bind(intern(&data.name), val);
         self.env = env.into_arc();
         Ok(LxVal::Unit)
       },
       Stmt::FieldUpdate { name, fields, value } => {
         let new_val = self.eval(value).await?;
-        let current = self.env.get(name).ok_or_else(|| LxError::runtime(format!("undefined variable '{name}'"), stmt.span))?;
-        if let LxVal::Object { id, .. } = &current {
-          crate::stdlib::object_update_nested(*id, fields, new_val).map_err(|e| LxError::runtime(e, stmt.span))?;
+        let current = self.env.get_str(name).ok_or_else(|| LxError::runtime(format!("undefined variable '{name}'"), stmt.span))?;
+        if let LxVal::Object(o) = &current {
+          crate::stdlib::object_update_nested(o.id, fields, new_val).map_err(|e| LxError::runtime(e, stmt.span))?;
           return Ok(LxVal::Unit);
         }
         let updated = Self::update_record_field(&current, fields, new_val, stmt.span)?;
-        self.env.reassign(name, updated).map_err(|e| LxError::runtime(e, stmt.span))?;
+        self.env.reassign(intern(name), updated).map_err(|e| LxError::runtime(e, stmt.span))?;
         Ok(LxVal::Unit)
       },
       Stmt::Expr(e) => self.eval(e).await,

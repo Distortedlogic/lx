@@ -1,3 +1,4 @@
+use crate::sym::Sym;
 use miette::SourceSpan;
 use num_bigint::BigInt;
 
@@ -25,8 +26,8 @@ pub enum TokenKind {
   False,
   Unit,
 
-  Ident(String),
-  TypeName(String),
+  Ident(Sym),
+  TypeName(Sym),
 
   Plus,
   Minus,

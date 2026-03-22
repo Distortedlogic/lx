@@ -1,5 +1,7 @@
 use std::io::Write;
 
+use itertools::Itertools;
+
 use crate::value::LxVal;
 
 use super::UserBackend;
@@ -114,18 +116,16 @@ impl UserBackend for StdinStdoutUserBackend {
         }
       }
     }
-    let header_line: Vec<String> = headers.iter().enumerate().map(|(i, h)| format!("{:width$}", h, width = widths[i])).collect();
-    eprintln!("{}", header_line.join("  "));
-    let sep: Vec<String> = widths.iter().map(|w| "-".repeat(*w)).collect();
-    eprintln!("{}", sep.join("  "));
+    eprintln!("{}", headers.iter().enumerate().format_with("  ", |(i, h), g| g(&format_args!("{:width$}", h, width = widths[i]))));
+    eprintln!("{}", widths.iter().format_with("  ", |w, g| g(&"-".repeat(*w))));
     for row in rows {
-      let cells: Vec<String> = (0..col_count)
-        .map(|i| {
+      eprintln!(
+        "{}",
+        (0..col_count).format_with("  ", |i, g| {
           let cell = row.get(i).map(|s| s.as_str()).unwrap_or("");
-          format!("{:width$}", cell, width = widths[i])
+          g(&format_args!("{:width$}", cell, width = widths[i]))
         })
-        .collect();
-      eprintln!("{}", cells.join("  "));
+      );
     }
   }
 

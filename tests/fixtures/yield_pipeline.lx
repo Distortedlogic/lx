@@ -1,3 +1,0 @@
-items = yield {request: "give me items"}
-total = items | sum
-total

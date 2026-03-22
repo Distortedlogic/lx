@@ -1,6 +1,7 @@
 use num_bigint::BigInt;
 
 use super::{BinOp, SExpr, SPattern, SType};
+use crate::sym::Sym;
 
 #[derive(Debug, Clone)]
 pub enum Literal {
@@ -22,14 +23,14 @@ pub enum StrPart {
 pub enum Section {
   Right { op: BinOp, operand: Box<SExpr> },
   Left { operand: Box<SExpr>, op: BinOp },
-  Field(String),
+  Field(Sym),
   Index(i64),
   BinOp(BinOp),
 }
 
 #[derive(Debug, Clone)]
 pub enum FieldKind {
-  Named(String),
+  Named(Sym),
   Index(i64),
   Computed(Box<SExpr>),
 }
@@ -42,7 +43,7 @@ pub enum ListElem {
 
 #[derive(Debug, Clone)]
 pub struct RecordField {
-  pub name: Option<String>,
+  pub name: Option<Sym>,
   pub value: SExpr,
   pub is_spread: bool,
 }
@@ -56,7 +57,7 @@ pub struct MapEntry {
 
 #[derive(Debug, Clone)]
 pub struct Param {
-  pub name: String,
+  pub name: Sym,
   pub type_ann: Option<SType>,
   pub default: Option<SExpr>,
 }

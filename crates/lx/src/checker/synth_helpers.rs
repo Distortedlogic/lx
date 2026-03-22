@@ -1,3 +1,4 @@
+use crate::sym::intern;
 use miette::SourceSpan;
 
 use crate::ast::{BinOp, Expr, Literal, MapEntry, MatchArm, Param, Pattern, SExpr, SPattern, SStmt, SType};
@@ -14,7 +15,7 @@ impl Checker {
         Some(ann) => self.resolve_type_ann(ann),
         None => self.fresh(),
       };
-      self.bind(p.name.clone(), ty.clone());
+      self.bind(p.name, ty.clone());
       param_types.push(ty);
     }
     let body_type = self.synth(body);
@@ -38,7 +39,7 @@ impl Checker {
   pub(super) fn bind_pattern_vars(&mut self, pat: &SPattern) {
     match &pat.node {
       Pattern::Bind(name) => {
-        self.bind(name.clone(), Type::Unknown);
+        self.bind(*name, Type::Unknown);
       },
       Pattern::Constructor { args, .. } => {
         for arg in args {
@@ -55,7 +56,7 @@ impl Checker {
           self.bind_pattern_vars(p);
         }
         if let Some(name) = rest {
-          self.bind(name.clone(), Type::Unknown);
+          self.bind(*name, Type::Unknown);
         }
       },
       Pattern::Record { fields, rest } => {
@@ -63,11 +64,11 @@ impl Checker {
           if let Some(p) = &f.pattern {
             self.bind_pattern_vars(p);
           } else {
-            self.bind(f.name.clone(), Type::Unknown);
+            self.bind(f.name, Type::Unknown);
           }
         }
         if let Some(name) = rest {
-          self.bind(name.clone(), Type::Unknown);
+          self.bind(*name, Type::Unknown);
         }
       },
       Pattern::Literal(_) | Pattern::Wildcard => {},

@@ -20,24 +20,24 @@ pub fn build() -> IndexMap<String, LxVal> {
 }
 
 fn bi_system(_args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  Ok(LxVal::Ok(Box::new(record! {
+  Ok(LxVal::ok(record! {
       "agents" => LxVal::list(Vec::new()),
       "messages_in_flight" => LxVal::int(0),
       "topics" => LxVal::list(Vec::new()),
       "supervisors" => LxVal::list(Vec::new()),
-  })))
+  }))
 }
 
 fn bi_agents(_args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  Ok(LxVal::Ok(Box::new(LxVal::list(Vec::new()))))
+  Ok(LxVal::ok(LxVal::list(Vec::new())))
 }
 
 fn bi_agent(_args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  Ok(LxVal::Err(Box::new(LxVal::str("agent introspection unavailable (agent runtime removed)"))))
+  Ok(LxVal::err_str("agent introspection unavailable (agent runtime removed)"))
 }
 
 fn bi_messages(_args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  Ok(LxVal::Ok(Box::new(LxVal::list(Vec::new()))))
+  Ok(LxVal::ok(LxVal::list(Vec::new())))
 }
 
 fn bi_bottleneck(_args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {

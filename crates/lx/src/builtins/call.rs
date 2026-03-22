@@ -23,11 +23,11 @@ pub(crate) async fn call_value(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Ar
       }
       let mut interp = crate::interpreter::Interpreter::with_env(&lf.closure, Arc::clone(ctx));
       let mut call_env = lf.closure.child();
-      for (i, name) in lf.params.iter().enumerate() {
+      for (i, &sym) in lf.params.iter().enumerate() {
         if i < lf.applied.len() {
-          call_env.bind(name.clone(), lf.applied[i].clone());
+          call_env.bind(sym, lf.applied[i].clone());
         } else if let Some(Some(def)) = lf.defaults.get(i) {
-          call_env.bind(name.clone(), def.clone());
+          call_env.bind(sym, def.clone());
         }
       }
       interp.set_env(call_env);

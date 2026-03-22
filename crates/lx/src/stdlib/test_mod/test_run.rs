@@ -154,13 +154,13 @@ fn run_scenarios(spec_fields: &IndexMap<String, LxVal>, scenarios: &[LxVal], spa
     sum / scenario_results.len() as f64
   };
 
-  Ok(LxVal::Ok(Box::new(record! {
+  Ok(LxVal::ok(record! {
       "spec" => LxVal::str(spec_name),
       "passed" => LxVal::Bool(all_passed),
       "score" => LxVal::Float(spec_score),
       "threshold" => LxVal::Float(threshold),
       "scenarios" => LxVal::list(scenario_results),
-  })))
+  }))
 }
 
 pub(crate) fn bi_run(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {

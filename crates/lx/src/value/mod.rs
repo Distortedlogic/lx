@@ -1,3 +1,4 @@
+use crate::sym::resolve;
 mod display;
 mod impls;
 
@@ -9,10 +10,41 @@ use serde::ser::SerializeMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use strum::IntoStaticStr;
 
-use crate::ast::SExpr;
+use crate::ast::{Field, MethodSpec, SExpr};
 use crate::env::Env;
 use crate::error::LxError;
+use crate::sym::Sym;
 use miette::SourceSpan;
+
+pub type FieldDef = Field<LxVal, Arc<SExpr>>;
+pub type TraitMethodDef = MethodSpec<FieldDef>;
+
+#[derive(Debug, Clone)]
+pub struct LxTrait {
+  pub name: Sym,
+  pub fields: Arc<Vec<FieldDef>>,
+  pub methods: Arc<Vec<TraitMethodDef>>,
+  pub defaults: Arc<IndexMap<String, LxVal>>,
+  pub requires: Arc<Vec<Sym>>,
+  pub description: Option<Sym>,
+  pub tags: Arc<Vec<Sym>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct LxClass {
+  pub name: Sym,
+  pub traits: Arc<Vec<Sym>>,
+  pub defaults: Arc<IndexMap<String, LxVal>>,
+  pub methods: Arc<IndexMap<String, LxVal>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct LxObject {
+  pub class_name: Sym,
+  pub id: u64,
+  pub traits: Arc<Vec<Sym>>,
+  pub methods: Arc<IndexMap<String, LxVal>>,
+}
 
 #[derive(Debug, Clone, IntoStaticStr, derive_more::From)]
 pub enum LxVal {
@@ -42,12 +74,12 @@ pub enum LxVal {
   None,
 
   Tagged {
-    tag: Arc<str>,
+    tag: Sym,
     values: Arc<Vec<LxVal>>,
   },
   #[strum(serialize = "Func")]
   TaggedCtor {
-    tag: Arc<str>,
+    tag: Sym,
     arity: usize,
     applied: Vec<LxVal>,
   },
@@ -57,30 +89,12 @@ pub enum LxVal {
     inclusive: bool,
   },
   TraitUnion {
-    name: Arc<str>,
-    variants: Arc<Vec<Arc<str>>>,
+    name: Sym,
+    variants: Arc<Vec<Sym>>,
   },
-  Trait {
-    name: Arc<str>,
-    fields: Arc<Vec<FieldDef>>,
-    methods: Arc<Vec<TraitMethodDef>>,
-    defaults: Arc<IndexMap<String, LxVal>>,
-    requires: Arc<Vec<Arc<str>>>,
-    description: Option<Arc<str>>,
-    tags: Arc<Vec<Arc<str>>>,
-  },
-  Class {
-    name: Arc<str>,
-    traits: Arc<Vec<Arc<str>>>,
-    defaults: Arc<IndexMap<String, LxVal>>,
-    methods: Arc<IndexMap<String, LxVal>>,
-  },
-  Object {
-    class_name: Arc<str>,
-    id: u64,
-    traits: Arc<Vec<Arc<str>>>,
-    methods: Arc<IndexMap<String, LxVal>>,
-  },
+  Trait(Box<LxTrait>),
+  Class(Box<LxClass>),
+  Object(Box<LxObject>),
   Store {
     id: u64,
   },
@@ -104,6 +118,21 @@ impl LxVal {
   }
   pub fn tuple(items: Vec<LxVal>) -> Self {
     LxVal::Tuple(Arc::new(items))
+  }
+  pub fn ok(v: LxVal) -> Self {
+    LxVal::Ok(Box::new(v))
+  }
+  pub fn ok_unit() -> Self {
+    LxVal::Ok(Box::new(LxVal::Unit))
+  }
+  pub fn some(v: LxVal) -> Self {
+    LxVal::Some(Box::new(v))
+  }
+  pub fn err(v: LxVal) -> Self {
+    LxVal::Err(Box::new(v))
+  }
+  pub fn err_str(s: impl AsRef<str>) -> Self {
+    LxVal::Err(Box::new(LxVal::str(s)))
   }
 
   pub fn require_str(&self, ctx: &str, span: SourceSpan) -> Result<&str, LxError> {
@@ -222,14 +251,14 @@ impl LxVal {
   }
 
   pub fn short_display(&self) -> String {
-    let s = format!("{self}");
+    let s = self.to_string();
     if s.len() > 80 { format!("{}...", &s[..77]) } else { s }
   }
 }
 
 #[derive(Debug, Clone)]
 pub struct LxFunc {
-  pub params: Vec<String>,
+  pub params: Vec<Sym>,
   pub defaults: Vec<Option<LxVal>>,
   pub body: Arc<SExpr>,
   pub closure: Arc<Env>,
@@ -258,21 +287,6 @@ pub struct BuiltinFunc {
   pub applied: Vec<LxVal>,
 }
 
-#[derive(Debug, Clone)]
-pub struct FieldDef {
-  pub name: String,
-  pub type_name: String,
-  pub default: Option<LxVal>,
-  pub constraint: Option<Arc<crate::ast::SExpr>>,
-}
-
-#[derive(Debug, Clone)]
-pub struct TraitMethodDef {
-  pub name: String,
-  pub input: Vec<FieldDef>,
-  pub output: String,
-}
-
 impl Serialize for LxVal {
   fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
     match self {
@@ -299,7 +313,7 @@ impl Serialize for LxVal {
       LxVal::Map(entries) => {
         let mut map = serializer.serialize_map(Some(entries.len()))?;
         for (k, v) in entries.as_ref() {
-          map.serialize_entry(&format!("{}", k.0), v)?;
+          map.serialize_entry(&k.0.to_string(), v)?;
         }
         map.end()
       },
@@ -312,7 +326,7 @@ impl Serialize for LxVal {
       },
       LxVal::Tagged { tag, values } => {
         let mut map = serializer.serialize_map(Some(2))?;
-        map.serialize_entry("__tag", tag.as_ref())?;
+        map.serialize_entry("__tag", resolve(*tag))?;
         map.serialize_entry("__values", values.as_ref())?;
         map.end()
       },
@@ -328,10 +342,10 @@ impl Serialize for LxVal {
         map.serialize_entry("__store", id)?;
         map.end()
       },
-      LxVal::Object { class_name, id, .. } => {
+      LxVal::Object(o) => {
         let mut map = serializer.serialize_map(Some(2))?;
-        map.serialize_entry("__object", &id)?;
-        map.serialize_entry("__class", class_name.as_ref())?;
+        map.serialize_entry("__object", &o.id)?;
+        map.serialize_entry("__class", resolve(o.class_name))?;
         map.end()
       },
       _ => serializer.serialize_str(&format!("<{}>", self.type_name())),

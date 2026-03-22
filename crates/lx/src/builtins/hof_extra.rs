@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use indexmap::IndexMap;
+use itertools::Itertools;
 
 use crate::error::LxError;
 use crate::runtime::RuntimeCtx;
@@ -143,14 +144,7 @@ pub(super) fn bi_windows(args: &[LxVal], sp: SourceSpan, _ctx: &Arc<RuntimeCtx>)
 
 pub(super) fn bi_intersperse(args: &[LxVal], sp: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let items = get_list(&args[1], "intersperse", sp)?;
-  let sep = &args[0];
-  let mut out = Vec::with_capacity(items.len() * 2);
-  for (i, v) in items.iter().enumerate() {
-    if i > 0 {
-      out.push(sep.clone());
-    }
-    out.push(v.clone());
-  }
+  let out: Vec<LxVal> = Itertools::intersperse(items.iter().cloned(), args[0].clone()).collect();
   Ok(LxVal::list(out))
 }
 
@@ -184,7 +178,7 @@ pub(super) fn bi_find_index(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCt
     for (i, v) in items.iter().enumerate() {
       let result = call(&args[0], v.clone(), sp, &ctx).await?;
       if result.as_bool() == Some(true) {
-        return Ok(LxVal::Some(Box::new(LxVal::int(i))));
+        return Ok(LxVal::some(LxVal::int(i)));
       }
     }
     Ok(LxVal::None)

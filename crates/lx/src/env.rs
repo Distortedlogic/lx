@@ -3,12 +3,13 @@ use std::sync::Arc;
 
 use dashmap::DashMap;
 
+use crate::sym::{Sym, intern};
 use crate::value::LxVal;
 
 #[derive(Debug, Clone, Default)]
 pub struct Env {
-  bindings: DashMap<String, LxVal>,
-  mutables: HashSet<String>,
+  bindings: DashMap<Sym, LxVal>,
+  mutables: HashSet<Sym>,
   parent: Option<Arc<Env>>,
 }
 
@@ -25,39 +26,47 @@ impl Env {
     Self::with_parent(Arc::clone(self))
   }
 
-  pub fn bind(&mut self, name: String, value: LxVal) {
+  pub fn bind(&mut self, name: Sym, value: LxVal) {
     self.bindings.insert(name, value);
   }
 
-  pub fn bind_mut(&mut self, name: String, value: LxVal) {
-    self.mutables.insert(name.clone());
+  pub fn bind_mut(&mut self, name: Sym, value: LxVal) {
+    self.mutables.insert(name);
     self.bindings.insert(name, value);
   }
 
-  pub fn reassign(&self, name: &str, value: LxVal) -> Result<(), String> {
-    if self.bindings.contains_key(name) {
-      if self.mutables.contains(name) {
-        self.bindings.insert(name.to_string(), value);
+  pub fn bind_str(&mut self, name: &str, value: LxVal) {
+    self.bindings.insert(intern(name), value);
+  }
+
+  pub fn reassign(&self, name: Sym, value: LxVal) -> Result<(), String> {
+    if self.bindings.contains_key(&name) {
+      if self.mutables.contains(&name) {
+        self.bindings.insert(name, value);
         return Ok(());
       }
-      return Err(format!("cannot reassign immutable binding '{name}'"));
+      return Err(format!("cannot reassign immutable binding '{}'", crate::sym::resolve(name)));
     }
     if let Some(parent) = &self.parent {
       return parent.reassign(name, value);
     }
-    Err(format!("undefined variable '{name}'"))
+    Err(format!("undefined variable '{}'", crate::sym::resolve(name)))
   }
 
-  pub fn get(&self, name: &str) -> Option<LxVal> {
-    if let Some(v) = self.bindings.get(name) {
+  pub fn get(&self, name: Sym) -> Option<LxVal> {
+    if let Some(v) = self.bindings.get(&name) {
       return Some(v.value().clone());
     }
     self.parent.as_ref().and_then(|p| p.get(name))
   }
 
-  pub fn has_mut(&self, name: &str) -> bool {
-    if self.bindings.contains_key(name) {
-      return self.mutables.contains(name);
+  pub fn get_str(&self, name: &str) -> Option<LxVal> {
+    self.get(intern(name))
+  }
+
+  pub fn has_mut(&self, name: Sym) -> bool {
+    if self.bindings.contains_key(&name) {
+      return self.mutables.contains(&name);
     }
     self.parent.as_ref().is_some_and(|p| p.has_mut(name))
   }

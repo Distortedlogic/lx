@@ -5,7 +5,7 @@ Add guard clauses to function definitions so functions can have multiple clauses
 # Why
 
 - Agent dispatch functions frequently branch on input shape: `action == "think"` vs `action == "plan"` vs `action == "reflect"`. Currently this requires a match or ternary inside a single function body. Multi-clause functions with guards read as a dispatch table.
-- The research in `research/pattern-matching/landscape.md` covers function-level guards in Erlang, Elixir, and Haskell. Elixir's `def foo(x) when is_integer(x)` is the model.
+- Elixir's `def foo(x) when is_integer(x)` is the model for function-level guards (Erlang, Elixir, Haskell all have this pattern).
 - This is syntactic sugar — it desugars to a match on the function arguments. Low implementation risk.
 
 # What Changes
@@ -25,15 +25,15 @@ Multiple bindings to the same name create a multi-clause function. At call time,
 
 ## Implementation approach
 
-Multi-clause functions are stored as `LxVal::MultiFunc(Vec<LxFunc>)`. Each `LxFunc` gains an optional `guard: Option<SExpr>` field. Application tries each clause: evaluate the guard in an env where params are bound to the args. If the guard returns true, evaluate the body. If false, try the next clause.
+Multi-clause functions are stored as `LxVal::MultiFunc(Vec<LxFunc>)`. Each `LxFunc` gains an optional `guard: Option<Arc<SExpr>>` field (using `Arc` to match the existing `body: Arc<SExpr>` pattern). Application tries each clause: evaluate the guard in an env where params are bound to the args. If the guard returns true, evaluate the body. If false, try the next clause.
 
 Alternatively, desugar at parse time: if a function name is bound multiple times in the same scope and all bindings are functions with guards, combine them into a single function with a match.
 
 ## Parser changes
 
-In `crates/lx/src/parser/func.rs`, after parsing the parameter list `(params)`, check for `&` followed by a guard expression before the `{` body. Store the guard in the `Expr::Func` variant.
+In `crates/lx/src/parser/expr.rs`, in the `func_def` parser (around line 275), after parsing the parameter list `(params)` and optional return type annotation, check for `&` (`TokenKind::Amp`) followed by a parenthesized guard expression before the body. Store the guard in the `Expr::Func` variant. Note: `&` is already used for match arm guards in the same file (line 404: `just(TokenKind::Amp).ignore_then(expr.clone()).or_not()`) — function guards should use the same pattern. `&` is also used as a low-precedence binary `And` operator (line 466), but this should not conflict since the function guard `&` appears between the param list `)` and the body expression, where a binary operator cannot legally occur.
 
-In `crates/lx/src/parser/statements.rs`, when a `Binding` re-binds a name that's already bound to a `Func` with a guard, combine them into a `MultiFunc`.
+In `crates/lx/src/parser/stmt.rs`, when a `Binding` re-binds a name that's already bound to a `Func` with a guard, combine them into a `MultiFunc`.
 
 ## AST changes
 
@@ -43,14 +43,16 @@ Add `guard: Option<Box<SExpr>>` to `Expr::Func` in `crates/lx/src/ast/mod.rs`.
 
 **Modified files:**
 - `crates/lx/src/ast/mod.rs` — add `guard` field to `Func` variant
-- `crates/lx/src/parser/func.rs` — parse `& (guard_expr)` after params
-- `crates/lx/src/interpreter/exec_stmt.rs` — detect multi-clause function bindings
-- `crates/lx/src/interpreter/apply.rs` — try clauses in order when applying multi-clause func
-- `crates/lx/src/value/mod.rs` — add `MultiFunc` variant or `guard` field to `LxFunc`
-- `crates/lx/src/visitor/walk/mod.rs` — walk guard expression
+- `crates/lx/src/parser/expr.rs` — parse `& (guard_expr)` after params in `func_def` parser
+- `crates/lx/src/interpreter/exec_stmt.rs` — detect multi-clause function bindings in `BindTarget::Name` handling
+- `crates/lx/src/interpreter/apply.rs` — try clauses in order when applying multi-clause func; also update `eval_func` which constructs `LxFunc`
+- `crates/lx/src/value/mod.rs` — add `MultiFunc` variant to `LxVal` and `guard` field to `LxFunc`
+- `crates/lx/src/visitor/walk/walk_expr.rs` — walk guard expression in `walk_func` and update `walk_expr` dispatch for `Expr::Func`
+- `crates/lx/src/visitor/mod.rs` — update `visit_func` trait method signature
 
-**New files:**
-- `tests/84_function_guards.lx` — tests for guarded function clauses
+**New files/dirs:**
+- `tests/` directory (does not exist yet; `just test` runs `cargo run -p lx-cli -- test tests/`)
+- `tests/function_guards.lx` — tests for guarded function clauses
 
 # Task List
 
@@ -58,13 +60,13 @@ Add `guard: Option<Box<SExpr>>` to `Expr::Func` in `crates/lx/src/ast/mod.rs`.
 
 **Subject:** Parse `& (guard)` after function parameter list
 
-**Description:** In `crates/lx/src/ast/mod.rs`, add `guard: Option<Box<SExpr>>` to the `Func` variant of `Expr`.
+**Description:** In `crates/lx/src/ast/mod.rs`, add `guard: Option<Box<SExpr>>` to the `Func` variant of `Expr`. The current variant is `Func { params: Vec<Param>, ret_type: Option<SType>, body: Box<SExpr> }`.
 
-In `crates/lx/src/parser/func.rs`, after parsing the parameter list and optional return type annotation, check if the next token is `&` (Ampersand). If so, consume it and parse the guard expression (in parentheses). Store it in the `guard` field. If no `&`, set `guard: None`.
+In `crates/lx/src/parser/expr.rs`, in the `func_def` parser (around line 275), after parsing the parameter list and optional return type annotation, check if the next token is `&` (`TokenKind::Amp`). If so, consume it and parse the guard expression (in parentheses). Store it in the `guard` field. If no `&`, set `guard: None`. Follow the same pattern used for match arm guards on line 404: `just(TokenKind::Amp).ignore_then(expr.clone()).or_not()`.
 
-Update all existing `Func` construction sites to pass `guard: None`.
+Update the single `Func` construction site in `expr.rs` (line 280) to pass `guard: None` (or the parsed guard).
 
-Update the visitor walker to walk the guard expression if present.
+Update the visitor walker in `crates/lx/src/visitor/walk/walk_expr.rs`: update `walk_func` to accept and walk the guard expression if present, and update the `Expr::Func` dispatch in `walk_expr` (line 77-79) to pass the guard. Also update the `visit_func` trait method signature in `crates/lx/src/visitor/mod.rs`.
 
 Run `just diagnose`.
 
@@ -76,9 +78,11 @@ Run `just diagnose`.
 
 **Subject:** Combine same-name guarded function bindings into multi-clause dispatch
 
-**Description:** In `crates/lx/src/value/mod.rs`, add a `guard: Option<SExpr>` field to `LxFunc`. Add a `MultiFunc(Vec<LxFunc>)` variant to `LxVal`.
+**Description:** In `crates/lx/src/value/mod.rs`, add a `guard: Option<Arc<SExpr>>` field to `LxFunc` (use `Arc<SExpr>` to match the existing `body: Arc<SExpr>` convention). Current `LxFunc` fields: `params`, `defaults`, `body`, `closure`, `arity`, `applied`, `source_text`, `source_name`. Add a `MultiFunc(Vec<LxFunc>)` variant to `LxVal`.
 
-In `crates/lx/src/interpreter/exec_stmt.rs`, when executing a `Binding` that re-binds a name already bound to a `Func` (or `MultiFunc`) with a guard: instead of replacing the binding, combine the old and new functions into a `MultiFunc`. If the old binding is already a `MultiFunc`, append the new clause. This preserves clause ordering (first defined = first tried).
+In `crates/lx/src/interpreter/exec_stmt.rs`, in the `BindTarget::Name(name)` branch: currently, if `has_mut(name)` is false, a child env is created and the name is bound (shadowing any previous binding). To support multi-clause functions, before creating the child env, check whether the current env already has a binding for `name` that is a `Func` (with a guard) or `MultiFunc`. If the new value is also a `Func` with a guard, combine them into a `MultiFunc` instead of shadowing. If the old binding is already a `MultiFunc`, append the new clause. This preserves clause ordering (first defined = first tried).
+
+Also update `eval_func` in `crates/lx/src/interpreter/apply.rs` (line 165-197) to populate the new `guard` field on `LxFunc` (set to `None` for now; the guard from the AST will need to be threaded through).
 
 Run `just diagnose`.
 
@@ -98,7 +102,7 @@ Run `just diagnose`.
 
 For single `LxFunc` with a guard: same logic but only one clause — error if guard fails.
 
-Create `tests/84_function_guards.lx`:
+Create `tests/` directory if it does not exist, then create `tests/function_guards.lx`:
 1. **Basic guard** — `abs = (x) & (x >= 0) { x }` and `abs = (x) & (x < 0) { 0 - x }`. Verify `abs 5 == 5` and `abs (-3) == 3`.
 2. **Guard with multiple params** — `clamp` example from above.
 3. **Fallback clause** — guarded clauses + one unguarded clause as catch-all.

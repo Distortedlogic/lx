@@ -9,8 +9,6 @@ use crate::runtime::RuntimeCtx;
 use crate::value::{LxVal, ValueKey};
 use miette::SourceSpan;
 
-use super::mk;
-
 pub(crate) fn cmp_values(a: &LxVal, b: &LxVal) -> std::cmp::Ordering {
   match (a, b) {
     (LxVal::Int(x), LxVal::Int(y)) => x.cmp(y),
@@ -24,7 +22,7 @@ pub(crate) fn cmp_values(a: &LxVal, b: &LxVal) -> std::cmp::Ordering {
 }
 
 fn maybe(v: Option<&LxVal>) -> LxVal {
-  v.map_or(LxVal::None, |v| LxVal::Some(Box::new(v.clone())))
+  v.map_or(LxVal::None, |v| LxVal::some(v.clone()))
 }
 
 fn bi_first(args: &[LxVal], sp: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
@@ -138,15 +136,11 @@ fn bi_entries(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resul
 }
 
 pub(super) fn register(env: &mut Env) {
-  env.bind("first".into(), mk("first", 1, bi_first));
-  env.bind("last".into(), mk("last", 1, bi_last));
-  env.bind("contains?".into(), mk("contains?", 2, bi_contains));
-  env.bind("get".into(), mk("get", 2, bi_get));
-  env.bind("to_list".into(), mk("to_list", 1, bi_to_list));
-  env.bind("to_map".into(), mk("to_map", 1, bi_to_map));
-  env.bind("to_record".into(), mk("to_record", 1, bi_to_record));
-  env.bind("keys".into(), mk("keys", 1, bi_keys));
-  env.bind("values".into(), mk("values", 1, bi_values));
-  env.bind("entries".into(), mk("entries", 1, bi_entries));
+  super::register_builtins!(env, {
+    "first"/1 => bi_first, "last"/1 => bi_last, "contains?"/2 => bi_contains,
+    "get"/2 => bi_get, "to_list"/1 => bi_to_list, "to_map"/1 => bi_to_map,
+    "to_record"/1 => bi_to_record, "keys"/1 => bi_keys, "values"/1 => bi_values,
+    "entries"/1 => bi_entries,
+  });
   super::coll_transform::register(env);
 }

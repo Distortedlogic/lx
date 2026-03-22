@@ -18,15 +18,15 @@ impl Interpreter {
     span: SourceSpan,
   ) -> Result<(), LxError> {
     for tn in traits {
-      let Some(LxVal::Trait { methods: req, defaults, .. }) = env.get(tn) else {
+      let Some(LxVal::Trait(t)) = env.get_str(tn) else {
         continue;
       };
-      for (k, v) in defaults.iter() {
+      for (k, v) in t.defaults.iter() {
         if !methods.contains_key(k) {
           methods.insert(k.clone(), v.clone());
         }
       }
-      for r in req.iter() {
+      for r in t.methods.iter() {
         if !methods.contains_key(&r.name) {
           return Err(LxError::runtime(format!("{kind} {name} missing method '{}' required by Trait {tn}", r.name), span));
         }

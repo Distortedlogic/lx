@@ -1,12 +1,14 @@
 # Goal
 
-Add `timeout` as a first-class expression wrapper so any expression can be time-bounded without wrapping it in a `sel` block. Currently `sel { expr -> it; timeout 5000 -> fallback }` is the only way to add a timeout — verbose for the common case of "run this one thing with a time limit."
+Add `timeout` as a first-class expression wrapper so any expression can be time-bounded. Currently there is no language-level timeout mechanism — the only option is to manually race expressions inside a `sel` block, which is verbose for the common case of "run this one thing with a time limit."
 
 # Why
 
 - Every agentic workflow has operations that can hang — LLM calls, HTTP requests, agent asks. Timeout is the most common `sel` usage pattern but requires 3 lines of boilerplate for one expression.
 - The research in `research/concurrency/design-patterns.md` covers structured concurrency (Trio, Kotlin) where timeout wraps expressions directly.
-- `timeout` already exists as a `sel` arm keyword — promoting it to an expression doesn't add new syntax, just broadens where it can appear.
+- Adding `timeout` as a keyword-level expression makes timeout a first-class language feature instead of requiring verbose `sel` blocks.
+
+**Note:** `timeout` currently exists as a builtin function in `crates/lx/src/builtins/convert.rs` that performs a blocking `std::thread::sleep`. Promoting `timeout` to a keyword will shadow that builtin; the old sleep-based `timeout` should be removed or renamed (e.g., `sleep`) as part of this work.
 
 # What Changes
 
@@ -24,9 +26,13 @@ result ? {
 
 This desugars internally to the existing `sel` machinery — wrapping the expression and a timeout arm.
 
+## Lexer changes
+
+Add `Timeout` to `TokenKind` in `crates/lx/src/lexer/token.rs`. Add `"timeout" => TokenKind::Timeout` to the `ident_or_keyword` function in `crates/lx/src/lexer/helpers.rs`.
+
 ## Parser changes
 
-In `crates/lx/src/parser/prefix.rs`, when `timeout` is encountered as a prefix token (not inside a `sel` arm context), parse it as: `Expr::Timeout { ms: SExpr, body: SExpr }`. The `ms` expression is parsed first, then the body.
+In `crates/lx/src/parser/expr.rs`, inside `expr_parser()`, add a `timeout_expr` combinator (similar to `emit_expr` or `assert_expr`): consume `TokenKind::Timeout`, parse the milliseconds expression, parse the body expression, and produce `Expr::Timeout { ms: SExpr, body: SExpr }`. Add it to the `atom` choice list.
 
 ## AST changes
 
@@ -43,30 +49,39 @@ Add a match arm for `Timeout` in the checker that synthesizes `Result { ok: body
 # Files Affected
 
 **Modified files:**
+- `crates/lx/src/lexer/token.rs` — add `Timeout` to `TokenKind`
+- `crates/lx/src/lexer/helpers.rs` — map `"timeout"` to `TokenKind::Timeout` in `ident_or_keyword`
 - `crates/lx/src/ast/mod.rs` — add `Timeout` variant to `Expr`
-- `crates/lx/src/parser/prefix.rs` — parse `timeout MILLIS EXPR` as expression
-- `crates/lx/src/interpreter/eval.rs` — evaluate `Timeout` via tokio select
+- `crates/lx/src/parser/expr.rs` — parse `timeout MILLIS EXPR` as expression atom
+- `crates/lx/src/interpreter/mod.rs` — add `Expr::Timeout` match arm in `eval()`
+- `crates/lx/src/interpreter/eval.rs` — implement `eval_timeout` method
 - `crates/lx/src/checker/synth.rs` — synthesize type for `Timeout`
-- `crates/lx/src/visitor/walk/mod.rs` — walk `Timeout` children
+- `crates/lx/src/visitor/walk/mod.rs` — add `Expr::Timeout` dispatch in `walk_expr`
+- `crates/lx/src/visitor/walk/walk_expr.rs` — add `walk_timeout` function
+- `crates/lx/src/visitor/mod.rs` — add `visit_timeout` method to `AstVisitor` trait
+- `crates/lx/src/builtins/convert.rs` — remove or rename the old `timeout` builtin (now a keyword)
 
 **New files:**
 - `tests/80_timeout_expr.lx` — tests for timeout as expression
 
 # Task List
 
-### Task 1: Add Timeout AST variant and parser support
+### Task 1: Add Timeout token, AST variant, and parser support
 
 **Subject:** Parse `timeout MILLIS EXPR` as a standalone expression
 
-**Description:** Add `Timeout { ms: Box<SExpr>, body: Box<SExpr> }` to the `Expr` enum in `crates/lx/src/ast/mod.rs`.
+**Description:**
 
-In `crates/lx/src/parser/prefix.rs`, add a match arm for the `timeout` keyword when it appears as a prefix expression (not inside a `sel` block). Parse: consume `timeout` keyword, parse the milliseconds expression at high binding power (e.g., BP 100 to get a single literal or ident), parse the body expression in parentheses or at standard BP.
-
-Update the visitor walker in `crates/lx/src/visitor/walk/mod.rs` to walk both `ms` and `body` children.
+1. Add `Timeout` to `TokenKind` in `crates/lx/src/lexer/token.rs` (alongside `Emit`, `Yield`, etc.).
+2. Add `"timeout" => TokenKind::Timeout` to `ident_or_keyword` in `crates/lx/src/lexer/helpers.rs`.
+3. Add `Timeout { ms: Box<SExpr>, body: Box<SExpr> }` to the `Expr` enum in `crates/lx/src/ast/mod.rs`.
+4. In `crates/lx/src/parser/expr.rs`, inside `expr_parser()`, add a `timeout_expr` combinator following the pattern of `assert_expr` (which also takes two sub-expressions): consume `TokenKind::Timeout`, then parse `ms` expression, then parse `body` expression, producing `Expr::Timeout { ms: Box::new(ms), body: Box::new(body) }`. Add `timeout_expr` to the `atom` choice list.
+5. Update the visitor: add `walk_timeout` in `crates/lx/src/visitor/walk/walk_expr.rs`, add `Expr::Timeout` dispatch in `walk_expr` in `crates/lx/src/visitor/walk/mod.rs`, and add `visit_timeout` to the `AstVisitor` trait in `crates/lx/src/visitor/mod.rs`.
+6. Remove or rename the old `timeout` builtin in `crates/lx/src/builtins/convert.rs` (rename to `sleep` since it does blocking sleep, not async timeout).
 
 Run `just diagnose`.
 
-**ActiveForm:** Adding Timeout AST variant and parser
+**ActiveForm:** Adding Timeout token, AST variant, and parser
 
 ---
 
@@ -74,7 +89,7 @@ Run `just diagnose`.
 
 **Subject:** Evaluate timeout expression via tokio select
 
-**Description:** In `crates/lx/src/interpreter/eval.rs` (or whichever file handles eval dispatch), add a match arm for `Expr::Timeout { ms, body }`:
+**Description:** Add `Expr::Timeout { ms, body }` to the eval match in `crates/lx/src/interpreter/mod.rs` (in the `eval()` method, around line 175 where `Sel` is handled), dispatching to a new `eval_timeout` method. Implement `eval_timeout` in `crates/lx/src/interpreter/eval.rs`:
 
 1. Evaluate `ms` to get the timeout duration in milliseconds (must be Int or Float).
 2. Spawn `body` evaluation as a future.

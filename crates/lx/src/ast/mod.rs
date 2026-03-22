@@ -1,3 +1,4 @@
+use crate::sym::Sym;
 mod display;
 mod expr_types;
 mod types;
@@ -32,11 +33,11 @@ pub struct Program {
 #[derive(Debug, Clone)]
 pub enum Stmt {
   Binding(Binding),
-  TypeDef { name: String, variants: Vec<(String, usize)>, exported: bool },
+  TypeDef { name: Sym, variants: Vec<(Sym, usize)>, exported: bool },
   TraitUnion(TraitUnionDef),
   TraitDecl(TraitDeclData),
   ClassDecl(ClassDeclData),
-  FieldUpdate { name: String, fields: Vec<String>, value: SExpr },
+  FieldUpdate { name: Sym, fields: Vec<Sym>, value: SExpr },
   Use(UseStmt),
   Expr(SExpr),
 }
@@ -52,16 +53,16 @@ pub struct Binding {
 
 #[derive(Debug, Clone)]
 pub enum BindTarget {
-  Name(String),
-  Reassign(String),
+  Name(Sym),
+  Reassign(Sym),
   Pattern(SPattern),
 }
 
 #[derive(Debug, Clone)]
 pub enum Expr {
   Literal(Literal),
-  Ident(String),
-  TypeConstructor(String),
+  Ident(Sym),
+  TypeConstructor(Sym),
 
   Binary { op: BinOp, left: Box<SExpr>, right: Box<SExpr> },
   Unary { op: UnaryOp, operand: Box<SExpr> },
@@ -87,7 +88,7 @@ pub enum Expr {
   Coalesce { expr: Box<SExpr>, default: Box<SExpr> },
 
   Slice { expr: Box<SExpr>, start: Option<Box<SExpr>>, end: Option<Box<SExpr>> },
-  NamedArg { name: String, value: Box<SExpr> },
+  NamedArg { name: Sym, value: Box<SExpr> },
 
   Loop(Vec<SStmt>),
   Break(Option<Box<SExpr>>),
@@ -98,7 +99,7 @@ pub enum Expr {
 
   Emit { value: Box<SExpr> },
   Yield { value: Box<SExpr> },
-  With { name: String, value: Box<SExpr>, body: Vec<SStmt>, mutable: bool },
-  WithResource { resources: Vec<(SExpr, String)>, body: Vec<SStmt> },
-  WithContext { fields: Vec<(String, SExpr)>, body: Vec<SStmt> },
+  With { name: Sym, value: Box<SExpr>, body: Vec<SStmt>, mutable: bool },
+  WithResource { resources: Vec<(SExpr, Sym)>, body: Vec<SStmt> },
+  WithContext { fields: Vec<(Sym, SExpr)>, body: Vec<SStmt> },
 }

@@ -1,3 +1,4 @@
+use crate::sym::intern;
 use std::sync::Arc;
 
 use crate::ast::{Literal, MatchArm, Pattern, SExpr};
@@ -13,7 +14,7 @@ impl super::Interpreter {
         let saved = Arc::clone(&self.env);
         let mut scope = self.env.child();
         for (name, v) in bindings {
-          scope.bind(name, v);
+          scope.bind(intern(&name), v);
         }
         self.env = scope.into_arc();
         if let Some(guard) = &arm.guard {
@@ -61,7 +62,7 @@ impl super::Interpreter {
           },
           _ => false,
         };
-        if matches { Some(vec![]) } else { None }
+        matches.then(Vec::new)
       },
       Pattern::Tuple(pats) => {
         let LxVal::Tuple(items) = value else {

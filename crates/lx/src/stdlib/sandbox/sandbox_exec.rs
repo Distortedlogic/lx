@@ -14,7 +14,7 @@ pub fn bi_exec(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resu
     _ => return Err(LxError::type_err("sandbox.exec expects Str command", span)),
   };
 
-  Ok(LxVal::Err(Box::new(LxVal::str("shell commands have been removed from lx"))))
+  Ok(LxVal::err_str("shell commands have been removed from lx"))
 }
 
 pub fn bi_spawn(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
@@ -22,8 +22,8 @@ pub fn bi_spawn(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Res
   let policy = POLICIES.get(&pid).ok_or_else(|| LxError::runtime("sandbox: policy not found", span))?;
 
   if !policy.agent {
-    return Ok(LxVal::Err(Box::new(LxVal::str("agent spawning denied by sandbox policy"))));
+    return Ok(LxVal::err_str("agent spawning denied by sandbox policy"));
   }
 
-  Ok(LxVal::Err(Box::new(LxVal::str("sandbox.spawn: OS-level sandboxing not yet implemented — use sandbox.scope for lx-level restriction"))))
+  Ok(LxVal::err_str("sandbox.spawn: OS-level sandboxing not yet implemented — use sandbox.scope for lx-level restriction"))
 }

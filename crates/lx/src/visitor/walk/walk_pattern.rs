@@ -6,7 +6,7 @@ use crate::visitor::AstVisitor;
 pub fn walk_pattern<V: AstVisitor + ?Sized>(v: &mut V, pattern: &Pattern, span: SourceSpan) {
   match pattern {
     Pattern::Literal(lit) => v.visit_pattern_literal(lit, span),
-    Pattern::Bind(name) => v.visit_pattern_bind(name, span),
+    Pattern::Bind(name) => v.visit_pattern_bind(*name, span),
     Pattern::Wildcard => v.visit_pattern_wildcard(span),
     Pattern::Tuple(elems) => v.visit_pattern_tuple(elems, span),
     Pattern::List { elems, rest } => {

@@ -6,8 +6,6 @@ use crate::runtime::RuntimeCtx;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
-use super::mk;
-
 #[path = "str_extra.rs"]
 mod str_extra;
 
@@ -80,21 +78,14 @@ fn bi_join(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<L
 }
 
 pub(super) fn register(env: &mut Env) {
-  env.bind("trim".into(), mk("trim", 1, bi_trim));
-  env.bind("trim_start".into(), mk("trim_start", 1, bi_trim_start));
-  env.bind("trim_end".into(), mk("trim_end", 1, bi_trim_end));
-  env.bind("upper".into(), mk("upper", 1, bi_upper));
-  env.bind("lower".into(), mk("lower", 1, bi_lower));
-  env.bind("lines".into(), mk("lines", 1, bi_lines));
-  env.bind("chars".into(), mk("chars", 1, bi_chars));
-  env.bind("byte_len".into(), mk("byte_len", 1, bi_byte_len));
-  env.bind("split".into(), mk("split", 2, bi_split));
-  env.bind("join".into(), mk("join", 2, bi_join));
-  env.bind("replace".into(), mk("replace", 3, str_extra::bi_replace));
-  env.bind("replace_all".into(), mk("replace_all", 3, str_extra::bi_replace_all));
-  env.bind("repeat".into(), mk("repeat", 2, str_extra::bi_repeat));
-  env.bind("starts?".into(), mk("starts?", 2, str_extra::bi_starts));
-  env.bind("ends?".into(), mk("ends?", 2, str_extra::bi_ends));
-  env.bind("pad_left".into(), mk("pad_left", 2, str_extra::bi_pad_left));
-  env.bind("pad_right".into(), mk("pad_right", 2, str_extra::bi_pad_right));
+  super::register_builtins!(env, {
+    "trim"/1 => bi_trim, "trim_start"/1 => bi_trim_start, "trim_end"/1 => bi_trim_end,
+    "upper"/1 => bi_upper, "lower"/1 => bi_lower, "lines"/1 => bi_lines,
+    "chars"/1 => bi_chars, "byte_len"/1 => bi_byte_len,
+    "split"/2 => bi_split, "join"/2 => bi_join,
+    "replace"/3 => str_extra::bi_replace, "replace_all"/3 => str_extra::bi_replace_all,
+    "repeat"/2 => str_extra::bi_repeat, "starts?"/2 => str_extra::bi_starts,
+    "ends?"/2 => str_extra::bi_ends, "pad_left"/2 => str_extra::bi_pad_left,
+    "pad_right"/2 => str_extra::bi_pad_right,
+  });
 }

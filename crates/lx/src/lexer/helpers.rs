@@ -26,7 +26,7 @@ pub(super) fn ident_or_keyword(text: &str) -> TokenKind {
     "emit" => TokenKind::Emit,
     "yield" => TokenKind::Yield,
     "with" => TokenKind::With,
-    _ => TokenKind::Ident(text.to_string()),
+    _ => TokenKind::Ident(crate::sym::intern(text)),
   }
 }
 
@@ -34,6 +34,6 @@ pub(super) fn type_name_or_keyword(text: &str) -> TokenKind {
   match text {
     "Trait" => TokenKind::Trait,
     "Class" => TokenKind::ClassKw,
-    _ => TokenKind::TypeName(text.to_string()),
+    _ => TokenKind::TypeName(crate::sym::intern(text)),
   }
 }

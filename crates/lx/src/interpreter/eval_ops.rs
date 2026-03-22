@@ -1,3 +1,4 @@
+use num_integer::Integer;
 use num_traits::ToPrimitive;
 
 use crate::ast::{BinOp, Literal, SExpr, StrPart, UnaryOp};
@@ -9,35 +10,25 @@ use super::Interpreter;
 
 fn dedent_string(s: &str) -> String {
   let lines: Vec<&str> = s.split('\n').collect();
-  let trimmed: Vec<&str> = if lines.first() == Some(&"") { lines[1..].to_vec() } else { lines.to_vec() };
+  let trimmed = if lines.first() == Some(&"") { &lines[1..] } else { &lines[..] };
   if trimmed.is_empty() {
     return String::new();
   }
   let last_is_whitespace = trimmed.last().is_some_and(|l| l.chars().all(|c| c == ' ' || c == '\t'));
-  let content_lines = if last_is_whitespace { &trimmed[..trimmed.len() - 1] } else { &trimmed[..] };
+  let content_lines = if last_is_whitespace { &trimmed[..trimmed.len() - 1] } else { trimmed };
   let min_indent = content_lines.iter().filter(|l| !l.is_empty()).map(|l| l.len() - l.trim_start().len()).min().unwrap_or(0);
-  let mut result = String::new();
-  for line in content_lines {
-    if line.len() >= min_indent {
-      result.push_str(&line[min_indent..]);
-    }
-    result.push('\n');
-  }
-  result
+  content_lines.iter().map(|line| if line.len() >= min_indent { &line[min_indent..] } else { "" }).collect::<Vec<_>>().join("\n") + "\n"
 }
 
 impl Interpreter {
-  pub(super) async fn eval_literal(&mut self, lit: &Literal, span: SourceSpan) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_literal(&mut self, lit: &Literal, _span: SourceSpan) -> Result<LxVal, LxError> {
     match lit {
       Literal::Int(n) => Ok(LxVal::Int(n.clone())),
       Literal::Float(f) => Ok(LxVal::Float(*f)),
       Literal::Bool(b) => Ok(LxVal::Bool(*b)),
       Literal::Str(parts) => self.eval_string_parts(parts).await,
       Literal::RawStr(s) => Ok(LxVal::str(s)),
-      Literal::Unit => {
-        let _ = span;
-        Ok(LxVal::Unit)
-      },
+      Literal::Unit => Ok(LxVal::Unit),
     }
   }
 
@@ -63,7 +54,7 @@ impl Interpreter {
         if b.sign() == num_bigint::Sign::NoSign {
           return Err(LxError::division_by_zero(span));
         }
-        let (q, r) = (a.clone() / b.clone(), a.clone() % b.clone());
+        let (q, r) = a.div_rem(b);
         if r.sign() != num_bigint::Sign::NoSign && (a.sign() != b.sign()) { Ok(LxVal::Int(q - 1)) } else { Ok(LxVal::Int(q)) }
       },
       (BinOp::Mod, LxVal::Int(a), LxVal::Int(b)) => {
@@ -143,7 +134,7 @@ impl Interpreter {
         StrPart::Interp(e) => {
           let v = self.eval(e).await?;
           let v = self.force_defaults(v, e.span).await?;
-          buf.push_str(&format!("{v}"));
+          buf.push_str(&v.to_string());
         },
       }
     }

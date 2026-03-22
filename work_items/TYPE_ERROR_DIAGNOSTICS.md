@@ -34,7 +34,7 @@ pub enum TypeContext {
 
 ## Propagate context through the checker
 
-In `checker/synth.rs` and `checker/stmts.rs`, where `unify` is called, wrap the call with context about what's being checked:
+In `checker/synth.rs`, `checker/synth_helpers.rs`, and `checker/stmts.rs`, where `unify` is called, wrap the call with context about what's being checked:
 
 ```rust
 self.table.unify_with_context(
@@ -62,12 +62,13 @@ Add help text for common cases:
 
 **Modified files:**
 - `crates/lx/src/checker/types.rs` — add `TypeError`, `TypeContext` types; add `unify_with_context` method
-- `crates/lx/src/checker/synth.rs` — pass context to unify calls for function args, returns, bindings
-- `crates/lx/src/checker/stmts.rs` — pass context for binding type checks
+- `crates/lx/src/checker/synth.rs` — pass context to unify calls (ternary branch unification)
+- `crates/lx/src/checker/synth_helpers.rs` — pass context to unify calls for function return types, trait fields, match arms, map entries, binary ops
+- `crates/lx/src/checker/stmts.rs` — pass context for binding and reassignment type checks
 - `crates/lx/src/checker/mod.rs` — convert `TypeError` to `LxError::Type` with rich message
-- `crates/lx/src/error.rs` — add `help` field to `LxError::Type`
+- `crates/lx/src/error.rs` — add `help` field to `LxError::Type` (mirroring existing `#[help]` on `LxError::Parse`)
 
-**Verification:** Existing type error tests in `tests/12_types.lx` must still pass. New error message format is verified by running `just diagnose` on intentionally mistyped programs.
+**Verification:** Run `just diagnose` to confirm compilation. No dedicated type-error test suite exists yet; verification is done by running `just diagnose` on intentionally mistyped programs.
 
 # Task List
 
@@ -123,7 +124,7 @@ Add `TypeError::help(&self) -> Option<String>` returning contextual help:
 - non-Func where Func expected → `Some("this value is not callable")`
 - Otherwise → `None`
 
-Add `help` field (`Option<String>`) to `LxError::Type` variant in `crates/lx/src/error.rs` and wire miette's `#[help]` attribute to it.
+Add `help` field (`Option<String>`) to `LxError::Type` variant in `crates/lx/src/error.rs` and wire miette's `#[help]` attribute to it (same pattern already used on `LxError::Parse`). Update the `LxError::type_err` constructor to accept the optional help parameter.
 
 Run `just diagnose`.
 
@@ -135,21 +136,25 @@ Run `just diagnose`.
 
 **Subject:** Pass context to unify calls in the checker for function args and bindings
 
-**Description:** In `crates/lx/src/checker/synth.rs`, find all calls to `self.table.unify()` and replace with `self.table.unify_with_context()` where context is available:
+**Description:** In `crates/lx/src/checker/synth.rs`, find the unify call (ternary else branch) and replace with `self.table.unify_with_context()` using `TypeContext::General`.
 
-- Function argument checking: pass `TypeContext::FuncArg` with function name, param name, and index.
-- Function return type: pass `TypeContext::FuncReturn` with function name.
-- Binary operators: pass `TypeContext::BinaryOp` with the operator string.
+In `crates/lx/src/checker/synth_helpers.rs`, find all calls to `self.table.unify()` and replace with `self.table.unify_with_context()` where context is available:
+
+- Function return type (line ~23): pass `TypeContext::FuncReturn` with function name.
+- Trait field type check (line ~102): pass `TypeContext::RecordField` with field name.
+- Match arm unification (line ~137): pass `TypeContext::MatchArm` with arm index.
+- Map key/value unification (lines ~153, ~157): use `TypeContext::General`.
+- Binary operators (line ~167): pass `TypeContext::BinaryOp` with the operator string.
 
 In `crates/lx/src/checker/stmts.rs`:
-- Binding type annotations: pass `TypeContext::Binding` with the binding name.
-- Record field assignments: pass `TypeContext::RecordField`.
+- Binding type annotations (line ~99): pass `TypeContext::Binding` with the binding name.
+- Reassignment type check (line ~113): pass `TypeContext::Binding` with the binding name.
 
 Convert `TypeError` to `LxError::Type` at the point where errors are surfaced, using `TypeError::to_message()` for the msg and `TypeError::help()` for the help field.
 
 For `unify` calls where context isn't readily available, use `TypeContext::General` — these can be incrementally enriched later.
 
-Run `just diagnose` and `just test`.
+Run `just diagnose`.
 
 **ActiveForm:** Wiring context into checker unify calls
 
