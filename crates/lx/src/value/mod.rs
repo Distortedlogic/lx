@@ -59,7 +59,7 @@ pub enum LxVal {
   Unit,
 
   List(Arc<Vec<LxVal>>),
-  Record(Arc<IndexMap<String, LxVal>>),
+  Record(Arc<IndexMap<Sym, LxVal>>),
   Map(Arc<IndexMap<ValueKey, LxVal>>),
   Tuple(Arc<Vec<LxVal>>),
 

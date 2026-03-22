@@ -30,8 +30,8 @@ use crate::value::LxVal;
 
 #[derive(Debug, Clone)]
 pub(crate) struct ModuleExports {
-  pub(crate) bindings: IndexMap<String, LxVal>,
-  pub(crate) variant_ctors: Vec<String>,
+  pub(crate) bindings: IndexMap<Sym, LxVal>,
+  pub(crate) variant_ctors: Vec<Sym>,
 }
 
 pub struct Interpreter {

@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::fmt;
 use std::sync::OnceLock;
 
@@ -32,6 +33,12 @@ impl fmt::Display for Sym {
 
 impl AsRef<str> for Sym {
   fn as_ref(&self) -> &str {
+    self.as_str()
+  }
+}
+
+impl Borrow<str> for Sym {
+  fn borrow(&self) -> &str {
     self.as_str()
   }
 }
