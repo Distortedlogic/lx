@@ -15,6 +15,7 @@ fastrand.workspace = true
 futures.workspace = true
 indexmap.workspace = true
 itertools.workspace = true
+la-arena.workspace = true
 lasso.workspace = true
 logos.workspace = true
 miette.workspace = true
