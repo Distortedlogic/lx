@@ -1,7 +1,7 @@
 use crate::ast::{Expr, FieldPattern, Literal, Pattern, SExpr, SPattern, StrPart};
 use crate::error::LxError;
 use crate::lexer::token::TokenKind;
-use crate::span::Span;
+use miette::SourceSpan;
 
 impl super::Parser {
   pub(crate) fn parse_pattern(&mut self) -> Result<SPattern, LxError> {
@@ -17,21 +17,21 @@ impl super::Parser {
       TokenKind::Minus => {
         let next = self.advance().clone();
         match next.kind {
-          TokenKind::Int(n) => Ok(SPattern::new(Pattern::Literal(Literal::Int(-n)), Span::from_range(tok.span.offset, next.span.end()))),
-          TokenKind::Float(f) => Ok(SPattern::new(Pattern::Literal(Literal::Float(-f)), Span::from_range(tok.span.offset, next.span.end()))),
+          TokenKind::Int(n) => Ok(SPattern::new(Pattern::Literal(Literal::Int(-n)), Span::from_range(tok.span.offset(), next.span.end()))),
+          TokenKind::Float(f) => Ok(SPattern::new(Pattern::Literal(Literal::Float(-f)), Span::from_range(tok.span.offset(), next.span.end()))),
           _ => Err(LxError::parse("expected number after '-' in pattern", next.span, None)),
         }
       },
-      TokenKind::StrStart => self.parse_str_pattern(tok.span.offset),
-      TokenKind::LParen => self.parse_tuple_pattern(tok.span.offset),
-      TokenKind::LBrace => self.parse_record_pattern(tok.span.offset),
-      TokenKind::LBracket => self.parse_list_pattern(tok.span.offset),
+      TokenKind::StrStart => self.parse_str_pattern(tok.span.offset()),
+      TokenKind::LParen => self.parse_tuple_pattern(tok.span.offset()),
+      TokenKind::LBrace => self.parse_record_pattern(tok.span.offset()),
+      TokenKind::LBracket => self.parse_list_pattern(tok.span.offset()),
       TokenKind::TypeName(name) => self.parse_constructor_pattern(name, tok.span),
       _ => Err(LxError::parse(format!("unexpected token in pattern: {:?}", tok.kind), tok.span, None)),
     }
   }
 
-  fn parse_str_pattern(&mut self, start: u32) -> Result<SPattern, LxError> {
+  fn parse_str_pattern(&mut self, start: usize) -> Result<SPattern, LxError> {
     let mut parts = Vec::new();
     loop {
       match self.peek().clone() {
@@ -50,7 +50,7 @@ impl super::Parser {
     }
   }
 
-  pub(super) fn parse_tuple_pattern(&mut self, start: u32) -> Result<SPattern, LxError> {
+  pub(super) fn parse_tuple_pattern(&mut self, start: usize) -> Result<SPattern, LxError> {
     let mut pats = Vec::new();
     while *self.peek() != TokenKind::RParen {
       pats.push(self.parse_pattern()?);
@@ -62,7 +62,7 @@ impl super::Parser {
     Ok(SPattern::new(Pattern::Tuple(pats), Span::from_range(start, end)))
   }
 
-  fn parse_record_pattern(&mut self, start: u32) -> Result<SPattern, LxError> {
+  fn parse_record_pattern(&mut self, start: usize) -> Result<SPattern, LxError> {
     let mut fields = Vec::new();
     let mut rest = None;
     while *self.peek() != TokenKind::RBrace {
@@ -89,7 +89,7 @@ impl super::Parser {
     Ok(SPattern::new(Pattern::Record { fields, rest }, Span::from_range(start, end)))
   }
 
-  fn parse_list_pattern(&mut self, start: u32) -> Result<SPattern, LxError> {
+  fn parse_list_pattern(&mut self, start: usize) -> Result<SPattern, LxError> {
     let mut elems = Vec::new();
     let mut rest = None;
     while *self.peek() != TokenKind::RBracket {

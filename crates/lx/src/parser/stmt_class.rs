@@ -1,10 +1,10 @@
 use crate::ast::{AgentMethod, ClassDeclData, ClassField, SStmt, Stmt};
 use crate::error::LxError;
 use crate::lexer::token::TokenKind;
-use crate::span::Span;
+use miette::SourceSpan;
 
 impl super::Parser {
-  pub(super) fn parse_class_decl(&mut self, mut exported: bool, start: u32) -> Result<SStmt, LxError> {
+  pub(super) fn parse_class_decl(&mut self, mut exported: bool, start: usize) -> Result<SStmt, LxError> {
     self.advance();
     if *self.peek() == TokenKind::Plus {
       self.advance();

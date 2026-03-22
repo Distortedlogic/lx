@@ -1,7 +1,7 @@
 use crate::ast::{Expr, SExpr};
 use crate::error::LxError;
 use crate::lexer::token::TokenKind;
-use crate::span::Span;
+use miette::SourceSpan;
 
 impl super::Parser {
   pub(super) fn is_with_binding(&self) -> bool {
@@ -17,7 +17,7 @@ impl super::Parser {
     false
   }
 
-  pub(super) fn parse_with(&mut self, start: u32) -> Result<SExpr, LxError> {
+  pub(super) fn parse_with(&mut self, start: usize) -> Result<SExpr, LxError> {
     if *self.peek() == TokenKind::Ident("context".into()) {
       return self.parse_with_context(start);
     }
@@ -27,7 +27,7 @@ impl super::Parser {
     self.parse_with_resource(start)
   }
 
-  fn parse_with_binding(&mut self, start: u32) -> Result<SExpr, LxError> {
+  fn parse_with_binding(&mut self, start: usize) -> Result<SExpr, LxError> {
     let mutable = *self.peek() == TokenKind::Ident("mut".into());
     if mutable {
       self.advance();
@@ -54,7 +54,7 @@ impl super::Parser {
     Ok(SExpr::new(Expr::With { name, value: Box::new(value), body, mutable }, Span::from_range(start, end)))
   }
 
-  fn parse_with_context(&mut self, start: u32) -> Result<SExpr, LxError> {
+  fn parse_with_context(&mut self, start: usize) -> Result<SExpr, LxError> {
     self.advance();
     let mut fields = Vec::new();
     while *self.peek() != TokenKind::LBrace {
@@ -77,7 +77,7 @@ impl super::Parser {
     Ok(SExpr::new(Expr::WithContext { fields, body }, Span::from_range(start, end)))
   }
 
-  fn parse_with_resource(&mut self, start: u32) -> Result<SExpr, LxError> {
+  fn parse_with_resource(&mut self, start: usize) -> Result<SExpr, LxError> {
     let mut resources = Vec::new();
     loop {
       let saved_stop = self.stop_ident.take();

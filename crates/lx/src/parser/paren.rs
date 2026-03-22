@@ -1,10 +1,10 @@
 use crate::ast::{BindTarget, Binding, Expr, Param, SExpr, SStmt, Section, Stmt};
 use crate::error::LxError;
 use crate::lexer::token::TokenKind;
-use crate::span::Span;
+use miette::SourceSpan;
 
 impl super::Parser {
-  pub(super) fn parse_paren(&mut self, start: u32) -> Result<SExpr, LxError> {
+  pub(super) fn parse_paren(&mut self, start: usize) -> Result<SExpr, LxError> {
     let saved_depth = self.collection_depth;
     self.collection_depth = 0;
     let result = self.parse_paren_inner(start);
@@ -12,7 +12,7 @@ impl super::Parser {
     result
   }
 
-  fn parse_paren_inner(&mut self, start: u32) -> Result<SExpr, LxError> {
+  fn parse_paren_inner(&mut self, start: usize) -> Result<SExpr, LxError> {
     if *self.peek() == TokenKind::RParen {
       if self.is_func_def() {
         return self.parse_func(start);
@@ -60,7 +60,7 @@ impl super::Parser {
     Ok(SExpr::new(Expr::Tuple(elems), Span::from_range(start, end)))
   }
 
-  fn try_section(&mut self, start: u32) -> Result<Option<SExpr>, LxError> {
+  fn try_section(&mut self, start: usize) -> Result<Option<SExpr>, LxError> {
     if *self.peek() == TokenKind::Dot
       && let Some(TokenKind::Ident(_)) = self.tokens.get(self.pos + 1).map(|t| &t.kind)
       && self.tokens.get(self.pos + 2).map(|t| &t.kind) == Some(&TokenKind::RParen)
@@ -114,7 +114,7 @@ impl super::Parser {
     Ok(None)
   }
 
-  pub(super) fn parse_func(&mut self, start: u32) -> Result<SExpr, LxError> {
+  pub(super) fn parse_func(&mut self, start: usize) -> Result<SExpr, LxError> {
     let mut params = Vec::new();
     let mut pat_desugars: Vec<(String, crate::ast::SPattern)> = Vec::new();
     let mut pat_count = 0u32;
@@ -140,7 +140,7 @@ impl super::Parser {
           params.push(Param { name: "_".into(), type_ann: None, default: None });
         },
         TokenKind::LParen => {
-          let pat = self.parse_tuple_pattern(tok.span.offset)?;
+          let pat = self.parse_tuple_pattern(tok.span.offset())?;
           let name = format!("_pat{pat_count}");
           pat_count += 1;
           pat_desugars.push((name.clone(), pat));

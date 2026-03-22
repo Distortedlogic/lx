@@ -1,7 +1,7 @@
 use crate::ast::{BinOp, Expr, FieldKind, Literal, MatchArm, SExpr};
 use crate::error::LxError;
 use crate::lexer::token::TokenKind;
-use crate::span::Span;
+use miette::SourceSpan;
 
 pub(crate) fn token_to_binop(kind: &TokenKind) -> Option<BinOp> {
   match kind {
@@ -28,7 +28,7 @@ pub(crate) fn token_to_binop(kind: &TokenKind) -> Option<BinOp> {
 
 impl super::Parser {
   pub(super) fn parse_infix(&mut self, left: SExpr, kind: &TokenKind, rbp: u8) -> Result<SExpr, LxError> {
-    let start = left.span.offset;
+    let start = left.span.offset();
     self.advance();
     self.skip_semis();
     match kind {
@@ -49,13 +49,13 @@ impl super::Parser {
     }
   }
 
-  fn parse_binary_infix(&mut self, left: SExpr, rbp: u8, make: fn(Box<SExpr>, Box<SExpr>) -> Expr, start: u32) -> Result<SExpr, LxError> {
+  fn parse_binary_infix(&mut self, left: SExpr, rbp: u8, make: fn(Box<SExpr>, Box<SExpr>) -> Expr, start: usize) -> Result<SExpr, LxError> {
     let right = self.parse_expr(rbp)?;
     let span = Span::from_range(start, right.span.end());
     Ok(SExpr::new(make(Box::new(left), Box::new(right)), span))
   }
 
-  fn parse_dot(&mut self, left: SExpr, start: u32) -> Result<SExpr, LxError> {
+  fn parse_dot(&mut self, left: SExpr, start: usize) -> Result<SExpr, LxError> {
     let tok = self.advance().clone();
     match tok.kind {
       TokenKind::Ident(name) | TokenKind::TypeName(name) => {
@@ -111,7 +111,7 @@ impl super::Parser {
         Ok(SExpr::new(Expr::FieldAccess { expr: Box::new(left), field: FieldKind::Computed(Box::new(key_expr)) }, span))
       },
       TokenKind::StrStart => {
-        let key_expr = self.parse_string(tok.span.offset)?;
+        let key_expr = self.parse_string(tok.span.offset())?;
         let end = key_expr.span.end();
         let span = Span::from_range(start, end);
         Ok(SExpr::new(Expr::FieldAccess { expr: Box::new(left), field: FieldKind::Computed(Box::new(key_expr)) }, span))
@@ -122,11 +122,11 @@ impl super::Parser {
 
   pub(super) fn parse_postfix(&mut self, left: SExpr) -> Result<SExpr, LxError> {
     let tok = self.advance();
-    let span = Span::from_range(left.span.offset, tok.span.end());
+    let span = Span::from_range(left.span.offset(), tok.span.end());
     Ok(SExpr::new(Expr::Propagate(Box::new(left)), span))
   }
 
-  pub(super) fn parse_question(&mut self, scrutinee: SExpr, start: u32) -> Result<SExpr, LxError> {
+  pub(super) fn parse_question(&mut self, scrutinee: SExpr, start: usize) -> Result<SExpr, LxError> {
     if *self.peek() == TokenKind::LBrace {
       self.advance();
       let mut arms = Vec::new();

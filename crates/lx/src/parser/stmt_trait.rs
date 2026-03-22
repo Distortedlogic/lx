@@ -1,10 +1,10 @@
 use crate::ast::{AgentMethod, FieldDecl, SStmt, Stmt, TraitDeclData, TraitEntry, TraitMethodDecl, TraitUnionDef};
 use crate::error::LxError;
 use crate::lexer::token::TokenKind;
-use crate::span::Span;
+use miette::SourceSpan;
 
 impl super::Parser {
-  pub(super) fn parse_trait_decl(&mut self, mut exported: bool, start: u32) -> Result<SStmt, LxError> {
+  pub(super) fn parse_trait_decl(&mut self, mut exported: bool, start: usize) -> Result<SStmt, LxError> {
     self.advance();
     if *self.peek() == TokenKind::Plus {
       self.advance();
@@ -85,7 +85,7 @@ impl super::Parser {
     Ok(FieldDecl { name: field_name, type_name, default, constraint })
   }
 
-  fn parse_trait_union(&mut self, name: String, exported: bool, start: u32) -> Result<SStmt, LxError> {
+  fn parse_trait_union(&mut self, name: String, exported: bool, start: usize) -> Result<SStmt, LxError> {
     let mut variants = Vec::new();
     variants.push(self.expect_type_name("Trait union variant")?);
     while *self.peek() == TokenKind::Pipe {

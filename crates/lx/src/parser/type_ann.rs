@@ -1,7 +1,7 @@
 use crate::ast::{SType, TypeExpr, TypeField};
 use crate::error::LxError;
 use crate::lexer::token::TokenKind;
-use crate::span::Span;
+use miette::SourceSpan;
 
 impl super::Parser {
   pub(crate) fn parse_type(&mut self) -> Result<SType, LxError> {
@@ -9,7 +9,7 @@ impl super::Parser {
     if *self.peek() == TokenKind::Caret {
       self.advance();
       let err = self.parse_type_app()?;
-      let span = Span::from_range(left.span.offset, err.span.end());
+      let span = Span::from_range(left.span.offset(), err.span.end());
       let fallible = TypeExpr::Fallible { ok: Box::new(left), err: Box::new(err) };
       if *self.peek() == TokenKind::Arrow {
         self.advance();
@@ -22,7 +22,7 @@ impl super::Parser {
     if *self.peek() == TokenKind::Arrow {
       self.advance();
       let ret = self.parse_type()?;
-      let span = Span::from_range(left.span.offset, ret.span.end());
+      let span = Span::from_range(left.span.offset(), ret.span.end());
       return Ok(SType::new(TypeExpr::Func { param: Box::new(left), ret: Box::new(ret) }, span));
     }
     Ok(left)
@@ -37,7 +37,7 @@ impl super::Parser {
       }
       if let Some(last) = args.last() {
         let end = last.span.end();
-        Ok(SType::new(TypeExpr::Applied(name, args), Span::from_range(tok.span.offset, end)))
+        Ok(SType::new(TypeExpr::Applied(name, args), Span::from_range(tok.span.offset(), end)))
       } else {
         Ok(SType::new(TypeExpr::Named(name), tok.span))
       }
@@ -57,13 +57,13 @@ impl super::Parser {
         Ok(SType::new(TypeExpr::Var(name), tok.span))
       },
       TokenKind::LBracket => {
-        let start = self.advance().span.offset;
+        let start = self.advance().span.offset();
         let inner = self.parse_type()?;
         let end = self.expect_kind(&TokenKind::RBracket)?.span.end();
         Ok(SType::new(TypeExpr::List(Box::new(inner)), Span::from_range(start, end)))
       },
       TokenKind::LBrace => {
-        let start = self.advance().span.offset;
+        let start = self.advance().span.offset();
         let mut fields = Vec::new();
         self.skip_semis();
         while *self.peek() != TokenKind::RBrace {
@@ -85,7 +85,7 @@ impl super::Parser {
         Ok(SType::new(TypeExpr::Record(fields), Span::from_range(start, end)))
       },
       TokenKind::PercentLBrace => {
-        let start = self.advance().span.offset;
+        let start = self.advance().span.offset();
         let key = self.parse_type()?;
         self.expect_kind(&TokenKind::Colon)?;
         let value = self.parse_type()?;
@@ -93,7 +93,7 @@ impl super::Parser {
         Ok(SType::new(TypeExpr::Map { key: Box::new(key), value: Box::new(value) }, Span::from_range(start, end)))
       },
       TokenKind::LParen => {
-        let start = self.advance().span.offset;
+        let start = self.advance().span.offset();
         if *self.peek() == TokenKind::RParen {
           let end = self.advance().span.end();
           return Ok(SType::new(TypeExpr::Named("Unit".into()), Span::from_range(start, end)));

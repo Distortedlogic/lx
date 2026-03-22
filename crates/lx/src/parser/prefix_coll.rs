@@ -1,10 +1,10 @@
 use crate::ast::{Expr, ListElem, MapEntry, RecordField, SExpr, SStmt};
 use crate::error::LxError;
 use crate::lexer::token::TokenKind;
-use crate::span::Span;
+use miette::SourceSpan;
 
 impl super::Parser {
-  pub(super) fn parse_list(&mut self, start: u32) -> Result<SExpr, LxError> {
+  pub(super) fn parse_list(&mut self, start: usize) -> Result<SExpr, LxError> {
     let mut elems = Vec::new();
     self.collection_depth += 1;
     while *self.peek() != TokenKind::RBracket {
@@ -23,7 +23,7 @@ impl super::Parser {
     Ok(SExpr::new(Expr::List(elems), Span::from_range(start, end)))
   }
 
-  pub(super) fn parse_block_or_record(&mut self, start: u32) -> Result<SExpr, LxError> {
+  pub(super) fn parse_block_or_record(&mut self, start: usize) -> Result<SExpr, LxError> {
     self.skip_semis();
     if *self.peek() == TokenKind::Colon && self.tokens.get(self.pos + 1).is_some_and(|t| t.kind == TokenKind::RBrace) {
       self.advance();
@@ -38,7 +38,7 @@ impl super::Parser {
     Ok(SExpr::new(Expr::Block(stmts), Span::from_range(start, end)))
   }
 
-  fn parse_record(&mut self, start: u32) -> Result<SExpr, LxError> {
+  fn parse_record(&mut self, start: usize) -> Result<SExpr, LxError> {
     let mut fields = Vec::new();
     self.skip_semis();
     self.collection_depth += 1;
@@ -82,7 +82,7 @@ impl super::Parser {
     Ok(SExpr::new(Expr::Record(fields), Span::from_range(start, end)))
   }
 
-  pub(super) fn parse_map(&mut self, start: u32) -> Result<SExpr, LxError> {
+  pub(super) fn parse_map(&mut self, start: usize) -> Result<SExpr, LxError> {
     let mut entries = Vec::new();
     self.collection_depth += 1;
     while *self.peek() != TokenKind::RBrace {

@@ -1,10 +1,10 @@
 use crate::ast::{SStmt, Stmt, UseKind, UseStmt};
 use crate::error::LxError;
 use crate::lexer::token::TokenKind;
-use crate::span::Span;
+use miette::SourceSpan;
 
 impl super::Parser {
-  pub(super) fn parse_use_stmt(&mut self, start: u32) -> Result<SStmt, LxError> {
+  pub(super) fn parse_use_stmt(&mut self, start: usize) -> Result<SStmt, LxError> {
     self.advance();
     let mut path = Vec::new();
     while *self.peek() == TokenKind::DotDot {

@@ -18,7 +18,7 @@ pub(crate) use infix::token_to_binop;
 use crate::ast::{Expr, Program, SExpr};
 use crate::error::LxError;
 use crate::lexer::token::{Token, TokenKind};
-use crate::span::Span;
+use miette::SourceSpan;
 
 pub fn parse(tokens: Vec<Token>) -> Result<Program, LxError> {
   Parser { tokens, pos: 0, no_juxtapose: false, collection_depth: 0, record_field_depth: 0, application_depth: 0, stop_ident: None }.parse_program()
@@ -121,15 +121,15 @@ impl Parser {
           let TokenKind::Ident(name) = tok.kind else { unreachable!() };
           self.advance();
           let value = self.parse_expr(32)?;
-          let arg_span = Span::from_range(tok.span.offset, value.span.end());
+          let arg_span = Span::from_range(tok.span.offset(), value.span.end());
           let arg = SExpr::new(Expr::NamedArg { name, value: Box::new(value) }, arg_span);
-          let span = Span::from_range(left.span.offset, arg.span.end());
+          let span = Span::from_range(left.span.offset(), arg.span.end());
           left = SExpr::new(Expr::Apply { func: Box::new(left), arg: Box::new(arg) }, span);
         } else {
           self.application_depth += 1;
           let arg = self.parse_expr(32)?;
           self.application_depth -= 1;
-          let span = Span::from_range(left.span.offset, arg.span.end());
+          let span = Span::from_range(left.span.offset(), arg.span.end());
           left = SExpr::new(Expr::Apply { func: Box::new(left), arg: Box::new(arg) }, span);
         }
         continue;

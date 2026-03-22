@@ -1,11 +1,11 @@
 use crate::ast::{BindTarget, Binding, Expr, FieldKind, SExpr, SStmt, Stmt};
 use crate::error::LxError;
 use crate::lexer::token::TokenKind;
-use crate::span::Span;
+use miette::SourceSpan;
 
 impl super::Parser {
   pub(crate) fn parse_stmt(&mut self) -> Result<SStmt, LxError> {
-    let start = self.tokens[self.pos].span.offset;
+    let start = self.tokens[self.pos].span.offset();
     if *self.peek() == TokenKind::Use {
       return self.parse_use_stmt(start);
     }
@@ -109,7 +109,7 @@ impl super::Parser {
     matches!(self.tokens.get(j).map(|t| &t.kind), Some(TokenKind::Assign))
   }
 
-  pub(super) fn try_parse_type_def(&mut self, exported: bool, start: u32) -> Result<Option<SStmt>, LxError> {
+  pub(super) fn try_parse_type_def(&mut self, exported: bool, start: usize) -> Result<Option<SStmt>, LxError> {
     if !matches!(self.peek(), TokenKind::TypeName(_)) {
       return Ok(None);
     }
