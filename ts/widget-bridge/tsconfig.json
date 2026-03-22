@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": ".",
+    "verbatimModuleSyntax": false
+  },
+  "include": ["src", "widgets"]
+}

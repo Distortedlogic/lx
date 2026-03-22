@@ -1,4 +1,4 @@
-use crate::ast::{BindTarget, Binding, SStmt, Stmt, StmtFieldUpdate, StmtTypeDef, UseKind, UseStmt};
+use crate::ast::{BindTarget, Binding, SStmt, Stmt, StmtFieldUpdate, StmtTypeDef, TraitEntry, UseKind, UseStmt};
 use crate::sym::Sym;
 use miette::SourceSpan;
 
@@ -35,7 +35,7 @@ impl Checker {
         let fields: Vec<(Sym, Type)> = data
           .entries
           .iter()
-          .filter_map(|e| if let crate::ast::TraitEntry::Field(f) = e { Some((f.name, super::named_to_type(f.type_name.as_str()))) } else { None })
+          .filter_map(|e| if let TraitEntry::Field(f) = e { Some((f.name, super::named_to_type(f.type_name.as_str()))) } else { None })
           .collect();
         if !fields.is_empty() {
           self.trait_fields.insert(data.name, fields);

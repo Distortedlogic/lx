@@ -1,7 +1,7 @@
-use crate::ast::{Expr, FieldKind, Literal, StrPart};
+use crate::ast::{Expr, ExprBinary, ExprFieldAccess, FieldKind, Literal, StrPart};
 
 pub(super) fn extract_field_call_parts(expr: &Expr) -> Option<(&str, &str)> {
-  let Expr::FieldAccess { expr: e, field: FieldKind::Named(f) } = expr else {
+  let Expr::FieldAccess(ExprFieldAccess { expr: e, field: FieldKind::Named(f) }) = expr else {
     return None;
   };
   let Expr::Ident(name) = &e.node else {
@@ -33,10 +33,10 @@ pub(super) fn extract_str_literal(expr: &Expr) -> Option<String> {
 pub(super) fn expr_label(expr: &Expr) -> String {
   match expr {
     Expr::Ident(name) => name.to_string(),
-    Expr::FieldAccess { expr: e, field: FieldKind::Named(f) } => {
+    Expr::FieldAccess(ExprFieldAccess { expr: e, field: FieldKind::Named(f) }) => {
       format!("{}.{f}", expr_label(&e.node))
     },
-    Expr::Binary { op, left, right } => {
+    Expr::Binary(ExprBinary { op, left, right }) => {
       format!("{} {op} {}", expr_label(&left.node), expr_label(&right.node))
     },
     Expr::Literal(Literal::Int(n)) => n.to_string(),

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_recursion::async_recursion;
 use indexmap::IndexMap;
 
-use crate::ast::{BindTarget, Stmt};
+use crate::ast::{BindTarget, SStmt, Stmt, StmtFieldUpdate, StmtTypeDef};
 use crate::env::Env;
 use crate::error::LxError;
 use crate::sym::Sym;
@@ -21,7 +21,7 @@ fn binding_pattern_hint(pat_str: &str) -> Option<&'static str> {
 
 impl Interpreter {
   #[async_recursion(?Send)]
-  pub(crate) async fn eval_stmt(&mut self, stmt: &crate::ast::SStmt) -> Result<LxVal, LxError> {
+  pub(crate) async fn eval_stmt(&mut self, stmt: &SStmt) -> Result<LxVal, LxError> {
     match &stmt.node {
       Stmt::Binding(b) => {
         let val = self.eval(&b.value).await?;
@@ -64,7 +64,7 @@ impl Interpreter {
         self.eval_use(use_stmt, stmt.span).await?;
         Ok(LxVal::Unit)
       },
-      Stmt::TypeDef { variants, .. } => {
+      Stmt::TypeDef(StmtTypeDef { variants, .. }) => {
         let env = self.env.child();
         for (ctor_name, arity) in variants {
           if *arity == 0 {
@@ -133,7 +133,7 @@ impl Interpreter {
         self.env = Arc::new(env);
         Ok(LxVal::Unit)
       },
-      Stmt::FieldUpdate { name, fields, value } => {
+      Stmt::FieldUpdate(StmtFieldUpdate { name, fields, value }) => {
         let new_val = self.eval(value).await?;
         let current = self.env.get(*name).ok_or_else(|| LxError::runtime(format!("undefined variable '{name}'"), stmt.span))?;
         if let LxVal::Object(o) = &current {

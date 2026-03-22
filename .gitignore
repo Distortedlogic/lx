@@ -3,8 +3,9 @@
 *.swp
 *.swo
 .DS_Store
-node_modules/
-*.vsix
-editors/vscode/dist/
-
 .env
+
+# typescript
+node_modules/
+**/dist/
+*.vsix

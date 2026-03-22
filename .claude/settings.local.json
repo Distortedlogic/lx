@@ -34,7 +34,12 @@
       "mcp__workflow__create_task",
       "mcp__workflow__update_task",
       "mcp__workflow__list_tasks",
-      "mcp__workflow__get_task"
+      "mcp__workflow__get_task",
+      "Bash(mkdir -p /home/entropybender/repos/lx/crates/pane-tree/src)",
+      "Bash(mkdir -p /home/entropybender/repos/lx/crates/pty-mux/src)",
+      "Bash(mkdir -p /home/entropybender/repos/lx/crates/widget-bridge/src)",
+      "Bash(mkdir -p /home/entropybender/repos/lx/crates/widget-bridge/ts/src)",
+      "Bash(mkdir -p /home/entropybender/repos/lx/crates/widget-bridge/ts/widgets)"
     ],
     "deny": [
       "Bash(git stash:*)",
@@ -48,5 +53,7 @@
     ]
   },
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": ["workflow"]
+  "enabledMcpjsonServers": [
+    "workflow"
+  ]
 }

@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use num_traits::ToPrimitive;
 
-use crate::ast::{Expr, FieldKind, SExpr, Section, Spanned};
+use crate::ast::{Expr, ExprBinary, ExprFieldAccess, FieldKind, SExpr, Section, Spanned};
 use crate::error::LxError;
 use crate::value::{LxFunc, LxVal};
 use miette::SourceSpan;
@@ -30,27 +30,27 @@ impl Interpreter {
   pub(super) fn eval_section(&mut self, sec: &Section, span: SourceSpan) -> Result<LxVal, LxError> {
     match sec {
       Section::Right { op, operand } => {
-        let body = Expr::Binary { op: *op, left: Box::new(Spanned::new(Expr::Ident(intern("_x")), span)), right: Box::new((**operand).clone()) };
+        let body = Expr::Binary(ExprBinary { op: *op, left: Box::new(Spanned::new(Expr::Ident(intern("_x")), span)), right: Box::new((**operand).clone()) });
         Ok(self.make_section_func(&["_x"], body, span))
       },
       Section::Left { operand, op } => {
-        let body = Expr::Binary { op: *op, left: Box::new((**operand).clone()), right: Box::new(Spanned::new(Expr::Ident(intern("_x")), span)) };
+        let body = Expr::Binary(ExprBinary { op: *op, left: Box::new((**operand).clone()), right: Box::new(Spanned::new(Expr::Ident(intern("_x")), span)) });
         Ok(self.make_section_func(&["_x"], body, span))
       },
       Section::Field(name) => {
-        let body = Expr::FieldAccess { expr: Box::new(Spanned::new(Expr::Ident(intern("_x")), span)), field: FieldKind::Named(*name) };
+        let body = Expr::FieldAccess(ExprFieldAccess { expr: Box::new(Spanned::new(Expr::Ident(intern("_x")), span)), field: FieldKind::Named(*name) });
         Ok(self.make_section_func(&["_x"], body, span))
       },
       Section::Index(idx) => {
-        let body = Expr::FieldAccess { expr: Box::new(Spanned::new(Expr::Ident(intern("_x")), span)), field: FieldKind::Index(*idx) };
+        let body = Expr::FieldAccess(ExprFieldAccess { expr: Box::new(Spanned::new(Expr::Ident(intern("_x")), span)), field: FieldKind::Index(*idx) });
         Ok(self.make_section_func(&["_x"], body, span))
       },
       Section::BinOp(op) => {
-        let body = Expr::Binary {
+        let body = Expr::Binary(ExprBinary {
           op: *op,
           left: Box::new(Spanned::new(Expr::Ident(intern("_a")), span)),
           right: Box::new(Spanned::new(Expr::Ident(intern("_b")), span)),
-        };
+        });
         Ok(self.make_section_func(&["_a", "_b"], body, span))
       },
     }

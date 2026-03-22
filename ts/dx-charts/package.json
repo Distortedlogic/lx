@@ -1,0 +1,14 @@
+{
+  "name": "@lx/dx-charts",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/dx-charts.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "vite build",
+    "check": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  }
+}

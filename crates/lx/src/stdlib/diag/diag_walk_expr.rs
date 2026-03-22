@@ -1,17 +1,18 @@
-use crate::ast::{Expr, SExpr};
+use std::ops::ControlFlow;
+
+use crate::ast::{Expr, ExprApply, SExpr};
 use crate::visitor::{AstVisitor, walk_expr};
 use miette::SourceSpan;
 
 use super::diag_helpers::{extract_field_call_parts, is_resource_action, is_resource_create, is_resource_module};
 use super::{EdgeStyle, NodeKind, Walker};
 
-pub(super) fn visit_expr_diag(w: &mut Walker, expr: &Expr, span: SourceSpan) {
+pub(super) fn visit_expr_diag(w: &mut Walker, expr: &Expr, span: SourceSpan) -> ControlFlow<()> {
   match expr {
-    Expr::Apply { func, arg } => {
+    Expr::Apply(ExprApply { func, arg }) => {
       if let Some((module, method, args)) = uncurry_call(expr) {
         if let Some(kind) = classify_call(module, method) {
-          handle_call(w, module, method, kind, &args, span);
-          return;
+          return handle_call(w, module, method, kind, &args, span);
         }
         if w.imported_modules.contains(&crate::sym::intern(module)) {
           let label = format!("{module}.{method}");
@@ -19,9 +20,9 @@ pub(super) fn visit_expr_diag(w: &mut Walker, expr: &Expr, span: SourceSpan) {
           let ctx = w.context.clone();
           w.add_edge(&ctx, &id, String::new(), EdgeStyle::Solid);
           for a in &args {
-            w.visit_expr(&a.node, a.span);
+            w.visit_expr(&a.node, a.span)?;
           }
-          return;
+          return ControlFlow::Continue(());
         }
       }
       if let Some((name, fn_args)) = uncurry_fn_call(expr)
@@ -30,12 +31,12 @@ pub(super) fn visit_expr_diag(w: &mut Walker, expr: &Expr, span: SourceSpan) {
         let ctx = w.context.clone();
         w.add_edge(&ctx, &node_id, String::new(), EdgeStyle::Solid);
         for a in &fn_args {
-          w.visit_expr(&a.node, a.span);
+          w.visit_expr(&a.node, a.span)?;
         }
-        return;
+        return ControlFlow::Continue(());
       }
-      w.visit_expr(&func.node, func.span);
-      w.visit_expr(&arg.node, arg.span);
+      w.visit_expr(&func.node, func.span)?;
+      w.visit_expr(&arg.node, arg.span)
     },
     _ => walk_expr(w, expr, span),
   }
@@ -44,7 +45,7 @@ pub(super) fn visit_expr_diag(w: &mut Walker, expr: &Expr, span: SourceSpan) {
 fn uncurry_call(expr: &Expr) -> Option<(&str, &str, Vec<&SExpr>)> {
   let mut args = Vec::new();
   let mut current = expr;
-  while let Expr::Apply { func, arg } = current {
+  while let Expr::Apply(ExprApply { func, arg }) = current {
     args.push(arg.as_ref());
     current = &func.node;
   }
@@ -56,7 +57,7 @@ fn uncurry_call(expr: &Expr) -> Option<(&str, &str, Vec<&SExpr>)> {
 fn uncurry_fn_call(expr: &Expr) -> Option<(&str, Vec<&SExpr>)> {
   let mut args = Vec::new();
   let mut current = expr;
-  while let Expr::Apply { func, arg } = current {
+  while let Expr::Apply(ExprApply { func, arg }) = current {
     args.push(arg.as_ref());
     current = &func.node;
   }
@@ -91,7 +92,7 @@ fn classify_call(module: &str, method: &str) -> Option<NodeKind> {
   }
 }
 
-fn handle_call(w: &mut Walker, module: &str, method: &str, kind: NodeKind, args: &[&SExpr], span: SourceSpan) {
+fn handle_call(w: &mut Walker, module: &str, method: &str, kind: NodeKind, args: &[&SExpr], span: SourceSpan) -> ControlFlow<()> {
   if let ("cron", "every") = (module, method) {
     let id = w.add_node_at("loop", "cron".into(), NodeKind::Loop, Some(span));
     let ctx = w.context.clone();
@@ -99,10 +100,10 @@ fn handle_call(w: &mut Walker, module: &str, method: &str, kind: NodeKind, args:
     if let Some(last) = args.last() {
       w.context_stack.push(w.context.clone());
       w.context = id;
-      w.visit_expr(&last.node, last.span);
+      w.visit_expr(&last.node, last.span)?;
       w.context = w.context_stack.pop().expect("diag: context_stack underflow");
     }
-    return;
+    return ControlFlow::Continue(());
   }
   if is_resource_module(module) && is_resource_action(method) {
     for arg in args {
@@ -111,7 +112,7 @@ fn handle_call(w: &mut Walker, module: &str, method: &str, kind: NodeKind, args:
       {
         let ctx = w.context.clone();
         w.add_edge(&ctx, &node_id, method.to_string(), EdgeStyle::Dashed);
-        return;
+        return ControlFlow::Continue(());
       }
     }
   }
@@ -121,6 +122,7 @@ fn handle_call(w: &mut Walker, module: &str, method: &str, kind: NodeKind, args:
   let ctx = w.context.clone();
   w.add_edge(&ctx, &id, String::new(), EdgeStyle::Solid);
   for arg in args {
-    w.visit_expr(&arg.node, arg.span);
+    w.visit_expr(&arg.node, arg.span)?;
   }
+  ControlFlow::Continue(())
 }

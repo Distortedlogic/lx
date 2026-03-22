@@ -5,8 +5,8 @@ use chumsky::prelude::*;
 use super::expr::{ident, semi_sep, skip_semis, type_name};
 use super::{Span, ss};
 use crate::ast::{
-  BinOp, Expr, ExprApply, ExprBinary, ExprCoalesce, ExprFieldAccess, ExprFunc, ExprMatch, ExprPipe, ExprTernary, ExprUnary, ExprWith, FieldKind, MatchArm,
-  SExpr, Section, StrPart, UnaryOp, WithKind,
+  BinOp, Expr, ExprApply, ExprBinary, ExprCoalesce, ExprFieldAccess, ExprFunc, ExprMatch, ExprPipe, ExprTernary, ExprUnary, ExprWith, FieldKind, Literal,
+  MatchArm, SExpr, Section, StrPart, UnaryOp, WithKind,
 };
 use crate::lexer::token::TokenKind;
 use crate::sym::intern;
@@ -29,7 +29,7 @@ where
   just(TokenKind::StrStart)
     .ignore_then(part.repeated().collect::<Vec<_>>())
     .then_ignore(just(TokenKind::StrEnd))
-    .map_with(|parts, e| SExpr::new(Expr::Literal(crate::ast::Literal::Str(parts)), ss(e.span())))
+    .map_with(|parts, e| SExpr::new(Expr::Literal(Literal::Str(parts)), ss(e.span())))
 }
 
 fn section_op<'a, I>() -> impl Parser<'a, I, TokenKind, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
@@ -202,7 +202,7 @@ pub(super) fn paren_parser<'a, I>(
 where
   I: ValueInput<'a, Token = TokenKind, Span = Span>,
 {
-  let unit = just(TokenKind::LParen).then(just(TokenKind::RParen)).map_with(|_, e| SExpr::new(Expr::Literal(crate::ast::Literal::Unit), ss(e.span())));
+  let unit = just(TokenKind::LParen).then(just(TokenKind::RParen)).map_with(|_, e| SExpr::new(Expr::Literal(Literal::Unit), ss(e.span())));
 
   let field_section = just(TokenKind::LParen)
     .ignore_then(just(TokenKind::Dot))

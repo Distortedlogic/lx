@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/lx", "crates/lx-cli"]
+members = ["crates/lx", "crates/lx-cli", "crates/pane-tree", "crates/pty-mux", "crates/widget-bridge", "crates/dx-charts"]
 exclude = ["reference/chumsky"]
 resolver = "2"
 

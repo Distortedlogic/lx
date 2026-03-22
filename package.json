@@ -1,0 +1,14 @@
+{
+  "name": "@lx/root",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm -r build",
+    "check": "pnpm -r check",
+    "clean": "pnpm -r clean"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "vite": "^8.0.0"
+  }
+}

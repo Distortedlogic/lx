@@ -55,13 +55,13 @@ fn bi_to_graph_chart(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -
 
 pub fn extract_mermaid(program: &Program) -> String {
   let mut walker = Walker::new();
-  walker.visit_program(program);
+  drop(walker.visit_program(program));
   to_mermaid(&walker.into_graph())
 }
 
 pub fn extract_echart_json(program: &Program) -> String {
   let mut walker = Walker::new();
-  walker.visit_program(program);
+  drop(walker.visit_program(program));
   let graph = walker.into_graph();
   graph_to_echart_json(&graph)
 }
@@ -70,7 +70,7 @@ fn extract_graph(src: &str, span: SourceSpan) -> Result<Graph, LxError> {
   let tokens = crate::lexer::lex(src).map_err(|e| LxError::runtime(format!("diag: lex error: {e}"), span))?;
   let program = crate::parser::parse(tokens).map_err(|e| LxError::runtime(format!("diag: parse error: {e}"), span))?;
   let mut walker = Walker::new();
-  walker.visit_program(&program);
+  drop(walker.visit_program(&program));
   Ok(walker.into_graph())
 }
 

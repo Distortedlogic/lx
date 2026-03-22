@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
-use crate::ast::{BindTarget, Program, Stmt, UseKind, UseStmt};
+use crate::ast::{BindTarget, Program, Stmt, StmtTypeDef, UseKind, UseStmt};
 use crate::error::LxError;
 use crate::value::LxVal;
 use miette::SourceSpan;
@@ -154,7 +154,7 @@ fn collect_exports(program: &Program, interp: &Interpreter) -> ModuleExports {
           bindings.insert(*name, val);
         }
       },
-      Stmt::TypeDef { exported: true, variants, .. } => {
+      Stmt::TypeDef(StmtTypeDef { exported: true, variants, .. }) => {
         for (ctor_name, _) in variants {
           if let Some(val) = interp.env.get(*ctor_name) {
             variant_ctors.push(*ctor_name);

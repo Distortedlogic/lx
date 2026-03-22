@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use crate::ast::{
-  Expr, ExprApply, ExprAssert, ExprBinary, ExprCoalesce, ExprEmit, ExprFieldAccess, ExprFunc, ExprMatch, ExprNamedArg, ExprPipe, ExprSlice, ExprTernary,
-  ExprTimeout, ExprUnary, ExprWith, ExprYield, ListElem, SExpr, SStmt, Section, Stmt, StmtFieldUpdate, WithKind,
+  BindTarget, Expr, ExprApply, ExprAssert, ExprBinary, ExprCoalesce, ExprEmit, ExprFieldAccess, ExprFunc, ExprMatch, ExprNamedArg, ExprPipe, ExprSlice,
+  ExprTernary, ExprTimeout, ExprUnary, ExprWith, ExprYield, ListElem, SExpr, SStmt, Section, Stmt, StmtFieldUpdate, WithKind,
 };
 use crate::sym::Sym;
 
@@ -19,15 +19,15 @@ fn free_vars_stmts(stmts: &[SStmt], vars: &mut HashSet<Sym>, bound: &mut HashSet
       Stmt::Binding(b) => {
         collect_free(&b.value.node, vars, bound);
         match &b.target {
-          crate::ast::BindTarget::Name(n) => {
+          BindTarget::Name(n) => {
             bound.insert(*n);
           },
-          crate::ast::BindTarget::Reassign(n) => {
+          BindTarget::Reassign(n) => {
             if !bound.contains(n) {
               vars.insert(*n);
             }
           },
-          crate::ast::BindTarget::Pattern(_) => {},
+          BindTarget::Pattern(_) => {},
         }
       },
       Stmt::Expr(e) => collect_free(&e.node, vars, bound),
@@ -131,7 +131,7 @@ fn collect_free(expr: &Expr, vars: &mut HashSet<Sym>, bound: &mut HashSet<Sym>) 
       },
     },
     Expr::Par(stmts) => free_vars_stmts(stmts, vars, bound),
-    Expr::Timeout { ms, body } => {
+    Expr::Timeout(ExprTimeout { ms, body }) => {
       collect_free(&ms.node, vars, bound);
       collect_free(&body.node, vars, bound);
     },
@@ -142,12 +142,12 @@ fn collect_free(expr: &Expr, vars: &mut HashSet<Sym>, bound: &mut HashSet<Sym>) 
       }
     },
     Expr::Propagate(inner) => collect_free(&inner.node, vars, bound),
-    Expr::Coalesce { expr, default } => {
+    Expr::Coalesce(ExprCoalesce { expr, default }) => {
       collect_free(&expr.node, vars, bound);
       collect_free(&default.node, vars, bound);
     },
-    Expr::FieldAccess { expr, .. } => collect_free(&expr.node, vars, bound),
-    Expr::Yield { value } | Expr::Emit { value } => {
+    Expr::FieldAccess(ExprFieldAccess { expr, .. }) => collect_free(&expr.node, vars, bound),
+    Expr::Yield(ExprYield { value }) | Expr::Emit(ExprEmit { value }) => {
       collect_free(&value.node, vars, bound);
     },
     Expr::Loop(stmts) => free_vars_stmts(stmts, vars, bound),
@@ -156,14 +156,14 @@ fn collect_free(expr: &Expr, vars: &mut HashSet<Sym>, bound: &mut HashSet<Sym>) 
         collect_free(&v.node, vars, bound);
       }
     },
-    Expr::Assert { expr, msg } => {
+    Expr::Assert(ExprAssert { expr, msg }) => {
       collect_free(&expr.node, vars, bound);
       if let Some(m) = msg {
         collect_free(&m.node, vars, bound);
       }
     },
-    Expr::NamedArg { value, .. } => collect_free(&value.node, vars, bound),
-    Expr::Slice { expr, start, end } => {
+    Expr::NamedArg(ExprNamedArg { value, .. }) => collect_free(&value.node, vars, bound),
+    Expr::Slice(ExprSlice { expr, start, end }) => {
       collect_free(&expr.node, vars, bound);
       if let Some(s) = start {
         collect_free(&s.node, vars, bound);

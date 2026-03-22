@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::ast::{Literal, MatchArm, Pattern, SExpr};
+use crate::ast::{Literal, MatchArm, Pattern, PatternConstructor, PatternList, PatternRecord, SExpr, StrPart};
 use crate::error::LxError;
 use crate::sym::Sym;
 use crate::value::LxVal;
@@ -54,8 +54,8 @@ impl super::Interpreter {
             let mut s = String::new();
             for part in parts {
               match part {
-                crate::ast::StrPart::Text(t) => s.push_str(t),
-                crate::ast::StrPart::Interp(_) => return None,
+                StrPart::Text(t) => s.push_str(t),
+                StrPart::Interp(_) => return None,
               }
             }
             s.as_str() == b.as_ref()
@@ -77,7 +77,7 @@ impl super::Interpreter {
         }
         Some(bindings)
       },
-      Pattern::List { elems, rest } => {
+      Pattern::List(PatternList { elems, rest }) => {
         let LxVal::List(items) = value else {
           return None;
         };
@@ -98,7 +98,7 @@ impl super::Interpreter {
         }
         Some(bindings)
       },
-      Pattern::Record { fields, rest } => {
+      Pattern::Record(PatternRecord { fields, rest }) => {
         let LxVal::Record(rec) = value else {
           return None;
         };
@@ -118,7 +118,7 @@ impl super::Interpreter {
         }
         Some(bindings)
       },
-      Pattern::Constructor { name, args } => match (name.as_str(), value) {
+      Pattern::Constructor(PatternConstructor { name, args }) => match (name.as_str(), value) {
         ("Ok", LxVal::Ok(v)) if args.len() == 1 => self.try_match_pattern(&args[0].node, v),
         ("Err", LxVal::Err(v)) if args.len() == 1 => self.try_match_pattern(&args[0].node, v),
         ("Some", LxVal::Some(v)) if args.len() == 1 => self.try_match_pattern(&args[0].node, v),
