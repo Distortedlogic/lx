@@ -1,0 +1,20 @@
+-- timeout expression tests
+-- verifies timeout wrapping returns Ok on completion and Err on expiry
+
+result1 = timeout 1000 (42)
+check1 = result1 == Ok 42
+assert check1
+
+result2 = timeout 1 (loop {})
+is_err = result2 ? { Err _ -> true; Ok _ -> false }
+assert is_err
+
+err_val = result2 ? { Err e -> e; Ok _ -> {kind: "none", ms: 0} }
+has_kind = err_val.kind == ":timeout"
+assert has_kind
+has_ms = err_val.ms == 1
+assert has_ms
+
+unwrapped = timeout 1000 (42)
+check_unwrap = unwrapped ^ == 42
+assert check_unwrap

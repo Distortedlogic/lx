@@ -29,7 +29,7 @@ pub fn build() -> IndexMap<crate::sym::Sym, LxVal> {
 pub(super) fn extract_record<'a>(v: &'a LxVal, name: &str, span: SourceSpan) -> Result<&'a IndexMap<crate::sym::Sym, LxVal>, LxError> {
   match v {
     LxVal::Record(r) => Ok(r.as_ref()),
-    _ => Err(LxError::type_err(format!("{name}: expected Record, got {}", v.type_name()), span)),
+    _ => Err(LxError::type_err(format!("{name}: expected Record, got {}", v.type_name()), span, None)),
   }
 }
 
@@ -46,12 +46,12 @@ fn bi_spec(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<L
   let name = args[0].require_str("test.spec", span)?;
   let opts = extract_record(&args[1], "test.spec", span)?;
 
-  let flow = opts.get(&crate::sym::intern("flow")).ok_or_else(|| LxError::type_err("test.spec: 'flow' is required", span))?.clone();
+  let flow = opts.get(&crate::sym::intern("flow")).ok_or_else(|| LxError::type_err("test.spec: 'flow' is required", span, None))?.clone();
   if flow.as_str().is_none() {
-    return Err(LxError::type_err("test.spec: 'flow' must be Str", span));
+    return Err(LxError::type_err("test.spec: 'flow' must be Str", span, None));
   }
 
-  let grader = opts.get(&crate::sym::intern("grader")).ok_or_else(|| LxError::type_err("test.spec: 'grader' is required", span))?.clone();
+  let grader = opts.get(&crate::sym::intern("grader")).ok_or_else(|| LxError::type_err("test.spec: 'grader' is required", span, None))?.clone();
 
   let threshold = opts.get(&crate::sym::intern("threshold")).and_then(|v| v.as_float()).unwrap_or(0.75);
 
@@ -80,7 +80,7 @@ fn bi_scenario(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resu
   let scenario_name = args[1].require_str("test.scenario", span)?;
   let opts = extract_record(&args[2], "test.scenario", span)?;
 
-  let input = opts.get(&crate::sym::intern("input")).ok_or_else(|| LxError::type_err("test.scenario: 'input' is required", span))?.clone();
+  let input = opts.get(&crate::sym::intern("input")).ok_or_else(|| LxError::type_err("test.scenario: 'input' is required", span, None))?.clone();
 
   let rubric = opts.get(&crate::sym::intern("rubric")).cloned().unwrap_or_else(|| LxVal::list(Vec::new()));
   let runs = opts.get(&crate::sym::intern("runs")).and_then(|v| v.as_int()).and_then(|n| i64::try_from(n).ok()).unwrap_or(3);

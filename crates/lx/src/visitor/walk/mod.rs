@@ -6,7 +6,10 @@ pub use walk_expr::*;
 pub use walk_pattern::*;
 pub use walk_type::*;
 
-use crate::ast::{BindTarget, Binding, ClassDeclData, Expr, Program, SExpr, Stmt, WithKind};
+use crate::ast::{
+  BindTarget, Binding, ClassDeclData, Expr, ExprApply, ExprAssert, ExprBinary, ExprCoalesce, ExprEmit, ExprFieldAccess, ExprFunc, ExprMatch, ExprNamedArg,
+  ExprPipe, ExprSlice, ExprTernary, ExprTimeout, ExprUnary, ExprWith, ExprYield, Program, SExpr, Stmt, StmtFieldUpdate, StmtTypeDef, WithKind,
+};
 use miette::SourceSpan;
 
 use super::AstVisitor;
@@ -20,13 +23,13 @@ pub fn walk_program<V: AstVisitor + ?Sized>(v: &mut V, program: &Program) {
 pub fn walk_stmt<V: AstVisitor + ?Sized>(v: &mut V, stmt: &Stmt, span: SourceSpan) {
   match stmt {
     Stmt::Binding(binding) => v.visit_binding(binding, span),
-    Stmt::TypeDef { name, variants, exported } => {
+    Stmt::TypeDef(StmtTypeDef { name, variants, exported }) => {
       v.visit_type_def(*name, variants, *exported, span);
     },
     Stmt::TraitUnion(def) => v.visit_trait_union(def, span),
     Stmt::TraitDecl(data) => v.visit_trait_decl(data, span),
     Stmt::ClassDecl(data) => v.visit_class_decl(data, span),
-    Stmt::FieldUpdate { name, fields, value } => {
+    Stmt::FieldUpdate(StmtFieldUpdate { name, fields, value }) => {
       v.visit_field_update(*name, fields, value, span);
     },
     Stmt::Use(use_stmt) => v.visit_use(use_stmt, span),
@@ -63,38 +66,39 @@ pub fn walk_expr<V: AstVisitor + ?Sized>(v: &mut V, expr: &Expr, span: SourceSpa
     Expr::Literal(lit) => v.visit_literal(lit, span),
     Expr::Ident(name) => v.visit_ident(*name, span),
     Expr::TypeConstructor(name) => v.visit_type_constructor(*name, span),
-    Expr::Binary { op, left, right } => v.visit_binary(*op, left, right, span),
-    Expr::Unary { op, operand } => v.visit_unary(*op, operand, span),
-    Expr::Pipe { left, right } => v.visit_pipe(left, right, span),
-    Expr::Apply { func, arg } => v.visit_apply(func, arg, span),
+    Expr::Binary(ExprBinary { op, left, right }) => v.visit_binary(*op, left, right, span),
+    Expr::Unary(ExprUnary { op, operand }) => v.visit_unary(*op, operand, span),
+    Expr::Pipe(ExprPipe { left, right }) => v.visit_pipe(left, right, span),
+    Expr::Apply(ExprApply { func, arg }) => v.visit_apply(func, arg, span),
     Expr::Section(section) => v.visit_section(section, span),
-    Expr::FieldAccess { expr: e, field } => v.visit_field_access(e, field, span),
+    Expr::FieldAccess(ExprFieldAccess { expr: e, field }) => v.visit_field_access(e, field, span),
     Expr::Block(stmts) => v.visit_block(stmts, span),
     Expr::Tuple(elems) => v.visit_tuple(elems, span),
     Expr::List(elems) => v.visit_list(elems, span),
     Expr::Record(fields) => v.visit_record(fields, span),
     Expr::Map(entries) => v.visit_map(entries, span),
-    Expr::Func { params, ret_type, body } => {
-      v.visit_func(params, ret_type.as_ref(), body, span);
+    Expr::Func(ExprFunc { params, ret_type, guard, body }) => {
+      v.visit_func(params, ret_type.as_ref(), guard.as_deref(), body, span);
     },
-    Expr::Match { scrutinee, arms } => v.visit_match(scrutinee, arms, span),
-    Expr::Ternary { cond, then_, else_ } => {
+    Expr::Match(ExprMatch { scrutinee, arms }) => v.visit_match(scrutinee, arms, span),
+    Expr::Ternary(ExprTernary { cond, then_, else_ }) => {
       v.visit_ternary(cond, then_, else_.as_deref(), span);
     },
     Expr::Propagate(inner) => v.visit_propagate(inner, span),
-    Expr::Coalesce { expr: e, default } => v.visit_coalesce(e, default, span),
-    Expr::Slice { expr: e, start, end } => {
+    Expr::Coalesce(ExprCoalesce { expr: e, default }) => v.visit_coalesce(e, default, span),
+    Expr::Slice(ExprSlice { expr: e, start, end }) => {
       v.visit_slice(e, start.as_deref(), end.as_deref(), span);
     },
-    Expr::NamedArg { name, value } => v.visit_named_arg(*name, value, span),
+    Expr::NamedArg(ExprNamedArg { name, value }) => v.visit_named_arg(*name, value, span),
     Expr::Loop(stmts) => v.visit_loop(stmts, span),
     Expr::Break(val) => v.visit_break(val.as_deref(), span),
-    Expr::Assert { expr: e, msg } => v.visit_assert(e, msg.as_deref(), span),
+    Expr::Assert(ExprAssert { expr: e, msg }) => v.visit_assert(e, msg.as_deref(), span),
     Expr::Par(stmts) => v.visit_par(stmts, span),
     Expr::Sel(arms) => v.visit_sel(arms, span),
-    Expr::Emit { value } => v.visit_emit(value, span),
-    Expr::Yield { value } => v.visit_yield(value, span),
-    Expr::With { kind, body } => match kind {
+    Expr::Timeout(ExprTimeout { ms, body }) => v.visit_timeout(ms, body, span),
+    Expr::Emit(ExprEmit { value }) => v.visit_emit(value, span),
+    Expr::Yield(ExprYield { value }) => v.visit_yield(value, span),
+    Expr::With(ExprWith { kind, body }) => match kind {
       WithKind::Binding { name, value, mutable } => {
         v.visit_with(*name, value, body, *mutable, span);
       },

@@ -33,11 +33,11 @@ pub struct Program {
 #[derive(Debug, Clone)]
 pub enum Stmt {
   Binding(Binding),
-  TypeDef { name: Sym, variants: Vec<(Sym, usize)>, exported: bool },
+  TypeDef(StmtTypeDef),
   TraitUnion(TraitUnionDef),
   TraitDecl(TraitDeclData),
   ClassDecl(ClassDeclData),
-  FieldUpdate { name: Sym, fields: Vec<Sym>, value: SExpr },
+  FieldUpdate(StmtFieldUpdate),
   Use(UseStmt),
   Expr(SExpr),
 }
@@ -64,14 +64,14 @@ pub enum Expr {
   Ident(Sym),
   TypeConstructor(Sym),
 
-  Binary { op: BinOp, left: Box<SExpr>, right: Box<SExpr> },
-  Unary { op: UnaryOp, operand: Box<SExpr> },
-  Pipe { left: Box<SExpr>, right: Box<SExpr> },
+  Binary(ExprBinary),
+  Unary(ExprUnary),
+  Pipe(ExprPipe),
 
-  Apply { func: Box<SExpr>, arg: Box<SExpr> },
+  Apply(ExprApply),
   Section(Section),
 
-  FieldAccess { expr: Box<SExpr>, field: FieldKind },
+  FieldAccess(ExprFieldAccess),
 
   Block(Vec<SStmt>),
   Tuple(Vec<SExpr>),
@@ -80,26 +80,27 @@ pub enum Expr {
   Record(Vec<RecordField>),
   Map(Vec<MapEntry>),
 
-  Func { params: Vec<Param>, ret_type: Option<SType>, body: Box<SExpr> },
-  Match { scrutinee: Box<SExpr>, arms: Vec<MatchArm> },
-  Ternary { cond: Box<SExpr>, then_: Box<SExpr>, else_: Option<Box<SExpr>> },
+  Func(ExprFunc),
+  Match(ExprMatch),
+  Ternary(ExprTernary),
 
   Propagate(Box<SExpr>),
-  Coalesce { expr: Box<SExpr>, default: Box<SExpr> },
+  Coalesce(ExprCoalesce),
 
-  Slice { expr: Box<SExpr>, start: Option<Box<SExpr>>, end: Option<Box<SExpr>> },
-  NamedArg { name: Sym, value: Box<SExpr> },
+  Slice(ExprSlice),
+  NamedArg(ExprNamedArg),
 
   Loop(Vec<SStmt>),
   Break(Option<Box<SExpr>>),
-  Assert { expr: Box<SExpr>, msg: Option<Box<SExpr>> },
+  Assert(ExprAssert),
 
   Par(Vec<SStmt>),
   Sel(Vec<SelArm>),
+  Timeout(ExprTimeout),
 
-  Emit { value: Box<SExpr> },
-  Yield { value: Box<SExpr> },
-  With { kind: WithKind, body: Vec<SStmt> },
+  Emit(ExprEmit),
+  Yield(ExprYield),
+  With(ExprWith),
 }
 
 #[derive(Debug, Clone)]

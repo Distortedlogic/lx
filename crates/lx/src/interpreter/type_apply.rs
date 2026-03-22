@@ -79,7 +79,7 @@ impl Interpreter {
         new_rec.insert(*field, updated);
         Ok(LxVal::record(new_rec))
       },
-      (other, _) => Err(LxError::type_err(format!("field update requires Record, got {}", other.type_name()), span)),
+      (other, _) => Err(LxError::type_err(format!("field update requires Record, got {}", other.type_name()), span, None)),
     }
   }
 }

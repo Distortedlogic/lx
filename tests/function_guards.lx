@@ -1,0 +1,48 @@
+-- function guard tests
+-- verifies multi-clause function dispatch with & (guard) syntax
+
+-- basic guard: absolute value via two guarded clauses
+abs = (x) & (x >= 0) { x }
+abs = (x) & (x < 0) { 0 - x }
+
+assert abs 5 == 5
+assert abs 0 == 0
+assert abs (0 - 3) == 3
+
+-- guard with multiple params: clamp
+clamp = (x min max) & (min <= max) {
+  x < min ? min : (x > max ? max : x)
+}
+clamp = (x min max) & (min > max) {
+  x > min ? min : (x < max ? max : x)
+}
+
+assert clamp 3 1 10 == 3
+assert clamp 0 1 10 == 1
+assert clamp 15 1 10 == 10
+assert clamp 5 10 1 == 5
+assert clamp 15 10 1 == 10
+
+-- fallback clause: guarded + one unguarded catch-all
+classify = (n) & (n > 0) { "positive" }
+classify = (n) & (n < 0) { "negative" }
+classify = (n) { "zero" }
+
+assert classify 42 == "positive"
+assert classify (0 - 7) == "negative"
+assert classify 0 == "zero"
+
+-- no match: all guarded, none match -> returns Err
+only_pos = (n) & (n > 100) { "big" }
+only_pos = (n) & (n > 50) { "medium" }
+
+no_match_result = only_pos 10
+is_err = no_match_result ? { Err _ -> true; _ -> false }
+assert is_err
+
+-- guard with builtin call
+is_short = (s) & (len s < 4) { true }
+is_short = (s) { false }
+
+assert is_short "hi" == true
+assert is_short "hello world" == false

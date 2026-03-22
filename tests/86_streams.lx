@@ -1,0 +1,52 @@
+-- lazy stream tests
+-- verifies stream.from, collect, map, filter, take, batch, fold, each, and generator functions
+
+use std/stream
+use std/store
+
+-- 1. from + collect roundtrip
+items1 = [1, 2, 3]
+r1 = stream.from items1 | stream.collect
+assert (r1 == [1, 2, 3])
+
+-- 2. Lazy map
+items2 = [1, 2, 3]
+r2 = stream.from items2 | stream.map ((x) x * 2) | stream.collect
+assert (r2 == [2, 4, 6])
+
+-- 3. Lazy filter (keep evens)
+items3 = [1, 2, 3, 4, 5]
+r3 = stream.from items3 | stream.filter ((x) x % 2 == 0) | stream.collect
+assert (r3 == [2, 4])
+
+-- 4. Lazy composition: map then filter
+items4 = [1, 2, 3, 4, 5]
+r4 = stream.from items4 | stream.map ((x) x * 10) | stream.filter ((x) x > 20) | stream.collect
+assert (r4 == [30, 40, 50])
+
+-- 5. take
+items5 = [1, 2, 3, 4, 5]
+r5 = stream.from items5 | stream.take 3 | stream.collect
+assert (r5 == [1, 2, 3])
+
+-- 6. batch
+items6 = [1, 2, 3, 4, 5]
+r6 = stream.from items6 | stream.batch 2 | stream.collect
+assert (r6 == [[1, 2], [3, 4], [5]])
+
+-- 7. fold (sum)
+items7 = [1, 2, 3, 4, 5]
+r7 = stream.from items7 | stream.fold 0 ((acc x) acc + x)
+assert (r7 == 15)
+
+-- 8. Generator function: stateful func that counts 1..5 then returns None
+counter = store.create ()
+store.set counter "n" 0
+gen = () {
+  n = store.get counter "n"
+  n2 = n + 1
+  store.set counter "n" n2
+  if n2 <= 5 then Some n2 else None
+}
+r8 = stream.from gen | stream.collect
+assert (r8 == [1, 2, 3, 4, 5])

@@ -12,7 +12,7 @@ mod str_extra;
 fn str_transform(args: &[LxVal], span: SourceSpan, name: &str, f: fn(&str) -> String) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Str(s) => Ok(LxVal::str(f(s))),
-    other => Err(LxError::type_err(format!("{name} expects Str, got {}", other.type_name()), span)),
+    other => Err(LxError::type_err(format!("{name} expects Str, got {}", other.type_name()), span, None)),
   }
 }
 
@@ -42,7 +42,7 @@ fn bi_lines(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<
       let items: Vec<LxVal> = s.lines().map(LxVal::str).collect();
       Ok(LxVal::list(items))
     },
-    other => Err(LxError::type_err(format!("lines expects Str, got {}", other.type_name()), span)),
+    other => Err(LxError::type_err(format!("lines expects Str, got {}", other.type_name()), span, None)),
   }
 }
 
@@ -52,14 +52,14 @@ fn bi_chars(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<
       let items: Vec<LxVal> = s.chars().map(|c| LxVal::str(c.to_string())).collect();
       Ok(LxVal::list(items))
     },
-    other => Err(LxError::type_err(format!("chars expects Str, got {}", other.type_name()), span)),
+    other => Err(LxError::type_err(format!("chars expects Str, got {}", other.type_name()), span, None)),
   }
 }
 
 fn bi_byte_len(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Str(s) => Ok(LxVal::int(s.len())),
-    other => Err(LxError::type_err(format!("byte_len expects Str, got {}", other.type_name()), span)),
+    other => Err(LxError::type_err(format!("byte_len expects Str, got {}", other.type_name()), span, None)),
   }
 }
 

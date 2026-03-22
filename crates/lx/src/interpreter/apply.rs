@@ -49,8 +49,15 @@ impl Interpreter {
         }
         let call_env = lf.closure.child();
         call_env.bind_params(&lf.params, &lf.applied, &lf.defaults);
-        self.call_in_closure(&lf, Arc::new(call_env), true).await
+        let call_env = Arc::new(call_env);
+        if let Some(ref guard) = lf.guard
+          && !self.eval_guard(guard, &call_env).await?
+        {
+          return Ok(LxVal::err_str("guard condition failed"));
+        }
+        self.call_in_closure(&lf, call_env, true).await
       },
+      LxVal::MultiFunc(clauses) => self.apply_multi_func(clauses, arg, span).await,
       LxVal::BuiltinFunc(mut bf) => {
         bf.applied.push(arg);
         if bf.applied.len() < bf.arity {
@@ -72,7 +79,7 @@ impl Interpreter {
           LxVal::Record(r) => r.as_ref().clone(),
           LxVal::Unit => indexmap::IndexMap::new(),
           _ => {
-            return Err(LxError::type_err(format!("Class {} constructor expects Record or (), got {}", c.name, arg.type_name()), span));
+            return Err(LxError::type_err(format!("Class {} constructor expects Record or (), got {}", c.name, arg.type_name()), span, None));
           },
         };
         let mut fields = c.defaults.as_ref().clone();
@@ -87,7 +94,7 @@ impl Interpreter {
         let id = crate::stdlib::object_insert(fields);
         Ok(LxVal::Object(Box::new(crate::value::LxObject { class_name: c.name, id, traits: c.traits, methods: c.methods })))
       },
-      other => Err(LxError::type_err(format!("cannot call {}, not a function", other.type_name()), span)),
+      other => Err(LxError::type_err(format!("cannot call {}, not a function", other.type_name()), span, None)),
     }
   }
 
@@ -133,7 +140,50 @@ impl Interpreter {
     }
   }
 
-  pub(super) async fn eval_func(&mut self, params: &[Param], body: &SExpr) -> Result<LxVal, LxError> {
+  async fn eval_guard(&mut self, guard: &SExpr, guard_env: &Arc<Env>) -> Result<bool, LxError> {
+    let saved = Arc::clone(&self.env);
+    self.env = Arc::clone(guard_env);
+    let result = self.eval(guard).await;
+    self.env = saved;
+    match result {
+      Ok(LxVal::Bool(b)) => Ok(b),
+      Ok(other) => Err(LxError::type_err(format!("guard must return Bool, got {}", other.type_name()), guard.span, None)),
+      Err(e) => Err(e),
+    }
+  }
+
+  async fn apply_multi_func(&mut self, mut clauses: Vec<LxFunc>, arg: LxVal, _span: SourceSpan) -> Result<LxVal, LxError> {
+    for clause in &mut clauses {
+      clause.applied.push(arg.clone());
+      if clause.applied.len() == 1
+        && clause.arity > 1
+        && let LxVal::Tuple(ref elems) = clause.applied[0]
+        && elems.len() == clause.arity
+      {
+        let elems = elems.as_ref().clone();
+        clause.applied = elems;
+      }
+    }
+    if clauses.iter().any(|c| c.applied.len() < c.arity) {
+      return Ok(LxVal::MultiFunc(clauses));
+    }
+    for clause in &clauses {
+      let call_env = clause.closure.child();
+      call_env.bind_params(&clause.params, &clause.applied, &clause.defaults);
+      let call_env = Arc::new(call_env);
+      match &clause.guard {
+        Some(guard) => {
+          if self.eval_guard(guard, &call_env).await? {
+            return self.call_in_closure(clause, call_env, true).await;
+          }
+        },
+        None => return self.call_in_closure(clause, call_env, true).await,
+      }
+    }
+    Ok(LxVal::err_str("no matching clause for function"))
+  }
+
+  pub(super) async fn eval_func(&mut self, params: &[Param], guard: Option<&SExpr>, body: &SExpr) -> Result<LxVal, LxError> {
     let param_names: Vec<_> = params.iter().map(|p| p.name).collect();
     let mut defaults = Vec::new();
     for p in params {
@@ -158,6 +208,7 @@ impl Interpreter {
     Ok(LxVal::Func(Box::new(LxFunc {
       params: param_names,
       defaults,
+      guard: guard.map(|g| Arc::new(g.clone())),
       body: Arc::new(body.clone()),
       closure: Arc::clone(&self.env),
       arity,

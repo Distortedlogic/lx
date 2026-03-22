@@ -2,7 +2,7 @@ use std::fmt;
 
 use itertools::Itertools;
 
-use super::{Literal, Pattern};
+use super::{Literal, Pattern, PatternConstructor, PatternList, PatternRecord};
 
 impl fmt::Display for Pattern {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -18,7 +18,7 @@ impl fmt::Display for Pattern {
         Literal::Str(_) => write!(f, "\"...\""),
       },
       Pattern::Tuple(pats) => write!(f, "({})", pats.iter().map(|p| &p.node).format(", ")),
-      Pattern::List { elems, rest } => {
+      Pattern::List(PatternList { elems, rest }) => {
         write!(f, "[{}", elems.iter().map(|p| &p.node).format(" "))?;
         if let Some(r) = rest {
           if !elems.is_empty() {
@@ -28,7 +28,7 @@ impl fmt::Display for Pattern {
         }
         write!(f, "]")
       },
-      Pattern::Record { fields, rest } => {
+      Pattern::Record(PatternRecord { fields, rest }) => {
         write!(
           f,
           "{{{}",
@@ -44,8 +44,8 @@ impl fmt::Display for Pattern {
         }
         write!(f, "}}")
       },
-      Pattern::Constructor { name, args } if args.is_empty() => write!(f, "{name}"),
-      Pattern::Constructor { name, args } => write!(f, "{name} {}", args.iter().map(|a| &a.node).format(" ")),
+      Pattern::Constructor(PatternConstructor { name, args }) if args.is_empty() => write!(f, "{name}"),
+      Pattern::Constructor(PatternConstructor { name, args }) => write!(f, "{name} {}", args.iter().map(|a| &a.node).format(" ")),
     }
   }
 }

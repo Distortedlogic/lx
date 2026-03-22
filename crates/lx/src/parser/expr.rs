@@ -3,7 +3,7 @@ use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 
 use super::{Span, ss};
-use crate::ast::{Expr, ListElem, Literal, MapEntry, Param, RecordField, SExpr, SStmt, SelArm};
+use crate::ast::{Expr, ExprAssert, ExprEmit, ExprTimeout, ExprYield, ListElem, Literal, MapEntry, Param, RecordField, SExpr, SStmt, SelArm};
 use crate::lexer::token::TokenKind;
 use crate::sym::Sym;
 
@@ -92,11 +92,18 @@ where
     let assert_expr = just(TokenKind::Assert)
       .ignore_then(expr.clone())
       .then(expr.clone().or_not())
-      .map_with(|(ex, msg), e| SExpr::new(Expr::Assert { expr: Box::new(ex), msg: msg.map(Box::new) }, ss(e.span())));
+      .map_with(|(ex, msg), e| SExpr::new(Expr::Assert(ExprAssert { expr: Box::new(ex), msg: msg.map(Box::new) }), ss(e.span())));
 
-    let emit_expr = just(TokenKind::Emit).ignore_then(expr.clone()).map_with(|v, e| SExpr::new(Expr::Emit { value: Box::new(v) }, ss(e.span())));
+    let emit_expr = just(TokenKind::Emit).ignore_then(expr.clone()).map_with(|v, e| SExpr::new(Expr::Emit(ExprEmit { value: Box::new(v) }), ss(e.span())));
 
-    let yield_expr = just(TokenKind::Yield).ignore_then(expr.clone()).map_with(|v, e| SExpr::new(Expr::Yield { value: Box::new(v) }, ss(e.span())));
+    let yield_expr = just(TokenKind::Yield).ignore_then(expr.clone()).map_with(|v, e| SExpr::new(Expr::Yield(ExprYield { value: Box::new(v) }), ss(e.span())));
+
+    let timeout_ms = choice((literal, ident_expr.clone(), paren.clone()));
+
+    let timeout_expr = just(TokenKind::Timeout)
+      .ignore_then(timeout_ms)
+      .then(expr.clone())
+      .map_with(|(ms, body), e| SExpr::new(Expr::Timeout(ExprTimeout { ms: Box::new(ms), body: Box::new(body) }), ss(e.span())));
 
     let with_expr = super::expr_pratt::with_parser(expr.clone());
 
@@ -118,6 +125,7 @@ where
       type_ctor,
       ident_expr,
     ))
+    .or(timeout_expr)
     .boxed();
 
     super::expr_pratt::pratt_expr(atom, expr)

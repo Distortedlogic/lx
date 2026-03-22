@@ -11,7 +11,7 @@ pub fn bi_exec(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resu
   let _pid = policy_id(&args[0], span)?;
   let _cmd = match &args[1] {
     LxVal::Str(s) => s.to_string(),
-    _ => return Err(LxError::type_err("sandbox.exec expects Str command", span)),
+    _ => return Err(LxError::type_err("sandbox.exec expects Str command", span, None)),
   };
 
   Ok(LxVal::err_str("shell commands have been removed from lx"))

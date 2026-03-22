@@ -84,7 +84,7 @@ pub fn walk_map<V: AstVisitor + ?Sized>(v: &mut V, entries: &[MapEntry], _span: 
   }
 }
 
-pub fn walk_func<V: AstVisitor + ?Sized>(v: &mut V, params: &[Param], ret_type: Option<&SType>, body: &SExpr, span: SourceSpan) {
+pub fn walk_func<V: AstVisitor + ?Sized>(v: &mut V, params: &[Param], ret_type: Option<&SType>, guard: Option<&SExpr>, body: &SExpr, span: SourceSpan) {
   for p in params {
     if let Some(ref d) = p.default {
       v.visit_expr(&d.node, d.span);
@@ -95,6 +95,9 @@ pub fn walk_func<V: AstVisitor + ?Sized>(v: &mut V, params: &[Param], ret_type: 
   }
   if let Some(rt) = ret_type {
     v.visit_type_expr(&rt.node, rt.span);
+  }
+  if let Some(g) = guard {
+    v.visit_expr(&g.node, g.span);
   }
   v.visit_expr(&body.node, body.span);
   v.visit_func_post(params, ret_type, body, span);
@@ -169,6 +172,11 @@ pub fn walk_par<V: AstVisitor + ?Sized>(v: &mut V, stmts: &[SStmt], span: Source
     v.visit_stmt(&s.node, s.span);
   }
   v.visit_par_post(stmts, span);
+}
+
+pub fn walk_timeout<V: AstVisitor + ?Sized>(v: &mut V, ms: &SExpr, body: &SExpr, _span: SourceSpan) {
+  v.visit_expr(&ms.node, ms.span);
+  v.visit_expr(&body.node, body.span);
 }
 
 pub fn walk_sel<V: AstVisitor + ?Sized>(v: &mut V, arms: &[SelArm], span: SourceSpan) {

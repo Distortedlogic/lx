@@ -1,8 +1,8 @@
-use crate::ast::{BindTarget, Binding, SStmt, Stmt, UseKind, UseStmt};
+use crate::ast::{BindTarget, Binding, SStmt, Stmt, StmtFieldUpdate, StmtTypeDef, UseKind, UseStmt};
 use crate::sym::Sym;
 use miette::SourceSpan;
 
-use super::types::{self, Type};
+use super::types::{self, Type, TypeContext};
 use super::{Checker, DiagLevel};
 
 impl Checker {
@@ -20,7 +20,7 @@ impl Checker {
         self.check_binding(b);
         Type::Unit
       },
-      Stmt::TypeDef { name, variants, .. } => {
+      Stmt::TypeDef(StmtTypeDef { name, variants, .. }) => {
         let variant_names: Vec<Sym> = variants.iter().map(|(n, _)| *n).collect();
         let variant_types: Vec<types::Variant> = variants.iter().map(|(n, arity)| types::Variant { name: *n, fields: vec![Type::Unknown; *arity] }).collect();
         self.type_defs.insert(*name, variant_names);
@@ -52,7 +52,7 @@ impl Checker {
         }
         Type::Unit
       },
-      Stmt::FieldUpdate { value, .. } => {
+      Stmt::FieldUpdate(StmtFieldUpdate { value, .. }) => {
         self.synth(value);
         Type::Unit
       },
@@ -96,8 +96,13 @@ impl Checker {
     let val_type = self.synth(&b.value);
     if let Some(ann) = &b.type_ann {
       let expected = self.resolve_type_ann(ann);
-      if let Err(msg) = self.table.unify(&expected, &val_type) {
-        self.emit(DiagLevel::Error, format!("binding type mismatch: {msg}"), b.value.span);
+      let binding_name = match &b.target {
+        BindTarget::Name(n) | BindTarget::Reassign(n) => n.to_string(),
+        BindTarget::Pattern(_) => "<pattern>".into(),
+      };
+      let ctx = TypeContext::Binding { name: binding_name };
+      if let Err(te) = self.table.unify_with_context(&expected, &val_type, ctx) {
+        self.emit_type_error(&te, b.value.span);
       }
     }
     match &b.target {
@@ -110,8 +115,9 @@ impl Checker {
       BindTarget::Reassign(name) => {
         if let Some(existing) = self.lookup(*name) {
           let resolved = self.table.resolve(&existing);
-          if let Err(msg) = self.table.unify(&resolved, &val_type) {
-            self.emit(DiagLevel::Error, format!("reassignment type mismatch: {msg}"), b.value.span);
+          let ctx = TypeContext::Binding { name: name.to_string() };
+          if let Err(te) = self.table.unify_with_context(&resolved, &val_type, ctx) {
+            self.emit_type_error(&te, b.value.span);
           }
         }
       },

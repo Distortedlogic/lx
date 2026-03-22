@@ -1,3 +1,5 @@
+mod channel;
+mod checkpoint;
 mod cron;
 pub mod diag;
 mod env;
@@ -13,9 +15,11 @@ mod sandbox_exec;
 mod sandbox_policy;
 #[path = "sandbox/sandbox_scope.rs"]
 mod sandbox_scope;
+mod schema;
 mod store;
 #[path = "store/store_dispatch.rs"]
 mod store_dispatch;
+mod stream;
 
 pub(crate) use store_dispatch::{build_constructor, object_get_field, object_insert, object_update_nested, store_clone, store_len, store_method};
 #[path = "test_mod/mod.rs"]
@@ -30,6 +34,8 @@ pub(crate) fn get_std_module(path: &[&str]) -> Option<ModuleExports> {
     return None;
   }
   let bindings = match path[1] {
+    "channel" => channel::build(),
+    "checkpoint" => checkpoint::build(),
     "math" => math::build(),
     "fs" => fs::build(),
     "env" => env::build(),
@@ -40,8 +46,10 @@ pub(crate) fn get_std_module(path: &[&str]) -> Option<ModuleExports> {
     "diag" => diag::build(),
     "sandbox" => sandbox::build(),
     "store" => store::build(),
+    "stream" => stream::build(),
     "test" => test::build(),
     "trait" => trait_ops::build(),
+    "schema" => schema::build(),
     _ => return None,
   };
   Some(ModuleExports { bindings, variant_ctors: Vec::new() })
@@ -51,5 +59,23 @@ pub(crate) fn std_module_exists(path: &[&str]) -> bool {
   if path.len() < 2 || path[0] != "std" {
     return false;
   }
-  matches!(path[1], "math" | "fs" | "env" | "md" | "introspect" | "time" | "cron" | "diag" | "sandbox" | "store" | "test" | "trait")
+  matches!(
+    path[1],
+    "channel"
+      | "checkpoint"
+      | "math"
+      | "fs"
+      | "env"
+      | "md"
+      | "introspect"
+      | "time"
+      | "cron"
+      | "diag"
+      | "sandbox"
+      | "store"
+      | "stream"
+      | "test"
+      | "trait"
+      | "schema"
+  )
 }

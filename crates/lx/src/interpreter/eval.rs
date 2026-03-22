@@ -1,8 +1,12 @@
 use std::sync::Arc;
+use std::time::Duration;
+
+use indexmap::IndexMap;
+use num_traits::ToPrimitive;
 
 use crate::ast::{BinOp, SExpr, SStmt, SelArm};
 use crate::error::LxError;
-use crate::sym::Sym;
+use crate::sym::{Sym, intern};
 use crate::value::LxVal;
 use miette::SourceSpan;
 
@@ -36,6 +40,7 @@ impl Interpreter {
 
   pub(super) async fn eval_loop(&mut self, stmts: &[SStmt]) -> Result<LxVal, LxError> {
     loop {
+      tokio::task::yield_now().await;
       let saved = Arc::clone(&self.env);
       self.env = Arc::new(self.env.child());
       for stmt in stmts {
@@ -60,7 +65,7 @@ impl Interpreter {
     let items = match &val {
       LxVal::List(l) => l.as_ref(),
       other => {
-        return Err(LxError::type_err(format!("slice requires List, got {}", other.type_name()), span));
+        return Err(LxError::type_err(format!("slice requires List, got {}", other.type_name()), span, None));
       },
     };
     let len = items.len();
@@ -69,7 +74,7 @@ impl Interpreter {
         let v = self.eval(e).await?;
         v.as_int()
           .and_then(|n| n.try_into().ok())
-          .ok_or_else(|| LxError::type_err(format!("slice start index must be Int, got {} `{v}`", v.type_name()), span))?
+          .ok_or_else(|| LxError::type_err(format!("slice start index must be Int, got {} `{v}`", v.type_name()), span, None))?
       },
       None => 0usize,
     };
@@ -78,7 +83,7 @@ impl Interpreter {
         let v = self.eval(e).await?;
         v.as_int()
           .and_then(|n| n.try_into().ok())
-          .ok_or_else(|| LxError::type_err(format!("slice end index must be Int, got {} `{v}`", v.type_name()), span))?
+          .ok_or_else(|| LxError::type_err(format!("slice end index must be Int, got {} `{v}`", v.type_name()), span, None))?
       },
       None => len,
     };
@@ -178,6 +183,37 @@ impl Interpreter {
     }
   }
 
+  pub(super) async fn eval_timeout(&mut self, ms_expr: &SExpr, body: &SExpr, span: SourceSpan) -> Result<LxVal, LxError> {
+    let ms_val = self.eval(ms_expr).await?;
+    let ms_u64 = match &ms_val {
+      LxVal::Int(n) => n.to_u64().ok_or_else(|| LxError::runtime("timeout: ms must be non-negative integer", span))?,
+      LxVal::Float(f) => *f as u64,
+      other => return Err(LxError::type_err(format!("timeout expects Int or Float for ms, got {}", other.type_name()), span, None)),
+    };
+    let body_owned = body.clone();
+    let env = Arc::clone(&self.env);
+    let ctx = Arc::clone(&self.ctx);
+    let module_cache = Arc::clone(&self.module_cache);
+    let loading = Arc::clone(&self.loading);
+    let source = self.source.clone();
+    let source_dir = self.source_dir.clone();
+    let body_fut = async move {
+      let mut interp = Interpreter { env, source, source_dir, module_cache, loading, ctx };
+      interp.eval(&body_owned).await
+    };
+    tokio::select! {
+      result = body_fut => {
+        Ok(LxVal::ok(result?))
+      }
+      _ = tokio::time::sleep(Duration::from_millis(ms_u64)) => {
+        let mut fields = IndexMap::new();
+        fields.insert(intern("kind"), LxVal::str(":timeout"));
+        fields.insert(intern("ms"), LxVal::Int(ms_u64.into()));
+        Ok(LxVal::err(LxVal::record(fields)))
+      }
+    }
+  }
+
   pub(super) async fn eval_assert(&mut self, expr: &SExpr, msg: &Option<Box<SExpr>>, span: SourceSpan) -> Result<LxVal, LxError> {
     let val = self.eval(expr).await?;
     let val = self.force_defaults(val, span).await?;
@@ -193,7 +229,7 @@ impl Interpreter {
         };
         Err(LxError::assert_fail(format!("{:?}", expr.node), message, span))
       },
-      _ => Err(LxError::type_err(format!("assert requires Bool, got {} `{}`", val.type_name(), val.short_display()), span)),
+      _ => Err(LxError::type_err(format!("assert requires Bool, got {} `{}`", val.type_name(), val.short_display()), span, None)),
     }
   }
 }

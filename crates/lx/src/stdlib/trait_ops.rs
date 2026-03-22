@@ -33,7 +33,7 @@ fn method_to_record(m: &TraitMethodDef) -> LxVal {
 
 fn bi_methods(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let LxVal::Trait(t) = &args[0] else {
-    return Err(LxError::type_err(format!("trait.methods: expected Trait, got {} `{}`", args[0].type_name(), args[0].short_display()), span));
+    return Err(LxError::type_err(format!("trait.methods: expected Trait, got {} `{}`", args[0].type_name(), args[0].short_display()), span, None));
   };
   let records: Vec<LxVal> = t.methods.iter().map(method_to_record).collect();
   Ok(LxVal::list(records))
@@ -41,11 +41,11 @@ fn bi_methods(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resul
 
 fn bi_match(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let LxVal::Trait(t) = &args[0] else {
-    return Err(LxError::type_err(format!("trait.match: expected Trait, got {} `{}`", args[0].type_name(), args[0].short_display()), span));
+    return Err(LxError::type_err(format!("trait.match: expected Trait, got {} `{}`", args[0].type_name(), args[0].short_display()), span, None));
   };
   let query = args[1]
     .as_str()
-    .ok_or_else(|| LxError::type_err(format!("trait.match: expected Str query, got {} `{}`", args[1].type_name(), args[1].short_display()), span))?;
+    .ok_or_else(|| LxError::type_err(format!("trait.match: expected Str query, got {} `{}`", args[1].type_name(), args[1].short_display()), span, None))?;
   let query_lower = query.to_lowercase();
   let words: Vec<&str> = query_lower.split_whitespace().collect();
   let mut best_name = "";

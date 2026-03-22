@@ -80,6 +80,8 @@ pub enum TokenKind {
   Emit,
   Yield,
   With,
+  Timeout,
+  As,
 
   Export,
   Semi,

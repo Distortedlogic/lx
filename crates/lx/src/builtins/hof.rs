@@ -69,7 +69,7 @@ pub(super) fn get_list<'a>(v: &'a LxVal, name: &str, sp: SourceSpan) -> Result<L
   match v {
     LxVal::List(l) => Ok(ListRef::Borrowed(l.as_ref())),
     LxVal::Range { start, end, inclusive } => Ok(ListRef::Owned(range_to_list(*start, *end, *inclusive))),
-    other => Err(LxError::type_err(format!("{name} expects List or Range, got {}", other.type_name()), sp)),
+    other => Err(LxError::type_err(format!("{name} expects List or Range, got {}", other.type_name()), sp, None)),
   }
 }
 
@@ -94,7 +94,7 @@ fn bi_filter(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
         Some(true) => out.push(v.clone()),
         Some(false) => {},
         _ => {
-          return Err(LxError::type_err(format!("filter predicate must return Bool, got {}", result.type_name()), sp));
+          return Err(LxError::type_err(format!("filter predicate must return Bool, got {}", result.type_name()), sp, None));
         },
       }
     }

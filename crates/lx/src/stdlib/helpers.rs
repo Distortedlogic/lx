@@ -16,8 +16,8 @@ pub fn extract_handle_id(val: &LxVal, field: &str, fn_name: &str, span: SourceSp
       .get(&intern(field))
       .and_then(|v| v.as_int())
       .and_then(|n| n.try_into().ok())
-      .ok_or_else(|| LxError::type_err(format!("{fn_name}: expected handle with '{field}'"), span)),
-    _ => Err(LxError::type_err(format!("{fn_name}: expected Record handle"), span)),
+      .ok_or_else(|| LxError::type_err(format!("{fn_name}: expected handle with '{field}'"), span, None)),
+    _ => Err(LxError::type_err(format!("{fn_name}: expected Record handle"), span, None)),
   }
 }
 
@@ -39,7 +39,7 @@ pub fn datetime_to_record(dt: DateTime<Utc>) -> LxVal {
 }
 
 pub fn require_str_field(rec: &IndexMap<Sym, LxVal>, key: &str, fn_name: &str, span: SourceSpan) -> Result<Arc<str>, LxError> {
-  rec.get(&intern(key)).and_then(|v| v.as_str()).map(Arc::from).ok_or_else(|| LxError::type_err(format!("{fn_name}: '{key}' must be Str"), span))
+  rec.get(&intern(key)).and_then(|v| v.as_str()).map(Arc::from).ok_or_else(|| LxError::type_err(format!("{fn_name}: '{key}' must be Str"), span, None))
 }
 
 #[macro_export]

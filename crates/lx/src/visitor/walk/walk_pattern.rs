@@ -1,4 +1,4 @@
-use crate::ast::{FieldPattern, Pattern, SPattern};
+use crate::ast::{FieldPattern, Pattern, PatternConstructor, PatternList, PatternRecord, SPattern};
 use miette::SourceSpan;
 
 use crate::visitor::AstVisitor;
@@ -9,13 +9,13 @@ pub fn walk_pattern<V: AstVisitor + ?Sized>(v: &mut V, pattern: &Pattern, span: 
     Pattern::Bind(name) => v.visit_pattern_bind(*name, span),
     Pattern::Wildcard => v.visit_pattern_wildcard(span),
     Pattern::Tuple(elems) => v.visit_pattern_tuple(elems, span),
-    Pattern::List { elems, rest } => {
+    Pattern::List(PatternList { elems, rest }) => {
       v.visit_pattern_list(elems, *rest, span);
     },
-    Pattern::Record { fields, rest } => {
+    Pattern::Record(PatternRecord { fields, rest }) => {
       v.visit_pattern_record(fields, *rest, span);
     },
-    Pattern::Constructor { name, args } => {
+    Pattern::Constructor(PatternConstructor { name, args }) => {
       v.visit_pattern_constructor(*name, args, span);
     },
   }

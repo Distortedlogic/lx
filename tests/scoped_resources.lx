@@ -1,0 +1,44 @@
+-- scoped resource cleanup tests
+-- verifies with/close resource protocol using mock resources and Store
+
+-- 1. Normal exit cleanup
+tracker1 = Store ()
+resource1 = {value: 42, close: () { tracker1.set "closed" true }}
+with resource1 as r {
+  assert (r.value == 42)
+}
+assert (tracker1.get "closed" == true)
+
+-- 2. Error exit cleanup
+tracker2 = Store ()
+resource2 = {value: 99, close: () { tracker2.set "closed" true }}
+do_error = () {
+  with resource2 as r {
+    assert (r.value == 99)
+    (Err "intentional error") ^
+  }
+}
+result2 = try do_error ()
+is_err2 = result2 ? { Err _ -> true; _ -> false }
+assert is_err2
+assert (tracker2.get "closed" == true)
+
+-- 3. No close field — plain record used as scoped binding
+with {x: 10, y: 20} as r {
+  assert (r.x == 10)
+  assert (r.y == 20)
+}
+
+-- 4. Nested with — both resources cleaned up in reverse order
+tracker4 = Store ()
+tracker4.set "order" []
+outer = {name: "outer", close: () { tracker4.set "order" (tracker4.get "order" ++ ["outer"]) }}
+inner = {name: "inner", close: () { tracker4.set "order" (tracker4.get "order" ++ ["inner"]) }}
+with outer as o {
+  assert (o.name == "outer")
+  with inner as i {
+    assert (i.name == "inner")
+  }
+}
+order4 = tracker4.get "order"
+assert (order4 == ["inner", "outer"])

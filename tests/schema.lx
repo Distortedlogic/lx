@@ -1,0 +1,66 @@
+-- schema validation tests
+-- verifies schema.define, schema.validate, schema.validate_all, schema.check
+
+use std/schema
+
+-- 1. required field present
+s1 = schema.define "S1" {name: true}
+r1 = schema.validate s1 {name: "alice"}
+is_ok1 = r1 ? { Ok _ -> true; Err _ -> false }
+assert is_ok1
+
+-- 2. required field missing
+r2 = schema.validate s1 {:}
+is_err2 = r2 ? { Err _ -> true; Ok _ -> false }
+assert is_err2
+err2 = r2 ? { Err e -> e; Ok _ -> {} }
+assert err2.field == "name"
+
+-- 3. default filling
+s3 = schema.define "S3" {role: {default: "guest"}}
+r3 = schema.validate s3 {:}
+val3 = r3 ? { Ok v -> v; Err _ -> {} }
+assert val3.role == "guest"
+
+-- 4. one_of constraint — valid
+s4 = schema.define "S4" {level: {one_of: ["a", "b"]}}
+r4a = schema.validate s4 {level: "a"}
+is_ok4a = r4a ? { Ok _ -> true; Err _ -> false }
+assert is_ok4a
+
+-- 4b. one_of constraint — invalid
+r4b = schema.validate s4 {level: "c"}
+is_err4b = r4b ? { Err _ -> true; Ok _ -> false }
+assert is_err4b
+
+-- 5. custom check — pass
+pos_check = (v) v > 0
+check_spec = {required: true, check: pos_check}
+s5 = schema.define "S5" {count: check_spec}
+r5a = schema.validate s5 {count: 5}
+is_ok5a = r5a ? { Ok _ -> true; Err _ -> false }
+assert is_ok5a
+
+-- 5b. custom check — fail
+r5b = schema.validate s5 {count: 0 - 1}
+is_err5b = r5b ? { Err _ -> true; Ok _ -> false }
+assert is_err5b
+
+-- 6. validate_all collects multiple failures
+s6 = schema.define "S6" {a: true, b: true}
+r6 = schema.validate_all s6 {:}
+errs6 = r6 ? { Err e -> e; Ok _ -> [] }
+assert (len errs6) == 2
+
+-- 7. schema.check returns Bool
+s7 = schema.define "S7" {x: true}
+assert (schema.check s7 {x: 1}) == true
+assert (schema.check s7 {:}) == false
+
+-- 8. extra fields preserved
+s8 = schema.define "S8" {a: true}
+r8 = schema.validate s8 {a: 1, b: 2, c: 3}
+val8 = r8 ? { Ok v -> v; Err _ -> {} }
+assert val8.a == 1
+assert val8.b == 2
+assert val8.c == 3

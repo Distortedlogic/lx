@@ -37,26 +37,26 @@ pub(super) fn parse_schedule(expr: &str, span: SourceSpan) -> Result<Schedule, L
 pub(super) fn positive_ms(val: &LxVal, name: &str, span: SourceSpan) -> Result<u64, LxError> {
   match val {
     LxVal::Int(n) => {
-      let v: i64 = n.try_into().map_err(|_| LxError::type_err(format!("{name}: value too large"), span))?;
+      let v: i64 = n.try_into().map_err(|_| LxError::type_err(format!("{name}: value too large"), span, None))?;
       if v <= 0 {
-        return Err(LxError::type_err(format!("{name}: must be positive"), span));
+        return Err(LxError::type_err(format!("{name}: must be positive"), span, None));
       }
       Ok(v as u64)
     },
     LxVal::Float(f) => {
       if *f <= 0.0 {
-        return Err(LxError::type_err(format!("{name}: must be positive"), span));
+        return Err(LxError::type_err(format!("{name}: must be positive"), span, None));
       }
       Ok(*f as u64)
     },
-    _ => Err(LxError::type_err(format!("{name}: expected Int or Float ms"), span)),
+    _ => Err(LxError::type_err(format!("{name}: expected Int or Float ms"), span, None)),
   }
 }
 
 pub(super) fn require_fn(val: &LxVal, name: &str, span: SourceSpan) -> Result<(), LxError> {
   match val {
-    LxVal::Func(_) | LxVal::BuiltinFunc(_) => Ok(()),
-    _ => Err(LxError::type_err(format!("{name}: expected a function"), span)),
+    LxVal::Func(_) | LxVal::MultiFunc(_) | LxVal::BuiltinFunc(_) => Ok(()),
+    _ => Err(LxError::type_err(format!("{name}: expected a function"), span, None)),
   }
 }
 

@@ -1,0 +1,92 @@
+-- checkpoint durable execution tests
+-- verifies scope/step checkpoint, replay, clear, and func rejection
+
+use std/checkpoint
+use std/fs
+
+-- 1. Basic checkpoint: scope with 2 steps, both execute and return correct values
+checkpoint.clear "test_basic"
+r1 = checkpoint.scope "test_basic" {:} (step) {
+  a = step "add" { 10 + 20 }
+  b = step "mul" { a * 3 }
+  {a: a, b: b}
+}
+assert (r1.a == 30)
+assert (r1.b == 90)
+checkpoint.clear "test_basic"
+
+-- 2. Replay: step body is a thunk; run scope twice; second run replays from cache
+checkpoint.clear "test_replay"
+counter_path = ".lx-checkpoints/test_replay_counter.txt"
+fs.write counter_path "0"
+
+inc_counter = () {
+  prev = fs.read counter_path
+  old = prev ? { Ok v -> v; Err _ -> "0" }
+  n = to_int old
+  fs.write counter_path (to_str (n + 1))
+  n + 1
+}
+
+run_scope = () {
+  checkpoint.scope "test_replay" {:} (step) {
+    step "counted" inc_counter
+    step "static" { 42 }
+  }
+}
+
+run_scope ()
+c1 = fs.read counter_path
+c1v = c1 ? { Ok v -> v; Err _ -> "0" }
+assert (c1v == "1")
+
+run_scope ()
+c2 = fs.read counter_path
+c2v = c2 ? { Ok v -> v; Err _ -> "0" }
+assert (c2v == "1")
+
+checkpoint.clear "test_replay"
+fs.remove counter_path
+
+-- 3. Clear: run scope, clear, run again, all steps re-execute
+checkpoint.clear "test_clear"
+counter_path3 = ".lx-checkpoints/test_clear_counter.txt"
+fs.write counter_path3 "0"
+
+inc_counter3 = () {
+  prev = fs.read counter_path3
+  old = prev ? { Ok v -> v; Err _ -> "0" }
+  n = to_int old
+  fs.write counter_path3 (to_str (n + 1))
+  n + 1
+}
+
+run_scope3 = () {
+  checkpoint.scope "test_clear" {:} (step) {
+    step "inc" inc_counter3
+  }
+}
+
+run_scope3 ()
+v3a = fs.read counter_path3
+v3a_s = v3a ? { Ok v -> v; Err _ -> "0" }
+assert (v3a_s == "1")
+
+checkpoint.clear "test_clear"
+run_scope3 ()
+v3b = fs.read counter_path3
+v3b_s = v3b ? { Ok v -> v; Err _ -> "0" }
+assert (v3b_s == "2")
+
+checkpoint.clear "test_clear"
+fs.remove counter_path3
+
+-- 4. Non-serializable error: step returns a function
+checkpoint.clear "test_func_err"
+make_fn = () { (x) x + 1 }
+func_result = checkpoint.scope "test_func_err" {:} (step) {
+  step "bad" make_fn
+}
+is_err4 = func_result ? { Err _ -> true; _ -> false }
+assert is_err4
+checkpoint.clear "test_func_err"

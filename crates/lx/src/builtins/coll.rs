@@ -40,7 +40,7 @@ fn bi_contains(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resu
       Ok(LxVal::Bool(s.contains(needle)))
     },
     LxVal::List(l) => Ok(LxVal::Bool(l.iter().any(|v| v == &args[0]))),
-    other => Err(LxError::type_err(format!("contains? expects Str/List, got {}", other.type_name()), span)),
+    other => Err(LxError::type_err(format!("contains? expects Str/List, got {}", other.type_name()), span, None)),
   }
 }
 
@@ -60,7 +60,7 @@ fn bi_get(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<Lx
       Ok(maybe(r.get(&crate::sym::intern(key))))
     },
     LxVal::Map(m) => Ok(maybe(m.get(&ValueKey(args[0].clone())))),
-    other => Err(LxError::type_err(format!("get expects List/Record/Map, got {}", other.type_name()), span)),
+    other => Err(LxError::type_err(format!("get expects List/Record/Map, got {}", other.type_name()), span, None)),
   }
 }
 
@@ -71,7 +71,7 @@ fn kv_tuple(k: LxVal, v: LxVal) -> LxVal {
 fn bi_to_list(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Map(m) => Ok(LxVal::list(m.iter().map(|(k, v)| kv_tuple(k.0.clone(), v.clone())).collect())),
-    other => Err(LxError::type_err(format!("to_list expects Map, got {}", other.type_name()), span)),
+    other => Err(LxError::type_err(format!("to_list expects Map, got {}", other.type_name()), span, None)),
   }
 }
 
@@ -86,13 +86,13 @@ fn bi_to_map(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result
             m.insert(ValueKey(t[0].clone()), t[1].clone());
           },
           other => {
-            return Err(LxError::type_err(format!("to_map: element must be 2-tuple, got {}", other.type_name()), span));
+            return Err(LxError::type_err(format!("to_map: element must be 2-tuple, got {}", other.type_name()), span, None));
           },
         }
       }
       Ok(LxVal::Map(Arc::new(m)))
     },
-    other => Err(LxError::type_err(format!("to_map expects Record/List, got {}", other.type_name()), span)),
+    other => Err(LxError::type_err(format!("to_map expects Record/List, got {}", other.type_name()), span, None)),
   }
 }
 
@@ -100,7 +100,7 @@ fn bi_to_record(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Res
   let m = match &args[0] {
     LxVal::Map(m) => m,
     other => {
-      return Err(LxError::type_err(format!("to_record expects Map, got {}", other.type_name()), span));
+      return Err(LxError::type_err(format!("to_record expects Map, got {}", other.type_name()), span, None));
     },
   };
   let mut r = IndexMap::new();
@@ -115,7 +115,7 @@ fn bi_keys(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<L
   match &args[0] {
     LxVal::Map(m) => Ok(LxVal::list(m.keys().map(|k| k.0.clone()).collect())),
     LxVal::Record(r) => Ok(LxVal::list(r.keys().map(LxVal::str).collect())),
-    other => Err(LxError::type_err(format!("keys expects Map/Record, got {}", other.type_name()), span)),
+    other => Err(LxError::type_err(format!("keys expects Map/Record, got {}", other.type_name()), span, None)),
   }
 }
 
@@ -123,7 +123,7 @@ fn bi_values(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result
   match &args[0] {
     LxVal::Map(m) => Ok(LxVal::list(m.values().cloned().collect())),
     LxVal::Record(r) => Ok(LxVal::list(r.values().cloned().collect())),
-    other => Err(LxError::type_err(format!("values expects Map/Record, got {}", other.type_name()), span)),
+    other => Err(LxError::type_err(format!("values expects Map/Record, got {}", other.type_name()), span, None)),
   }
 }
 
@@ -131,7 +131,7 @@ fn bi_entries(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resul
   match &args[0] {
     LxVal::Map(m) => Ok(LxVal::list(m.iter().map(|(k, v)| kv_tuple(k.0.clone(), v.clone())).collect())),
     LxVal::Record(r) => Ok(LxVal::list(r.iter().map(|(k, v)| kv_tuple(LxVal::str(k), v.clone())).collect())),
-    other => Err(LxError::type_err(format!("entries expects Map/Record, got {}", other.type_name()), span)),
+    other => Err(LxError::type_err(format!("entries expects Map/Record, got {}", other.type_name()), span, None)),
   }
 }
 

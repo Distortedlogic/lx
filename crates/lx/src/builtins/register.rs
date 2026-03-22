@@ -28,7 +28,7 @@ fn make_log_builtin(name: &'static str, level: LogLevel) -> LxVal {
 fn bi_not(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Bool(b) => Ok(LxVal::Bool(!b)),
-    other => Err(LxError::type_err(format!("not expects Bool, got {}", other.type_name()), span)),
+    other => Err(LxError::type_err(format!("not expects Bool, got {}", other.type_name()), span, None)),
   }
 }
 
@@ -41,7 +41,7 @@ fn bi_len(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<Lx
     LxVal::Tuple(t) => t.len(),
     LxVal::Store { id } => crate::stdlib::store_len(*id),
     other => {
-      return Err(LxError::type_err(format!("len expects collection, got {}", other.type_name()), span));
+      return Err(LxError::type_err(format!("len expects collection, got {}", other.type_name()), span, None));
     },
   };
   Ok(LxVal::int(n))
@@ -56,7 +56,7 @@ fn bi_empty(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<
     LxVal::Tuple(t) => t.is_empty(),
     LxVal::Store { id } => crate::stdlib::store_len(*id) == 0,
     other => {
-      return Err(LxError::type_err(format!("empty? expects collection, got {}", other.type_name()), span));
+      return Err(LxError::type_err(format!("empty? expects collection, got {}", other.type_name()), span, None));
     },
   };
   Ok(LxVal::Bool(empty))
@@ -90,14 +90,14 @@ fn bi_some_q(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resul
 fn bi_even(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Int(n) => Ok(LxVal::Bool(n % BigInt::from(2) == BigInt::from(0))),
-    other => Err(LxError::type_err(format!("even? expects Int, got {}", other.type_name()), span)),
+    other => Err(LxError::type_err(format!("even? expects Int, got {}", other.type_name()), span, None)),
   }
 }
 
 fn bi_odd(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Int(n) => Ok(LxVal::Bool(n % BigInt::from(2) != BigInt::from(0))),
-    other => Err(LxError::type_err(format!("odd? expects Int, got {}", other.type_name()), span)),
+    other => Err(LxError::type_err(format!("odd? expects Int, got {}", other.type_name()), span, None)),
   }
 }
 

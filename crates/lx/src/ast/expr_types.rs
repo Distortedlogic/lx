@@ -1,6 +1,6 @@
 use num_bigint::BigInt;
 
-use super::{BinOp, SExpr, SPattern, SType};
+use super::{BinOp, SExpr, SPattern, SStmt, SType, UnaryOp, WithKind};
 use crate::sym::Sym;
 
 #[derive(Debug, Clone)]
@@ -73,4 +73,103 @@ pub struct MatchArm {
 pub struct SelArm {
   pub expr: SExpr,
   pub handler: SExpr,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprBinary {
+  pub op: BinOp,
+  pub left: Box<SExpr>,
+  pub right: Box<SExpr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprUnary {
+  pub op: UnaryOp,
+  pub operand: Box<SExpr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprPipe {
+  pub left: Box<SExpr>,
+  pub right: Box<SExpr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprApply {
+  pub func: Box<SExpr>,
+  pub arg: Box<SExpr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprFieldAccess {
+  pub expr: Box<SExpr>,
+  pub field: FieldKind,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprFunc {
+  pub params: Vec<Param>,
+  pub ret_type: Option<SType>,
+  pub guard: Option<Box<SExpr>>,
+  pub body: Box<SExpr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprMatch {
+  pub scrutinee: Box<SExpr>,
+  pub arms: Vec<MatchArm>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprTernary {
+  pub cond: Box<SExpr>,
+  pub then_: Box<SExpr>,
+  pub else_: Option<Box<SExpr>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprCoalesce {
+  pub expr: Box<SExpr>,
+  pub default: Box<SExpr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprSlice {
+  pub expr: Box<SExpr>,
+  pub start: Option<Box<SExpr>>,
+  pub end: Option<Box<SExpr>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprNamedArg {
+  pub name: Sym,
+  pub value: Box<SExpr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprAssert {
+  pub expr: Box<SExpr>,
+  pub msg: Option<Box<SExpr>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprTimeout {
+  pub ms: Box<SExpr>,
+  pub body: Box<SExpr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprEmit {
+  pub value: Box<SExpr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprYield {
+  pub value: Box<SExpr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprWith {
+  pub kind: WithKind,
+  pub body: Vec<SStmt>,
 }

@@ -107,7 +107,7 @@ fn bi_at(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVa
 
 fn bi_cancel(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = args[0].require_int("cron.cancel", span)?;
-  let id: u64 = id.try_into().map_err(|_| LxError::type_err("cron.cancel: invalid handle", span))?;
+  let id: u64 = id.try_into().map_err(|_| LxError::type_err("cron.cancel: invalid handle", span, None))?;
   match JOBS.remove(&id) {
     Some((_, job)) => {
       job.cancel.store(true, Ordering::Relaxed);
@@ -134,14 +134,14 @@ fn bi_next(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<L
 fn bi_next_n(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let n = match &args[0] {
     LxVal::Int(n) => {
-      let v: i64 = n.try_into().map_err(|_| LxError::type_err("cron.next_n: count too large", span))?;
+      let v: i64 = n.try_into().map_err(|_| LxError::type_err("cron.next_n: count too large", span, None))?;
       if v <= 0 {
-        return Err(LxError::type_err("cron.next_n: count must be positive", span));
+        return Err(LxError::type_err("cron.next_n: count must be positive", span, None));
       }
       v as usize
     },
     _ => {
-      return Err(LxError::type_err("cron.next_n: first arg must be Int", span));
+      return Err(LxError::type_err("cron.next_n: first arg must be Int", span, None));
     },
   };
   let expr = args[1].require_str("cron.next_n", span)?;

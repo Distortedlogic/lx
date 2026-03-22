@@ -99,8 +99,8 @@ pub(super) fn parse_policy(config: &IndexMap<crate::sym::Sym, LxVal>, span: Sour
 
   if let Some(v) = config.get(&crate::sym::intern("max_time_ms")) {
     match v {
-      LxVal::Int(n) => p.max_time_ms = n.try_into().map_err(|_| LxError::type_err("sandbox: max_time_ms must be positive", span))?,
-      _ => return Err(LxError::type_err("sandbox: max_time_ms must be Int", span)),
+      LxVal::Int(n) => p.max_time_ms = n.try_into().map_err(|_| LxError::type_err("sandbox: max_time_ms must be positive", span, None))?,
+      _ => return Err(LxError::type_err("sandbox: max_time_ms must be Int", span, None)),
     }
   }
 

@@ -17,6 +17,7 @@ impl Interpreter {
     LxVal::Func(Box::new(LxFunc {
       params: params.iter().map(|p| crate::sym::intern(p)).collect(),
       defaults: vec![None; arity],
+      guard: None,
       body: Arc::new(body),
       closure: Arc::clone(&self.env),
       arity,
@@ -74,15 +75,17 @@ impl Interpreter {
             Ok(crate::stdlib::object_get_field(o.id, name.as_str()).unwrap_or(LxVal::None))
           }
         },
-        LxVal::Store { .. } => crate::stdlib::store_method(name.as_str(), &val).ok_or_else(|| LxError::type_err(format!("Store has no method '{name}'"), span)),
-        other => Err(LxError::type_err(format!("field access on {}, not Record", other.type_name()), span)),
+        LxVal::Store { .. } => {
+          crate::stdlib::store_method(name.as_str(), &val).ok_or_else(|| LxError::type_err(format!("Store has no method '{name}'"), span, None))
+        },
+        other => Err(LxError::type_err(format!("field access on {}, not Record", other.type_name()), span, None)),
       },
       FieldKind::Index(idx) => {
         let items = match &val {
           LxVal::Tuple(t) => t.as_ref(),
           LxVal::List(l) => l.as_ref(),
           other => {
-            return Err(LxError::type_err(format!("index access on {}, not Tuple/List", other.type_name()), span));
+            return Err(LxError::type_err(format!("index access on {}, not Tuple/List", other.type_name()), span, None));
           },
         };
         let i = if *idx < 0 { items.len() as i64 + idx } else { *idx } as usize;
@@ -101,21 +104,35 @@ impl Interpreter {
             let i = if i < 0 { items.len() as i64 + i } else { i } as usize;
             items.get(i).cloned().ok_or_else(|| LxError::runtime(format!("index {i} out of bounds (list length {})", items.len()), span))
           },
-          _ => Err(LxError::type_err(format!("computed field access: unsupported types {} / {}", val.type_name(), key.type_name()), span)),
+          _ => Err(LxError::type_err(format!("computed field access: unsupported types {} / {}", val.type_name(), key.type_name()), span, None)),
         }
       },
     }
   }
 
   fn inject_self(method: &LxVal, self_val: &LxVal) -> LxVal {
-    if let LxVal::Func(lf) = method {
-      let method_env = lf.closure.child();
-      method_env.bind_str("self", self_val.clone());
-      let mut lf = lf.clone();
-      lf.closure = Arc::new(method_env);
-      LxVal::Func(lf)
-    } else {
-      method.clone()
+    match method {
+      LxVal::Func(lf) => {
+        let method_env = lf.closure.child();
+        method_env.bind_str("self", self_val.clone());
+        let mut lf = lf.clone();
+        lf.closure = Arc::new(method_env);
+        LxVal::Func(lf)
+      },
+      LxVal::MultiFunc(clauses) => {
+        let injected = clauses
+          .iter()
+          .map(|lf| {
+            let method_env = lf.closure.child();
+            method_env.bind_str("self", self_val.clone());
+            let mut lf = lf.clone();
+            lf.closure = Arc::new(method_env);
+            lf
+          })
+          .collect();
+        LxVal::MultiFunc(injected)
+      },
+      _ => method.clone(),
     }
   }
 
@@ -127,7 +144,7 @@ impl Interpreter {
         Some(e) => self.eval(e).await,
         None => Ok(LxVal::Unit),
       },
-      _ => Err(LxError::type_err(format!("ternary `?` condition must be Bool, got {} `{}`", cv.type_name(), cv.short_display()), span)),
+      _ => Err(LxError::type_err(format!("ternary `?` condition must be Bool, got {} `{}`", cv.type_name(), cv.short_display()), span, None)),
     }
   }
 }

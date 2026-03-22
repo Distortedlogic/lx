@@ -23,6 +23,7 @@ pub struct Diagnostic {
   pub level: DiagLevel,
   pub msg: String,
   pub span: SourceSpan,
+  pub help: Option<String>,
 }
 
 pub struct CheckResult {
@@ -76,7 +77,13 @@ impl Checker {
   }
 
   pub(crate) fn emit(&mut self, level: DiagLevel, msg: String, span: SourceSpan) {
-    self.diagnostics.push(Diagnostic { level, msg, span });
+    self.diagnostics.push(Diagnostic { level, msg, span, help: None });
+  }
+
+  pub(crate) fn emit_type_error(&mut self, te: &types::TypeError, span: SourceSpan) {
+    let help = te.help();
+    let msg = te.to_message();
+    self.diagnostics.push(Diagnostic { level: DiagLevel::Error, msg, span, help });
   }
 
   pub(crate) fn fresh(&mut self) -> Type {

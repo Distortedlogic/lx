@@ -137,7 +137,7 @@ impl Interpreter {
       Expr::List(elems) => self.eval_list(elems).await,
       Expr::Record(fields) => self.eval_record(fields).await,
       Expr::Map(entries) => self.eval_map(entries).await,
-      Expr::Func { params, body, .. } => self.eval_func(params, body).await,
+      Expr::Func { params, guard, body, .. } => self.eval_func(params, guard.as_deref(), body).await,
       Expr::Match { scrutinee, arms } => self.eval_match(scrutinee, arms, span).await,
       Expr::Ternary { cond, then_, else_ } => self.eval_ternary(cond, then_, else_, span).await,
       Expr::Assert { expr: e, msg } => self.eval_assert(e, msg, span).await,
@@ -148,7 +148,7 @@ impl Interpreter {
           LxVal::Err(_) => Err(LxError::propagate(v, span)),
           LxVal::Some(v) => Ok(*v),
           LxVal::None => Err(LxError::propagate(LxVal::err_str("unwrapped None"), span)),
-          other => Err(LxError::type_err(format!("^ expects Result or Maybe, got {}", other.type_name()), span)),
+          other => Err(LxError::type_err(format!("^ expects Result or Maybe, got {}", other.type_name()), span, None)),
         }
       },
       Expr::Coalesce { expr: e, default } => {
@@ -174,6 +174,7 @@ impl Interpreter {
       },
       Expr::Par(stmts) => self.eval_par(stmts).await,
       Expr::Sel(arms) => self.eval_sel(arms, span).await,
+      Expr::Timeout { ms, body } => self.eval_timeout(ms, body, span).await,
       Expr::Emit { value } => {
         let v = self.eval(value).await?;
         self.ctx.emit.emit(&v, span)?;

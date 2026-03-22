@@ -27,7 +27,7 @@ impl super::Interpreter {
             Some(true) => {},
             _ => {
               self.env = saved;
-              return Err(LxError::type_err(format!("match guard must be Bool, got {} `{}`", gv.type_name(), gv.short_display()), span));
+              return Err(LxError::type_err(format!("match guard must be Bool, got {} `{}`", gv.type_name(), gv.short_display()), span, None));
             },
           }
         }

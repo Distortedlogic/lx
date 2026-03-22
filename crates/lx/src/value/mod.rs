@@ -67,6 +67,8 @@ pub enum LxVal {
   #[strum(serialize = "Func")]
   Func(Box<LxFunc>),
   #[strum(serialize = "Func")]
+  MultiFunc(Vec<LxFunc>),
+  #[strum(serialize = "Func")]
   BuiltinFunc(BuiltinFunc),
 
   Ok(Box<LxVal>),
@@ -99,6 +101,9 @@ pub enum LxVal {
   Store {
     id: u64,
   },
+  Stream {
+    id: u64,
+  },
 }
 
 #[derive(Debug, Clone)]
@@ -114,8 +119,7 @@ macro_rules! require_methods {
     $(
       pub fn $name(&self, ctx: &str, span: SourceSpan) -> Result<$ret, LxError> {
         self.$as_method().ok_or_else(|| LxError::type_err(
-          format!("{ctx} expects {}, got {}", $type_label, self.type_name()), span,
-        ))
+          format!("{ctx} expects {}, got {}", $type_label, self.type_name()), span, None))
       }
     )+
   };
@@ -209,26 +213,26 @@ impl LxVal {
   }
 
   pub fn require_list(&self, ctx: &str, span: SourceSpan) -> Result<&[LxVal], LxError> {
-    self.as_list().map(|l| l.as_slice()).ok_or_else(|| LxError::type_err(format!("{ctx} expects List, got {}", self.type_name()), span))
+    self.as_list().map(|l| l.as_slice()).ok_or_else(|| LxError::type_err(format!("{ctx} expects List, got {}", self.type_name()), span, None))
   }
 
   pub fn require_record(&self, ctx: &str, span: SourceSpan) -> Result<&IndexMap<Sym, LxVal>, LxError> {
     match self {
       LxVal::Record(r) => Ok(r.as_ref()),
-      _ => Err(LxError::type_err(format!("{ctx} expects Record, got {}", self.type_name()), span)),
+      _ => Err(LxError::type_err(format!("{ctx} expects Record, got {}", self.type_name()), span, None)),
     }
   }
 
   pub fn require_usize(&self, ctx: &str, span: SourceSpan) -> Result<usize, LxError> {
     let n = self.require_int(ctx, span)?;
-    n.to_usize().ok_or_else(|| LxError::type_err(format!("{ctx} expects non-negative Int that fits usize, got {n}"), span))
+    n.to_usize().ok_or_else(|| LxError::type_err(format!("{ctx} expects non-negative Int that fits usize, got {n}"), span, None))
   }
 
   pub fn require_keyed(&self, ctx: &str, span: SourceSpan) -> Result<KeyedRef<'_>, LxError> {
     match self {
       LxVal::Record(r) => Ok(KeyedRef::Record(r.as_ref())),
       LxVal::Map(m) => Ok(KeyedRef::Map(m.as_ref())),
-      _ => Err(LxError::type_err(format!("{ctx} expects Record or Map, got {}", self.type_name()), span)),
+      _ => Err(LxError::type_err(format!("{ctx} expects Record or Map, got {}", self.type_name()), span, None)),
     }
   }
 

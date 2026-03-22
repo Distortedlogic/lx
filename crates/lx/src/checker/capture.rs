@@ -1,6 +1,9 @@
 use std::collections::HashSet;
 
-use crate::ast::{Expr, ListElem, SExpr, SStmt, Section, Stmt, WithKind};
+use crate::ast::{
+  Expr, ExprApply, ExprAssert, ExprBinary, ExprCoalesce, ExprEmit, ExprFieldAccess, ExprFunc, ExprMatch, ExprNamedArg, ExprPipe, ExprSlice, ExprTernary,
+  ExprTimeout, ExprUnary, ExprWith, ExprYield, ListElem, SExpr, SStmt, Section, Stmt, StmtFieldUpdate, WithKind,
+};
 use crate::sym::Sym;
 
 pub fn free_vars(expr: &SExpr) -> HashSet<Sym> {
@@ -28,7 +31,7 @@ fn free_vars_stmts(stmts: &[SStmt], vars: &mut HashSet<Sym>, bound: &mut HashSet
         }
       },
       Stmt::Expr(e) => collect_free(&e.node, vars, bound),
-      Stmt::FieldUpdate { value, .. } => collect_free(&value.node, vars, bound),
+      Stmt::FieldUpdate(StmtFieldUpdate { value, .. }) => collect_free(&value.node, vars, bound),
       _ => {},
     }
   }
@@ -41,23 +44,23 @@ fn collect_free(expr: &Expr, vars: &mut HashSet<Sym>, bound: &mut HashSet<Sym>) 
         vars.insert(*name);
       }
     },
-    Expr::Func { params, body, .. } => {
+    Expr::Func(ExprFunc { params, body, .. }) => {
       let mut inner_bound = bound.clone();
       for p in params {
         inner_bound.insert(p.name);
       }
       collect_free(&body.node, vars, &mut inner_bound);
     },
-    Expr::Binary { left, right, .. } => {
+    Expr::Binary(ExprBinary { left, right, .. }) => {
       collect_free(&left.node, vars, bound);
       collect_free(&right.node, vars, bound);
     },
-    Expr::Unary { operand, .. } => collect_free(&operand.node, vars, bound),
-    Expr::Pipe { left, right } => {
+    Expr::Unary(ExprUnary { operand, .. }) => collect_free(&operand.node, vars, bound),
+    Expr::Pipe(ExprPipe { left, right }) => {
       collect_free(&left.node, vars, bound);
       collect_free(&right.node, vars, bound);
     },
-    Expr::Apply { func, arg } => {
+    Expr::Apply(ExprApply { func, arg }) => {
       collect_free(&func.node, vars, bound);
       collect_free(&arg.node, vars, bound);
     },
@@ -92,20 +95,20 @@ fn collect_free(expr: &Expr, vars: &mut HashSet<Sym>, bound: &mut HashSet<Sym>) 
         collect_free(&e.value.node, vars, bound);
       }
     },
-    Expr::Match { scrutinee, arms } => {
+    Expr::Match(ExprMatch { scrutinee, arms }) => {
       collect_free(&scrutinee.node, vars, bound);
       for arm in arms {
         collect_free(&arm.body.node, vars, bound);
       }
     },
-    Expr::Ternary { cond, then_, else_, .. } => {
+    Expr::Ternary(ExprTernary { cond, then_, else_, .. }) => {
       collect_free(&cond.node, vars, bound);
       collect_free(&then_.node, vars, bound);
       if let Some(e) = else_ {
         collect_free(&e.node, vars, bound);
       }
     },
-    Expr::With { kind, body } => match kind {
+    Expr::With(ExprWith { kind, body }) => match kind {
       WithKind::Binding { name, value, .. } => {
         collect_free(&value.node, vars, bound);
         let mut inner = bound.clone();
@@ -128,6 +131,10 @@ fn collect_free(expr: &Expr, vars: &mut HashSet<Sym>, bound: &mut HashSet<Sym>) 
       },
     },
     Expr::Par(stmts) => free_vars_stmts(stmts, vars, bound),
+    Expr::Timeout { ms, body } => {
+      collect_free(&ms.node, vars, bound);
+      collect_free(&body.node, vars, bound);
+    },
     Expr::Sel(arms) => {
       for arm in arms {
         collect_free(&arm.expr.node, vars, bound);

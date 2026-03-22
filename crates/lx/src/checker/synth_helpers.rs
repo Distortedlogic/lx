@@ -1,9 +1,9 @@
 use crate::sym::Sym;
 use miette::SourceSpan;
 
-use crate::ast::{BinOp, Expr, Literal, MapEntry, MatchArm, Param, Pattern, SExpr, SPattern, SType};
+use crate::ast::{BinOp, Expr, Literal, MapEntry, MatchArm, Param, Pattern, PatternConstructor, PatternList, PatternRecord, SExpr, SPattern, SType};
 
-use super::types::Type;
+use super::types::{Type, TypeContext};
 use super::{Checker, DiagLevel};
 
 impl Checker {
@@ -21,8 +21,9 @@ impl Checker {
     let body_type = self.synth(body);
     if let Some(ret_ann) = ret_type {
       let expected = self.resolve_type_ann(ret_ann);
-      if let Err(msg) = self.table.unify(&expected, &body_type) {
-        self.emit(DiagLevel::Error, format!("return type mismatch: {msg}"), body.span);
+      let ctx = TypeContext::FuncReturn { func_name: "anonymous".into() };
+      if let Err(te) = self.table.unify_with_context(&expected, &body_type, ctx) {
+        self.emit_type_error(&te, body.span);
       }
     }
     self.pop_scope();
@@ -41,7 +42,7 @@ impl Checker {
       Pattern::Bind(name) => {
         self.bind(*name, Type::Unknown);
       },
-      Pattern::Constructor { args, .. } => {
+      Pattern::Constructor(PatternConstructor { args, .. }) => {
         for arg in args {
           self.bind_pattern_vars(arg);
         }
@@ -51,7 +52,7 @@ impl Checker {
           self.bind_pattern_vars(p);
         }
       },
-      Pattern::List { elems, rest } => {
+      Pattern::List(PatternList { elems, rest }) => {
         for p in elems {
           self.bind_pattern_vars(p);
         }
@@ -59,7 +60,7 @@ impl Checker {
           self.bind(*name, Type::Unknown);
         }
       },
-      Pattern::Record { fields, rest } => {
+      Pattern::Record(PatternRecord { fields, rest }) => {
         for f in fields {
           if let Some(p) = &f.pattern {
             self.bind_pattern_vars(p);
@@ -92,8 +93,9 @@ impl Checker {
         for rf in rec_fields {
           if rf.name == Some(*trait_name) {
             let val_t = self.synth(&rf.value);
-            if let Err(msg) = self.table.unify(trait_type, &val_t) {
-              self.emit(DiagLevel::Error, format!("Trait field `{trait_name}` type mismatch: {msg}"), rf.value.span);
+            let ctx = TypeContext::RecordField { field_name: trait_name.to_string() };
+            if let Err(te) = self.table.unify_with_context(trait_type, &val_t, ctx) {
+              self.emit_type_error(&te, rf.value.span);
             }
           }
         }
@@ -119,7 +121,7 @@ impl Checker {
       }
     }
     let result = self.fresh();
-    for arm in arms {
+    for (idx, arm) in arms.iter().enumerate() {
       self.push_scope();
       self.bind_pattern_vars(&arm.pattern);
       if let Some(guard) = &arm.guard {
@@ -127,8 +129,9 @@ impl Checker {
       }
       let body_t = self.synth(&arm.body);
       self.pop_scope();
-      if let Err(msg) = self.table.unify(&result, &body_t) {
-        self.emit(DiagLevel::Error, format!("match arm type mismatch: {msg}"), arm.body.span);
+      let ctx = TypeContext::MatchArm { arm_idx: idx };
+      if let Err(te) = self.table.unify_with_context(&result, &body_t, ctx) {
+        self.emit_type_error(&te, arm.body.span);
       }
     }
     self.table.resolve(&result)
@@ -143,11 +146,11 @@ impl Checker {
     for e in entries {
       if let Some(k) = &e.key {
         let kt = self.synth(k);
-        let _ = self.table.unify(&key_t, &kt);
+        let _ = self.table.unify_with_context(&key_t, &kt, TypeContext::General);
         key_t = self.table.resolve(&key_t);
       }
       let vt = self.synth(&e.value);
-      let _ = self.table.unify(&val_t, &vt);
+      let _ = self.table.unify_with_context(&val_t, &vt, TypeContext::General);
       val_t = self.table.resolve(&val_t);
     }
     Type::Map { key: Box::new(key_t), value: Box::new(val_t) }
@@ -157,7 +160,16 @@ impl Checker {
     let lt = self.table.resolve(lt);
     let rt = self.table.resolve(rt);
     match op {
-      BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Mod | BinOp::IntDiv => self.table.unify(&lt, &rt).unwrap_or(Type::Unknown),
+      BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Mod | BinOp::IntDiv => {
+        let ctx = TypeContext::BinaryOp { op: format!("{op:?}") };
+        match self.table.unify_with_context(&lt, &rt, ctx) {
+          Ok(t) => t,
+          Err(te) => {
+            self.emit_type_error(&te, span);
+            Type::Unknown
+          },
+        }
+      },
       BinOp::Concat => Type::Str,
       BinOp::Eq | BinOp::NotEq | BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq => Type::Bool,
       BinOp::And | BinOp::Or => {

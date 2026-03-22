@@ -58,7 +58,7 @@ impl fmt::Display for LxVal {
         let inner = entries.iter().format_with("  ", |(k, v), g| g(&format_args!("{}: {v}", k.0)));
         write!(f, "Map{{{inner}}}")
       },
-      LxVal::Func(_) => write!(f, "<func>"),
+      LxVal::Func(_) | LxVal::MultiFunc(_) => write!(f, "<func>"),
       LxVal::BuiltinFunc(b) => write!(f, "<builtin {}/{}>", b.name, b.arity),
       LxVal::Ok(v) => write!(f, "Ok {v}"),
       LxVal::Err(v) => write!(f, "Err {v}"),
@@ -77,6 +77,7 @@ impl fmt::Display for LxVal {
       LxVal::Class(c) => write!(f, "<Class {}>", c.name),
       LxVal::Object(o) => write!(f, "<{}#{}>", o.class_name, o.id),
       LxVal::Store { id } => write!(f, "<Store#{id}>"),
+      LxVal::Stream { id } => write!(f, "<Stream#{id}>"),
     }
   }
 }

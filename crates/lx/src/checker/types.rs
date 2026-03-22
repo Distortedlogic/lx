@@ -137,6 +137,10 @@ impl UnificationTable {
     Ok(Type::Record(fields))
   }
 
+  pub fn unify_with_context(&mut self, a: &Type, b: &Type, ctx: TypeContext) -> Result<Type, TypeError> {
+    self.unify(a, b).map_err(|_| TypeError { expected: a.clone(), found: b.clone(), context: ctx })
+  }
+
   fn occurs(&self, var: TypeVarId, ty: &Type) -> bool {
     match ty {
       Type::Var(id) => {
@@ -155,6 +159,65 @@ impl UnificationTable {
       Type::Tuple(elems) => elems.iter().any(|t| self.occurs(var, t)),
       Type::Record(fields) => fields.iter().any(|(_, t)| self.occurs(var, t)),
       _ => false,
+    }
+  }
+}
+
+pub struct TypeError {
+  pub expected: Type,
+  pub found: Type,
+  pub context: TypeContext,
+}
+
+pub enum TypeContext {
+  FuncArg { func_name: String, param_name: String, param_idx: usize },
+  FuncReturn { func_name: String },
+  Binding { name: String },
+  RecordField { field_name: String },
+  ListElement { index: usize },
+  MatchArm { arm_idx: usize },
+  BinaryOp { op: String },
+  General,
+}
+
+impl TypeError {
+  pub fn to_message(&self) -> String {
+    let expected = &self.expected;
+    let found = &self.found;
+    match &self.context {
+      TypeContext::FuncArg { func_name, param_name, param_idx } => {
+        format!("type mismatch in argument '{param_name}' (#{param_idx}) of '{func_name}'\n  expected: {expected}\n     found: {found}")
+      },
+      TypeContext::FuncReturn { func_name } => {
+        format!("type mismatch in return type of '{func_name}'\n  expected: {expected}\n     found: {found}")
+      },
+      TypeContext::Binding { name } => {
+        format!("type mismatch in binding '{name}'\n  expected: {expected}\n     found: {found}")
+      },
+      TypeContext::RecordField { field_name } => {
+        format!("type mismatch in record field '{field_name}'\n  expected: {expected}\n     found: {found}")
+      },
+      TypeContext::ListElement { index } => {
+        format!("type mismatch in list element #{index}\n  expected: {expected}\n     found: {found}")
+      },
+      TypeContext::MatchArm { arm_idx } => {
+        format!("type mismatch in match arm #{arm_idx}\n  expected: {expected}\n     found: {found}")
+      },
+      TypeContext::BinaryOp { op } => {
+        format!("type mismatch in '{op}' expression\n  expected: {expected}\n     found: {found}")
+      },
+      TypeContext::General => {
+        format!("type mismatch\n  expected: {expected}\n     found: {found}")
+      },
+    }
+  }
+
+  pub fn help(&self) -> Option<String> {
+    match (&self.expected, &self.found) {
+      (Type::Int, Type::Str) => Some("did you mean to pass a number?".into()),
+      (Type::Str, Type::Int) => Some("did you mean to convert this to a string?".into()),
+      (Type::Func { .. }, _) => Some("this value is not callable".into()),
+      _ => None,
     }
   }
 }

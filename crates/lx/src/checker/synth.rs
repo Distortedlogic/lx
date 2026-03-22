@@ -1,8 +1,11 @@
-use crate::ast::{Expr, SExpr, WithKind};
+use crate::ast::{
+  Expr, ExprApply, ExprAssert, ExprBinary, ExprCoalesce, ExprEmit, ExprFieldAccess, ExprFunc, ExprMatch, ExprNamedArg, ExprPipe, ExprSlice, ExprTernary,
+  ExprTimeout, ExprUnary, ExprWith, ExprYield, ListElem, SExpr, Stmt, UnaryOp, WithKind,
+};
 use crate::sym::intern;
 
 use super::synth_helpers::synth_literal;
-use super::types::Type;
+use super::types::{Type, TypeContext};
 use super::{Checker, DiagLevel};
 
 impl Checker {
@@ -11,12 +14,12 @@ impl Checker {
       Expr::Literal(lit) => synth_literal(lit),
       Expr::Ident(name) => self.lookup(*name).unwrap_or(Type::Unknown),
       Expr::TypeConstructor(_) => Type::Unknown,
-      Expr::Binary { op, left, right } => {
+      Expr::Binary(ExprBinary { op, left, right }) => {
         let lt = self.synth(left);
         let rt = self.synth(right);
         self.synth_binary(op, &lt, &rt, expr.span)
       },
-      Expr::Unary { op: crate::ast::UnaryOp::Neg, operand } => {
+      Expr::Unary(ExprUnary { op: UnaryOp::Neg, operand }) => {
         let t = self.synth(operand);
         match self.table.resolve(&t) {
           Type::Int | Type::Float => t,
@@ -26,13 +29,13 @@ impl Checker {
           },
         }
       },
-      Expr::Unary { op: crate::ast::UnaryOp::Not, .. } => Type::Bool,
-      Expr::Pipe { left, right } => {
+      Expr::Unary(ExprUnary { op: UnaryOp::Not, .. }) => Type::Bool,
+      Expr::Pipe(ExprPipe { left, right }) => {
         let _ = self.synth(left);
         self.synth(right)
       },
-      Expr::Apply { func, arg } => self.synth_apply(func, arg),
-      Expr::Func { params, ret_type, body } => self.synth_func(params, ret_type, body),
+      Expr::Apply(ExprApply { func, arg }) => self.synth_apply(func, arg),
+      Expr::Func(ExprFunc { params, ret_type, body, .. }) => self.synth_func(params, ret_type, body),
       Expr::Block(stmts) => self.check_stmts(stmts),
       Expr::Tuple(elems) => Type::Tuple(elems.iter().map(|e| self.synth(e)).collect()),
       Expr::List(elems) => {
@@ -40,8 +43,8 @@ impl Checker {
           Type::List(Box::new(self.fresh()))
         } else {
           let first = match &elems[0] {
-            crate::ast::ListElem::Single(e) => self.synth(e),
-            crate::ast::ListElem::Spread(e) => self.synth(e),
+            ListElem::Single(e) => self.synth(e),
+            ListElem::Spread(e) => self.synth(e),
           };
           Type::List(Box::new(first))
         }
@@ -62,12 +65,12 @@ impl Checker {
           },
         }
       },
-      Expr::Coalesce { expr: e, default } => {
+      Expr::Coalesce(ExprCoalesce { expr: e, default }) => {
         let _ = self.synth(e);
         self.synth(default)
       },
-      Expr::Match { scrutinee, arms } => self.synth_match(scrutinee, arms, expr.span),
-      Expr::Ternary { cond, then_, else_ } => {
+      Expr::Match(ExprMatch { scrutinee, arms }) => self.synth_match(scrutinee, arms, expr.span),
+      Expr::Ternary(ExprTernary { cond, then_, else_ }) => {
         let ct = self.synth(cond);
         let resolved = self.table.resolve(&ct);
         if resolved != Type::Bool && resolved != Type::Unknown {
@@ -76,12 +79,18 @@ impl Checker {
         let tt = self.synth(then_);
         if let Some(e) = else_ {
           let et = self.synth(e);
-          self.table.unify(&tt, &et).unwrap_or(Type::Unknown)
+          match self.table.unify_with_context(&tt, &et, TypeContext::General) {
+            Ok(t) => t,
+            Err(te) => {
+              self.emit_type_error(&te, e.span);
+              Type::Unknown
+            },
+          }
         } else {
           tt
         }
       },
-      Expr::With { kind, body } => match kind {
+      Expr::With(ExprWith { kind, body }) => match kind {
         WithKind::Binding { name, value, mutable: _ } => {
           let vt = self.synth(value);
           self.push_scope();
@@ -111,8 +120,8 @@ impl Checker {
           result
         },
       },
-      Expr::Yield { .. } => Type::Unknown,
-      Expr::Emit { value } => {
+      Expr::Yield(ExprYield { .. }) => Type::Unknown,
+      Expr::Emit(ExprEmit { value }) => {
         self.synth(value);
         Type::Unit
       },
@@ -126,14 +135,14 @@ impl Checker {
         }
         Type::Unit
       },
-      Expr::Assert { expr, msg } => {
+      Expr::Assert(ExprAssert { expr, msg }) => {
         self.synth(expr);
         if let Some(m) = msg {
           self.synth(m);
         }
         Type::Unit
       },
-      Expr::Slice { expr, start, end } => {
+      Expr::Slice(ExprSlice { expr, start, end }) => {
         let t = self.synth(expr);
         if let Some(s) = start {
           self.synth(s);
@@ -145,19 +154,29 @@ impl Checker {
       },
       Expr::Section(_) => Type::Func { param: Box::new(Type::Unknown), ret: Box::new(Type::Unknown) },
       Expr::Map(entries) => self.synth_map(entries),
-      Expr::FieldAccess { expr, .. } => {
+      Expr::FieldAccess(ExprFieldAccess { expr, .. }) => {
         self.synth(expr);
         Type::Unknown
       },
-      Expr::NamedArg { value, .. } => self.synth(value),
+      Expr::NamedArg(ExprNamedArg { value, .. }) => self.synth(value),
       Expr::Par(stmts) => {
         for s in stmts {
-          if let crate::ast::Stmt::Expr(e) = &s.node {
+          if let Stmt::Expr(e) = &s.node {
             self.check_mutable_captures(e, expr.span);
           }
         }
         let result = self.check_stmts(stmts);
         Type::List(Box::new(result))
+      },
+      Expr::Timeout(ExprTimeout { ms, body }) => {
+        let ms_type = self.synth(ms);
+        let resolved = self.table.resolve(&ms_type);
+        if resolved != Type::Int && resolved != Type::Float && resolved != Type::Unknown {
+          self.emit(DiagLevel::Error, "timeout ms must be Int or Float".into(), ms.span);
+        }
+        let body_type = self.synth(body);
+        let err_fields = vec![(intern("kind"), Type::Str), (intern("ms"), Type::Int)];
+        Type::Result { ok: Box::new(body_type), err: Box::new(Type::Record(err_fields)) }
       },
       Expr::Sel(arms) => {
         for arm in arms {

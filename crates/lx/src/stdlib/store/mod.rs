@@ -41,7 +41,7 @@ pub fn build() -> IndexMap<crate::sym::Sym, LxVal> {
 pub(super) fn store_id(v: &LxVal, span: SourceSpan) -> Result<u64, LxError> {
   match v {
     LxVal::Store { id } => Ok(*id),
-    _ => Err(LxError::type_err("store: expected Store", span)),
+    _ => Err(LxError::type_err("store: expected Store", span, None)),
   }
 }
 
@@ -80,7 +80,7 @@ pub(super) fn bi_create(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>
     LxVal::Record(r) => r.get(&crate::sym::intern("persist")).and_then(|v| v.as_str()).map(PathBuf::from),
     LxVal::Unit => None,
     _ => {
-      return Err(LxError::type_err("store.create: opts must be Record or ()", span));
+      return Err(LxError::type_err("store.create: opts must be Record or ()", span, None));
     },
   };
   let data = path.as_deref().map(load_from_disk).unwrap_or_default();

@@ -10,6 +10,7 @@ use crate::value::LxVal;
 pub struct LxFunc {
   pub params: Vec<Sym>,
   pub defaults: Vec<Option<LxVal>>,
+  pub guard: Option<Arc<SExpr>>,
   pub body: Arc<SExpr>,
   pub closure: Arc<Env>,
   pub arity: usize,

@@ -57,7 +57,7 @@ fn num_fold(
         fa = op_float(fa, *f);
       },
       other => {
-        return Err(LxError::type_err(format!("{name}: non-number {}", other.type_name()), span));
+        return Err(LxError::type_err(format!("{name}: non-number {}", other.type_name()), span, None));
       },
     }
   }
@@ -114,7 +114,7 @@ fn bi_has_key(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resul
       let key = args[0].require_str("has_key?", span)?;
       Ok(LxVal::Bool(r.contains_key(&crate::sym::intern(key))))
     },
-    other => Err(LxError::type_err(format!("has_key? expects Map/Record, got {}", other.type_name()), span)),
+    other => Err(LxError::type_err(format!("has_key? expects Map/Record, got {}", other.type_name()), span, None)),
   }
 }
 
@@ -122,7 +122,7 @@ fn bi_remove(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result
   let m = match &args[1] {
     LxVal::Map(m) => m,
     other => {
-      return Err(LxError::type_err(format!("remove expects Map, got {}", other.type_name()), span));
+      return Err(LxError::type_err(format!("remove expects Map, got {}", other.type_name()), span, None));
     },
   };
   let mut out = m.as_ref().clone();
@@ -137,7 +137,7 @@ fn bi_merge(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<
       merged.extend(m2.iter().map(|(k, v)| (k.clone(), v.clone())));
       Ok(LxVal::Map(Arc::new(merged)))
     },
-    _ => Err(LxError::type_err(format!("merge expects two Maps, got {} and {}", args[0].type_name(), args[1].type_name()), span)),
+    _ => Err(LxError::type_err(format!("merge expects two Maps, got {} and {}", args[0].type_name(), args[1].type_name()), span, None)),
   }
 }
 

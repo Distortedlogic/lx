@@ -4,7 +4,9 @@ use async_recursion::async_recursion;
 use indexmap::IndexMap;
 
 use crate::ast::{BindTarget, Stmt};
+use crate::env::Env;
 use crate::error::LxError;
+use crate::sym::Sym;
 use crate::value::{LxClass, LxTrait, LxVal};
 
 use super::Interpreter;
@@ -27,8 +29,10 @@ impl Interpreter {
         match &b.target {
           BindTarget::Name(name) => {
             if self.env.has_mut(*name) {
+              let val = Self::maybe_combine_clauses(&self.env, *name, val);
               self.env.reassign(*name, val).map_err(|e| LxError::runtime(e, stmt.span))?;
             } else {
+              let val = Self::maybe_combine_clauses(&self.env, *name, val);
               let env = self.env.child();
               env.bind_with_mutability(*name, val, b.mutable);
               self.env = Arc::new(env);
@@ -141,6 +145,22 @@ impl Interpreter {
         Ok(LxVal::Unit)
       },
       Stmt::Expr(e) => self.eval(e).await,
+    }
+  }
+
+  fn maybe_combine_clauses(env: &Arc<Env>, name: Sym, val: LxVal) -> LxVal {
+    let LxVal::Func(new_func) = &val else { return val };
+    let Some(existing) = env.get(name) else { return val };
+    match existing {
+      LxVal::Func(ref ef) if ef.guard.is_some() => {
+        let clauses = vec![ef.as_ref().clone(), new_func.as_ref().clone()];
+        LxVal::MultiFunc(clauses)
+      },
+      LxVal::MultiFunc(mut clauses) => {
+        clauses.push(new_func.as_ref().clone());
+        LxVal::MultiFunc(clauses)
+      },
+      _ => val,
     }
   }
 }

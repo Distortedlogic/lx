@@ -38,6 +38,8 @@ pub enum LxError {
     msg: String,
     #[label("{msg}")]
     span: SourceSpan,
+    #[help]
+    help: Option<String>,
   },
 
   #[error("break")]
@@ -68,8 +70,8 @@ impl LxError {
     Self::Assert { expr: expr.into(), message, span }
   }
 
-  pub fn type_err(msg: impl Into<String>, span: SourceSpan) -> Self {
-    Self::Type { msg: msg.into(), span }
+  pub fn type_err(msg: impl Into<String>, span: SourceSpan, help: Option<String>) -> Self {
+    Self::Type { msg: msg.into(), span, help }
   }
 
   pub fn division_by_zero(span: SourceSpan) -> Self {

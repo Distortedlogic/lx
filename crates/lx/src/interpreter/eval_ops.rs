@@ -112,7 +112,7 @@ impl Interpreter {
         v.extend(b.as_ref().iter().cloned());
         Ok(LxVal::list(v))
       },
-      _ => Err(LxError::type_err(format!("cannot apply '{op}' to {} and {}", lv.type_name(), rv.type_name()), span)),
+      _ => Err(LxError::type_err(format!("cannot apply '{op}' to {} and {}", lv.type_name(), rv.type_name()), span, None)),
     }
   }
 
@@ -122,7 +122,7 @@ impl Interpreter {
       (UnaryOp::Neg, LxVal::Int(n)) => Ok(LxVal::Int(-n)),
       (UnaryOp::Neg, LxVal::Float(f)) => Ok(LxVal::Float(-f)),
       (UnaryOp::Not, LxVal::Bool(b)) => Ok(LxVal::Bool(!b)),
-      _ => Err(LxError::type_err(format!("cannot apply '{op}' to {}", v.type_name()), span)),
+      _ => Err(LxError::type_err(format!("cannot apply '{op}' to {}", v.type_name()), span, None)),
     }
   }
 
@@ -155,7 +155,7 @@ impl Interpreter {
         let r = self.eval(right).await?;
         self.force_defaults(r, span).await
       },
-      _ => Err(LxError::type_err(format!("{op_name} requires Bool operands, got {}", l.type_name()), span)),
+      _ => Err(LxError::type_err(format!("{op_name} requires Bool operands, got {}", l.type_name()), span, None)),
     }
   }
 

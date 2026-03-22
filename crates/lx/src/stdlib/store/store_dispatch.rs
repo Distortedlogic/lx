@@ -158,7 +158,7 @@ fn bi_merge(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<
     },
     LxVal::Record(r) => r.as_ref().clone(),
     other => {
-      return Err(LxError::type_err(format!("store.merge: expected Store or Record, got {}", other.type_name()), span));
+      return Err(LxError::type_err(format!("store.merge: expected Store or Record, got {}", other.type_name()), span, None));
     },
   };
   let mut s = get_store_mut(id, span)?;

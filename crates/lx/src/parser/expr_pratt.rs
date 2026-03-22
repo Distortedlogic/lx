@@ -4,7 +4,10 @@ use chumsky::prelude::*;
 
 use super::expr::{ident, semi_sep, skip_semis, type_name};
 use super::{Span, ss};
-use crate::ast::{BinOp, Expr, FieldKind, MatchArm, SExpr, Section, StrPart, UnaryOp, WithKind};
+use crate::ast::{
+  BinOp, Expr, ExprApply, ExprBinary, ExprCoalesce, ExprFieldAccess, ExprFunc, ExprMatch, ExprPipe, ExprTernary, ExprUnary, ExprWith, FieldKind, MatchArm,
+  SExpr, Section, StrPart, UnaryOp, WithKind,
+};
 use crate::lexer::token::TokenKind;
 use crate::sym::intern;
 
@@ -106,20 +109,20 @@ where
 
   macro_rules! binop {
     ($assoc:ident($bp:expr), $tok:expr, $op:expr) => {
-      infix($assoc($bp), just($tok), |l: SExpr, _, r: SExpr, e| SExpr::new(Expr::Binary { op: $op, left: Box::new(l), right: Box::new(r) }, ss(e.span())))
+      infix($assoc($bp), just($tok), |l: SExpr, _, r: SExpr, e| SExpr::new(Expr::Binary(ExprBinary { op: $op, left: Box::new(l), right: Box::new(r) }), ss(e.span())))
         .boxed()
     };
   }
 
   atom.pratt(vec![
-    prefix(29, just(TokenKind::Minus), |_, operand: SExpr, e| SExpr::new(Expr::Unary { op: UnaryOp::Neg, operand: Box::new(operand) }, ss(e.span()))).boxed(),
-    prefix(29, just(TokenKind::Bang), |_, operand: SExpr, e| SExpr::new(Expr::Unary { op: UnaryOp::Not, operand: Box::new(operand) }, ss(e.span()))).boxed(),
-    postfix(33, just(TokenKind::Dot).then(dot_field), |left: SExpr, (_, field), e| SExpr::new(Expr::FieldAccess { expr: Box::new(left), field }, ss(e.span())))
+    prefix(29, just(TokenKind::Minus), |_, operand: SExpr, e| SExpr::new(Expr::Unary(ExprUnary { op: UnaryOp::Neg, operand: Box::new(operand) }), ss(e.span()))).boxed(),
+    prefix(29, just(TokenKind::Bang), |_, operand: SExpr, e| SExpr::new(Expr::Unary(ExprUnary { op: UnaryOp::Not, operand: Box::new(operand) }), ss(e.span()))).boxed(),
+    postfix(33, just(TokenKind::Dot).then(dot_field), |left: SExpr, (_, field), e| SExpr::new(Expr::FieldAccess(ExprFieldAccess { expr: Box::new(left), field }), ss(e.span())))
       .boxed(),
     postfix(10, just(TokenKind::Caret), |operand: SExpr, _, e| SExpr::new(Expr::Propagate(Box::new(operand)), ss(e.span()))).boxed(),
     postfix(3, just(TokenKind::Question).then(question_rhs), |scrutinee: SExpr, (_, rhs), e| match rhs {
-      QRhs::Match(arms) => SExpr::new(Expr::Match { scrutinee: Box::new(scrutinee), arms }, ss(e.span())),
-      QRhs::Ternary(then_, else_) => SExpr::new(Expr::Ternary { cond: Box::new(scrutinee), then_: Box::new(then_), else_: else_.map(Box::new) }, ss(e.span())),
+      QRhs::Match(arms) => SExpr::new(Expr::Match(ExprMatch { scrutinee: Box::new(scrutinee), arms }), ss(e.span())),
+      QRhs::Ternary(then_, else_) => SExpr::new(Expr::Ternary(ExprTernary { cond: Box::new(scrutinee), then_: Box::new(then_), else_: else_.map(Box::new) }), ss(e.span())),
     })
     .boxed(),
     binop!(left(27), TokenKind::Star, BinOp::Mul),
@@ -131,7 +134,7 @@ where
     binop!(left(23), TokenKind::DotDot, BinOp::Range),
     binop!(left(23), TokenKind::DotDotEq, BinOp::RangeInclusive),
     binop!(left(21), TokenKind::PlusPlus, BinOp::Concat),
-    infix(left(19), just(TokenKind::Pipe), |l: SExpr, _, r: SExpr, e| SExpr::new(Expr::Pipe { left: Box::new(l), right: Box::new(r) }, ss(e.span()))).boxed(),
+    infix(left(19), just(TokenKind::Pipe), |l: SExpr, _, r: SExpr, e| SExpr::new(Expr::Pipe(ExprPipe { left: Box::new(l), right: Box::new(r) }), ss(e.span()))).boxed(),
     binop!(left(17), TokenKind::Eq, BinOp::Eq),
     binop!(left(17), TokenKind::NotEq, BinOp::NotEq),
     binop!(left(17), TokenKind::Lt, BinOp::Lt),
@@ -140,13 +143,13 @@ where
     binop!(left(17), TokenKind::GtEq, BinOp::GtEq),
     binop!(left(15), TokenKind::And, BinOp::And),
     binop!(left(13), TokenKind::Or, BinOp::Or),
-    infix(left(11), just(TokenKind::QQ), |l: SExpr, _, r: SExpr, e| SExpr::new(Expr::Coalesce { expr: Box::new(l), default: Box::new(r) }, ss(e.span())))
+    infix(left(11), just(TokenKind::QQ), |l: SExpr, _, r: SExpr, e| SExpr::new(Expr::Coalesce(ExprCoalesce { expr: Box::new(l), default: Box::new(r) }), ss(e.span())))
       .boxed(),
     infix(left(7), just(TokenKind::Amp), |l: SExpr, _, r: SExpr, e| {
-      SExpr::new(Expr::Binary { op: BinOp::And, left: Box::new(l), right: Box::new(r) }, ss(e.span()))
+      SExpr::new(Expr::Binary(ExprBinary { op: BinOp::And, left: Box::new(l), right: Box::new(r) }), ss(e.span()))
     })
     .boxed(),
-    infix(left(31), empty(), |func: SExpr, _, arg: SExpr, e| SExpr::new(Expr::Apply { func: Box::new(func), arg: Box::new(arg) }, ss(e.span()))).boxed(),
+    infix(left(31), empty(), |func: SExpr, _, arg: SExpr, e| SExpr::new(Expr::Apply(ExprApply { func: Box::new(func), arg: Box::new(arg) }), ss(e.span()))).boxed(),
   ])
 }
 
@@ -167,7 +170,7 @@ where
     .then_ignore(just(TokenKind::LBrace))
     .then(super::expr::stmts_block(expr.clone()))
     .then_ignore(just(TokenKind::RBrace))
-    .map_with(|(fields, body), e| SExpr::new(Expr::With { kind: WithKind::Context { fields }, body }, ss(e.span())));
+    .map_with(|(fields, body), e| SExpr::new(Expr::With(ExprWith { kind: WithKind::Context { fields }, body }), ss(e.span())));
 
   let with_binding = just(TokenKind::With)
     .ignore_then(just(TokenKind::Ident(intern("mut"))).to(true).or_not().map(|x| x.unwrap_or(false)))
@@ -178,17 +181,17 @@ where
     .then(super::expr::stmts_block(expr.clone()))
     .then_ignore(just(TokenKind::RBrace))
     .map_with(|((((explicit_mut, name), is_decl_mut), value), body), e| {
-      SExpr::new(Expr::With { kind: WithKind::Binding { name, value: Box::new(value), mutable: explicit_mut || is_decl_mut }, body }, ss(e.span()))
+      SExpr::new(Expr::With(ExprWith { kind: WithKind::Binding { name, value: Box::new(value), mutable: explicit_mut || is_decl_mut }, body }), ss(e.span()))
     });
 
-  let resource = expr.clone().then_ignore(just(TokenKind::Ident(intern("as")))).then(ident());
+  let resource = expr.clone().then_ignore(just(TokenKind::As)).then(ident());
 
   let with_resource = just(TokenKind::With)
     .ignore_then(resource.separated_by(just(TokenKind::Semi)).at_least(1).collect::<Vec<_>>())
     .then_ignore(just(TokenKind::LBrace))
     .then(super::expr::stmts_block(expr))
     .then_ignore(just(TokenKind::RBrace))
-    .map_with(|(resources, body), e| SExpr::new(Expr::With { kind: WithKind::Resources { resources }, body }, ss(e.span())));
+    .map_with(|(resources, body), e| SExpr::new(Expr::With(ExprWith { kind: WithKind::Resources { resources }, body }), ss(e.span())));
 
   choice((with_context, with_binding, with_resource))
 }
@@ -237,8 +240,11 @@ where
     .ignore_then(param.repeated().collect::<Vec<_>>())
     .then_ignore(just(TokenKind::RParen))
     .then(just(TokenKind::Arrow).ignore_then(super::type_ann::type_parser()).or_not())
+    .then(just(TokenKind::Amp).ignore_then(expr.clone().delimited_by(just(TokenKind::LParen), just(TokenKind::RParen))).or_not())
     .then(expr.clone())
-    .map_with(|((params, ret_type), body), e| SExpr::new(Expr::Func { params, ret_type, body: Box::new(body) }, ss(e.span())));
+    .map_with(|(((params, ret_type), guard), body), e| {
+      SExpr::new(Expr::Func(ExprFunc { params, ret_type, guard: guard.map(Box::new), body: Box::new(body) }), ss(e.span()))
+    });
 
   let tuple = just(TokenKind::LParen)
     .ignore_then(expr.clone().separated_by(just(TokenKind::Semi).or_not()).at_least(2).collect::<Vec<_>>())

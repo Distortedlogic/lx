@@ -22,9 +22,9 @@ pub enum Pattern {
   Bind(Sym),
   Wildcard,
   Tuple(Vec<SPattern>),
-  List { elems: Vec<SPattern>, rest: Option<Sym> },
-  Record { fields: Vec<FieldPattern>, rest: Option<Sym> },
-  Constructor { name: Sym, args: Vec<SPattern> },
+  List(PatternList),
+  Record(PatternRecord),
+  Constructor(PatternConstructor),
 }
 
 #[derive(Debug, Clone)]
@@ -161,4 +161,36 @@ pub enum UnaryOp {
   Neg,
   #[strum(to_string = "!")]
   Not,
+}
+
+#[derive(Debug, Clone)]
+pub struct StmtTypeDef {
+  pub name: Sym,
+  pub variants: Vec<(Sym, usize)>,
+  pub exported: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct StmtFieldUpdate {
+  pub name: Sym,
+  pub fields: Vec<Sym>,
+  pub value: SExpr,
+}
+
+#[derive(Debug, Clone)]
+pub struct PatternList {
+  pub elems: Vec<SPattern>,
+  pub rest: Option<Sym>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PatternRecord {
+  pub fields: Vec<FieldPattern>,
+  pub rest: Option<Sym>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PatternConstructor {
+  pub name: Sym,
+  pub args: Vec<SPattern>,
 }

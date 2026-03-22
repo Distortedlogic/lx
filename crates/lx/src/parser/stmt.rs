@@ -5,8 +5,8 @@ use chumsky::prelude::*;
 use super::expr::{ident, name_or_type, type_name};
 use super::{Span, ss};
 use crate::ast::{
-  AgentMethod, BindTarget, Binding, Expr, FieldDecl, FieldKind, Program, SExpr, SStmt, Stmt, TraitDeclData, TraitEntry, TraitMethodDecl, TraitUnionDef,
-  UseKind, UseStmt,
+  AgentMethod, BindTarget, Binding, Expr, ExprFieldAccess, FieldDecl, FieldKind, Program, SExpr, SStmt, Stmt, StmtFieldUpdate, StmtTypeDef, TraitDeclData,
+  TraitEntry, TraitMethodDecl, TraitUnionDef, UseKind, UseStmt,
 };
 use crate::lexer::token::TokenKind;
 use crate::sym::Sym;
@@ -54,7 +54,7 @@ where
       d.exported = exp;
       SStmt::new(Stmt::ClassDecl(d), ss(e.span()))
     }),
-    exported.clone().then(type_def).map_with(|(exp, (name, variants)), e| SStmt::new(Stmt::TypeDef { name, variants, exported: exp }, ss(e.span()))),
+    exported.clone().then(type_def).map_with(|(exp, (name, variants)), e| SStmt::new(Stmt::TypeDef(StmtTypeDef { name, variants, exported: exp }), ss(e.span()))),
     exported.then(binding).map_with(|(exp, mut b), e| {
       b.exported = exp;
       SStmt::new(Stmt::Binding(b), ss(e.span()))
@@ -142,15 +142,15 @@ where
 {
   expr.clone().then_ignore(just(TokenKind::Reassign)).then(expr).try_map_with(|(target, value), e| {
     let (name, fields) = expr_to_field_chain(&target).map_err(|_| Rich::custom(e.span(), "'<-' requires name.field target"))?;
-    Ok(SStmt::new(Stmt::FieldUpdate { name, fields, value }, ss(e.span())))
+    Ok(SStmt::new(Stmt::FieldUpdate(StmtFieldUpdate { name, fields, value }), ss(e.span())))
   })
 }
 
 fn expr_to_field_chain(expr: &SExpr) -> Result<(Sym, Vec<Sym>), ()> {
   match &expr.node {
-    Expr::FieldAccess { expr: inner, field: FieldKind::Named(f) } => match &inner.node {
+    Expr::FieldAccess(ExprFieldAccess { expr: inner, field: FieldKind::Named(f) }) => match &inner.node {
       Expr::Ident(name) => Ok((*name, vec![*f])),
-      Expr::FieldAccess { .. } => {
+      Expr::FieldAccess(_) => {
         let (name, mut fields) = expr_to_field_chain(inner)?;
         fields.push(*f);
         Ok((name, fields))

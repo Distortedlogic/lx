@@ -71,8 +71,8 @@ pub trait AstVisitor {
   fn visit_map(&mut self, entries: &[MapEntry], span: SourceSpan) {
     walk_map(self, entries, span);
   }
-  fn visit_func(&mut self, params: &[Param], ret_type: Option<&SType>, body: &SExpr, span: SourceSpan) {
-    walk_func(self, params, ret_type, body, span);
+  fn visit_func(&mut self, params: &[Param], ret_type: Option<&SType>, guard: Option<&SExpr>, body: &SExpr, span: SourceSpan) {
+    walk_func(self, params, ret_type, guard, body, span);
   }
   fn visit_func_post(&mut self, _params: &[Param], _ret_type: Option<&SType>, _body: &SExpr, _span: SourceSpan) {}
   fn visit_match(&mut self, scrutinee: &SExpr, arms: &[MatchArm], span: SourceSpan) {
@@ -113,6 +113,9 @@ pub trait AstVisitor {
     walk_sel(self, arms, span);
   }
   fn visit_sel_post(&mut self, _arms: &[SelArm], _span: SourceSpan) {}
+  fn visit_timeout(&mut self, ms: &SExpr, body: &SExpr, span: SourceSpan) {
+    walk_timeout(self, ms, body, span);
+  }
   fn visit_emit(&mut self, value: &SExpr, span: SourceSpan) {
     walk_emit(self, value, span);
   }

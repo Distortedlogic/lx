@@ -4,7 +4,7 @@ use chumsky::prelude::*;
 
 use super::expr::{ident, type_name};
 use super::{Span, ss};
-use crate::ast::{FieldPattern, Literal, Pattern, SPattern, StrPart};
+use crate::ast::{FieldPattern, Literal, Pattern, PatternConstructor, PatternList, PatternRecord, SPattern, StrPart};
 use crate::lexer::token::TokenKind;
 
 pub(super) fn pattern_parser<'a, I>() -> impl Parser<'a, I, SPattern, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
@@ -75,7 +75,7 @@ where
     .then(super::expr::skip_semis().ignore_then(rest).or_not())
     .then_ignore(super::expr::skip_semis())
     .then_ignore(just(TokenKind::RBrace))
-    .map_with(|(fields, rest), e| SPattern::new(Pattern::Record { fields, rest: rest.flatten() }, ss(e.span())))
+    .map_with(|(fields, rest), e| SPattern::new(Pattern::Record(PatternRecord { fields, rest: rest.flatten() }), ss(e.span())))
 }
 
 fn list_pattern<'a, I>(
@@ -90,7 +90,7 @@ where
     .ignore_then(pat.separated_by(just(TokenKind::Semi).or_not()).collect::<Vec<_>>())
     .then(rest.or_not())
     .then_ignore(just(TokenKind::RBracket))
-    .map_with(|(elems, rest), e| SPattern::new(Pattern::List { elems, rest: rest.flatten() }, ss(e.span())))
+    .map_with(|(elems, rest), e| SPattern::new(Pattern::List(PatternList { elems, rest: rest.flatten() }), ss(e.span())))
 }
 
 fn ctor_pattern<'a, I>(
@@ -99,5 +99,5 @@ fn ctor_pattern<'a, I>(
 where
   I: ValueInput<'a, Token = TokenKind, Span = Span>,
 {
-  type_name().then(pat.repeated().collect::<Vec<_>>()).map_with(|(name, args), e| SPattern::new(Pattern::Constructor { name, args }, ss(e.span())))
+  type_name().then(pat.repeated().collect::<Vec<_>>()).map_with(|(name, args), e| SPattern::new(Pattern::Constructor(PatternConstructor { name, args }), ss(e.span())))
 }

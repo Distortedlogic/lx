@@ -146,7 +146,7 @@ pub(super) fn field_str(rec: &IndexMap<crate::sym::Sym, LxVal>, field: &str) -> 
 }
 
 pub(super) fn get_nodes(val: &LxVal, span: SourceSpan) -> Result<&[LxVal], LxError> {
-  val.as_list().map(|l| l.as_slice()).ok_or_else(|| LxError::type_err("md: expected List (parsed doc)", span))
+  val.as_list().map(|l| l.as_slice()).ok_or_else(|| LxError::type_err("md: expected List (parsed doc)", span, None))
 }
 
 pub(super) fn nodes_by_type(nodes: &[LxVal], type_name: &str) -> Vec<LxVal> {

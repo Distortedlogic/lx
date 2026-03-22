@@ -63,7 +63,9 @@ impl LxVal {
       (LxVal::Class(a), LxVal::Class(b)) => a.name == b.name,
       (LxVal::Object(a), LxVal::Object(b)) => a.id == b.id,
       (LxVal::Store { id: i1 }, LxVal::Store { id: i2 }) => i1 == i2,
+      (LxVal::Stream { id: i1 }, LxVal::Stream { id: i2 }) => i1 == i2,
       (LxVal::Func(_), _) | (_, LxVal::Func(_)) => false,
+      (LxVal::MultiFunc(_), _) | (_, LxVal::MultiFunc(_)) => false,
       (LxVal::BuiltinFunc(_), _) | (_, LxVal::BuiltinFunc(_)) => false,
       _ => false,
     }
@@ -117,7 +119,8 @@ impl LxVal {
       LxVal::Class(c) => c.name.hash(state),
       LxVal::Object(o) => o.id.hash(state),
       LxVal::Store { id } => id.hash(state),
-      LxVal::Func(_) | LxVal::BuiltinFunc(_) | LxVal::TaggedCtor { .. } => {},
+      LxVal::Stream { id } => id.hash(state),
+      LxVal::Func(_) | LxVal::MultiFunc(_) | LxVal::BuiltinFunc(_) | LxVal::TaggedCtor { .. } => {},
     }
   }
 }

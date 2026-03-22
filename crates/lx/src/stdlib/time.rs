@@ -27,20 +27,20 @@ fn bi_now(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<L
 fn bi_sleep(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let ms = match &args[0] {
     LxVal::Int(n) => {
-      let v: i64 = n.try_into().map_err(|_| LxError::type_err("time.sleep: ms too large", span))?;
+      let v: i64 = n.try_into().map_err(|_| LxError::type_err("time.sleep: ms too large", span, None))?;
       if v < 0 {
-        return Err(LxError::type_err("time.sleep: ms must be non-negative", span));
+        return Err(LxError::type_err("time.sleep: ms must be non-negative", span, None));
       }
       v as u64
     },
     LxVal::Float(f) => {
       if *f < 0.0 {
-        return Err(LxError::type_err("time.sleep: ms must be non-negative", span));
+        return Err(LxError::type_err("time.sleep: ms must be non-negative", span, None));
       }
       *f as u64
     },
     _ => {
-      return Err(LxError::type_err("time.sleep expects Int or Float ms", span));
+      return Err(LxError::type_err("time.sleep expects Int or Float ms", span, None));
     },
   };
   std::thread::sleep(std::time::Duration::from_millis(ms));
@@ -67,18 +67,18 @@ fn record_to_datetime(val: &LxVal, span: SourceSpan) -> Result<DateTime<Utc>, Lx
   match val {
     LxVal::Record(fields) => {
       if let Some(LxVal::Int(epoch)) = fields.get(&crate::sym::intern("epoch")) {
-        let secs: i64 = epoch.try_into().map_err(|_| LxError::type_err("time: epoch too large", span))?;
+        let secs: i64 = epoch.try_into().map_err(|_| LxError::type_err("time: epoch too large", span, None))?;
         return Utc.timestamp_opt(secs, 0).single().ok_or_else(|| LxError::runtime("time: invalid epoch", span));
       }
       if let Some(LxVal::Int(ms)) = fields.get(&crate::sym::intern("ms")) {
-        let millis: i64 = ms.try_into().map_err(|_| LxError::type_err("time: ms too large", span))?;
+        let millis: i64 = ms.try_into().map_err(|_| LxError::type_err("time: ms too large", span, None))?;
         return Utc.timestamp_millis_opt(millis).single().ok_or_else(|| LxError::runtime("time: invalid ms", span));
       }
       if let Some(LxVal::Str(iso)) = fields.get(&crate::sym::intern("iso")) {
         return DateTime::parse_from_rfc3339(iso).map(|dt| dt.with_timezone(&Utc)).map_err(|e| LxError::runtime(format!("time: bad iso: {e}"), span));
       }
-      Err(LxError::type_err("time: record needs epoch, ms, or iso field", span))
+      Err(LxError::type_err("time: record needs epoch, ms, or iso field", span, None))
     },
-    _ => Err(LxError::type_err("time: expected timestamp Record", span)),
+    _ => Err(LxError::type_err("time: expected timestamp Record", span, None)),
   }
 }

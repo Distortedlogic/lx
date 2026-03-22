@@ -143,24 +143,24 @@ fn parse_edge_type(s: &str) -> Result<EdgeType, String> {
 
 fn value_to_graph(val: &LxVal, span: SourceSpan) -> Result<Graph, LxError> {
   let LxVal::Record(rec) = val else {
-    return Err(LxError::type_err("diag.to_mermaid expects Graph record", span));
+    return Err(LxError::type_err("diag.to_mermaid expects Graph record", span, None));
   };
-  let nodes_val = rec.get(&crate::sym::intern("nodes")).ok_or_else(|| LxError::type_err("graph missing 'nodes'", span))?;
-  let edges_val = rec.get(&crate::sym::intern("edges")).ok_or_else(|| LxError::type_err("graph missing 'edges'", span))?;
+  let nodes_val = rec.get(&crate::sym::intern("nodes")).ok_or_else(|| LxError::type_err("graph missing 'nodes'", span, None))?;
+  let edges_val = rec.get(&crate::sym::intern("edges")).ok_or_else(|| LxError::type_err("graph missing 'edges'", span, None))?;
   let nodes = match nodes_val {
     LxVal::List(l) => l.iter().map(|v| value_to_node(v, span)).collect::<Result<_, _>>()?,
-    _ => return Err(LxError::type_err("graph.nodes must be List", span)),
+    _ => return Err(LxError::type_err("graph.nodes must be List", span, None)),
   };
   let edges = match edges_val {
     LxVal::List(l) => l.iter().map(|v| value_to_edge(v, span)).collect::<Result<_, _>>()?,
-    _ => return Err(LxError::type_err("graph.edges must be List", span)),
+    _ => return Err(LxError::type_err("graph.edges must be List", span, None)),
   };
   Ok(Graph { nodes, edges, subgraphs: vec![] })
 }
 
 fn value_to_node(val: &LxVal, span: SourceSpan) -> Result<DiagNode, LxError> {
   let LxVal::Record(rec) = val else {
-    return Err(LxError::type_err("node must be Record", span));
+    return Err(LxError::type_err("node must be Record", span, None));
   };
   let children = match rec.get(&crate::sym::intern("children")) {
     Some(LxVal::List(l)) => l.iter().map(|v| value_to_node(v, span)).collect::<Result<_, _>>()?,
@@ -171,7 +171,7 @@ fn value_to_node(val: &LxVal, span: SourceSpan) -> Result<DiagNode, LxError> {
     n.to_u32()
   });
   let kind_str = require_str_field(rec, "kind", "diag.node", span)?;
-  let kind = parse_node_kind(&kind_str).map_err(|e| LxError::type_err(e, span))?;
+  let kind = parse_node_kind(&kind_str).map_err(|e| LxError::type_err(e, span, None))?;
   Ok(DiagNode {
     id: require_str_field(rec, "id", "diag.node", span)?.to_string(),
     label: require_str_field(rec, "label", "diag.node", span)?.to_string(),
@@ -183,12 +183,12 @@ fn value_to_node(val: &LxVal, span: SourceSpan) -> Result<DiagNode, LxError> {
 
 fn value_to_edge(val: &LxVal, span: SourceSpan) -> Result<DiagEdge, LxError> {
   let LxVal::Record(rec) = val else {
-    return Err(LxError::type_err("edge must be Record", span));
+    return Err(LxError::type_err("edge must be Record", span, None));
   };
   let style_str = require_str_field(rec, "style", "diag.edge", span)?;
-  let style = parse_edge_style(&style_str).map_err(|e| LxError::type_err(e, span))?;
+  let style = parse_edge_style(&style_str).map_err(|e| LxError::type_err(e, span, None))?;
   let edge_type_str = rec.get(&crate::sym::intern("edge_type")).and_then(|v| v.as_str()).unwrap_or("exec");
-  let edge_type = parse_edge_type(edge_type_str).map_err(|e| LxError::type_err(e, span))?;
+  let edge_type = parse_edge_type(edge_type_str).map_err(|e| LxError::type_err(e, span, None))?;
   Ok(DiagEdge {
     from: require_str_field(rec, "from", "diag.edge", span)?.to_string(),
     to: require_str_field(rec, "to", "diag.edge", span)?.to_string(),

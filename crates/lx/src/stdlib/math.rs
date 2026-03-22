@@ -31,7 +31,7 @@ fn to_f64(v: &LxVal, span: SourceSpan) -> Result<f64, LxError> {
   match v {
     LxVal::Float(f) => Ok(*f),
     LxVal::Int(n) => n.to_f64().ok_or_else(|| LxError::runtime("math: Int too large for float", span)),
-    other => Err(LxError::type_err(format!("math: expected number, got {}", other.type_name()), span)),
+    other => Err(LxError::type_err(format!("math: expected number, got {}", other.type_name()), span, None)),
   }
 }
 
@@ -45,7 +45,7 @@ fn bi_abs(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<Lx
       }
     },
     LxVal::Float(f) => Ok(LxVal::Float(f.abs())),
-    other => Err(LxError::type_err(format!("math.abs expects number, got {}", other.type_name()), span)),
+    other => Err(LxError::type_err(format!("math.abs expects number, got {}", other.type_name()), span, None)),
   }
 }
 

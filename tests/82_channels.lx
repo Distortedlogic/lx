@@ -1,0 +1,86 @@
+-- channel CSP tests
+-- verifies channel create/send/recv/try_recv/close with bounded and unbounded channels
+
+use std/channel
+
+-- 1. Basic send/recv: order preserved
+ch1 = channel.create 10
+tx1 = ch1.0
+rx1 = ch1.1
+channel.send tx1 "a"
+channel.send tx1 "b"
+channel.send tx1 "c"
+
+r1a = channel.recv rx1
+assert (r1a == Ok "a")
+r1b = channel.recv rx1
+assert (r1b == Ok "b")
+r1c = channel.recv rx1
+assert (r1c == Ok "c")
+
+-- 2. Close behavior: recv drains then returns Err
+ch2 = channel.create 10
+tx2 = ch2.0
+rx2 = ch2.1
+channel.send tx2 "x"
+channel.send tx2 "y"
+channel.close tx2
+
+r2a = channel.recv rx2
+assert (r2a == Ok "x")
+r2b = channel.recv rx2
+assert (r2b == Ok "y")
+r2c = channel.recv rx2
+is_err2 = r2c ? { Err _ -> true; Ok _ -> false }
+assert is_err2
+
+-- 3. Par producer/consumer
+ch3 = channel.create 10
+tx3 = ch3.0
+rx3 = ch3.1
+result3 = par {
+  {
+    channel.send tx3 10
+    channel.send tx3 20
+    channel.send tx3 30
+    channel.close tx3
+  }
+  {
+    v1 = channel.recv rx3
+    v2 = channel.recv rx3
+    v3 = channel.recv rx3
+    v4 = channel.recv rx3
+    [v1, v2, v3, v4]
+  }
+}
+recv_list = result3.1
+assert (recv_list.0 == Ok 10)
+assert (recv_list.1 == Ok 20)
+assert (recv_list.2 == Ok 30)
+r3closed = recv_list.3 ? { Err _ -> true; Ok _ -> false }
+assert r3closed
+
+-- 4. try_recv: None on empty, Some after send
+ch4 = channel.create 10
+tx4 = ch4.0
+rx4 = ch4.1
+r4a = channel.try_recv rx4
+assert (r4a == None)
+
+channel.send tx4 42
+r4b = channel.try_recv rx4
+assert (r4b == Some 42)
+
+r4c = channel.try_recv rx4
+assert (r4c == None)
+
+-- 5. Bounded channel capacity 1: send blocks when full, timeout detects it
+ch5 = channel.create 1
+tx5 = ch5.0
+rx5 = ch5.1
+channel.send tx5 "first"
+blocked = timeout 50 (channel.send tx5 "second")
+is_timeout = blocked ? { Err e -> e.kind == ":timeout"; _ -> false }
+assert is_timeout
+drain5 = channel.recv rx5
+assert (drain5 == Ok "first")

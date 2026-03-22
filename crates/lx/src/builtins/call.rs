@@ -42,6 +42,10 @@ pub(crate) async fn call_value(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Ar
         BuiltinKind::Async(f) => f(bf.applied, span, Arc::clone(ctx)).await,
       }
     },
+    LxVal::MultiFunc(clauses) => {
+      let mut interp = crate::interpreter::Interpreter::with_env(&crate::env::Env::default(), Arc::clone(ctx));
+      interp.apply_func(LxVal::MultiFunc(clauses.clone()), arg, span).await
+    },
     LxVal::TaggedCtor { tag, arity, applied } => {
       let mut applied = applied.clone();
       applied.push(arg);
@@ -51,6 +55,6 @@ pub(crate) async fn call_value(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Ar
         Ok(LxVal::Tagged { tag: *tag, values: Arc::new(applied) })
       }
     },
-    other => Err(LxError::type_err(format!("cannot call {}, not a function", other.type_name()), span)),
+    other => Err(LxError::type_err(format!("cannot call {}, not a function", other.type_name()), span, None)),
   }
 }

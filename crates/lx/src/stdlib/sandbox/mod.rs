@@ -58,7 +58,7 @@ fn bi_policy(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result
     LxVal::Str(name) => make_preset(name),
     LxVal::Record(config) => parse_policy(config, span)?,
     _ => {
-      return Err(LxError::type_err("sandbox.policy expects Str preset name or config Record", span));
+      return Err(LxError::type_err("sandbox.policy expects Str preset name or config Record", span, None));
     },
   };
   let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
@@ -77,13 +77,13 @@ fn bi_permits(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resul
   let capability = match &args[1] {
     LxVal::Str(s) => s.to_string(),
     _ => {
-      return Err(LxError::type_err("sandbox.permits expects Str capability", span));
+      return Err(LxError::type_err("sandbox.permits expects Str capability", span, None));
     },
   };
   let target = match &args[2] {
     LxVal::Str(s) => s.to_string(),
     _ => {
-      return Err(LxError::type_err("sandbox.permits expects Str target", span));
+      return Err(LxError::type_err("sandbox.permits expects Str target", span, None));
     },
   };
   let p = POLICIES.get(&id).ok_or_else(|| LxError::runtime("sandbox: policy not found", span))?;
@@ -92,7 +92,7 @@ fn bi_permits(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resul
 
 fn bi_merge(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let LxVal::List(handles) = &args[0] else {
-    return Err(LxError::type_err("sandbox.merge expects List of policy handles", span));
+    return Err(LxError::type_err("sandbox.merge expects List of policy handles", span, None));
   };
   let mut policies = Vec::new();
   for h in handles.iter() {
@@ -109,7 +109,7 @@ fn bi_merge(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<
 fn bi_attenuate(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let parent_id = policy_id(&args[0], span)?;
   let LxVal::Record(overrides) = &args[1] else {
-    return Err(LxError::type_err("sandbox.attenuate expects Record overrides", span));
+    return Err(LxError::type_err("sandbox.attenuate expects Record overrides", span, None));
   };
   let parent = POLICIES.get(&parent_id).ok_or_else(|| LxError::runtime("sandbox: policy not found", span))?.clone();
   let child = parse_policy(overrides, span)?;

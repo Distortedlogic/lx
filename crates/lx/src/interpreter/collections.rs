@@ -15,7 +15,7 @@ impl super::Interpreter {
           match v {
             LxVal::List(items) => out.extend(items.as_ref().iter().cloned()),
             other => {
-              return Err(LxError::type_err(format!("spread requires List, got {}", other.type_name()), e.span));
+              return Err(LxError::type_err(format!("spread requires List, got {}", other.type_name()), e.span, None));
             },
           }
         },
@@ -32,7 +32,7 @@ impl super::Interpreter {
         match v {
           LxVal::Record(r) => map.extend(r.iter().map(|(k, v)| (*k, v.clone()))),
           other => {
-            return Err(LxError::type_err(format!("spread requires Record, got {}", other.type_name()), f.value.span));
+            return Err(LxError::type_err(format!("spread requires Record, got {}", other.type_name()), f.value.span, None));
           },
         }
       } else {
@@ -60,7 +60,7 @@ impl super::Interpreter {
         match v {
           LxVal::Map(m) => map.extend(m.iter().map(|(k, v)| (k.clone(), v.clone()))),
           other => {
-            return Err(LxError::type_err(format!("spread requires Map, got {}", other.type_name()), entry.value.span));
+            return Err(LxError::type_err(format!("spread requires Map, got {}", other.type_name()), entry.value.span, None));
           },
         }
       } else {

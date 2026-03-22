@@ -27,7 +27,7 @@ pub fn check_file(path: &str, strict: bool) -> ExitCode {
           "warning"
         },
       };
-      let err = lx::error::LxError::type_err(format!("{prefix}: {}", d.msg), d.span);
+      let err = lx::error::LxError::type_err(format!("{prefix}: {}", d.msg), d.span, d.help.clone());
       let named = miette::NamedSource::new(path, source.clone());
       let report = miette::Report::new(err).with_source_code(named);
       eprintln!("{report:?}");
@@ -88,7 +88,7 @@ pub fn check_workspace(member_filter: Option<&str>, strict: bool) -> ExitCode {
           } else if file_errors == 0 {
             member_ok += 1;
             for d in &result.diagnostics {
-              let err = lx::error::LxError::type_err(format!("warning: {}", d.msg), d.span);
+              let err = lx::error::LxError::type_err(format!("warning: {}", d.msg), d.span, d.help.clone());
               let named = miette::NamedSource::new(path_str.clone(), source.clone());
               let report = miette::Report::new(err).with_source_code(named);
               eprintln!("{report:?}");
@@ -100,7 +100,7 @@ pub fn check_workspace(member_filter: Option<&str>, strict: bool) -> ExitCode {
                 lx::checker::DiagLevel::Error => "error",
                 lx::checker::DiagLevel::Warning => "warning",
               };
-              let err = lx::error::LxError::type_err(format!("{prefix}: {}", d.msg), d.span);
+              let err = lx::error::LxError::type_err(format!("{prefix}: {}", d.msg), d.span, d.help.clone());
               let named = miette::NamedSource::new(path_str.clone(), source.clone());
               let report = miette::Report::new(err).with_source_code(named);
               eprintln!("{report:?}");

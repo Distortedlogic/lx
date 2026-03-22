@@ -26,6 +26,8 @@ pub(super) fn ident_or_keyword(text: &str) -> TokenKind {
     "emit" => TokenKind::Emit,
     "yield" => TokenKind::Yield,
     "with" => TokenKind::With,
+    "timeout" => TokenKind::Timeout,
+    "as" => TokenKind::As,
     _ => TokenKind::Ident(crate::sym::intern(text)),
   }
 }
