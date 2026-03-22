@@ -24,7 +24,7 @@ pub struct LxTrait {
   pub name: Sym,
   pub fields: Arc<Vec<FieldDef>>,
   pub methods: Arc<Vec<TraitMethodDef>>,
-  pub defaults: Arc<IndexMap<String, LxVal>>,
+  pub defaults: Arc<IndexMap<Sym, LxVal>>,
   pub requires: Arc<Vec<Sym>>,
   pub description: Option<Sym>,
   pub tags: Arc<Vec<Sym>>,
@@ -34,8 +34,8 @@ pub struct LxTrait {
 pub struct LxClass {
   pub name: Sym,
   pub traits: Arc<Vec<Sym>>,
-  pub defaults: Arc<IndexMap<String, LxVal>>,
-  pub methods: Arc<IndexMap<String, LxVal>>,
+  pub defaults: Arc<IndexMap<Sym, LxVal>>,
+  pub methods: Arc<IndexMap<Sym, LxVal>>,
 }
 
 #[derive(Debug, Clone)]
@@ -43,7 +43,7 @@ pub struct LxObject {
   pub class_name: Sym,
   pub id: u64,
   pub traits: Arc<Vec<Sym>>,
-  pub methods: Arc<IndexMap<String, LxVal>>,
+  pub methods: Arc<IndexMap<Sym, LxVal>>,
 }
 
 #[derive(Debug, Clone, IntoStaticStr, derive_more::From)]
@@ -113,7 +113,7 @@ impl LxVal {
   pub fn list(items: Vec<LxVal>) -> Self {
     LxVal::List(Arc::new(items))
   }
-  pub fn record(fields: IndexMap<String, LxVal>) -> Self {
+  pub fn record(fields: IndexMap<Sym, LxVal>) -> Self {
     LxVal::Record(Arc::new(fields))
   }
   pub fn tuple(items: Vec<LxVal>) -> Self {
@@ -155,7 +155,7 @@ impl LxVal {
     self.as_list().map(|l| l.as_slice()).ok_or_else(|| LxError::type_err(format!("{ctx} expects List, got {}", self.type_name()), span))
   }
 
-  pub fn require_record(&self, ctx: &str, span: SourceSpan) -> Result<&IndexMap<String, LxVal>, LxError> {
+  pub fn require_record(&self, ctx: &str, span: SourceSpan) -> Result<&IndexMap<Sym, LxVal>, LxError> {
     match self {
       LxVal::Record(r) => Ok(r.as_ref()),
       _ => Err(LxError::type_err(format!("{ctx} expects Record, got {}", self.type_name()), span)),
@@ -199,42 +199,42 @@ impl LxVal {
 
   pub fn str_field(&self, key: &str) -> Option<&str> {
     match self {
-      LxVal::Record(fields) => fields.get(key).and_then(|v| v.as_str()),
+      LxVal::Record(fields) => fields.get(&crate::sym::intern(key)).and_then(|v| v.as_str()),
       _ => None,
     }
   }
 
   pub fn int_field(&self, key: &str) -> Option<&BigInt> {
     match self {
-      LxVal::Record(fields) => fields.get(key).and_then(|v| v.as_int()),
+      LxVal::Record(fields) => fields.get(&crate::sym::intern(key)).and_then(|v| v.as_int()),
       _ => None,
     }
   }
 
   pub fn float_field(&self, key: &str) -> Option<f64> {
     match self {
-      LxVal::Record(fields) => fields.get(key).and_then(|v| v.as_float()),
+      LxVal::Record(fields) => fields.get(&crate::sym::intern(key)).and_then(|v| v.as_float()),
       _ => None,
     }
   }
 
   pub fn bool_field(&self, key: &str) -> Option<bool> {
     match self {
-      LxVal::Record(fields) => fields.get(key).and_then(|v| v.as_bool()),
+      LxVal::Record(fields) => fields.get(&crate::sym::intern(key)).and_then(|v| v.as_bool()),
       _ => None,
     }
   }
 
   pub fn list_field(&self, key: &str) -> Option<&[LxVal]> {
     match self {
-      LxVal::Record(fields) => fields.get(key).and_then(|v| v.as_list()).map(|l| l.as_slice()),
+      LxVal::Record(fields) => fields.get(&crate::sym::intern(key)).and_then(|v| v.as_list()).map(|l| l.as_slice()),
       _ => None,
     }
   }
 
-  pub fn record_field(&self, key: &str) -> Option<&IndexMap<String, LxVal>> {
+  pub fn record_field(&self, key: &str) -> Option<&IndexMap<Sym, LxVal>> {
     match self {
-      LxVal::Record(fields) => fields.get(key).and_then(|v| match v {
+      LxVal::Record(fields) => fields.get(&crate::sym::intern(key)).and_then(|v| match v {
         LxVal::Record(inner) => Some(inner.as_ref()),
         _ => None,
       }),

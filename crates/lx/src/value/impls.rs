@@ -6,7 +6,7 @@ use super::{LxVal, ValueKey};
 macro_rules! record {
     ($($key:expr => $val:expr),* $(,)?) => {{
         let mut m = indexmap::IndexMap::new();
-        $(m.insert(String::from($key), $val);)*
+        $(m.insert($crate::sym::intern($key), $val);)*
         $crate::value::LxVal::Record(std::sync::Arc::new(m))
     }};
 }
