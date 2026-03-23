@@ -49,20 +49,20 @@ pub trait AstFolder {
     name
   }
 
-  fn fold_binary(&mut self, b: ExprBinary, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_binary(self, b, span, arena)
+  fn fold_binary(&mut self, id: ExprId, b: ExprBinary, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_binary(self, id, b, span, arena)
   }
 
-  fn fold_unary(&mut self, u: ExprUnary, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_unary(self, u, span, arena)
+  fn fold_unary(&mut self, id: ExprId, u: ExprUnary, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_unary(self, id, u, span, arena)
   }
 
-  fn fold_pipe(&mut self, p: ExprPipe, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_pipe(self, p, span, arena)
+  fn fold_pipe(&mut self, id: ExprId, p: ExprPipe, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_pipe(self, id, p, span, arena)
   }
 
-  fn fold_apply(&mut self, a: ExprApply, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_apply(self, a, span, arena)
+  fn fold_apply(&mut self, id: ExprId, a: ExprApply, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_apply(self, id, a, span, arena)
   }
 
   fn fold_section(&mut self, s: Section, span: SourceSpan, arena: &mut AstArena) -> ExprId {
@@ -73,12 +73,12 @@ pub trait AstFolder {
     fold_field_access(self, fa, span, arena)
   }
 
-  fn fold_block(&mut self, stmts: Vec<StmtId>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_block(self, stmts, span, arena)
+  fn fold_block(&mut self, id: ExprId, stmts: &[StmtId], span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_block(self, id, stmts, span, arena)
   }
 
-  fn fold_tuple(&mut self, elems: Vec<ExprId>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_tuple(self, elems, span, arena)
+  fn fold_tuple(&mut self, id: ExprId, elems: &[ExprId], span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_tuple(self, id, elems, span, arena)
   }
 
   fn fold_list(&mut self, elems: Vec<ListElem>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
@@ -161,16 +161,16 @@ pub trait AstFolder {
     fold_pattern(self, id, arena)
   }
 
-  fn fold_pattern_list(&mut self, pl: PatternList, span: SourceSpan, arena: &mut AstArena) -> PatternId {
-    fold_pattern_list(self, pl, span, arena)
+  fn fold_pattern_list(&mut self, id: PatternId, pl: &PatternList, span: SourceSpan, arena: &mut AstArena) -> PatternId {
+    fold_pattern_list(self, id, pl, span, arena)
   }
 
-  fn fold_pattern_record(&mut self, pr: PatternRecord, span: SourceSpan, arena: &mut AstArena) -> PatternId {
-    fold_pattern_record(self, pr, span, arena)
+  fn fold_pattern_record(&mut self, id: PatternId, pr: &PatternRecord, span: SourceSpan, arena: &mut AstArena) -> PatternId {
+    fold_pattern_record(self, id, pr, span, arena)
   }
 
-  fn fold_pattern_constructor(&mut self, pc: PatternConstructor, span: SourceSpan, arena: &mut AstArena) -> PatternId {
-    fold_pattern_constructor(self, pc, span, arena)
+  fn fold_pattern_constructor(&mut self, id: PatternId, pc: &PatternConstructor, span: SourceSpan, arena: &mut AstArena) -> PatternId {
+    fold_pattern_constructor(self, id, pc, span, arena)
   }
 
   fn fold_type_expr(&mut self, id: TypeExprId, arena: &mut AstArena) -> TypeExprId {

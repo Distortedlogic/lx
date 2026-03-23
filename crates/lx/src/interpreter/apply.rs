@@ -113,13 +113,6 @@ impl Interpreter {
     }
   }
 
-  pub(super) async fn eval_pipe(&mut self, left: ExprId, right: ExprId, span: SourceSpan) -> Result<LxVal, LxError> {
-    let val = self.eval(left).await?;
-    let val = self.force_defaults(val, span).await?;
-    let func = self.eval(right).await?;
-    self.apply_func(func, val, span).await
-  }
-
   fn apply_named_args(&self, lf: &mut LxFunc, arg: LxVal) {
     if let LxVal::Tagged { ref tag, ref values } = arg
       && *tag == "__named"

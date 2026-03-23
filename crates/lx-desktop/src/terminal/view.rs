@@ -25,20 +25,12 @@ pub fn TerminalView(terminal_id: String, working_dir: String, command: Option<St
     let wd = working_dir.clone();
     let cmd = command.clone();
     async move {
-      dioxus::logger::tracing::info!("terminal {element_id}: creating PTY, wd={wd}");
       let session = match pty_mux::get_or_create(&element_id, 80, 24, Some(&wd), cmd.as_deref()) {
-        Ok(s) => {
-          dioxus::logger::tracing::info!("terminal {element_id}: PTY created successfully");
-          s
-        },
-        Err(e) => {
-          dioxus::logger::tracing::error!("terminal {element_id}: PTY failed: {e}");
-          return;
-        },
+        Ok(s) => s,
+        Err(_e) => return,
       };
 
       let (initial, mut rx) = session.subscribe();
-      dioxus::logger::tracing::info!("terminal {element_id}: subscribed, initial_bytes={}", initial.len());
       if !initial.is_empty() {
         widget.send_update(B64.encode(&initial));
       }
@@ -87,7 +79,7 @@ pub fn TerminalView(terminal_id: String, working_dir: String, command: Option<St
   rsx! {
     div {
       id: "{eid_rsx}",
-      class: "w-full h-full bg-gray-950 overflow-hidden",
+      class: "w-full h-full bg-[var(--surface-container-lowest)] overflow-hidden p-[1.1rem]",
     }
   }
 }
@@ -97,7 +89,10 @@ pub fn BrowserView(browser_id: String, url: String, devtools: bool) -> Element {
   let (element_id, _widget) = use_ts_widget("browser", serde_json::json!({ "url": url }));
 
   rsx! {
-    div { id: "{element_id}", class: "w-full h-full" }
+    div {
+      id: "{element_id}",
+      class: "w-full h-full bg-[var(--surface-container)]",
+    }
   }
 }
 
@@ -113,7 +108,10 @@ pub fn EditorView(editor_id: String, file_path: String, language: Option<String>
   );
 
   rsx! {
-    div { id: "{element_id}", class: "w-full h-full" }
+    div {
+      id: "{element_id}",
+      class: "w-full h-full bg-[var(--surface-container-lowest)]",
+    }
   }
 }
 
@@ -122,7 +120,10 @@ pub fn AgentView(agent_id: String, session_id: String, model: String) -> Element
   let (element_id, _widget) = use_ts_widget("agent", serde_json::json!({}));
 
   rsx! {
-    div { id: "{element_id}", class: "w-full h-full" }
+    div {
+      id: "{element_id}",
+      class: "w-full h-full bg-[var(--surface-container)]",
+    }
   }
 }
 
@@ -131,7 +132,10 @@ pub fn CanvasView(canvas_id: String, widget_type: String, config: serde_json::Va
   let (element_id, _widget) = use_ts_widget(&widget_type, &config);
 
   rsx! {
-    div { id: "{element_id}", class: "w-full h-full" }
+    div {
+      id: "{element_id}",
+      class: "w-full h-full bg-[var(--surface-container)]",
+    }
   }
 }
 
@@ -151,7 +155,10 @@ pub fn ChartView(chart_id: String, chart_json: String, title: Option<String>) ->
     document::eval(&format!("DxCharts.disposeChart('{id_drop}')"));
   });
   rsx! {
-    div { id: "{div_id}", class: "w-full h-full min-h-32" }
+    div {
+      id: "{div_id}",
+      class: "w-full h-full min-h-32 bg-[var(--surface-container)]",
+    }
   }
 }
 
@@ -195,7 +202,10 @@ pub fn VoiceView(voice_id: String) -> Element {
   });
 
   rsx! {
-    div { id: "{eid_rsx}", class: "w-full h-full" }
+    div {
+      id: "{eid_rsx}",
+      class: "w-full h-full bg-[var(--surface-container-lowest)]",
+    }
   }
 }
 

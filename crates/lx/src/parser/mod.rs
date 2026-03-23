@@ -49,7 +49,16 @@ pub(crate) fn token_to_binop(kind: &TokenKind) -> Option<BinOp> {
   }
 }
 
-pub fn parse(tokens: Vec<Token>) -> Result<Program<Surface>, LxError> {
+pub struct ParseResult {
+  pub program: Option<Program<Surface>>,
+  pub errors: Vec<LxError>,
+}
+
+pub fn parse(tokens: Vec<Token>) -> ParseResult {
+  parse_with_recovery(tokens)
+}
+
+fn parse_with_recovery(tokens: Vec<Token>) -> ParseResult {
   let len = tokens.last().map(|t| t.span.offset() + t.span.len()).unwrap_or(0);
   let eoi: Span = (len..len).into();
 
@@ -65,15 +74,14 @@ pub fn parse(tokens: Vec<Token>) -> Result<Program<Surface>, LxError> {
   let input = Stream::from_iter(spanned).map(eoi, |(t, s)| (t, s));
   let arena = Rc::new(RefCell::new(AstArena::new()));
 
-  match stmt::program_parser(arena.clone()).parse(input).into_result() {
-    Ok(stmts) => {
-      let arena = Rc::try_unwrap(arena).expect("arena still borrowed").into_inner();
-      Ok(Program { stmts, arena, _phase: PhantomData })
-    },
-    Err(errs) => {
-      let e = &errs[0];
-      let sp = ss(*e.span());
-      Err(LxError::parse(format!("{e:?}"), sp, None))
-    },
-  }
+  let (output, errs) = stmt::program_parser(arena.clone()).parse(input).into_output_errors();
+
+  let errors: Vec<LxError> = errs.into_iter().map(|e| LxError::parse(format!("{e:?}"), ss(*e.span()), None)).collect();
+
+  let program = output.map(|stmts| {
+    let arena = Rc::try_unwrap(arena).expect("arena still borrowed").into_inner();
+    Program { stmts, arena, _phase: PhantomData }
+  });
+
+  ParseResult { program, errors }
 }

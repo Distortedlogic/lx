@@ -158,7 +158,6 @@ pub enum TypeContext {
   FuncReturn { func_name: String },
   Binding { name: String },
   RecordField { field_name: String },
-  ListElement { index: usize },
   MatchArm { arm_idx: usize },
   BinaryOp { op: String },
   General,
@@ -180,9 +179,6 @@ impl TypeError {
       },
       TypeContext::RecordField { field_name } => {
         format!("type mismatch in record field '{field_name}'\n  expected: {expected}\n     found: {found}")
-      },
-      TypeContext::ListElement { index } => {
-        format!("type mismatch in list element #{index}\n  expected: {expected}\n     found: {found}")
       },
       TypeContext::MatchArm { arm_idx } => {
         format!("type mismatch in match arm #{arm_idx}\n  expected: {expected}\n     found: {found}")

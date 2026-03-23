@@ -2,11 +2,18 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
 
+use lx::error::LxError;
 use lx::runtime::RuntimeCtx;
 
-pub fn run(source: &str, filename: &str, ctx: &Arc<RuntimeCtx>) -> Result<(), Vec<lx::error::LxError>> {
+pub fn run(source: &str, filename: &str, ctx: &Arc<RuntimeCtx>) -> Result<(), Vec<LxError>> {
   let tokens = lx::lexer::lex(source).map_err(|e| vec![e])?;
-  let surface = lx::parser::parse(tokens).map_err(|e| vec![e])?;
+  let result = lx::parser::parse(tokens);
+  let surface = result.program.ok_or(result.errors.clone())?;
+  if !result.errors.is_empty() {
+    for e in &result.errors {
+      eprintln!("parse warning: {e}");
+    }
+  }
   let program = lx::folder::desugar(surface);
   let source_dir = Path::new(filename).parent().map(|p| p.to_path_buf());
   let mut interp = lx::interpreter::Interpreter::new(source, source_dir, Arc::clone(ctx));
@@ -33,11 +40,20 @@ pub fn read_and_parse(path: &str) -> Result<(String, lx::ast::Program<lx::ast::C
     eprintln!("{:?}", miette::Report::new(e).with_source_code(named));
     ExitCode::from(1)
   })?;
-  let surface = lx::parser::parse(tokens).map_err(|e| {
-    let named = miette::NamedSource::new(path, source.clone());
-    eprintln!("{:?}", miette::Report::new(e).with_source_code(named));
+  let result = lx::parser::parse(tokens);
+  let surface = result.program.ok_or_else(|| {
+    for e in &result.errors {
+      let named = miette::NamedSource::new(path, source.clone());
+      eprintln!("{:?}", miette::Report::new(e.clone()).with_source_code(named));
+    }
     ExitCode::from(1)
   })?;
+  if !result.errors.is_empty() {
+    for e in &result.errors {
+      let named = miette::NamedSource::new(path, source.clone());
+      eprintln!("parse warning: {:?}", miette::Report::new(e.clone()).with_source_code(named));
+    }
+  }
   let program = lx::folder::desugar(surface);
   Ok((source, program))
 }

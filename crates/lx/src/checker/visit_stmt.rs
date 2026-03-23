@@ -3,9 +3,10 @@ use crate::sym::Sym;
 use miette::SourceSpan;
 
 use super::diagnostics::DiagnosticKind;
+use super::symbol_table::DefKind;
 use super::types::{self, Type};
 use super::unification::TypeContext;
-use super::{Checker, DiagLevel, Diagnostic};
+use super::{Checker, DiagLevel, Diagnostic, named_to_type};
 
 impl Checker<'_> {
   pub(crate) fn check_stmts(&mut self, stmts: &[StmtId]) -> Type {
@@ -38,11 +39,8 @@ impl Checker<'_> {
       },
       Stmt::TraitUnion(_) => Type::Unit,
       Stmt::TraitDecl(data) => {
-        let fields: Vec<(Sym, Type)> = data
-          .entries
-          .iter()
-          .filter_map(|e| if let TraitEntry::Field(f) = e { Some((f.name, super::named_to_type(f.type_name.as_str()))) } else { None })
-          .collect();
+        let fields: Vec<(Sym, Type)> =
+          data.entries.iter().filter_map(|e| if let TraitEntry::Field(f) = e { Some((f.name, named_to_type(f.type_name.as_str()))) } else { None }).collect();
         if !fields.is_empty() {
           self.trait_fields.insert(data.name, fields);
         }
@@ -92,8 +90,7 @@ impl Checker<'_> {
 
   fn check_import_conflict(&mut self, name: Sym, span: SourceSpan) {
     if let Some(&existing) = self.import_sources.get(&name) {
-      let original_span =
-        self.symbols.resolve(name).filter(|def| matches!(def.kind, super::symbol_table::DefKind::Import)).map(|def| def.span).unwrap_or(existing);
+      let original_span = self.symbols.resolve(name).filter(|def| matches!(def.kind, DefKind::Import)).map(|def| def.span).unwrap_or(existing);
       let kind = DiagnosticKind::DuplicateImport { name, original_span };
       let secondary = vec![(original_span, "previously imported here".into())];
       let fix = kind.suggest_fix(span);
@@ -105,23 +102,26 @@ impl Checker<'_> {
 
   fn check_binding(&mut self, b: &Binding, _span: SourceSpan) {
     let val_span = self.arena.expr_span(b.value);
-    let val_type = self.synth_expr(b.value);
-    if let Some(ann) = b.type_ann {
-      let ann_span = self.arena.type_expr_span(ann);
+    let val_type = if let Some(ann) = b.type_ann {
       let expected = self.resolve_type_ann(ann);
+      let ann_span = self.arena.type_expr_span(ann);
+      let checked = self.check_expr(b.value, &expected);
       let binding_name = match &b.target {
         BindTarget::Name(n) | BindTarget::Reassign(n) => n.to_string(),
         BindTarget::Pattern(_) => "<pattern>".into(),
       };
       let ctx = TypeContext::Binding { name: binding_name };
-      match self.table.unify_with_context(&expected, &val_type, ctx) {
-        Ok(_) => {},
+      match self.table.unify_with_context(&expected, &checked, ctx) {
+        Ok(t) => t,
         Err(mut te) => {
           te.expected_origin = Some(ann_span);
           self.emit_type_error(&te, val_span);
+          checked
         },
       }
-    }
+    } else {
+      self.synth_expr(b.value)
+    };
     match &b.target {
       BindTarget::Name(name) => {
         if b.mutable {

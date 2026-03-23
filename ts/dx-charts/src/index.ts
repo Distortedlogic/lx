@@ -33,3 +33,13 @@ export {
   genTimeTooltip,
   memoryTooltip,
 } from "./formatters";
+
+import * as self from "./index";
+
+declare global {
+  interface Window {
+    DxCharts: typeof self;
+  }
+}
+
+window.DxCharts = self;

@@ -1,5 +1,17 @@
 var DxCharts = (function(exports) {
 	Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
+	//#region \0rolldown/runtime.js
+	var __defProp = Object.defineProperty;
+	var __exportAll = (all, no_symbols) => {
+		let target = {};
+		for (var name in all) __defProp(target, name, {
+			get: all[name],
+			enumerable: true
+		});
+		if (!no_symbols) __defProp(target, Symbol.toStringTag, { value: "Module" });
+		return target;
+	};
+	//#endregion
 	//#region src/formatters.ts
 	function formatDuration(value) {
 		if (value < .1) return value.toFixed(4) + "ms";
@@ -459,6 +471,34 @@ var DxCharts = (function(exports) {
 			}]
 		};
 	}
+	window.DxCharts = /* @__PURE__ */ __exportAll({
+		abbreviateCategory: () => abbreviateCategory,
+		abbreviateNumber: () => abbreviateNumber,
+		abbreviatePopulation: () => abbreviatePopulation,
+		alpsTooltipFormatter: () => alpsTooltipFormatter,
+		candlestickRenderItem: () => candlestickRenderItem,
+		cumulativeGrowthTooltip: () => cumulativeGrowthTooltip,
+		disposeChart: () => disposeChart,
+		formatDuration: () => formatDuration,
+		formatFitness: () => formatFitness,
+		formatFixed2: () => formatFixed2,
+		formatFixed4: () => formatFixed4,
+		formatIdentity: () => formatIdentity,
+		formatMegabytes: () => formatMegabytes,
+		formatMoney: () => formatMoney,
+		formatMoneyFull: () => formatMoneyFull,
+		formatNumber: () => formatNumber,
+		formatPercent: () => formatPercent,
+		formatRound: () => formatRound,
+		genTimeTooltip: () => genTimeTooltip,
+		initChart: () => initChart,
+		initFlowGraph: () => initFlowGraph,
+		memoryTooltip: () => memoryTooltip,
+		restoreChart: () => restoreChart,
+		scatterTooltipFormatter: () => scatterTooltipFormatter,
+		setupFlamegraph: () => setupFlamegraph,
+		updateFlowGraphStatus: () => updateFlowGraphStatus
+	});
 	//#endregion
 	exports.abbreviateCategory = abbreviateCategory;
 	exports.abbreviateNumber = abbreviateNumber;

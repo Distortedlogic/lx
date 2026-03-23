@@ -1,5 +1,7 @@
 # Voice Pipeline Integration Plan
 
+**Status: COMPLETED**
+
 ## Prerequisites
 
 Read `/home/entropybender/repos/lx/CLAUDE.md` first and follow all rules in it. Key rules that apply here:
@@ -8,11 +10,11 @@ Read `/home/entropybender/repos/lx/CLAUDE.md` first and follow all rules in it. 
 - No `.unwrap()` — use `?` or `.expect("reason")`
 - Do not swallow errors — propagate or surface them
 - 300 line file limit
-- Run `cargo clippy -p lx-desktop -- -D warnings` to verify — must pass with zero warnings
+- Verify with `cd crates/lx-desktop && cargo clippy --features desktop -- -D warnings`
 
 ## Goal
 
-Wire the voice chat pipeline into the lx-desktop Dioxus app. A human opens a Voice pane, speaks into their microphone, speech is transcribed (Whisper STT), sent to Claude CLI for an LLM response, and the response is spoken back (Kokoro TTS). All infrastructure crates and TS packages already exist and compile. This plan covers only the remaining integration code — 4 file changes total.
+Wire the voice chat pipeline into the lx-desktop Dioxus app. A human opens a Voice pane, speaks into their microphone, speech is transcribed (Whisper STT), sent to Claude CLI for an LLM response, and the response is spoken back (Kokoro TTS).
 
 ## Architecture
 
@@ -130,25 +132,11 @@ Access fields via `msg["type"].as_str()` and `msg["data"].as_str()`. These retur
 
 ## Changes — Step by Step
 
-### Step 1: Add dependencies to `crates/lx-desktop/Cargo.toml`
+### Step 1: Cargo.toml dependencies
 
-The current `[dependencies]` section is:
+The crate uses `dioxus = { version = "0.7", features = ["fullstack", "router"] }` with separate `desktop` and `server` feature flags. Tokio requires the `process` feature for `ClaudeCliBackend`.
 
-```toml
-[dependencies]
-pane-tree = { path = "../pane-tree" }
-pty-mux = { path = "../pty-mux" }
-widget-bridge = { path = "../widget-bridge" }
-base64 = "0.22"
-dioxus = { version = "0.7", features = ["desktop", "router"] }
-serde = { workspace = true }
-serde_json = { workspace = true }
-tokio = { workspace = true }
-uuid = { version = "1", features = ["v4"] }
-```
-
-Add these 6 lines (4 local crates + 2 new external deps):
-
+Required dependencies for voice pipeline:
 ```toml
 audio-core = { path = "../audio-core" }
 whisper-client = { path = "../whisper-client" }
@@ -158,9 +146,14 @@ anyhow = "1"
 async-trait = "0.1"
 ```
 
+Tokio must include the `process` feature:
+```toml
+tokio = { workspace = true, features = ["process"] }
+```
+
 ### Step 2: Create `crates/lx-desktop/src/voice_backend.rs`
 
-Create this new file with this exact content:
+Implements `AgentBackend` by shelling out to `claude` CLI:
 
 ```rust
 use voice_agent::AgentBackend;
@@ -169,75 +162,27 @@ pub struct ClaudeCliBackend;
 
 #[async_trait::async_trait]
 impl AgentBackend for ClaudeCliBackend {
-    async fn query(&self, text: &str) -> anyhow::Result<String> {
-        let output = tokio::process::Command::new("claude")
-            .args(["-p", text, "--output-format", "text"])
-            .output()
-            .await?;
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            anyhow::bail!("claude cli failed: {stderr}");
-        }
-        let response = String::from_utf8(output.stdout)?;
-        Ok(response.trim().to_owned())
+  async fn query(&self, text: &str) -> anyhow::Result<String> {
+    let output = tokio::process::Command::new("claude").args(["-p", text, "--output-format", "text"]).output().await?;
+    if !output.status.success() {
+      let stderr = String::from_utf8_lossy(&output.stderr);
+      anyhow::bail!("claude cli failed: {stderr}");
     }
+    let response = String::from_utf8(output.stdout)?;
+    Ok(response.trim().to_owned())
+  }
 }
 ```
 
-### Step 3: Add module declaration to `crates/lx-desktop/src/main.rs`
+### Step 3: Module declarations
 
-The current file is:
+The crate uses a `lib.rs` + `main.rs` split for fullstack support. `voice_backend` is declared in `lib.rs` as `pub mod voice_backend;`. The `main.rs` uses `lx_desktop::` paths and has dual `#[cfg(feature = "server")]` / `#[cfg(not(feature = "server"))]` entry points.
 
-```rust
-mod app;
-mod layout;
-mod pages;
-mod panes;
-mod routes;
-mod terminal;
-
-fn main() {
-    dioxus::launch(app::App);
-}
-```
-
-Add `mod voice_backend;` after `mod terminal;`:
-
-```rust
-mod app;
-mod layout;
-mod pages;
-mod panes;
-mod routes;
-mod terminal;
-mod voice_backend;
-
-fn main() {
-    dioxus::launch(app::App);
-}
-```
-
-### Step 4: Rewrite VoiceView in `crates/lx-desktop/src/terminal/view.rs`
-
-This file contains 7 view components in this order: `TerminalView`, `BrowserView`, `EditorView`, `AgentView`, `CanvasView`, `ChartView`, `VoiceView`. **Do NOT modify any component except VoiceView.** VoiceView is the last component in the file (lines 161-171).
+### Step 4: VoiceView in `crates/lx-desktop/src/terminal/view.rs`
 
 #### Step 4a: Add imports
 
-The current import block at the top of `view.rs` is:
-
-```rust
-use base64::Engine as _;
-use base64::engine::general_purpose::STANDARD as B64;
-use dioxus::prelude::*;
-use pane_tree::TabsState;
-use pane_tree::{NotificationLevel, PaneNotification};
-use widget_bridge::use_ts_widget;
-
-use super::use_tabs_state;
-use crate::panes::DesktopPane;
-```
-
-Add these 4 lines after `use widget_bridge::use_ts_widget;` and before `use super::use_tabs_state;`:
+Add after `use widget_bridge::use_ts_widget;`:
 
 ```rust
 use kokoro_client::SpeechRequest;
@@ -246,27 +191,11 @@ use whisper_client::InferenceClient as _;
 use whisper_client::TranscribeRequest;
 ```
 
-The `as _` imports bring the traits into scope so `.infer()` and `.query()` can be called on the concrete types, without creating unused-import warnings (since the trait names themselves are never referenced directly).
+The `as _` imports bring traits into scope for `.infer()` and `.query()` calls without unused-import warnings.
 
-#### Step 4b: Replace VoiceView
+#### Step 4b: VoiceView component and pipeline
 
-Delete the current VoiceView stub (lines 161-171):
-
-```rust
-#[component]
-pub fn VoiceView(voice_id: String) -> Element {
-    let (element_id, _widget) = use_ts_widget("voice", serde_json::json!({}));
-
-    rsx! {
-        div {
-            id: "{element_id}",
-            class: "w-full h-full",
-        }
-    }
-}
-```
-
-Replace with:
+Clippy requires `let...else` for the recv pattern and collapsible `if let` chains:
 
 ```rust
 #[component]
@@ -277,18 +206,14 @@ pub fn VoiceView(voice_id: String) -> Element {
     let eid_rsx = element_id.clone();
     use_future(move || async move {
         loop {
-            let msg = match widget.recv::<serde_json::Value>().await {
-                Ok(msg) => msg,
-                Err(_) => break,
-            };
+            let Ok(msg) = widget.recv::<serde_json::Value>().await else { break };
 
             match msg["type"].as_str() {
                 Some("audio_chunk") => {
-                    if let Some(data) = msg["data"].as_str() {
-                        if let Ok(bytes) = B64.decode(data) {
+                    if let Some(data) = msg["data"].as_str()
+                        && let Ok(bytes) = B64.decode(data) {
                             pcm_buffer.write().extend_from_slice(&bytes);
                         }
-                    }
                 }
                 Some("silence_detected") => {
                     let buffer = std::mem::take(&mut *pcm_buffer.write());
@@ -312,82 +237,128 @@ pub fn VoiceView(voice_id: String) -> Element {
     });
 
     rsx! {
-        div {
-            id: "{eid_rsx}",
-            class: "w-full h-full",
-        }
+        div { id: "{eid_rsx}", class: "w-full h-full bg-[var(--surface-container-lowest)]" }
     }
 }
 
-async fn process_voice_pipeline(
-    pcm: &[u8],
-    widget: widget_bridge::TsWidgetHandle,
-) -> anyhow::Result<()> {
-    let wav = audio_core::wrap_pcm_as_wav(
-        pcm,
-        audio_core::SAMPLE_RATE,
-        audio_core::CHANNELS,
-        audio_core::BITS_PER_SAMPLE,
-    );
+async fn process_voice_pipeline(pcm: &[u8], widget: widget_bridge::TsWidgetHandle) -> anyhow::Result<()> {
+    let wav = audio_core::wrap_pcm_as_wav(pcm, audio_core::SAMPLE_RATE, audio_core::CHANNELS, audio_core::BITS_PER_SAMPLE);
     let audio_data = B64.encode(&wav);
 
-    let transcription = whisper_client::WHISPER
-        .infer(&TranscribeRequest { audio_data, language: None })
-        .await?;
+    let transcription = whisper_client::WHISPER.infer(&TranscribeRequest { audio_data, language: None }).await?;
 
     let text = transcription.text.trim().to_owned();
-    widget.send_update(serde_json::json!({
-        "type": "transcript",
-        "text": text,
-    }));
+    widget.send_update(serde_json::json!({ "type": "transcript", "text": text }));
 
     if text.is_empty() {
         return Ok(());
     }
 
     let response = crate::voice_backend::ClaudeCliBackend.query(&text).await?;
-    widget.send_update(serde_json::json!({
-        "type": "agent_response",
-        "text": response,
-    }));
+    widget.send_update(serde_json::json!({ "type": "agent_response", "text": response }));
 
-    let speech_req = SpeechRequest {
-        text: response,
-        voice: "af_heart".into(),
-        lang_code: "a".into(),
-        speed: 1.0,
-    };
+    let speech_req = SpeechRequest { text: response, voice: "af_heart".into(), lang_code: "a".into(), speed: 1.0 };
     let wav_bytes = kokoro_client::KOKORO.infer(&speech_req).await?;
     let chunks = audio_core::chunk_wav(&wav_bytes, 32768);
     for chunk in chunks {
-        widget.send_update(serde_json::json!({
-            "type": "audio_response",
-            "data": B64.encode(&chunk),
-        }));
+        widget.send_update(serde_json::json!({ "type": "audio_response", "data": B64.encode(&chunk) }));
     }
     Ok(())
 }
 ```
 
-Key implementation details:
-- `pcm_buffer` is a `Signal<Vec<u8>>` — Dioxus signals are `Copy`, so it can be used inside `use_future` without cloning
-- `widget` is `TsWidgetHandle` which is also `Copy` — same applies
-- `process_voice_pipeline()` is a standalone async function that takes the PCM buffer by reference and the widget handle. It propagates all errors via `?`. The caller in VoiceView catches the error and sends it to the widget for display
-- `std::mem::take()` on `pcm_buffer.write()` swaps the buffer contents with an empty Vec, giving ownership of the accumulated PCM to the processing pipeline while clearing the buffer for the next recording
-- `B64` is already imported at line 2 of the file as `use base64::engine::general_purpose::STANDARD as B64`
+### Step 5: Voice widget TS integration
+
+The voice widget must be part of the `widget-bridge` bundle, not a separate `voice-client.js` bundle. A separate IIFE bundle creates its own `widgets` Map via its own copy of `registerWidget`, so the voice widget registers into a Map that `widget-bridge.js` never sees.
+
+Create `ts/widget-bridge/widgets/voice.ts` containing the voice widget implementation. Import from `../src/registry` (same package, same Map). Add the side-effect import `import "../widgets/voice"` to `ts/widget-bridge/src/index.ts`.
+
+Add `@lx/audio-capture` and `@lx/audio-playback` as dependencies to `ts/widget-bridge/package.json`. Add TS path mappings for these packages to `ts/widget-bridge/tsconfig.json`. Widen `rootDir` to `".."` to accommodate cross-package source resolution.
+
+Remove `voice-client.js` from `build.rs` copy list and from `app.rs` script loading.
+
+### Step 6: JS global registration
+
+Dioxus desktop wraps every `document::eval()` call in `new AsyncFunction("dioxus", script)(dioxus)` (see `reference/dioxus/packages/desktop/src/query.rs` line 80). This creates a function scope where `var` declarations are local, not global. An IIFE like `var WidgetBridge = (function(exports) { ... })({})` does NOT create a persistent global when eval'd. Appending `; window.WidgetBridge = WidgetBridge;` externally in Rust also fails — the IIFE may error inside the AsyncFunction wrapper before the assignment executes.
+
+The TS source must explicitly assign to the window object inside the module itself. This applies to both `widget-bridge` and `dx-charts`.
+
+Add to `ts/widget-bridge/src/index.ts`:
+
+```typescript
+import * as self from "./index";
+
+declare global {
+  interface Window {
+    WidgetBridge: typeof self;
+  }
+}
+
+window.WidgetBridge = self;
+```
+
+Add to `ts/dx-charts/src/index.ts`:
+
+```typescript
+import * as self from "./index";
+
+declare global {
+  interface Window {
+    DxCharts: typeof self;
+  }
+}
+
+window.DxCharts = self;
+```
+
+These compile into the IIFE bundles, so `window.WidgetBridge` and `window.DxCharts` are set during module initialization and persist for subsequent eval calls.
+
+### Step 7: JS loading in desktop mode
+
+JS assets must be loaded via `include_str!` + `document::eval()` in a `use_hook` in the Shell component, not via `document::Script` tags. `document::Script` creates script tags asynchronously — the `WidgetBridge` global may not exist when components try to use it.
+
+In `layout/shell.rs`, all three JS bundles are loaded:
+```rust
+#[cfg(feature = "desktop")]
+const ECHARTS_JS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/echarts-5.5.1.min.js"));
+#[cfg(feature = "desktop")]
+const DX_CHARTS_JS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/dx-charts.js"));
+#[cfg(feature = "desktop")]
+const WIDGET_BRIDGE_JS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/widget-bridge.js"));
+
+// In Shell component:
+#[cfg(feature = "desktop")]
+use_hook(|| {
+    document::eval(ECHARTS_JS);
+    document::eval(DX_CHARTS_JS);
+    document::eval(WIDGET_BRIDGE_JS);
+});
+```
+
+For web builds, `app.rs` declares static assets with `with_static_head(true)` which injects blocking `<script>` tags into the initial HTML. These statics are underscore-prefixed since they are not referenced in rsx — manganis picks them up via link sections in the binary regardless:
+```rust
+static _ECHARTS_JS: Asset = asset!("/assets/echarts-5.5.1.min.js", AssetOptions::js().with_static_head(true));
+static _DX_CHARTS_JS: Asset = asset!("/assets/dx-charts.js", AssetOptions::js().with_static_head(true));
+static _WIDGET_BRIDGE_JS: Asset = asset!("/assets/widget-bridge.js", AssetOptions::js().with_static_head(true));
+```
+
+CSS is loaded at runtime via `document::Stylesheet` since it works for both desktop and web:
+```rust
+static TAILWIND_CSS: Asset = asset!("/assets/tailwind.css", AssetOptions::css().with_static_head(true));
+
+// In App rsx:
+document::Stylesheet { href: TAILWIND_CSS }
+```
+
+`with_static_head(true)` only takes effect for web builds (the CLI injects into `index.html`). It has no effect on desktop builds, where the hardcoded webview HTML template is used instead.
 
 ## Verification
 
-After making all 4 changes:
-
 ```bash
-cargo clippy -p lx-desktop -- -D warnings
+cd crates/lx-desktop && cargo clippy --features desktop -- -D warnings
 ```
 
-Must pass with zero errors and zero warnings. Common pitfalls:
-- `clippy::unwrap_used` — do not use `.unwrap()` anywhere
-- `clippy::needless_pass_by_value` — if clippy suggests `&str`, change the parameter
-- `dead_code` — every type/function must be used
+Must pass with zero errors and zero warnings.
 
 ## Runtime Prerequisites
 
@@ -401,7 +372,27 @@ Without these, the voice pane will show errors when you try to speak. All other 
 
 ## Manual Test
 
-1. `cargo run -p lx-desktop`
-2. Right-click the `+` button in the tab bar → select "Voice"
+1. `just desktop` (runs `dx serve -p lx-desktop`)
+2. Click the `+` button in the tab bar → select "Voice"
 3. A voice pane appears with Start/Stop buttons and a transcript area
 4. Click Start → speak → wait for silence detection → observe transcript + agent response + audio playback
+
+### Step 8: View container backgrounds
+
+All view components in `view.rs` were updated with design system CSS variable backgrounds as part of the UX design system update:
+- TerminalView: `bg-[var(--surface-container-lowest)] p-[1.1rem]`
+- EditorView, VoiceView: `bg-[var(--surface-container-lowest)]`
+- BrowserView, AgentView, CanvasView: `bg-[var(--surface-container)]`
+- ChartView: `bg-[var(--surface-container)]`
+
+## Implementation Notes
+
+Issues encountered during implementation:
+
+- **Clippy `manual_let_else`**: The `match widget.recv() { Ok(msg) => msg, Err(_) => break }` pattern must use `let Ok(msg) = ... else { break }` form.
+- **Clippy `collapsible_if`**: Nested `if let Some(data) = ... { if let Ok(bytes) = ... { ... } }` must be collapsed into a single `if let ... && let ...` chain.
+- **Tokio `process` feature**: The workspace tokio dependency does not include the `process` feature. The lx-desktop Cargo.toml must add `features = ["process"]` to its tokio dependency.
+- **Separate IIFE bundles don't share state**: A voice-client.js built as a separate IIFE creates its own `widgets` Map. The voice widget must be part of the widget-bridge bundle.
+- **AsyncFunction scope isolation**: `document::eval()` wraps JS in `new AsyncFunction(...)`, making `var` declarations local. Window global assignments must be inside the TS source, not appended externally in Rust.
+- **`document::Script` is async in desktop**: Script tags created via `document::Script` load asynchronously in the webview. JS globals may not exist when components mount. Use `include_str!` + `document::eval()` in `use_hook` for synchronous loading.
+- **`with_static_head(true)` is web-only**: The Dioxus CLI injects static head assets into `index.html` at build time. Desktop uses a hardcoded HTML template that the CLI does not modify.

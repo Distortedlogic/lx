@@ -4,8 +4,8 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 
 use crate::ast::{BindTarget, Core, Program, Stmt, StmtTypeDef, UseKind, UseStmt};
-use crate::folder::desugar;
 use crate::error::LxError;
+use crate::folder::desugar;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
@@ -105,7 +105,15 @@ impl Interpreter {
     }
     let source = std::fs::read_to_string(file_path).map_err(|e| LxError::runtime(format!("cannot read module '{}': {e}", file_path.display()), span))?;
     let tokens = crate::lexer::lex(&source).map_err(|e| LxError::runtime(format!("module '{}': {e}", file_path.display()), span))?;
-    let surface = crate::parser::parse(tokens).map_err(|e| LxError::runtime(format!("module '{}': {e}", file_path.display()), span))?;
+    let result = crate::parser::parse(tokens);
+    let surface = result.program.ok_or_else(|| {
+      let msgs: Vec<String> = result.errors.iter().map(|e| format!("{e}")).collect();
+      LxError::runtime(format!("module '{}': {}", file_path.display(), msgs.join("; ")), span)
+    })?;
+    if !result.errors.is_empty() {
+      let msgs: Vec<String> = result.errors.iter().map(|e| format!("{e}")).collect();
+      eprintln!("parse warning in module '{}': {}", file_path.display(), msgs.join("; "));
+    }
     let program = desugar(surface);
     let module_dir = file_path.parent().map(|p| p.to_path_buf());
     let mut mod_interp = Interpreter::new(&source, module_dir, Arc::clone(&self.ctx));

@@ -1,7 +1,17 @@
 var WidgetBridge = (function(exports) {
 	Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 	//#region \0rolldown/runtime.js
+	var __defProp = Object.defineProperty;
 	var __commonJSMin = (cb, mod) => () => (mod || cb((mod = { exports: {} }).exports, mod), mod.exports);
+	var __exportAll = (all, no_symbols) => {
+		let target = {};
+		for (var name in all) __defProp(target, name, {
+			get: all[name],
+			enumerable: true
+		});
+		if (!no_symbols) __defProp(target, Symbol.toStringTag, { value: "Module" });
+		return target;
+	};
 	//#endregion
 	//#region ../../node_modules/.pnpm/@xterm+xterm@5.5.0/node_modules/@xterm/xterm/lib/xterm.js
 	var require_xterm = /* @__PURE__ */ __commonJSMin(((exports, module) => {
@@ -8404,6 +8414,16 @@ registerProcessor('capture', Capture);
 			const el = document.getElementById(elementId);
 			if (el) el.innerHTML = "";
 		}
+	});
+	window.WidgetBridge = /* @__PURE__ */ __exportAll({
+		disposeTerminal: () => disposeTerminal,
+		fitTerminal: () => fitTerminal,
+		mountTerminal: () => mountTerminal,
+		registerWidget: () => registerWidget,
+		runDividerDrag: () => runDividerDrag,
+		runWidgetBridge: () => runWidgetBridge,
+		startDividerDrag: () => startDividerDrag,
+		writeTerminal: () => writeTerminal
 	});
 	//#endregion
 	exports.disposeTerminal = disposeTerminal;

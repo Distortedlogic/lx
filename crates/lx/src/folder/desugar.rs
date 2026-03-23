@@ -4,8 +4,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use miette::SourceSpan;
 
 use crate::ast::{
-  AstArena, Binding, Core, Expr, ExprApply, ExprBinary, ExprCoalesce, ExprFieldAccess, ExprFunc, ExprId, ExprMatch, ExprPipe, ExprTernary, ExprWith,
-  FieldKind, Literal, MatchArm, Param, Pattern, PatternConstructor, Program, Section, Stmt, StrPart, Surface, WithKind,
+  AstArena, BindTarget, Binding, Core, Expr, ExprApply, ExprBinary, ExprCoalesce, ExprFieldAccess, ExprFunc, ExprId, ExprMatch, ExprPipe, ExprTernary,
+  ExprWith, FieldKind, Literal, MatchArm, Param, Pattern, PatternConstructor, Program, Section, Stmt, StrPart, Surface, WithKind,
 };
 use crate::sym::{Sym, intern};
 
@@ -20,21 +20,13 @@ fn gensym(prefix: &str) -> Sym {
 }
 
 fn make_lambda(name: Sym, body: ExprId, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-  arena.alloc_expr(
-    Expr::Func(ExprFunc {
-      params: vec![Param { name, type_ann: None, default: None }],
-      ret_type: None,
-      guard: None,
-      body,
-    }),
-    span,
-  )
+  arena.alloc_expr(Expr::Func(ExprFunc { params: vec![Param { name, type_ann: None, default: None }], ret_type: None, guard: None, body }), span)
 }
 
 struct Desugarer;
 
 impl AstFolder for Desugarer {
-  fn fold_pipe(&mut self, p: ExprPipe, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+  fn fold_pipe(&mut self, _id: ExprId, p: ExprPipe, span: SourceSpan, arena: &mut AstArena) -> ExprId {
     let left = self.fold_expr(p.left, arena);
     let right = self.fold_expr(p.right, arena);
     arena.alloc_expr(Expr::Apply(ExprApply { func: right, arg: left }), span)
@@ -101,9 +93,8 @@ impl AstFolder for Desugarer {
     let v = gensym("v");
     let v_bind = |arena: &mut AstArena| arena.alloc_pattern(Pattern::Bind(v), span);
     let v_ref = |arena: &mut AstArena| arena.alloc_expr(Expr::Ident(v), span);
-    let ctor_pat = |name: &str, args: Vec<_>, arena: &mut AstArena| {
-      arena.alloc_pattern(Pattern::Constructor(PatternConstructor { name: intern(name), args }), span)
-    };
+    let ctor_pat =
+      |name: &str, args: Vec<_>, arena: &mut AstArena| arena.alloc_pattern(Pattern::Constructor(PatternConstructor { name: intern(name), args }), span);
     let some_bind = v_bind(arena);
     let some_pat = ctor_pat("Some", vec![some_bind], arena);
     let some_body = v_ref(arena);
@@ -143,10 +134,8 @@ impl AstFolder for Desugarer {
       WithKind::Binding { name, value, mutable } => {
         let folded_value = self.fold_expr(value, arena);
         let folded_body: Vec<_> = w.body.into_iter().map(|s| self.fold_stmt(s, arena)).collect();
-        let binding_stmt = arena.alloc_stmt(
-          Stmt::Binding(Binding { exported: false, mutable, target: crate::ast::BindTarget::Name(name), type_ann: None, value: folded_value }),
-          span,
-        );
+        let binding_stmt =
+          arena.alloc_stmt(Stmt::Binding(Binding { exported: false, mutable, target: BindTarget::Name(name), type_ann: None, value: folded_value }), span);
         let mut block_stmts = vec![binding_stmt];
         block_stmts.extend(folded_body);
         arena.alloc_expr(Expr::Block(block_stmts), span)

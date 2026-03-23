@@ -70,7 +70,15 @@ pub fn extract_echart_json<P>(program: &Program<P>) -> String {
 
 fn extract_graph(src: &str, span: SourceSpan) -> Result<Graph, LxError> {
   let tokens = lex(src).map_err(|e| LxError::runtime(format!("diag: lex error: {e}"), span))?;
-  let program = parse(tokens).map_err(|e| LxError::runtime(format!("diag: parse error: {e}"), span))?;
+  let result = parse(tokens);
+  let program = result.program.ok_or_else(|| {
+    let msgs: Vec<String> = result.errors.iter().map(|e| format!("{e}")).collect();
+    LxError::runtime(format!("diag: parse errors: {}", msgs.join("; ")), span)
+  })?;
+  if !result.errors.is_empty() {
+    let msgs: Vec<String> = result.errors.iter().map(|e| format!("{e}")).collect();
+    eprintln!("diag: parse warnings: {}", msgs.join("; "));
+  }
   let mut walker = Walker::new();
   let _ = walker.visit_program(&program);
   Ok(walker.into_graph())

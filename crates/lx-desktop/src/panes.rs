@@ -3,13 +3,13 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum DesktopPane {
-  Terminal { id: String, working_dir: String, command: Option<String> },
-  Browser { id: String, url: String, devtools: bool },
-  Editor { id: String, file_path: String, language: Option<String> },
-  Agent { id: String, session_id: String, model: String },
-  Canvas { id: String, widget_type: String, config: serde_json::Value },
-  Chart { id: String, chart_json: String, title: Option<String> },
-  Voice { id: String },
+  Terminal { id: String, working_dir: String, command: Option<String>, name: Option<String> },
+  Browser { id: String, url: String, devtools: bool, name: Option<String> },
+  Editor { id: String, file_path: String, language: Option<String>, name: Option<String> },
+  Agent { id: String, session_id: String, model: String, name: Option<String> },
+  Canvas { id: String, widget_type: String, config: serde_json::Value, name: Option<String> },
+  Chart { id: String, chart_json: String, title: Option<String>, name: Option<String> },
+  Voice { id: String, name: Option<String> },
 }
 
 impl Pane for DesktopPane {
@@ -50,15 +50,27 @@ impl DesktopPane {
     }
   }
 
+  pub fn name(&self) -> Option<&str> {
+    match self {
+      Self::Terminal { name, .. }
+      | Self::Browser { name, .. }
+      | Self::Editor { name, .. }
+      | Self::Agent { name, .. }
+      | Self::Canvas { name, .. }
+      | Self::Chart { name, .. }
+      | Self::Voice { name, .. } => name.as_deref(),
+    }
+  }
+
   pub fn make_default(kind: PaneKind, id: String) -> Self {
     match kind {
-      PaneKind::Terminal => Self::Terminal { id, working_dir: ".".into(), command: None },
-      PaneKind::Browser => Self::Browser { id, url: "about:blank".into(), devtools: false },
-      PaneKind::Editor => Self::Editor { id, file_path: String::new(), language: None },
-      PaneKind::Agent => Self::Agent { id: id.clone(), session_id: uuid::Uuid::new_v4().to_string(), model: "claude-sonnet-4-6".into() },
-      PaneKind::Canvas => Self::Canvas { id, widget_type: "markdown".into(), config: serde_json::Value::Object(Default::default()) },
-      PaneKind::Chart => Self::Chart { id, chart_json: String::new(), title: None },
-      PaneKind::Voice => Self::Voice { id },
+      PaneKind::Terminal => Self::Terminal { id, working_dir: ".".into(), command: None, name: None },
+      PaneKind::Browser => Self::Browser { id, url: "about:blank".into(), devtools: false, name: None },
+      PaneKind::Editor => Self::Editor { id, file_path: String::new(), language: None, name: None },
+      PaneKind::Agent => Self::Agent { id: id.clone(), session_id: uuid::Uuid::new_v4().to_string(), model: "claude-sonnet-4-6".into(), name: None },
+      PaneKind::Canvas => Self::Canvas { id, widget_type: "markdown".into(), config: serde_json::Value::Object(Default::default()), name: None },
+      PaneKind::Chart => Self::Chart { id, chart_json: String::new(), title: None, name: None },
+      PaneKind::Voice => Self::Voice { id, name: None },
     }
   }
 

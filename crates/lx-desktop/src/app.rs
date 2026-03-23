@@ -11,28 +11,18 @@ static _WIDGET_BRIDGE_JS: Asset = asset!("/assets/widget-bridge.js", AssetOption
 pub fn App() -> Element {
   rsx! {
     document::Stylesheet { href: TAILWIND_CSS }
-    document::Style {
-      r#"
-            :root {{
-                --foreground: #e5e7eb;
-                --color-chart-axis: #404040;
-                --color-chart-split: #333333;
-                --color-chart-tooltip: #171717;
-            }}
-            "#
-    }
     ErrorBoundary {
       handle_error: |errors: ErrorContext| {
           let msg = errors
               .error()
               .map_or_else(|| "An unknown error occurred".to_owned(), |e| e.to_string());
           rsx! {
-            div { class: "flex items-center justify-center h-screen text-red-500", "{msg}" }
+            div { class: "flex items-center justify-center h-screen text-[var(--error)]", "{msg}" }
           }
       },
       SuspenseBoundary {
         fallback: |_| rsx! {
-          div { class: "flex items-center justify-center h-screen text-gray-500", "Loading..." }
+          div { class: "flex items-center justify-center h-screen text-[var(--outline)]", "Loading..." }
         },
         Router::<Route> {}
       }

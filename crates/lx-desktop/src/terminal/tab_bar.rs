@@ -1,5 +1,5 @@
 use dioxus::prelude::*;
-use pane_tree::{NotificationLevel, PaneNode, TabsState};
+use pane_tree::{NotificationLevel, PaneNode, Rect, TabsState};
 use uuid::Uuid;
 
 use super::add_tab;
@@ -16,7 +16,7 @@ pub fn TabBar(tabs_state: Signal<TabsState<DesktopPane>>, on_new_tab: EventHandl
   let mut dropdown_input = use_signal(|| None::<(PaneKind, String)>);
 
   rsx! {
-    div { class: "flex items-center bg-gray-950",
+    div { class: "flex items-center bg-[var(--surface-container)]",
       div { class: "flex flex-1 overflow-x-auto",
         for tab in tabs.iter() {
           {
@@ -24,44 +24,40 @@ pub fn TabBar(tabs_state: Signal<TabsState<DesktopPane>>, on_new_tab: EventHandl
               let tab_id_close = tab.id.clone();
               let is_active = active_id.as_deref() == Some(tab.id.as_str());
               let bg = if is_active {
-                  "bg-gray-800 border-b-2 border-blue-400"
+                  "bg-[var(--surface-container-high)] border-b-2 border-[var(--primary)]"
               } else {
-                  "bg-gray-950 hover:bg-gray-800"
+                  "bg-transparent hover:bg-[var(--primary)]/10 hover:backdrop-blur-sm"
               };
+              let tab_icon = {
+                  let rects = tab.root().compute_pane_rects(Rect::default());
+                  rects.first().map(|(p, _)| p.icon()).unwrap_or("\u{25B8}")
+              };
+              let icon_color = if is_active { "text-[var(--primary)]" } else { "text-[var(--outline)]" };
               let highest_level = highest_notification_level(&tabs_state.read(), &tab.id);
               let dot_class = highest_level
                   .map(|level| match level {
-                      NotificationLevel::Error => {
-                          "w-1.5 h-1.5 rounded-full inline-block ml-1.5 bg-red-500"
-                      }
-                      NotificationLevel::Attention => {
-                          "w-1.5 h-1.5 rounded-full inline-block ml-1.5 bg-amber-500 animate-pulse"
-                      }
-                      NotificationLevel::Warning => {
-                          "w-1.5 h-1.5 rounded-full inline-block ml-1.5 bg-amber-400"
-                      }
-                      NotificationLevel::Success => {
-                          "w-1.5 h-1.5 rounded-full inline-block ml-1.5 bg-emerald-500"
-                      }
-                      NotificationLevel::Info => {
-                          "w-1.5 h-1.5 rounded-full inline-block ml-1.5 bg-blue-400"
-                      }
+                      NotificationLevel::Error => "w-1.5 h-1.5 rounded-full inline-block ml-1.5 bg-[var(--error)]",
+                      NotificationLevel::Attention => "w-1.5 h-1.5 rounded-full inline-block ml-1.5 bg-[var(--warning)] animate-pulse",
+                      NotificationLevel::Warning => "w-1.5 h-1.5 rounded-full inline-block ml-1.5 bg-[var(--warning)]",
+                      NotificationLevel::Success => "w-1.5 h-1.5 rounded-full inline-block ml-1.5 bg-[var(--success)]",
+                      NotificationLevel::Info => "w-1.5 h-1.5 rounded-full inline-block ml-1.5 bg-[var(--primary)]",
                   });
               rsx! {
                 button {
-                  class: "flex items-center gap-1.5 px-4 py-2 text-sm font-medium whitespace-nowrap",
+                  class: "flex items-center gap-1.5 px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors duration-150",
                   class: "{bg}",
                   onclick: move |_| {
                       let mut s = tabs_state.write();
                       s.set_active_and_focus(&tab_id_click);
                       s.clear_tab_notifications(&tab_id_click);
                   },
+                  span { class: "text-xs {icon_color}", "{tab_icon}" }
                   "{tab.title}"
                   if let Some(dc) = dot_class {
                     span { class: "{dc}" }
                   }
                   span {
-                    class: "ml-1 text-xs opacity-50 hover:opacity-100",
+                    class: "ml-1 text-xs text-[var(--outline)] hover:text-[var(--on-surface)] transition-colors duration-150",
                     onclick: move |evt| {
                         evt.stop_propagation();
                         tabs_state.write().close_tab(&tab_id_close);
@@ -75,7 +71,7 @@ pub fn TabBar(tabs_state: Signal<TabsState<DesktopPane>>, on_new_tab: EventHandl
       }
       div { class: "relative",
         button {
-          class: "px-3 py-2 text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800",
+          class: "px-3 py-2 text-sm font-medium text-[var(--outline)] hover:text-[var(--on-surface)] hover:bg-[var(--surface-container-high)] transition-colors duration-150",
           onclick: move |_| on_new_tab.call(()),
           oncontextmenu: move |evt| {
               evt.prevent_default();
@@ -92,9 +88,9 @@ pub fn TabBar(tabs_state: Signal<TabsState<DesktopPane>>, on_new_tab: EventHandl
                 dropdown_input.set(None);
             },
           }
-          div { class: "absolute top-full right-0 z-30 mt-1 py-1 bg-gray-800 border border-gray-600 rounded-md shadow-lg min-w-52",
+          div { class: "absolute top-full right-0 z-30 mt-1 py-1 bg-[var(--surface-container-high)]/80 backdrop-blur-[12px] rounded-md shadow-ambient min-w-52",
             button {
-              class: "w-full text-left px-3 py-1.5 text-sm hover:bg-gray-700",
+              class: "w-full text-left px-3 py-1.5 text-sm hover:bg-[var(--surface-bright)] transition-colors duration-150",
               onclick: move |_| {
                   on_new_tab.call(());
                   dropdown_open.set(false);
@@ -103,32 +99,30 @@ pub fn TabBar(tabs_state: Signal<TabsState<DesktopPane>>, on_new_tab: EventHandl
               "\u{25B8} Terminal"
             }
             button {
-              class: "w-full text-left px-3 py-1.5 text-sm hover:bg-gray-700",
+              class: "w-full text-left px-3 py-1.5 text-sm hover:bg-[var(--surface-bright)] transition-colors duration-150",
               onclick: move |_| dropdown_input.set(Some((PaneKind::Browser, String::new()))),
               "\u{1F310} Browser"
             }
             button {
-              class: "w-full text-left px-3 py-1.5 text-sm hover:bg-gray-700",
+              class: "w-full text-left px-3 py-1.5 text-sm hover:bg-[var(--surface-bright)] transition-colors duration-150",
               onclick: move |_| dropdown_input.set(Some((PaneKind::Editor, String::new()))),
               "\u{25C7} Editor"
             }
             button {
-              class: "w-full text-left px-3 py-1.5 text-sm hover:bg-gray-700",
+              class: "w-full text-left px-3 py-1.5 text-sm hover:bg-[var(--surface-bright)] transition-colors duration-150",
               onclick: move |_| dropdown_input.set(Some((PaneKind::Agent, String::new()))),
               "\u{25CF} Agent"
             }
             button {
-              class: "w-full text-left px-3 py-1.5 text-sm hover:bg-gray-700",
+              class: "w-full text-left px-3 py-1.5 text-sm hover:bg-[var(--surface-bright)] transition-colors duration-150",
               onclick: move |_| dropdown_input.set(Some((PaneKind::Canvas, String::new()))),
               "\u{25FB} Canvas"
             }
             button {
-              class: "w-full text-left px-3 py-1.5 text-sm hover:bg-gray-700",
+              class: "w-full text-left px-3 py-1.5 text-sm hover:bg-[var(--surface-bright)] transition-colors duration-150",
               onclick: move |_| {
                   let id = Uuid::new_v4().to_string();
-                  let pane = DesktopPane::Voice {
-                      id: id.clone(),
-                  };
+                  let pane = DesktopPane::Voice { id: id.clone(), name: None };
                   add_tab(tabs_state, id, "Voice".into(), PaneNode::Leaf(pane));
                   dropdown_open.set(false);
                   dropdown_input.set(None);
@@ -158,20 +152,21 @@ fn render_dropdown_input(
 
   if kind == PaneKind::Canvas {
     return rsx! {
-      div { class: "border-t border-gray-600 mt-1 pt-1",
+      div { class: "border-t border-[var(--outline-variant)]/15 mt-1 pt-1",
         for widget_type in ["log-viewer", "markdown", "json-viewer"] {
           {
               let wt = widget_type.to_string();
               let wt2 = wt.clone();
               rsx! {
                 button {
-                  class: "w-full text-left px-3 py-1.5 text-sm hover:bg-gray-700 pl-6",
+                  class: "w-full text-left px-3 py-1.5 text-sm hover:bg-[var(--surface-bright)] pl-6 transition-colors duration-150",
                   onclick: move |_| {
                       let id = Uuid::new_v4().to_string();
                       let pane = DesktopPane::Canvas {
                           id: id.clone(),
                           widget_type: wt.clone(),
                           config: serde_json::Value::Object(Default::default()),
+                          name: None,
                       };
                       add_tab(tabs_state, id, wt.clone(), PaneNode::Leaf(pane));
                       dropdown_open.set(false);
@@ -194,9 +189,9 @@ fn render_dropdown_input(
   };
 
   rsx! {
-    div { class: "border-t border-gray-600 mt-1 pt-1 px-3 py-1.5 flex items-center gap-2",
+    div { class: "border-t border-[var(--outline-variant)]/15 mt-1 pt-1 px-3 py-1.5 flex items-center gap-2",
       input {
-        class: "flex-1 bg-gray-900 text-sm px-2 py-1 rounded border border-gray-600 outline-none",
+        class: "flex-1 bg-[var(--surface-container-lowest)] text-sm px-2 py-1 rounded outline-none focus:bg-[var(--surface-container-low)] focus:border-b focus:border-[var(--primary)] transition-colors duration-150",
         placeholder: "{placeholder}",
         value: "{input_val}",
         oninput: move |evt: FormEvent| {
@@ -217,7 +212,7 @@ fn render_dropdown_input(
         },
       }
       button {
-        class: "px-3 py-1 bg-blue-600 text-sm rounded hover:bg-blue-500",
+        class: "px-3 py-1 bg-gradient-to-r from-[var(--primary)] to-[var(--primary-container)] text-[var(--on-primary)] text-sm rounded",
         onclick: move |_| {
             let current = dropdown_input.read().clone();
             if let Some((k, val)) = current {
@@ -238,18 +233,18 @@ fn create_pane_from_input(tabs_state: Signal<TabsState<DesktopPane>>, kind: Pane
     PaneKind::Browser => {
       let url = input.to_string();
       let title = url.split('/').nth(2).unwrap_or(&url).to_string();
-      (title, DesktopPane::Browser { id: id.clone(), url, devtools: false })
+      (title, DesktopPane::Browser { id: id.clone(), url, devtools: false, name: None })
     },
     PaneKind::Editor => {
       let file_path = input.to_string();
       let title = file_path.rsplit('/').next().unwrap_or(&file_path).to_string();
-      (title, DesktopPane::Editor { id: id.clone(), file_path, language: None })
+      (title, DesktopPane::Editor { id: id.clone(), file_path, language: None, name: None })
     },
     PaneKind::Agent => {
       let model = if input.is_empty() { "claude-sonnet-4-6".to_string() } else { input.to_string() };
       let session_id = Uuid::new_v4().to_string();
       let title = model.clone();
-      (title, DesktopPane::Agent { id: id.clone(), session_id, model })
+      (title, DesktopPane::Agent { id: id.clone(), session_id, model, name: None })
     },
     _ => return,
   };

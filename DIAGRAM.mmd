@@ -5,19 +5,56 @@ graph TD
 
     subgraph FRONTEND ["FRONTEND · sugared, LLM-friendly"]
         lexer["Lexer"] --> parser["Parser → Surface AST"]
-        parser --> desugar["Desugar · Folder → Core AST<br>─────────────────────<br>Agent → Class+Trait<br>pipes → nested apply<br>sections → lambdas<br>ternary/??/^ → match<br>interp → concat<br>with-bind → block"]
+        parser --> desugar["`**Desugar · Folder → Core AST**
+Agent → Class+Trait
+pipes → nested apply
+sections → lambdas
+ternary/??/^ → match
+interp → concat
+with-bind → block`"]
     end
 
     source --> lexer
-    desugar --> checker["Checker · Visitor<br>─────────────────────<br>inference<br>unification<br>exhaustiveness<br>diagnostics"]
-    checker --> interpreter["Interpreter<br>─────────────────────<br>async tree-walk eval"]
+    desugar --> checker["`**Checker · Visitor**
+inference
+unification
+exhaustiveness
+diagnostics`"]
+    checker --> interpreter["`**Interpreter**
+async tree-walk eval`"]
 
-    interpreter --> backends["Core Backends #40;swappable#41;<br>─────────────────────<br>Ai<br>Fs"]
-    interpreter --> events["Runtime Events<br>─────────────────────<br>agent: spawned<br>agent: msg<br>agent: done<br>agent: error<br>pipeline: progress<br>emit<br>log"]
+    interpreter --> backends["`**Core Backends (swappable)**
+Ai
+Fs`"]
+    interpreter --> events["`**Runtime Events**
+---
+**AGENT**
+spawned · msg · done · error
+**PIPELINE**
+progress
+**OUTPUT**
+emit · log`"]
 
-    backends --> tools["Tool Ecosystem<br>─────────────────────<br>DEFAULTS<br>fs · shell · search · browse<br>─────────────────────<br>ADD-ONS<br>git · http · db<br>email · slack · ..."]
+    backends --> tools["`**Tools**
+Read · Write · Edit
+Glob · Grep
+WebSearch · WebFetch`"]
+    backends --> clis["`**CLIs**
+Bash
+Skill`"]
+    backends --> infra["`**Infra**
+AskUserQuestion
+EnterPlanMode · ExitPlanMode
+EnterWorktree · ExitWorktree
+CronCreate · CronDelete · CronList
+ToolSearch
+ListMcpResources
+ReadMcpResource`"]
 
-    events --> subs["Subscribers<br>─────────────────────<br>lx-desktop<br>stdio<br>headless"]
+    events --> subs["`**Subscribers**
+lx-desktop
+stdio
+headless`"]
 
     style FRONTEND fill:#1e1e3a,stroke:#e94560,color:#eee,stroke-width:2px
     style source fill:#2a2a4a,stroke:#888,color:#fff
@@ -28,6 +65,8 @@ graph TD
     style interpreter fill:#1a1a3e,stroke:#7c5cbf,color:#eee
     style backends fill:#0f3460,stroke:#53a8b6,color:#eee
     style tools fill:#1a2a3e,stroke:#888,color:#ccc
+    style clis fill:#1a2a3e,stroke:#888,color:#ccc
+    style infra fill:#1a2a3e,stroke:#888,color:#ccc
     style events fill:#1a2e1a,stroke:#4ecca3,color:#eee
     style subs fill:#1a2e1a,stroke:#4ecca3,color:#eee
 

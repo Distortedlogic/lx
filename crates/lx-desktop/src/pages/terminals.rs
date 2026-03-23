@@ -24,11 +24,11 @@ fn split_pane(mut tabs_state: Signal<TabsState<DesktopPane>>, pane_id: &str, dir
         let panes = tab.root().compute_pane_rects(Rect::default());
         let source = panes.iter().find(|(p, _)| p.pane_id() == pane_id);
         match source.map(|(p, _)| p) {
-          Some(DesktopPane::Terminal { working_dir, .. }) => DesktopPane::Terminal { id: new_id, working_dir: working_dir.clone(), command: None },
-          _ => DesktopPane::Terminal { id: new_id, working_dir: ".".into(), command: None },
+          Some(DesktopPane::Terminal { working_dir, .. }) => DesktopPane::Terminal { id: new_id, working_dir: working_dir.clone(), command: None, name: None },
+          _ => DesktopPane::Terminal { id: new_id, working_dir: ".".into(), command: None, name: None },
         }
       },
-      None => DesktopPane::Terminal { id: new_id, working_dir: ".".into(), command: None },
+      None => DesktopPane::Terminal { id: new_id, working_dir: ".".into(), command: None, name: None },
     }
   };
   tabs_state.write().split_pane(pane_id, direction, PaneNode::Leaf(new_pane));
@@ -50,12 +50,24 @@ pub fn Terminals() -> Element {
 
   rsx! {
     div { class: "flex flex-col h-full",
-      div { class: "flex items-center",
+      div { class: "flex items-center border-b border-[var(--outline-variant)]/15",
         div { class: "flex-1",
           TabBar {
             tabs_state,
             on_new_tab: move |_| create_new_tab(tabs_state),
           }
+        }
+        span { class: "border border-[var(--outline-variant)] rounded px-2 py-0.5 text-xs uppercase tracking-wider text-[var(--outline)]",
+          "LAYOUT: BACKEND DEV"
+        }
+        button { class: "bg-gradient-to-r from-[var(--primary)] to-[var(--primary-container)] text-[var(--on-primary)] rounded-md px-4 py-1.5 text-sm font-medium mx-2",
+          "\u{25B6} RUN.LX"
+        }
+        button { class: "bg-[var(--surface-container-high)] text-[var(--on-surface)] px-2 py-1.5 rounded-md text-sm mr-1",
+          "\u{229E}"
+        }
+        button { class: "bg-[var(--surface-container-high)] text-[var(--on-surface)] px-2 py-1.5 rounded-md text-sm mr-2",
+          "\u{2630}"
         }
       }
       if has_tabs {
@@ -65,11 +77,11 @@ pub fn Terminals() -> Element {
           }
         }
       } else {
-        div { class: "flex flex-1 items-center justify-center text-gray-400",
+        div { class: "flex flex-1 items-center justify-center text-[var(--outline)]",
           div { class: "text-center",
             p { class: "text-lg mb-2", "No terminals open" }
             button {
-              class: "px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-500",
+              class: "bg-gradient-to-r from-[var(--primary)] to-[var(--primary-container)] text-[var(--on-primary)] rounded-md px-4 py-2 text-sm font-medium",
               onclick: move |_| create_new_tab(tabs_state),
               "New Terminal"
             }
@@ -97,7 +109,7 @@ fn render_tab(
     div {
       id: "{tab_container_id}",
       key: "{tab.id}",
-      class: "absolute inset-0 bg-gray-900",
+      class: "absolute inset-0 bg-[var(--surface)]",
       style: "visibility: {visibility};",
       for (pane , rect) in pane_rects.iter() {
         {render_pane_item(tabs_state, pane, rect, focused_pane_id)}
@@ -112,7 +124,7 @@ fn render_tab(
 fn render_pane_item(mut tabs_state: Signal<TabsState<DesktopPane>>, pane: &DesktopPane, rect: &Rect, focused_pane_id: &Option<String>) -> Element {
   let pid = pane.pane_id().to_owned();
   let is_focused = focused_pane_id.as_deref() == Some(pid.as_str());
-  let border = if is_focused { "border-blue-400" } else { "border-gray-700" };
+  let border = if is_focused { "border-[var(--primary)]" } else { "border-[var(--outline-variant)]/30" };
   let pid_focus = pid.clone();
   let pid_sh = pid.clone();
   let pid_sv = pid.clone();
@@ -146,49 +158,25 @@ fn render_pane_item(mut tabs_state: Signal<TabsState<DesktopPane>>, pane: &Deskt
 
 fn render_pane_view(pane: &DesktopPane) -> Element {
   match pane {
-    DesktopPane::Terminal { id, working_dir, command } => rsx! {
-      TerminalView {
-        terminal_id: id.clone(),
-        working_dir: working_dir.clone(),
-        command: command.clone(),
-      }
+    DesktopPane::Terminal { id, working_dir, command, .. } => rsx! {
+      TerminalView { terminal_id: id.clone(), working_dir: working_dir.clone(), command: command.clone() }
     },
-    DesktopPane::Browser { id, url, devtools } => rsx! {
-      BrowserView {
-        browser_id: id.clone(),
-        url: url.clone(),
-        devtools: *devtools,
-      }
+    DesktopPane::Browser { id, url, devtools, .. } => rsx! {
+      BrowserView { browser_id: id.clone(), url: url.clone(), devtools: *devtools }
     },
-    DesktopPane::Editor { id, file_path, language } => rsx! {
-      EditorView {
-        editor_id: id.clone(),
-        file_path: file_path.clone(),
-        language: language.clone(),
-      }
+    DesktopPane::Editor { id, file_path, language, .. } => rsx! {
+      EditorView { editor_id: id.clone(), file_path: file_path.clone(), language: language.clone() }
     },
-    DesktopPane::Agent { id, session_id, model } => rsx! {
-      AgentView {
-        agent_id: id.clone(),
-        session_id: session_id.clone(),
-        model: model.clone(),
-      }
+    DesktopPane::Agent { id, session_id, model, .. } => rsx! {
+      AgentView { agent_id: id.clone(), session_id: session_id.clone(), model: model.clone() }
     },
-    DesktopPane::Canvas { id, widget_type, config } => rsx! {
-      CanvasView {
-        canvas_id: id.clone(),
-        widget_type: widget_type.clone(),
-        config: config.clone(),
-      }
+    DesktopPane::Canvas { id, widget_type, config, .. } => rsx! {
+      CanvasView { canvas_id: id.clone(), widget_type: widget_type.clone(), config: config.clone() }
     },
-    DesktopPane::Chart { id, chart_json, title } => rsx! {
-      ChartView {
-        chart_id: id.clone(),
-        chart_json: chart_json.clone(),
-        title: title.clone(),
-      }
+    DesktopPane::Chart { id, chart_json, title, .. } => rsx! {
+      ChartView { chart_id: id.clone(), chart_json: chart_json.clone(), title: title.clone() }
     },
-    DesktopPane::Voice { id } => rsx! {
+    DesktopPane::Voice { id, .. } => rsx! {
       VoiceView { voice_id: id.clone() }
     },
   }
@@ -197,11 +185,11 @@ fn render_pane_view(pane: &DesktopPane) -> Element {
 fn render_divider_item(mut tabs_state: Signal<TabsState<DesktopPane>>, divider: &DividerInfo, container_id: &str) -> Element {
   let (div_class, div_style) = match divider.direction {
     SplitDirection::Horizontal => (
-      "absolute z-20 cursor-col-resize hover:bg-blue-500/50 bg-gray-700",
+      "absolute z-20 cursor-col-resize hover:bg-[var(--primary)]/50 bg-[var(--surface-bright)]",
       format!("left: {}%; top: {}%; width: 4px; height: {}%;", divider.rect.left, divider.rect.top, divider.rect.height,),
     ),
     SplitDirection::Vertical => (
-      "absolute z-20 cursor-row-resize hover:bg-blue-500/50 bg-gray-700",
+      "absolute z-20 cursor-row-resize hover:bg-[var(--primary)]/50 bg-[var(--surface-bright)]",
       format!("left: {}%; top: {}%; width: {}%; height: 4px;", divider.rect.left, divider.rect.top, divider.rect.width,),
     ),
   };

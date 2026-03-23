@@ -12,3 +12,13 @@ import "../widgets/log-viewer";
 import "../widgets/markdown";
 import "../widgets/json-viewer";
 import "../widgets/voice";
+
+import * as self from "./index";
+
+declare global {
+  interface Window {
+    WidgetBridge: typeof self;
+  }
+}
+
+window.WidgetBridge = self;

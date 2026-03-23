@@ -4,7 +4,9 @@ use dioxus::prelude::*;
 use pane_tree::{PaneNode, TabsState};
 use tokio::sync::mpsc;
 
+use super::menu_bar::MenuBar;
 use super::sidebar::Sidebar;
+use super::status_bar::StatusBar;
 use crate::panes::DesktopPane;
 use crate::routes::Route;
 use crate::terminal::{add_tab, use_provide_tabs};
@@ -28,20 +30,11 @@ type SpawnReceiver = mpsc::UnboundedReceiver<TerminalSpawnRequest>;
 pub fn Shell() -> Element {
   let tabs_state = use_provide_tabs();
   #[cfg(feature = "desktop")]
-  {
-    use_hook(|| {
-      document::eval(ECHARTS_JS);
-      document::eval(&format!("{DX_CHARTS_JS}; window.DxCharts = DxCharts;"));
-      document::eval(&format!("{WIDGET_BRIDGE_JS}; window.WidgetBridge = WidgetBridge;"));
-    });
-    use_future(|| async {
-      let mut check = document::eval("dioxus.send(typeof WidgetBridge !== 'undefined' ? JSON.stringify(Object.keys(WidgetBridge)) : 'UNDEFINED')");
-      match check.recv::<serde_json::Value>().await {
-        Ok(keys) => dioxus::logger::tracing::info!("WidgetBridge check: {keys}"),
-        Err(e) => dioxus::logger::tracing::error!("WidgetBridge check failed: {e:?}"),
-      }
-    });
-  }
+  use_hook(|| {
+    document::eval(ECHARTS_JS);
+    document::eval(DX_CHARTS_JS);
+    document::eval(WIDGET_BRIDGE_JS);
+  });
   let spawn_channel = use_hook(|| {
     let (tx, rx) = mpsc::unbounded_channel::<TerminalSpawnRequest>();
     (tx, Arc::new(Mutex::new(Some(rx))))
@@ -50,28 +43,32 @@ pub fn Shell() -> Element {
   spawn_terminal_listener(tabs_state, &spawn_channel.1);
   let collapsed = use_signal(|| false);
   rsx! {
-    div { class: "min-h-screen bg-gray-900 text-gray-100 flex",
-      Sidebar { collapsed }
-      main { class: "flex-1 flex flex-col p-4 min-h-0",
-        div { class: "flex-1 min-h-0 overflow-auto",
-          ErrorBoundary {
-            handle_error: |errors: ErrorContext| {
-                let msg = errors
-                    .error()
-                    .map_or_else(|| "Page error".to_owned(), |e| e.to_string());
-                rsx! {
-                  div { class: "p-4 text-red-400", "{msg}" }
-                }
-            },
-            SuspenseBoundary {
-              fallback: |_| rsx! {
-                div { class: "flex items-center justify-center h-full text-gray-500", "Loading..." }
+    div { class: "min-h-screen bg-[var(--surface)] text-[var(--on-surface)] flex flex-col",
+      MenuBar {}
+      div { class: "flex flex-1 min-h-0",
+        Sidebar { collapsed }
+        main { class: "flex-1 flex flex-col p-0 min-h-0",
+          div { class: "flex-1 min-h-0 overflow-auto",
+            ErrorBoundary {
+              handle_error: |errors: ErrorContext| {
+                  let msg = errors
+                      .error()
+                      .map_or_else(|| "Page error".to_owned(), |e| e.to_string());
+                  rsx! {
+                    div { class: "p-4 text-[var(--error)]", "{msg}" }
+                  }
               },
-              Outlet::<Route> {}
+              SuspenseBoundary {
+                fallback: |_| rsx! {
+                  div { class: "flex items-center justify-center h-full text-[var(--outline)]", "Loading..." }
+                },
+                Outlet::<Route> {}
+              }
             }
           }
         }
       }
+      StatusBar {}
     }
   }
 }

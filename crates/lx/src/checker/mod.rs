@@ -1,16 +1,17 @@
 use crate::sym::Sym;
 mod capture;
+mod check_expr;
 pub mod diagnostics;
 mod exhaust;
 mod exhaust_core;
 mod exhaust_types;
-mod leave_expr;
 mod resolve;
 mod symbol_table;
+mod synth_compound;
+mod synth_control;
 mod type_ops;
 pub mod types;
 pub mod unification;
-mod visit_expr;
 mod visit_stmt;
 
 use std::collections::{HashMap, HashSet};
@@ -18,7 +19,6 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use crate::ast::{AstArena, Core, Program, TypeExpr, TypeExprId};
-use crate::visitor::AstVisitor;
 use diagnostics::{DiagnosticKind, Fix};
 use miette::SourceSpan;
 use symbol_table::SymbolTable;
@@ -55,7 +55,6 @@ pub(crate) struct Checker<'a> {
   pub(crate) arena: &'a AstArena,
   mutables: HashSet<Sym>,
   symbols: SymbolTable,
-  type_stack: Vec<Type>,
 }
 
 impl<'a> Checker<'a> {
@@ -70,21 +69,6 @@ impl<'a> Checker<'a> {
       arena,
       mutables: HashSet::new(),
       symbols,
-      type_stack: Vec::new(),
-    }
-  }
-
-  pub(crate) fn push_type(&mut self, ty: Type) {
-    self.type_stack.push(ty);
-  }
-
-  pub(crate) fn pop_type(&mut self) -> Type {
-    match self.type_stack.pop() {
-      Some(ty) => ty,
-      None => {
-        eprintln!("internal compiler error: type stack underflow");
-        Type::Error
-      },
     }
   }
 
@@ -177,12 +161,18 @@ impl<'a> Checker<'a> {
       },
     }
   }
+
+  fn check_program(&mut self, program: &Program<Core>) {
+    for &sid in &program.stmts {
+      self.check_stmt(sid, &program.arena);
+    }
+  }
 }
 
 pub fn check(program: &Program<Core>, source: Arc<str>) -> CheckResult {
   let symbols = resolve::resolve(program);
   let mut checker = Checker::new(&program.arena, symbols);
-  checker.visit_program(program);
+  checker.check_program(program);
   CheckResult { diagnostics: checker.diagnostics, source }
 }
 

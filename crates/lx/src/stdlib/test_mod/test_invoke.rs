@@ -13,7 +13,15 @@ pub(super) fn invoke_flow(flow_path: &str, input: &LxVal, ctx: &Arc<RuntimeCtx>,
   };
   let source = std::fs::read_to_string(&path).map_err(|e| LxError::runtime(format!("test.run: cannot read flow '{flow_path}': {e}"), span))?;
   let tokens = crate::lexer::lex(&source).map_err(|e| LxError::runtime(format!("test.run: lex error in '{flow_path}': {e}"), span))?;
-  let surface = crate::parser::parse(tokens).map_err(|e| LxError::runtime(format!("test.run: parse error in '{flow_path}': {e}"), span))?;
+  let result = crate::parser::parse(tokens);
+  let surface = result.program.ok_or_else(|| {
+    let msgs: Vec<String> = result.errors.iter().map(|e| format!("{e}")).collect();
+    LxError::runtime(format!("test.run: parse errors in '{flow_path}': {}", msgs.join("; ")), span)
+  })?;
+  if !result.errors.is_empty() {
+    let msgs: Vec<String> = result.errors.iter().map(|e| format!("{e}")).collect();
+    eprintln!("test.run: parse warnings in '{flow_path}': {}", msgs.join("; "));
+  }
   let program = crate::folder::desugar(surface);
   let module_dir = path.parent().map(|p| p.to_path_buf());
   let mut interp = crate::interpreter::Interpreter::new(&source, module_dir, Arc::clone(ctx));

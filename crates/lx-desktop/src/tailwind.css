@@ -1,3 +1,63 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&display=swap');
 
 @source "../src/**/*.rs";
+
+@theme {
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+}
+
+:root {
+  --surface: #131313;
+  --surface-container-low: #1A1A1A;
+  --surface-container: #201F1F;
+  --surface-container-high: #2A2A2A;
+  --surface-container-highest: #353534;
+  --surface-container-lowest: #0E0E0E;
+  --surface-bright: #3A3939;
+
+  --primary: #FFB87B;
+  --primary-container: #FF8F00;
+  --on-primary: #131313;
+
+  --on-surface: #E6E1DD;
+  --on-surface-variant: #DCC1AE;
+
+  --outline: #A48C7A;
+  --outline-variant: #564334;
+
+  --tertiary: #87CFFF;
+
+  --error: #EF5350;
+  --warning: #FFB300;
+  --success: #66BB6A;
+
+  --color-chart-axis: #404040;
+  --color-chart-split: #333333;
+  --color-chart-tooltip: #171717;
+}
+
+.shadow-ambient {
+  box-shadow: 0 8px 32px rgba(30, 20, 10, 0.06);
+}
+
+.border-ghost {
+  border: 1px solid rgba(86, 67, 52, 0.15);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface-container-low);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--surface-container-highest);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--surface-bright);
+}

@@ -1,3 +1,4 @@
+pub mod status_badge;
 pub mod tab_bar;
 pub mod toolbar;
 pub mod view;
@@ -23,6 +24,6 @@ pub fn add_tab(mut state: Signal<TabsState<DesktopPane>>, id: String, title: Str
 }
 
 pub fn add_terminal_tab(state: Signal<TabsState<DesktopPane>>, id: String, title: String, working_dir: String, command: Option<String>) {
-  let pane = DesktopPane::Terminal { id: id.clone(), working_dir, command };
+  let pane = DesktopPane::Terminal { id: id.clone(), working_dir, command, name: None };
   add_tab(state, id, title, PaneNode::Leaf(pane));
 }

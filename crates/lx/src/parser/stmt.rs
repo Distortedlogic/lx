@@ -15,10 +15,16 @@ where
   I: ValueInput<'a, Token = TokenKind, Span = Span>,
 {
   let expr = super::expr::expr_parser(arena.clone());
+
+  let skip_to_semi = any().and_is(none_of([TokenKind::Semi, TokenKind::Eof])).repeated().at_least(1).then(just(TokenKind::Semi).or_not()).ignored();
+
+  let recoverable_stmt = stmt_parser(expr, arena).map(Some).recover_with(via_parser(skip_to_semi.map(|_| None)));
+
   super::expr::skip_semis()
-    .ignore_then(stmt_parser(expr, arena).separated_by(just(TokenKind::Semi).repeated().at_least(1)).allow_trailing().collect::<Vec<_>>())
+    .ignore_then(recoverable_stmt.separated_by(just(TokenKind::Semi).repeated().at_least(1)).allow_trailing().collect::<Vec<_>>())
     .then_ignore(super::expr::skip_semis())
     .then_ignore(just(TokenKind::Eof))
+    .map(|stmts: Vec<Option<StmtId>>| stmts.into_iter().flatten().collect())
 }
 
 pub(super) fn stmt_parser<'a, I>(

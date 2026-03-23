@@ -18,13 +18,22 @@ pub fn run_agent(script_path: &str) -> ExitCode {
       return ExitCode::from(1);
     },
   };
-  let program = match lx::parser::parse(tokens) {
-    Ok(p) => p,
-    Err(e) => {
-      eprintln!("agent error: {e}");
+  let result = lx::parser::parse(tokens);
+  let surface = match result.program {
+    Some(p) => {
+      for e in &result.errors {
+        eprintln!("agent warning: {e}");
+      }
+      p
+    },
+    None => {
+      for e in &result.errors {
+        eprintln!("agent error: {e}");
+      }
       return ExitCode::from(1);
     },
   };
+  let program = lx::folder::desugar(surface);
   let source_dir = Path::new(script_path).parent().map(|p| p.to_path_buf());
   let ctx = Arc::new(lx::runtime::RuntimeCtx::default());
   let mut interp = lx::interpreter::Interpreter::new(&source, source_dir, Arc::clone(&ctx));
