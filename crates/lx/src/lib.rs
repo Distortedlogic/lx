@@ -4,6 +4,7 @@ pub mod checker;
 pub mod env;
 pub mod error;
 pub mod folder;
+pub mod formatter;
 pub mod interpreter;
 pub mod lexer;
 pub mod linter;

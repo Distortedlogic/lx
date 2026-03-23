@@ -1,12 +1,12 @@
 graph TD
-    source[".lx source"]
+    source[".lx source"]:::white
     config["`**Config**
 CLAUDE.md · AGENTS.md
 Skills · Policies
-Permissions`"]
-    source --> lexer["Lexer"]
+Permissions`"]:::white
+    source --> lexer["Lexer"]:::orange
     config --> lexer
-    lexer --> parser["Parser → Surface AST"]
+    lexer --> parser["Parser → Surface AST"]:::orange
     parser --> desugars
 
     subgraph desugars ["Desugar · Folder → Core AST"]
@@ -15,15 +15,15 @@ Permissions`"]
 pipes → nested apply
 sections → lambdas
 ternary/??/^ → match
-interp → concat`"]
+interp → concat`"]:::orange
         ds_agents["`**Agents**
 Agent → Class+Trait
 spawn → instantiate+register
 ~>? → send+await
-~> → send`"]
+~> → send`"]:::orange
         ds_control["`**Control**
 with-bind → block
-refine → loop+grade+track`"]
+refine → loop+grade+track`"]:::orange
         ds_syntax ~~~ ds_agents ~~~ ds_control
     end
 
@@ -31,7 +31,7 @@ refine → loop+grade+track`"]
 inference
 unification
 exhaustiveness
-diagnostics`"]
+diagnostics`"]:::yellow
     checker --> guardrails
 
     subgraph guardrails ["Guardrails"]
@@ -39,20 +39,20 @@ diagnostics`"]
         gr_content["`**Content**
 relevance
 safety · PII
-moderation`"]
+moderation`"]:::red
         gr_tool["`**Tool**
 risk rating
 input validation
-output validation`"]
+output validation`"]:::red
         gr_policy["`**Policy**
 rules-based
 constitutional
-sandbox enforcement`"]
+sandbox enforcement`"]:::red
         gr_content ~~~ gr_tool ~~~ gr_policy
     end
 
     guardrails --> interpreter["`**Interpreter**
-async tree-walk eval`"]
+async tree-walk eval`"]:::purple
 
     interpreter --> backends["`**Core Backends (swappable)**
 Ai
@@ -60,49 +60,49 @@ Fs
 Store
 Channel
 Memory
-Sandbox`"]
+Sandbox`"]:::blue
     interpreter --> events
 
     subgraph events ["Runtime Events"]
         direction LR
         evt_agent["`**Agent**
 spawned · msg
-done · error`"]
+done · error`"]:::teal
         evt_pipeline["`**Pipeline**
 progress · step
 compensate
-checkpoint`"]
+checkpoint`"]:::teal
         evt_output["`**Output**
 emit · log
 yield
-diagnostic`"]
+diagnostic`"]:::teal
         evt_budget["`**Budget**
 warning
 exceeded
-threshold`"]
+threshold`"]:::teal
         evt_concurrency["`**Concurrency**
 par · sel
 timeout
-cancel`"]
+cancel`"]:::teal
         evt_state["`**State**
 mutation
 checkpoint
-context`"]
+context`"]:::teal
         evt_trace["`**Trace**
 span · tool_call
-cost`"]
+cost`"]:::teal
         evt_security["`**Security**
 guardrail triggered
 permission denied
-sandbox violation`"]
+sandbox violation`"]:::teal
         evt_eval["`**Evaluation**
 grade assigned
 threshold met/missed
-validation pass/fail`"]
+validation pass/fail`"]:::teal
         evt_memory["`**Memory**
 recalled · stored
 consolidated
-pruned`"]
+pruned`"]:::teal
         evt_agent ~~~ evt_pipeline ~~~ evt_output
         evt_budget ~~~ evt_concurrency ~~~ evt_state
         evt_trace ~~~ evt_security ~~~ evt_eval
@@ -114,10 +114,10 @@ Glob · Grep
 WebSearch · WebFetch
 Browser · Git
 Test · Lint
-RAG · Embed`"]
+RAG · Embed`"]:::bluelight
     backends --> clis["`**CLIs**
 Bash
-Skill`"]
+Skill`"]:::bluelight
     backends --> infra["`**Infra**
 AskUserQuestion
 PlanMode
@@ -125,50 +125,31 @@ Worktree
 Cron
 ToolSearch · MCP
 Hooks · Permissions
-Context Management`"]
+Context Management`"]:::bluelight
 
     backends --> protocols["`**Protocols**
 MCP — agent ↔ tool
 A2A — agent ↔ agent
-AG-UI — agent ↔ frontend`"]
+AG-UI — agent ↔ frontend`"]:::bluelight
 
     events --> subs["`**Subscribers**
 lx-desktop
 stdio
 agent-mode
 CI/CD
-headless`"]
+headless`"]:::teal
 
-    style source fill:#000,stroke:#fff,color:#fff
-    style config fill:#000,stroke:#fff,color:#fff
-    style lexer fill:#000,stroke:#ff6600,color:#fff
-    style parser fill:#000,stroke:#ff6600,color:#fff
+    classDef white fill:#000,stroke:#fff,color:#fff
+    classDef orange fill:#000,stroke:#ff6600,color:#fff
+    classDef yellow fill:#000,stroke:#dcdcaa,color:#fff
+    classDef red fill:#000,stroke:#d16969,color:#fff
+    classDef purple fill:#000,stroke:#c586c0,color:#fff
+    classDef blue fill:#000,stroke:#569cd6,color:#fff
+    classDef bluelight fill:#000,stroke:#569cd6,color:#9cdcfe
+    classDef teal fill:#000,stroke:#4ec9b0,color:#fff
+
     style desugars fill:#0a0a0a,stroke:#ff6600,color:#fff,stroke-width:2px
-    style ds_syntax fill:#000,stroke:#ff6600,color:#fff
-    style ds_agents fill:#000,stroke:#ff6600,color:#fff
-    style ds_control fill:#000,stroke:#ff6600,color:#fff
-    style checker fill:#000,stroke:#dcdcaa,color:#fff
     style guardrails fill:#0a0a0a,stroke:#d16969,color:#fff,stroke-width:2px
-    style gr_content fill:#000,stroke:#d16969,color:#fff
-    style gr_tool fill:#000,stroke:#d16969,color:#fff
-    style gr_policy fill:#000,stroke:#d16969,color:#fff
-    style interpreter fill:#000,stroke:#c586c0,color:#fff
-    style backends fill:#000,stroke:#569cd6,color:#fff
-    style tools fill:#000,stroke:#569cd6,color:#9cdcfe
-    style clis fill:#000,stroke:#569cd6,color:#9cdcfe
-    style infra fill:#000,stroke:#569cd6,color:#9cdcfe
-    style protocols fill:#000,stroke:#569cd6,color:#9cdcfe
     style events fill:#0a0a0a,stroke:#4ec9b0,color:#fff,stroke-width:2px
-    style evt_agent fill:#000,stroke:#4ec9b0,color:#fff
-    style evt_pipeline fill:#000,stroke:#4ec9b0,color:#fff
-    style evt_output fill:#000,stroke:#4ec9b0,color:#fff
-    style evt_budget fill:#000,stroke:#4ec9b0,color:#fff
-    style evt_concurrency fill:#000,stroke:#4ec9b0,color:#fff
-    style evt_state fill:#000,stroke:#4ec9b0,color:#fff
-    style evt_trace fill:#000,stroke:#4ec9b0,color:#fff
-    style evt_security fill:#000,stroke:#4ec9b0,color:#fff
-    style evt_eval fill:#000,stroke:#4ec9b0,color:#fff
-    style evt_memory fill:#000,stroke:#4ec9b0,color:#fff
-    style subs fill:#000,stroke:#4ec9b0,color:#fff
 
     linkStyle default stroke:#6fc3df,stroke-width:1.5px
