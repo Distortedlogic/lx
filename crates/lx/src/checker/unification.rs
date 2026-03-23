@@ -51,8 +51,8 @@ impl UnificationTable {
     match (&a, &b) {
       _ if a == b => Ok(a),
       (Type::Error, _) | (_, Type::Error) => Ok(Type::Error),
-      (Type::Unknown, _) => Ok(b),
-      (_, Type::Unknown) => Ok(a),
+      (Type::Unknown, _) | (Type::Todo, _) => Ok(b),
+      (_, Type::Unknown) | (_, Type::Todo) => Ok(a),
       (Type::Var(id), _) => {
         if self.occurs(*id, &b) {
           return Err(format!("infinite type: t{} occurs in {b:?}", id.index()));

@@ -8,29 +8,23 @@ impl Checker<'_> {
   pub(super) fn check_expr(&mut self, eid: ExprId, expected: &Type) -> Type {
     let arena = self.arena;
     let expr = arena.expr(eid).clone();
-    match &expr {
+    match expr {
       Expr::Func(func) => {
         if let Type::Func { params: exp_params, ret: exp_ret } = self.table.resolve(expected) {
-          self.check_func_against(func, &exp_params, &exp_ret)
+          self.check_func_against(&func, &exp_params, &exp_ret)
         } else {
           self.synth_expr(eid)
         }
       },
       Expr::List(elems) => {
         if let Type::List(exp_elem) = self.table.resolve(expected) {
-          self.check_list(elems, &exp_elem)
+          self.check_list(&elems, &exp_elem)
         } else {
           self.synth_expr(eid)
         }
       },
-      Expr::Match(m) => {
-        let arms = m.arms.clone();
-        self.check_match(m.scrutinee, &arms, expected)
-      },
-      Expr::Block(stmts) => {
-        let stmts = stmts.clone();
-        self.check_block(&stmts, expected)
-      },
+      Expr::Match(m) => self.check_match(m.scrutinee, &m.arms, expected),
+      Expr::Block(stmts) => self.check_block(&stmts, expected),
       _ => {
         let actual = self.synth_expr(eid);
         let span = arena.expr_span(eid);
@@ -104,8 +98,8 @@ impl Checker<'_> {
       self.check_stmt(sid, arena);
     }
     let last_stmt = arena.stmt(last).clone();
-    match &last_stmt {
-      Stmt::Expr(e) => self.check_expr(*e, expected),
+    match last_stmt {
+      Stmt::Expr(e) => self.check_expr(e, expected),
       _ => {
         self.check_stmt(last, arena);
         Type::Unit

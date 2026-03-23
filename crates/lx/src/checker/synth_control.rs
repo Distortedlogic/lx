@@ -45,7 +45,7 @@ impl Checker<'_> {
     let ct = self.synth_expr(cond);
     let cond_span = self.arena.expr_span(cond);
     let resolved = self.table.resolve(&ct);
-    if resolved != Type::Bool && resolved != Type::Unknown && resolved != Type::Error {
+    if resolved != Type::Bool && resolved != Type::Unknown && resolved != Type::Todo && resolved != Type::Error {
       self.emit(DiagLevel::Error, DiagnosticKind::TernaryCondNotBool, cond_span);
     }
     let tt = self.synth_expr(then_);
@@ -81,14 +81,14 @@ impl Checker<'_> {
       self.synth_expr(arm.expr);
       self.synth_expr(arm.handler);
     }
-    Type::Unknown
+    Type::Todo
   }
 
   pub(super) fn synth_timeout_type(&mut self, ms: ExprId, body: ExprId) -> Type {
     let ms_span = self.arena.expr_span(ms);
     let ms_type = self.synth_expr(ms);
     let resolved = self.table.resolve(&ms_type);
-    if resolved != Type::Int && resolved != Type::Float && resolved != Type::Unknown && resolved != Type::Error {
+    if resolved != Type::Int && resolved != Type::Float && resolved != Type::Unknown && resolved != Type::Todo && resolved != Type::Error {
       self.emit(DiagLevel::Error, DiagnosticKind::TimeoutMsNotNumeric, ms_span);
     }
     let body_type = self.synth_expr(body);

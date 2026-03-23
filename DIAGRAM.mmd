@@ -36,27 +36,38 @@ Channel`"]
     interpreter --> events
 
     subgraph events ["Runtime Events"]
+        direction LR
         evt_agent["`**Agent**
 spawned · msg
 done · error`"]
         evt_pipeline["`**Pipeline**
 progress · step
-compensate · checkpoint`"]
+compensate
+checkpoint`"]
         evt_output["`**Output**
 emit · log
-yield · diagnostic`"]
+yield
+diagnostic`"]
+
         evt_budget["`**Budget**
-warning · exceeded
+warning
+exceeded
 threshold`"]
         evt_concurrency["`**Concurrency**
 par · sel
-timeout · cancel`"]
+timeout
+cancel`"]
         evt_state["`**State**
-mutation · checkpoint
+mutation
+checkpoint
 context`"]
+
         evt_trace["`**Trace**
 span · tool_call
 cost`"]
+
+        evt_agent ~~~ evt_pipeline ~~~ evt_output
+        evt_budget ~~~ evt_concurrency ~~~ evt_state
     end
 
     backends --> tools["`**Tools**

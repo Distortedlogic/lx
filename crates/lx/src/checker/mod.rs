@@ -23,7 +23,7 @@ use diagnostics::{DiagnosticKind, Fix};
 use miette::SourceSpan;
 use symbol_table::SymbolTable;
 
-use types::Type;
+use types::{Type, Variant};
 use unification::{TypeError, UnificationTable};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -119,11 +119,24 @@ impl<'a> Checker<'a> {
   }
 
   pub(crate) fn resolve_type_ann(&mut self, ty_id: TypeExprId) -> Type {
-    match self.arena.type_expr(ty_id) {
-      TypeExpr::Named(name) => named_to_type(name.as_str()),
+    match self.arena.type_expr(ty_id).clone() {
+      TypeExpr::Named(name) => {
+        let t = named_to_type(name.as_str());
+        if t != Type::Unknown {
+          return t;
+        }
+        let sym = crate::sym::intern(name.as_str());
+        if let Some(variant_names) = self.type_defs.get(&sym).cloned() {
+          let variants = variant_names.iter().map(|vn| Variant { name: *vn, fields: vec![] }).collect();
+          return Type::Union { name: sym, variants };
+        }
+        if let Some(fields) = self.trait_fields.get(&sym).cloned() {
+          return Type::Record(fields);
+        }
+        Type::Unknown
+      },
       TypeExpr::Var(_) => self.fresh(),
       TypeExpr::Applied(name, args) => {
-        let args = args.clone();
         let resolved: Vec<Type> = args.iter().map(|a| self.resolve_type_ann(*a)).collect();
         match name.as_str() {
           "Maybe" if resolved.len() == 1 => Type::Maybe(Box::new(resolved.into_iter().next().unwrap_or(Type::Unknown))),
@@ -131,32 +144,32 @@ impl<'a> Checker<'a> {
             let mut it = resolved.into_iter();
             Type::Result { ok: Box::new(it.next().unwrap_or(Type::Unknown)), err: Box::new(it.next().unwrap_or(Type::Unknown)) }
           },
-          _ => Type::Unknown,
+          _ => {
+            let sym = crate::sym::intern(name.as_str());
+            if let Some(variant_names) = self.type_defs.get(&sym).cloned() {
+              let variants = variant_names.iter().map(|vn| Variant { name: *vn, fields: vec![] }).collect();
+              Type::Union { name: sym, variants }
+            } else {
+              Type::Unknown
+            }
+          },
         }
       },
-      TypeExpr::List(inner) => {
-        let inner = *inner;
-        Type::List(Box::new(self.resolve_type_ann(inner)))
-      },
+      TypeExpr::List(inner) => Type::List(Box::new(self.resolve_type_ann(inner))),
       TypeExpr::Map { key, value } => {
-        let (key, value) = (*key, *value);
         Type::Map { key: Box::new(self.resolve_type_ann(key)), value: Box::new(self.resolve_type_ann(value)) }
       },
       TypeExpr::Record(fields) => {
-        let fields = fields.clone();
         let fs = fields.iter().map(|f| (f.name, self.resolve_type_ann(f.ty))).collect();
         Type::Record(fs)
       },
       TypeExpr::Tuple(elems) => {
-        let elems = elems.clone();
         Type::Tuple(elems.iter().map(|e| self.resolve_type_ann(*e)).collect())
       },
       TypeExpr::Func { param, ret } => {
-        let (param, ret) = (*param, *ret);
         Type::Func { params: vec![self.resolve_type_ann(param)], ret: Box::new(self.resolve_type_ann(ret)) }
       },
       TypeExpr::Fallible { ok, err } => {
-        let (ok, err) = (*ok, *err);
         Type::Result { ok: Box::new(self.resolve_type_ann(ok)), err: Box::new(self.resolve_type_ann(err)) }
       },
     }

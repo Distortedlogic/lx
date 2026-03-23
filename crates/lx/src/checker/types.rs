@@ -61,6 +61,7 @@ pub enum Type {
 
   Var(TypeVarKey),
   Unknown,
+  Todo,
   Error,
 }
 
@@ -94,6 +95,7 @@ impl fmt::Display for Type {
       Type::Union { name, .. } => write!(f, "{name}"),
       Type::Var(key) => write!(f, "t{}", key.index()),
       Type::Unknown => write!(f, "?"),
+      Type::Todo => write!(f, "<todo>"),
       Type::Error => write!(f, "<error>"),
     }
   }

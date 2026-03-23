@@ -11,9 +11,9 @@ impl Checker<'_> {
     let arena = self.arena;
     let expr = arena.expr(eid).clone();
     let span = arena.expr_span(eid);
-    match &expr {
-      Expr::Literal(lit) => self.synth_literal(lit),
-      Expr::Ident(name) => self.lookup(*name).unwrap_or(Type::Unknown),
+    match expr {
+      Expr::Literal(lit) => self.synth_literal(&lit),
+      Expr::Ident(name) => self.lookup(name).unwrap_or(Type::Unknown),
       Expr::TypeConstructor(_) => Type::Unknown,
       Expr::Binary(binary) => {
         let lt = self.synth_expr(binary.left);
@@ -21,44 +21,29 @@ impl Checker<'_> {
         self.synth_binary_type(&binary.op, &lt, &rt, span)
       },
       Expr::Unary(unary) => self.synth_unary(unary.op, unary.operand, span),
-      Expr::Pipe(_) => Type::Unknown,
+      Expr::Pipe(_) => Type::Todo,
       Expr::Apply(apply) => self.synth_apply_type(apply.func, apply.arg),
-      Expr::Section(_) => Type::Func { params: vec![Type::Unknown], ret: Box::new(Type::Unknown) },
+      Expr::Section(_) => Type::Todo,
       Expr::FieldAccess(fa) => {
         self.synth_expr(fa.expr);
-        if let FieldKind::Computed(c) = &fa.field {
-          self.synth_expr(*c);
+        if let FieldKind::Computed(c) = fa.field {
+          self.synth_expr(c);
         }
-        Type::Unknown
+        Type::Todo
       },
-      Expr::Block(stmts) => {
-        let stmts = stmts.clone();
-        self.check_stmts(&stmts)
-      },
+      Expr::Block(stmts) => self.check_stmts(&stmts),
       Expr::Tuple(elems) => {
-        let elems = elems.clone();
         let types: Vec<Type> = elems.iter().map(|e| self.synth_expr(*e)).collect();
         Type::Tuple(types)
       },
-      Expr::List(elems) => self.synth_list(elems, span),
+      Expr::List(elems) => self.synth_list(&elems, span),
       Expr::Record(fields) => self.synth_record(fields),
-      Expr::Map(entries) => {
-        let entries = entries.clone();
-        self.synth_map_type(&entries)
-      },
-      Expr::Func(func) => {
-        let params = func.params.clone();
-        let ret_type = func.ret_type;
-        let body = func.body;
-        self.synth_func_type(&params, &ret_type, body)
-      },
-      Expr::Match(m) => {
-        let arms = m.arms.clone();
-        self.synth_match_type(m.scrutinee, &arms, span)
-      },
+      Expr::Map(entries) => self.synth_map_type(&entries),
+      Expr::Func(func) => self.synth_func_type(&func.params, &func.ret_type, func.body),
+      Expr::Match(m) => self.synth_match_type(m.scrutinee, &m.arms, span),
       Expr::Ternary(ternary) => self.synth_ternary_type(ternary.cond, ternary.then_, ternary.else_),
-      Expr::Propagate(inner) => self.synth_propagate(*inner, span),
-      Expr::Coalesce(_) => Type::Unknown,
+      Expr::Propagate(inner) => self.synth_propagate(inner, span),
+      Expr::Coalesce(_) => Type::Todo,
       Expr::Slice(slice) => {
         if let Some(s) = slice.start {
           self.synth_expr(s);
@@ -70,13 +55,12 @@ impl Checker<'_> {
       },
       Expr::NamedArg(na) => self.synth_expr(na.value),
       Expr::Loop(stmts) => {
-        let stmts = stmts.clone();
         self.check_stmts(&stmts);
         Type::Unit
       },
       Expr::Break(value) => {
         if let Some(v) = value {
-          self.synth_expr(*v);
+          self.synth_expr(v);
         }
         Type::Unit
       },
@@ -87,14 +71,8 @@ impl Checker<'_> {
         }
         Type::Unit
       },
-      Expr::Par(stmts) => {
-        let stmts = stmts.clone();
-        self.synth_par_type(&stmts, span)
-      },
-      Expr::Sel(arms) => {
-        let arms = arms.clone();
-        self.synth_sel_type(&arms, span)
-      },
+      Expr::Par(stmts) => self.synth_par_type(&stmts, span),
+      Expr::Sel(arms) => self.synth_sel_type(&arms, span),
       Expr::Timeout(timeout) => self.synth_timeout_type(timeout.ms, timeout.body),
       Expr::Emit(emit) => {
         self.synth_expr(emit.value);
@@ -102,13 +80,9 @@ impl Checker<'_> {
       },
       Expr::Yield(yld) => {
         self.synth_expr(yld.value);
-        Type::Unknown
+        Type::Todo
       },
-      Expr::With(with) => {
-        let kind = with.kind.clone();
-        let body = with.body.clone();
-        self.synth_with_type(&kind, &body)
-      },
+      Expr::With(with) => self.synth_with_type(&with.kind, &with.body),
     }
   }
 
@@ -118,6 +92,7 @@ impl Checker<'_> {
       UnaryOp::Neg => match self.table.resolve(&t) {
         Type::Int | Type::Float => t,
         Type::Error => Type::Error,
+        Type::Unknown | Type::Todo => t,
         _ => {
           self.emit(DiagLevel::Error, DiagnosticKind::NegationRequiresNumeric, span);
           Type::Error
@@ -132,7 +107,7 @@ impl Checker<'_> {
     match self.table.resolve(&t) {
       Type::Result { ok, .. } => *ok,
       Type::Maybe(inner) => *inner,
-      Type::Unknown => Type::Unknown,
+      Type::Unknown | Type::Todo => Type::Unknown,
       Type::Error => Type::Error,
       _ => {
         self.emit(DiagLevel::Error, DiagnosticKind::PropagateRequiresResultOrMaybe, span);
@@ -158,8 +133,7 @@ impl Checker<'_> {
     Type::List(Box::new(first))
   }
 
-  fn synth_record(&mut self, fields: &[RecordField]) -> Type {
-    let fields = fields.to_vec();
+  fn synth_record(&mut self, fields: Vec<RecordField>) -> Type {
     let fs: Vec<_> = fields
       .iter()
       .filter_map(|f| match f {
@@ -187,7 +161,7 @@ impl Checker<'_> {
       BinOp::Concat => Type::Str,
       BinOp::Eq | BinOp::NotEq | BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq => Type::Bool,
       BinOp::And | BinOp::Or => {
-        if lt != Type::Bool && lt != Type::Unknown && lt != Type::Error {
+        if lt != Type::Bool && lt != Type::Unknown && lt != Type::Todo && lt != Type::Error {
           self.emit(DiagLevel::Error, DiagnosticKind::LogicalOpRequiresBool, span);
         }
         Type::Bool

@@ -211,4 +211,3 @@ pub fn fold_map<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, entries: Vec<MapEn
   }
   arena.alloc_expr(Expr::Map(folded), span)
 }
-

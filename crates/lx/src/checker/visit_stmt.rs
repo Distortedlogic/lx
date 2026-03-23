@@ -21,9 +21,9 @@ impl Checker<'_> {
   pub(super) fn check_stmt(&mut self, sid: StmtId, arena: &AstArena) -> Type {
     let span = arena.stmt_span(sid);
     let stmt = arena.stmt(sid).clone();
-    match &stmt {
+    match stmt {
       Stmt::Binding(b) => {
-        self.check_binding(b, span);
+        self.check_binding(&b, span);
         Type::Unit
       },
       Stmt::TypeDef(td) => {
@@ -61,10 +61,10 @@ impl Checker<'_> {
         Type::Unit
       },
       Stmt::Use(u) => {
-        self.resolve_use(u, span);
+        self.resolve_use(&u, span);
         Type::Unit
       },
-      Stmt::Expr(e) => self.synth_expr(*e),
+      Stmt::Expr(e) => self.synth_expr(e),
     }
   }
 
