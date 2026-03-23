@@ -11,13 +11,11 @@ Wire the PaneToolbar address bar, back, forward, and refresh buttons to the Brow
 
 # What changes
 
-**Convert `render_pane_item` to `PaneItem` component (terminals.rs):** The current `render_pane_item` is a plain function, which cannot use hooks. Convert it to a `#[component] fn PaneItem` so we can create hooks inside it. Create a `tokio::sync::mpsc::unbounded_channel::<String>()` for navigation commands (event-driven, zero-latency, no polling). The `UnboundedSender` goes to the `on_navigate` EventHandler. The `UnboundedReceiver` is stored in an `Arc<std::sync::Mutex<Option<...>>>` so it can be passed as a component prop (BrowserView `.take()`s it once on mount). Create a `Signal<String>` for `current_url` (BrowserView writes after navigation, PaneToolbar reads to sync address bar). Pass both to BrowserView and PaneToolbar.
+**Convert `render_pane_item` to `PaneItem` component (terminals.rs):** The current `render_pane_item` is a plain function, which cannot use hooks. Convert it to a `#[component] fn PaneItem`. Create a `tokio::sync::mpsc::unbounded_channel::<String>()` for navigation commands and a `Signal<String>` for `current_url`. Provide both via `provide_context` using a `BrowserNavCtx` struct — this avoids threading props through `render_pane_view` (6 of 7 match arms would ignore them) and avoids needing a PartialEq newtype wrapper for the receiver. Wire `on_navigate` for Browser panes to send commands through the channel sender.
 
-**Add navigation channel and current_url to BrowserView (view.rs):** Add `nav_rx: Arc<std::sync::Mutex<Option<UnboundedReceiver<String>>>>` and `current_url: Signal<String>` props. In the existing `use_future`, take the receiver once at the start of the async block. Add a third `tokio::select!` branch: `cmd = rx.recv() => { ... }` — this wakes instantly when PaneToolbar sends a command (no polling). Match on the command: "back" → `go_back()`, "forward" → `go_forward()`, "refresh" → `reload()`, anything else → normalize URL and `navigate()`. After successful navigate, write `final_url` to `current_url`. Also update the initial navigation block and the `Some("navigate")` widget recv arm to write `final_url` to `current_url`.
+**Add channel recv branch to BrowserView (view.rs):** BrowserView calls `use_context::<BrowserNavCtx>()` to get the receiver and current_url signal. Takes the receiver once at the start of the `use_future` async block. Adds a third `tokio::select!` branch: `cmd = rx.recv()` — wakes instantly when PaneToolbar sends a command, zero polling. Dispatches the command using the session already in scope. Updates `current_url` after every navigation.
 
-**Add current_url prop to PaneToolbar (toolbar.rs):** Add `current_url: ReadOnlySignal<String>` prop. Add a `use_effect` that syncs `current_url` to `url_input` when it changes.
-
-**Thread props through render_pane_view (terminals.rs):** Add the nav_rx and current_url parameters. Pass to BrowserView in the Browser match arm. Other arms ignore them.
+**Add current_url sync to PaneToolbar (toolbar.rs):** Add `current_url: ReadOnlySignal<String>` prop (this IS reactive display state — a prop is appropriate). Add a `use_effect` that syncs it to the address bar input.
 
 # How it works
 
@@ -35,47 +33,48 @@ Back/forward/refresh follow the same path but with command strings "back"/"forwa
 
 # Files affected
 
-- `crates/lx-desktop/src/pages/terminals.rs` — convert `render_pane_item` to `PaneItem` component, create channel + signal, wire `on_navigate`, thread through `render_pane_view`
-- `crates/lx-desktop/src/terminal/view.rs` — add `nav_rx` and `current_url` props to `BrowserView`, add channel recv branch to select loop
+- `crates/lx-desktop/src/pages/terminals.rs` — convert `render_pane_item` to `PaneItem` component, add `BrowserNavCtx` struct, `provide_context`, wire `on_navigate`
+- `crates/lx-desktop/src/terminal/view.rs` — `use_context` in `BrowserView`, add channel recv branch to select loop, update `current_url` after navigation
 - `crates/lx-desktop/src/terminal/toolbar.rs` — add `current_url` prop to `PaneToolbar`, add `use_effect` to sync address bar
 
 # Task List
 
-### Task 1: Convert render_pane_item to PaneItem component with navigation channel
+### Task 1: Convert render_pane_item to PaneItem component with BrowserNavCtx
 
-**Subject:** Convert render_pane_item to a Dioxus component with mpsc channel for navigation
+**Subject:** Convert render_pane_item to a Dioxus component with context-based navigation channel
 
 **Description:** In `crates/lx-desktop/src/pages/terminals.rs`:
 
 (A) Add imports at the top: `use std::sync::{Arc, Mutex};` and `use tokio::sync::mpsc;`.
 
-(B) Rename `render_pane_item` to `PaneItem` and add `#[component]` attribute. Change the signature from `fn render_pane_item(mut tabs_state: Signal<TabsState<DesktopPane>>, pane: &DesktopPane, rect: &Rect, focused_pane_id: &Option<String>) -> Element` to `fn PaneItem(tabs_state: Signal<TabsState<DesktopPane>>, pane: DesktopPane, rect: Rect, focused_pane_id: Option<String>) -> Element`. Props are now owned. `let pid = pane.pane_id().to_owned()` becomes `let pid = pane.pane_id().to_string()`. Keep the `pane_toolbar` and `pane_view` clones since pane is consumed by the rsx block.
+(B) `BrowserNavCtx` is defined in `crates/lx-desktop/src/terminal/view.rs` (see Task 2), not here. Import it: `use crate::terminal::view::BrowserNavCtx;`.
 
-(C) Inside PaneItem, after the existing variable declarations and before the `rsx!` block, create the channel and signals:
+(C) Rename `render_pane_item` to `PaneItem` and add `#[component]` attribute. Change the signature from `fn render_pane_item(mut tabs_state: Signal<TabsState<DesktopPane>>, pane: &DesktopPane, rect: &Rect, focused_pane_id: &Option<String>) -> Element` to `fn PaneItem(tabs_state: Signal<TabsState<DesktopPane>>, pane: DesktopPane, rect: Rect, focused_pane_id: Option<String>) -> Element`. Props are now owned. `let pid = pane.pane_id().to_owned()` becomes `let pid = pane.pane_id().to_string()`. Keep the `pane_toolbar` and `pane_view` clones since pane is consumed by the rsx block.
+
+(D) Inside PaneItem, after the existing variable declarations and before the `rsx!` block, create the channel, signal, and provide context:
 ```
-let (nav_tx, nav_rx) = use_hook(|| {
-    let (tx, rx) = mpsc::unbounded_channel::<String>();
-    (tx, Arc::new(Mutex::new(Some(rx))))
-});
-let mut current_url: Signal<String> = use_signal(|| {
+let current_url: Signal<String> = use_signal(|| {
     match &pane { DesktopPane::Browser { url, .. } => url.clone(), _ => String::new() }
 });
+let nav_ctx = use_hook(|| {
+    let (tx, rx) = mpsc::unbounded_channel::<String>();
+    BrowserNavCtx { tx, rx: Arc::new(Mutex::new(Some(rx))), current_url }
+});
+provide_context(nav_ctx.clone());
 ```
-`use_hook` stores the `(UnboundedSender, Arc<Mutex<Option<UnboundedReceiver>>>)` pair. `UnboundedSender` is Clone, `Arc<Mutex<...>>` is Clone, so the tuple is Clone — satisfying `use_hook`'s requirement. The channel is created once on first render. The Arc+Mutex wrapper lets BrowserView take the receiver once via `.lock().unwrap().take()`.
+`use_hook` stores the `BrowserNavCtx` (Clone satisfied). The channel is created once on first render. `current_url` signal is captured by value (Signal is Copy).
 
-(D) Change `on_navigate: None::<EventHandler<String>>,` to:
+(E) Change `on_navigate: None::<EventHandler<String>>,` to:
 ```
 on_navigate: if matches!(&pane_toolbar, DesktopPane::Browser { .. }) {
-    let tx = nav_tx.clone();
+    let tx = nav_ctx.tx.clone();
     Some(EventHandler::new(move |cmd: String| { let _ = tx.send(cmd); }))
 } else {
     None
 },
 ```
 
-(E) Add `current_url: current_url.into(),` as a new prop in the PaneToolbar block (after on_navigate).
-
-(F) Change `{render_pane_view(&pane_view)}` to `{render_pane_view(&pane_view, nav_rx.clone(), current_url)}`.
+(F) Add `current_url: current_url.into(),` as a new prop in the PaneToolbar block (after on_navigate).
 
 (G) Update the call site in `render_tab` (line 103). Change `{render_pane_item(tabs_state, pane, rect, focused_pane_id)}` to:
 ```
@@ -88,29 +87,40 @@ PaneItem {
 }
 ```
 
-(H) Update `render_pane_view` signature to `fn render_pane_view(pane: &DesktopPane, nav_rx: Arc<Mutex<Option<mpsc::UnboundedReceiver<String>>>>, current_url: Signal<String>) -> Element`. In the `DesktopPane::Browser` match arm, add `nav_rx` and `current_url` props to BrowserView. All other match arms are unchanged.
+`render_pane_view` signature is UNCHANGED — no threading nav_rx or current_url through it. BrowserView gets what it needs from context.
 
-**ActiveForm:** Converting render_pane_item to PaneItem component with mpsc navigation channel
+**ActiveForm:** Converting render_pane_item to PaneItem component with context-based navigation
 
-### Task 2: Add channel recv branch and current_url to BrowserView
+### Task 2: Add channel recv branch and current_url updates to BrowserView
 
-**Subject:** Wire mpsc receiver to CDP session navigation in BrowserView's select loop
+**Subject:** Wire mpsc receiver from context to CDP session navigation in BrowserView's select loop
 
 **Description:** In `crates/lx-desktop/src/terminal/view.rs`:
 
-(A) Add imports: `use std::sync::{Arc, Mutex};` and `use tokio::sync::mpsc;`.
+(A) Add imports at the top of view.rs: `use std::sync::{Arc, Mutex};` and `use tokio::sync::mpsc;`.
 
-(B) Change the BrowserView component signature to: `pub fn BrowserView(browser_id: String, url: String, devtools: bool, nav_rx: Arc<Mutex<Option<mpsc::UnboundedReceiver<String>>>>, current_url: Signal<String>)`. The `Arc<Mutex<Option<...>>>` is Clone + PartialEq (via Arc pointer equality) — wait, Arc does NOT implement PartialEq by default. Add a newtype wrapper:
+(B) Define the context struct in view.rs, before the BrowserView component:
 ```
 #[derive(Clone)]
-pub struct NavReceiver(pub Arc<Mutex<Option<mpsc::UnboundedReceiver<String>>>>);
-impl PartialEq for NavReceiver { fn eq(&self, other: &Self) -> bool { Arc::ptr_eq(&self.0, &other.0) } }
+pub struct BrowserNavCtx {
+    pub tx: mpsc::UnboundedSender<String>,
+    pub rx: Arc<Mutex<Option<mpsc::UnboundedReceiver<String>>>>,
+    pub current_url: Signal<String>,
+}
 ```
-Use `nav_rx: NavReceiver` as the prop type instead of the raw Arc. Update terminals.rs to wrap: `nav_rx: NavReceiver(nav_rx.clone())` in render_pane_view's Browser arm, and the `render_pane_view` signature to use `NavReceiver`.
+This is `Clone` because `UnboundedSender` is Clone, `Arc` is Clone, `Signal` is Copy. No PartialEq needed — `provide_context` only requires `Clone + 'static`. Defined here (next to BrowserView, its primary consumer) so that `terminals.rs` imports it from `view.rs` — same direction as existing imports, no circular dependency.
 
-(C) At the start of the `use_future` async block (after `let session = ...` succeeds), take the receiver: `let mut nav_rx = nav_rx.0.lock().unwrap().take();`.
+(C) BrowserView component signature is UNCHANGED — no new props. BrowserView gets the navigation channel from context.
 
-(D) Update the initial navigation block. Change:
+(D) Inside BrowserView, after `let bid_drop = browser_id.clone();` and before the `use_future` block, retrieve the context: `let nav_ctx: BrowserNavCtx = use_context();`.
+
+(E) At the start of the `use_future` async block, after the session is created and initial navigation is done, take the receiver unconditionally:
+```
+let Some(mut nav_rx) = nav_ctx.rx.lock().unwrap().take() else { return; };
+```
+This runs once — the receiver is consumed by this future. If the future somehow re-runs and the receiver was already taken, it exits cleanly.
+
+(F) Update the initial navigation block. Change:
 ```
 if !url.is_empty()
     && url != "about:blank"
@@ -124,15 +134,15 @@ to:
 ```
 if !url.is_empty() && url != "about:blank" {
     match session.navigate(&url).await {
-        Ok((final_url, _)) => current_url.set(final_url),
+        Ok((final_url, _)) => nav_ctx.current_url.set(final_url),
         Err(e) => { error!("browser navigate failed: {e}"); return; }
     }
 }
 ```
 
-(E) Add a third branch to the `tokio::select!` loop. This branch only exists if the receiver was successfully taken (it should always succeed since only one BrowserView instance takes it). Use an `if let` to guard:
+(G) Add a third branch to the `tokio::select!` loop:
 ```
-cmd = async { match nav_rx.as_mut() { Some(rx) => rx.recv().await, None => std::future::pending().await } } => {
+cmd = nav_rx.recv() => {
     if let Some(cmd) = cmd {
         match cmd.as_str() {
             "back" => { if let Err(e) = session.go_back().await { error!("browser go_back failed: {e}"); } }
@@ -145,7 +155,7 @@ cmd = async { match nav_rx.as_mut() { Some(rx) => rx.recv().await, None => std::
                     format!("https://{raw_url}")
                 };
                 match session.navigate(&url).await {
-                    Ok((final_url, _)) => current_url.set(final_url),
+                    Ok((final_url, _)) => nav_ctx.current_url.set(final_url),
                     Err(e) => { error!("browser navigate failed: {e}"); }
                 }
             }
@@ -153,21 +163,21 @@ cmd = async { match nav_rx.as_mut() { Some(rx) => rx.recv().await, None => std::
     }
 }
 ```
-The `async { match nav_rx.as_mut() ... }` pattern handles the case where the receiver wasn't taken (returns `pending()` which never resolves, so the branch is effectively disabled). When the receiver IS present, `rx.recv()` wakes instantly when PaneToolbar sends a command — zero polling.
+`nav_rx.recv()` wakes instantly when PaneToolbar sends a command — no polling. The session is already in scope — no redundant lookup.
 
-(F) Update the existing `Some("navigate")` match arm to write final_url to current_url:
+(H) Update the existing `Some("navigate")` match arm to write final_url to current_url:
 ```
 Some("navigate") => {
     if let Some(nav_url) = msg["url"].as_str() {
         match session.navigate(nav_url).await {
-            Ok((final_url, _)) => current_url.set(final_url),
+            Ok((final_url, _)) => nav_ctx.current_url.set(final_url),
             Err(e) => { error!("browser navigate failed: {e}"); break; }
         }
     }
 }
 ```
 
-**ActiveForm:** Adding mpsc channel recv branch and current_url updates to BrowserView
+**ActiveForm:** Adding context-based channel recv branch and current_url updates to BrowserView
 
 ### Task 3: Add current_url prop to PaneToolbar
 
@@ -175,7 +185,7 @@ Some("navigate") => {
 
 **Description:** In `crates/lx-desktop/src/terminal/toolbar.rs`:
 
-(A) Add `current_url: ReadOnlySignal<String>` to the PaneToolbar component signature (after `on_navigate`).
+(A) Add `current_url: ReadOnlySignal<String>` to the PaneToolbar component signature (after `on_navigate`). This is reactive display state — a prop is appropriate here (the toolbar displays the URL, it doesn't own it).
 
 (B) After `let mut url_input = use_signal(|| initial_url);` (line 21), add:
 ```
@@ -187,7 +197,7 @@ use_effect(move || {
 });
 ```
 
-This fires whenever `current_url` changes. When BrowserView navigates and writes the final URL to `current_url`, this effect updates the address bar input to match.
+(C) In `crates/lx-desktop/src/pages/terminals.rs`, in the PaneToolbar block inside PaneItem, add the `current_url` prop. It was already specified in Task 1 step (F): `current_url: current_url.into(),`.
 
 **ActiveForm:** Syncing PaneToolbar address bar with browser current URL
 

@@ -13,12 +13,19 @@ pub fn PaneToolbar(
   on_close: EventHandler,
   on_navigate: Option<EventHandler<String>>,
   on_convert: EventHandler<PaneNode<DesktopPane>>,
+  current_url: ReadOnlySignal<String>,
 ) -> Element {
   let initial_url = match &pane {
     DesktopPane::Browser { url, .. } => url.clone(),
     _ => String::new(),
   };
   let mut url_input = use_signal(|| initial_url);
+  use_effect(move || {
+    let val = current_url.read().clone();
+    if !val.is_empty() {
+      url_input.set(val);
+    }
+  });
   let mut conversion_open = use_signal(|| false);
   let current_kind = pane.kind();
   let icon = pane.icon();

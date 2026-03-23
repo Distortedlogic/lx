@@ -1,6 +1,7 @@
 {
-  "theme": "dark",
+  "theme": "base",
   "themeVariables": {
+    "background": "#000000",
     "primaryColor": "#000000",
     "primaryTextColor": "#ffffff",
     "primaryBorderColor": "#6fc3df",

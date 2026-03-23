@@ -113,6 +113,11 @@ impl BrowserSession {
     page.reload().await.context("reload failed")?;
     Ok(())
   }
+
+  pub async fn current_url(&self) -> Result<String> {
+    let page = self.page.lock().await;
+    Ok(page.url().await?.unwrap_or_default())
+  }
 }
 
 pub async fn get_or_create_session(id: &str) -> Result<Arc<BrowserSession>> {
