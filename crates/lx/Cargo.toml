@@ -5,6 +5,7 @@ name = "lx"
 version = "0.1.0"
 
 [dependencies]
+lx-macros = { path = "../lx-macros" }
 async-recursion.workspace = true
 chrono.workspace = true
 chumsky.workspace = true

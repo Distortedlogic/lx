@@ -12,6 +12,7 @@ members = [
   "crates/audio-core",
   "crates/voice-agent",
   "crates/lx-desktop",
+  "crates/lx-macros",
 ]
 exclude = ["reference/chumsky"]
 resolver = "2"

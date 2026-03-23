@@ -3,8 +3,11 @@ mod display;
 mod expr_types;
 mod parent_map;
 mod types;
+mod walk_impls;
 
 use std::marker::PhantomData;
+
+use lx_macros::AstWalk;
 
 use crate::sym::Sym;
 
@@ -23,19 +26,22 @@ pub struct Program<Phase = Surface> {
   pub _phase: PhantomData<Phase>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, AstWalk)]
 pub enum Stmt {
   Binding(Binding),
+  #[walk(skip)]
   TypeDef(StmtTypeDef),
+  #[walk(skip)]
   TraitUnion(TraitUnionDef),
   TraitDecl(TraitDeclData),
   ClassDecl(ClassDeclData),
   FieldUpdate(StmtFieldUpdate),
+  #[walk(skip)]
   Use(UseStmt),
   Expr(ExprId),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, AstWalk)]
 pub struct Binding {
   pub exported: bool,
   pub mutable: bool,
@@ -44,14 +50,14 @@ pub struct Binding {
   pub value: ExprId,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, AstWalk)]
 pub enum BindTarget {
   Name(Sym),
   Reassign(Sym),
   Pattern(PatternId),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, AstWalk)]
 pub enum Expr {
   Literal(Literal),
   Ident(Sym),

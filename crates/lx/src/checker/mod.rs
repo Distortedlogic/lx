@@ -5,10 +5,10 @@ pub mod diagnostics;
 mod exhaust;
 mod exhaust_core;
 mod exhaust_types;
-mod resolve;
-mod symbol_table;
+pub(crate) mod symbol_table;
 mod synth_compound;
 mod synth_control;
+pub mod type_arena;
 mod type_ops;
 pub mod types;
 pub mod unification;
@@ -18,10 +18,11 @@ use std::collections::{HashMap, HashSet};
 
 use std::sync::Arc;
 
-use crate::ast::{AstArena, Core, Program, TypeExpr, TypeExprId};
+use crate::ast::{AstArena, Core, ExprId, Program, TypeExpr, TypeExprId};
 use diagnostics::{DiagnosticKind, Fix};
 use miette::SourceSpan;
 use symbol_table::SymbolTable;
+use type_arena::{TypeArena, TypeId};
 
 use types::{Type, Variant};
 use unification::{TypeError, UnificationTable};
@@ -43,70 +44,55 @@ pub struct Diagnostic {
 pub struct CheckResult {
   pub diagnostics: Vec<Diagnostic>,
   pub source: Arc<str>,
+  pub expr_types: HashMap<ExprId, TypeId>,
+  pub type_arena: TypeArena,
 }
 
 pub(crate) struct Checker<'a> {
   pub(crate) table: UnificationTable,
-  scope: Vec<HashMap<Sym, Type>>,
+  pub(crate) type_arena: TypeArena,
   pub(crate) diagnostics: Vec<Diagnostic>,
   pub(crate) type_defs: HashMap<Sym, Vec<Sym>>,
   import_sources: HashMap<Sym, SourceSpan>,
-  pub(crate) trait_fields: HashMap<Sym, Vec<(Sym, Type)>>,
+  pub(crate) trait_fields: HashMap<Sym, Vec<(Sym, TypeId)>>,
   pub(crate) arena: &'a AstArena,
   mutables: HashSet<Sym>,
-  symbols: SymbolTable,
+  pub(crate) symbols: SymbolTable,
+  pub(crate) expr_types: HashMap<ExprId, TypeId>,
 }
 
 impl<'a> Checker<'a> {
-  fn new(arena: &'a AstArena, symbols: SymbolTable) -> Self {
+  fn new(arena: &'a AstArena) -> Self {
     Self {
       table: UnificationTable::new(),
-      scope: vec![HashMap::new()],
+      type_arena: TypeArena::new(),
       diagnostics: Vec::new(),
       type_defs: HashMap::new(),
       import_sources: HashMap::new(),
       trait_fields: HashMap::new(),
       arena,
       mutables: HashSet::new(),
-      symbols,
+      symbols: SymbolTable::new(),
+      expr_types: HashMap::new(),
     }
   }
 
-  pub(crate) fn bind(&mut self, name: Sym, ty: Type) {
-    if let Some(scope) = self.scope.last_mut() {
-      scope.insert(name, ty);
-    }
-  }
-
-  pub(crate) fn lookup(&self, name: Sym) -> Option<Type> {
-    for scope in self.scope.iter().rev() {
-      if let Some(ty) = scope.get(&name) {
-        return Some(ty.clone());
-      }
-    }
-    None
+  pub(crate) fn record_type(&mut self, id: ExprId, ty: TypeId) {
+    self.expr_types.insert(id, ty);
   }
 
   pub(crate) fn is_mutable(&self, name: Sym) -> bool {
     self.mutables.contains(&name)
   }
 
-  pub(crate) fn push_scope(&mut self) {
-    self.scope.push(HashMap::new());
-  }
-
-  pub(crate) fn pop_scope(&mut self) {
-    self.scope.pop();
-  }
-
   pub(crate) fn emit(&mut self, level: DiagLevel, kind: DiagnosticKind, span: SourceSpan) {
-    let fix = kind.suggest_fix(span);
+    let fix = kind.suggest_fix(span, &self.type_arena);
     self.diagnostics.push(Diagnostic { level, kind, span, secondary: Vec::new(), fix });
   }
 
   pub(crate) fn emit_type_error(&mut self, te: &TypeError, span: SourceSpan) {
     let kind = DiagnosticKind::TypeMismatch { error: te.clone() };
-    let fix = kind.suggest_fix(span);
+    let fix = kind.suggest_fix(span, &self.type_arena);
     let mut secondary = Vec::new();
     if let Some(origin) = te.expected_origin {
       secondary.push((origin, "expected type declared here".into()));
@@ -114,56 +100,91 @@ impl<'a> Checker<'a> {
     self.diagnostics.push(Diagnostic { level: DiagLevel::Error, kind, span, secondary, fix });
   }
 
-  pub(crate) fn fresh(&mut self) -> Type {
-    self.table.fresh_var()
+  pub(crate) fn fresh(&mut self) -> TypeId {
+    self.table.fresh_var(&mut self.type_arena)
   }
 
-  pub(crate) fn resolve_type_ann(&mut self, ty_id: TypeExprId) -> Type {
+  pub(crate) fn resolve_type_ann(&mut self, ty_id: TypeExprId) -> TypeId {
     match self.arena.type_expr(ty_id).clone() {
       TypeExpr::Named(name) => {
-        let t = named_to_type(name.as_str());
-        if t != Type::Unknown {
+        let t = self.named_to_type(name.as_str());
+        if t != self.type_arena.unknown() {
           return t;
         }
         let sym = crate::sym::intern(name.as_str());
         if let Some(variant_names) = self.type_defs.get(&sym).cloned() {
           let variants = variant_names.iter().map(|vn| Variant { name: *vn, fields: vec![] }).collect();
-          return Type::Union { name: sym, variants };
+          return self.type_arena.alloc(Type::Union { name: sym, variants });
         }
         if let Some(fields) = self.trait_fields.get(&sym).cloned() {
-          return Type::Record(fields);
+          return self.type_arena.alloc(Type::Record(fields));
         }
-        Type::Unknown
+        self.type_arena.unknown()
       },
       TypeExpr::Var(_) => self.fresh(),
       TypeExpr::Applied(name, args) => {
-        let resolved: Vec<Type> = args.iter().map(|a| self.resolve_type_ann(*a)).collect();
+        let resolved: Vec<TypeId> = args.iter().map(|a| self.resolve_type_ann(*a)).collect();
         match name.as_str() {
-          "Maybe" if resolved.len() == 1 => Type::Maybe(Box::new(resolved.into_iter().next().unwrap_or(Type::Unknown))),
+          "Maybe" if resolved.len() == 1 => {
+            let inner = resolved.into_iter().next().unwrap_or(self.type_arena.unknown());
+            self.type_arena.alloc(Type::Maybe(inner))
+          },
           "Result" if resolved.len() == 2 => {
             let mut it = resolved.into_iter();
-            Type::Result { ok: Box::new(it.next().unwrap_or(Type::Unknown)), err: Box::new(it.next().unwrap_or(Type::Unknown)) }
+            let ok = it.next().unwrap_or(self.type_arena.unknown());
+            let err = it.next().unwrap_or(self.type_arena.unknown());
+            self.type_arena.alloc(Type::Result { ok, err })
           },
           _ => {
             let sym = crate::sym::intern(name.as_str());
             if let Some(variant_names) = self.type_defs.get(&sym).cloned() {
               let variants = variant_names.iter().map(|vn| Variant { name: *vn, fields: vec![] }).collect();
-              Type::Union { name: sym, variants }
+              self.type_arena.alloc(Type::Union { name: sym, variants })
             } else {
-              Type::Unknown
+              self.type_arena.unknown()
             }
           },
         }
       },
-      TypeExpr::List(inner) => Type::List(Box::new(self.resolve_type_ann(inner))),
-      TypeExpr::Map { key, value } => Type::Map { key: Box::new(self.resolve_type_ann(key)), value: Box::new(self.resolve_type_ann(value)) },
+      TypeExpr::List(inner) => {
+        let inner = self.resolve_type_ann(inner);
+        self.type_arena.alloc(Type::List(inner))
+      },
+      TypeExpr::Map { key, value } => {
+        let key = self.resolve_type_ann(key);
+        let value = self.resolve_type_ann(value);
+        self.type_arena.alloc(Type::Map { key, value })
+      },
       TypeExpr::Record(fields) => {
         let fs = fields.iter().map(|f| (f.name, self.resolve_type_ann(f.ty))).collect();
-        Type::Record(fs)
+        self.type_arena.alloc(Type::Record(fs))
       },
-      TypeExpr::Tuple(elems) => Type::Tuple(elems.iter().map(|e| self.resolve_type_ann(*e)).collect()),
-      TypeExpr::Func { param, ret } => Type::Func { params: vec![self.resolve_type_ann(param)], ret: Box::new(self.resolve_type_ann(ret)) },
-      TypeExpr::Fallible { ok, err } => Type::Result { ok: Box::new(self.resolve_type_ann(ok)), err: Box::new(self.resolve_type_ann(err)) },
+      TypeExpr::Tuple(elems) => {
+        let elems: Vec<_> = elems.iter().map(|e| self.resolve_type_ann(*e)).collect();
+        self.type_arena.alloc(Type::Tuple(elems))
+      },
+      TypeExpr::Func { param, ret } => {
+        let param = self.resolve_type_ann(param);
+        let ret = self.resolve_type_ann(ret);
+        self.type_arena.alloc(Type::Func { param, ret })
+      },
+      TypeExpr::Fallible { ok, err } => {
+        let ok = self.resolve_type_ann(ok);
+        let err = self.resolve_type_ann(err);
+        self.type_arena.alloc(Type::Result { ok, err })
+      },
+    }
+  }
+
+  fn named_to_type(&self, name: &str) -> TypeId {
+    match name {
+      "Int" => self.type_arena.int(),
+      "Float" => self.type_arena.float(),
+      "Bool" => self.type_arena.bool(),
+      "Str" => self.type_arena.str(),
+      "Unit" => self.type_arena.unit(),
+      "Bytes" => self.type_arena.bytes(),
+      _ => self.type_arena.unknown(),
     }
   }
 
@@ -175,20 +196,7 @@ impl<'a> Checker<'a> {
 }
 
 pub fn check(program: &Program<Core>, source: Arc<str>) -> CheckResult {
-  let symbols = resolve::resolve(program);
-  let mut checker = Checker::new(&program.arena, symbols);
+  let mut checker = Checker::new(&program.arena);
   checker.check_program(program);
-  CheckResult { diagnostics: checker.diagnostics, source }
-}
-
-fn named_to_type(name: &str) -> Type {
-  match name {
-    "Int" => Type::Int,
-    "Float" => Type::Float,
-    "Bool" => Type::Bool,
-    "Str" => Type::Str,
-    "Unit" => Type::Unit,
-    "Bytes" => Type::Bytes,
-    _ => Type::Unknown,
-  }
+  CheckResult { diagnostics: checker.diagnostics, source, expr_types: checker.expr_types, type_arena: checker.type_arena }
 }

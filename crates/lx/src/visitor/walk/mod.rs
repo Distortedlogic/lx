@@ -1,6 +1,6 @@
 use std::ops::ControlFlow;
 
-use crate::ast::{AstArena, BindTarget, Binding, ClassDeclData, Expr, ExprId, Program, Stmt, StmtFieldUpdate, StmtId, TraitDeclData, TraitEntry};
+use crate::ast::{AstArena, BindTarget, Binding, ClassDeclData, Expr, ExprId, NodeId, Program, Stmt, StmtFieldUpdate, StmtId, TraitDeclData};
 use miette::SourceSpan;
 
 use super::{AstVisitor, VisitAction};
@@ -57,6 +57,22 @@ pub use walk_type::*;
 walk_dispatch!(walk_trait_decl_dispatch, walk_trait_decl, visit_trait_decl, leave_trait_decl, TraitDeclData);
 walk_dispatch!(walk_class_decl_dispatch, walk_class_decl, visit_class_decl, leave_class_decl, ClassDeclData);
 walk_dispatch!(walk_field_update_dispatch, walk_field_update, visit_field_update, leave_field_update, StmtFieldUpdate);
+
+fn dispatch_child<V: AstVisitor + ?Sized>(v: &mut V, child: NodeId, arena: &AstArena) -> ControlFlow<()> {
+  match child {
+    NodeId::Expr(id) => dispatch_expr(v, id, arena),
+    NodeId::Stmt(id) => dispatch_stmt(v, id, arena),
+    NodeId::Pattern(id) => walk_pattern_dispatch(v, id, arena),
+    NodeId::TypeExpr(id) => walk_type_expr_dispatch(v, id, arena),
+  }
+}
+
+fn dispatch_children<V: AstVisitor + ?Sized>(v: &mut V, children: &[NodeId], arena: &AstArena) -> ControlFlow<()> {
+  for &child in children {
+    dispatch_child(v, child, arena)?;
+  }
+  ControlFlow::Continue(())
+}
 
 pub fn walk_program<V: AstVisitor + ?Sized, P>(v: &mut V, program: &Program<P>) -> ControlFlow<()> {
   let arena = &program.arena;
@@ -192,43 +208,16 @@ pub fn walk_expr<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, arena: &AstArena
 }
 
 pub fn walk_trait_decl<V: AstVisitor + ?Sized>(v: &mut V, data: &TraitDeclData, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  for entry in &data.entries {
-    if let TraitEntry::Field(field) = entry {
-      if let Some(default) = field.default {
-        dispatch_expr(v, default, arena)?;
-      }
-      if let Some(constraint) = field.constraint {
-        dispatch_expr(v, constraint, arena)?;
-      }
-    }
-  }
-  for method in &data.methods {
-    for input in &method.input {
-      if let Some(d) = input.default {
-        dispatch_expr(v, d, arena)?;
-      }
-      if let Some(c) = input.constraint {
-        dispatch_expr(v, c, arena)?;
-      }
-    }
-  }
-  for method in &data.defaults {
-    dispatch_expr(v, method.handler, arena)?;
-  }
+  dispatch_children(v, &data.children(), arena)?;
   v.leave_trait_decl(data, span, arena)
 }
 
 pub fn walk_class_decl<V: AstVisitor + ?Sized>(v: &mut V, data: &ClassDeclData, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  for f in &data.fields {
-    dispatch_expr(v, f.default, arena)?;
-  }
-  for m in &data.methods {
-    dispatch_expr(v, m.handler, arena)?;
-  }
+  dispatch_children(v, &data.children(), arena)?;
   v.leave_class_decl(data, span, arena)
 }
 
 pub fn walk_field_update<V: AstVisitor + ?Sized>(v: &mut V, fu: &StmtFieldUpdate, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_expr(v, fu.value, arena)?;
+  dispatch_children(v, &fu.children(), arena)?;
   v.leave_field_update(fu, span, arena)
 }

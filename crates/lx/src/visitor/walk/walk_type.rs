@@ -6,6 +6,8 @@ use miette::SourceSpan;
 
 use crate::visitor::{AstVisitor, VisitAction};
 
+use super::dispatch_children;
+
 pub(crate) fn walk_type_expr_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: TypeExprId, arena: &AstArena) -> ControlFlow<()> {
   let span = arena.type_expr_span(id);
   let type_expr = arena.type_expr(id);
@@ -125,9 +127,7 @@ fn walk_type_record_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: TypeExprId, 
 }
 
 pub fn walk_type_record<V: AstVisitor + ?Sized>(v: &mut V, id: TypeExprId, fields: &[TypeField], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  for f in fields {
-    walk_type_expr_dispatch(v, f.ty, arena)?;
-  }
+  dispatch_children(v, &fields.iter().flat_map(|f| f.children()).collect::<Vec<_>>(), arena)?;
   v.leave_type_record(id, fields, span, arena)
 }
 

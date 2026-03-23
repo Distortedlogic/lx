@@ -1,3 +1,4 @@
+use lx_macros::AstWalk;
 use strum::Display;
 
 use super::{ExprId, Literal, PatternId, TypeExprId};
@@ -16,7 +17,7 @@ pub enum UseKind {
   Selective(Vec<Sym>),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, AstWalk)]
 pub enum Pattern {
   Literal(Literal),
   Bind(Sym),
@@ -92,13 +93,13 @@ pub struct ClassDeclData {
   pub exported: bool,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, AstWalk)]
 pub struct FieldPattern {
   pub name: Sym,
   pub pattern: Option<PatternId>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, AstWalk)]
 pub enum TypeExpr {
   Named(Sym),
   Var(Sym),
@@ -111,7 +112,7 @@ pub enum TypeExpr {
   Fallible { ok: TypeExprId, err: TypeExprId },
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, AstWalk)]
 pub struct TypeField {
   pub name: Sym,
   pub ty: TypeExprId,
@@ -170,26 +171,26 @@ pub struct StmtTypeDef {
   pub exported: bool,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, AstWalk)]
 pub struct StmtFieldUpdate {
   pub name: Sym,
   pub fields: Vec<Sym>,
   pub value: ExprId,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, AstWalk)]
 pub struct PatternList {
   pub elems: Vec<PatternId>,
   pub rest: Option<Sym>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, AstWalk)]
 pub struct PatternRecord {
   pub fields: Vec<FieldPattern>,
   pub rest: Option<Sym>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, AstWalk)]
 pub struct PatternConstructor {
   pub name: Sym,
   pub args: Vec<PatternId>,

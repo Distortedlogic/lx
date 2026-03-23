@@ -1,9 +1,10 @@
+use lx_macros::AstWalk;
 use num_bigint::BigInt;
 
 use super::{BinOp, ExprId, PatternId, StmtId, TypeExprId, UnaryOp, WithKind};
 use crate::sym::Sym;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, AstWalk)]
 pub enum Literal {
   Int(BigInt),
   Float(f64),
@@ -13,7 +14,7 @@ pub enum Literal {
   Unit,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, AstWalk)]
 pub enum StrPart {
   Text(String),
   Interp(ExprId),
@@ -47,7 +48,7 @@ impl PartialEq for Literal {
 
 impl Eq for Literal {}
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, AstWalk)]
 pub enum Section {
   Right { op: BinOp, operand: ExprId },
   Left { operand: ExprId, op: BinOp },
@@ -56,83 +57,83 @@ pub enum Section {
   BinOp(BinOp),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, AstWalk)]
 pub enum FieldKind {
   Named(Sym),
   Index(i64),
   Computed(ExprId),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, AstWalk)]
 pub enum ListElem {
   Single(ExprId),
   Spread(ExprId),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, AstWalk)]
 pub enum RecordField {
   Named { name: Sym, value: ExprId },
   Spread(ExprId),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, AstWalk)]
 pub enum MapEntry {
   Keyed { key: ExprId, value: ExprId },
   Spread(ExprId),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, AstWalk)]
 pub struct Param {
   pub name: Sym,
   pub type_ann: Option<TypeExprId>,
   pub default: Option<ExprId>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, AstWalk)]
 pub struct MatchArm {
   pub pattern: PatternId,
   pub guard: Option<ExprId>,
   pub body: ExprId,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, AstWalk)]
 pub struct SelArm {
   pub expr: ExprId,
   pub handler: ExprId,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, AstWalk)]
 pub struct ExprBinary {
   pub op: BinOp,
   pub left: ExprId,
   pub right: ExprId,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, AstWalk)]
 pub struct ExprUnary {
   pub op: UnaryOp,
   pub operand: ExprId,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, AstWalk)]
 pub struct ExprPipe {
   pub left: ExprId,
   pub right: ExprId,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, AstWalk)]
 pub struct ExprApply {
   pub func: ExprId,
   pub arg: ExprId,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, AstWalk)]
 pub struct ExprFieldAccess {
   pub expr: ExprId,
   pub field: FieldKind,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, AstWalk)]
 pub struct ExprFunc {
   pub params: Vec<Param>,
   pub ret_type: Option<TypeExprId>,
@@ -140,61 +141,61 @@ pub struct ExprFunc {
   pub body: ExprId,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, AstWalk)]
 pub struct ExprMatch {
   pub scrutinee: ExprId,
   pub arms: Vec<MatchArm>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, AstWalk)]
 pub struct ExprTernary {
   pub cond: ExprId,
   pub then_: ExprId,
   pub else_: Option<ExprId>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, AstWalk)]
 pub struct ExprCoalesce {
   pub expr: ExprId,
   pub default: ExprId,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, AstWalk)]
 pub struct ExprSlice {
   pub expr: ExprId,
   pub start: Option<ExprId>,
   pub end: Option<ExprId>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, AstWalk)]
 pub struct ExprNamedArg {
   pub name: Sym,
   pub value: ExprId,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, AstWalk)]
 pub struct ExprAssert {
   pub expr: ExprId,
   pub msg: Option<ExprId>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, AstWalk)]
 pub struct ExprTimeout {
   pub ms: ExprId,
   pub body: ExprId,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, AstWalk)]
 pub struct ExprEmit {
   pub value: ExprId,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, AstWalk)]
 pub struct ExprYield {
   pub value: ExprId,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, AstWalk)]
 pub struct ExprWith {
   pub kind: WithKind,
   pub body: Vec<StmtId>,

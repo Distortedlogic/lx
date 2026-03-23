@@ -107,6 +107,7 @@ pub fn TabBar(tabs_state: Signal<TabsState<DesktopPane>>, on_new_tab: EventHandl
               {
                   let label = kind.label();
                   let icon = kind.icon();
+                  let kind = *kind;
                   let is_canvas = kind == PaneKind::Canvas;
                   rsx! {
                     button {

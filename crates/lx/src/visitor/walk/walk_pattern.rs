@@ -6,6 +6,8 @@ use miette::SourceSpan;
 
 use crate::visitor::{AstVisitor, VisitAction};
 
+use super::dispatch_children;
+
 pub(crate) fn walk_pattern_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: PatternId, arena: &AstArena) -> ControlFlow<()> {
   let span = arena.pattern_span(id);
   let pattern = arena.pattern(id);
@@ -121,11 +123,7 @@ pub fn walk_pattern_record<V: AstVisitor + ?Sized>(
   span: SourceSpan,
   arena: &AstArena,
 ) -> ControlFlow<()> {
-  for f in fields {
-    if let Some(pid) = f.pattern {
-      walk_pattern_dispatch(v, pid, arena)?;
-    }
-  }
+  dispatch_children(v, &fields.iter().flat_map(|f| f.children()).collect::<Vec<_>>(), arena)?;
   v.leave_pattern_record(id, fields, rest, span, arena)
 }
 

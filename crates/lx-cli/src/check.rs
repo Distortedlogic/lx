@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use lx::checker::{DiagLevel, Diagnostic, check};
+use lx::checker::{CheckResult, DiagLevel, Diagnostic, check};
 use lx::error::LxError;
 use miette::{NamedSource, Report};
 
@@ -33,7 +33,8 @@ pub fn check_file(path: &str, strict: bool) -> ExitCode {
           "warning"
         },
       };
-      let err = LxError::type_err(format!("{prefix}: {}", d.kind), d.span, d.kind.help());
+      let msg = d.kind.display(&result.type_arena);
+      let err = LxError::type_err(format!("{prefix}: {msg}"), d.span, d.kind.help(&result.type_arena));
       let named = NamedSource::new(path, source.clone());
       let report = Report::new(err).with_source_code(named);
       eprintln!("{report:?}");
@@ -93,26 +94,10 @@ pub fn check_workspace(member_filter: Option<&str>, strict: bool) -> ExitCode {
             member_ok += 1;
           } else if file_errors == 0 {
             member_ok += 1;
-            for d in &result.diagnostics {
-              let err = LxError::type_err(format!("warning: {}", d.kind), d.span, d.kind.help());
-              let named = NamedSource::new(path_str.clone(), source.clone());
-              let report = Report::new(err).with_source_code(named);
-              eprintln!("{report:?}");
-              print_fix(d);
-            }
+            print_diagnostics(&result, &path_str, &source, "warning");
           } else {
             member_err += 1;
-            for d in &result.diagnostics {
-              let prefix = match d.level {
-                DiagLevel::Error => "error",
-                DiagLevel::Warning => "warning",
-              };
-              let err = LxError::type_err(format!("{prefix}: {}", d.kind), d.span, d.kind.help());
-              let named = NamedSource::new(path_str.clone(), source.clone());
-              let report = Report::new(err).with_source_code(named);
-              eprintln!("{report:?}");
-              print_fix(d);
-            }
+            print_all_diagnostics(&result, &path_str, &source);
           }
         },
         Err(_) => {
@@ -148,6 +133,32 @@ pub fn check_workspace(member_filter: Option<&str>, strict: bool) -> ExitCode {
     println!("\nTOTAL: {} files, {} errors, {} members", total_ok + total_err, total_err, members.len());
   }
   if any_failure { ExitCode::from(1) } else { ExitCode::SUCCESS }
+}
+
+fn print_diagnostics(result: &CheckResult, path_str: &str, source: &str, prefix: &str) {
+  for d in &result.diagnostics {
+    let msg = d.kind.display(&result.type_arena);
+    let err = LxError::type_err(format!("{prefix}: {msg}"), d.span, d.kind.help(&result.type_arena));
+    let named = NamedSource::new(path_str, source.to_string());
+    let report = Report::new(err).with_source_code(named);
+    eprintln!("{report:?}");
+    print_fix(d);
+  }
+}
+
+fn print_all_diagnostics(result: &CheckResult, path_str: &str, source: &str) {
+  for d in &result.diagnostics {
+    let prefix = match d.level {
+      DiagLevel::Error => "error",
+      DiagLevel::Warning => "warning",
+    };
+    let msg = d.kind.display(&result.type_arena);
+    let err = LxError::type_err(format!("{prefix}: {msg}"), d.span, d.kind.help(&result.type_arena));
+    let named = NamedSource::new(path_str, source.to_string());
+    let report = Report::new(err).with_source_code(named);
+    eprintln!("{report:?}");
+    print_fix(d);
+  }
 }
 
 fn print_fix(d: &Diagnostic) {

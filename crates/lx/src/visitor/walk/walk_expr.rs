@@ -1,15 +1,12 @@
 use std::ops::ControlFlow;
 
 use crate::ast::{
-  AstArena, ExprApply, ExprBinary, ExprFieldAccess, ExprFunc, ExprId, ExprMatch, ExprPipe, ExprUnary, FieldKind, ListElem, Literal, MapEntry, RecordField,
-  Section, StmtId, StrPart,
+  AstArena, ExprApply, ExprBinary, ExprFieldAccess, ExprFunc, ExprId, ExprMatch, ExprPipe, ExprUnary, ListElem, Literal, MapEntry, RecordField, Section, StmtId,
 };
 use miette::SourceSpan;
 
 use super::super::{AstVisitor, VisitAction};
-use super::dispatch_expr;
-use super::walk_pattern::walk_pattern_dispatch;
-use super::walk_type::walk_type_expr_dispatch;
+use super::{dispatch_children, dispatch_expr};
 
 walk_dispatch_id!(walk_literal_dispatch, walk_literal, visit_literal, leave_literal, Literal, ExprId);
 walk_dispatch_id!(walk_binary_dispatch, walk_binary, visit_binary, leave_binary, ExprBinary, ExprId);
@@ -28,54 +25,37 @@ walk_dispatch_id_slice!(walk_record_dispatch, walk_record, visit_record, leave_r
 walk_dispatch_id_slice!(walk_map_dispatch, walk_map, visit_map, leave_map, MapEntry, ExprId);
 
 pub fn walk_literal<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, lit: &Literal, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  if let Literal::Str(parts) = lit {
-    for part in parts {
-      if let StrPart::Interp(eid) = part {
-        dispatch_expr(v, *eid, arena)?;
-      }
-    }
-  }
+  dispatch_children(v, &lit.children(), arena)?;
   v.leave_literal(id, lit, span, arena)
 }
 
 pub fn walk_binary<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, binary: &ExprBinary, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_expr(v, binary.left, arena)?;
-  dispatch_expr(v, binary.right, arena)?;
+  dispatch_children(v, &binary.children(), arena)?;
   v.leave_binary(id, binary, span, arena)
 }
 
 pub fn walk_unary<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, unary: &ExprUnary, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_expr(v, unary.operand, arena)?;
+  dispatch_children(v, &unary.children(), arena)?;
   v.leave_unary(id, unary, span, arena)
 }
 
 pub fn walk_pipe<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, pipe: &ExprPipe, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_expr(v, pipe.left, arena)?;
-  dispatch_expr(v, pipe.right, arena)?;
+  dispatch_children(v, &pipe.children(), arena)?;
   v.leave_pipe(id, pipe, span, arena)
 }
 
 pub fn walk_apply<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, apply: &ExprApply, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_expr(v, apply.func, arena)?;
-  dispatch_expr(v, apply.arg, arena)?;
+  dispatch_children(v, &apply.children(), arena)?;
   v.leave_apply(id, apply, span, arena)
 }
 
 pub fn walk_section<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, section: &Section, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  match section {
-    Section::Right { operand, .. } | Section::Left { operand, .. } => {
-      dispatch_expr(v, *operand, arena)?;
-    },
-    _ => {},
-  }
+  dispatch_children(v, &section.children(), arena)?;
   v.leave_section(id, section, span, arena)
 }
 
 pub fn walk_field_access<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, fa: &ExprFieldAccess, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_expr(v, fa.expr, arena)?;
-  if let FieldKind::Computed(c) = &fa.field {
-    dispatch_expr(v, *c, arena)?;
-  }
+  dispatch_children(v, &fa.children(), arena)?;
   v.leave_field_access(id, fa, span, arena)
 }
 
@@ -94,67 +74,26 @@ pub fn walk_tuple<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, elems: &[ExprId
 }
 
 pub fn walk_list<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, elems: &[ListElem], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  for e in elems {
-    let eid = match e {
-      ListElem::Single(eid) | ListElem::Spread(eid) => *eid,
-    };
-    dispatch_expr(v, eid, arena)?;
-  }
+  dispatch_children(v, &elems.iter().flat_map(|e| e.children()).collect::<Vec<_>>(), arena)?;
   v.leave_list(id, elems, span, arena)
 }
 
 pub fn walk_record<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, fields: &[RecordField], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  for f in fields {
-    let eid = match f {
-      RecordField::Named { value, .. } | RecordField::Spread(value) => *value,
-    };
-    dispatch_expr(v, eid, arena)?;
-  }
+  dispatch_children(v, &fields.iter().flat_map(|f| f.children()).collect::<Vec<_>>(), arena)?;
   v.leave_record(id, fields, span, arena)
 }
 
 pub fn walk_map<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, entries: &[MapEntry], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  for entry in entries {
-    match entry {
-      MapEntry::Keyed { key, value } => {
-        dispatch_expr(v, *key, arena)?;
-        dispatch_expr(v, *value, arena)?;
-      },
-      MapEntry::Spread(value) => {
-        dispatch_expr(v, *value, arena)?;
-      },
-    }
-  }
+  dispatch_children(v, &entries.iter().flat_map(|e| e.children()).collect::<Vec<_>>(), arena)?;
   v.leave_map(id, entries, span, arena)
 }
 
 pub fn walk_func<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, func: &ExprFunc, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  for p in &func.params {
-    if let Some(d) = p.default {
-      dispatch_expr(v, d, arena)?;
-    }
-    if let Some(ty) = p.type_ann {
-      walk_type_expr_dispatch(v, ty, arena)?;
-    }
-  }
-  if let Some(rt) = func.ret_type {
-    walk_type_expr_dispatch(v, rt, arena)?;
-  }
-  if let Some(g) = func.guard {
-    dispatch_expr(v, g, arena)?;
-  }
-  dispatch_expr(v, func.body, arena)?;
+  dispatch_children(v, &func.children(), arena)?;
   v.leave_func(id, func, span, arena)
 }
 
 pub fn walk_match<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, m: &ExprMatch, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_expr(v, m.scrutinee, arena)?;
-  for arm in &m.arms {
-    walk_pattern_dispatch(v, arm.pattern, arena)?;
-    if let Some(g) = arm.guard {
-      dispatch_expr(v, g, arena)?;
-    }
-    dispatch_expr(v, arm.body, arena)?;
-  }
+  dispatch_children(v, &m.children(), arena)?;
   v.leave_match(id, m, span, arena)
 }

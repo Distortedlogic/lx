@@ -4,6 +4,7 @@ use miette::SourceSpan;
 
 use crate::sym::Sym;
 
+use super::type_arena::TypeArena;
 use super::unification::TypeError;
 
 pub struct TextEdit {
@@ -46,14 +47,14 @@ pub enum DiagnosticKind {
 }
 
 impl DiagnosticKind {
-  pub fn help(&self) -> Option<String> {
+  pub fn help(&self, ta: &TypeArena) -> Option<String> {
     match self {
-      Self::TypeMismatch { error } => error.help(),
+      Self::TypeMismatch { error } => error.help(ta),
       _ => None,
     }
   }
 
-  pub fn suggest_fix(&self, span: SourceSpan) -> Option<Fix> {
+  pub fn suggest_fix(&self, span: SourceSpan, ta: &TypeArena) -> Option<Fix> {
     match self {
       Self::DuplicateImport { .. } => Some(Fix {
         description: "remove duplicate import".into(),
@@ -61,31 +62,29 @@ impl DiagnosticKind {
         applicability: Applicability::MachineApplicable,
       }),
       Self::TypeMismatch { error } => {
-        error.help().map(|help_text| Fix { description: help_text, edits: Vec::new(), applicability: Applicability::DisplayOnly })
+        error.help(ta).map(|help_text| Fix { description: help_text, edits: Vec::new(), applicability: Applicability::DisplayOnly })
       },
       _ => None,
     }
   }
-}
 
-impl fmt::Display for DiagnosticKind {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+  pub fn display(&self, ta: &TypeArena) -> String {
     match self {
-      Self::NegationRequiresNumeric => write!(f, "negation requires Int or Float"),
-      Self::PropagateRequiresResultOrMaybe => write!(f, "^ requires Result or Maybe"),
-      Self::TernaryCondNotBool => write!(f, "ternary condition must be Bool"),
-      Self::TimeoutMsNotNumeric => write!(f, "timeout ms must be Int or Float"),
-      Self::LogicalOpRequiresBool => write!(f, "logical operator requires Bool"),
+      Self::NegationRequiresNumeric => "negation requires Int or Float".into(),
+      Self::PropagateRequiresResultOrMaybe => "^ requires Result or Maybe".into(),
+      Self::TernaryCondNotBool => "ternary condition must be Bool".into(),
+      Self::TimeoutMsNotNumeric => "timeout ms must be Int or Float".into(),
+      Self::LogicalOpRequiresBool => "logical operator requires Bool".into(),
       Self::MutableCaptureInConcurrent { name } => {
-        write!(f, "cannot capture mutable binding `{name}` in concurrent context")
+        format!("cannot capture mutable binding `{name}` in concurrent context")
       },
       Self::NonExhaustiveMatch { type_name, missing_pattern } => {
-        write!(f, "non-exhaustive match on {type_name}: missing {missing_pattern}")
+        format!("non-exhaustive match on {type_name}: missing {missing_pattern}")
       },
       Self::DuplicateImport { name, .. } => {
-        write!(f, "'{name}' already imported")
+        format!("'{name}' already imported")
       },
-      Self::TypeMismatch { error } => write!(f, "{}", error.to_message()),
+      Self::TypeMismatch { error } => error.to_message(ta),
     }
   }
 }

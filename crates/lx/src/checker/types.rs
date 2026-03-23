@@ -1,8 +1,7 @@
-use std::fmt;
-
 use crate::sym::Sym;
 use ena::unify::{NoError, UnifyKey, UnifyValue};
-use itertools::Itertools;
+
+use super::type_arena::TypeId;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TypeVarKey(u32);
@@ -24,7 +23,7 @@ impl UnifyKey for TypeVarKey {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct TypeVarValue(pub Option<Type>);
+pub struct TypeVarValue(pub Option<TypeId>);
 
 impl UnifyValue for TypeVarValue {
   type Error = NoError;
@@ -48,14 +47,14 @@ pub enum Type {
   Unit,
   Bytes,
 
-  List(Box<Type>),
-  Map { key: Box<Type>, value: Box<Type> },
-  Record(Vec<(Sym, Type)>),
-  Tuple(Vec<Type>),
+  List(TypeId),
+  Map { key: TypeId, value: TypeId },
+  Record(Vec<(Sym, TypeId)>),
+  Tuple(Vec<TypeId>),
 
-  Func { params: Vec<Type>, ret: Box<Type> },
-  Result { ok: Box<Type>, err: Box<Type> },
-  Maybe(Box<Type>),
+  Func { param: TypeId, ret: TypeId },
+  Result { ok: TypeId, err: TypeId },
+  Maybe(TypeId),
 
   Union { name: Sym, variants: Vec<Variant> },
 
@@ -68,35 +67,5 @@ pub enum Type {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Variant {
   pub name: Sym,
-  pub fields: Vec<Type>,
-}
-
-impl fmt::Display for Type {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      Type::Int => write!(f, "Int"),
-      Type::Float => write!(f, "Float"),
-      Type::Bool => write!(f, "Bool"),
-      Type::Str => write!(f, "Str"),
-      Type::Unit => write!(f, "()"),
-      Type::Bytes => write!(f, "Bytes"),
-      Type::List(inner) => write!(f, "[{inner}]"),
-      Type::Map { key, value } => write!(f, "%{{{key}: {value}}}"),
-      Type::Record(fields) => {
-        write!(f, "{{{}}}", fields.iter().format_with("  ", |(n, t), g| g(&format_args!("{n}: {t}"))))
-      },
-      Type::Tuple(elems) => write!(f, "({})", elems.iter().format(", ")),
-      Type::Func { params, ret } => {
-        let params_str = params.iter().format(", ");
-        write!(f, "({params_str}) -> {ret}")
-      },
-      Type::Result { ok, err } => write!(f, "{ok} ^ {err}"),
-      Type::Maybe(inner) => write!(f, "Maybe {inner}"),
-      Type::Union { name, .. } => write!(f, "{name}"),
-      Type::Var(key) => write!(f, "t{}", key.index()),
-      Type::Unknown => write!(f, "?"),
-      Type::Todo => write!(f, "<todo>"),
-      Type::Error => write!(f, "<error>"),
-    }
-  }
+  pub fields: Vec<TypeId>,
 }

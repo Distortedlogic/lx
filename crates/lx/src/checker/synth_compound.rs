@@ -7,20 +7,24 @@ use miette::SourceSpan;
 use super::capture::free_vars;
 use super::diagnostics::DiagnosticKind;
 use super::exhaust::{check_exhaustiveness, check_exhaustiveness_no_variants};
+use super::symbol_table::DefKind;
+use super::type_arena::TypeId;
 use super::types::Type;
 use super::unification::TypeContext;
 use super::{Checker, DiagLevel};
 
 impl Checker<'_> {
-  pub(super) fn synth_func_type(&mut self, params: &[Param], ret_type: &Option<TypeExprId>, body: ExprId) -> Type {
-    self.push_scope();
+  pub(super) fn synth_func_type(&mut self, params: &[Param], ret_type: &Option<TypeExprId>, body: ExprId) -> TypeId {
+    self.symbols.push_scope();
     let mut param_types = Vec::new();
+    let func_span = self.arena.expr_span(body);
     for p in params {
       let ty = match p.type_ann {
         Some(ann) => self.resolve_type_ann(ann),
         None => self.fresh(),
       };
-      self.bind(p.name, ty.clone());
+      self.symbols.define(p.name, DefKind::FuncParam, func_span);
+      self.symbols.set_type(p.name, ty);
       param_types.push(ty);
     }
     let body_span = self.arena.expr_span(body);
@@ -29,7 +33,7 @@ impl Checker<'_> {
     if let Some(ret_ann) = ret_type {
       let expected = self.resolve_type_ann(*ret_ann);
       let ctx = TypeContext::FuncReturn { func_name: "anonymous".into() };
-      match self.table.unify_with_context(&expected, &body_type, ctx) {
+      match self.table.unify_with_context(expected, body_type, ctx, &mut self.type_arena) {
         Ok(_) => {},
         Err(mut te) => {
           te.expected_origin = ret_ann_span;
@@ -37,18 +41,25 @@ impl Checker<'_> {
         },
       }
     }
-    self.pop_scope();
+    self.symbols.pop_scope();
     let ret = match ret_type {
       Some(ann) => self.resolve_type_ann(*ann),
       None => body_type,
     };
-    Type::Func { params: param_types, ret: Box::new(ret) }
+    let mut func_type = ret;
+    for &p in param_types.iter().rev() {
+      func_type = self.type_arena.alloc(Type::Func { param: p, ret: func_type });
+    }
+    func_type
   }
 
   pub(super) fn bind_pattern_vars(&mut self, pid: PatternId) {
+    let unknown = self.type_arena.unknown();
+    let span = self.arena.pattern_span(pid);
     match self.arena.pattern(pid).clone() {
       Pattern::Bind(name) => {
-        self.bind(name, Type::Unknown);
+        self.symbols.define(name, DefKind::PatternBind, span);
+        self.symbols.set_type(name, unknown);
       },
       Pattern::Constructor(PatternConstructor { args, .. }) => {
         for arg in &args {
@@ -65,7 +76,8 @@ impl Checker<'_> {
           self.bind_pattern_vars(*p);
         }
         if let Some(name) = rest {
-          self.bind(name, Type::Unknown);
+          self.symbols.define(name, DefKind::PatternBind, span);
+          self.symbols.set_type(name, unknown);
         }
       },
       Pattern::Record(PatternRecord { fields, rest }) => {
@@ -73,11 +85,13 @@ impl Checker<'_> {
           if let Some(p) = f.pattern {
             self.bind_pattern_vars(p);
           } else {
-            self.bind(f.name, Type::Unknown);
+            self.symbols.define(f.name, DefKind::PatternBind, span);
+            self.symbols.set_type(f.name, unknown);
           }
         }
         if let Some(name) = rest {
-          self.bind(name, Type::Unknown);
+          self.symbols.define(name, DefKind::PatternBind, span);
+          self.symbols.set_type(name, unknown);
         }
       },
       Pattern::Literal(_) | Pattern::Wildcard => {},
@@ -93,7 +107,7 @@ impl Checker<'_> {
     }
   }
 
-  pub(super) fn synth_apply_type(&mut self, func: ExprId, arg: ExprId) -> Type {
+  pub(super) fn synth_apply_type(&mut self, func: ExprId, arg: ExprId) -> TypeId {
     let func_expr = self.arena.expr(func).clone();
     let arg_expr = self.arena.expr(arg).clone();
     if let (Expr::Ident(name) | Expr::TypeConstructor(name), Expr::Record(rec_fields)) = (&func_expr, &arg_expr)
@@ -107,65 +121,63 @@ impl Checker<'_> {
             let val_span = self.arena.expr_span(*value);
             let val_t = self.synth_expr(*value);
             let ctx = TypeContext::RecordField { field_name: trait_name.to_string() };
-            if let Err(te) = self.table.unify_with_context(trait_type, &val_t, ctx) {
+            if let Err(te) = self.table.unify_with_context(*trait_type, val_t, ctx, &mut self.type_arena) {
               self.emit_type_error(&te, val_span);
             }
           }
         }
       }
-      return Type::Record(fields);
+      return self.type_arena.alloc(Type::Record(fields));
     }
     let ft = self.synth_expr(func);
     let arg_span = self.arena.expr_span(arg);
-    match self.table.resolve(&ft) {
-      Type::Func { params, ret } => {
-        if params.is_empty() {
-          self.synth_expr(arg);
-          return *ret;
-        }
-        let arg_t = self.check_expr(arg, &params[0]);
+    let resolved = self.table.resolve(ft, &self.type_arena);
+    match self.type_arena.get(resolved).clone() {
+      Type::Func { param, ret } => {
+        let arg_t = self.check_expr(arg, param);
         let ctx = TypeContext::FuncArg { func_name: "apply".into(), param_name: "arg".into(), param_idx: 0 };
-        if let Err(te) = self.table.unify_with_context(&params[0], &arg_t, ctx) {
+        if let Err(te) = self.table.unify_with_context(param, arg_t, ctx, &mut self.type_arena) {
           self.emit_type_error(&te, arg_span);
-          return Type::Error;
+          return self.type_arena.error();
         }
-        if params.len() == 1 { *ret } else { Type::Func { params: params[1..].to_vec(), ret } }
+        ret
       },
       Type::Error => {
         self.synth_expr(arg);
-        Type::Error
+        self.type_arena.error()
       },
       _ => {
         self.synth_expr(arg);
-        Type::Unknown
+        self.type_arena.unknown()
       },
     }
   }
 
-  pub(super) fn synth_match_type(&mut self, scrutinee: ExprId, arms: &[MatchArm], span: SourceSpan) -> Type {
+  pub(super) fn synth_match_type(&mut self, scrutinee: ExprId, arms: &[MatchArm], span: SourceSpan) -> TypeId {
     let scrut_t = self.synth_expr(scrutinee);
-    let resolved_scrut = self.table.resolve(&scrut_t);
-    self.check_match_exhaustiveness(&resolved_scrut, arms, span);
+    let resolved_scrut = self.table.resolve(scrut_t, &self.type_arena);
+    self.check_match_exhaustiveness(resolved_scrut, arms, span);
     let result = self.fresh();
     for (idx, arm) in arms.iter().enumerate() {
-      self.push_scope();
+      self.symbols.push_scope();
       self.bind_pattern_vars(arm.pattern);
       if let Some(guard) = arm.guard {
         self.synth_expr(guard);
       }
       let body_span = self.arena.expr_span(arm.body);
-      let body_t = self.check_expr(arm.body, &result);
-      self.pop_scope();
+      let body_t = self.check_expr(arm.body, result);
+      self.symbols.pop_scope();
       let ctx = TypeContext::MatchArm { arm_idx: idx };
-      if let Err(te) = self.table.unify_with_context(&result, &body_t, ctx) {
+      if let Err(te) = self.table.unify_with_context(result, body_t, ctx, &mut self.type_arena) {
         self.emit_type_error(&te, body_span);
       }
     }
-    self.table.resolve(&result)
+    self.table.resolve(result, &self.type_arena)
   }
 
-  pub(super) fn check_match_exhaustiveness(&mut self, scrut_type: &Type, arms: &[MatchArm], span: SourceSpan) {
-    let missing = match scrut_type {
+  pub(super) fn check_match_exhaustiveness(&mut self, scrut_type: TypeId, arms: &[MatchArm], span: SourceSpan) {
+    let scrut = self.type_arena.get(scrut_type).clone();
+    let missing = match &scrut {
       Type::Union { name, variants } => {
         let variant_info: Vec<(Sym, usize)> = variants.iter().map(|v| (v.name, v.fields.len())).collect();
         check_exhaustiveness(*name, &variant_info, arms, self.arena)
@@ -191,18 +203,20 @@ impl Checker<'_> {
       },
       _ => return,
     };
-    let type_name = match scrut_type {
+    let type_name = match &scrut {
       Type::Union { name, .. } => *name,
-      _ => sym::intern(&format!("{scrut_type}")),
+      _ => sym::intern(&self.type_arena.display(scrut_type)),
     };
     for pat in &missing {
       self.emit(DiagLevel::Warning, DiagnosticKind::NonExhaustiveMatch { type_name, missing_pattern: pat.clone() }, span);
     }
   }
 
-  pub(super) fn synth_map_type(&mut self, entries: &[MapEntry]) -> Type {
+  pub(super) fn synth_map_type(&mut self, entries: &[MapEntry]) -> TypeId {
     if entries.is_empty() {
-      return Type::Map { key: Box::new(self.fresh()), value: Box::new(self.fresh()) };
+      let key = self.fresh();
+      let value = self.fresh();
+      return self.type_arena.alloc(Type::Map { key, value });
     }
     let mut key_t = self.fresh();
     let mut val_t = self.fresh();
@@ -211,31 +225,31 @@ impl Checker<'_> {
         MapEntry::Keyed { key, value } => {
           let kt = self.synth_expr(*key);
           let key_span = self.arena.expr_span(*key);
-          if let Err(te) = self.table.unify_with_context(&key_t, &kt, TypeContext::General) {
+          if let Err(te) = self.table.unify_with_context(key_t, kt, TypeContext::General, &mut self.type_arena) {
             self.emit_type_error(&te, key_span);
           }
-          key_t = self.table.resolve(&key_t);
+          key_t = self.table.resolve(key_t, &self.type_arena);
           let vt = self.synth_expr(*value);
           let val_span = self.arena.expr_span(*value);
-          if let Err(te) = self.table.unify_with_context(&val_t, &vt, TypeContext::General) {
+          if let Err(te) = self.table.unify_with_context(val_t, vt, TypeContext::General, &mut self.type_arena) {
             self.emit_type_error(&te, val_span);
           }
-          val_t = self.table.resolve(&val_t);
+          val_t = self.table.resolve(val_t, &self.type_arena);
         },
         MapEntry::Spread(value) => {
           let vt = self.synth_expr(*value);
           let val_span = self.arena.expr_span(*value);
-          if let Err(te) = self.table.unify_with_context(&val_t, &vt, TypeContext::General) {
+          if let Err(te) = self.table.unify_with_context(val_t, vt, TypeContext::General, &mut self.type_arena) {
             self.emit_type_error(&te, val_span);
           }
-          val_t = self.table.resolve(&val_t);
+          val_t = self.table.resolve(val_t, &self.type_arena);
         },
       }
     }
-    Type::Map { key: Box::new(key_t), value: Box::new(val_t) }
+    self.type_arena.alloc(Type::Map { key: key_t, value: val_t })
   }
 
-  pub(super) fn synth_literal(&mut self, lit: &Literal) -> Type {
+  pub(super) fn synth_literal(&mut self, lit: &Literal) -> TypeId {
     if let Literal::Str(parts) = lit {
       for part in parts {
         if let StrPart::Interp(eid) = part {
@@ -243,6 +257,6 @@ impl Checker<'_> {
         }
       }
     }
-    Self::synth_literal_type(lit)
+    self.synth_literal_type(lit)
   }
 }
