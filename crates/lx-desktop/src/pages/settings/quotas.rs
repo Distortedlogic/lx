@@ -10,7 +10,7 @@ struct Quota {
 }
 
 const QUOTAS: &[Quota] = &[
-  Quota { label: "COMPUTE_CORE", percent: 85, color: "bg-[var(--success)]", overload: false, min_label: "0.0 GHz/s", max_label: "12.4 GHz/s" },
+  Quota { label: "COMPUTE_CORE", percent: 85, color: "bg-[var(--warning)]", overload: false, min_label: "0.0 GHz/s", max_label: "12.4 GHz/s" },
   Quota { label: "MEMORY_BUFFER", percent: 32, color: "bg-[var(--warning)]", overload: false, min_label: "0.0 GB", max_label: "64.0 GB" },
   Quota { label: "STORAGE_IO", percent: 95, color: "bg-[var(--error)]", overload: true, min_label: "0.0 MB/s", max_label: "1.0 GB/s" },
 ];
@@ -18,13 +18,9 @@ const QUOTAS: &[Quota] = &[
 #[component]
 pub fn QuotasPanel() -> Element {
   rsx! {
-    div { class: "bg-[var(--surface-container)] border border-[var(--outline-variant)]/30 rounded-lg p-4",
-      div { class: "flex items-center gap-3 mb-4",
-        div { class: "h-px w-8 bg-[var(--outline-variant)]" }
-        span { class: "text-xs uppercase tracking-wider font-semibold text-[var(--on-surface)]",
-          "RESOURCE_QUOTAS"
-        }
-        div { class: "h-px flex-1 bg-[var(--outline-variant)]" }
+    div { class: "space-y-4",
+      span { class: "text-xs uppercase tracking-wider font-semibold text-white border-l-4 border-[var(--warning)] pl-3",
+        "RESOURCE_QUOTAS"
       }
       div { class: "flex gap-3",
         for quota in QUOTAS {
@@ -32,7 +28,7 @@ pub fn QuotasPanel() -> Element {
               let pct = format!("{}%", quota.percent);
               let width = format!("width: {}%;", quota.percent);
               rsx! {
-                div { class: "flex-1 bg-[var(--surface-container-low)] border border-[var(--outline-variant)]/30 rounded-lg p-3",
+                div { class: "flex-1 bg-[var(--surface-container-lowest)] border-2 border-[var(--outline-variant)] p-4",
                   div { class: "flex items-center justify-between mb-2",
                     span { class: "text-[10px] uppercase tracking-wider text-[var(--outline)]", "{quota.label}" }
                     if quota.overload {

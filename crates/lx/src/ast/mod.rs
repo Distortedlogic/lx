@@ -23,7 +23,7 @@ pub struct Program<Phase = Surface> {
   pub _phase: PhantomData<Phase>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
   Binding(Binding),
   TypeDef(StmtTypeDef),
@@ -35,7 +35,7 @@ pub enum Stmt {
   Expr(ExprId),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Binding {
   pub exported: bool,
   pub mutable: bool,
@@ -44,14 +44,14 @@ pub struct Binding {
   pub value: ExprId,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum BindTarget {
   Name(Sym),
   Reassign(Sym),
   Pattern(PatternId),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
   Literal(Literal),
   Ident(Sym),
@@ -96,7 +96,7 @@ pub enum Expr {
   With(ExprWith),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum WithKind {
   Binding { name: Sym, value: ExprId, mutable: bool },
   Resources { resources: Vec<(ExprId, Sym)> },

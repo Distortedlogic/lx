@@ -11,9 +11,14 @@ use miette::SourceSpan;
 mod action;
 mod hooks_pattern;
 mod hooks_type;
+pub mod transformer;
 mod walk;
+pub mod walk_transform;
 pub use action::*;
+pub use transformer::*;
 pub use walk::*;
+pub use walk_transform::walk_transform_stmt;
+pub use walk_transform::{walk_transform_expr, walk_transform_pattern, walk_transform_type_expr};
 
 pub trait AstVisitor {
   fn visit_program<P>(&mut self, program: &Program<P>) -> VisitAction {

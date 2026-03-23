@@ -6,7 +6,7 @@ const MENU_ITEMS: &[&str] = &["FILE", "EDIT", "SELECTION", "VIEW", "GO", "RUN", 
 pub fn MenuBar() -> Element {
   rsx! {
     div {
-      class: "flex items-center h-8 bg-[var(--surface-container-low)] text-xs uppercase tracking-wider shrink-0 select-none",
+      class: "flex items-center h-10 bg-[var(--surface-container-lowest)] border-b-2 border-[var(--outline)] text-xs uppercase tracking-wider shrink-0 select-none",
       onmousedown: move |_| {
           #[cfg(feature = "desktop")] dioxus::desktop::window().drag();
       },
@@ -33,21 +33,21 @@ pub fn MenuBar() -> Element {
           onclick: move |_| {
               #[cfg(feature = "desktop")] dioxus::desktop::window().set_minimized(true);
           },
-          "\u{2212}"
+          span { class: "material-symbols-outlined text-sm", "remove" }
         }
         button {
           class: "px-3 py-1 hover:bg-[var(--surface-container-high)] text-[var(--on-surface-variant)] transition-colors duration-150",
           onclick: move |_| {
               #[cfg(feature = "desktop")] dioxus::desktop::window().toggle_maximized();
           },
-          "\u{25A1}"
+          span { class: "material-symbols-outlined text-sm", "content_copy" }
         }
         button {
           class: "px-3 py-1 hover:bg-[var(--error)]/80 text-[var(--on-surface-variant)] hover:text-white transition-colors duration-150",
           onclick: move |_| {
               #[cfg(feature = "desktop")] dioxus::desktop::window().close();
           },
-          "\u{00D7}"
+          span { class: "material-symbols-outlined text-sm", "close" }
         }
       }
     }

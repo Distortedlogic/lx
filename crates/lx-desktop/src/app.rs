@@ -10,6 +10,10 @@ static _WIDGET_BRIDGE_JS: Asset = asset!("/assets/widget-bridge.js", AssetOption
 #[component]
 pub fn App() -> Element {
   rsx! {
+    document::Link {
+      rel: "stylesheet",
+      href: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap",
+    }
     document::Stylesheet { href: TAILWIND_CSS }
     ErrorBoundary {
       handle_error: |errors: ErrorContext| {

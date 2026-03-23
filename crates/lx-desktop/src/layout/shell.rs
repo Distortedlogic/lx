@@ -42,7 +42,8 @@ pub fn Shell() -> Element {
   use_context_provider(|| spawn_channel.0.clone());
   spawn_terminal_listener(tabs_state, &spawn_channel.1);
   rsx! {
-    div { class: "min-h-screen bg-[var(--surface)] text-[var(--on-surface)] flex flex-col",
+    div { class: "relative h-screen overflow-hidden bg-[var(--surface)] text-[var(--on-surface)] flex flex-col",
+      ResizeHandles {}
       MenuBar {}
       div { class: "flex flex-1 min-h-0",
         Sidebar {}
@@ -68,6 +69,112 @@ pub fn Shell() -> Element {
         }
       }
       StatusBar {}
+    }
+  }
+}
+
+#[component]
+fn ResizeHandles() -> Element {
+  rsx! {
+    div {
+      class: "absolute top-0 left-2 right-2 h-1 z-50",
+      style: "cursor: ns-resize;",
+      onmousedown: move |_| {
+          #[cfg(feature = "desktop")]
+          {
+              let _ = dioxus::desktop::window()
+                  .drag_resize_window(
+                      dioxus::desktop::tao::window::ResizeDirection::North,
+                  );
+          }
+      },
+    }
+    div {
+      class: "absolute bottom-0 left-2 right-2 h-1 z-50",
+      style: "cursor: ns-resize;",
+      onmousedown: move |_| {
+          #[cfg(feature = "desktop")]
+          {
+              let _ = dioxus::desktop::window()
+                  .drag_resize_window(
+                      dioxus::desktop::tao::window::ResizeDirection::South,
+                  );
+          }
+      },
+    }
+    div {
+      class: "absolute left-0 top-2 bottom-2 w-1 z-50",
+      style: "cursor: ew-resize;",
+      onmousedown: move |_| {
+          #[cfg(feature = "desktop")]
+          {
+              let _ = dioxus::desktop::window()
+                  .drag_resize_window(dioxus::desktop::tao::window::ResizeDirection::West);
+          }
+      },
+    }
+    div {
+      class: "absolute right-0 top-2 bottom-2 w-1 z-50",
+      style: "cursor: ew-resize;",
+      onmousedown: move |_| {
+          #[cfg(feature = "desktop")]
+          {
+              let _ = dioxus::desktop::window()
+                  .drag_resize_window(dioxus::desktop::tao::window::ResizeDirection::East);
+          }
+      },
+    }
+    div {
+      class: "absolute top-0 left-0 w-2 h-2 z-50",
+      style: "cursor: nwse-resize;",
+      onmousedown: move |_| {
+          #[cfg(feature = "desktop")]
+          {
+              let _ = dioxus::desktop::window()
+                  .drag_resize_window(
+                      dioxus::desktop::tao::window::ResizeDirection::NorthWest,
+                  );
+          }
+      },
+    }
+    div {
+      class: "absolute top-0 right-0 w-2 h-2 z-50",
+      style: "cursor: nesw-resize;",
+      onmousedown: move |_| {
+          #[cfg(feature = "desktop")]
+          {
+              let _ = dioxus::desktop::window()
+                  .drag_resize_window(
+                      dioxus::desktop::tao::window::ResizeDirection::NorthEast,
+                  );
+          }
+      },
+    }
+    div {
+      class: "absolute bottom-0 left-0 w-2 h-2 z-50",
+      style: "cursor: nesw-resize;",
+      onmousedown: move |_| {
+          #[cfg(feature = "desktop")]
+          {
+              let _ = dioxus::desktop::window()
+                  .drag_resize_window(
+                      dioxus::desktop::tao::window::ResizeDirection::SouthWest,
+                  );
+          }
+      },
+    }
+    div {
+      class: "absolute bottom-0 right-0 w-2 h-2 z-50",
+      style: "cursor: nwse-resize;",
+      onmousedown: move |_| {
+          #[cfg(feature = "desktop")]
+          {
+              let _ = dioxus::desktop::window()
+                  .drag_resize_window(
+                      dioxus::desktop::tao::window::ResizeDirection::SouthEast,
+                  );
+          }
+      },
     }
   }
 }

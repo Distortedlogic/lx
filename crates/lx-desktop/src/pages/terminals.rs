@@ -67,11 +67,11 @@ pub fn Terminals() -> Element {
       } else {
         div { class: "flex flex-1 items-center justify-center text-[var(--outline)]",
           div { class: "text-center",
-            p { class: "text-lg mb-2", "No terminals open" }
+            p { class: "text-lg mb-2", "No panes open" }
             button {
               class: "bg-gradient-to-r from-[var(--primary)] to-[var(--primary-container)] text-[var(--on-primary)] rounded-md px-4 py-2 text-sm font-medium",
               onclick: move |_| create_new_tab(tabs_state),
-              "New Terminal"
+              "New Pane"
             }
           }
         }
