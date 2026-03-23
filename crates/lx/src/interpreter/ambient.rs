@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 
 use crate::ast::{ExprId, StmtId};
 use crate::builtins::mk;
-use crate::error::LxError;
+use crate::error::{EvalResult, LxError};
 use crate::value::LxVal;
 use miette::SourceSpan;
 
@@ -69,7 +69,7 @@ fn get_ambient_snapshot() -> IndexMap<crate::sym::Sym, LxVal> {
 
 impl Interpreter {
   #[async_recursion(?Send)]
-  pub(super) async fn eval_with_context(&mut self, fields: &[(crate::sym::Sym, ExprId)], body: &[StmtId], _span: SourceSpan) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_with_context(&mut self, fields: &[(crate::sym::Sym, ExprId)], body: &[StmtId], _span: SourceSpan) -> EvalResult<LxVal> {
     let mut new_fields = get_ambient(self);
     for &(name, eid) in fields {
       let val = self.eval(eid).await?;

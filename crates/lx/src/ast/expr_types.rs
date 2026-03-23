@@ -19,6 +19,34 @@ pub enum StrPart {
   Interp(ExprId),
 }
 
+impl PartialEq for StrPart {
+  fn eq(&self, other: &Self) -> bool {
+    match (self, other) {
+      (StrPart::Text(a), StrPart::Text(b)) => a == b,
+      (StrPart::Interp(a), StrPart::Interp(b)) => a == b,
+      _ => false,
+    }
+  }
+}
+
+impl Eq for StrPart {}
+
+impl PartialEq for Literal {
+  fn eq(&self, other: &Self) -> bool {
+    match (self, other) {
+      (Literal::Int(a), Literal::Int(b)) => a == b,
+      (Literal::Float(a), Literal::Float(b)) => a.to_bits() == b.to_bits(),
+      (Literal::Str(a), Literal::Str(b)) => a == b,
+      (Literal::RawStr(a), Literal::RawStr(b)) => a == b,
+      (Literal::Bool(a), Literal::Bool(b)) => a == b,
+      (Literal::Unit, Literal::Unit) => true,
+      _ => false,
+    }
+  }
+}
+
+impl Eq for Literal {}
+
 #[derive(Debug, Clone)]
 pub enum Section {
   Right { op: BinOp, operand: ExprId },

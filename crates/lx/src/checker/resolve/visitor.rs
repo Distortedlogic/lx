@@ -1,16 +1,14 @@
 use miette::SourceSpan;
 
 use crate::ast::{
-  AstArena, BindTarget, Binding, ClassDeclData, ExprFunc, ExprMatch, ExprWith, FieldPattern, PatternId, StmtId, StmtTypeDef, TraitDeclData, UseKind, UseStmt,
-  WithKind,
+  AstArena, BindTarget, Binding, ClassDeclData, ExprFunc, ExprId, ExprMatch, ExprWith, FieldPattern, PatternId, StmtId, StmtTypeDef, TraitDeclData, UseKind,
+  UseStmt, WithKind,
 };
 use crate::sym::{Sym, intern};
-use crate::visitor::{AstLeave, AstVisitor, VisitAction, cf_to_action, dispatch_expr, dispatch_stmt, walk_binding, walk_func, walk_pattern};
+use crate::visitor::{AstVisitor, VisitAction, dispatch_expr, dispatch_stmt, walk_binding, walk_func, walk_pattern};
 
 use super::Resolver;
 use crate::checker::symbol_table::DefKind;
-
-impl AstLeave for Resolver<'_> {}
 
 impl AstVisitor for Resolver<'_> {
   fn visit_binding(&mut self, binding: &Binding, span: SourceSpan, arena: &AstArena) -> VisitAction {
@@ -29,17 +27,20 @@ impl AstVisitor for Resolver<'_> {
     VisitAction::Skip
   }
 
-  fn visit_func(&mut self, func: &ExprFunc, span: SourceSpan, arena: &AstArena) -> VisitAction {
+  fn visit_func(&mut self, _id: ExprId, func: &ExprFunc, span: SourceSpan, arena: &AstArena) -> VisitAction {
     self.table.push_scope();
     for p in &func.params {
       self.table.define(p.name, DefKind::FuncParam, span);
     }
-    let result = walk_func(self, func, span, arena);
+    let result = walk_func(self, _id, func, span, arena);
     self.table.pop_scope();
-    cf_to_action(result)
+    match result {
+      std::ops::ControlFlow::Continue(()) => VisitAction::Skip,
+      std::ops::ControlFlow::Break(()) => VisitAction::Stop,
+    }
   }
 
-  fn visit_block(&mut self, stmts: &[StmtId], _span: SourceSpan, arena: &AstArena) -> VisitAction {
+  fn visit_block(&mut self, _id: ExprId, stmts: &[StmtId], _span: SourceSpan, arena: &AstArena) -> VisitAction {
     self.table.push_scope();
     for &s in stmts {
       if dispatch_stmt(self, s, arena).is_break() {
@@ -51,8 +52,8 @@ impl AstVisitor for Resolver<'_> {
     VisitAction::Skip
   }
 
-  fn visit_match(&mut self, m: &ExprMatch, _span: SourceSpan, arena: &AstArena) -> VisitAction {
-    if dispatch_expr(self, arena.expr(m.scrutinee), arena.expr_span(m.scrutinee), arena).is_break() {
+  fn visit_match(&mut self, _id: ExprId, m: &ExprMatch, _span: SourceSpan, arena: &AstArena) -> VisitAction {
+    if dispatch_expr(self, m.scrutinee, arena).is_break() {
       return VisitAction::Stop;
     }
     for arm in &m.arms {
@@ -60,17 +61,17 @@ impl AstVisitor for Resolver<'_> {
       self.bind_pattern_names(arm.pattern);
       let pattern = arena.pattern(arm.pattern);
       let pspan = arena.pattern_span(arm.pattern);
-      if walk_pattern(self, pattern, pspan, arena).is_break() {
+      if walk_pattern(self, arm.pattern, pattern, pspan, arena).is_break() {
         self.table.pop_scope();
         return VisitAction::Stop;
       }
       if let Some(g) = arm.guard
-        && dispatch_expr(self, arena.expr(g), arena.expr_span(g), arena).is_break()
+        && dispatch_expr(self, g, arena).is_break()
       {
         self.table.pop_scope();
         return VisitAction::Stop;
       }
-      if dispatch_expr(self, arena.expr(arm.body), arena.expr_span(arm.body), arena).is_break() {
+      if dispatch_expr(self, arm.body, arena).is_break() {
         self.table.pop_scope();
         return VisitAction::Stop;
       }
@@ -79,10 +80,10 @@ impl AstVisitor for Resolver<'_> {
     VisitAction::Skip
   }
 
-  fn visit_with(&mut self, with: &ExprWith, _span: SourceSpan, arena: &AstArena) -> VisitAction {
+  fn visit_with(&mut self, _id: ExprId, with: &ExprWith, _span: SourceSpan, arena: &AstArena) -> VisitAction {
     match &with.kind {
       WithKind::Binding { name, value, mutable: _ } => {
-        if dispatch_expr(self, arena.expr(*value), arena.expr_span(*value), arena).is_break() {
+        if dispatch_expr(self, *value, arena).is_break() {
           return VisitAction::Stop;
         }
         let vspan = arena.expr_span(*value);
@@ -98,7 +99,7 @@ impl AstVisitor for Resolver<'_> {
       },
       WithKind::Resources { resources } => {
         for &(r, _) in resources {
-          if dispatch_expr(self, arena.expr(r), arena.expr_span(r), arena).is_break() {
+          if dispatch_expr(self, r, arena).is_break() {
             return VisitAction::Stop;
           }
         }
@@ -117,7 +118,7 @@ impl AstVisitor for Resolver<'_> {
       },
       WithKind::Context { fields } => {
         for &(_, eid) in fields {
-          if dispatch_expr(self, arena.expr(eid), arena.expr_span(eid), arena).is_break() {
+          if dispatch_expr(self, eid, arena).is_break() {
             return VisitAction::Stop;
           }
         }
@@ -137,7 +138,7 @@ impl AstVisitor for Resolver<'_> {
     VisitAction::Skip
   }
 
-  fn visit_loop(&mut self, stmts: &[StmtId], _span: SourceSpan, arena: &AstArena) -> VisitAction {
+  fn visit_loop(&mut self, _id: ExprId, stmts: &[StmtId], _span: SourceSpan, arena: &AstArena) -> VisitAction {
     self.table.push_scope();
     for &s in stmts {
       if dispatch_stmt(self, s, arena).is_break() {
@@ -149,7 +150,7 @@ impl AstVisitor for Resolver<'_> {
     VisitAction::Skip
   }
 
-  fn visit_par(&mut self, stmts: &[StmtId], _span: SourceSpan, arena: &AstArena) -> VisitAction {
+  fn visit_par(&mut self, _id: ExprId, stmts: &[StmtId], _span: SourceSpan, arena: &AstArena) -> VisitAction {
     self.table.push_scope();
     for &s in stmts {
       if dispatch_stmt(self, s, arena).is_break() {
@@ -198,16 +199,16 @@ impl AstVisitor for Resolver<'_> {
     VisitAction::Descend
   }
 
-  fn visit_pattern_bind(&mut self, name: Sym, span: SourceSpan, _arena: &AstArena) -> VisitAction {
+  fn visit_pattern_bind(&mut self, _id: PatternId, name: Sym, span: SourceSpan, _arena: &AstArena) -> VisitAction {
     self.table.define(name, DefKind::PatternBind, span);
     VisitAction::Descend
   }
 
-  fn visit_pattern_list(&mut self, elems: &[PatternId], rest: Option<Sym>, span: SourceSpan, arena: &AstArena) -> VisitAction {
+  fn visit_pattern_list(&mut self, _id: PatternId, elems: &[PatternId], rest: Option<Sym>, span: SourceSpan, arena: &AstArena) -> VisitAction {
     for &e in elems {
       let pattern = arena.pattern(e);
       let pspan = arena.pattern_span(e);
-      if walk_pattern(self, pattern, pspan, arena).is_break() {
+      if walk_pattern(self, e, pattern, pspan, arena).is_break() {
         return VisitAction::Stop;
       }
     }
@@ -217,12 +218,12 @@ impl AstVisitor for Resolver<'_> {
     VisitAction::Skip
   }
 
-  fn visit_pattern_record(&mut self, fields: &[FieldPattern], rest: Option<Sym>, span: SourceSpan, arena: &AstArena) -> VisitAction {
+  fn visit_pattern_record(&mut self, _id: PatternId, fields: &[FieldPattern], rest: Option<Sym>, span: SourceSpan, arena: &AstArena) -> VisitAction {
     for f in fields {
       if let Some(pid) = f.pattern {
         let pattern = arena.pattern(pid);
         let pspan = arena.pattern_span(pid);
-        if walk_pattern(self, pattern, pspan, arena).is_break() {
+        if walk_pattern(self, pid, pattern, pspan, arena).is_break() {
           return VisitAction::Stop;
         }
       } else {

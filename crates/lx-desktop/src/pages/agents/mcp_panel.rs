@@ -1,45 +1,63 @@
 use dioxus::prelude::*;
 
-struct McpServer {
+struct McpModule {
   name: &'static str,
-  info: &'static str,
+  version: &'static str,
   status: &'static str,
 }
 
-const SERVERS: &[McpServer] = &[
-  McpServer { name: "FILESYSTEM", info: "localhost:3001", status: "connected" },
-  McpServer { name: "GIT", info: "localhost:3002", status: "connected" },
-  McpServer { name: "WEB-SEARCH", info: "api.search:443", status: "degraded" },
-  McpServer { name: "DATABASE", info: "db.internal:5432", status: "disconnected" },
+const MODULES: &[McpModule] = &[
+  McpModule { name: "POSTGRES_INTERFACE", version: "v2.1.0", status: "ONLINE" },
+  McpModule { name: "AWS_CONSOLE_BRIDGE", version: "v1.4.3", status: "ONLINE" },
+  McpModule { name: "O_WORKSPACE_SYNC", version: "", status: "OFFLINE" },
 ];
 
 #[component]
 pub fn McpPanel() -> Element {
   rsx! {
-    div { class: "bg-[var(--surface-container)] rounded-lg p-4",
-      p { class: "text-xs uppercase tracking-wider font-semibold text-[var(--on-surface)] mb-3", "MCP SERVER CLUSTER" }
-      div { class: "flex flex-col gap-2",
-        for server in SERVERS {
-          {
-              let dot_color = match server.status {
-                  "connected" => "text-[var(--success)]",
-                  "degraded" => "text-[var(--warning)]",
-                  _ => "text-[var(--error)]",
-              };
-              rsx! {
-                div { class: "flex items-center gap-2 text-xs",
-                  span { class: "{dot_color}", "\u{25CF}" }
-                  span { class: "font-medium text-[var(--on-surface)] uppercase tracking-wider", "{server.name}" }
-                  div { class: "flex-1" }
-                  span { class: "text-[var(--outline)]", "{server.info}" }
-                  button { class: "text-[var(--outline)] hover:text-[var(--on-surface)] transition-colors duration-150 ml-1", "\u{2699}" }
-                }
+    div { class: "flex items-center gap-3 mb-4",
+      div { class: "h-px flex-1 bg-[var(--outline-variant)]" }
+      span { class: "text-xs uppercase tracking-wider font-semibold text-[var(--on-surface)]",
+        "MCP_EXTENSIONS"
+      }
+      div { class: "h-px flex-1 bg-[var(--outline-variant)]" }
+    }
+    div { class: "grid grid-cols-4 gap-3",
+      for module in MODULES {
+        div { class: "bg-[var(--surface-container-low)] border border-[var(--outline-variant)]/30 rounded-lg p-4 flex flex-col gap-2",
+          span { class: "text-2xl text-[var(--primary)]", "\u{1F5C4}" }
+          span { class: "text-xs font-semibold uppercase tracking-wider text-[var(--on-surface)]",
+            "{module.name}"
+          }
+          if module.status == "OFFLINE" {
+            if module.version.is_empty() {
+              span { class: "text-[10px] uppercase tracking-wider text-[var(--error)]",
+                "{module.status}"
               }
+            } else {
+              span { class: "text-[10px] uppercase tracking-wider text-[var(--outline)]",
+                "{module.version} // "
+                span { class: "text-[var(--error)]", "{module.status}" }
+              }
+            }
+          } else {
+            if module.version.is_empty() {
+              span { class: "text-[10px] uppercase tracking-wider text-[var(--outline)]",
+                "{module.status}"
+              }
+            } else {
+              span { class: "text-[10px] uppercase tracking-wider text-[var(--outline)]",
+                "{module.version} // {module.status}"
+              }
+            }
           }
         }
       }
-      button { class: "w-full mt-3 py-2 text-xs text-[var(--outline)] hover:text-[var(--primary)] border border-dashed border-[var(--outline-variant)] rounded hover:border-[var(--primary)] transition-colors duration-150 uppercase tracking-wider",
-        "+ CONNECT NEW MCP SERVER"
+      div { class: "bg-[var(--surface-container-low)] border border-dashed border-[var(--outline-variant)] rounded-lg p-4 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-[var(--primary)] transition-colors duration-150",
+        span { class: "text-2xl text-[var(--outline)]", "+" }
+        span { class: "text-xs uppercase tracking-wider text-[var(--outline)]",
+          "INSTALL MODULE"
+        }
       }
     }
   }

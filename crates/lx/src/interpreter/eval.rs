@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use num_traits::ToPrimitive;
 
 use crate::ast::{BinOp, ExprId, SelArm, StmtId};
-use crate::error::LxError;
+use crate::error::{EvalResult, EvalSignal, LxError};
 use crate::sym::{Sym, intern};
 use crate::value::LxVal;
 use miette::SourceSpan;
@@ -13,7 +13,7 @@ use miette::SourceSpan;
 use super::Interpreter;
 
 impl Interpreter {
-  pub(super) async fn eval_binary(&mut self, op: &BinOp, left: ExprId, right: ExprId, span: SourceSpan) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_binary(&mut self, op: &BinOp, left: ExprId, right: ExprId, span: SourceSpan) -> EvalResult<LxVal> {
     if *op == BinOp::And {
       return self.eval_short_circuit(left, right, true, span).await;
     }
@@ -24,10 +24,10 @@ impl Interpreter {
     let lv = self.force_defaults(lv, span).await?;
     let rv = self.eval(right).await?;
     let rv = self.force_defaults(rv, span).await?;
-    self.binary_op(op, &lv, &rv, span)
+    Ok(self.binary_op(op, &lv, &rv, span)?)
   }
 
-  pub(super) async fn eval_block(&mut self, stmts: &[StmtId]) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_block(&mut self, stmts: &[StmtId]) -> EvalResult<LxVal> {
     let saved = Arc::clone(&self.env);
     self.env = Arc::new(self.env.child());
     let stmts = stmts.to_vec();
@@ -39,7 +39,7 @@ impl Interpreter {
     Ok(result)
   }
 
-  pub(super) async fn eval_loop(&mut self, stmts: &[StmtId]) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_loop(&mut self, stmts: &[StmtId]) -> EvalResult<LxVal> {
     let stmts = stmts.to_vec();
     loop {
       tokio::task::yield_now().await;
@@ -48,9 +48,9 @@ impl Interpreter {
       for sid in &stmts {
         match self.eval_stmt(*sid).await {
           Ok(_) => {},
-          Err(LxError::BreakSignal { value }) => {
+          Err(EvalSignal::Break(value)) => {
             self.env = saved;
-            return Ok(*value);
+            return Ok(value);
           },
           Err(e) => {
             self.env = saved;
@@ -62,12 +62,12 @@ impl Interpreter {
     }
   }
 
-  pub(super) async fn eval_slice(&mut self, expr: ExprId, start: Option<ExprId>, end: Option<ExprId>, span: SourceSpan) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_slice(&mut self, expr: ExprId, start: Option<ExprId>, end: Option<ExprId>, span: SourceSpan) -> EvalResult<LxVal> {
     let val = self.eval(expr).await?;
     let items = match &val {
       LxVal::List(l) => l.as_ref(),
       other => {
-        return Err(LxError::type_err(format!("slice requires List, got {}", other.type_name()), span, None));
+        return Err(LxError::type_err(format!("slice requires List, got {}", other.type_name()), span, None).into());
       },
     };
     let len = items.len();
@@ -94,7 +94,7 @@ impl Interpreter {
     Ok(LxVal::list(items[s..en].to_vec()))
   }
 
-  pub(super) async fn eval_par(&mut self, stmts: &[StmtId]) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_par(&mut self, stmts: &[StmtId]) -> EvalResult<LxVal> {
     let stmts_owned: Vec<StmtId> = stmts.to_vec();
     let mut futures = Vec::with_capacity(stmts_owned.len());
     for sid in stmts_owned {
@@ -115,9 +115,9 @@ impl Interpreter {
     Ok(LxVal::tuple(vals?))
   }
 
-  pub(super) async fn eval_sel(&mut self, arms: &[SelArm], span: SourceSpan) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_sel(&mut self, arms: &[SelArm], span: SourceSpan) -> EvalResult<LxVal> {
     if arms.is_empty() {
-      return Err(LxError::runtime("sel: no arms", span));
+      return Err(LxError::runtime("sel: no arms", span).into());
     }
     let arms_owned: Vec<SelArm> = arms.to_vec();
     let mut futures = Vec::with_capacity(arms_owned.len());
@@ -147,7 +147,7 @@ impl Interpreter {
     result
   }
 
-  pub(super) async fn eval_with_resource(&mut self, resources: &[(ExprId, Sym)], body: &[StmtId], span: SourceSpan) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_with_resource(&mut self, resources: &[(ExprId, Sym)], body: &[StmtId], span: SourceSpan) -> EvalResult<LxVal> {
     let mut acquired: Vec<(Sym, LxVal)> = Vec::new();
     for &(expr, name) in resources {
       match self.eval(expr).await {
@@ -187,12 +187,12 @@ impl Interpreter {
     }
   }
 
-  pub(super) async fn eval_timeout(&mut self, ms_expr: ExprId, body: ExprId, span: SourceSpan) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_timeout(&mut self, ms_expr: ExprId, body: ExprId, span: SourceSpan) -> EvalResult<LxVal> {
     let ms_val = self.eval(ms_expr).await?;
     let ms_u64 = match &ms_val {
       LxVal::Int(n) => n.to_u64().ok_or_else(|| LxError::runtime("timeout: ms must be non-negative integer", span))?,
       LxVal::Float(f) => *f as u64,
-      other => return Err(LxError::type_err(format!("timeout expects Int or Float for ms, got {}", other.type_name()), span, None)),
+      other => return Err(LxError::type_err(format!("timeout expects Int or Float for ms, got {}", other.type_name()), span, None).into()),
     };
     let body_eid = body;
     let env = Arc::clone(&self.env);
@@ -219,7 +219,7 @@ impl Interpreter {
     }
   }
 
-  pub(super) async fn eval_assert(&mut self, expr: ExprId, msg: Option<ExprId>, span: SourceSpan) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_assert(&mut self, expr: ExprId, msg: Option<ExprId>, span: SourceSpan) -> EvalResult<LxVal> {
     let val = self.eval(expr).await?;
     let val = self.force_defaults(val, span).await?;
     match val.as_bool() {
@@ -233,9 +233,9 @@ impl Interpreter {
           None => None,
         };
         let expr_node = self.arena.expr(expr);
-        Err(LxError::assert_fail(format!("{expr_node:?}"), message, span))
+        Err(LxError::assert_fail(format!("{expr_node:?}"), message, span).into())
       },
-      _ => Err(LxError::type_err(format!("assert requires Bool, got {} `{}`", val.type_name(), val.short_display()), span, None)),
+      _ => Err(LxError::type_err(format!("assert requires Bool, got {} `{}`", val.type_name(), val.short_display()), span, None).into()),
     }
   }
 }

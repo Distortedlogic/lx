@@ -3,6 +3,7 @@ use pane_tree::PaneNode;
 use uuid::Uuid;
 
 use crate::panes::{DesktopPane, PaneKind};
+use crate::terminal::status_badge::{BadgeVariant, StatusBadge};
 
 #[component]
 pub fn PaneToolbar(
@@ -32,17 +33,29 @@ pub fn PaneToolbar(
       rsx! {
         button {
           class: "px-1.5 py-0.5 bg-[var(--surface-container-highest)]/80 rounded hover:bg-[var(--surface-bright)] transition-colors duration-150",
-          onclick: move |_| { if let Some(ref h) = nav { h.call("back".into()); } },
+          onclick: move |_| {
+              if let Some(ref h) = nav {
+                  h.call("back".into());
+              }
+          },
           "\u{2190}"
         }
         button {
           class: "px-1.5 py-0.5 bg-[var(--surface-container-highest)]/80 rounded hover:bg-[var(--surface-bright)] transition-colors duration-150",
-          onclick: move |_| { if let Some(ref h) = nav2 { h.call("forward".into()); } },
+          onclick: move |_| {
+              if let Some(ref h) = nav2 {
+                  h.call("forward".into());
+              }
+          },
           "\u{2192}"
         }
         button {
           class: "px-1.5 py-0.5 bg-[var(--surface-container-highest)]/80 rounded hover:bg-[var(--surface-bright)] transition-colors duration-150",
-          onclick: move |_| { if let Some(ref h) = nav3 { h.call("refresh".into()); } },
+          onclick: move |_| {
+              if let Some(ref h) = nav3 {
+                  h.call("refresh".into());
+              }
+          },
           "\u{21BB}"
         }
         input {
@@ -59,7 +72,9 @@ pub fn PaneToolbar(
     },
     _ => {
       rsx! {
-        span { class: "text-xs text-[var(--primary)] uppercase font-semibold tracking-[0.05em] truncate", "{pane_title}" }
+        span { class: "text-xs text-[var(--primary)] uppercase font-semibold tracking-[0.05em] truncate",
+          "{pane_title}"
+        }
       }
     },
   };
@@ -101,13 +116,21 @@ pub fn PaneToolbar(
             div { class: "h-px bg-[var(--outline-variant)]/15 my-1" }
             button {
               class: "flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-[var(--surface-bright)] transition-colors duration-150",
-              onclick: move |evt| { evt.stop_propagation(); on_split_h.call(()); conversion_open.set(false); },
+              onclick: move |evt| {
+                  evt.stop_propagation();
+                  on_split_h.call(());
+                  conversion_open.set(false);
+              },
               span { "\u{21E5}" }
               span { "Split Right" }
             }
             button {
               class: "flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-[var(--surface-bright)] transition-colors duration-150",
-              onclick: move |evt| { evt.stop_propagation(); on_split_v.call(()); conversion_open.set(false); },
+              onclick: move |evt| {
+                  evt.stop_propagation();
+                  on_split_v.call(());
+                  conversion_open.set(false);
+              },
               span { "\u{21E4}" }
               span { "Split Down" }
             }
@@ -116,19 +139,34 @@ pub fn PaneToolbar(
       }
       {left_section}
       div { class: "flex-1" }
+      if pane.kind() == PaneKind::Terminal {
+        StatusBadge {
+          label: "ACTIVE".to_string(),
+          variant: BadgeVariant::Active,
+        }
+      }
       button {
         class: "px-1.5 py-0.5 bg-[var(--surface-container-highest)]/80 rounded hover:bg-[var(--surface-bright)] transition-colors duration-150",
-        onclick: move |evt| { evt.stop_propagation(); on_split_h.call(()); },
+        onclick: move |evt| {
+            evt.stop_propagation();
+            on_split_h.call(());
+        },
         "\u{229F}"
       }
       button {
         class: "px-1.5 py-0.5 bg-[var(--surface-container-highest)]/80 rounded hover:bg-[var(--surface-bright)] transition-colors duration-150",
-        onclick: move |evt| { evt.stop_propagation(); on_split_v.call(()); },
+        onclick: move |evt| {
+            evt.stop_propagation();
+            on_split_v.call(());
+        },
         "\u{229E}"
       }
       button {
         class: "px-1.5 py-0.5 bg-[var(--surface-container-highest)]/80 rounded hover:bg-[var(--surface-bright)] transition-colors duration-150",
-        onclick: move |evt| { evt.stop_propagation(); on_close.call(()); },
+        onclick: move |evt| {
+            evt.stop_propagation();
+            on_close.call(());
+        },
         "\u{00D7}"
       }
     }
@@ -144,7 +182,7 @@ fn derive_pane_title(pane: &DesktopPane) -> String {
       if let Some(cmd) = command {
         cmd.split_whitespace().next().unwrap_or("terminal").to_string()
       } else {
-        working_dir.rsplit('/').next().unwrap_or("terminal").to_string()
+        working_dir.clone()
       }
     },
     DesktopPane::Browser { url, .. } => url.split('/').nth(2).unwrap_or("browser").to_string(),

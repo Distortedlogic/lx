@@ -1,11 +1,11 @@
 use crate::ast::{ExprId, ListElem, MapEntry, RecordField};
-use crate::error::LxError;
+use crate::error::{EvalResult, LxError};
 use crate::value::{LxVal, ValueKey};
 use indexmap::IndexMap;
 use std::sync::Arc;
 
 impl super::Interpreter {
-  pub(super) async fn eval_list(&mut self, elems: &[ListElem]) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_list(&mut self, elems: &[ListElem]) -> EvalResult<LxVal> {
     let mut out = Vec::new();
     for elem in elems {
       let eid = match elem {
@@ -19,7 +19,7 @@ impl super::Interpreter {
           LxVal::List(items) => out.extend(items.as_ref().iter().cloned()),
           other => {
             let espan = self.arena.expr_span(eid);
-            return Err(LxError::type_err(format!("spread requires List, got {}", other.type_name()), espan, None));
+            return Err(LxError::type_err(format!("spread requires List, got {}", other.type_name()), espan, None).into());
           },
         },
       }
@@ -27,7 +27,7 @@ impl super::Interpreter {
     Ok(LxVal::list(out))
   }
 
-  pub(super) async fn eval_record(&mut self, fields: &[RecordField]) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_record(&mut self, fields: &[RecordField]) -> EvalResult<LxVal> {
     let mut map = IndexMap::new();
     for f in fields {
       match f {
@@ -37,7 +37,7 @@ impl super::Interpreter {
           match v {
             LxVal::Record(r) => map.extend(r.iter().map(|(k, v)| (*k, v.clone()))),
             other => {
-              return Err(LxError::type_err(format!("spread requires Record, got {}", other.type_name()), fspan, None));
+              return Err(LxError::type_err(format!("spread requires Record, got {}", other.type_name()), fspan, None).into());
             },
           }
         },
@@ -50,7 +50,7 @@ impl super::Interpreter {
     Ok(LxVal::record(map))
   }
 
-  pub(super) async fn eval_tuple(&mut self, elems: &[ExprId]) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_tuple(&mut self, elems: &[ExprId]) -> EvalResult<LxVal> {
     let mut vals = Vec::with_capacity(elems.len());
     for &e in elems {
       vals.push(self.eval(e).await?);
@@ -58,7 +58,7 @@ impl super::Interpreter {
     Ok(LxVal::tuple(vals))
   }
 
-  pub(super) async fn eval_map(&mut self, entries: &[MapEntry]) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_map(&mut self, entries: &[MapEntry]) -> EvalResult<LxVal> {
     let mut map = IndexMap::new();
     for entry in entries {
       match entry {
@@ -68,7 +68,7 @@ impl super::Interpreter {
           match v {
             LxVal::Map(m) => map.extend(m.iter().map(|(k, v)| (k.clone(), v.clone()))),
             other => {
-              return Err(LxError::type_err(format!("spread requires Map, got {}", other.type_name()), vspan, None));
+              return Err(LxError::type_err(format!("spread requires Map, got {}", other.type_name()), vspan, None).into());
             },
           }
         },

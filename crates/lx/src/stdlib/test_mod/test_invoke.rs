@@ -35,7 +35,10 @@ pub(super) fn invoke_flow(flow_path: &str, input: &LxVal, ctx: &Arc<RuntimeCtx>,
         .env
         .get(crate::sym::intern(&entry_name))
         .ok_or_else(|| LxError::runtime(format!("test.run: flow '{flow_path}' exported +{entry_name} not found in env"), span))?;
-      interp.apply_func(entry, input.clone(), span).await
+      interp.apply_func(entry, input.clone(), span).await.map_err(|e| match e {
+        crate::error::EvalSignal::Error(e) => e,
+        crate::error::EvalSignal::Break(_) => LxError::runtime("break outside loop", span),
+      })
     })
   })
 }

@@ -1,11 +1,6 @@
+pub mod accounts;
 pub mod activity;
 pub mod agents;
-pub mod dashboard;
-pub mod files;
 pub mod repos;
-pub mod search;
 pub mod settings;
-pub mod tasks;
 pub mod terminals;
-pub mod voice;
-pub mod workspaces;

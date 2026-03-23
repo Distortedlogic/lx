@@ -1,14 +1,14 @@
 use crate::sym::Sym;
 use std::sync::Arc;
 
-use crate::error::LxError;
+use crate::error::{EvalResult, LxError};
 use crate::value::{FieldDef, LxVal};
 use miette::SourceSpan;
 
 use super::Interpreter;
 
 impl Interpreter {
-  pub(super) async fn apply_trait_fields(&mut self, name: &str, fields: &Arc<Vec<FieldDef>>, arg: &LxVal, _span: SourceSpan) -> Result<LxVal, LxError> {
+  pub(super) async fn apply_trait_fields(&mut self, name: &str, fields: &Arc<Vec<FieldDef>>, arg: &LxVal, _span: SourceSpan) -> EvalResult<LxVal> {
     let LxVal::Record(rec) = arg else {
       return Ok(LxVal::err_str(format!("Trait {name}: expected Record, got {}", arg.type_name())));
     };

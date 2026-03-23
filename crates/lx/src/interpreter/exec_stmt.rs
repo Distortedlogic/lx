@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 
 use crate::ast::{BindTarget, Stmt, StmtId, StmtTypeDef};
 use crate::env::Env;
-use crate::error::LxError;
+use crate::error::{EvalResult, LxError};
 use crate::sym::Sym;
 use crate::value::{LxClass, LxTrait, LxVal};
 
@@ -21,7 +21,7 @@ fn binding_pattern_hint(pat_str: &str) -> Option<&'static str> {
 
 impl Interpreter {
   #[async_recursion(?Send)]
-  pub(crate) async fn eval_stmt(&mut self, sid: StmtId) -> Result<LxVal, LxError> {
+  pub(crate) async fn eval_stmt(&mut self, sid: StmtId) -> EvalResult<LxVal> {
     let span = self.arena.stmt_span(sid);
     let stmt = self.arena.stmt(sid).clone();
     match &stmt {
@@ -79,7 +79,7 @@ impl Interpreter {
         self.env = Arc::new(env);
         Ok(LxVal::Unit)
       },
-      Stmt::TraitUnion(def) => self.eval_trait_union(def.name, &def.variants, span),
+      Stmt::TraitUnion(def) => Ok(self.eval_trait_union(def.name, &def.variants, span)?),
       Stmt::TraitDecl(data) => {
         let trait_fields = self.eval_trait_fields(data.name.as_str(), &data.entries, span).await?;
         let mut method_defs = Vec::new();

@@ -19,9 +19,7 @@ pub(super) fn visit_apply_diag(w: &mut Walker, apply: &ExprApply, span: SourceSp
       let ctx = w.context.clone();
       w.add_edge(&ctx, &id, String::new(), EdgeStyle::Solid);
       for a in &args {
-        let a_expr = arena.expr(*a);
-        let a_span = arena.expr_span(*a);
-        dispatch_expr(w, a_expr, a_span, arena)?;
+        dispatch_expr(w, *a, arena)?;
       }
       return ControlFlow::Continue(());
     }
@@ -32,18 +30,12 @@ pub(super) fn visit_apply_diag(w: &mut Walker, apply: &ExprApply, span: SourceSp
     let ctx = w.context.clone();
     w.add_edge(&ctx, &node_id, String::new(), EdgeStyle::Solid);
     for a in &fn_args {
-      let a_expr = arena.expr(*a);
-      let a_span = arena.expr_span(*a);
-      dispatch_expr(w, a_expr, a_span, arena)?;
+      dispatch_expr(w, *a, arena)?;
     }
     return ControlFlow::Continue(());
   }
-  let func_expr = arena.expr(apply.func);
-  let func_span = arena.expr_span(apply.func);
-  dispatch_expr(w, func_expr, func_span, arena)?;
-  let arg_expr = arena.expr(apply.arg);
-  let arg_span = arena.expr_span(apply.arg);
-  dispatch_expr(w, arg_expr, arg_span, arena)
+  dispatch_expr(w, apply.func, arena)?;
+  dispatch_expr(w, apply.arg, arena)
 }
 
 fn uncurry_call<'a>(apply: &'a ExprApply, arena: &'a AstArena) -> Option<(&'a str, &'a str, Vec<ExprId>)> {
@@ -104,9 +96,7 @@ fn handle_call(w: &mut Walker, module: &str, method: &str, kind: NodeKind, args:
     if let Some(last) = args.last() {
       w.context_stack.push(w.context.clone());
       w.context = id;
-      let l_expr = arena.expr(*last);
-      let l_span = arena.expr_span(*last);
-      dispatch_expr(w, l_expr, l_span, arena)?;
+      dispatch_expr(w, *last, arena)?;
       w.context = w.context_stack.pop().expect("diag: context_stack underflow");
     }
     return ControlFlow::Continue(());
@@ -128,9 +118,7 @@ fn handle_call(w: &mut Walker, module: &str, method: &str, kind: NodeKind, args:
   let ctx = w.context.clone();
   w.add_edge(&ctx, &id, String::new(), EdgeStyle::Solid);
   for arg_id in args {
-    let a_expr = arena.expr(*arg_id);
-    let a_span = arena.expr_span(*arg_id);
-    dispatch_expr(w, a_expr, a_span, arena)?;
+    dispatch_expr(w, *arg_id, arena)?;
   }
   ControlFlow::Continue(())
 }

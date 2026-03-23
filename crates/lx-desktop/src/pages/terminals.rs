@@ -57,18 +57,6 @@ pub fn Terminals() -> Element {
             on_new_tab: move |_| create_new_tab(tabs_state),
           }
         }
-        span { class: "border border-[var(--outline-variant)] rounded px-2 py-0.5 text-xs uppercase tracking-wider text-[var(--outline)]",
-          "LAYOUT: BACKEND DEV"
-        }
-        button { class: "bg-gradient-to-r from-[var(--primary)] to-[var(--primary-container)] text-[var(--on-primary)] rounded-md px-4 py-1.5 text-sm font-medium mx-2",
-          "\u{25B6} RUN.LX"
-        }
-        button { class: "bg-[var(--surface-container-high)] text-[var(--on-surface)] px-2 py-1.5 rounded-md text-sm mr-1",
-          "\u{229E}"
-        }
-        button { class: "bg-[var(--surface-container-high)] text-[var(--on-surface)] px-2 py-1.5 rounded-md text-sm mr-2",
-          "\u{2630}"
-        }
       }
       if has_tabs {
         div { class: "relative flex-1 min-h-0",
@@ -159,22 +147,46 @@ fn render_pane_item(mut tabs_state: Signal<TabsState<DesktopPane>>, pane: &Deskt
 fn render_pane_view(pane: &DesktopPane) -> Element {
   match pane {
     DesktopPane::Terminal { id, working_dir, command, .. } => rsx! {
-      TerminalView { terminal_id: id.clone(), working_dir: working_dir.clone(), command: command.clone() }
+      TerminalView {
+        terminal_id: id.clone(),
+        working_dir: working_dir.clone(),
+        command: command.clone(),
+      }
     },
     DesktopPane::Browser { id, url, devtools, .. } => rsx! {
-      BrowserView { browser_id: id.clone(), url: url.clone(), devtools: *devtools }
+      BrowserView {
+        browser_id: id.clone(),
+        url: url.clone(),
+        devtools: *devtools,
+      }
     },
     DesktopPane::Editor { id, file_path, language, .. } => rsx! {
-      EditorView { editor_id: id.clone(), file_path: file_path.clone(), language: language.clone() }
+      EditorView {
+        editor_id: id.clone(),
+        file_path: file_path.clone(),
+        language: language.clone(),
+      }
     },
     DesktopPane::Agent { id, session_id, model, .. } => rsx! {
-      AgentView { agent_id: id.clone(), session_id: session_id.clone(), model: model.clone() }
+      AgentView {
+        agent_id: id.clone(),
+        session_id: session_id.clone(),
+        model: model.clone(),
+      }
     },
     DesktopPane::Canvas { id, widget_type, config, .. } => rsx! {
-      CanvasView { canvas_id: id.clone(), widget_type: widget_type.clone(), config: config.clone() }
+      CanvasView {
+        canvas_id: id.clone(),
+        widget_type: widget_type.clone(),
+        config: config.clone(),
+      }
     },
     DesktopPane::Chart { id, chart_json, title, .. } => rsx! {
-      ChartView { chart_id: id.clone(), chart_json: chart_json.clone(), title: title.clone() }
+      ChartView {
+        chart_id: id.clone(),
+        chart_json: chart_json.clone(),
+        title: title.clone(),
+      }
     },
     DesktopPane::Voice { id, .. } => rsx! {
       VoiceView { voice_id: id.clone() }

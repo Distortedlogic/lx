@@ -32,7 +32,7 @@ impl AstFolder for Desugarer {
     arena.alloc_expr(Expr::Apply(ExprApply { func: right, arg: left }), span)
   }
 
-  fn fold_section(&mut self, s: Section, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+  fn fold_section(&mut self, _id: ExprId, s: Section, span: SourceSpan, arena: &mut AstArena) -> ExprId {
     match s {
       Section::Right { op, operand } => {
         let folded_operand = self.fold_expr(operand, arena);
@@ -72,7 +72,7 @@ impl AstFolder for Desugarer {
     }
   }
 
-  fn fold_ternary(&mut self, t: ExprTernary, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+  fn fold_ternary(&mut self, _id: ExprId, t: ExprTernary, span: SourceSpan, arena: &mut AstArena) -> ExprId {
     let cond = self.fold_expr(t.cond, arena);
     let then_ = self.fold_expr(t.then_, arena);
     let else_ = t.else_.map(|e| self.fold_expr(e, arena)).unwrap_or_else(|| arena.alloc_expr(Expr::Literal(Literal::Unit), span));
@@ -87,7 +87,7 @@ impl AstFolder for Desugarer {
     )
   }
 
-  fn fold_coalesce(&mut self, c: ExprCoalesce, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+  fn fold_coalesce(&mut self, _id: ExprId, c: ExprCoalesce, span: SourceSpan, arena: &mut AstArena) -> ExprId {
     let expr = self.fold_expr(c.expr, arena);
     let default = self.fold_expr(c.default, arena);
     let v = gensym("v");
@@ -129,7 +129,7 @@ impl AstFolder for Desugarer {
     }
   }
 
-  fn fold_with(&mut self, w: ExprWith, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+  fn fold_with(&mut self, _id: ExprId, w: ExprWith, span: SourceSpan, arena: &mut AstArena) -> ExprId {
     match w.kind {
       WithKind::Binding { name, value, mutable } => {
         let folded_value = self.fold_expr(value, arena);

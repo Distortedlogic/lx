@@ -12,7 +12,7 @@ pub fn fold_expr<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, arena: &mut AstAr
   match expr {
     Expr::Literal(lit) => {
       let folded = f.fold_literal(lit.clone(), span, arena);
-      if literal_eq(&folded, &lit) {
+      if folded == lit {
         return id;
       }
       arena.alloc_expr(Expr::Literal(folded), span)
@@ -29,51 +29,30 @@ pub fn fold_expr<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, arena: &mut AstAr
     Expr::Unary(u) => f.fold_unary(id, u, span, arena),
     Expr::Pipe(p) => f.fold_pipe(id, p, span, arena),
     Expr::Apply(a) => f.fold_apply(id, a, span, arena),
-    Expr::Section(s) => f.fold_section(s, span, arena),
-    Expr::FieldAccess(fa) => f.fold_field_access(fa, span, arena),
+    Expr::Section(s) => f.fold_section(id, s, span, arena),
+    Expr::FieldAccess(fa) => f.fold_field_access(id, fa, span, arena),
     Expr::Block(ref stmts) => f.fold_block(id, stmts, span, arena),
     Expr::Tuple(ref elems) => f.fold_tuple(id, elems, span, arena),
-    Expr::List(elems) => f.fold_list(elems, span, arena),
-    Expr::Record(fields) => f.fold_record(fields, span, arena),
-    Expr::Map(entries) => f.fold_map(entries, span, arena),
-    Expr::Func(func) => f.fold_func(func, span, arena),
-    Expr::Match(m) => f.fold_match(m, span, arena),
-    Expr::Ternary(t) => f.fold_ternary(t, span, arena),
-    Expr::Propagate(inner) => f.fold_propagate(inner, span, arena),
-    Expr::Coalesce(c) => f.fold_coalesce(c, span, arena),
-    Expr::Slice(s) => f.fold_slice(s, span, arena),
-    Expr::NamedArg(na) => f.fold_named_arg(na, span, arena),
-    Expr::Loop(stmts) => f.fold_loop(stmts, span, arena),
-    Expr::Break(val) => f.fold_break(val, span, arena),
-    Expr::Assert(a) => f.fold_assert(a, span, arena),
-    Expr::Par(stmts) => f.fold_par(stmts, span, arena),
-    Expr::Sel(arms) => f.fold_sel(arms, span, arena),
-    Expr::Timeout(t) => f.fold_timeout(t, span, arena),
-    Expr::Emit(e) => f.fold_emit(e, span, arena),
-    Expr::Yield(y) => f.fold_yield(y, span, arena),
-    Expr::With(w) => f.fold_with(w, span, arena),
+    Expr::List(elems) => f.fold_list(id, elems, span, arena),
+    Expr::Record(fields) => f.fold_record(id, fields, span, arena),
+    Expr::Map(entries) => f.fold_map(id, entries, span, arena),
+    Expr::Func(func) => f.fold_func(id, func, span, arena),
+    Expr::Match(m) => f.fold_match(id, m, span, arena),
+    Expr::Ternary(t) => f.fold_ternary(id, t, span, arena),
+    Expr::Propagate(inner) => f.fold_propagate(id, inner, span, arena),
+    Expr::Coalesce(c) => f.fold_coalesce(id, c, span, arena),
+    Expr::Slice(s) => f.fold_slice(id, s, span, arena),
+    Expr::NamedArg(na) => f.fold_named_arg(id, na, span, arena),
+    Expr::Loop(stmts) => f.fold_loop(id, stmts, span, arena),
+    Expr::Break(val) => f.fold_break(id, val, span, arena),
+    Expr::Assert(a) => f.fold_assert(id, a, span, arena),
+    Expr::Par(stmts) => f.fold_par(id, stmts, span, arena),
+    Expr::Sel(arms) => f.fold_sel(id, arms, span, arena),
+    Expr::Timeout(t) => f.fold_timeout(id, t, span, arena),
+    Expr::Emit(e) => f.fold_emit(id, e, span, arena),
+    Expr::Yield(y) => f.fold_yield(id, y, span, arena),
+    Expr::With(w) => f.fold_with(id, w, span, arena),
   }
-}
-
-fn literal_eq(a: &Literal, b: &Literal) -> bool {
-  match (a, b) {
-    (Literal::Int(x), Literal::Int(y)) => x == y,
-    (Literal::Float(x), Literal::Float(y)) => x.to_bits() == y.to_bits(),
-    (Literal::Bool(x), Literal::Bool(y)) => x == y,
-    (Literal::Unit, Literal::Unit) => true,
-    (Literal::RawStr(x), Literal::RawStr(y)) => x == y,
-    (Literal::Str(x), Literal::Str(y)) => str_parts_eq(x, y),
-    _ => false,
-  }
-}
-
-fn str_parts_eq(a: &[StrPart], b: &[StrPart]) -> bool {
-  a.len() == b.len()
-    && a.iter().zip(b.iter()).all(|(x, y)| match (x, y) {
-      (StrPart::Text(a), StrPart::Text(b)) => a == b,
-      (StrPart::Interp(a), StrPart::Interp(b)) => a == b,
-      _ => false,
-    })
 }
 
 pub fn fold_literal<F: AstFolder + ?Sized>(f: &mut F, lit: Literal, _span: SourceSpan, arena: &mut AstArena) -> Literal {
@@ -82,7 +61,7 @@ pub fn fold_literal<F: AstFolder + ?Sized>(f: &mut F, lit: Literal, _span: Sourc
       let folded = parts
         .into_iter()
         .map(|part| match part {
-          StrPart::Text(s) => StrPart::Text(s),
+          part @ StrPart::Text(_) => part,
           StrPart::Interp(eid) => StrPart::Interp(f.fold_expr(eid, arena)),
         })
         .collect();
@@ -127,27 +106,38 @@ pub fn fold_apply<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, a: ExprApply, sp
   arena.alloc_expr(Expr::Apply(ExprApply { func, arg }), span)
 }
 
-pub fn fold_section<F: AstFolder + ?Sized>(f: &mut F, s: Section, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-  let folded = match s {
+pub fn fold_section<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, s: Section, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+  match s {
     Section::Right { op, operand } => {
       let folded_operand = f.fold_expr(operand, arena);
-      Section::Right { op, operand: folded_operand }
+      if folded_operand == operand {
+        return id;
+      }
+      arena.alloc_expr(Expr::Section(Section::Right { op, operand: folded_operand }), span)
     },
     Section::Left { operand, op } => {
       let folded_operand = f.fold_expr(operand, arena);
-      Section::Left { operand: folded_operand, op }
+      if folded_operand == operand {
+        return id;
+      }
+      arena.alloc_expr(Expr::Section(Section::Left { operand: folded_operand, op }), span)
     },
-    other => other,
-  };
-  arena.alloc_expr(Expr::Section(folded), span)
+    Section::Field(_) | Section::Index(_) | Section::BinOp(_) => id,
+  }
 }
 
-pub fn fold_field_access<F: AstFolder + ?Sized>(f: &mut F, fa: ExprFieldAccess, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+pub fn fold_field_access<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, fa: ExprFieldAccess, span: SourceSpan, arena: &mut AstArena) -> ExprId {
   let expr = f.fold_expr(fa.expr, arena);
-  let field = match fa.field {
-    FieldKind::Computed(c) => FieldKind::Computed(f.fold_expr(c, arena)),
-    other => other,
+  let (field, field_changed) = match fa.field {
+    FieldKind::Computed(c) => {
+      let folded = f.fold_expr(c, arena);
+      (FieldKind::Computed(folded), folded != c)
+    },
+    other => (other, false),
   };
+  if expr == fa.expr && !field_changed {
+    return id;
+  }
   arena.alloc_expr(Expr::FieldAccess(ExprFieldAccess { expr, field }), span)
 }
 
@@ -167,43 +157,58 @@ pub fn fold_tuple<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, elems: &[ExprId]
   arena.alloc_expr(Expr::Tuple(folded), span)
 }
 
-pub fn fold_list<F: AstFolder + ?Sized>(f: &mut F, elems: Vec<ListElem>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-  let folded = elems
-    .into_iter()
+pub fn fold_list<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, elems: Vec<ListElem>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+  let folded: Vec<ListElem> = elems
+    .iter()
     .map(|elem| match elem {
-      ListElem::Single(e) => ListElem::Single(f.fold_expr(e, arena)),
-      ListElem::Spread(e) => ListElem::Spread(f.fold_expr(e, arena)),
+      ListElem::Single(e) => ListElem::Single(f.fold_expr(*e, arena)),
+      ListElem::Spread(e) => ListElem::Spread(f.fold_expr(*e, arena)),
     })
     .collect();
+  let changed = folded.iter().zip(elems.iter()).any(|(a, b)| match (a, b) {
+    (ListElem::Single(a), ListElem::Single(b)) | (ListElem::Spread(a), ListElem::Spread(b)) => a != b,
+    _ => true,
+  });
+  if !changed {
+    return id;
+  }
   arena.alloc_expr(Expr::List(folded), span)
 }
 
-pub fn fold_record<F: AstFolder + ?Sized>(f: &mut F, fields: Vec<RecordField>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-  let folded = fields
-    .into_iter()
+pub fn fold_record<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, fields: Vec<RecordField>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+  let folded: Vec<RecordField> = fields
+    .iter()
     .map(|field| match field {
-      RecordField::Named { name, value } => RecordField::Named { name, value: f.fold_expr(value, arena) },
-      RecordField::Spread(value) => RecordField::Spread(f.fold_expr(value, arena)),
+      RecordField::Named { name, value } => RecordField::Named { name: *name, value: f.fold_expr(*value, arena) },
+      RecordField::Spread(value) => RecordField::Spread(f.fold_expr(*value, arena)),
     })
     .collect();
+  let changed = folded.iter().zip(fields.iter()).any(|(a, b)| match (a, b) {
+    (RecordField::Named { value: av, .. }, RecordField::Named { value: bv, .. }) | (RecordField::Spread(av), RecordField::Spread(bv)) => av != bv,
+    _ => true,
+  });
+  if !changed {
+    return id;
+  }
   arena.alloc_expr(Expr::Record(folded), span)
 }
 
-pub fn fold_map<F: AstFolder + ?Sized>(f: &mut F, entries: Vec<MapEntry>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-  let folded = entries
-    .into_iter()
+pub fn fold_map<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, entries: Vec<MapEntry>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+  let folded: Vec<MapEntry> = entries
+    .iter()
     .map(|entry| match entry {
-      MapEntry::Keyed { key, value } => MapEntry::Keyed { key: f.fold_expr(key, arena), value: f.fold_expr(value, arena) },
-      MapEntry::Spread(value) => MapEntry::Spread(f.fold_expr(value, arena)),
+      MapEntry::Keyed { key, value } => MapEntry::Keyed { key: f.fold_expr(*key, arena), value: f.fold_expr(*value, arena) },
+      MapEntry::Spread(value) => MapEntry::Spread(f.fold_expr(*value, arena)),
     })
     .collect();
+  let changed = folded.iter().zip(entries.iter()).any(|(a, b)| match (a, b) {
+    (MapEntry::Keyed { key: ak, value: av }, MapEntry::Keyed { key: bk, value: bv }) => ak != bk || av != bv,
+    (MapEntry::Spread(a), MapEntry::Spread(b)) => a != b,
+    _ => true,
+  });
+  if !changed {
+    return id;
+  }
   arena.alloc_expr(Expr::Map(folded), span)
 }
 
-pub fn fold_stmts<F: AstFolder + ?Sized>(f: &mut F, stmts: Vec<StmtId>, arena: &mut AstArena) -> Vec<StmtId> {
-  stmts.into_iter().map(|s| f.fold_stmt(s, arena)).collect()
-}
-
-pub fn fold_exprs<F: AstFolder + ?Sized>(f: &mut F, exprs: Vec<ExprId>, arena: &mut AstArena) -> Vec<ExprId> {
-  exprs.into_iter().map(|e| f.fold_expr(e, arena)).collect()
-}

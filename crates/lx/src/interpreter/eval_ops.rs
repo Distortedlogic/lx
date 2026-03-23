@@ -2,7 +2,7 @@ use num_integer::Integer;
 use num_traits::ToPrimitive;
 
 use crate::ast::{BinOp, ExprId, Literal, StrPart, UnaryOp};
-use crate::error::LxError;
+use crate::error::{EvalResult, LxError};
 use crate::value::LxVal;
 use miette::SourceSpan;
 
@@ -21,7 +21,7 @@ fn dedent_string(s: &str) -> String {
 }
 
 impl Interpreter {
-  pub(super) async fn eval_literal(&mut self, lit: &Literal, _span: SourceSpan) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_literal(&mut self, lit: &Literal, _span: SourceSpan) -> EvalResult<LxVal> {
     match lit {
       Literal::Int(n) => Ok(LxVal::Int(n.clone())),
       Literal::Float(f) => Ok(LxVal::Float(*f)),
@@ -116,17 +116,17 @@ impl Interpreter {
     }
   }
 
-  pub(super) async fn eval_unary(&mut self, op: &UnaryOp, operand: ExprId, span: SourceSpan) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_unary(&mut self, op: &UnaryOp, operand: ExprId, span: SourceSpan) -> EvalResult<LxVal> {
     let v = self.eval(operand).await?;
     match (op, &v) {
       (UnaryOp::Neg, LxVal::Int(n)) => Ok(LxVal::Int(-n)),
       (UnaryOp::Neg, LxVal::Float(f)) => Ok(LxVal::Float(-f)),
       (UnaryOp::Not, LxVal::Bool(b)) => Ok(LxVal::Bool(!b)),
-      _ => Err(LxError::type_err(format!("cannot apply '{op}' to {}", v.type_name()), span, None)),
+      _ => Err(LxError::type_err(format!("cannot apply '{op}' to {}", v.type_name()), span, None).into()),
     }
   }
 
-  pub(super) async fn eval_string_parts(&mut self, parts: &[StrPart]) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_string_parts(&mut self, parts: &[StrPart]) -> EvalResult<LxVal> {
     let mut buf = String::new();
     for part in parts {
       match part {
@@ -145,7 +145,7 @@ impl Interpreter {
     Ok(LxVal::str(buf))
   }
 
-  pub(super) async fn eval_short_circuit(&mut self, left: ExprId, right: ExprId, is_and: bool, span: SourceSpan) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_short_circuit(&mut self, left: ExprId, right: ExprId, is_and: bool, span: SourceSpan) -> EvalResult<LxVal> {
     let l = self.eval(left).await?;
     let l = self.force_defaults(l, span).await?;
     let short_circuit_on = !is_and;
@@ -156,7 +156,7 @@ impl Interpreter {
         let r = self.eval(right).await?;
         self.force_defaults(r, span).await
       },
-      _ => Err(LxError::type_err(format!("{op_name} requires Bool operands, got {}", l.type_name()), span, None)),
+      _ => Err(LxError::type_err(format!("{op_name} requires Bool operands, got {}", l.type_name()), span, None).into()),
     }
   }
 

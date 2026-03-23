@@ -1,7 +1,22 @@
 use miette::{Diagnostic, SourceSpan};
 use thiserror::Error;
 
+use crate::value::LxVal;
+
 pub type LxResult<T> = Result<T, LxError>;
+pub type EvalResult<T> = Result<T, EvalSignal>;
+
+#[derive(Debug, Clone)]
+pub enum EvalSignal {
+  Error(LxError),
+  Break(LxVal),
+}
+
+impl From<LxError> for EvalSignal {
+  fn from(e: LxError) -> Self {
+    EvalSignal::Error(e)
+  }
+}
 
 #[derive(Debug, Clone, Error, Diagnostic)]
 pub enum LxError {
@@ -42,9 +57,6 @@ pub enum LxError {
     help: Option<String>,
   },
 
-  #[error("break")]
-  BreakSignal { value: Box<crate::value::LxVal> },
-
   #[error("propagated error: {value}")]
   #[diagnostic(code(lx::propagate))]
   Propagate {
@@ -76,10 +88,6 @@ impl LxError {
 
   pub fn division_by_zero(span: SourceSpan) -> Self {
     Self::runtime("division by zero", span)
-  }
-
-  pub fn break_signal(value: crate::value::LxVal) -> Self {
-    Self::BreakSignal { value: Box::new(value) }
   }
 
   pub fn propagate(value: crate::value::LxVal, span: SourceSpan) -> Self {

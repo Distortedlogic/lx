@@ -3,40 +3,15 @@ use dioxus::prelude::*;
 #[component]
 pub fn VoiceBanner() -> Element {
   rsx! {
-    div { class: "bg-[var(--surface-container)] rounded-lg p-4 flex items-center gap-4",
-      div { class: "bg-[var(--primary-container)]/20 rounded-full p-4 shrink-0",
-        span { class: "text-2xl", "\u{1F3A4}" }
+    div { class: "bg-[var(--surface-container)] rounded-lg px-4 py-2 flex items-center gap-3",
+      span { class: "text-[var(--primary)] text-sm", "\u{1F512}" }
+      span { class: "text-sm font-semibold uppercase tracking-wider text-[var(--on-surface)]",
+        "SYSTEM_LISTENING"
       }
-      div { class: "flex-1 min-w-0",
-        p { class: "text-sm font-semibold uppercase tracking-wider text-[var(--on-surface)]", "VOICE INTERACTION ACTIVE" }
-        p { class: "text-xs text-[var(--outline)] mt-0.5", "LISTENING FOR COMMANDS..." }
-      }
-      div { class: "flex items-center gap-1 h-8",
-        for i in 0..8 {
-          {
-              let height = match i % 4 {
-                  0 => "h-3",
-                  1 => "h-5",
-                  2 => "h-7",
-                  _ => "h-4",
-              };
-              let delay = format!("animation-delay: {}ms", i * 120);
-              rsx! {
-                div {
-                  class: "w-1 bg-[var(--primary)] rounded-full animate-pulse {height}",
-                  style: "{delay}",
-                }
-              }
-          }
-        }
-      }
-      div { class: "flex items-center gap-2 shrink-0",
-        button { class: "border border-[var(--primary)] text-[var(--primary)] rounded px-4 py-1.5 text-sm uppercase hover:bg-[var(--primary)]/10 transition-colors duration-150",
-          "PUSH TO TALK"
-        }
-        button { class: "border border-[var(--primary)] text-[var(--primary)] rounded px-4 py-1.5 text-sm uppercase hover:bg-[var(--primary)]/10 transition-colors duration-150",
-          "CONFIGURE AUDIO"
-        }
+      span { class: "text-[var(--primary)] text-sm ml-1", "\u{2581}\u{2582}\u{2583}\u{2584}" }
+      div { class: "flex-1" }
+      button { class: "border border-[var(--primary)] text-[var(--primary)] rounded px-4 py-1.5 text-sm uppercase hover:bg-[var(--primary)]/10 transition-colors duration-150 font-semibold",
+        "PUSH TO TALK"
       }
     }
   }

@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
 use crate::ast::{ExprId, Literal, MatchArm, Pattern, PatternConstructor, PatternList, PatternRecord, StrPart};
-use crate::error::LxError;
+use crate::error::{EvalResult, LxError};
 use crate::sym::Sym;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
 impl super::Interpreter {
-  pub(super) async fn eval_match(&mut self, scrutinee: ExprId, arms: &[MatchArm], span: SourceSpan) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_match(&mut self, scrutinee: ExprId, arms: &[MatchArm], span: SourceSpan) -> EvalResult<LxVal> {
     let val = self.eval(scrutinee).await?;
     for arm in arms {
       let pat = self.arena.pattern(arm.pattern).clone();
@@ -28,7 +28,7 @@ impl super::Interpreter {
             Some(true) => {},
             _ => {
               self.env = saved;
-              return Err(LxError::type_err(format!("match guard must be Bool, got {} `{}`", gv.type_name(), gv.short_display()), span, None));
+              return Err(LxError::type_err(format!("match guard must be Bool, got {} `{}`", gv.type_name(), gv.short_display()), span, None).into());
             },
           }
         }
@@ -37,7 +37,7 @@ impl super::Interpreter {
         return result;
       }
     }
-    Err(LxError::runtime(format!("no matching pattern for {} `{}`", val.type_name(), val.short_display()), span))
+    Err(LxError::runtime(format!("no matching pattern for {} `{}`", val.type_name(), val.short_display()), span).into())
   }
 
   pub(super) fn try_match_pattern(&self, pattern: &Pattern, value: &LxVal) -> Option<Vec<(Sym, LxVal)>> {

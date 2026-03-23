@@ -15,7 +15,7 @@ pub use fold_type::*;
 use crate::ast::{
   AstArena, Binding, ExprApply, ExprAssert, ExprBinary, ExprCoalesce, ExprEmit, ExprFieldAccess, ExprFunc, ExprId, ExprMatch, ExprNamedArg, ExprPipe,
   ExprSlice, ExprTernary, ExprTimeout, ExprUnary, ExprWith, ExprYield, ListElem, Literal, MapEntry, PatternConstructor, PatternId, PatternList, PatternRecord,
-  Program, RecordField, Section, SelArm, StmtId, TypeExprId,
+  Program, RecordField, Section, SelArm, StmtId, StmtTypeDef, TraitUnionDef, TypeExprId, UseStmt,
 };
 use crate::sym::Sym;
 use miette::SourceSpan;
@@ -29,8 +29,8 @@ pub trait AstFolder {
     fold_stmt(self, id, arena)
   }
 
-  fn fold_binding(&mut self, binding: Binding, span: SourceSpan, arena: &mut AstArena) -> StmtId {
-    fold_binding(self, binding, span, arena)
+  fn fold_binding(&mut self, id: StmtId, binding: Binding, span: SourceSpan, arena: &mut AstArena) -> StmtId {
+    fold_binding(self, id, binding, span, arena)
   }
 
   fn fold_expr(&mut self, id: ExprId, arena: &mut AstArena) -> ExprId {
@@ -65,12 +65,12 @@ pub trait AstFolder {
     fold_apply(self, id, a, span, arena)
   }
 
-  fn fold_section(&mut self, s: Section, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_section(self, s, span, arena)
+  fn fold_section(&mut self, id: ExprId, s: Section, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_section(self, id, s, span, arena)
   }
 
-  fn fold_field_access(&mut self, fa: ExprFieldAccess, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_field_access(self, fa, span, arena)
+  fn fold_field_access(&mut self, id: ExprId, fa: ExprFieldAccess, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_field_access(self, id, fa, span, arena)
   }
 
   fn fold_block(&mut self, id: ExprId, stmts: &[StmtId], span: SourceSpan, arena: &mut AstArena) -> ExprId {
@@ -81,80 +81,90 @@ pub trait AstFolder {
     fold_tuple(self, id, elems, span, arena)
   }
 
-  fn fold_list(&mut self, elems: Vec<ListElem>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_list(self, elems, span, arena)
+  fn fold_list(&mut self, id: ExprId, elems: Vec<ListElem>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_list(self, id, elems, span, arena)
   }
 
-  fn fold_record(&mut self, fields: Vec<RecordField>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_record(self, fields, span, arena)
+  fn fold_record(&mut self, id: ExprId, fields: Vec<RecordField>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_record(self, id, fields, span, arena)
   }
 
-  fn fold_map(&mut self, entries: Vec<MapEntry>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_map(self, entries, span, arena)
+  fn fold_map(&mut self, id: ExprId, entries: Vec<MapEntry>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_map(self, id, entries, span, arena)
   }
 
-  fn fold_func(&mut self, func: ExprFunc, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_func(self, func, span, arena)
+  fn fold_func(&mut self, id: ExprId, func: ExprFunc, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_func(self, id, func, span, arena)
   }
 
-  fn fold_match(&mut self, m: ExprMatch, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_match(self, m, span, arena)
+  fn fold_match(&mut self, id: ExprId, m: ExprMatch, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_match(self, id, m, span, arena)
   }
 
-  fn fold_ternary(&mut self, t: ExprTernary, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_ternary(self, t, span, arena)
+  fn fold_ternary(&mut self, id: ExprId, t: ExprTernary, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_ternary(self, id, t, span, arena)
   }
 
-  fn fold_propagate(&mut self, inner: ExprId, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_propagate(self, inner, span, arena)
+  fn fold_propagate(&mut self, id: ExprId, inner: ExprId, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_propagate(self, id, inner, span, arena)
   }
 
-  fn fold_coalesce(&mut self, c: ExprCoalesce, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_coalesce(self, c, span, arena)
+  fn fold_coalesce(&mut self, id: ExprId, c: ExprCoalesce, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_coalesce(self, id, c, span, arena)
   }
 
-  fn fold_slice(&mut self, s: ExprSlice, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_slice(self, s, span, arena)
+  fn fold_slice(&mut self, id: ExprId, s: ExprSlice, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_slice(self, id, s, span, arena)
   }
 
-  fn fold_named_arg(&mut self, na: ExprNamedArg, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_named_arg(self, na, span, arena)
+  fn fold_named_arg(&mut self, id: ExprId, na: ExprNamedArg, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_named_arg(self, id, na, span, arena)
   }
 
-  fn fold_loop(&mut self, stmts: Vec<StmtId>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_loop(self, stmts, span, arena)
+  fn fold_loop(&mut self, id: ExprId, stmts: Vec<StmtId>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_loop(self, id, stmts, span, arena)
   }
 
-  fn fold_break(&mut self, val: Option<ExprId>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_break(self, val, span, arena)
+  fn fold_break(&mut self, id: ExprId, val: Option<ExprId>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_break(self, id, val, span, arena)
   }
 
-  fn fold_assert(&mut self, a: ExprAssert, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_assert(self, a, span, arena)
+  fn fold_assert(&mut self, id: ExprId, a: ExprAssert, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_assert(self, id, a, span, arena)
   }
 
-  fn fold_par(&mut self, stmts: Vec<StmtId>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_par(self, stmts, span, arena)
+  fn fold_par(&mut self, id: ExprId, stmts: Vec<StmtId>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_par(self, id, stmts, span, arena)
   }
 
-  fn fold_sel(&mut self, arms: Vec<SelArm>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_sel(self, arms, span, arena)
+  fn fold_sel(&mut self, id: ExprId, arms: Vec<SelArm>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_sel(self, id, arms, span, arena)
   }
 
-  fn fold_timeout(&mut self, t: ExprTimeout, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_timeout(self, t, span, arena)
+  fn fold_timeout(&mut self, id: ExprId, t: ExprTimeout, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_timeout(self, id, t, span, arena)
   }
 
-  fn fold_emit(&mut self, e: ExprEmit, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_emit(self, e, span, arena)
+  fn fold_emit(&mut self, id: ExprId, e: ExprEmit, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_emit(self, id, e, span, arena)
   }
 
-  fn fold_yield(&mut self, y: ExprYield, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_yield(self, y, span, arena)
+  fn fold_yield(&mut self, id: ExprId, y: ExprYield, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_yield(self, id, y, span, arena)
   }
 
-  fn fold_with(&mut self, w: ExprWith, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    fold_with(self, w, span, arena)
+  fn fold_with(&mut self, id: ExprId, w: ExprWith, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    fold_with(self, id, w, span, arena)
+  }
+
+  fn fold_type_def(&mut self, id: StmtId, _def: StmtTypeDef, _span: SourceSpan, _arena: &mut AstArena) -> StmtId {
+    id
+  }
+  fn fold_trait_union(&mut self, id: StmtId, _def: TraitUnionDef, _span: SourceSpan, _arena: &mut AstArena) -> StmtId {
+    id
+  }
+  fn fold_use(&mut self, id: StmtId, _stmt: UseStmt, _span: SourceSpan, _arena: &mut AstArena) -> StmtId {
+    id
   }
 
   fn fold_pattern(&mut self, id: PatternId, arena: &mut AstArena) -> PatternId {

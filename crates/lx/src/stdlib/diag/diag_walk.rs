@@ -11,11 +11,11 @@ use std::collections::{HashMap, HashSet};
 use std::ops::ControlFlow;
 
 use crate::ast::{
-  AstArena, BindTarget, Binding, Expr, ExprApply, ExprFunc, ExprMatch, ExprTernary, MapEntry, Program, SelArm, Stmt, StmtId, StmtTypeDef, TraitDeclData,
-  UseStmt,
+  AstArena, BindTarget, Binding, Expr, ExprApply, ExprFunc, ExprId, ExprMatch, ExprTernary, MapEntry, Program, SelArm, Stmt, StmtId, StmtTypeDef,
+  TraitDeclData, UseStmt,
 };
 use crate::sym::{Sym, intern};
-use crate::visitor::{AstLeave, AstVisitor, VisitAction, cf_to_action, dispatch_expr, walk_loop, walk_par, walk_program};
+use crate::visitor::{AstVisitor, VisitAction, dispatch_expr, walk_loop, walk_par, walk_program};
 use miette::SourceSpan;
 
 pub(crate) use diag_types::*;
@@ -82,34 +82,32 @@ impl Walker {
   }
 }
 
-impl AstLeave for Walker {
-  fn leave_par(&mut self, _stmts: &[StmtId], _span: SourceSpan, _arena: &AstArena) -> ControlFlow<()> {
-    self.context = self.context_stack.pop().expect("diag: context_stack underflow");
-    ControlFlow::Continue(())
-  }
-
-  fn leave_sel(&mut self, _arms: &[SelArm], _span: SourceSpan, _arena: &AstArena) -> ControlFlow<()> {
-    self.context = self.context_stack.pop().expect("diag: context_stack underflow");
-    ControlFlow::Continue(())
-  }
-
-  fn leave_match(&mut self, _m: &ExprMatch, _span: SourceSpan, _arena: &AstArena) -> ControlFlow<()> {
-    self.context = self.context_stack.pop().expect("diag: context_stack underflow");
-    ControlFlow::Continue(())
-  }
-
-  fn leave_ternary(&mut self, _ternary: &ExprTernary, _span: SourceSpan, _arena: &AstArena) -> ControlFlow<()> {
-    self.context = self.context_stack.pop().expect("diag: context_stack underflow");
-    ControlFlow::Continue(())
-  }
-
-  fn leave_loop(&mut self, _stmts: &[StmtId], _span: SourceSpan, _arena: &AstArena) -> ControlFlow<()> {
-    self.context = self.context_stack.pop().expect("diag: context_stack underflow");
-    ControlFlow::Continue(())
-  }
-}
-
 impl AstVisitor for Walker {
+  fn leave_par(&mut self, _id: ExprId, _stmts: &[StmtId], _span: SourceSpan, _arena: &AstArena) -> ControlFlow<()> {
+    self.context = self.context_stack.pop().expect("diag: context_stack underflow");
+    ControlFlow::Continue(())
+  }
+
+  fn leave_sel(&mut self, _id: ExprId, _arms: &[SelArm], _span: SourceSpan, _arena: &AstArena) -> ControlFlow<()> {
+    self.context = self.context_stack.pop().expect("diag: context_stack underflow");
+    ControlFlow::Continue(())
+  }
+
+  fn leave_match(&mut self, _id: ExprId, _m: &ExprMatch, _span: SourceSpan, _arena: &AstArena) -> ControlFlow<()> {
+    self.context = self.context_stack.pop().expect("diag: context_stack underflow");
+    ControlFlow::Continue(())
+  }
+
+  fn leave_ternary(&mut self, _id: ExprId, _ternary: &ExprTernary, _span: SourceSpan, _arena: &AstArena) -> ControlFlow<()> {
+    self.context = self.context_stack.pop().expect("diag: context_stack underflow");
+    ControlFlow::Continue(())
+  }
+
+  fn leave_loop(&mut self, _id: ExprId, _stmts: &[StmtId], _span: SourceSpan, _arena: &AstArena) -> ControlFlow<()> {
+    self.context = self.context_stack.pop().expect("diag: context_stack underflow");
+    ControlFlow::Continue(())
+  }
+
   fn visit_program<P>(&mut self, program: &Program<P>) -> VisitAction {
     let arena = &program.arena;
     let saved_fn = self.current_fn.take();
@@ -126,7 +124,10 @@ impl AstVisitor for Walker {
       }
     }
     self.current_fn = saved_fn;
-    cf_to_action(walk_program(self, program))
+    match walk_program(self, program) {
+      ControlFlow::Continue(()) => VisitAction::Descend,
+      ControlFlow::Break(()) => VisitAction::Stop,
+    }
   }
 
   fn visit_binding(&mut self, binding: &Binding, _span: SourceSpan, arena: &AstArena) -> VisitAction {
@@ -151,9 +152,7 @@ impl AstVisitor for Walker {
         self.context = id.clone();
         self.current_fn = Some(var_name);
         self.subgraph_nodes.entry(var_name.to_string()).or_default().push(id);
-        let body_expr = arena.expr(body);
-        let body_span = arena.expr_span(body);
-        if dispatch_expr(self, body_expr, body_span, arena).is_break() {
+        if dispatch_expr(self, body, arena).is_break() {
           self.context = saved_ctx;
           self.current_fn = saved_fn;
           return VisitAction::Stop;
@@ -188,9 +187,7 @@ impl AstVisitor for Walker {
         }
       }
     }
-    let val_expr = arena.expr(binding.value);
-    let val_span = arena.expr_span(binding.value);
-    if dispatch_expr(self, val_expr, val_span, arena).is_break() {
+    if dispatch_expr(self, binding.value, arena).is_break() {
       return VisitAction::Stop;
     }
     VisitAction::Skip
@@ -214,35 +211,33 @@ impl AstVisitor for Walker {
     VisitAction::Skip
   }
 
-  fn visit_par(&mut self, stmts: &[StmtId], span: SourceSpan, arena: &AstArena) -> VisitAction {
+  fn visit_par(&mut self, _id: ExprId, stmts: &[StmtId], span: SourceSpan, arena: &AstArena) -> VisitAction {
     let fork_id = self.add_node_at("fork", "par".into(), NodeKind::Fork, Some(span));
     let ctx = self.context.clone();
     self.add_edge(&ctx, &fork_id, String::new(), EdgeStyle::Solid);
     self.context_stack.push(self.context.clone());
     self.context = fork_id;
-    if walk_par(self, stmts, span, arena).is_break() {
+    if walk_par(self, _id, stmts, span, arena).is_break() {
       return VisitAction::Stop;
     }
     VisitAction::Skip
   }
 
-  fn visit_sel(&mut self, arms: &[SelArm], span: SourceSpan, arena: &AstArena) -> VisitAction {
+  fn visit_sel(&mut self, _id: ExprId, arms: &[SelArm], span: SourceSpan, arena: &AstArena) -> VisitAction {
     let dec_id = self.add_node_at("sel", "sel".into(), NodeKind::Decision, Some(span));
     let ctx = self.context.clone();
     self.add_edge(&ctx, &dec_id, String::new(), EdgeStyle::Solid);
     self.context_stack.push(self.context.clone());
     self.context = dec_id;
     for arm in arms {
-      let h_expr = arena.expr(arm.handler);
-      let h_span = arena.expr_span(arm.handler);
-      if dispatch_expr(self, h_expr, h_span, arena).is_break() {
+      if dispatch_expr(self, arm.handler, arena).is_break() {
         return VisitAction::Stop;
       }
     }
     VisitAction::Skip
   }
 
-  fn visit_match(&mut self, m: &ExprMatch, span: SourceSpan, arena: &AstArena) -> VisitAction {
+  fn visit_match(&mut self, _id: ExprId, m: &ExprMatch, span: SourceSpan, arena: &AstArena) -> VisitAction {
     let label = format!("{}?", diag_helpers::expr_label(arena.expr(m.scrutinee), arena));
     let dec_id = self.add_node_at("match", label, NodeKind::Decision, Some(span));
     let ctx = self.context.clone();
@@ -250,51 +245,48 @@ impl AstVisitor for Walker {
     self.context_stack.push(self.context.clone());
     self.context = dec_id;
     for arm in &m.arms {
-      let b_expr = arena.expr(arm.body);
-      let b_span = arena.expr_span(arm.body);
-      if dispatch_expr(self, b_expr, b_span, arena).is_break() {
+      if dispatch_expr(self, arm.body, arena).is_break() {
         return VisitAction::Stop;
       }
     }
     VisitAction::Skip
   }
 
-  fn visit_ternary(&mut self, ternary: &ExprTernary, span: SourceSpan, arena: &AstArena) -> VisitAction {
+  fn visit_ternary(&mut self, _id: ExprId, ternary: &ExprTernary, span: SourceSpan, arena: &AstArena) -> VisitAction {
     let label = format!("{}?", diag_helpers::expr_label(arena.expr(ternary.cond), arena));
     let dec_id = self.add_node_at("cond", label, NodeKind::Decision, Some(span));
     let ctx = self.context.clone();
     self.add_edge(&ctx, &dec_id, String::new(), EdgeStyle::Solid);
     self.context_stack.push(self.context.clone());
     self.context = dec_id.clone();
-    let t_expr = arena.expr(ternary.then_);
-    let t_span = arena.expr_span(ternary.then_);
-    if dispatch_expr(self, t_expr, t_span, arena).is_break() {
+    if dispatch_expr(self, ternary.then_, arena).is_break() {
       return VisitAction::Stop;
     }
     if let Some(e) = ternary.else_ {
       self.context = dec_id;
-      let e_expr = arena.expr(e);
-      let e_span = arena.expr_span(e);
-      if dispatch_expr(self, e_expr, e_span, arena).is_break() {
+      if dispatch_expr(self, e, arena).is_break() {
         return VisitAction::Stop;
       }
     }
     VisitAction::Skip
   }
 
-  fn visit_loop(&mut self, stmts: &[StmtId], span: SourceSpan, arena: &AstArena) -> VisitAction {
+  fn visit_loop(&mut self, _id: ExprId, stmts: &[StmtId], span: SourceSpan, arena: &AstArena) -> VisitAction {
     let loop_id = self.add_node_at("loop", "loop".into(), NodeKind::Loop, Some(span));
     let ctx = self.context.clone();
     self.add_edge(&ctx, &loop_id, String::new(), EdgeStyle::Solid);
     self.context_stack.push(self.context.clone());
     self.context = loop_id;
-    if walk_loop(self, stmts, span, arena).is_break() {
+    if walk_loop(self, _id, stmts, span, arena).is_break() {
       return VisitAction::Stop;
     }
     VisitAction::Skip
   }
 
-  fn visit_apply(&mut self, apply: &ExprApply, span: SourceSpan, arena: &AstArena) -> VisitAction {
-    cf_to_action(diag_walk_expr::visit_apply_diag(self, apply, span, arena))
+  fn visit_apply(&mut self, _id: ExprId, apply: &ExprApply, span: SourceSpan, arena: &AstArena) -> VisitAction {
+    match diag_walk_expr::visit_apply_diag(self, apply, span, arena) {
+      ControlFlow::Continue(()) => VisitAction::Skip,
+      ControlFlow::Break(()) => VisitAction::Stop,
+    }
   }
 }

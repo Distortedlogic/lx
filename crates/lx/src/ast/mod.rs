@@ -1,6 +1,7 @@
 pub mod arena;
 mod display;
 mod expr_types;
+mod parent_map;
 mod types;
 
 use std::marker::PhantomData;
@@ -9,6 +10,7 @@ use crate::sym::Sym;
 
 pub use arena::{AstArena, AstNode, ExprId, NodeId, PatternId, Spanned, StmtId, TypeExprId};
 pub use expr_types::*;
+pub use parent_map::build_parent_map;
 pub use types::*;
 
 pub struct Surface;

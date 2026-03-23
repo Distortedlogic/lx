@@ -2,24 +2,28 @@ use std::sync::Arc;
 
 use super::Interpreter;
 use crate::ast::{FieldDecl, TraitEntry};
-use crate::error::LxError;
+use crate::error::{EvalResult, LxError};
 use crate::sym::Sym;
 use crate::value::{ConstraintExpr, FieldDef, LxVal};
 use miette::{SourceOffset, SourceSpan};
 
 impl Interpreter {
   pub async fn call(&mut self, func: LxVal, arg: LxVal) -> Result<LxVal, LxError> {
-    self.apply_func(func, arg, SourceSpan::new(SourceOffset::from(0), 0)).await
+    let span = SourceSpan::new(SourceOffset::from(0), 0);
+    self.apply_func(func, arg, span).await.map_err(|e| match e {
+      crate::error::EvalSignal::Error(e) => e,
+      crate::error::EvalSignal::Break(_) => LxError::runtime("break outside loop", span),
+    })
   }
 
-  pub(super) async fn eval_trait_fields(&mut self, name: &str, entries: &[TraitEntry], span: SourceSpan) -> Result<Vec<FieldDef>, LxError> {
+  pub(super) async fn eval_trait_fields(&mut self, name: &str, entries: &[TraitEntry], span: SourceSpan) -> EvalResult<Vec<FieldDef>> {
     let mut fields = Vec::new();
     for entry in entries {
       match entry {
         TraitEntry::Spread(base_name) => {
           let base = self.env.get(*base_name).ok_or_else(|| LxError::runtime(format!("Trait {name}: spread base '{base_name}' not found"), span))?;
           let LxVal::Trait(ref base_trait) = base else {
-            return Err(LxError::runtime(format!("Trait {name}: '{base_name}' is not a Trait, got {}", base.type_name()), span));
+            return Err(LxError::runtime(format!("Trait {name}: '{base_name}' is not a Trait, got {}", base.type_name()), span).into());
           };
           for f in base_trait.fields.iter() {
             if let Some(pos) = fields.iter().position(|pf: &FieldDef| pf.name == f.name) {
@@ -42,7 +46,7 @@ impl Interpreter {
     Ok(fields)
   }
 
-  async fn eval_field_decl(&mut self, f: &FieldDecl) -> Result<FieldDef, LxError> {
+  async fn eval_field_decl(&mut self, f: &FieldDecl) -> EvalResult<FieldDef> {
     let default = match f.default {
       Some(eid) => Some(self.eval(eid).await?),
       None => None,

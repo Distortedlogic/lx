@@ -3,14 +3,14 @@ use std::sync::Arc;
 use num_traits::ToPrimitive;
 
 use crate::ast::{ExprId, FieldKind};
-use crate::error::LxError;
+use crate::error::{EvalResult, LxError};
 use crate::value::LxVal;
 use miette::SourceSpan;
 
 use super::Interpreter;
 
 impl Interpreter {
-  pub(super) async fn eval_field_access(&mut self, expr: ExprId, field: &FieldKind, span: SourceSpan) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_field_access(&mut self, expr: ExprId, field: &FieldKind, span: SourceSpan) -> EvalResult<LxVal> {
     let val = self.eval(expr).await?;
     match field {
       FieldKind::Named(name) => match &val {
@@ -30,20 +30,20 @@ impl Interpreter {
           }
         },
         LxVal::Store { .. } => {
-          crate::stdlib::store_method(name.as_str(), &val).ok_or_else(|| LxError::type_err(format!("Store has no method '{name}'"), span, None))
+          Ok(crate::stdlib::store_method(name.as_str(), &val).ok_or_else(|| LxError::type_err(format!("Store has no method '{name}'"), span, None))?)
         },
-        other => Err(LxError::type_err(format!("field access on {}, not Record", other.type_name()), span, None)),
+        other => Err(LxError::type_err(format!("field access on {}, not Record", other.type_name()), span, None).into()),
       },
       FieldKind::Index(idx) => {
         let items = match &val {
           LxVal::Tuple(t) => t.as_ref(),
           LxVal::List(l) => l.as_ref(),
           other => {
-            return Err(LxError::type_err(format!("index access on {}, not Tuple/List", other.type_name()), span, None));
+            return Err(LxError::type_err(format!("index access on {}, not Tuple/List", other.type_name()), span, None).into());
           },
         };
         let i = if *idx < 0 { items.len() as i64 + idx } else { *idx } as usize;
-        items.get(i).cloned().ok_or_else(|| LxError::runtime(format!("index {idx} out of bounds"), span))
+        Ok(items.get(i).cloned().ok_or_else(|| LxError::runtime(format!("index {idx} out of bounds"), span))?)
       },
       FieldKind::Computed(key_eid) => {
         let key = self.eval(*key_eid).await?;
@@ -56,9 +56,9 @@ impl Interpreter {
           (LxVal::List(items), LxVal::Int(n)) => {
             let i = n.to_i64().ok_or_else(|| LxError::runtime(format!("index {n} too large for i64"), span))?;
             let i = if i < 0 { items.len() as i64 + i } else { i } as usize;
-            items.get(i).cloned().ok_or_else(|| LxError::runtime(format!("index {i} out of bounds (list length {})", items.len()), span))
+            Ok(items.get(i).cloned().ok_or_else(|| LxError::runtime(format!("index {i} out of bounds (list length {})", items.len()), span))?)
           },
-          _ => Err(LxError::type_err(format!("computed field access: unsupported types {} / {}", val.type_name(), key.type_name()), span, None)),
+          _ => Err(LxError::type_err(format!("computed field access: unsupported types {} / {}", val.type_name(), key.type_name()), span, None).into()),
         }
       },
     }

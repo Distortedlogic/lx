@@ -16,8 +16,10 @@ pub fn fold_stmt<F: AstFolder + ?Sized>(f: &mut F, id: StmtId, arena: &mut AstAr
   let span = arena.stmt_span(id);
   let stmt = arena.stmt(id).clone();
   match stmt {
-    Stmt::Binding(binding) => f.fold_binding(binding, span, arena),
-    Stmt::TypeDef(_) | Stmt::TraitUnion(_) | Stmt::Use(_) => id,
+    Stmt::Binding(binding) => f.fold_binding(id, binding, span, arena),
+    Stmt::TypeDef(def) => f.fold_type_def(id, def, span, arena),
+    Stmt::TraitUnion(def) => f.fold_trait_union(id, def, span, arena),
+    Stmt::Use(u) => f.fold_use(id, u, span, arena),
     Stmt::TraitDecl(data) => fold_trait_decl(f, data, span, arena),
     Stmt::ClassDecl(data) => fold_class_decl(f, data, span, arena),
     Stmt::FieldUpdate(fu) => fold_field_update(f, fu, span, arena),

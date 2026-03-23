@@ -45,7 +45,10 @@ pub(crate) async fn call_value(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Ar
     LxVal::MultiFunc(clauses) => {
       let arena = clauses.first().map(|c| Arc::clone(&c.arena)).unwrap_or_else(|| Arc::new(crate::ast::AstArena::new()));
       let mut interp = crate::interpreter::Interpreter::with_env(&crate::env::Env::default(), arena, Arc::clone(ctx));
-      interp.apply_func(LxVal::MultiFunc(clauses.clone()), arg, span).await
+      interp.apply_func(LxVal::MultiFunc(clauses.clone()), arg, span).await.map_err(|e| match e {
+        crate::error::EvalSignal::Error(e) => e,
+        crate::error::EvalSignal::Break(_) => LxError::runtime("break outside loop", span),
+      })
     },
     LxVal::TaggedCtor { tag, arity, applied } => {
       let mut applied = applied.clone();

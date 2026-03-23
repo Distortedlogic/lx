@@ -27,7 +27,7 @@ use crate::ast::{
   ExprTimeout, ExprUnary, ExprWith, ExprYield, Program, Stmt, WithKind,
 };
 use crate::env::Env;
-use crate::error::LxError;
+use crate::error::{EvalResult, EvalSignal, LxError};
 use crate::runtime::RuntimeCtx;
 use crate::value::LxVal;
 
@@ -80,7 +80,11 @@ impl Interpreter {
   }
 
   pub async fn eval_expr(&mut self, eid: ExprId) -> Result<LxVal, LxError> {
-    self.eval(eid).await
+    let span = self.arena.expr_span(eid);
+    self.eval(eid).await.map_err(|e| match e {
+      EvalSignal::Error(e) => e,
+      EvalSignal::Break(_) => LxError::runtime("break outside loop", span),
+    })
   }
 
   pub async fn exec(&mut self, program: &Program<Core>) -> Result<LxVal, LxError> {
@@ -105,26 +109,29 @@ impl Interpreter {
     let mut result = LxVal::Unit;
     let stmts = program.stmts.clone();
     for sid in &stmts {
-      result = self.eval_stmt(*sid).await?;
+      result = self.eval_stmt(*sid).await.map_err(|e| match e {
+        EvalSignal::Error(e) => e,
+        EvalSignal::Break(_) => LxError::runtime("break outside loop", self.arena.stmt_span(*sid)),
+      })?;
     }
     Ok(result)
   }
 
   #[async_recursion(?Send)]
-  pub(crate) async fn eval(&mut self, eid: ExprId) -> Result<LxVal, LxError> {
+  pub(crate) async fn eval(&mut self, eid: ExprId) -> EvalResult<LxVal> {
     let span = self.arena.expr_span(eid);
     let expr = self.arena.expr(eid).clone();
     match expr {
       Expr::Literal(ref lit) => self.eval_literal(lit, span).await,
-      Expr::Ident(name) => self.env.get(name).ok_or_else(|| {
+      Expr::Ident(name) => Ok(self.env.get(name).ok_or_else(|| {
         let hint = hints::keyword_hint(name.as_str());
         let msg = match hint {
           Some(h) => format!("undefined variable '{name}' — {h}"),
           None => format!("undefined variable '{name}'"),
         };
         LxError::runtime(msg, span)
-      }),
-      Expr::TypeConstructor(name) => self.env.get(name).ok_or_else(|| LxError::runtime(format!("undefined constructor '{name}'"), span)),
+      })?),
+      Expr::TypeConstructor(name) => Ok(self.env.get(name).ok_or_else(|| LxError::runtime(format!("undefined constructor '{name}'"), span))?),
       Expr::Binary(ExprBinary { op, left, right }) => self.eval_binary(&op, left, right, span).await,
       Expr::Unary(ExprUnary { op, operand }) => self.eval_unary(&op, operand, span).await,
       Expr::Pipe(_) => unreachable!(),
@@ -156,10 +163,10 @@ impl Interpreter {
         let v = self.eval(inner).await?;
         match v {
           LxVal::Ok(v) => Ok(*v),
-          LxVal::Err(_) => Err(LxError::propagate(v, span)),
+          LxVal::Err(_) => Err(LxError::propagate(v, span).into()),
           LxVal::Some(v) => Ok(*v),
-          LxVal::None => Err(LxError::propagate(LxVal::err_str("unwrapped None"), span)),
-          other => Err(LxError::type_err(format!("^ expects Result or Maybe, got {}", other.type_name()), span, None)),
+          LxVal::None => Err(LxError::propagate(LxVal::err_str("unwrapped None"), span).into()),
+          other => Err(LxError::type_err(format!("^ expects Result or Maybe, got {}", other.type_name()), span, None).into()),
         }
       },
       Expr::Coalesce(_) => unreachable!(),
@@ -171,7 +178,7 @@ impl Interpreter {
           Some(e) => self.eval(e).await?,
           None => LxVal::Unit,
         };
-        Err(LxError::break_signal(v))
+        Err(EvalSignal::Break(v))
       },
       Expr::Par(ref stmts) => self.eval_par(stmts).await,
       Expr::Sel(ref arms) => self.eval_sel(arms, span).await,
@@ -183,7 +190,7 @@ impl Interpreter {
       },
       Expr::Yield(ExprYield { value }) => {
         let v = self.eval(value).await?;
-        self.ctx.yield_.yield_value(v, span)
+        Ok(self.ctx.yield_.yield_value(v, span)?)
       },
       Expr::With(ExprWith { ref kind, ref body }) => match kind.clone() {
         WithKind::Binding { .. } => unreachable!(),

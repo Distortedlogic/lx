@@ -26,14 +26,18 @@ async tree-walk eval`"]
     interpreter --> backends["`**Core Backends (swappable)**
 Ai
 Fs`"]
-    interpreter --> events["`**Runtime Events**
----
-**AGENT**
-spawned · msg · done · error
-**PIPELINE**
-progress
-**OUTPUT**
+
+    interpreter --> events
+
+    subgraph events ["Runtime Events"]
+        evt_agent["`**Agent**
+spawned · msg
+done · error`"]
+        evt_pipeline["`**Pipeline**
+progress`"]
+        evt_output["`**Output**
 emit · log`"]
+    end
 
     backends --> tools["`**Tools**
 Read · Write · Edit
@@ -68,6 +72,9 @@ headless`"]
     style clis fill:#1a2a3e,stroke:#888,color:#ccc
     style infra fill:#1a2a3e,stroke:#888,color:#ccc
     style events fill:#1a2e1a,stroke:#4ecca3,color:#eee
+    style evt_agent fill:#1a2e1a,stroke:#4ecca3,color:#eee
+    style evt_pipeline fill:#1a2e1a,stroke:#4ecca3,color:#eee
+    style evt_output fill:#1a2e1a,stroke:#4ecca3,color:#eee
     style subs fill:#1a2e1a,stroke:#4ecca3,color:#eee
 
     linkStyle default stroke:#888,stroke-width:1.5px

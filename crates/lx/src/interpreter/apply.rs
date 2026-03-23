@@ -2,14 +2,14 @@ use std::sync::Arc;
 
 use crate::ast::{AstArena, ExprId, Param};
 use crate::env::Env;
-use crate::error::LxError;
+use crate::error::{EvalResult, EvalSignal, LxError};
 use crate::value::{BuiltinKind, LxFunc, LxVal};
 use miette::SourceSpan;
 
 use super::Interpreter;
 
 impl Interpreter {
-  async fn call_in_closure(&mut self, lf: &LxFunc, call_env: Arc<Env>, cross_module_errors: bool) -> Result<LxVal, LxError> {
+  async fn call_in_closure(&mut self, lf: &LxFunc, call_env: Arc<Env>, cross_module_errors: bool) -> EvalResult<LxVal> {
     let is_cross_module = cross_module_errors && self.source != lf.source_text.as_ref();
     let fn_source_text = Arc::clone(&lf.source_text);
     let fn_source_name = Arc::clone(&lf.source_name);
@@ -23,13 +23,13 @@ impl Interpreter {
     self.source = saved_source;
     self.arena = saved_arena;
     match result {
-      Err(LxError::Propagate { value, .. }) => Ok(*value),
-      Err(e) if is_cross_module => Err(e.with_source(fn_source_name.to_string(), fn_source_text)),
+      Err(EvalSignal::Error(LxError::Propagate { value, .. })) => Ok(*value),
+      Err(EvalSignal::Error(e)) if is_cross_module => Err(EvalSignal::Error(e.with_source(fn_source_name.to_string(), fn_source_text))),
       other => other,
     }
   }
 
-  pub async fn apply_func(&mut self, func: LxVal, arg: LxVal, span: SourceSpan) -> Result<LxVal, LxError> {
+  pub async fn apply_func(&mut self, func: LxVal, arg: LxVal, span: SourceSpan) -> EvalResult<LxVal> {
     match func {
       LxVal::Func(mut lf) => {
         if let LxVal::Unit = &arg
@@ -67,8 +67,8 @@ impl Interpreter {
           return Ok(LxVal::BuiltinFunc(bf));
         }
         match bf.kind {
-          BuiltinKind::Sync(f) => f(&bf.applied, span, &self.ctx),
-          BuiltinKind::Async(f) => f(bf.applied, span, Arc::clone(&self.ctx)).await,
+          BuiltinKind::Sync(f) => Ok(f(&bf.applied, span, &self.ctx)?),
+          BuiltinKind::Async(f) => Ok(f(bf.applied, span, Arc::clone(&self.ctx)).await?),
         }
       },
       LxVal::TaggedCtor { tag, arity, mut applied } => {
@@ -76,13 +76,13 @@ impl Interpreter {
         if applied.len() < arity { Ok(LxVal::TaggedCtor { tag, arity, applied }) } else { Ok(LxVal::Tagged { tag, values: Arc::new(applied) }) }
       },
       LxVal::Trait(ref t) if !t.fields.is_empty() => self.apply_trait_fields(t.name.as_str(), &t.fields, &arg, span).await,
-      LxVal::TraitUnion { name, variants } => self.apply_trait_union(name.as_str(), &variants, &arg, span).await,
+      LxVal::TraitUnion { name, variants } => Ok(self.apply_trait_union(name.as_str(), &variants, &arg, span).await?),
       LxVal::Class(c) => {
         let overrides = match &arg {
           LxVal::Record(r) => r.as_ref().clone(),
           LxVal::Unit => indexmap::IndexMap::new(),
           _ => {
-            return Err(LxError::type_err(format!("Class {} constructor expects Record or (), got {}", c.name, arg.type_name()), span, None));
+            return Err(LxError::type_err(format!("Class {} constructor expects Record or (), got {}", c.name, arg.type_name()), span, None).into());
           },
         };
         let mut fields = c.defaults.as_ref().clone();
@@ -97,11 +97,11 @@ impl Interpreter {
         let id = crate::stdlib::object_insert(fields);
         Ok(LxVal::Object(Box::new(crate::value::LxObject { class_name: c.name, id, traits: c.traits, methods: c.methods })))
       },
-      other => Err(LxError::type_err(format!("cannot call {}, not a function", other.type_name()), span, None)),
+      other => Err(LxError::type_err(format!("cannot call {}, not a function", other.type_name()), span, None).into()),
     }
   }
 
-  pub(super) async fn force_defaults(&mut self, val: LxVal, _span: SourceSpan) -> Result<LxVal, LxError> {
+  pub(super) async fn force_defaults(&mut self, val: LxVal, _span: SourceSpan) -> EvalResult<LxVal> {
     match val {
       LxVal::Func(ref lf) if lf.applied.len() < lf.arity && (lf.applied.len()..lf.arity).all(|i| matches!(lf.defaults.get(i), Some(Some(_)))) => {
         let LxVal::Func(lf) = val else { unreachable!() };
@@ -136,7 +136,7 @@ impl Interpreter {
     }
   }
 
-  async fn eval_guard(&mut self, guard_eid: ExprId, guard_arena: &Arc<AstArena>, guard_env: &Arc<Env>) -> Result<bool, LxError> {
+  async fn eval_guard(&mut self, guard_eid: ExprId, guard_arena: &Arc<AstArena>, guard_env: &Arc<Env>) -> EvalResult<bool> {
     let saved = Arc::clone(&self.env);
     let saved_arena = Arc::clone(&self.arena);
     self.env = Arc::clone(guard_env);
@@ -147,12 +147,12 @@ impl Interpreter {
     self.arena = saved_arena;
     match result {
       Ok(LxVal::Bool(b)) => Ok(b),
-      Ok(other) => Err(LxError::type_err(format!("guard must return Bool, got {}", other.type_name()), guard_span, None)),
+      Ok(other) => Err(LxError::type_err(format!("guard must return Bool, got {}", other.type_name()), guard_span, None).into()),
       Err(e) => Err(e),
     }
   }
 
-  async fn apply_multi_func(&mut self, mut clauses: Vec<LxFunc>, arg: LxVal, _span: SourceSpan) -> Result<LxVal, LxError> {
+  async fn apply_multi_func(&mut self, mut clauses: Vec<LxFunc>, arg: LxVal, _span: SourceSpan) -> EvalResult<LxVal> {
     for clause in &mut clauses {
       clause.applied.push(arg.clone());
       if clause.applied.len() == 1
@@ -183,7 +183,7 @@ impl Interpreter {
     Ok(LxVal::err_str("no matching clause for function"))
   }
 
-  pub(super) async fn eval_func(&mut self, params: &[Param], guard: Option<ExprId>, body: ExprId) -> Result<LxVal, LxError> {
+  pub(super) async fn eval_func(&mut self, params: &[Param], guard: Option<ExprId>, body: ExprId) -> EvalResult<LxVal> {
     let param_names: Vec<_> = params.iter().map(|p| p.name).collect();
     let mut defaults = Vec::new();
     for p in params {

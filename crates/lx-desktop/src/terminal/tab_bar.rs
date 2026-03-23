@@ -32,15 +32,29 @@ pub fn TabBar(tabs_state: Signal<TabsState<DesktopPane>>, on_new_tab: EventHandl
                   let rects = tab.root().compute_pane_rects(Rect::default());
                   rects.first().map(|(p, _)| p.icon()).unwrap_or("\u{25B8}")
               };
-              let icon_color = if is_active { "text-[var(--primary)]" } else { "text-[var(--outline)]" };
+              let icon_color = if is_active {
+                  "text-[var(--primary)]"
+              } else {
+                  "text-[var(--outline)]"
+              };
               let highest_level = highest_notification_level(&tabs_state.read(), &tab.id);
               let dot_class = highest_level
                   .map(|level| match level {
-                      NotificationLevel::Error => "w-1.5 h-1.5 rounded-full inline-block ml-1.5 bg-[var(--error)]",
-                      NotificationLevel::Attention => "w-1.5 h-1.5 rounded-full inline-block ml-1.5 bg-[var(--warning)] animate-pulse",
-                      NotificationLevel::Warning => "w-1.5 h-1.5 rounded-full inline-block ml-1.5 bg-[var(--warning)]",
-                      NotificationLevel::Success => "w-1.5 h-1.5 rounded-full inline-block ml-1.5 bg-[var(--success)]",
-                      NotificationLevel::Info => "w-1.5 h-1.5 rounded-full inline-block ml-1.5 bg-[var(--primary)]",
+                      NotificationLevel::Error => {
+                          "w-1.5 h-1.5 rounded-full inline-block ml-1.5 bg-[var(--error)]"
+                      }
+                      NotificationLevel::Attention => {
+                          "w-1.5 h-1.5 rounded-full inline-block ml-1.5 bg-[var(--warning)] animate-pulse"
+                      }
+                      NotificationLevel::Warning => {
+                          "w-1.5 h-1.5 rounded-full inline-block ml-1.5 bg-[var(--warning)]"
+                      }
+                      NotificationLevel::Success => {
+                          "w-1.5 h-1.5 rounded-full inline-block ml-1.5 bg-[var(--success)]"
+                      }
+                      NotificationLevel::Info => {
+                          "w-1.5 h-1.5 rounded-full inline-block ml-1.5 bg-[var(--primary)]"
+                      }
                   });
               rsx! {
                 button {
@@ -122,7 +136,10 @@ pub fn TabBar(tabs_state: Signal<TabsState<DesktopPane>>, on_new_tab: EventHandl
               class: "w-full text-left px-3 py-1.5 text-sm hover:bg-[var(--surface-bright)] transition-colors duration-150",
               onclick: move |_| {
                   let id = Uuid::new_v4().to_string();
-                  let pane = DesktopPane::Voice { id: id.clone(), name: None };
+                  let pane = DesktopPane::Voice {
+                      id: id.clone(),
+                      name: None,
+                  };
                   add_tab(tabs_state, id, "Voice".into(), PaneNode::Leaf(pane));
                   dropdown_open.set(false);
                   dropdown_input.set(None);

@@ -3,7 +3,7 @@ use std::ops::ControlFlow;
 
 use crate::ast::{AstArena, BindTarget, Binding, ExprFunc, ExprId, ExprMatch, ExprWith, FieldPattern, PatternId, StmtId, WithKind};
 use crate::sym::Sym;
-use crate::visitor::{AstLeave, AstVisitor, VisitAction, cf_to_action, dispatch_expr, dispatch_stmt, walk_binding, walk_func, walk_pattern};
+use crate::visitor::{AstVisitor, VisitAction, dispatch_expr, dispatch_stmt, walk_binding, walk_func, walk_pattern};
 use miette::SourceSpan;
 
 struct FreeVarCollector {
@@ -35,10 +35,8 @@ impl FreeVarCollector {
   }
 }
 
-impl AstLeave for FreeVarCollector {}
-
 impl AstVisitor for FreeVarCollector {
-  fn visit_ident(&mut self, name: Sym, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
+  fn visit_ident(&mut self, _id: ExprId, name: Sym, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
     if !self.is_bound(name) {
       self.free.insert(name);
     }
@@ -61,17 +59,20 @@ impl AstVisitor for FreeVarCollector {
     VisitAction::Skip
   }
 
-  fn visit_func(&mut self, func: &ExprFunc, span: SourceSpan, arena: &AstArena) -> VisitAction {
+  fn visit_func(&mut self, _id: ExprId, func: &ExprFunc, span: SourceSpan, arena: &AstArena) -> VisitAction {
     self.push_scope();
     for p in &func.params {
       self.bind(p.name);
     }
-    let result = walk_func(self, func, span, arena);
+    let result = walk_func(self, _id, func, span, arena);
     self.pop_scope();
-    cf_to_action(result)
+    match result {
+      ControlFlow::Continue(()) => VisitAction::Skip,
+      ControlFlow::Break(()) => VisitAction::Stop,
+    }
   }
 
-  fn visit_block(&mut self, stmts: &[StmtId], _span: SourceSpan, arena: &AstArena) -> VisitAction {
+  fn visit_block(&mut self, _id: ExprId, stmts: &[StmtId], _span: SourceSpan, arena: &AstArena) -> VisitAction {
     self.push_scope();
     for &s in stmts {
       if dispatch_stmt(self, s, arena).is_break() {
@@ -83,16 +84,16 @@ impl AstVisitor for FreeVarCollector {
     VisitAction::Skip
   }
 
-  fn visit_pattern_bind(&mut self, name: Sym, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
+  fn visit_pattern_bind(&mut self, _id: PatternId, name: Sym, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
     self.bind(name);
     VisitAction::Descend
   }
 
-  fn visit_pattern_list(&mut self, elems: &[PatternId], rest: Option<Sym>, _span: SourceSpan, arena: &AstArena) -> VisitAction {
+  fn visit_pattern_list(&mut self, _id: PatternId, elems: &[PatternId], rest: Option<Sym>, _span: SourceSpan, arena: &AstArena) -> VisitAction {
     for &e in elems {
       let pattern = arena.pattern(e);
       let pspan = arena.pattern_span(e);
-      if walk_pattern(self, pattern, pspan, arena).is_break() {
+      if walk_pattern(self, e, pattern, pspan, arena).is_break() {
         return VisitAction::Stop;
       }
     }
@@ -102,12 +103,12 @@ impl AstVisitor for FreeVarCollector {
     VisitAction::Skip
   }
 
-  fn visit_pattern_record(&mut self, fields: &[FieldPattern], rest: Option<Sym>, _span: SourceSpan, arena: &AstArena) -> VisitAction {
+  fn visit_pattern_record(&mut self, _id: PatternId, fields: &[FieldPattern], rest: Option<Sym>, _span: SourceSpan, arena: &AstArena) -> VisitAction {
     for f in fields {
       if let Some(pid) = f.pattern {
         let pattern = arena.pattern(pid);
         let pspan = arena.pattern_span(pid);
-        if walk_pattern(self, pattern, pspan, arena).is_break() {
+        if walk_pattern(self, pid, pattern, pspan, arena).is_break() {
           return VisitAction::Stop;
         }
       } else {
@@ -120,10 +121,10 @@ impl AstVisitor for FreeVarCollector {
     VisitAction::Skip
   }
 
-  fn visit_with(&mut self, with: &ExprWith, _span: SourceSpan, arena: &AstArena) -> VisitAction {
+  fn visit_with(&mut self, _id: ExprId, with: &ExprWith, _span: SourceSpan, arena: &AstArena) -> VisitAction {
     match &with.kind {
       WithKind::Binding { name, value, .. } => {
-        if dispatch_expr(self, arena.expr(*value), arena.expr_span(*value), arena).is_break() {
+        if dispatch_expr(self, *value, arena).is_break() {
           return VisitAction::Stop;
         }
         self.push_scope();
@@ -138,7 +139,7 @@ impl AstVisitor for FreeVarCollector {
       },
       WithKind::Resources { resources } => {
         for &(r, _) in resources {
-          if dispatch_expr(self, arena.expr(r), arena.expr_span(r), arena).is_break() {
+          if dispatch_expr(self, r, arena).is_break() {
             return VisitAction::Stop;
           }
         }
@@ -156,7 +157,7 @@ impl AstVisitor for FreeVarCollector {
       },
       WithKind::Context { fields } => {
         for &(_, eid) in fields {
-          if dispatch_expr(self, arena.expr(eid), arena.expr_span(eid), arena).is_break() {
+          if dispatch_expr(self, eid, arena).is_break() {
             return VisitAction::Stop;
           }
         }
@@ -170,7 +171,7 @@ impl AstVisitor for FreeVarCollector {
     VisitAction::Skip
   }
 
-  fn visit_loop(&mut self, stmts: &[StmtId], _span: SourceSpan, arena: &AstArena) -> VisitAction {
+  fn visit_loop(&mut self, _id: ExprId, stmts: &[StmtId], _span: SourceSpan, arena: &AstArena) -> VisitAction {
     self.push_scope();
     for &s in stmts {
       if dispatch_stmt(self, s, arena).is_break() {
@@ -182,7 +183,7 @@ impl AstVisitor for FreeVarCollector {
     VisitAction::Skip
   }
 
-  fn visit_par(&mut self, stmts: &[StmtId], _span: SourceSpan, arena: &AstArena) -> VisitAction {
+  fn visit_par(&mut self, _id: ExprId, stmts: &[StmtId], _span: SourceSpan, arena: &AstArena) -> VisitAction {
     self.push_scope();
     for &s in stmts {
       if dispatch_stmt(self, s, arena).is_break() {
@@ -194,25 +195,25 @@ impl AstVisitor for FreeVarCollector {
     VisitAction::Skip
   }
 
-  fn visit_match(&mut self, m: &ExprMatch, _span: SourceSpan, arena: &AstArena) -> VisitAction {
-    if dispatch_expr(self, arena.expr(m.scrutinee), arena.expr_span(m.scrutinee), arena).is_break() {
+  fn visit_match(&mut self, _id: ExprId, m: &ExprMatch, _span: SourceSpan, arena: &AstArena) -> VisitAction {
+    if dispatch_expr(self, m.scrutinee, arena).is_break() {
       return VisitAction::Stop;
     }
     for arm in &m.arms {
       self.push_scope();
       let pattern = arena.pattern(arm.pattern);
       let pspan = arena.pattern_span(arm.pattern);
-      if walk_pattern(self, pattern, pspan, arena).is_break() {
+      if walk_pattern(self, arm.pattern, pattern, pspan, arena).is_break() {
         self.pop_scope();
         return VisitAction::Stop;
       }
       if let Some(g) = arm.guard
-        && dispatch_expr(self, arena.expr(g), arena.expr_span(g), arena).is_break()
+        && dispatch_expr(self, g, arena).is_break()
       {
         self.pop_scope();
         return VisitAction::Stop;
       }
-      if dispatch_expr(self, arena.expr(arm.body), arena.expr_span(arm.body), arena).is_break() {
+      if dispatch_expr(self, arm.body, arena).is_break() {
         self.pop_scope();
         return VisitAction::Stop;
       }
@@ -224,7 +225,7 @@ impl AstVisitor for FreeVarCollector {
 
 pub fn free_vars(eid: ExprId, arena: &AstArena) -> HashSet<Sym> {
   let mut collector = FreeVarCollector::new();
-  match dispatch_expr(&mut collector, arena.expr(eid), arena.expr_span(eid), arena) {
+  match dispatch_expr(&mut collector, eid, arena) {
     ControlFlow::Continue(()) | ControlFlow::Break(()) => {},
   }
   collector.free

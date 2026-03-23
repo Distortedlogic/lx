@@ -9,33 +9,33 @@
 }
 
 :root {
-  --surface: #131313;
-  --surface-container-low: #1A1A1A;
-  --surface-container: #201F1F;
-  --surface-container-high: #2A2A2A;
-  --surface-container-highest: #353534;
-  --surface-container-lowest: #0E0E0E;
-  --surface-bright: #3A3939;
+  --surface: #0A0A10;
+  --surface-container-low: #12121A;
+  --surface-container: #1A1A24;
+  --surface-container-high: #242430;
+  --surface-container-highest: #2E2E3A;
+  --surface-container-lowest: #08080E;
+  --surface-bright: #383845;
 
-  --primary: #FFB87B;
-  --primary-container: #FF8F00;
-  --on-primary: #131313;
+  --primary: #FFD600;
+  --primary-container: #F9A825;
+  --on-primary: #0A0A10;
 
-  --on-surface: #E6E1DD;
-  --on-surface-variant: #DCC1AE;
+  --on-surface: #E0E0E0;
+  --on-surface-variant: #B0B0B0;
 
-  --outline: #A48C7A;
-  --outline-variant: #564334;
+  --outline: #666680;
+  --outline-variant: #2A2A3A;
 
-  --tertiary: #87CFFF;
+  --tertiary: #26C6DA;
 
-  --error: #EF5350;
-  --warning: #FFB300;
-  --success: #66BB6A;
+  --error: #F44336;
+  --warning: #FF9800;
+  --success: #4CAF50;
 
-  --color-chart-axis: #404040;
-  --color-chart-split: #333333;
-  --color-chart-tooltip: #171717;
+  --color-chart-axis: #3A3A4A;
+  --color-chart-split: #2A2A3A;
+  --color-chart-tooltip: #12121A;
 }
 
 .shadow-ambient {
