@@ -4,40 +4,102 @@ Make `lx test` assertion failures show expected and actual values instead of an 
 
 # Why
 
-LLM agents write lx tests and iterate on failing assertions. Currently, `eval_assert` in the interpreter constructs the error with `format!("{expr_node:?}")` — the Rust Debug format of the AST node. This is useless to an agent trying to figure out what went wrong. The agent needs to see the actual runtime values to diagnose the problem.
+LLM agents write lx tests and iterate on failing assertions. Currently `eval_assert` constructs the error with `format!("{expr_node:?}")` — the Rust Debug format of the AST node. This is useless to an agent. The agent needs to see the actual runtime values to diagnose the problem.
 
-The `LxVal` type already has `short_display()` (truncates to 80 chars) and a full `Display` impl. The assertion evaluation already evaluates the whole expression to a boolean — the change is to evaluate the two sides of a comparison separately and capture their values before comparing.
+# Verified facts
+
+- **eval_assert** is at `interpreter/eval.rs:222-240`. Current code:
+  ```rust
+  pub(super) async fn eval_assert(&mut self, expr: ExprId, msg: Option<ExprId>, span: SourceSpan) -> EvalResult<LxVal> {
+      let val = self.eval(expr).await?;
+      let val = self.force_defaults(val, span).await?;
+      match val.as_bool() {
+          Some(true) => Ok(LxVal::Unit),
+          Some(false) => {
+              let message = match msg {
+                  Some(m) => { let mv = self.eval(m).await?; Some(mv.to_string()) },
+                  None => None,
+              };
+              let expr_node = self.arena.expr(expr);
+              Err(LxError::assert_fail(format!("{expr_node:?}"), message, span).into())
+          },
+          _ => Err(LxError::type_err(format!("assert requires Bool, got {} `{}`", val.type_name(), val.short_display()), span, None).into()),
+      }
+  }
+  ```
+- **LxError::Assert variant** (`error.rs:41-48`):
+  ```rust
+  #[error("assertion failed: {expr}")]
+  #[diagnostic(code(lx::assert))]
+  Assert { expr: String, message: Option<String>, #[label("assertion failed")] span: SourceSpan }
+  ```
+- **assert_fail constructor** (`error.rs:81-83`):
+  ```rust
+  pub fn assert_fail(expr: impl Into<String>, message: Option<String>, span: SourceSpan) -> Self {
+      Self::Assert { expr: expr.into(), message, span }
+  }
+  ```
+- **Note: the `message` field is captured but never rendered** — the `#[error]` format only includes `{expr}`, and there's no `#[help]` attribute on `message`. This is a pre-existing bug.
+- **Interpreter struct** (`interpreter/mod.rs:40-48`):
+  ```rust
+  pub struct Interpreter {
+      pub(crate) env: Arc<Env>,
+      source: String,           // ← the source code, type is String not Arc<str>
+      pub(crate) source_dir: Option<PathBuf>,
+      pub(crate) module_cache: Arc<Mutex<HashMap<PathBuf, ModuleExports>>>,
+      pub(crate) loading: Arc<Mutex<HashSet<PathBuf>>>,
+      pub(crate) ctx: Arc<RuntimeCtx>,
+      pub(crate) arena: Arc<AstArena>,
+  }
+  ```
+- **LxVal::short_display()** (`value/mod.rs:284-287`):
+  ```rust
+  pub fn short_display(&self) -> String {
+      let s = self.to_string();
+      if s.len() > 80 { format!("{}...", &s[..77]) } else { s }
+  }
+  ```
+- **ExprAssert struct** (`ast/expr_types.rs:177-181`): `{ expr: ExprId, msg: Option<ExprId> }`
+- **ExprBinary struct** (`ast/expr_types.rs:105-110`): `{ op: BinOp, left: ExprId, right: ExprId }`
+- **BinOp::Eq, BinOp::NotEq, BinOp::Lt, BinOp::Gt, BinOp::LtEq, BinOp::GtEq** — all defined in `types.rs:124-160`, all implement `Display` via strum.
+- **The interpreter has `self.source: String`** and can extract source text via span: `&self.source[span.offset()..span.offset()+span.len()]` — but SourceSpan offsets are byte offsets and the source is UTF-8, so this is safe as long as spans are aligned to char boundaries (which the lexer guarantees).
+- **The interpreter has `self.arena: Arc<AstArena>`** — can access any AST node by ID.
 
 # What changes
 
-**Modified `crates/lx/src/error.rs`:** Extend `LxError::Assert` with optional `expected` and `actual` string fields. Update the miette error format to render them.
+**Modified `crates/lx/src/error.rs`:** Extend `Assert` with `expected: Option<String>` and `actual: Option<String>`. Add `#[help]` that renders message + expected/actual. Update constructor.
 
-**Modified `crates/lx/src/interpreter/eval.rs`:** In `eval_assert`, detect when the assert expression is a binary comparison (`Eq`, `NotEq`, `Lt`, `Gt`, `Lte`, `Gte`). If so, evaluate both sides separately, capture their display strings, then perform the comparison. On failure, pass the captured values to `assert_fail`.
+**Modified `crates/lx/src/interpreter/eval.rs`:** In `eval_assert`, detect binary comparison expressions, evaluate both sides separately, capture values on failure.
 
 # Files affected
 
-- EDIT: `crates/lx/src/error.rs` — extend Assert variant with expected/actual fields
+- EDIT: `crates/lx/src/error.rs` — extend Assert variant, update constructor
 - EDIT: `crates/lx/src/interpreter/eval.rs` — detect comparison in assert, capture values
 
 # Task List
 
-### Task 1: Extend LxError::Assert with expected and actual fields
+### Task 1: Extend LxError::Assert with expected/actual fields
 
-**Subject:** Add expected/actual value display to assertion error type
+**Subject:** Add expected/actual value display and help text to assertion errors
 
-**Description:** In `crates/lx/src/error.rs`, modify the `Assert` variant of `LxError`:
+**Description:** In `crates/lx/src/error.rs`:
 
-Current shape (approximately):
+Change the `Assert` variant from:
 ```rust
+#[error("assertion failed: {expr}")]
+#[diagnostic(code(lx::assert))]
 Assert {
     expr: String,
     message: Option<String>,
+    #[label("assertion failed")]
     span: SourceSpan,
-}
+},
 ```
 
-Change to:
+To:
 ```rust
+#[error("assertion failed: {expr}")]
+#[diagnostic(code(lx::assert), help("{}", Self::assert_help_text(message, expected, actual)))]
 Assert {
     expr: String,
     message: Option<String>,
@@ -45,17 +107,25 @@ Assert {
     actual: Option<String>,
     #[label("assertion failed")]
     span: SourceSpan,
-}
+},
 ```
 
-Update the `#[error]` format string. The miette `#[error]` attribute controls the top-line message. Change it from `"assertion failed: {expr}"` to a dynamic format that includes expected/actual when present. Since miette's `#[error]` might not support conditional formatting, implement it as:
-- `#[error("assertion failed: {expr}")]` — keep the top line simple
-- Add a `#[help]` attribute that renders the expected/actual detail. Compute the help string dynamically:
-  - If both `expected` and `actual` are Some: `"expected: {expected}\n  actual: {actual}"`
-  - If `message` is Some: include that too
-  - If neither: no help
+Wait — miette's `#[diagnostic(help(...))]` with `Self::method()` may not work in derive macros. Check the miette docs for how to compute help text dynamically. The existing `Parse` and `Type` variants use `#[help] help: Option<String>` — a simple optional string field with the `#[help]` attribute. Follow that pattern:
 
-Alternatively, if miette supports `#[diagnostic(help(...))]` with a method, implement `fn help_text(&self) -> Option<String>` and use that.
+```rust
+#[error("assertion failed: {expr}")]
+#[diagnostic(code(lx::assert))]
+Assert {
+    expr: String,
+    message: Option<String>,
+    expected: Option<String>,
+    actual: Option<String>,
+    #[help]
+    help: Option<String>,
+    #[label("assertion failed")]
+    span: SourceSpan,
+},
+```
 
 Update the `assert_fail` constructor:
 ```rust
@@ -65,14 +135,21 @@ pub fn assert_fail(
     expected: Option<String>,
     actual: Option<String>,
     span: SourceSpan,
-) -> Self
+) -> Self {
+    let mut help_parts: Vec<String> = Vec::new();
+    if let Some(ref msg) = message {
+        help_parts.push(msg.clone());
+    }
+    if let (Some(ref exp), Some(ref act)) = (&expected, &actual) {
+        help_parts.push(format!("expected: {exp}"));
+        help_parts.push(format!("  actual: {act}"));
+    }
+    let help = if help_parts.is_empty() { None } else { Some(help_parts.join("\n")) };
+    Self::Assert { expr: expr.into(), message, expected, actual, help, span }
+}
 ```
 
-Find all call sites of `assert_fail` and update them. There should be at least:
-- `interpreter/eval.rs` `eval_assert` — this is the main one (updated in Task 2)
-- Any other places that construct `LxError::Assert` directly
-
-For existing call sites that don't have expected/actual info, pass `None, None` for the new fields.
+There should be no other call sites for `assert_fail` besides `eval.rs`. Verify by searching for `assert_fail` — if there are others, update them to pass `None, None` for the new parameters.
 
 **ActiveForm:** Extending Assert error with expected/actual fields
 
@@ -80,32 +157,98 @@ For existing call sites that don't have expected/actual info, pass `None, None` 
 
 **Subject:** Evaluate both sides of comparison assertions and capture values on failure
 
-**Description:** In `crates/lx/src/interpreter/eval.rs`, modify `eval_assert` (around line 222):
+**Description:** In `crates/lx/src/interpreter/eval.rs`, replace the `eval_assert` method (lines 222-240) with:
 
-Current flow:
-1. Evaluate the whole assert expression to a value
-2. Check if it's `true` or `false`
-3. On false: construct error with AST debug dump
+```rust
+pub(super) async fn eval_assert(&mut self, expr: ExprId, msg: Option<ExprId>, span: SourceSpan) -> EvalResult<LxVal> {
+    let expr_node = self.arena.expr(expr).clone();
 
-New flow:
-1. Look at the assert expression AST node (via `self.arena.expr(expr)`)
-2. If it's `Expr::Binary { op, left, right }` where `op` is `Eq`, `NotEq`, `Lt`, `Gt`, `Lte`, or `Gte`:
-   a. Evaluate `left` → `left_val`
-   b. Evaluate `right` → `right_val`
-   c. Perform the comparison (evaluate the original binary expression, or compare the values directly)
-   d. If the comparison is false (assertion fails):
-      - Capture `expected = right_val.short_display()` (the right side is conventionally the expected value in `assert (actual == expected)`)
-      - Capture `actual = left_val.short_display()`
-      - For `NotEq`: swap the labels — `"should not equal: {right_val}"` or keep expected/actual but note the operator
-      - For ordering ops (`Lt`, `Gt`, etc.): include the operator in the message: `"expected {left_val} {op} {right_val}"`
-      - Construct `LxError::assert_fail(expr_source, message, Some(expected), Some(actual), span)`
-3. If the expression is NOT a binary comparison (it's just a boolean expression):
-   a. Evaluate normally
-   b. On false: construct error with `None, None` for expected/actual (fallback to current behavior minus the AST debug dump)
+    // Check if assert expression is a binary comparison
+    if let Expr::Binary(binary) = &expr_node {
+        match binary.op {
+            BinOp::Eq | BinOp::NotEq | BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq => {
+                let left_val = self.eval(binary.left).await?;
+                let left_val = self.force_defaults(left_val, span).await?;
+                let right_val = self.eval(binary.right).await?;
+                let right_val = self.force_defaults(right_val, span).await?;
 
-For the `expr` string field in the error: instead of `format!("{expr_node:?}")` (Rust Debug dump), use the formatter to render the expression as lx source. Call `lx::formatter::format_expr(expr_id, arena)` if such a function exists, or reconstruct a readable representation. If no single-expression formatter exists, use a simpler approach: format as `"{left_display} {op} {right_display}"` for binary comparisons, or `"<expression>"` for non-comparison asserts.
+                // Now evaluate the full comparison
+                let result = self.eval(expr).await?;
+                let result = self.force_defaults(result, span).await?;
 
-Check if the `Formatter` has a method to format a single expression (not a whole program). If not, use a simple stringification: get the source span and slice the original source text to get the expression text. The interpreter has `self.source: Arc<str>` — use `&self.source[span.offset()..span.offset()+span.len()]` to extract the original source text of the assert expression.
+                match result.as_bool() {
+                    Some(true) => return Ok(LxVal::Unit),
+                    Some(false) => {
+                        let message = match msg {
+                            Some(m) => { let mv = self.eval(m).await?; Some(mv.to_string()) },
+                            None => None,
+                        };
+                        // Extract source text for the expression
+                        let expr_text = if span.offset() + span.len() <= self.source.len() {
+                            self.source[span.offset()..span.offset() + span.len()].to_string()
+                        } else {
+                            format!("{} {} {}", left_val.short_display(), binary.op, right_val.short_display())
+                        };
+                        return Err(LxError::assert_fail(
+                            expr_text,
+                            message,
+                            Some(right_val.short_display()),
+                            Some(left_val.short_display()),
+                            span,
+                        ).into());
+                    },
+                    _ => {
+                        return Err(LxError::type_err(
+                            format!("assert requires Bool, got {} `{}`", result.type_name(), result.short_display()),
+                            span, None,
+                        ).into());
+                    },
+                }
+            },
+            _ => {}, // Fall through to general case for non-comparison binary ops
+        }
+    }
+
+    // General case: non-comparison expression
+    let val = self.eval(expr).await?;
+    let val = self.force_defaults(val, span).await?;
+    match val.as_bool() {
+        Some(true) => Ok(LxVal::Unit),
+        Some(false) => {
+            let message = match msg {
+                Some(m) => { let mv = self.eval(m).await?; Some(mv.to_string()) },
+                None => None,
+            };
+            let expr_text = if span.offset() + span.len() <= self.source.len() {
+                self.source[span.offset()..span.offset() + span.len()].to_string()
+            } else {
+                format!("{:?}", expr_node)
+            };
+            Err(LxError::assert_fail(expr_text, message, None, None, span).into())
+        },
+        _ => Err(LxError::type_err(format!("assert requires Bool, got {} `{}`", val.type_name(), val.short_display()), span, None).into()),
+    }
+}
+```
+
+**Important note on double-evaluation**: The comparison case evaluates `left` and `right` separately to capture their values, then evaluates the full expression again for the comparison result. This means the expression is evaluated twice. For pure expressions (which assertions should be), this is fine. For expressions with side effects, the assert could trigger effects twice — but assert expressions should be pure comparisons, so this is acceptable.
+
+**Alternative to avoid double-eval**: Instead of re-evaluating the full expression, perform the comparison manually:
+```rust
+let comparison_result = match binary.op {
+    BinOp::Eq => left_val == right_val,
+    BinOp::NotEq => left_val != right_val,
+    // For Lt, Gt, etc. — check if LxVal implements PartialOrd
+    _ => { /* fall through to general case */ },
+};
+```
+Check if `LxVal` implements `PartialOrd` or has comparison methods. If it does, use the direct comparison to avoid double-evaluation. If not, the double-eval approach is fine.
+
+Add necessary imports at the top of `eval.rs`:
+```rust
+use crate::ast::{Expr, BinOp, ExprBinary};
+```
+Check what's already imported — `Expr` and `BinOp` may already be in scope.
 
 **ActiveForm:** Capturing comparison values in assertion evaluation
 

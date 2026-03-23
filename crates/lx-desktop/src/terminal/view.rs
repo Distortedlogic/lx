@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as B64;
+use dioxus::logger::tracing::error;
 use dioxus::prelude::*;
 use pane_tree::TabsState;
 use pane_tree::{NotificationLevel, PaneNotification};
@@ -31,7 +32,10 @@ pub fn TerminalView(terminal_id: String, working_dir: String, command: Option<St
     async move {
       let session = match pty_mux::get_or_create(&element_id, 80, 24, Some(&wd), cmd.as_deref()) {
         Ok(s) => s,
-        Err(_e) => return,
+        Err(e) => {
+          error!("pty session create failed: {e}");
+          return;
+        },
       };
 
       let (initial, mut rx) = session.subscribe();
@@ -60,19 +64,18 @@ pub fn TerminalView(terminal_id: String, working_dir: String, command: Option<St
                 match result {
                     Ok(msg) => match msg["type"].as_str() {
                         Some("input") => {
-                            if let Some(data) = msg["data"].as_str() {
-                                if session.send_input(data.as_bytes().to_vec()).await.is_err() { break; }
-                            }
+                            if let Some(data) = msg["data"].as_str()
+                                && let Err(e) = session.send_input(data.as_bytes().to_vec()).await { error!("pty send_input failed: {e}"); break; }
                         }
                         Some("resize") => {
                             let cols = msg["cols"].as_u64().unwrap_or(80) as u16;
                             let rows = msg["rows"].as_u64().unwrap_or(24) as u16;
-                            if session.resize(cols, rows).is_err() { break; }
+                            if let Err(e) = session.resize(cols, rows) { error!("pty resize failed: {e}"); break; }
                             widget.send_resize();
                         }
                         _ => {}
                     },
-                    Err(_) => break,
+                    Err(e) => { error!("terminal widget recv failed: {e}"); break; }
                 }
             }
         }
@@ -100,13 +103,19 @@ pub fn BrowserView(browser_id: String, url: String, devtools: bool) -> Element {
     async move {
       let session = match browser_cdp::get_or_create_session(&browser_id).await {
         Ok(s) => s,
-        Err(_e) => return,
+        Err(e) => {
+          error!("browser session create failed: {e:#}");
+          widget.send_update(serde_json::json!({"error": format!("{e:#}")}));
+          return;
+        },
       };
 
-      if !url.is_empty() && url != "about:blank" {
-        if session.navigate(&url).await.is_err() {
-          return;
-        }
+      if !url.is_empty()
+        && url != "about:blank"
+        && let Err(e) = session.navigate(&url).await
+      {
+        error!("browser navigate failed: {e}");
+        return;
       }
 
       let mut interval = interval(Duration::from_millis(500));
@@ -116,7 +125,7 @@ pub fn BrowserView(browser_id: String, url: String, devtools: bool) -> Element {
             _ = interval.tick() => {
                 match session.screenshot().await {
                     Ok(b64) => widget.send_update(b64),
-                    Err(_) => break,
+                    Err(e) => { error!("browser screenshot failed: {e}"); break; }
                 }
             }
             result = widget.recv::<Value>() => {
@@ -124,30 +133,28 @@ pub fn BrowserView(browser_id: String, url: String, devtools: bool) -> Element {
                     Ok(msg) => match msg["type"].as_str() {
                         Some("click") => {
                             let (Some(x), Some(y)) = (msg["x"].as_f64(), msg["y"].as_f64()) else { continue; };
-                            if session.click(x, y).await.is_err() { break; }
+                            if let Err(e) = session.click(x, y).await { error!("browser click failed: {e}"); break; }
                         }
                         Some("type") => {
-                            if let Some(text) = msg["text"].as_str() {
-                                if session.type_text(text).await.is_err() { break; }
-                            }
+                            if let Some(text) = msg["text"].as_str()
+                                && let Err(e) = session.type_text(text).await { error!("browser type_text failed: {e}"); break; }
                         }
                         Some("navigate") => {
-                            if let Some(nav_url) = msg["url"].as_str() {
-                                if session.navigate(nav_url).await.is_err() { break; }
-                            }
+                            if let Some(nav_url) = msg["url"].as_str()
+                                && let Err(e) = session.navigate(nav_url).await { error!("browser navigate failed: {e}"); break; }
                         }
                         Some("back") => {
-                            if session.go_back().await.is_err() { break; }
+                            if let Err(e) = session.go_back().await { error!("browser go_back failed: {e}"); break; }
                         }
                         Some("forward") => {
-                            if session.go_forward().await.is_err() { break; }
+                            if let Err(e) = session.go_forward().await { error!("browser go_forward failed: {e}"); break; }
                         }
                         Some("refresh") => {
-                            if session.reload().await.is_err() { break; }
+                            if let Err(e) = session.reload().await { error!("browser reload failed: {e}"); break; }
                         }
                         _ => {}
                     },
-                    Err(_) => break,
+                    Err(e) => { error!("browser widget recv failed: {e}"); break; }
                 }
             }
         }

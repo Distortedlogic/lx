@@ -6,6 +6,12 @@ _default:
     set -euo pipefail
     just --choose
 
+clear:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cargo clean
+    rm *.lock
+
 fmt:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -47,6 +53,15 @@ desktop:
 # run lx-mobile app
 mobile:
     dx serve -p lx-mobile --platform mobile
+
+# render all .mmd diagrams to .png
+diagrams:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for f in *.mmd; do
+      mmdc -i "$f" -o "${f%.mmd}.png" -c mermaid.config.json -b transparent
+    done
+    echo "diagrams: ok"
 
 # build vscode extension vsix (install via VS Code UI: Ctrl+Shift+P > Install from VSIX)
 package-vscode:

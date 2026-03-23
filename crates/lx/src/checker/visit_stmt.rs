@@ -7,8 +7,8 @@ use miette::SourceSpan;
 use super::diagnostics::DiagnosticKind;
 use super::semantic::DefKind;
 use super::type_arena::TypeId;
+use super::type_error::TypeContext;
 use super::types::{Type, Variant};
-use super::unification::TypeContext;
 use super::{Checker, DiagLevel, Diagnostic};
 
 impl Checker<'_> {
@@ -104,6 +104,13 @@ impl Checker<'_> {
     let std_translated: Option<HashMap<Sym, TypeId>> =
       std_data.map(|(pairs, src_arena)| pairs.into_iter().map(|(n, t)| (n, self.type_arena.copy_type(t, &src_arena))).collect());
 
+    if is_std && u.path.len() >= 2 && std_translated.is_none() {
+      let module_key = u.path[1].as_str();
+      let available: Vec<&str> = self.stdlib_sigs.keys().map(|k| k.as_str()).collect();
+      let suggestions = super::suggest::closest_matches(module_key, &available, 3);
+      self.emit(DiagLevel::Error, DiagnosticKind::UnknownModule { name: format!("std.{module_key}"), suggestions }, span);
+    }
+
     match &u.kind {
       UseKind::Whole => {
         if let Some(name) = module_name {
@@ -139,7 +146,9 @@ impl Checker<'_> {
           let def_id = self.sem.add_definition(*name, DefKind::Import, span, false);
           self.sem.set_definition_type(def_id, ty);
           if std_translated.as_ref().is_some_and(|t| !t.contains_key(name)) {
-            self.emit(DiagLevel::Error, DiagnosticKind::UnknownImport { name: *name, module: module_name.unwrap_or(*name) }, span);
+            let export_names: Vec<&str> = std_translated.as_ref().map(|t| t.keys().map(|k| k.as_str()).collect()).unwrap_or_default();
+            let suggestions = super::suggest::closest_matches(name.as_str(), &export_names, 5);
+            self.emit(DiagLevel::Error, DiagnosticKind::UnknownImport { name: *name, module: module_name.unwrap_or(*name), suggestions }, span);
           } else if std_translated.is_none()
             && let Some(mod_sym) = module_name
             && let Some(sig) = self.import_signatures.get(&mod_sym)
@@ -147,7 +156,11 @@ impl Checker<'_> {
             && !sig.types.contains_key(name)
             && !sig.traits.contains_key(name)
           {
-            self.emit(DiagLevel::Error, DiagnosticKind::UnknownImport { name: *name, module: mod_sym }, span);
+            let mut export_names: Vec<&str> = sig.bindings.keys().map(|k| k.as_str()).collect();
+            export_names.extend(sig.types.keys().map(|k| k.as_str()));
+            export_names.extend(sig.traits.keys().map(|k| k.as_str()));
+            let suggestions = super::suggest::closest_matches(name.as_str(), &export_names, 5);
+            self.emit(DiagLevel::Error, DiagnosticKind::UnknownImport { name: *name, module: mod_sym, suggestions }, span);
           }
         }
       },

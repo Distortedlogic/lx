@@ -1,3 +1,4 @@
+import { marked } from "marked";
 import type { Widget } from "../src/registry";
 import { registerWidget } from "../src/registry";
 
@@ -39,7 +40,7 @@ const markdownWidget: Widget = {
     if (!el) return;
     const container = el.querySelector(".md-container");
     if (!container) return;
-    container.innerHTML = data as string;
+    container.innerHTML = marked.parse(data as string) as string;
   },
 
   dispose(elementId: string) {

@@ -4,8 +4,8 @@ use super::Checker;
 use super::narrowing;
 use super::semantic::{DefKind, ScopeKind};
 use super::type_arena::TypeId;
+use super::type_error::TypeContext;
 use super::types::Type;
-use super::unification::TypeContext;
 
 impl Checker<'_> {
   pub(super) fn check_expr(&mut self, eid: ExprId, expected: TypeId) -> TypeId {

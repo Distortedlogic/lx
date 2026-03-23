@@ -1,5 +1,6 @@
 mod agent_cmd;
 mod check;
+mod fmt;
 mod init;
 mod install;
 mod install_ops;
@@ -44,6 +45,15 @@ enum Command {
     member: Option<String>,
     #[arg(long)]
     strict: bool,
+    #[arg(long)]
+    fix: bool,
+  },
+  Fmt {
+    file: Option<String>,
+    #[arg(long)]
+    member: Option<String>,
+    #[arg(long)]
+    check: bool,
   },
   Agent {
     script: String,
@@ -77,11 +87,18 @@ fn main() -> ExitCode {
       let resolved = resolve_run_target(&file);
       run_file(&resolved, json)
     },
-    Command::Check { file, member, strict } => {
+    Command::Check { file, member, strict, fix } => {
       if let Some(file) = file {
-        check::check_file(&file, strict)
+        check::check_file(&file, strict, fix)
       } else {
-        check::check_workspace(member.as_deref(), strict)
+        check::check_workspace(member.as_deref(), strict, fix)
+      }
+    },
+    Command::Fmt { file, member, check } => {
+      if let Some(path) = file {
+        fmt::fmt_file(&path, check)
+      } else {
+        fmt::fmt_workspace(member.as_deref(), check)
       }
     },
     Command::Test { dir, member } => {

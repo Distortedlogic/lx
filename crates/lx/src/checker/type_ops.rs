@@ -3,8 +3,8 @@ use miette::SourceSpan;
 
 use super::diagnostics::DiagnosticKind;
 use super::type_arena::TypeId;
+use super::type_error::TypeContext;
 use super::types::Type;
-use super::unification::TypeContext;
 use super::{Checker, DiagLevel};
 
 impl Checker<'_> {
@@ -23,6 +23,11 @@ impl Checker<'_> {
       Expr::Ident(name) => {
         if let Some(def_id) = self.sem.resolve_in_scope(*name) {
           self.sem.add_reference(eid, def_id);
+        } else {
+          let scope_names = self.sem.names_in_scope();
+          let candidates: Vec<&str> = scope_names.iter().map(|s| s.as_str()).collect();
+          let suggestions = super::suggest::closest_matches(name.as_str(), &candidates, 3);
+          self.emit(DiagLevel::Error, DiagnosticKind::UnknownIdent { name: *name, suggestions }, span);
         }
         if let Some(narrowed) = self.narrowing.lookup(*name) { narrowed } else { self.sem.lookup_type(*name).unwrap_or(self.type_arena.unknown()) }
       },

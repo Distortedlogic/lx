@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
 use ena::unify::{InPlaceUnificationTable, UnifyKey};
-use miette::SourceSpan;
 
 use crate::sym::Sym;
 
 use super::type_arena::{TypeArena, TypeId};
+use super::type_error::{TypeContext, TypeError};
 use super::types::{Type, TypeVarKey, TypeVarValue};
 
 pub struct UnificationTable {
@@ -214,64 +214,6 @@ impl UnificationTable {
       Type::Param { bound: None, .. } => false,
       Type::Error => false,
       _ => false,
-    }
-  }
-}
-
-#[derive(Clone)]
-pub struct TypeError {
-  pub expected: TypeId,
-  pub found: TypeId,
-  pub context: TypeContext,
-  pub expected_origin: Option<SourceSpan>,
-}
-
-#[derive(Clone)]
-pub enum TypeContext {
-  FuncArg { func_name: String, param_name: String, param_idx: usize },
-  FuncReturn { func_name: String },
-  Binding { name: String },
-  RecordField { field_name: String },
-  MatchArm { arm_idx: usize },
-  BinaryOp { op: String },
-  General,
-}
-
-impl TypeError {
-  pub fn to_message(&self, ta: &TypeArena) -> String {
-    let expected = ta.display(self.expected);
-    let found = ta.display(self.found);
-    match &self.context {
-      TypeContext::FuncArg { func_name, param_name, param_idx } => {
-        format!("type mismatch in argument '{param_name}' (#{param_idx}) of '{func_name}'\n  expected: {expected}\n     found: {found}")
-      },
-      TypeContext::FuncReturn { func_name } => {
-        format!("type mismatch in return type of '{func_name}'\n  expected: {expected}\n     found: {found}")
-      },
-      TypeContext::Binding { name } => {
-        format!("type mismatch in binding '{name}'\n  expected: {expected}\n     found: {found}")
-      },
-      TypeContext::RecordField { field_name } => {
-        format!("type mismatch in record field '{field_name}'\n  expected: {expected}\n     found: {found}")
-      },
-      TypeContext::MatchArm { arm_idx } => {
-        format!("type mismatch in match arm #{arm_idx}\n  expected: {expected}\n     found: {found}")
-      },
-      TypeContext::BinaryOp { op } => {
-        format!("type mismatch in '{op}' expression\n  expected: {expected}\n     found: {found}")
-      },
-      TypeContext::General => {
-        format!("type mismatch\n  expected: {expected}\n     found: {found}")
-      },
-    }
-  }
-
-  pub fn help(&self, ta: &TypeArena) -> Option<String> {
-    match (ta.get(self.expected), ta.get(self.found)) {
-      (Type::Int, Type::Str) => Some("did you mean to pass a number?".into()),
-      (Type::Str, Type::Int) => Some("did you mean to convert this to a string?".into()),
-      (Type::Func { .. }, _) => Some("this value is not callable".into()),
-      _ => None,
     }
   }
 }

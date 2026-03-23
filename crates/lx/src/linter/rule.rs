@@ -26,4 +26,7 @@ pub trait LintRule {
   fn check_pattern(&mut self, _id: PatternId, _pattern: &Pattern, _span: SourceSpan, _model: &SemanticModel, _arena: &AstArena) -> Vec<Diagnostic> {
     vec![]
   }
+
+  fn enter_expr(&mut self, _id: ExprId, _expr: &Expr, _span: SourceSpan, _arena: &AstArena) {}
+  fn leave_expr(&mut self, _id: ExprId, _expr: &Expr, _span: SourceSpan, _arena: &AstArena) {}
 }

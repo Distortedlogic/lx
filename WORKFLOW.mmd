@@ -4,21 +4,36 @@ graph TD
     groups --> loop_start["For each group"]:::purple
 
     loop_start --> implement["1. Spawn subagent: Implement"]:::orange
-    implement --> audit["2. Spawn subagent: Audit\nscore 0-100"]:::yellow
-    audit --> check{{"score >= 93?"}}:::teal
+    implement --> audit["`**2. Spawn subagent: Audit**
+just diagnose + just test = 0 errors
+no Type::Todo / Unknown / todo! stubs
+no empty trait impls or _ => {} arms
+new structs · traits · fields have call sites
+every deliverable in work item implemented
+no file exceeds 300 lines
+run rust-audit.md + lx-audit.md`"]:::yellow
+    audit --> check{{"all pass?"}}:::teal
 
     check -- "yes" --> next_group["Next group"]:::blue
     check -- "no" --> stuck{{"stuck?"}}:::red
 
-    stuck -- "no" --> fix["3. Spawn subagent: Fix findings"]:::orange
+    stuck -- "no" --> fix["`**3. Spawn subagent: Fix**
+receives file:line per failure`"]:::orange
     fix --> audit
 
-    stuck -- "yes" --> bail["Bail — log stuck state"]:::red
+    stuck -- "yes" --> bail["Bail — log unresolved"]:::red
     bail --> next_group
 
     next_group --> more{{"more groups?"}}:::purple
     more -- "yes" --> loop_start
-    more -- "no" --> done(["Done"]):::teal
+    more -- "no" --> sys_audit["`**4. Spawn subagent: System Audit**
+rg Type::Todo · Type::Unknown across crates/
+pub items with zero external call sites
+no impl body is empty or placeholder
+untested modules · files over 300 lines
+full rust-audit.md + lx-audit.md
+output: findings with file:line`"]:::cyan
+    sys_audit --> done(["Done"]):::teal
 
     classDef teal fill:#000,stroke:#4ec9b0,color:#fff
     classDef blue fill:#000,stroke:#569cd6,color:#fff
@@ -26,5 +41,6 @@ graph TD
     classDef orange fill:#000,stroke:#ff6600,color:#fff
     classDef yellow fill:#000,stroke:#dcdcaa,color:#fff
     classDef red fill:#000,stroke:#d16969,color:#fff
+    classDef cyan fill:#000,stroke:#4fc1ff,color:#fff
 
     linkStyle default stroke:#6fc3df,stroke-width:1.5px

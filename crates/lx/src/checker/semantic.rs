@@ -146,6 +146,20 @@ impl SemanticModelBuilder {
     self.resolve_in_scope(name).and_then(|id| self.definitions[id].ty)
   }
 
+  pub fn names_in_scope(&self) -> Vec<Sym> {
+    let mut names = Vec::new();
+    for &scope_id in &self.scope_stack {
+      for &(sid, name) in self.def_lookup.keys() {
+        if sid == scope_id {
+          names.push(name);
+        }
+      }
+    }
+    names.sort();
+    names.dedup();
+    names
+  }
+
   pub fn build(
     self,
     expr_types: HashMap<ExprId, TypeId>,

@@ -5,8 +5,8 @@ use miette::SourceSpan;
 use super::diagnostics::DiagnosticKind;
 use super::semantic::{DefKind, ScopeKind};
 use super::type_arena::TypeId;
+use super::type_error::TypeContext;
 use super::types::Type;
-use super::unification::TypeContext;
 use super::{Checker, DiagLevel};
 
 impl Checker<'_> {

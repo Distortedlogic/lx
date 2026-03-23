@@ -11,9 +11,11 @@ pub mod module_graph;
 mod narrowing;
 pub mod semantic;
 mod stdlib_sigs;
+pub(crate) mod suggest;
 mod synth_compound;
 mod synth_control;
 pub mod type_arena;
+pub mod type_error;
 mod type_ops;
 pub mod types;
 pub mod unification;
@@ -31,8 +33,11 @@ use narrowing::NarrowingEnv;
 use semantic::{SemanticModel, SemanticModelBuilder};
 use type_arena::{TypeArena, TypeId};
 
+use type_error::TypeError;
 use types::{Type, Variant};
-use unification::{TypeError, UnificationTable};
+use unification::UnificationTable;
+
+use crate::linter::{RuleRegistry, lint};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiagLevel {
@@ -104,14 +109,19 @@ impl<'a> Checker<'a> {
     self.diagnostics.push(Diagnostic { level, kind, span, secondary: Vec::new(), fix });
   }
 
-  pub(crate) fn emit_type_error(&mut self, te: &TypeError, span: SourceSpan) {
+  pub(crate) fn make_type_error_diagnostic(&self, te: &TypeError, span: SourceSpan) -> Diagnostic {
     let kind = DiagnosticKind::TypeMismatch { error: te.clone() };
     let fix = kind.suggest_fix(span, &self.type_arena);
     let mut secondary = Vec::new();
     if let Some(origin) = te.expected_origin {
       secondary.push((origin, "expected type declared here".into()));
     }
-    self.diagnostics.push(Diagnostic { level: DiagLevel::Error, kind, span, secondary, fix });
+    Diagnostic { level: DiagLevel::Error, kind, span, secondary, fix }
+  }
+
+  pub(crate) fn emit_type_error(&mut self, te: &TypeError, span: SourceSpan) {
+    let diag = self.make_type_error_diagnostic(te, span);
+    self.diagnostics.push(diag);
   }
 
   pub(crate) fn fresh(&mut self) -> TypeId {
@@ -218,7 +228,11 @@ pub fn check(program: &Program<Core>, source: Arc<str>) -> CheckResult {
   let mut checker = Checker::new(&program.arena);
   checker.check_program(program);
   let semantic = checker.sem.build(checker.expr_types, checker.type_defs, checker.trait_fields, checker.type_arena);
-  CheckResult { diagnostics: checker.diagnostics, source, semantic }
+  let mut diagnostics = checker.diagnostics;
+  let mut registry = RuleRegistry::default_rules();
+  let lint_diags = lint(program, &semantic, &mut registry);
+  diagnostics.extend(lint_diags);
+  CheckResult { diagnostics, source, semantic }
 }
 
 pub fn check_with_imports(program: &Program<Core>, source: Arc<str>, import_signatures: HashMap<Sym, ModuleSignature>) -> CheckResult {
@@ -241,5 +255,9 @@ pub fn check_with_imports(program: &Program<Core>, source: Arc<str>, import_sign
   checker.import_signatures = import_signatures;
   checker.check_program(program);
   let semantic = checker.sem.build(checker.expr_types, checker.type_defs, checker.trait_fields, checker.type_arena);
-  CheckResult { diagnostics: checker.diagnostics, source, semantic }
+  let mut diagnostics = checker.diagnostics;
+  let mut registry = RuleRegistry::default_rules();
+  let lint_diags = lint(program, &semantic, &mut registry);
+  diagnostics.extend(lint_diags);
+  CheckResult { diagnostics, source, semantic }
 }

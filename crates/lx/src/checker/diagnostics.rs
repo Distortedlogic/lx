@@ -5,13 +5,14 @@ use miette::SourceSpan;
 use crate::sym::Sym;
 
 use super::type_arena::TypeArena;
-use super::unification::TypeError;
+use super::type_error::TypeError;
 
 pub struct TextEdit {
   pub range: SourceSpan,
   pub replacement: String,
 }
 
+#[derive(PartialEq)]
 pub enum Applicability {
   MachineApplicable,
   MaybeIncorrect,
@@ -43,15 +44,24 @@ pub enum DiagnosticKind {
   MutableCaptureInConcurrent { name: Sym },
   NonExhaustiveMatch { type_name: Sym, missing_pattern: String },
   DuplicateImport { name: Sym, original_span: SourceSpan },
-  UnknownImport { name: Sym, module: Sym },
+  UnknownImport { name: Sym, module: Sym, suggestions: Vec<String> },
   TypeMismatch { error: TypeError },
   LintWarning { rule_name: String, message: String },
+  UnknownIdent { name: Sym, suggestions: Vec<String> },
+  UnknownModule { name: String, suggestions: Vec<String> },
 }
 
 impl DiagnosticKind {
   pub fn help(&self, ta: &TypeArena) -> Option<String> {
     match self {
       Self::TypeMismatch { error } => error.help(ta),
+      Self::UnknownImport { name, module, suggestions } => {
+        super::suggest::format_suggestions(suggestions).or_else(|| Some(format!("'{name}' is not exported by module '{module}'")))
+      },
+      Self::UnknownIdent { name, suggestions } => {
+        super::suggest::format_suggestions(suggestions).or_else(|| Some(format!("'{name}' is not defined in this scope")))
+      },
+      Self::UnknownModule { name, suggestions } => super::suggest::format_suggestions(suggestions).or_else(|| Some(format!("module '{name}' not found"))),
       _ => None,
     }
   }
@@ -86,12 +96,18 @@ impl DiagnosticKind {
       Self::DuplicateImport { name, .. } => {
         format!("'{name}' already imported")
       },
-      Self::UnknownImport { name, module } => {
+      Self::UnknownImport { name, module, .. } => {
         format!("'{name}' is not exported by module '{module}'")
       },
       Self::TypeMismatch { error } => error.to_message(ta),
       Self::LintWarning { rule_name, message } => {
         format!("[{rule_name}] {message}")
+      },
+      Self::UnknownIdent { name, .. } => {
+        format!("unknown identifier '{name}'")
+      },
+      Self::UnknownModule { name, .. } => {
+        format!("unknown module '{name}'")
       },
     }
   }

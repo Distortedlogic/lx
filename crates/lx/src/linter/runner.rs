@@ -1,6 +1,9 @@
+use std::ops::ControlFlow;
+
 use crate::ast::{AstArena, Expr, ExprId, Pattern, PatternId, Program, Stmt, StmtId};
 use crate::checker::Diagnostic;
 use crate::checker::semantic::SemanticModel;
+use crate::linter::rules::mut_never_mutated::check_unused_mut;
 use crate::visitor::{AstVisitor, VisitAction};
 use miette::SourceSpan;
 
@@ -22,10 +25,18 @@ impl<'a> LintRunner<'a> {
 impl AstVisitor for LintRunner<'_> {
   fn on_expr(&mut self, id: ExprId, expr: &Expr, span: SourceSpan, arena: &AstArena) -> VisitAction {
     for rule in self.rules.iter_mut() {
+      rule.enter_expr(id, expr, span, arena);
       let mut diags = rule.check_expr(id, expr, span, self.model, arena);
       self.diagnostics.append(&mut diags);
     }
     VisitAction::Descend
+  }
+
+  fn leave_expr(&mut self, id: ExprId, expr: &Expr, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+    for rule in self.rules.iter_mut() {
+      rule.leave_expr(id, expr, span, arena);
+    }
+    ControlFlow::Continue(())
   }
 
   fn on_stmt(&mut self, id: StmtId, stmt: &Stmt, span: SourceSpan, arena: &AstArena) -> VisitAction {
@@ -48,5 +59,7 @@ impl AstVisitor for LintRunner<'_> {
 pub fn lint<P>(program: &Program<P>, model: &SemanticModel, registry: &mut RuleRegistry) -> Vec<Diagnostic> {
   let mut runner = LintRunner::new(registry.rules_mut(), model);
   runner.visit_program(program);
-  runner.diagnostics
+  let mut diags = runner.diagnostics;
+  diags.extend(check_unused_mut(program, model, &program.arena));
+  diags
 }

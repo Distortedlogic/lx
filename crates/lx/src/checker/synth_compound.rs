@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::{Expr, ExprId, Literal, MapEntry, MatchArm, Param, RecordField, StrPart, TypeExprId};
+use crate::ast::{Expr, ExprId, FieldKind, Literal, MapEntry, MatchArm, Param, RecordField, StrPart, TypeExprId};
 use crate::sym::{self, Sym};
 use miette::SourceSpan;
 
@@ -10,8 +10,8 @@ use super::exhaust::{check_exhaustiveness, check_exhaustiveness_no_variants};
 use super::narrowing;
 use super::semantic::{DefKind, ScopeKind};
 use super::type_arena::TypeId;
+use super::type_error::{TypeContext, TypeError};
 use super::types::Type;
-use super::unification::TypeContext;
 use super::{Checker, DiagLevel};
 
 impl Checker<'_> {
@@ -92,9 +92,18 @@ impl Checker<'_> {
       }
       return self.type_arena.alloc(Type::Record(fields));
     }
+    let func_name = match &func_expr {
+      Expr::Ident(name) => name.to_string(),
+      Expr::FieldAccess(fa) => match &fa.field {
+        FieldKind::Named(name) => name.to_string(),
+        _ => "<fn>".into(),
+      },
+      _ => "<fn>".into(),
+    };
     let ft = self.synth_expr(func);
     let arg_span = self.arena.expr_span(arg);
     let resolved = self.table.resolve(ft, &self.type_arena);
+    let sig_display = self.type_arena.display(resolved);
     match self.type_arena.get(resolved).clone() {
       Type::Func { param, ret } => {
         let type_params = self.collect_params(resolved);
@@ -105,9 +114,12 @@ impl Checker<'_> {
           (self.substitute(param, &subst), self.substitute(ret, &subst))
         };
         let arg_t = self.check_expr(arg, inst_param);
-        let ctx = TypeContext::FuncArg { func_name: "apply".into(), param_name: "arg".into(), param_idx: 0 };
+        let ctx = TypeContext::FuncArg { func_name, param_name: "arg".into(), param_idx: 0 };
         if let Err(te) = self.table.unify_with_context(inst_param, arg_t, ctx, &mut self.type_arena) {
-          self.emit_type_error(&te, arg_span);
+          let func_span = self.arena.expr_span(func);
+          let mut diag = self.make_type_error_diagnostic(&te, arg_span);
+          diag.secondary.push((func_span, format!("signature: {sig_display}")));
+          self.diagnostics.push(diag);
           return self.type_arena.error();
         }
         inst_ret
@@ -118,6 +130,12 @@ impl Checker<'_> {
       },
       _ => {
         self.synth_expr(arg);
+        let param = self.type_arena.unknown();
+        let ret = self.type_arena.unknown();
+        let expected = self.type_arena.alloc(Type::Func { param, ret });
+        let func_span = self.arena.expr_span(func);
+        let kind = DiagnosticKind::TypeMismatch { error: TypeError { expected, found: resolved, context: TypeContext::General, expected_origin: None } };
+        self.emit(DiagLevel::Error, kind, func_span);
         self.type_arena.unknown()
       },
     }

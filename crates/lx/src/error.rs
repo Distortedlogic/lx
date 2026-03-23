@@ -43,6 +43,10 @@ pub enum LxError {
   Assert {
     expr: String,
     message: Option<String>,
+    expected: Option<String>,
+    actual: Option<String>,
+    #[help]
+    help: Option<String>,
     #[label("assertion failed")]
     span: SourceSpan,
   },
@@ -78,8 +82,17 @@ impl LxError {
     Self::Runtime { msg: msg.into(), span }
   }
 
-  pub fn assert_fail(expr: impl Into<String>, message: Option<String>, span: SourceSpan) -> Self {
-    Self::Assert { expr: expr.into(), message, span }
+  pub fn assert_fail(expr: impl Into<String>, message: Option<String>, expected: Option<String>, actual: Option<String>, span: SourceSpan) -> Self {
+    let mut help_parts: Vec<String> = Vec::new();
+    if let Some(ref msg) = message {
+      help_parts.push(msg.clone());
+    }
+    if let (Some(exp), Some(act)) = (&expected, &actual) {
+      help_parts.push(format!("expected: {exp}"));
+      help_parts.push(format!("  actual: {act}"));
+    }
+    let help = if help_parts.is_empty() { None } else { Some(help_parts.join("\n")) };
+    Self::Assert { expr: expr.into(), message, expected, actual, help, span }
   }
 
   pub fn type_err(msg: impl Into<String>, span: SourceSpan, help: Option<String>) -> Self {

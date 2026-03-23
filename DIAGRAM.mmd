@@ -60,9 +60,15 @@ Fs
 Store
 Channel
 Memory
-Sandbox
-User`"]:::blue
+Sandbox`"]:::blue
     interpreter --> events
+
+    backends --> user["`**User Interaction**
+confirm · choose · ask
+progress · status
+table · notify
+approval gates
+escalation`"]:::bluelight
 
     subgraph events ["Runtime Events"]
         direction LR
@@ -138,6 +144,11 @@ stdio
 agent-mode
 CI/CD
 headless`"]:::teal
+
+    subs --> control["`**Control Channel**
+kill
+pause · resume`"]:::teal
+    control --> interpreter
 
     classDef white fill:#000,stroke:#fff,color:#fff
     classDef orange fill:#000,stroke:#ff6600,color:#fff
