@@ -20,6 +20,9 @@ export function mountTerminal(elementId: string, dx: Dioxus): void {
 
   const term = new Terminal({
     cursorBlink: true,
+    fontSize: 13,
+    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+    lineHeight: 1.3,
     theme: {
       background: "#0E0E0E",
       foreground: "#DCC1AE",
@@ -27,6 +30,22 @@ export function mountTerminal(elementId: string, dx: Dioxus): void {
       cursorAccent: "#0E0E0E",
       selectionBackground: "rgba(255,184,123,0.2)",
       selectionForeground: "#E6E1DD",
+      black: "#1A1A1A",
+      red: "#EF5350",
+      green: "#66BB6A",
+      yellow: "#FFB300",
+      blue: "#87CFFF",
+      magenta: "#DCC1AE",
+      cyan: "#87CFFF",
+      white: "#E6E1DD",
+      brightBlack: "#564334",
+      brightRed: "#EF5350",
+      brightGreen: "#66BB6A",
+      brightYellow: "#FFB87B",
+      brightBlue: "#87CFFF",
+      brightMagenta: "#DCC1AE",
+      brightCyan: "#87CFFF",
+      brightWhite: "#E6E1DD",
     },
   });
 
