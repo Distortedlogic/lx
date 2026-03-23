@@ -11,7 +11,11 @@ pipes → nested apply
 sections → lambdas
 ternary/??/^ → match
 interp → concat
-with-bind → block`"]
+with-bind → block
+spawn → instantiate+register
+~>? → send+await
+~> → send
+refine → loop+grade+track`"]
     end
 
     source --> lexer
@@ -25,7 +29,9 @@ async tree-walk eval`"]
 
     interpreter --> backends["`**Core Backends (swappable)**
 Ai
-Fs`"]
+Fs
+Store
+Channel`"]
 
     interpreter --> events
 
@@ -34,30 +40,48 @@ Fs`"]
 spawned · msg
 done · error`"]
         evt_pipeline["`**Pipeline**
-progress`"]
+progress · step
+compensate · checkpoint`"]
         evt_output["`**Output**
-emit · log`"]
+emit · log
+yield · diagnostic`"]
+        evt_budget["`**Budget**
+warning · exceeded
+threshold`"]
+        evt_concurrency["`**Concurrency**
+par · sel
+timeout · cancel`"]
+        evt_state["`**State**
+mutation · checkpoint
+context`"]
+        evt_trace["`**Trace**
+span · tool_call
+cost`"]
     end
 
     backends --> tools["`**Tools**
 Read · Write · Edit
 Glob · Grep
-WebSearch · WebFetch`"]
+WebSearch · WebFetch
+Browser · Git
+Test · Lint`"]
     backends --> clis["`**CLIs**
 Bash
 Skill`"]
     backends --> infra["`**Infra**
 AskUserQuestion
-EnterPlanMode · ExitPlanMode
-EnterWorktree · ExitWorktree
-CronCreate · CronDelete · CronList
-ToolSearch
-ListMcpResources
-ReadMcpResource`"]
+PlanMode
+Worktree
+Cron
+ToolSearch · MCP
+Hooks · Permissions
+Compaction`"]
 
     events --> subs["`**Subscribers**
 lx-desktop
 stdio
+agent-mode
+CI/CD
 headless`"]
 
     style FRONTEND fill:#1e1e3a,stroke:#e94560,color:#eee,stroke-width:2px
@@ -75,6 +99,10 @@ headless`"]
     style evt_agent fill:#1a2e1a,stroke:#4ecca3,color:#eee
     style evt_pipeline fill:#1a2e1a,stroke:#4ecca3,color:#eee
     style evt_output fill:#1a2e1a,stroke:#4ecca3,color:#eee
+    style evt_budget fill:#1a2e1a,stroke:#4ecca3,color:#eee
+    style evt_concurrency fill:#1a2e1a,stroke:#4ecca3,color:#eee
+    style evt_state fill:#1a2e1a,stroke:#4ecca3,color:#eee
+    style evt_trace fill:#1a2e1a,stroke:#4ecca3,color:#eee
     style subs fill:#1a2e1a,stroke:#4ecca3,color:#eee
 
     linkStyle default stroke:#888,stroke-width:1.5px

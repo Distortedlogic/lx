@@ -33,13 +33,19 @@ pub fn fold_stmt<F: AstFolder + ?Sized>(f: &mut F, id: StmtId, arena: &mut AstAr
   }
 }
 
-pub fn fold_binding<F: AstFolder + ?Sized>(f: &mut F, binding: Binding, span: miette::SourceSpan, arena: &mut AstArena) -> StmtId {
+pub fn fold_binding<F: AstFolder + ?Sized>(f: &mut F, id: StmtId, binding: Binding, span: miette::SourceSpan, arena: &mut AstArena) -> StmtId {
   let type_ann = binding.type_ann.map(|t| f.fold_type_expr(t, arena));
-  let target = match binding.target {
-    BindTarget::Pattern(pat) => BindTarget::Pattern(f.fold_pattern(pat, arena)),
-    other => other,
+  let (target, target_changed) = match &binding.target {
+    BindTarget::Pattern(pat) => {
+      let folded = f.fold_pattern(*pat, arena);
+      (BindTarget::Pattern(folded), folded != *pat)
+    },
+    other => (other.clone(), false),
   };
   let value = f.fold_expr(binding.value, arena);
+  if type_ann == binding.type_ann && !target_changed && value == binding.value {
+    return id;
+  }
   arena.alloc_stmt(Stmt::Binding(Binding { exported: binding.exported, mutable: binding.mutable, target, type_ann, value }), span)
 }
 
