@@ -4,15 +4,16 @@ struct TreeEntry {
   name: &'static str,
   indent: u8,
   is_folder: bool,
+  selected: bool,
 }
 
 const ENTRIES: &[TreeEntry] = &[
-  TreeEntry { name: "src/core/rag_engine", indent: 0, is_folder: true },
-  TreeEntry { name: "src/utils/ast_parser", indent: 0, is_folder: true },
-  TreeEntry { name: "config.xml", indent: 0, is_folder: false },
-  TreeEntry { name: "transformer.js", indent: 1, is_folder: false },
-  TreeEntry { name: "analyzer.py", indent: 1, is_folder: false },
-  TreeEntry { name: "docs/spec", indent: 0, is_folder: true },
+  TreeEntry { name: "src/core/rag_engine", indent: 0, is_folder: true, selected: true },
+  TreeEntry { name: "src/utils/ast_parser", indent: 0, is_folder: true, selected: false },
+  TreeEntry { name: "config.yaml", indent: 0, is_folder: false, selected: false },
+  TreeEntry { name: "transformer.js", indent: 1, is_folder: false, selected: false },
+  TreeEntry { name: "analyzer.py", indent: 1, is_folder: false, selected: false },
+  TreeEntry { name: "docs/spec", indent: 0, is_folder: true, selected: false },
 ];
 
 #[component]
@@ -35,9 +36,10 @@ pub fn FileTree() -> Element {
               } else {
                   "text-[var(--on-surface-variant)]"
               };
+              let bg = if entry.selected { " bg-[var(--surface-container-high)]" } else { "" };
               rsx! {
                 div {
-                  class: "flex items-center gap-2 py-1.5 px-2 text-xs rounded cursor-pointer hover:bg-[var(--surface-container-high)] transition-colors duration-150 {color}",
+                  class: "flex items-center gap-2 py-1.5 px-2 text-xs rounded cursor-pointer hover:bg-[var(--surface-container-high)] transition-colors duration-150 {color}{bg}",
                   style: "{pad}",
                   span { "{icon}" }
                   span { "{entry.name}" }

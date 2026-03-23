@@ -156,22 +156,14 @@ impl<'a> Checker<'a> {
         }
       },
       TypeExpr::List(inner) => Type::List(Box::new(self.resolve_type_ann(inner))),
-      TypeExpr::Map { key, value } => {
-        Type::Map { key: Box::new(self.resolve_type_ann(key)), value: Box::new(self.resolve_type_ann(value)) }
-      },
+      TypeExpr::Map { key, value } => Type::Map { key: Box::new(self.resolve_type_ann(key)), value: Box::new(self.resolve_type_ann(value)) },
       TypeExpr::Record(fields) => {
         let fs = fields.iter().map(|f| (f.name, self.resolve_type_ann(f.ty))).collect();
         Type::Record(fs)
       },
-      TypeExpr::Tuple(elems) => {
-        Type::Tuple(elems.iter().map(|e| self.resolve_type_ann(*e)).collect())
-      },
-      TypeExpr::Func { param, ret } => {
-        Type::Func { params: vec![self.resolve_type_ann(param)], ret: Box::new(self.resolve_type_ann(ret)) }
-      },
-      TypeExpr::Fallible { ok, err } => {
-        Type::Result { ok: Box::new(self.resolve_type_ann(ok)), err: Box::new(self.resolve_type_ann(err)) }
-      },
+      TypeExpr::Tuple(elems) => Type::Tuple(elems.iter().map(|e| self.resolve_type_ann(*e)).collect()),
+      TypeExpr::Func { param, ret } => Type::Func { params: vec![self.resolve_type_ann(param)], ret: Box::new(self.resolve_type_ann(ret)) },
+      TypeExpr::Fallible { ok, err } => Type::Result { ok: Box::new(self.resolve_type_ann(ok)), err: Box::new(self.resolve_type_ann(err)) },
     }
   }
 

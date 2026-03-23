@@ -12,6 +12,9 @@ pub fn AstConfig() -> Element {
           "NODE_COUNT: 14,282"
         }
       }
+      span { class: "text-[10px] uppercase tracking-wider text-[var(--outline)] mb-1",
+        "ANALYSIS MODE"
+      }
       div { class: "flex gap-0 mb-4",
         span { class: "bg-[var(--primary)] text-[var(--on-primary)] px-6 py-2 text-xs uppercase tracking-wider font-semibold rounded-l cursor-pointer",
           "SYNTACTIC"
@@ -24,11 +27,11 @@ pub fn AstConfig() -> Element {
         }
       }
       div { class: "bg-[var(--surface-container)] border border-[var(--outline-variant)]/30 rounded-lg p-4 mb-4",
-        div { class: "flex items-center gap-2 mb-2",
+        div { class: "flex items-center justify-between mb-2",
           span { class: "text-xs font-semibold uppercase tracking-wider text-[var(--on-surface)]",
             "AST_ROOT_SELECTOR"
           }
-          span { class: "text-[var(--warning)]", "\u{2B50}" }
+          span { class: "text-[var(--warning)]", "\u{2192}" }
         }
         p { class: "text-xs text-[var(--outline)] font-mono mb-3",
           "// Target specific tree depth"

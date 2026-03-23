@@ -42,9 +42,7 @@ pub fn EnvVarsPanel() -> Element {
             span { class: "flex-[5] text-xs text-[var(--on-surface-variant)]",
               "{var_entry.value}"
             }
-            span { class: "flex-[1] text-right text-[var(--success)]",
-              "\u{2713}"
-            }
+            span { class: "flex-[1] text-right text-[var(--outline)]", "\u{270F}" }
           }
         }
       }

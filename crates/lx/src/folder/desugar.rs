@@ -32,32 +32,32 @@ impl AstFolder for Desugarer {
     arena.alloc_expr(Expr::Apply(ExprApply { func: right, arg: left }), span)
   }
 
-  fn fold_section(&mut self, _id: ExprId, s: Section, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+  fn fold_section(&mut self, _id: ExprId, s: &Section, span: SourceSpan, arena: &mut AstArena) -> ExprId {
     match s {
       Section::Right { op, operand } => {
-        let folded_operand = self.fold_expr(operand, arena);
+        let folded_operand = self.fold_expr(*operand, arena);
         let p = gensym("x");
         let pi = arena.alloc_expr(Expr::Ident(p), span);
-        let body = arena.alloc_expr(Expr::Binary(ExprBinary { op, left: pi, right: folded_operand }), span);
+        let body = arena.alloc_expr(Expr::Binary(ExprBinary { op: *op, left: pi, right: folded_operand }), span);
         make_lambda(p, body, span, arena)
       },
       Section::Left { operand, op } => {
-        let folded_operand = self.fold_expr(operand, arena);
+        let folded_operand = self.fold_expr(*operand, arena);
         let p = gensym("x");
         let pi = arena.alloc_expr(Expr::Ident(p), span);
-        let body = arena.alloc_expr(Expr::Binary(ExprBinary { op, left: folded_operand, right: pi }), span);
+        let body = arena.alloc_expr(Expr::Binary(ExprBinary { op: *op, left: folded_operand, right: pi }), span);
         make_lambda(p, body, span, arena)
       },
       Section::Field(name) => {
         let p = gensym("x");
         let pi = arena.alloc_expr(Expr::Ident(p), span);
-        let body = arena.alloc_expr(Expr::FieldAccess(ExprFieldAccess { expr: pi, field: FieldKind::Named(name) }), span);
+        let body = arena.alloc_expr(Expr::FieldAccess(ExprFieldAccess { expr: pi, field: FieldKind::Named(*name) }), span);
         make_lambda(p, body, span, arena)
       },
       Section::Index(idx) => {
         let p = gensym("x");
         let pi = arena.alloc_expr(Expr::Ident(p), span);
-        let body = arena.alloc_expr(Expr::FieldAccess(ExprFieldAccess { expr: pi, field: FieldKind::Index(idx) }), span);
+        let body = arena.alloc_expr(Expr::FieldAccess(ExprFieldAccess { expr: pi, field: FieldKind::Index(*idx) }), span);
         make_lambda(p, body, span, arena)
       },
       Section::BinOp(op) => {
@@ -65,7 +65,7 @@ impl AstFolder for Desugarer {
         let b = gensym("b");
         let ai = arena.alloc_expr(Expr::Ident(a), span);
         let bi = arena.alloc_expr(Expr::Ident(b), span);
-        let body = arena.alloc_expr(Expr::Binary(ExprBinary { op, left: ai, right: bi }), span);
+        let body = arena.alloc_expr(Expr::Binary(ExprBinary { op: *op, left: ai, right: bi }), span);
         let inner = make_lambda(b, body, span, arena);
         make_lambda(a, inner, span, arena)
       },
@@ -129,26 +129,26 @@ impl AstFolder for Desugarer {
     }
   }
 
-  fn fold_with(&mut self, _id: ExprId, w: ExprWith, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-    match w.kind {
+  fn fold_with(&mut self, _id: ExprId, w: &ExprWith, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    match &w.kind {
       WithKind::Binding { name, value, mutable } => {
-        let folded_value = self.fold_expr(value, arena);
-        let folded_body: Vec<_> = w.body.into_iter().map(|s| self.fold_stmt(s, arena)).collect();
-        let binding_stmt =
-          arena.alloc_stmt(Stmt::Binding(Binding { exported: false, mutable, target: BindTarget::Name(name), type_ann: None, value: folded_value }), span);
+        let folded_value = self.fold_expr(*value, arena);
+        let folded_body: Vec<_> = w.body.iter().map(|s| self.fold_stmt(*s, arena)).collect();
+        let binding_stmt = arena.alloc_stmt(
+          Stmt::Binding(Binding { exported: false, mutable: *mutable, target: BindTarget::Name(*name), type_ann: None, value: folded_value }),
+          span,
+        );
         let mut block_stmts = vec![binding_stmt];
         block_stmts.extend(folded_body);
         arena.alloc_expr(Expr::Block(block_stmts), span)
       },
       other_kind => {
         let kind = match other_kind {
-          WithKind::Resources { resources } => {
-            WithKind::Resources { resources: resources.into_iter().map(|(e, sym)| (self.fold_expr(e, arena), sym)).collect() }
-          },
-          WithKind::Context { fields } => WithKind::Context { fields: fields.into_iter().map(|(sym, e)| (sym, self.fold_expr(e, arena))).collect() },
+          WithKind::Resources { resources } => WithKind::Resources { resources: resources.iter().map(|(e, sym)| (self.fold_expr(*e, arena), *sym)).collect() },
+          WithKind::Context { fields } => WithKind::Context { fields: fields.iter().map(|(sym, e)| (*sym, self.fold_expr(*e, arena))).collect() },
           WithKind::Binding { .. } => unreachable!(),
         };
-        let body: Vec<_> = w.body.into_iter().map(|s| self.fold_stmt(s, arena)).collect();
+        let body: Vec<_> = w.body.iter().map(|s| self.fold_stmt(*s, arena)).collect();
         arena.alloc_expr(Expr::With(ExprWith { kind, body }), span)
       },
     }

@@ -29,7 +29,7 @@ pub trait AstFolder {
     fold_stmt(self, id, arena)
   }
 
-  fn fold_binding(&mut self, id: StmtId, binding: Binding, span: SourceSpan, arena: &mut AstArena) -> StmtId {
+  fn fold_binding(&mut self, id: StmtId, binding: &Binding, span: SourceSpan, arena: &mut AstArena) -> StmtId {
     fold_binding(self, id, binding, span, arena)
   }
 
@@ -65,7 +65,7 @@ pub trait AstFolder {
     fold_apply(self, id, a, span, arena)
   }
 
-  fn fold_section(&mut self, id: ExprId, s: Section, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+  fn fold_section(&mut self, id: ExprId, s: &Section, span: SourceSpan, arena: &mut AstArena) -> ExprId {
     fold_section(self, id, s, span, arena)
   }
 
@@ -81,23 +81,23 @@ pub trait AstFolder {
     fold_tuple(self, id, elems, span, arena)
   }
 
-  fn fold_list(&mut self, id: ExprId, elems: Vec<ListElem>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+  fn fold_list(&mut self, id: ExprId, elems: &[ListElem], span: SourceSpan, arena: &mut AstArena) -> ExprId {
     fold_list(self, id, elems, span, arena)
   }
 
-  fn fold_record(&mut self, id: ExprId, fields: Vec<RecordField>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+  fn fold_record(&mut self, id: ExprId, fields: &[RecordField], span: SourceSpan, arena: &mut AstArena) -> ExprId {
     fold_record(self, id, fields, span, arena)
   }
 
-  fn fold_map(&mut self, id: ExprId, entries: Vec<MapEntry>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+  fn fold_map(&mut self, id: ExprId, entries: &[MapEntry], span: SourceSpan, arena: &mut AstArena) -> ExprId {
     fold_map(self, id, entries, span, arena)
   }
 
-  fn fold_func(&mut self, id: ExprId, func: ExprFunc, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+  fn fold_func(&mut self, id: ExprId, func: &ExprFunc, span: SourceSpan, arena: &mut AstArena) -> ExprId {
     fold_func(self, id, func, span, arena)
   }
 
-  fn fold_match(&mut self, id: ExprId, m: ExprMatch, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+  fn fold_match(&mut self, id: ExprId, m: &ExprMatch, span: SourceSpan, arena: &mut AstArena) -> ExprId {
     fold_match(self, id, m, span, arena)
   }
 
@@ -121,7 +121,7 @@ pub trait AstFolder {
     fold_named_arg(self, id, na, span, arena)
   }
 
-  fn fold_loop(&mut self, id: ExprId, stmts: Vec<StmtId>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+  fn fold_loop(&mut self, id: ExprId, stmts: &[StmtId], span: SourceSpan, arena: &mut AstArena) -> ExprId {
     fold_loop(self, id, stmts, span, arena)
   }
 
@@ -133,11 +133,11 @@ pub trait AstFolder {
     fold_assert(self, id, a, span, arena)
   }
 
-  fn fold_par(&mut self, id: ExprId, stmts: Vec<StmtId>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+  fn fold_par(&mut self, id: ExprId, stmts: &[StmtId], span: SourceSpan, arena: &mut AstArena) -> ExprId {
     fold_par(self, id, stmts, span, arena)
   }
 
-  fn fold_sel(&mut self, id: ExprId, arms: Vec<SelArm>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+  fn fold_sel(&mut self, id: ExprId, arms: &[SelArm], span: SourceSpan, arena: &mut AstArena) -> ExprId {
     fold_sel(self, id, arms, span, arena)
   }
 
@@ -153,7 +153,7 @@ pub trait AstFolder {
     fold_yield(self, id, y, span, arena)
   }
 
-  fn fold_with(&mut self, id: ExprId, w: ExprWith, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+  fn fold_with(&mut self, id: ExprId, w: &ExprWith, span: SourceSpan, arena: &mut AstArena) -> ExprId {
     fold_with(self, id, w, span, arena)
   }
 

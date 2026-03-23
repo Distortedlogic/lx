@@ -16,7 +16,7 @@ pub fn fold_stmt<F: AstFolder + ?Sized>(f: &mut F, id: StmtId, arena: &mut AstAr
   let span = arena.stmt_span(id);
   let stmt = arena.stmt(id).clone();
   match stmt {
-    Stmt::Binding(binding) => f.fold_binding(id, binding, span, arena),
+    Stmt::Binding(ref binding) => f.fold_binding(id, binding, span, arena),
     Stmt::TypeDef(def) => f.fold_type_def(id, def, span, arena),
     Stmt::TraitUnion(def) => f.fold_trait_union(id, def, span, arena),
     Stmt::Use(u) => f.fold_use(id, u, span, arena),
@@ -33,7 +33,7 @@ pub fn fold_stmt<F: AstFolder + ?Sized>(f: &mut F, id: StmtId, arena: &mut AstAr
   }
 }
 
-pub fn fold_binding<F: AstFolder + ?Sized>(f: &mut F, id: StmtId, binding: Binding, span: miette::SourceSpan, arena: &mut AstArena) -> StmtId {
+pub fn fold_binding<F: AstFolder + ?Sized>(f: &mut F, id: StmtId, binding: &Binding, span: miette::SourceSpan, arena: &mut AstArena) -> StmtId {
   let type_ann = binding.type_ann.map(|t| f.fold_type_expr(t, arena));
   let (target, target_changed) = match &binding.target {
     BindTarget::Pattern(pat) => {

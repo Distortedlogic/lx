@@ -5,7 +5,7 @@ pub fn TaskPriorityPanel() -> Element {
   rsx! {
     div { class: "bg-[var(--surface-container)] border border-[var(--outline-variant)]/30 rounded-lg p-4",
       div { class: "flex items-center gap-3 mb-4",
-        div { class: "h-px flex-1 bg-[var(--outline-variant)]" }
+        div { class: "h-px w-8 bg-[var(--outline-variant)]" }
         span { class: "text-xs uppercase tracking-wider font-semibold text-[var(--on-surface)]",
           "TASK_PRIORITY"
         }
@@ -17,10 +17,7 @@ pub fn TaskPriorityPanel() -> Element {
         }
         span { class: "text-sm font-semibold text-[var(--on-surface)]", "0.84" }
       }
-      input {
-        r#type: "range",
-        class: "w-full accent-[var(--primary)] mb-3",
-      }
+      input { r#type: "range", class: "w-full accent-[var(--warning)] mb-3" }
       div { class: "flex justify-between text-[10px] text-[var(--outline)] mb-4",
         span { "LOW_LATENCY" }
         span { "HIGH_THROUGHPUT" }
@@ -44,9 +41,12 @@ pub fn TaskPriorityPanel() -> Element {
 #[component]
 pub fn ArchitectCard() -> Element {
   rsx! {
-    div { class: "bg-[var(--surface-container)] border border-[var(--success)] rounded-lg p-4",
+    div { class: "relative bg-[var(--surface-container)] border border-[var(--success)] rounded-lg p-4",
+      span { class: "absolute -top-2 -right-2 bg-[var(--success)] text-[var(--on-primary)] text-[10px] px-2 py-0.5 rounded font-semibold uppercase tracking-wider",
+        "LIVE"
+      }
       div { class: "flex items-center gap-2 mb-2",
-        span { class: "text-[var(--success)]", "\u{25CF}" }
+        span { class: "text-[var(--success)]", "\u{2B22}" }
         span { class: "text-sm font-bold uppercase tracking-wider text-[var(--on-surface)]",
           "ARCHITECT_01"
         }
@@ -68,7 +68,7 @@ pub fn ArchitectCard() -> Element {
 pub fn SystemNotice() -> Element {
   rsx! {
     div { class: "flex items-start gap-3 mt-2",
-      span { class: "text-[var(--warning)] text-lg shrink-0", "\u{26A0}" }
+      span { class: "text-[var(--primary)] text-lg shrink-0", "\u{25CF}" }
       p { class: "text-xs text-[var(--outline)] leading-relaxed",
         "SYSTEM_NOTICE: All configuration changes require manual validation before persisting to the blockchain ledger. Expect a 120ms latency injection during the verification cycle."
       }

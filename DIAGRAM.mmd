@@ -1,25 +1,30 @@
-%%{init: {'theme': 'dark', 'themeVariables': {'primaryColor': '#2a2a4a', 'primaryTextColor': '#e0e0e0', 'primaryBorderColor': '#555', 'lineColor': '#888', 'fontSize': '14px', 'fontFamily': 'monospace'}}}%%
+%%{init: {'theme': 'dark', 'themeVariables': {'primaryColor': '#000000', 'primaryTextColor': '#ffffff', 'primaryBorderColor': '#6fc3df', 'lineColor': '#6fc3df', 'fontSize': '14px', 'fontFamily': 'monospace'}}}%%
 
 graph TD
     source[".lx source"]
+    source --> lexer["Lexer"]
+    lexer --> parser["Parser → Surface AST"]
+    parser --> desugars
 
-    subgraph FRONTEND ["FRONTEND · sugared, LLM-friendly"]
-        lexer["Lexer"] --> parser["Parser → Surface AST"]
-        parser --> desugar["`**Desugar · Folder → Core AST**
-Agent → Class+Trait
+    subgraph desugars ["Desugar · Folder → Core AST"]
+        direction LR
+        ds_syntax["`**Syntax**
 pipes → nested apply
 sections → lambdas
 ternary/??/^ → match
-interp → concat
-with-bind → block
+interp → concat`"]
+        ds_agents["`**Agents**
+Agent → Class+Trait
 spawn → instantiate+register
 ~>? → send+await
-~> → send
+~> → send`"]
+        ds_control["`**Control**
+with-bind → block
 refine → loop+grade+track`"]
+        ds_syntax ~~~ ds_agents ~~~ ds_control
     end
 
-    source --> lexer
-    desugar --> checker["`**Checker · Visitor**
+    desugars --> checker["`**Checker · Visitor**
 inference
 unification
 exhaustiveness
@@ -32,7 +37,6 @@ Ai
 Fs
 Store
 Channel`"]
-
     interpreter --> events
 
     subgraph events ["Runtime Events"]
@@ -48,7 +52,6 @@ checkpoint`"]
 emit · log
 yield
 diagnostic`"]
-
         evt_budget["`**Budget**
 warning
 exceeded
@@ -61,11 +64,9 @@ cancel`"]
 mutation
 checkpoint
 context`"]
-
         evt_trace["`**Trace**
 span · tool_call
 cost`"]
-
         evt_agent ~~~ evt_pipeline ~~~ evt_output
         evt_budget ~~~ evt_concurrency ~~~ evt_state
     end
@@ -95,25 +96,27 @@ agent-mode
 CI/CD
 headless`"]
 
-    style FRONTEND fill:#1e1e3a,stroke:#e94560,color:#eee,stroke-width:2px
-    style source fill:#2a2a4a,stroke:#888,color:#fff
-    style lexer fill:#2a1a3e,stroke:#e94560,color:#eee
-    style parser fill:#2a1a3e,stroke:#e94560,color:#eee
-    style desugar fill:#2a1a3e,stroke:#e94560,color:#eee
-    style checker fill:#1a2a4e,stroke:#4a9eff,color:#eee
-    style interpreter fill:#1a1a3e,stroke:#7c5cbf,color:#eee
-    style backends fill:#0f3460,stroke:#53a8b6,color:#eee
-    style tools fill:#1a2a3e,stroke:#888,color:#ccc
-    style clis fill:#1a2a3e,stroke:#888,color:#ccc
-    style infra fill:#1a2a3e,stroke:#888,color:#ccc
-    style events fill:#1a2e1a,stroke:#4ecca3,color:#eee
-    style evt_agent fill:#1a2e1a,stroke:#4ecca3,color:#eee
-    style evt_pipeline fill:#1a2e1a,stroke:#4ecca3,color:#eee
-    style evt_output fill:#1a2e1a,stroke:#4ecca3,color:#eee
-    style evt_budget fill:#1a2e1a,stroke:#4ecca3,color:#eee
-    style evt_concurrency fill:#1a2e1a,stroke:#4ecca3,color:#eee
-    style evt_state fill:#1a2e1a,stroke:#4ecca3,color:#eee
-    style evt_trace fill:#1a2e1a,stroke:#4ecca3,color:#eee
-    style subs fill:#1a2e1a,stroke:#4ecca3,color:#eee
+    style source fill:#000,stroke:#fff,color:#fff
+    style lexer fill:#000,stroke:#ff6600,color:#fff
+    style parser fill:#000,stroke:#ff6600,color:#fff
+    style desugars fill:#0a0a0a,stroke:#ff6600,color:#fff,stroke-width:2px
+    style ds_syntax fill:#000,stroke:#ff6600,color:#fff
+    style ds_agents fill:#000,stroke:#ff6600,color:#fff
+    style ds_control fill:#000,stroke:#ff6600,color:#fff
+    style checker fill:#000,stroke:#dcdcaa,color:#fff
+    style interpreter fill:#000,stroke:#c586c0,color:#fff
+    style backends fill:#000,stroke:#569cd6,color:#fff
+    style tools fill:#000,stroke:#569cd6,color:#9cdcfe
+    style clis fill:#000,stroke:#569cd6,color:#9cdcfe
+    style infra fill:#000,stroke:#569cd6,color:#9cdcfe
+    style events fill:#0a0a0a,stroke:#4ec9b0,color:#fff,stroke-width:2px
+    style evt_agent fill:#000,stroke:#4ec9b0,color:#fff
+    style evt_pipeline fill:#000,stroke:#4ec9b0,color:#fff
+    style evt_output fill:#000,stroke:#4ec9b0,color:#fff
+    style evt_budget fill:#000,stroke:#4ec9b0,color:#fff
+    style evt_concurrency fill:#000,stroke:#4ec9b0,color:#fff
+    style evt_state fill:#000,stroke:#4ec9b0,color:#fff
+    style evt_trace fill:#000,stroke:#4ec9b0,color:#fff
+    style subs fill:#000,stroke:#4ec9b0,color:#fff
 
-    linkStyle default stroke:#888,stroke-width:1.5px
+    linkStyle default stroke:#6fc3df,stroke-width:1.5px

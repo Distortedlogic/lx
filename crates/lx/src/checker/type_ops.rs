@@ -37,7 +37,7 @@ impl Checker<'_> {
         Type::Tuple(types)
       },
       Expr::List(elems) => self.synth_list(&elems, span),
-      Expr::Record(fields) => self.synth_record(fields),
+      Expr::Record(ref fields) => self.synth_record(fields),
       Expr::Map(entries) => self.synth_map_type(&entries),
       Expr::Func(func) => self.synth_func_type(&func.params, &func.ret_type, func.body),
       Expr::Match(m) => self.synth_match_type(m.scrutinee, &m.arms, span),
@@ -133,7 +133,7 @@ impl Checker<'_> {
     Type::List(Box::new(first))
   }
 
-  fn synth_record(&mut self, fields: Vec<RecordField>) -> Type {
+  fn synth_record(&mut self, fields: &[RecordField]) -> Type {
     let fs: Vec<_> = fields
       .iter()
       .filter_map(|f| match f {

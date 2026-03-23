@@ -20,7 +20,7 @@ pub fn QuotasPanel() -> Element {
   rsx! {
     div { class: "bg-[var(--surface-container)] border border-[var(--outline-variant)]/30 rounded-lg p-4",
       div { class: "flex items-center gap-3 mb-4",
-        div { class: "h-px flex-1 bg-[var(--outline-variant)]" }
+        div { class: "h-px w-8 bg-[var(--outline-variant)]" }
         span { class: "text-xs uppercase tracking-wider font-semibold text-[var(--on-surface)]",
           "RESOURCE_QUOTAS"
         }

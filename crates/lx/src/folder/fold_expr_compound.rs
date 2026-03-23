@@ -6,7 +6,7 @@ use miette::SourceSpan;
 
 use super::AstFolder;
 
-pub fn fold_func<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, func: ExprFunc, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+pub fn fold_func<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, func: &ExprFunc, span: SourceSpan, arena: &mut AstArena) -> ExprId {
   let params: Vec<Param> = func
     .params
     .iter()
@@ -22,7 +22,7 @@ pub fn fold_func<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, func: ExprFunc, s
   arena.alloc_expr(Expr::Func(ExprFunc { params, ret_type, guard, body }), span)
 }
 
-pub fn fold_match<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, m: ExprMatch, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+pub fn fold_match<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, m: &ExprMatch, span: SourceSpan, arena: &mut AstArena) -> ExprId {
   let scrutinee = f.fold_expr(m.scrutinee, arena);
   let arms: Vec<MatchArm> = m
     .arms
@@ -81,9 +81,9 @@ pub fn fold_named_arg<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, na: ExprName
   arena.alloc_expr(Expr::NamedArg(ExprNamedArg { name: na.name, value }), span)
 }
 
-pub fn fold_loop<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, stmts: Vec<StmtId>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+pub fn fold_loop<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, stmts: &[StmtId], span: SourceSpan, arena: &mut AstArena) -> ExprId {
   let folded: Vec<StmtId> = stmts.iter().map(|s| f.fold_stmt(*s, arena)).collect();
-  if folded == stmts {
+  if folded.as_slice() == stmts {
     return id;
   }
   arena.alloc_expr(Expr::Loop(folded), span)
@@ -106,15 +106,15 @@ pub fn fold_assert<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, a: ExprAssert, 
   arena.alloc_expr(Expr::Assert(ExprAssert { expr, msg }), span)
 }
 
-pub fn fold_par<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, stmts: Vec<StmtId>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+pub fn fold_par<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, stmts: &[StmtId], span: SourceSpan, arena: &mut AstArena) -> ExprId {
   let folded: Vec<StmtId> = stmts.iter().map(|s| f.fold_stmt(*s, arena)).collect();
-  if folded == stmts {
+  if folded.as_slice() == stmts {
     return id;
   }
   arena.alloc_expr(Expr::Par(folded), span)
 }
 
-pub fn fold_sel<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, arms: Vec<SelArm>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+pub fn fold_sel<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, arms: &[SelArm], span: SourceSpan, arena: &mut AstArena) -> ExprId {
   let folded: Vec<SelArm> = arms.iter().map(|arm| SelArm { expr: f.fold_expr(arm.expr, arena), handler: f.fold_expr(arm.handler, arena) }).collect();
   let changed = folded.iter().zip(arms.iter()).any(|(a, b)| a.expr != b.expr || a.handler != b.handler);
   if !changed {
@@ -148,7 +148,7 @@ pub fn fold_yield<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, y: ExprYield, sp
   arena.alloc_expr(Expr::Yield(ExprYield { value }), span)
 }
 
-pub fn fold_with<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, w: ExprWith, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+pub fn fold_with<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, w: &ExprWith, span: SourceSpan, arena: &mut AstArena) -> ExprId {
   let (kind, kind_changed) = match &w.kind {
     WithKind::Binding { name, value, mutable } => {
       let folded_value = f.fold_expr(*value, arena);
@@ -166,7 +166,7 @@ pub fn fold_with<F: AstFolder + ?Sized>(f: &mut F, id: ExprId, w: ExprWith, span
     },
   };
   let body: Vec<StmtId> = w.body.iter().map(|s| f.fold_stmt(*s, arena)).collect();
-  if !kind_changed && body == w.body {
+  if !kind_changed && body.as_slice() == w.body.as_slice() {
     return id;
   }
   arena.alloc_expr(Expr::With(ExprWith { kind, body }), span)

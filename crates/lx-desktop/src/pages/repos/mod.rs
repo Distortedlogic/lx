@@ -11,17 +11,17 @@ use self::file_tree::FileTree;
 #[component]
 pub fn Repos() -> Element {
   rsx! {
-    div { class: "flex flex-col h-full",
-      div { class: "flex flex-1 min-h-0",
-        FileTree {}
+    div { class: "flex h-full",
+      FileTree {}
+      div { class: "flex-1 flex flex-col min-h-0 min-w-0",
         AstConfig {}
-        ChunksPanel {}
-      }
-      div { class: "p-4 border-t border-[var(--outline-variant)]/15",
-        button { class: "w-full bg-[var(--success)] text-[var(--on-primary)] rounded py-3 text-sm uppercase tracking-wider font-semibold hover:brightness-110 transition-all duration-150",
-          "\u{26A1} RUN ANALYSIS ENGINE"
+        div { class: "p-4 border-t border-[var(--outline-variant)]/15",
+          button { class: "w-full bg-[var(--success)] text-[var(--on-primary)] rounded py-3 text-sm uppercase tracking-wider font-semibold hover:brightness-110 transition-all duration-150",
+            "\u{26A1} RUN ANALYSIS ENGINE"
+          }
         }
       }
+      ChunksPanel {}
     }
   }
 }
