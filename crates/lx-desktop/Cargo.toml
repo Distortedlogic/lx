@@ -30,6 +30,7 @@ anyhow = "1"
 async-trait = "0.1"
 base64 = "0.22"
 dioxus = { version = "0.7", features = ["fullstack", "router"] }
+futures = "0.3"
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["process"] }

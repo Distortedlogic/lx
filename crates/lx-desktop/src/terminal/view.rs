@@ -1,16 +1,15 @@
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as B64;
 use dioxus::logger::tracing::error;
 use dioxus::prelude::*;
+use futures::StreamExt;
 use pane_tree::TabsState;
 use pane_tree::{NotificationLevel, PaneNotification};
 use serde_json::Value;
 use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::mpsc;
-use tokio::time::interval;
 use uuid::Uuid;
 use widget_bridge::use_ts_widget;
 
@@ -135,15 +134,21 @@ pub fn BrowserView(browser_id: String, url: String, devtools: bool) -> Element {
         return;
       };
 
-      let mut interval = interval(Duration::from_millis(500));
+      let mut frames = match session.start_screencast().await {
+        Ok(s) => s,
+        Err(e) => {
+          error!("browser start_screencast failed: {e}");
+          return;
+        },
+      };
 
       loop {
         tokio::select! {
-            _ = interval.tick() => {
-                match session.screenshot().await {
-                    Ok(b64) => widget.send_update(b64),
-                    Err(e) => { error!("browser screenshot failed: {e}"); break; }
-                }
+            frame = frames.next() => {
+                let Some(frame) = frame else { break; };
+                let b64 = String::from(frame.data.clone());
+                widget.send_update(b64);
+                if let Err(e) = session.ack_frame(frame.session_id).await { error!("browser ack_frame failed: {e}"); break; }
             }
             result = widget.recv::<Value>() => {
                 match result {

@@ -59,7 +59,7 @@ diagrams:
     #!/usr/bin/env bash
     set -euo pipefail
     for f in *.mmd; do
-      mmdc -i "$f" -o "${f%.mmd}.png" -c mermaid.config.json -b "#000000"
+      mmdc -i "$f" -o "${f%.mmd}.png" -c mermaid.config.json -b "#000000" -s 2
     done
     echo "diagrams: ok"
 

@@ -1,13 +1,13 @@
 use std::sync::{Arc, LazyLock};
 
 use anyhow::{Context, Result};
-use base64::Engine as _;
-use base64::engine::general_purpose::STANDARD as B64;
 use chromiumoxide::cdp::browser_protocol::input::{
   DispatchKeyEventParams, DispatchKeyEventType, DispatchMouseEventParams, DispatchMouseEventType, MouseButton,
 };
-use chromiumoxide::cdp::browser_protocol::page::{CaptureScreenshotFormat, GetNavigationHistoryParams, NavigateToHistoryEntryParams};
-use chromiumoxide::page::ScreenshotParams;
+use chromiumoxide::cdp::browser_protocol::page::{
+  EventScreencastFrame, GetNavigationHistoryParams, NavigateToHistoryEntryParams, ScreencastFrameAckParams, StartScreencastFormat, StartScreencastParams,
+};
+use chromiumoxide::listeners::EventStream;
 use chromiumoxide::{Browser, BrowserConfig, Handler, Page};
 use dashmap::DashMap;
 use futures::StreamExt;
@@ -77,11 +77,18 @@ impl BrowserSession {
     Ok(())
   }
 
-  pub async fn screenshot(&self) -> Result<String> {
+  pub async fn start_screencast(&self) -> Result<EventStream<EventScreencastFrame>> {
     let page = self.page.lock().await;
-    let params = ScreenshotParams::builder().format(CaptureScreenshotFormat::Jpeg).quality(70).build();
-    let bytes = page.screenshot(params).await.context("screenshot failed")?;
-    Ok(B64.encode(&bytes))
+    let stream = page.event_listener::<EventScreencastFrame>().await.context("screencast listener failed")?;
+    let params = StartScreencastParams::builder().format(StartScreencastFormat::Jpeg).quality(70).every_nth_frame(1).build();
+    page.execute(params).await.context("start screencast failed")?;
+    Ok(stream)
+  }
+
+  pub async fn ack_frame(&self, session_id: i64) -> Result<()> {
+    let page = self.page.lock().await;
+    page.execute(ScreencastFrameAckParams::new(session_id)).await.context("screencast ack failed")?;
+    Ok(())
   }
 
   pub async fn go_back(&self) -> Result<()> {

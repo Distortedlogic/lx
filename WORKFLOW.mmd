@@ -3,61 +3,80 @@ graph TD
     start --> loop_start["For each group"]:::purple
 
     loop_start --> implement["`**1. Implement**
-execute tasks as written
-no skip · no combine · no reorder`"]:::orange
+read every task in the work item
+do each task fully, in order, one at a time
+do not skip or mark done early
+do not combine tasks
+do not add work not in the task
+do not substitute a different approach`"]:::orange
     implement --> audit["`**2. Audit**
-spec vs actual, task-by-task
-no stubs · no no-ops
-new items have call sites
-compiles · tests pass
+——— read ———
+work item spec · diff of all changes
+——— for each task ———
+did the code change match the spec?
+——— check all touched files ———
+empty function bodies
+functions returning placeholders
+match arms discarding with _ => {}
+new struct/trait/enum with no users
+TODO/FIXME/unimplemented left behind
+code compiles with 0 warnings
+all tests pass
+——— returns ———
 grade 0–100
-findings with file:line`"]:::yellow
+list of {file, issue, severity}`"]:::yellow
     audit --> check{{"grade >= 93?"}}:::teal
 
-    check -- "no" --> stuck{{"stuck?\n3+ attempts ·\nplateau · repeats"}}:::red
+    check -- "no" --> stuck{{"stuck?\n3+ attempts ·\ngrade not improving ·\nsame findings repeating"}}:::red
     check -- "yes" --> more{{"more groups?"}}:::purple
 
     stuck -- "yes" --> bail["`**Bail**
-log group · grade
-unresolved file:line`"]:::red
+log which group failed
+log final grade
+log every unresolved finding`"]:::red
     bail --> done
 
     more -- "yes" --> loop_start
     more -- "no" --> sys_audit
 
     stuck -- "no" --> fix["`**3. Fix**
-fix each finding at file:line
-no new features
-no unrelated changes`"]:::orange
+receive findings list from auditor
+open each flagged file
+fix exactly the issue described
+do not add features
+do not refactor nearby code
+do not touch files not in findings`"]:::orange
     fix --> audit
 
     sys_audit["`**4. System Audit**
-scan full codebase
-no stubs · no no-ops
-new items have call sites
-compiles · tests pass
+——— read ———
+scan every file in the codebase
+——— check all files ———
+empty function bodies
+functions returning placeholders
+match arms discarding with _ => {}
+pub items with no external users
+TODO/FIXME/unimplemented left behind
+code compiles with 0 warnings
+all tests pass
+——— returns ———
 grade 0–100
-findings with file:line`"]:::cyan
+list of {file, issue, severity}`"]:::cyan
     sys_audit --> sys_check{{"grade >= 93?"}}:::teal
 
-    sys_check -- "no" --> sys_stuck{{"stuck?\n3+ attempts ·\nplateau · repeats"}}:::red
+    sys_check -- "no" --> sys_stuck{{"stuck?\n3+ attempts ·\ngrade not improving ·\nsame findings repeating"}}:::red
     sys_check -- "yes" --> done(["Done"]):::teal
 
     sys_stuck -- "no" --> sys_fix["`**5. Fix**
-fix each finding at file:line
-no new features
-no unrelated changes`"]:::orange
+receive findings list from auditor
+open each flagged file
+fix exactly the issue described
+do not add features
+do not refactor nearby code
+do not touch files not in findings`"]:::orange
     sys_fix --> sys_audit
 
     sys_stuck -- "yes" --> sys_bail["`**Bail**
-log grade
-unresolved file:line`"]:::red
+log final grade
+log every unresolved finding`"]:::red
     sys_bail --> done
-
-    classDef teal stroke:#4ec9b0
-    classDef blue stroke:#569cd6
-    classDef purple stroke:#c586c0
-    classDef orange stroke:#ff6600
-    classDef yellow stroke:#dcdcaa
-    classDef red stroke:#d16969
-    classDef cyan stroke:#4fc1ff
