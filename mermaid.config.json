@@ -6,6 +6,8 @@
     "primaryTextColor": "#ffffff",
     "primaryBorderColor": "#6fc3df",
     "lineColor": "#6fc3df",
+    "clusterBkg": "#0a0a0a",
+    "clusterBorder": "#6fc3df",
     "fontSize": "14px",
     "fontFamily": "monospace"
   }

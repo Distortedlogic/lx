@@ -129,6 +129,7 @@ fn PaneItem(mut tabs_state: Signal<TabsState<DesktopPane>>, pane: DesktopPane, r
   let pid_sv = pid.clone();
   let pid_close = pid.clone();
   let pid_convert = pid.clone();
+  let is_browser = matches!(&pane, DesktopPane::Browser { .. });
   let pane_toolbar = pane.clone();
   let pane_view = pane.clone();
 
@@ -154,7 +155,7 @@ fn PaneItem(mut tabs_state: Signal<TabsState<DesktopPane>>, pane: DesktopPane, r
         on_split_h: move |_| split_pane(tabs_state, &pid_sh, SplitDirection::Horizontal),
         on_split_v: move |_| split_pane(tabs_state, &pid_sv, SplitDirection::Vertical),
         on_close: move |_| close_pane(tabs_state, &pid_close),
-        on_navigate: if matches!(&pane_toolbar, DesktopPane::Browser { .. }) {
+        on_navigate: if is_browser {
           let tx = nav_ctx.tx.clone();
           Some(EventHandler::new(move |cmd: String| { if let Err(e) = tx.send(cmd) { error!("nav send failed: {e}"); } }))
         } else {

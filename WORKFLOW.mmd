@@ -5,42 +5,40 @@ graph TD
 
     loop_start --> implement["1. Spawn subagent: Implement"]:::orange
     implement --> audit["`**2. Spawn subagent: Audit**
-just diagnose + just test = 0 errors
-no Type::Todo / Unknown / todo! stubs
-no empty trait impls or _ => {} arms
-new structs · traits · fields have call sites
-every deliverable in work item implemented
-no file exceeds 300 lines
-run rust-audit.md + lx-audit.md`"]:::yellow
-    audit --> check{{"all pass?"}}:::teal
+verify every task in work item was executed
+no tasks skipped, shortened, or deviated from
+no stubs, placeholders, or no-op bodies
+new infrastructure has actual call sites
+compiles and tests pass with 0 errors
+grade 0–100`"]:::yellow
+    audit --> check{{"score >= 93?"}}:::teal
 
     check -- "yes" --> next_group["Next group"]:::blue
     check -- "no" --> stuck{{"stuck?"}}:::red
+
+    stuck -- "yes" --> bail["Bail — log unresolved"]:::red
+    bail --> done
 
     stuck -- "no" --> fix["`**3. Spawn subagent: Fix**
 receives file:line per failure`"]:::orange
     fix --> audit
 
-    stuck -- "yes" --> bail["Bail — log unresolved"]:::red
-    bail --> next_group
-
     next_group --> more{{"more groups?"}}:::purple
     more -- "yes" --> loop_start
     more -- "no" --> sys_audit["`**4. Spawn subagent: System Audit**
-rg Type::Todo · Type::Unknown across crates/
-pub items with zero external call sites
-no impl body is empty or placeholder
-untested modules · files over 300 lines
+verify all work items were fully executed
+no stubs, placeholders, or Todo returns
+no empty trait impls or no-op method bodies
+infrastructure has actual call sites
+just diagnose + just test = 0 errors
 full rust-audit.md + lx-audit.md
 output: findings with file:line`"]:::cyan
     sys_audit --> done(["Done"]):::teal
 
-    classDef teal fill:#000,stroke:#4ec9b0,color:#fff
-    classDef blue fill:#000,stroke:#569cd6,color:#fff
-    classDef purple fill:#000,stroke:#c586c0,color:#fff
-    classDef orange fill:#000,stroke:#ff6600,color:#fff
-    classDef yellow fill:#000,stroke:#dcdcaa,color:#fff
-    classDef red fill:#000,stroke:#d16969,color:#fff
-    classDef cyan fill:#000,stroke:#4fc1ff,color:#fff
-
-    linkStyle default stroke:#6fc3df,stroke-width:1.5px
+    classDef teal stroke:#4ec9b0
+    classDef blue stroke:#569cd6
+    classDef purple stroke:#c586c0
+    classDef orange stroke:#ff6600
+    classDef yellow stroke:#dcdcaa
+    classDef red stroke:#d16969
+    classDef cyan stroke:#4fc1ff

@@ -1,9 +1,9 @@
 graph TD
-    source[".lx source"]:::white
+    source[".lx source"]
     config["`**Config**
 CLAUDE.md · AGENTS.md
 Skills · Policies
-Permissions`"]:::white
+Permissions`"]
     source --> lexer["Lexer"]:::orange
     config --> lexer
     lexer --> parser["Parser → Surface AST"]:::orange
@@ -150,17 +150,14 @@ kill
 pause · resume`"]:::teal
     control --> interpreter
 
-    classDef white fill:#000,stroke:#fff,color:#fff
-    classDef orange fill:#000,stroke:#ff6600,color:#fff
-    classDef yellow fill:#000,stroke:#dcdcaa,color:#fff
-    classDef red fill:#000,stroke:#d16969,color:#fff
-    classDef purple fill:#000,stroke:#c586c0,color:#fff
-    classDef blue fill:#000,stroke:#569cd6,color:#fff
-    classDef bluelight fill:#000,stroke:#569cd6,color:#9cdcfe
-    classDef teal fill:#000,stroke:#4ec9b0,color:#fff
+    classDef orange stroke:#ff6600
+    classDef yellow stroke:#dcdcaa
+    classDef red stroke:#d16969
+    classDef purple stroke:#c586c0
+    classDef blue stroke:#569cd6
+    classDef bluelight stroke:#569cd6,color:#9cdcfe
+    classDef teal stroke:#4ec9b0
 
-    style desugars fill:#0a0a0a,stroke:#ff6600,color:#fff,stroke-width:2px
-    style guardrails fill:#0a0a0a,stroke:#d16969,color:#fff,stroke-width:2px
-    style events fill:#0a0a0a,stroke:#4ec9b0,color:#fff,stroke-width:2px
-
-    linkStyle default stroke:#6fc3df,stroke-width:1.5px
+    style desugars stroke:#ff6600,stroke-width:2px
+    style guardrails stroke:#d16969,stroke-width:2px
+    style events stroke:#4ec9b0,stroke-width:2px

@@ -161,15 +161,15 @@ pub fn BrowserView(browser_id: String, url: String, devtools: bool) -> Element {
                         }
                         Some("back") => {
                             if let Err(e) = session.go_back().await { error!("browser go_back failed: {e}"); break; }
-                            if let Ok(url) = session.current_url().await { nav_ctx.current_url.set(url); }
+                            match session.current_url().await { Ok(url) => nav_ctx.current_url.set(url), Err(e) => error!("browser current_url failed: {e}") }
                         }
                         Some("forward") => {
                             if let Err(e) = session.go_forward().await { error!("browser go_forward failed: {e}"); break; }
-                            if let Ok(url) = session.current_url().await { nav_ctx.current_url.set(url); }
+                            match session.current_url().await { Ok(url) => nav_ctx.current_url.set(url), Err(e) => error!("browser current_url failed: {e}") }
                         }
                         Some("refresh") => {
                             if let Err(e) = session.reload().await { error!("browser reload failed: {e}"); break; }
-                            if let Ok(url) = session.current_url().await { nav_ctx.current_url.set(url); }
+                            match session.current_url().await { Ok(url) => nav_ctx.current_url.set(url), Err(e) => error!("browser current_url failed: {e}") }
                         }
                         _ => {}
                     },
@@ -181,15 +181,15 @@ pub fn BrowserView(browser_id: String, url: String, devtools: bool) -> Element {
                     match cmd.as_str() {
                         "back" => {
                             if let Err(e) = session.go_back().await { error!("browser go_back failed: {e}"); }
-                            if let Ok(url) = session.current_url().await { nav_ctx.current_url.set(url); }
+                            match session.current_url().await { Ok(url) => nav_ctx.current_url.set(url), Err(e) => error!("browser current_url failed: {e}") }
                         }
                         "forward" => {
                             if let Err(e) = session.go_forward().await { error!("browser go_forward failed: {e}"); }
-                            if let Ok(url) = session.current_url().await { nav_ctx.current_url.set(url); }
+                            match session.current_url().await { Ok(url) => nav_ctx.current_url.set(url), Err(e) => error!("browser current_url failed: {e}") }
                         }
                         "refresh" => {
                             if let Err(e) = session.reload().await { error!("browser reload failed: {e}"); }
-                            if let Ok(url) = session.current_url().await { nav_ctx.current_url.set(url); }
+                            match session.current_url().await { Ok(url) => nav_ctx.current_url.set(url), Err(e) => error!("browser current_url failed: {e}") }
                         }
                         raw_url => {
                             let url = if raw_url.starts_with("http://") || raw_url.starts_with("https://") {
