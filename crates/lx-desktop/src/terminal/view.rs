@@ -21,9 +21,9 @@ pub use super::voice_view::VoiceView;
 
 #[derive(Clone)]
 pub struct BrowserNavCtx {
-    pub tx: mpsc::UnboundedSender<String>,
-    pub rx: Arc<Mutex<Option<mpsc::UnboundedReceiver<String>>>>,
-    pub current_url: Signal<String>,
+  pub tx: mpsc::UnboundedSender<String>,
+  pub rx: Arc<Mutex<Option<mpsc::UnboundedReceiver<String>>>>,
+  pub current_url: Signal<String>,
 }
 
 #[component]
@@ -110,7 +110,7 @@ pub fn BrowserView(browser_id: String, url: String, devtools: bool) -> Element {
   use_future(move || {
     let browser_id = browser_id.clone();
     let url = url.clone();
-    let nav_ctx = nav_ctx.clone();
+    let mut nav_ctx = nav_ctx.clone();
     async move {
       let session = match browser_cdp::get_or_create_session(&browser_id).await {
         Ok(s) => s,
@@ -124,11 +124,16 @@ pub fn BrowserView(browser_id: String, url: String, devtools: bool) -> Element {
       if !url.is_empty() && url != "about:blank" {
         match session.navigate(&url).await {
           Ok((final_url, _)) => nav_ctx.current_url.set(final_url),
-          Err(e) => { error!("browser navigate failed: {e}"); return; }
+          Err(e) => {
+            error!("browser navigate failed: {e}");
+            return;
+          },
         }
       }
 
-      let Some(mut nav_rx) = nav_ctx.rx.lock().unwrap().take() else { return; };
+      let Some(mut nav_rx) = nav_ctx.rx.lock().unwrap().take() else {
+        return;
+      };
 
       let mut interval = interval(Duration::from_millis(500));
 

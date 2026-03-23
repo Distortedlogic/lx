@@ -107,7 +107,7 @@ fn render_tab(
         PaneItem {
           key: "{pane.pane_id()}",
           tabs_state,
-          pane: pane.clone(),
+          pane: DesktopPane::clone(pane),
           rect: *rect,
           focused_pane_id: focused_pane_id.clone(),
         }
@@ -133,14 +133,26 @@ fn PaneItem(mut tabs_state: Signal<TabsState<DesktopPane>>, pane: DesktopPane, r
   let pane_toolbar = pane.clone();
   let pane_view = pane.clone();
 
-  let current_url: Signal<String> = use_signal(|| {
-    match &pane { DesktopPane::Browser { url, .. } => url.clone(), _ => String::new() }
+  let current_url: Signal<String> = use_signal(|| match &pane {
+    DesktopPane::Browser { url, .. } => url.clone(),
+    _ => String::new(),
   });
   let nav_ctx = use_hook(|| {
     let (tx, rx) = mpsc::unbounded_channel::<String>();
     BrowserNavCtx { tx, rx: Arc::new(Mutex::new(Some(rx))), current_url }
   });
   provide_context(nav_ctx.clone());
+
+  let on_nav = if is_browser {
+    let tx = nav_ctx.tx.clone();
+    Some(EventHandler::new(move |cmd: String| {
+      if let Err(e) = tx.send(cmd) {
+        error!("nav send failed: {e}");
+      }
+    }))
+  } else {
+    None
+  };
 
   rsx! {
     div {
@@ -155,16 +167,11 @@ fn PaneItem(mut tabs_state: Signal<TabsState<DesktopPane>>, pane: DesktopPane, r
         on_split_h: move |_| split_pane(tabs_state, &pid_sh, SplitDirection::Horizontal),
         on_split_v: move |_| split_pane(tabs_state, &pid_sv, SplitDirection::Vertical),
         on_close: move |_| close_pane(tabs_state, &pid_close),
-        on_navigate: if is_browser {
-          let tx = nav_ctx.tx.clone();
-          Some(EventHandler::new(move |cmd: String| { if let Err(e) = tx.send(cmd) { error!("nav send failed: {e}"); } }))
-        } else {
-          None
-        },
+        on_navigate: on_nav,
         on_convert: move |new_node: PaneNode<DesktopPane>| {
             tabs_state.write().convert_pane_in_active_tab(&pid_convert, new_node);
         },
-        current_url: current_url.into(),
+        current_url: ReadSignal::from(current_url),
       }
       div { class: "flex-1 min-h-0", {render_pane_view(&pane_view)} }
     }

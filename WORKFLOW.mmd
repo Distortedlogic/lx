@@ -1,7 +1,6 @@
 graph TD
     start(["Start"]):::teal
-    start --> groups["Collect groups"]:::blue
-    groups --> loop_start["For each group"]:::purple
+    start --> loop_start["For each group"]:::purple
 
     loop_start --> implement["1. Spawn subagent: Implement"]:::orange
     implement --> audit["`**2. Spawn subagent: Audit**
@@ -13,17 +12,16 @@ compiles and tests pass with 0 errors
 grade 0–100`"]:::yellow
     audit --> check{{"score >= 93?"}}:::teal
 
-    check -- "yes" --> next_group["Next group"]:::blue
     check -- "no" --> stuck{{"stuck?"}}:::red
-
-    stuck -- "yes" --> bail["Bail — log unresolved"]:::red
-    bail --> done
+    check -- "yes" --> more{{"more groups?"}}:::purple
 
     stuck -- "no" --> fix["`**3. Spawn subagent: Fix**
 receives file:line per failure`"]:::orange
     fix --> audit
 
-    next_group --> more{{"more groups?"}}:::purple
+    stuck -- "yes" --> bail["Bail — log unresolved"]:::red
+    bail --> done
+
     more -- "yes" --> loop_start
     more -- "no" --> sys_audit["`**4. Spawn subagent: System Audit**
 verify all work items were fully executed
@@ -31,7 +29,17 @@ no stubs, placeholders, or no-op bodies
 infrastructure has actual call sites
 compiles and tests pass with 0 errors
 output: findings with file:line`"]:::cyan
-    sys_audit --> done(["Done"]):::teal
+    sys_audit --> sys_check{{"score >= 93?"}}:::teal
+
+    sys_check -- "no" --> sys_stuck{{"stuck?"}}:::red
+    sys_check -- "yes" --> done(["Done"]):::teal
+
+    sys_stuck -- "no" --> sys_fix["`**5. Spawn subagent: Fix**
+receives file:line per failure`"]:::orange
+    sys_fix --> sys_audit
+
+    sys_stuck -- "yes" --> sys_bail["Bail — log unresolved"]:::red
+    sys_bail --> done
 
     classDef teal stroke:#4ec9b0
     classDef blue stroke:#569cd6

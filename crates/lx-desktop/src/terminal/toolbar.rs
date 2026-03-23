@@ -13,7 +13,7 @@ pub fn PaneToolbar(
   on_close: EventHandler,
   on_navigate: Option<EventHandler<String>>,
   on_convert: EventHandler<PaneNode<DesktopPane>>,
-  current_url: ReadOnlySignal<String>,
+  current_url: ReadSignal<String>,
 ) -> Element {
   let initial_url = match &pane {
     DesktopPane::Browser { url, .. } => url.clone(),
