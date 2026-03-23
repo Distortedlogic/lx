@@ -1,16 +1,20 @@
+use std::time::Duration;
+
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as B64;
 use dioxus::prelude::*;
-use kokoro_client::SpeechRequest;
 use pane_tree::TabsState;
 use pane_tree::{NotificationLevel, PaneNotification};
-use voice_agent::AgentBackend as _;
-use whisper_client::InferenceClient as _;
-use whisper_client::TranscribeRequest;
+use serde_json::Value;
+use tokio::sync::broadcast::error::RecvError;
+use tokio::time::interval;
+use uuid::Uuid;
 use widget_bridge::use_ts_widget;
 
 use super::use_tabs_state;
 use crate::panes::DesktopPane;
+
+pub use super::voice_view::VoiceView;
 
 #[component]
 pub fn TerminalView(terminal_id: String, working_dir: String, command: Option<String>) -> Element {
@@ -42,28 +46,28 @@ pub fn TerminalView(terminal_id: String, working_dir: String, command: Option<St
                     Ok(bytes) => {
                         widget.send_update(B64.encode(&bytes));
                     }
-                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                    Err(RecvError::Closed) => {
                         tabs_state.write().set_notification(
                             &tid_notif,
                             PaneNotification { level: NotificationLevel::Success, message: None },
                         );
                         break;
                     }
-                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
+                    Err(RecvError::Lagged(_)) => {}
                 }
             }
-            result = widget.recv::<serde_json::Value>() => {
+            result = widget.recv::<Value>() => {
                 match result {
                     Ok(msg) => match msg["type"].as_str() {
                         Some("input") => {
                             if let Some(data) = msg["data"].as_str() {
-                                let _ = session.send_input(data.as_bytes().to_vec()).await;
+                                if session.send_input(data.as_bytes().to_vec()).await.is_err() { break; }
                             }
                         }
                         Some("resize") => {
                             let cols = msg["cols"].as_u64().unwrap_or(80) as u16;
                             let rows = msg["rows"].as_u64().unwrap_or(24) as u16;
-                            let _ = session.resize(cols, rows);
+                            if session.resize(cols, rows).is_err() { break; }
                             widget.send_resize();
                         }
                         _ => {}
@@ -86,11 +90,78 @@ pub fn TerminalView(terminal_id: String, working_dir: String, command: Option<St
 
 #[component]
 pub fn BrowserView(browser_id: String, url: String, devtools: bool) -> Element {
-  let (element_id, _widget) = use_ts_widget("browser", serde_json::json!({ "url": url, "mode": "cdp" }));
+  let (element_id, widget) = use_ts_widget("browser", serde_json::json!({ "url": url, "mode": "cdp" }));
+
+  let eid_rsx = element_id.clone();
+  let bid_drop = browser_id.clone();
+  use_future(move || {
+    let browser_id = browser_id.clone();
+    let url = url.clone();
+    async move {
+      let session = match browser_cdp::get_or_create_session(&browser_id).await {
+        Ok(s) => s,
+        Err(_e) => return,
+      };
+
+      if !url.is_empty() && url != "about:blank" {
+        if session.navigate(&url).await.is_err() {
+          return;
+        }
+      }
+
+      let mut interval = interval(Duration::from_millis(500));
+
+      loop {
+        tokio::select! {
+            _ = interval.tick() => {
+                match session.screenshot().await {
+                    Ok(b64) => widget.send_update(b64),
+                    Err(_) => break,
+                }
+            }
+            result = widget.recv::<Value>() => {
+                match result {
+                    Ok(msg) => match msg["type"].as_str() {
+                        Some("click") => {
+                            let (Some(x), Some(y)) = (msg["x"].as_f64(), msg["y"].as_f64()) else { continue; };
+                            if session.click(x, y).await.is_err() { break; }
+                        }
+                        Some("type") => {
+                            if let Some(text) = msg["text"].as_str() {
+                                if session.type_text(text).await.is_err() { break; }
+                            }
+                        }
+                        Some("navigate") => {
+                            if let Some(nav_url) = msg["url"].as_str() {
+                                if session.navigate(nav_url).await.is_err() { break; }
+                            }
+                        }
+                        Some("back") => {
+                            if session.go_back().await.is_err() { break; }
+                        }
+                        Some("forward") => {
+                            if session.go_forward().await.is_err() { break; }
+                        }
+                        Some("refresh") => {
+                            if session.reload().await.is_err() { break; }
+                        }
+                        _ => {}
+                    },
+                    Err(_) => break,
+                }
+            }
+        }
+      }
+    }
+  });
+
+  use_drop(move || {
+    browser_cdp::remove_session(&bid_drop);
+  });
 
   rsx! {
     div {
-      id: "{element_id}",
+      id: "{eid_rsx}",
       class: "w-full h-full bg-[var(--surface-container)]",
     }
   }
@@ -130,7 +201,7 @@ pub fn AgentView(agent_id: String, session_id: String, model: String) -> Element
 }
 
 #[component]
-pub fn CanvasView(canvas_id: String, widget_type: String, config: serde_json::Value) -> Element {
+pub fn CanvasView(canvas_id: String, widget_type: String, config: Value) -> Element {
   let (element_id, _widget) = use_ts_widget(&widget_type, &config);
 
   rsx! {
@@ -143,7 +214,7 @@ pub fn CanvasView(canvas_id: String, widget_type: String, config: serde_json::Va
 
 #[component]
 pub fn ChartView(chart_id: String, chart_json: String, title: Option<String>) -> Element {
-  let div_id = use_hook(|| format!("chart-{}", uuid::Uuid::new_v4().simple()));
+  let div_id = use_hook(|| format!("chart-{}", Uuid::new_v4().simple()));
   let id = div_id.clone();
   use_effect(move || {
     let json = chart_json.clone();
@@ -162,85 +233,4 @@ pub fn ChartView(chart_id: String, chart_json: String, title: Option<String>) ->
       class: "w-full h-full min-h-32 bg-[var(--surface-container)]",
     }
   }
-}
-
-#[component]
-pub fn VoiceView(voice_id: String) -> Element {
-  let (element_id, widget) = use_ts_widget("voice", serde_json::json!({}));
-  let mut pcm_buffer: Signal<Vec<u8>> = use_signal(Vec::new);
-
-  let eid_rsx = element_id.clone();
-  use_future(move || async move {
-    loop {
-      let Ok(msg) = widget.recv::<serde_json::Value>().await else { break };
-
-      match msg["type"].as_str() {
-        Some("audio_chunk") => {
-          if let Some(data) = msg["data"].as_str()
-            && let Ok(bytes) = B64.decode(data)
-          {
-            pcm_buffer.write().extend_from_slice(&bytes);
-          }
-        },
-        Some("silence_detected") => {
-          let buffer = std::mem::take(&mut *pcm_buffer.write());
-          if buffer.is_empty() {
-            continue;
-          }
-          if let Err(e) = process_voice_pipeline(&buffer, widget).await {
-            widget.send_update(serde_json::json!({
-                "type": "error",
-                "message": e.to_string(),
-            }));
-          }
-        },
-        Some("start_standby") | Some("cancel") => {
-          pcm_buffer.write().clear();
-        },
-        Some("playback_complete") => {},
-        _ => {},
-      }
-    }
-  });
-
-  rsx! {
-    div {
-      id: "{eid_rsx}",
-      class: "w-full h-full bg-[var(--surface-container-lowest)]",
-    }
-  }
-}
-
-async fn process_voice_pipeline(pcm: &[u8], widget: widget_bridge::TsWidgetHandle) -> anyhow::Result<()> {
-  let wav = audio_core::wrap_pcm_as_wav(pcm, audio_core::SAMPLE_RATE, audio_core::CHANNELS, audio_core::BITS_PER_SAMPLE);
-  let audio_data = B64.encode(&wav);
-
-  let transcription = whisper_client::WHISPER.infer(&TranscribeRequest { audio_data, language: None }).await?;
-
-  let text = transcription.text.trim().to_owned();
-  widget.send_update(serde_json::json!({
-      "type": "transcript",
-      "text": text,
-  }));
-
-  if text.is_empty() {
-    return Ok(());
-  }
-
-  let response = crate::voice_backend::ClaudeCliBackend.query(&text).await?;
-  widget.send_update(serde_json::json!({
-      "type": "agent_response",
-      "text": response,
-  }));
-
-  let speech_req = SpeechRequest { text: response, voice: "af_heart".into(), lang_code: "a".into(), speed: 1.0 };
-  let wav_bytes = kokoro_client::KOKORO.infer(&speech_req).await?;
-  let chunks = audio_core::chunk_wav(&wav_bytes, 32768);
-  for chunk in chunks {
-    widget.send_update(serde_json::json!({
-        "type": "audio_response",
-        "data": B64.encode(&chunk),
-    }));
-  }
-  Ok(())
 }

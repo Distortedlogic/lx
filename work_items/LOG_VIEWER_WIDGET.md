@@ -10,7 +10,7 @@ Extract the log viewer into a self-contained, well-documented widget with a clea
 
 # What changes
 
-**Add filter toolbar to `ts/widget-bridge/widgets/log-viewer.ts`:** A compact toolbar above the log container with toggle buttons for each log level (info, warn, error, debug) and a clear button. Toggling a level hides/shows lines of that level via CSS class filtering. Clear empties the container and re-shows the placeholder.
+**Add filter toolbar to `ts/widget-bridge/widgets/log-viewer.ts`:** A compact toolbar above the log container with toggle buttons for each log level (info, warn, error, debug) and a clear button. Toggling a level hides/shows lines of that level via CSS class filtering. Clear empties the container and re-creates the placeholder div.
 
 **Add log line count display:** Show a count of total and visible log lines in the toolbar.
 
@@ -24,7 +24,15 @@ Extract the log viewer into a self-contained, well-documented widget with a clea
 
 **Subject:** Add level filtering and clear functionality to log viewer widget
 
-**Description:** In `ts/widget-bridge/widgets/log-viewer.ts`, in the `mount` function, before appending the log container to the element, create a toolbar div with `display: flex; alignItems: center; gap: 4px; padding: 4px 8px; background: #131313; borderBottom: 1px solid #484848; fontSize: 11px;`. Add four toggle buttons (info, warn, error, debug) — each styled with the corresponding level color, initially "on" (opacity 1). Clicking a toggle sets its opacity to 0.3 and adds a CSS class to the container that hides lines of that level (use `data-level` attribute on each log line div, and a container class like `hide-info` with CSS rule `[data-level="info"] { display: none }`). Add a "Clear" button that empties the container and re-shows the placeholder. Add a span showing line count, updated in the `update` method. In the `appendLine` function, add `div.dataset.level = line.level` to each log line div so filtering works. Inject the filter CSS styles via a `<style>` tag in the mount function.
+**Description:** In `ts/widget-bridge/widgets/log-viewer.ts`, in the `mount` function, use flexbox for the outer container layout: set the element to `display: flex; flexDirection: column; height: 100%`. The toolbar is a fixed-height child and the log container uses `flex: 1; overflow-y: auto` — this prevents the container from overflowing when the toolbar is added.
+
+Create a toolbar div with `display: flex; alignItems: center; gap: 4px; padding: 4px 8px; background: #131313; borderBottom: 1px solid #484848; fontSize: 11px;`. Add four toggle buttons (info, warn, error, debug) — each styled with the corresponding level color, initially "on" (opacity 1). Clicking a toggle ALTERNATES between on (opacity 1, class removed, level added back to `hiddenLevels` set) and off (opacity 0.3, class added, level removed from set). The CSS rules must be SCOPED to the container class: `.hide-info [data-level="info"] { display: none }`, `.hide-warn [data-level="warn"] { display: none }`, etc. — NOT bare `[data-level="info"] { display: none }` which would always hide.
+
+Add a "Clear" button that empties the container and re-creates the placeholder div. The placeholder must be created with `document.createElement` matching the same structure as the initial mount (not just "re-shown", since the update method calls `.remove()` on the placeholder). For example: `const placeholder = document.createElement("p"); placeholder.style.color = "#757575"; placeholder.textContent = "Log viewer — awaiting log entries"; container.appendChild(placeholder);` — and store the reference on the state object so `update` can find it.
+
+Add a span showing line count, updated in the `update` method. Track filter state via a `Set<string>` of hidden levels stored on the state object (add `hiddenLevels: Set<string>` to `LogViewerState`). The line count display should reflect total lines and the number hidden by filters.
+
+In the `appendLine` function, add `div.dataset.level = line.level` to each log line div so filtering works. Inject the filter CSS styles via a `<style>` tag in the mount function.
 
 **ActiveForm:** Adding filter toolbar and clear button to log viewer
 

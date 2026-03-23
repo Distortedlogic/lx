@@ -162,7 +162,7 @@ function mountCdp(elementId: string, cfg: { url?: string; viewport?: { width: nu
     ctx.fillStyle = "#0e0e0e";
     ctx.fillRect(0, 0, 800, 600);
     ctx.fillStyle = "#757575";
-    ctx.font = "24px monospace";
+    ctx.font = "14px monospace";
     ctx.textAlign = "center";
     ctx.fillText("CDP backend not connected", 400, 300);
   }

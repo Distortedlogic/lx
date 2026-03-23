@@ -5,16 +5,28 @@
   "type": "module",
   "main": "dist/widget-bridge.js",
   "types": "dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "vite build",
     "check": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@xterm/xterm": "^5.5.0",
-    "@xterm/addon-fit": "^0.10.0",
+    "@codemirror/lang-css": "^6.3.1",
+    "@codemirror/lang-html": "^6.4.11",
+    "@codemirror/lang-javascript": "^6.2.5",
+    "@codemirror/lang-json": "^6.0.2",
+    "@codemirror/lang-python": "^6.2.1",
+    "@codemirror/lang-rust": "^6.0.2",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/theme-one-dark": "^6.1.3",
+    "@codemirror/view": "^6.40.0",
     "@lx/audio-capture": "workspace:*",
-    "@lx/audio-playback": "workspace:*"
+    "@lx/audio-playback": "workspace:*",
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0",
+    "codemirror": "^6.0.2"
   }
 }

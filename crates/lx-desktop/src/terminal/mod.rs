@@ -2,6 +2,7 @@ pub mod status_badge;
 pub mod tab_bar;
 pub mod toolbar;
 pub mod view;
+pub mod voice_view;
 
 use dioxus::prelude::*;
 use pane_tree::{PaneNode, Tab, TabsState};

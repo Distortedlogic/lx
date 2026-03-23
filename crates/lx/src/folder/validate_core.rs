@@ -1,6 +1,6 @@
 use crate::ast::{AstArena, Core, Expr, ExprId, NodeId, Program, StmtId, WithKind};
 
-pub fn validate_core(program: &Program<Core>) {
+pub(super) fn validate_core(program: &Program<Core>) {
   for &sid in &program.stmts {
     validate_stmt(sid, &program.arena);
   }

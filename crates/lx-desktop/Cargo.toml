@@ -25,6 +25,7 @@ audio-core = { path = "../audio-core" }
 whisper-client = { path = "../whisper-client" }
 kokoro-client = { path = "../kokoro-client" }
 voice-agent = { path = "../voice-agent" }
+browser-cdp = { path = "../browser-cdp" }
 anyhow = "1"
 async-trait = "0.1"
 base64 = "0.22"
