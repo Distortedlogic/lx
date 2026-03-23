@@ -65,10 +65,9 @@ where
       d.exported = exp;
       a3.borrow_mut().alloc_stmt(Stmt::ClassDecl(d), ss(e.span()))
     }),
-    exported
-      .clone()
-      .then(type_def)
-      .map_with(move |(exp, (name, variants)), e| a4.borrow_mut().alloc_stmt(Stmt::TypeDef(StmtTypeDef { name, variants, exported: exp }), ss(e.span()))),
+    exported.clone().then(type_def).map_with(move |(exp, (name, type_params, variants)), e| {
+      a4.borrow_mut().alloc_stmt(Stmt::TypeDef(StmtTypeDef { name, type_params, variants, exported: exp }), ss(e.span()))
+    }),
     exported.then(binding).map_with(move |(exp, mut b), e| {
       b.exported = exp;
       a5.borrow_mut().alloc_stmt(Stmt::Binding(b), ss(e.span()))
@@ -160,7 +159,7 @@ where
   })
 }
 
-fn type_def_parser<'a, I>() -> impl Parser<'a, I, (Sym, Vec<(Sym, usize)>), extra::Err<Rich<'a, TokenKind, Span>>> + Clone
+fn type_def_parser<'a, I>() -> impl Parser<'a, I, (Sym, Vec<Sym>, Vec<(Sym, usize)>), extra::Err<Rich<'a, TokenKind, Span>>> + Clone
 where
   I: ValueInput<'a, Token = TokenKind, Span = Span>,
 {
@@ -173,11 +172,11 @@ where
   );
 
   type_name()
-    .then(ident().ignored().repeated())
+    .then(super::type_ann::generic_params())
     .then_ignore(just(TokenKind::Assign))
     .then_ignore(super::expr::skip_semis())
     .then(variant.separated_by(super::expr::skip_semis()).at_least(1).collect::<Vec<_>>())
-    .map(|((name, _), variants)| (name, variants))
+    .map(|((name, type_params), variants)| (name, type_params, variants))
 }
 
 fn trait_parser<'a, I>(
@@ -190,19 +189,31 @@ where
   let trait_union = just(TokenKind::Trait)
     .ignore_then(just(TokenKind::Export).or_not())
     .ignore_then(type_name())
+    .then(super::type_ann::generic_params())
     .then_ignore(just(TokenKind::Assign))
     .then(type_name().separated_by(just(TokenKind::Pipe)).at_least(1).collect::<Vec<_>>())
-    .map(|(name, variants)| Stmt::TraitUnion(TraitUnionDef { name, variants, exported: false }));
+    .map(|((name, type_params), variants)| Stmt::TraitUnion(TraitUnionDef { name, type_params, variants, exported: false }));
 
   let trait_decl = just(TokenKind::Trait)
     .ignore_then(just(TokenKind::Export).or_not())
     .ignore_then(type_name())
+    .then(super::type_ann::generic_params())
     .then_ignore(just(TokenKind::Assign))
     .then_ignore(just(TokenKind::LBrace))
     .then(trait_body(expr))
     .then_ignore(just(TokenKind::RBrace))
-    .map(|(name, (entries, defaults))| {
-      Stmt::TraitDecl(TraitDeclData { name, entries, methods: vec![], defaults, requires: vec![], description: None, tags: vec![], exported: false })
+    .map(|((name, type_params), (entries, defaults))| {
+      Stmt::TraitDecl(TraitDeclData {
+        name,
+        type_params,
+        entries,
+        methods: vec![],
+        defaults,
+        requires: vec![],
+        description: None,
+        tags: vec![],
+        exported: false,
+      })
     });
 
   trait_union.or(trait_decl)

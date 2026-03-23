@@ -26,6 +26,29 @@ const editorWidget: Widget = {
     container.textContent = content;
     container.contentEditable = "true";
     container.spellcheck = false;
+    container.classList.add("border-l-2", "border-[var(--outline-variant)]");
+
+    const placeholderText = "Empty — start typing";
+
+    function updatePlaceholder() {
+      if (!container.textContent) {
+        container.style.color = "#757575";
+        container.textContent = placeholderText;
+      }
+    }
+
+    container.addEventListener("focus", () => {
+      if (container.textContent === placeholderText) {
+        container.textContent = "";
+        container.style.color = "#e0e0e0";
+      }
+    });
+
+    container.addEventListener("blur", () => {
+      updatePlaceholder();
+    });
+
+    updatePlaceholder();
 
     container.addEventListener("keydown", (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {

@@ -1,8 +1,11 @@
-%%{init: {'theme': 'dark', 'themeVariables': {'primaryColor': '#000000', 'primaryTextColor': '#ffffff', 'primaryBorderColor': '#6fc3df', 'lineColor': '#6fc3df', 'fontSize': '14px', 'fontFamily': 'monospace'}}}%%
-
 graph TD
     source[".lx source"]
+    config["`**Config**
+CLAUDE.md · AGENTS.md
+Skills · Policies
+Permissions`"]
     source --> lexer["Lexer"]
+    config --> lexer
     lexer --> parser["Parser → Surface AST"]
     parser --> desugars
 
@@ -29,14 +32,35 @@ inference
 unification
 exhaustiveness
 diagnostics`"]
-    checker --> interpreter["`**Interpreter**
+    checker --> guardrails
+
+    subgraph guardrails ["Guardrails"]
+        direction LR
+        gr_content["`**Content**
+relevance
+safety · PII
+moderation`"]
+        gr_tool["`**Tool**
+risk rating
+input validation
+output validation`"]
+        gr_policy["`**Policy**
+rules-based
+constitutional
+sandbox enforcement`"]
+        gr_content ~~~ gr_tool ~~~ gr_policy
+    end
+
+    guardrails --> interpreter["`**Interpreter**
 async tree-walk eval`"]
 
     interpreter --> backends["`**Core Backends (swappable)**
 Ai
 Fs
 Store
-Channel`"]
+Channel
+Memory
+Sandbox`"]
     interpreter --> events
 
     subgraph events ["Runtime Events"]
@@ -67,8 +91,21 @@ context`"]
         evt_trace["`**Trace**
 span · tool_call
 cost`"]
+        evt_security["`**Security**
+guardrail triggered
+permission denied
+sandbox violation`"]
+        evt_eval["`**Evaluation**
+grade assigned
+threshold met/missed
+validation pass/fail`"]
+        evt_memory["`**Memory**
+recalled · stored
+consolidated
+pruned`"]
         evt_agent ~~~ evt_pipeline ~~~ evt_output
         evt_budget ~~~ evt_concurrency ~~~ evt_state
+        evt_trace ~~~ evt_security ~~~ evt_eval
     end
 
     backends --> tools["`**Tools**
@@ -76,7 +113,8 @@ Read · Write · Edit
 Glob · Grep
 WebSearch · WebFetch
 Browser · Git
-Test · Lint`"]
+Test · Lint
+RAG · Embed`"]
     backends --> clis["`**CLIs**
 Bash
 Skill`"]
@@ -87,7 +125,12 @@ Worktree
 Cron
 ToolSearch · MCP
 Hooks · Permissions
-Compaction`"]
+Context Management`"]
+
+    backends --> protocols["`**Protocols**
+MCP — agent ↔ tool
+A2A — agent ↔ agent
+AG-UI — agent ↔ frontend`"]
 
     events --> subs["`**Subscribers**
 lx-desktop
@@ -97,6 +140,7 @@ CI/CD
 headless`"]
 
     style source fill:#000,stroke:#fff,color:#fff
+    style config fill:#000,stroke:#fff,color:#fff
     style lexer fill:#000,stroke:#ff6600,color:#fff
     style parser fill:#000,stroke:#ff6600,color:#fff
     style desugars fill:#0a0a0a,stroke:#ff6600,color:#fff,stroke-width:2px
@@ -104,11 +148,16 @@ headless`"]
     style ds_agents fill:#000,stroke:#ff6600,color:#fff
     style ds_control fill:#000,stroke:#ff6600,color:#fff
     style checker fill:#000,stroke:#dcdcaa,color:#fff
+    style guardrails fill:#0a0a0a,stroke:#d16969,color:#fff,stroke-width:2px
+    style gr_content fill:#000,stroke:#d16969,color:#fff
+    style gr_tool fill:#000,stroke:#d16969,color:#fff
+    style gr_policy fill:#000,stroke:#d16969,color:#fff
     style interpreter fill:#000,stroke:#c586c0,color:#fff
     style backends fill:#000,stroke:#569cd6,color:#fff
     style tools fill:#000,stroke:#569cd6,color:#9cdcfe
     style clis fill:#000,stroke:#569cd6,color:#9cdcfe
     style infra fill:#000,stroke:#569cd6,color:#9cdcfe
+    style protocols fill:#000,stroke:#569cd6,color:#9cdcfe
     style events fill:#0a0a0a,stroke:#4ec9b0,color:#fff,stroke-width:2px
     style evt_agent fill:#000,stroke:#4ec9b0,color:#fff
     style evt_pipeline fill:#000,stroke:#4ec9b0,color:#fff
@@ -117,6 +166,9 @@ headless`"]
     style evt_concurrency fill:#000,stroke:#4ec9b0,color:#fff
     style evt_state fill:#000,stroke:#4ec9b0,color:#fff
     style evt_trace fill:#000,stroke:#4ec9b0,color:#fff
+    style evt_security fill:#000,stroke:#4ec9b0,color:#fff
+    style evt_eval fill:#000,stroke:#4ec9b0,color:#fff
+    style evt_memory fill:#000,stroke:#4ec9b0,color:#fff
     style subs fill:#000,stroke:#4ec9b0,color:#fff
 
     linkStyle default stroke:#6fc3df,stroke-width:1.5px

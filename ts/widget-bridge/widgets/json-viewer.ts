@@ -93,6 +93,11 @@ const jsonViewerWidget: Widget = {
     container.className = "json-viewer-container";
 
     el.appendChild(container);
+
+    const placeholder = document.createElement("div");
+    placeholder.textContent = "JSON viewer — no data loaded";
+    placeholder.style.color = "#757575";
+    container.appendChild(placeholder);
   },
 
   update(elementId: string, data: unknown) {

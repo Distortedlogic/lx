@@ -33,8 +33,8 @@ pub fn check_file(path: &str, strict: bool) -> ExitCode {
           "warning"
         },
       };
-      let msg = d.kind.display(&result.type_arena);
-      let err = LxError::type_err(format!("{prefix}: {msg}"), d.span, d.kind.help(&result.type_arena));
+      let msg = d.kind.display(&result.semantic.type_arena);
+      let err = LxError::type_err(format!("{prefix}: {msg}"), d.span, d.kind.help(&result.semantic.type_arena));
       let named = NamedSource::new(path, source.clone());
       let report = Report::new(err).with_source_code(named);
       eprintln!("{report:?}");
@@ -137,8 +137,8 @@ pub fn check_workspace(member_filter: Option<&str>, strict: bool) -> ExitCode {
 
 fn print_diagnostics(result: &CheckResult, path_str: &str, source: &str, prefix: &str) {
   for d in &result.diagnostics {
-    let msg = d.kind.display(&result.type_arena);
-    let err = LxError::type_err(format!("{prefix}: {msg}"), d.span, d.kind.help(&result.type_arena));
+    let msg = d.kind.display(&result.semantic.type_arena);
+    let err = LxError::type_err(format!("{prefix}: {msg}"), d.span, d.kind.help(&result.semantic.type_arena));
     let named = NamedSource::new(path_str, source.to_string());
     let report = Report::new(err).with_source_code(named);
     eprintln!("{report:?}");
@@ -152,8 +152,8 @@ fn print_all_diagnostics(result: &CheckResult, path_str: &str, source: &str) {
       DiagLevel::Error => "error",
       DiagLevel::Warning => "warning",
     };
-    let msg = d.kind.display(&result.type_arena);
-    let err = LxError::type_err(format!("{prefix}: {msg}"), d.span, d.kind.help(&result.type_arena));
+    let msg = d.kind.display(&result.semantic.type_arena);
+    let err = LxError::type_err(format!("{prefix}: {msg}"), d.span, d.kind.help(&result.semantic.type_arena));
     let named = NamedSource::new(path_str, source.to_string());
     let report = Report::new(err).with_source_code(named);
     eprintln!("{report:?}");

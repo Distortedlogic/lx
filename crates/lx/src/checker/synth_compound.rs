@@ -1,30 +1,35 @@
-use crate::ast::{
-  Expr, ExprId, Literal, MapEntry, MatchArm, Param, Pattern, PatternConstructor, PatternId, PatternList, PatternRecord, RecordField, StrPart, TypeExprId,
-};
+use std::collections::HashMap;
+
+use crate::ast::{Expr, ExprId, Literal, MapEntry, MatchArm, Param, RecordField, StrPart, TypeExprId};
 use crate::sym::{self, Sym};
 use miette::SourceSpan;
 
 use super::capture::free_vars;
 use super::diagnostics::DiagnosticKind;
 use super::exhaust::{check_exhaustiveness, check_exhaustiveness_no_variants};
-use super::symbol_table::DefKind;
+use super::narrowing;
+use super::semantic::{DefKind, ScopeKind};
 use super::type_arena::TypeId;
 use super::types::Type;
 use super::unification::TypeContext;
 use super::{Checker, DiagLevel};
 
 impl Checker<'_> {
-  pub(super) fn synth_func_type(&mut self, params: &[Param], ret_type: &Option<TypeExprId>, body: ExprId) -> TypeId {
-    self.symbols.push_scope();
-    let mut param_types = Vec::new();
+  pub(super) fn synth_func_type(&mut self, type_params: &[Sym], params: &[Param], ret_type: &Option<TypeExprId>, body: ExprId) -> TypeId {
     let func_span = self.arena.expr_span(body);
+    if !type_params.is_empty() {
+      let bounds: Vec<(Sym, Option<TypeId>)> = type_params.iter().map(|s| (*s, None)).collect();
+      self.push_generic_scope(&bounds);
+    }
+    self.sem.push_scope(ScopeKind::Function, func_span);
+    let mut param_types = Vec::new();
     for p in params {
       let ty = match p.type_ann {
         Some(ann) => self.resolve_type_ann(ann),
         None => self.fresh(),
       };
-      self.symbols.define(p.name, DefKind::FuncParam, func_span);
-      self.symbols.set_type(p.name, ty);
+      let def_id = self.sem.add_definition(p.name, DefKind::FuncParam, func_span, false);
+      self.sem.set_definition_type(def_id, ty);
       param_types.push(ty);
     }
     let body_span = self.arena.expr_span(body);
@@ -41,7 +46,10 @@ impl Checker<'_> {
         },
       }
     }
-    self.symbols.pop_scope();
+    self.sem.pop_scope();
+    if !type_params.is_empty() {
+      self.pop_generic_scope();
+    }
     let ret = match ret_type {
       Some(ann) => self.resolve_type_ann(*ann),
       None => body_type,
@@ -51,51 +59,6 @@ impl Checker<'_> {
       func_type = self.type_arena.alloc(Type::Func { param: p, ret: func_type });
     }
     func_type
-  }
-
-  pub(super) fn bind_pattern_vars(&mut self, pid: PatternId) {
-    let unknown = self.type_arena.unknown();
-    let span = self.arena.pattern_span(pid);
-    match self.arena.pattern(pid).clone() {
-      Pattern::Bind(name) => {
-        self.symbols.define(name, DefKind::PatternBind, span);
-        self.symbols.set_type(name, unknown);
-      },
-      Pattern::Constructor(PatternConstructor { args, .. }) => {
-        for arg in &args {
-          self.bind_pattern_vars(*arg);
-        }
-      },
-      Pattern::Tuple(pats) => {
-        for p in &pats {
-          self.bind_pattern_vars(*p);
-        }
-      },
-      Pattern::List(PatternList { elems, rest }) => {
-        for p in &elems {
-          self.bind_pattern_vars(*p);
-        }
-        if let Some(name) = rest {
-          self.symbols.define(name, DefKind::PatternBind, span);
-          self.symbols.set_type(name, unknown);
-        }
-      },
-      Pattern::Record(PatternRecord { fields, rest }) => {
-        for f in &fields {
-          if let Some(p) = f.pattern {
-            self.bind_pattern_vars(p);
-          } else {
-            self.symbols.define(f.name, DefKind::PatternBind, span);
-            self.symbols.set_type(f.name, unknown);
-          }
-        }
-        if let Some(name) = rest {
-          self.symbols.define(name, DefKind::PatternBind, span);
-          self.symbols.set_type(name, unknown);
-        }
-      },
-      Pattern::Literal(_) | Pattern::Wildcard => {},
-    }
   }
 
   pub(super) fn check_mutable_captures(&mut self, eid: ExprId, span: SourceSpan) {
@@ -134,13 +97,20 @@ impl Checker<'_> {
     let resolved = self.table.resolve(ft, &self.type_arena);
     match self.type_arena.get(resolved).clone() {
       Type::Func { param, ret } => {
-        let arg_t = self.check_expr(arg, param);
+        let type_params = self.collect_params(resolved);
+        let (inst_param, inst_ret) = if type_params.is_empty() {
+          (param, ret)
+        } else {
+          let subst: HashMap<Sym, TypeId> = type_params.into_iter().map(|name| (name, self.fresh())).collect();
+          (self.substitute(param, &subst), self.substitute(ret, &subst))
+        };
+        let arg_t = self.check_expr(arg, inst_param);
         let ctx = TypeContext::FuncArg { func_name: "apply".into(), param_name: "arg".into(), param_idx: 0 };
-        if let Err(te) = self.table.unify_with_context(param, arg_t, ctx, &mut self.type_arena) {
+        if let Err(te) = self.table.unify_with_context(inst_param, arg_t, ctx, &mut self.type_arena) {
           self.emit_type_error(&te, arg_span);
           return self.type_arena.error();
         }
-        ret
+        inst_ret
       },
       Type::Error => {
         self.synth_expr(arg);
@@ -159,14 +129,23 @@ impl Checker<'_> {
     self.check_match_exhaustiveness(resolved_scrut, arms, span);
     let result = self.fresh();
     for (idx, arm) in arms.iter().enumerate() {
-      self.symbols.push_scope();
-      self.bind_pattern_vars(arm.pattern);
+      let arm_span = self.arena.pattern_span(arm.pattern);
+      self.sem.push_scope(ScopeKind::MatchArm, arm_span);
+      self.infer_pattern_bindings(arm.pattern, resolved_scrut);
+      self.narrowing.push();
+      if let Expr::Ident(scrut_name) = self.arena.expr(scrutinee) {
+        let pattern = self.arena.pattern(arm.pattern).clone();
+        let resolved_type = self.type_arena.get(resolved_scrut).clone();
+        let narrowed = narrowing::compute_narrowed_type(&pattern, resolved_scrut, &mut self.type_arena, &resolved_type);
+        self.narrowing.narrow(*scrut_name, narrowed);
+      }
       if let Some(guard) = arm.guard {
         self.synth_expr(guard);
       }
       let body_span = self.arena.expr_span(arm.body);
       let body_t = self.check_expr(arm.body, result);
-      self.symbols.pop_scope();
+      self.narrowing.pop();
+      self.sem.pop_scope();
       let ctx = TypeContext::MatchArm { arm_idx: idx };
       if let Err(te) = self.table.unify_with_context(result, body_t, ctx, &mut self.type_arena) {
         self.emit_type_error(&te, body_span);

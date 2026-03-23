@@ -86,7 +86,7 @@ pub fn TerminalView(terminal_id: String, working_dir: String, command: Option<St
 
 #[component]
 pub fn BrowserView(browser_id: String, url: String, devtools: bool) -> Element {
-  let (element_id, _widget) = use_ts_widget("browser", serde_json::json!({ "url": url }));
+  let (element_id, _widget) = use_ts_widget("browser", serde_json::json!({ "url": url, "mode": "cdp" }));
 
   rsx! {
     div {
@@ -99,9 +99,11 @@ pub fn BrowserView(browser_id: String, url: String, devtools: bool) -> Element {
 #[component]
 pub fn EditorView(editor_id: String, file_path: String, language: Option<String>) -> Element {
   let lang = language.unwrap_or_else(|| "plaintext".into());
+  let content = if file_path.is_empty() { String::new() } else { std::fs::read_to_string(&file_path).unwrap_or_default() };
   let (element_id, _widget) = use_ts_widget(
     "editor",
     serde_json::json!({
+        "content": content,
         "language": lang,
         "filePath": file_path,
     }),

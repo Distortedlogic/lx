@@ -52,4 +52,5 @@ export async function runDividerDrag(dx: Dioxus): Promise<void> {
     args.parentSize,
     dx
   );
+  await dx.recv();
 }

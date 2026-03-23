@@ -31,6 +31,7 @@ where
   just(TokenKind::ClassKw)
     .ignore_then(just(TokenKind::Export).or_not())
     .ignore_then(type_name())
+    .then(super::type_ann::generic_params())
     .then(trait_list.or_not().map(|t| t.unwrap_or_default()))
     .then_ignore(just(TokenKind::Assign))
     .then_ignore(just(TokenKind::LBrace))
@@ -38,7 +39,7 @@ where
     .then(member.separated_by(super::expr::skip_semis()).collect::<Vec<_>>())
     .then_ignore(super::expr::skip_semis())
     .then_ignore(just(TokenKind::RBrace))
-    .map(|((name, traits), members)| {
+    .map(|(((name, type_params), traits), members)| {
       let mut fields = Vec::new();
       let mut methods = Vec::new();
       for m in members {
@@ -47,7 +48,7 @@ where
           ClassMember::Method(m) => methods.push(m),
         }
       }
-      ClassDeclData { name, traits, fields, methods, exported: false }
+      ClassDeclData { name, type_params, traits, fields, methods, exported: false }
     })
 }
 

@@ -104,10 +104,13 @@ where
   let func_def = just(TokenKind::LParen)
     .ignore_then(param.repeated().collect::<Vec<_>>())
     .then_ignore(just(TokenKind::RParen))
+    .then(super::type_ann::generic_params())
     .then(just(TokenKind::Arrow).ignore_then(super::type_ann::type_parser(arena.clone())).or_not())
     .then(just(TokenKind::Amp).ignore_then(expr.clone().delimited_by(just(TokenKind::LParen), just(TokenKind::RParen))).or_not())
     .then(expr.clone())
-    .map_with(move |(((params, ret_type), guard), body), e| a7.borrow_mut().alloc_expr(Expr::Func(ExprFunc { params, ret_type, guard, body }), ss(e.span())));
+    .map_with(move |((((params, type_params), ret_type), guard), body), e| {
+      a7.borrow_mut().alloc_expr(Expr::Func(ExprFunc { params, type_params, ret_type, guard, body }), ss(e.span()))
+    });
 
   let tuple = just(TokenKind::LParen)
     .ignore_then(expr.clone().separated_by(just(TokenKind::Semi).or_not()).at_least(2).collect::<Vec<_>>())

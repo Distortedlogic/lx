@@ -43,7 +43,9 @@ pub enum DiagnosticKind {
   MutableCaptureInConcurrent { name: Sym },
   NonExhaustiveMatch { type_name: Sym, missing_pattern: String },
   DuplicateImport { name: Sym, original_span: SourceSpan },
+  UnknownImport { name: Sym, module: Sym },
   TypeMismatch { error: TypeError },
+  LintWarning { rule_name: String, message: String },
 }
 
 impl DiagnosticKind {
@@ -84,7 +86,13 @@ impl DiagnosticKind {
       Self::DuplicateImport { name, .. } => {
         format!("'{name}' already imported")
       },
+      Self::UnknownImport { name, module } => {
+        format!("'{name}' is not exported by module '{module}'")
+      },
       Self::TypeMismatch { error } => error.to_message(ta),
+      Self::LintWarning { rule_name, message } => {
+        format!("[{rule_name}] {message}")
+      },
     }
   }
 }

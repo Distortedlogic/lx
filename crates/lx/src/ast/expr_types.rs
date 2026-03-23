@@ -136,6 +136,7 @@ pub struct ExprFieldAccess {
 #[derive(Debug, Clone, PartialEq, AstWalk)]
 pub struct ExprFunc {
   pub params: Vec<Param>,
+  pub type_params: Vec<Sym>,
   pub ret_type: Option<TypeExprId>,
   pub guard: Option<ExprId>,
   pub body: ExprId,

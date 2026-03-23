@@ -47,6 +47,7 @@ impl TraitDeclData {
     let defaults = recurse_agent_methods(t, self.defaults, arena);
     TraitDeclData {
       name: self.name,
+      type_params: self.type_params,
       entries,
       methods,
       defaults,
@@ -82,7 +83,7 @@ impl ClassDeclData {
   pub fn recurse_children<T: AstTransformer + ?Sized>(self, t: &mut T, arena: &mut AstArena) -> Self {
     let fields = self.fields.into_iter().map(|f| ClassField { name: f.name, default: walk_transform_expr(t, f.default, arena) }).collect();
     let methods = recurse_agent_methods(t, self.methods, arena);
-    ClassDeclData { name: self.name, traits: self.traits, fields, methods, exported: self.exported }
+    ClassDeclData { name: self.name, type_params: self.type_params, traits: self.traits, fields, methods, exported: self.exported }
   }
 
   pub fn children(&self) -> Vec<NodeId> {

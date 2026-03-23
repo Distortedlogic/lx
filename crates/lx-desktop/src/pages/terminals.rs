@@ -223,8 +223,13 @@ fn render_divider_item(mut tabs_state: Signal<TabsState<DesktopPane>>, divider: 
           let p_start = if is_h { parent_rect.left } else { parent_rect.top };
           let p_size = if is_h { parent_rect.width } else { parent_rect.height };
           spawn(async move {
-              let js = build_drag_js(&cid, is_h, p_start, p_size);
-              let mut eval = document::eval(&js);
+              let mut eval = document::eval("WidgetBridge.runDividerDrag(dioxus)");
+              let _ = eval.send(serde_json::json!({
+                  "containerId": cid,
+                  "direction": if is_h { "horizontal" } else { "vertical" },
+                  "parentStart": p_start,
+                  "parentSize": p_size
+              }));
               while let Ok(msg) = eval.recv::<serde_json::Value>().await {
                   match msg["type"].as_str() {
                       Some("ratio") => {
@@ -239,36 +244,4 @@ fn render_divider_item(mut tabs_state: Signal<TabsState<DesktopPane>>, divider: 
       },
     }
   }
-}
-
-fn build_drag_js(cid: &str, is_h: bool, p_start: f64, p_size: f64) -> String {
-  format!(
-    r#"(async function(dioxus) {{
-            const c = document.getElementById("{cid}");
-            if (!c) {{ dioxus.send({{ type: "done" }}); return; }}
-            const r = c.getBoundingClientRect();
-            const isH = {is_h};
-            const aPos = isH ? r.x : r.y;
-            const aDim = isH ? r.width : r.height;
-            const pS = aPos + (aDim * {p_start}) / 100;
-            const pSz = (aDim * {p_size}) / 100;
-            function onMove(e) {{
-                const pos = (isH ? e.clientX : e.clientY) - pS;
-                const ratio = Math.max(0.1, Math.min(0.9, pos / pSz));
-                dioxus.send({{ type: "ratio", value: ratio }});
-            }}
-            function onUp() {{
-                document.removeEventListener("mousemove", onMove);
-                document.removeEventListener("mouseup", onUp);
-                document.body.style.cursor = "";
-                document.body.style.userSelect = "";
-                dioxus.send({{ type: "done" }});
-            }}
-            document.addEventListener("mousemove", onMove);
-            document.addEventListener("mouseup", onUp);
-            document.body.style.cursor = isH ? "col-resize" : "row-resize";
-            document.body.style.userSelect = "none";
-            await dioxus.recv();
-        }})(dioxus)"#,
-  )
 }

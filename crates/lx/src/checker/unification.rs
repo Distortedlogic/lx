@@ -72,6 +72,10 @@ impl UnificationTable {
         let inner = self.deep_resolve(inner, ta);
         ta.alloc(Type::Maybe(inner))
       },
+      Type::Param { name, bound: Some(b) } => {
+        let b = self.deep_resolve(b, ta);
+        ta.alloc(Type::Param { name, bound: Some(b) })
+      },
       _ => id,
     }
   }
@@ -136,6 +140,23 @@ impl UnificationTable {
         let b_fields = b_fields.clone();
         self.unify_records(&a_fields, &b_fields, ta)
       },
+      (Type::Param { name: a_name, .. }, Type::Param { name: b_name, .. }) if a_name == b_name => Ok(a),
+      (Type::Param { bound: Some(b_bound), .. }, _) => {
+        let b_bound = *b_bound;
+        self.unify(b_bound, b, ta)
+      },
+      (_, Type::Param { bound: Some(b_bound), .. }) => {
+        let b_bound = *b_bound;
+        self.unify(a, b_bound, ta)
+      },
+      (Type::Param { bound: None, .. }, _) => {
+        let var = self.fresh_var(ta);
+        self.unify(var, b, ta)
+      },
+      (_, Type::Param { bound: None, .. }) => {
+        let var = self.fresh_var(ta);
+        self.unify(a, var, ta)
+      },
       _ => Err(format!("type mismatch: expected {}, got {}", ta.display(a), ta.display(b))),
     }
   }
@@ -189,6 +210,8 @@ impl UnificationTable {
         let fields: Vec<_> = fields.clone();
         fields.iter().any(|(_, t)| self.occurs(var, *t, ta))
       },
+      Type::Param { bound: Some(b), .. } => self.occurs(var, *b, ta),
+      Type::Param { bound: None, .. } => false,
       Type::Error => false,
       _ => false,
     }

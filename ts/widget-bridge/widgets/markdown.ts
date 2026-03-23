@@ -31,6 +31,7 @@ const markdownWidget: Widget = {
 
     el.appendChild(style);
     el.appendChild(container);
+    container.innerHTML = '<p style="color: #757575;">Markdown viewer — no content loaded</p>';
   },
 
   update(elementId: string, data: unknown) {

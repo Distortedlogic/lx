@@ -129,54 +129,9 @@ function mountIframe(elementId: string, cfg: { url?: string }, dx: Dioxus) {
 }
 
 function mountCdp(elementId: string, cfg: { url?: string; viewport?: { width: number; height: number } }, dx: Dioxus) {
-  const container = document.createElement("div");
-  container.style.display = "flex";
-  container.style.flexDirection = "column";
-  container.style.height = "100%";
-
-  const toolbar = document.createElement("div");
-  toolbar.style.height = "36px";
-  toolbar.style.display = "flex";
-  toolbar.style.alignItems = "center";
-  toolbar.style.gap = "4px";
-  toolbar.style.padding = "0 8px";
-  toolbar.style.background = "#1a1a2e";
-  toolbar.style.borderBottom = "1px solid #333";
-
-  const makeBtn = (label: string) => {
-    const btn = document.createElement("button");
-    btn.innerHTML = label;
-    btn.style.background = "none";
-    btn.style.border = "none";
-    btn.style.color = "#e0e0e0";
-    btn.style.cursor = "pointer";
-    btn.style.fontSize = "16px";
-    btn.style.padding = "2px 6px";
-    return btn;
-  };
-
-  const backBtn = makeBtn("\u2190");
-  const fwdBtn = makeBtn("\u2192");
-  const refreshBtn = makeBtn("\u21BB");
-
-  const input = document.createElement("input");
-  input.type = "text";
-  input.style.flex = "1";
-  input.style.background = "#0a0a0a";
-  input.style.border = "1px solid #444";
-  input.style.color = "#e0e0e0";
-  input.style.fontSize = "13px";
-  input.style.padding = "4px 8px";
-  input.style.borderRadius = "4px";
-  input.value = cfg?.url ?? "";
-
-  toolbar.appendChild(backBtn);
-  toolbar.appendChild(fwdBtn);
-  toolbar.appendChild(refreshBtn);
-  toolbar.appendChild(input);
-
   const wrapper = document.createElement("div");
-  wrapper.style.flex = "1";
+  wrapper.style.width = "100%";
+  wrapper.style.height = "100%";
   wrapper.style.position = "relative";
   wrapper.style.overflow = "hidden";
 
@@ -184,7 +139,6 @@ function mountCdp(elementId: string, cfg: { url?: string; viewport?: { width: nu
   canvas.style.width = "100%";
   canvas.style.height = "100%";
   canvas.style.display = "block";
-  canvas.style.cursor = "crosshair";
 
   const textarea = document.createElement("textarea");
   textarea.style.position = "absolute";
@@ -193,16 +147,25 @@ function mountCdp(elementId: string, cfg: { url?: string; viewport?: { width: nu
   textarea.style.width = "100%";
   textarea.style.height = "100%";
   textarea.style.opacity = "0";
-  textarea.style.cursor = "crosshair";
   textarea.style.resize = "none";
 
   wrapper.appendChild(canvas);
   wrapper.appendChild(textarea);
-  container.appendChild(toolbar);
-  container.appendChild(wrapper);
 
   const el = document.getElementById(elementId);
-  if (el) el.appendChild(container);
+  if (el) el.appendChild(wrapper);
+
+  canvas.width = 800;
+  canvas.height = 600;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.fillStyle = "#0e0e0e";
+    ctx.fillRect(0, 0, 800, 600);
+    ctx.fillStyle = "#757575";
+    ctx.font = "24px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("CDP backend not connected", 400, 300);
+  }
 
   canvas.addEventListener("click", (e) => {
     const rect = canvas.getBoundingClientRect();
@@ -220,16 +183,6 @@ function mountCdp(elementId: string, cfg: { url?: string; viewport?: { width: nu
       textarea.value = "";
     }
   });
-
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      dx.send({ type: "navigate", url: input.value });
-    }
-  });
-
-  backBtn.addEventListener("click", () => dx.send({ type: "back" }));
-  fwdBtn.addEventListener("click", () => dx.send({ type: "forward" }));
-  refreshBtn.addEventListener("click", () => dx.send({ type: "refresh" }));
 }
 
 registerWidget("browser", browserWidget);

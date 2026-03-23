@@ -1,0 +1,12 @@
+.teal > rect, .teal > polygon { fill: #000 !important; stroke: #4ec9b0 !important; }
+.teal span { color: #fff !important; }
+.blue > rect, .blue > polygon { fill: #000 !important; stroke: #569cd6 !important; }
+.blue span { color: #9cdcfe !important; }
+.purple > rect, .purple > polygon { fill: #000 !important; stroke: #c586c0 !important; }
+.purple span { color: #fff !important; }
+.orange > rect, .orange > polygon { fill: #000 !important; stroke: #ff6600 !important; }
+.orange span { color: #fff !important; }
+.yellow > rect, .yellow > polygon { fill: #000 !important; stroke: #dcdcaa !important; }
+.yellow span { color: #fff !important; }
+.red > rect, .red > polygon { fill: #000 !important; stroke: #d16969 !important; }
+.red span { color: #fff !important; }

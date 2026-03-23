@@ -6,6 +6,7 @@ pub mod error;
 pub mod folder;
 pub mod interpreter;
 pub mod lexer;
+pub mod linter;
 pub mod parser;
 pub mod runtime;
 pub mod stdlib;

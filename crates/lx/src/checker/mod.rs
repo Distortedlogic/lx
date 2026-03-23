@@ -5,7 +5,12 @@ pub mod diagnostics;
 mod exhaust;
 mod exhaust_core;
 mod exhaust_types;
-pub(crate) mod symbol_table;
+mod generics;
+mod infer_pattern;
+pub mod module_graph;
+mod narrowing;
+pub mod semantic;
+mod stdlib_sigs;
 mod synth_compound;
 mod synth_control;
 pub mod type_arena;
@@ -14,14 +19,16 @@ pub mod types;
 pub mod unification;
 mod visit_stmt;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use std::sync::Arc;
 
 use crate::ast::{AstArena, Core, ExprId, Program, TypeExpr, TypeExprId};
 use diagnostics::{DiagnosticKind, Fix};
 use miette::SourceSpan;
-use symbol_table::SymbolTable;
+use module_graph::ModuleSignature;
+use narrowing::NarrowingEnv;
+use semantic::{SemanticModel, SemanticModelBuilder};
 use type_arena::{TypeArena, TypeId};
 
 use types::{Type, Variant};
@@ -44,8 +51,7 @@ pub struct Diagnostic {
 pub struct CheckResult {
   pub diagnostics: Vec<Diagnostic>,
   pub source: Arc<str>,
-  pub expr_types: HashMap<ExprId, TypeId>,
-  pub type_arena: TypeArena,
+  pub semantic: SemanticModel,
 }
 
 pub(crate) struct Checker<'a> {
@@ -54,11 +60,15 @@ pub(crate) struct Checker<'a> {
   pub(crate) diagnostics: Vec<Diagnostic>,
   pub(crate) type_defs: HashMap<Sym, Vec<Sym>>,
   import_sources: HashMap<Sym, SourceSpan>,
+  pub(crate) import_signatures: HashMap<Sym, ModuleSignature>,
+  pub(crate) translated_imports: HashMap<Sym, HashMap<Sym, TypeId>>,
   pub(crate) trait_fields: HashMap<Sym, Vec<(Sym, TypeId)>>,
   pub(crate) arena: &'a AstArena,
-  mutables: HashSet<Sym>,
-  pub(crate) symbols: SymbolTable,
+  pub(crate) sem: SemanticModelBuilder,
   pub(crate) expr_types: HashMap<ExprId, TypeId>,
+  generic_scope: Vec<HashMap<Sym, TypeId>>,
+  pub(crate) narrowing: NarrowingEnv,
+  stdlib_sigs: HashMap<String, ModuleSignature>,
 }
 
 impl<'a> Checker<'a> {
@@ -69,11 +79,15 @@ impl<'a> Checker<'a> {
       diagnostics: Vec::new(),
       type_defs: HashMap::new(),
       import_sources: HashMap::new(),
+      import_signatures: HashMap::new(),
+      translated_imports: HashMap::new(),
       trait_fields: HashMap::new(),
       arena,
-      mutables: HashSet::new(),
-      symbols: SymbolTable::new(),
+      sem: SemanticModelBuilder::new(),
       expr_types: HashMap::new(),
+      generic_scope: Vec::new(),
+      narrowing: NarrowingEnv::new(),
+      stdlib_sigs: stdlib_sigs::build_stdlib_signatures(),
     }
   }
 
@@ -82,7 +96,7 @@ impl<'a> Checker<'a> {
   }
 
   pub(crate) fn is_mutable(&self, name: Sym) -> bool {
-    self.mutables.contains(&name)
+    self.sem.resolve_in_scope(name).map(|id| self.sem.definitions[id].mutable).unwrap_or(false)
   }
 
   pub(crate) fn emit(&mut self, level: DiagLevel, kind: DiagnosticKind, span: SourceSpan) {
@@ -121,7 +135,12 @@ impl<'a> Checker<'a> {
         }
         self.type_arena.unknown()
       },
-      TypeExpr::Var(_) => self.fresh(),
+      TypeExpr::Var(name) => {
+        if let Some(ty) = self.lookup_type_param(name) {
+          return ty;
+        }
+        self.fresh()
+      },
       TypeExpr::Applied(name, args) => {
         let resolved: Vec<TypeId> = args.iter().map(|a| self.resolve_type_ann(*a)).collect();
         match name.as_str() {
@@ -198,5 +217,29 @@ impl<'a> Checker<'a> {
 pub fn check(program: &Program<Core>, source: Arc<str>) -> CheckResult {
   let mut checker = Checker::new(&program.arena);
   checker.check_program(program);
-  CheckResult { diagnostics: checker.diagnostics, source, expr_types: checker.expr_types, type_arena: checker.type_arena }
+  let semantic = checker.sem.build(checker.expr_types, checker.type_defs, checker.trait_fields, checker.type_arena);
+  CheckResult { diagnostics: checker.diagnostics, source, semantic }
+}
+
+pub fn check_with_imports(program: &Program<Core>, source: Arc<str>, import_signatures: HashMap<Sym, ModuleSignature>) -> CheckResult {
+  let mut checker = Checker::new(&program.arena);
+  for (module_name, sig) in &import_signatures {
+    let mut translated = HashMap::new();
+    for (binding_name, &foreign_type_id) in &sig.bindings {
+      let local_id = checker.type_arena.copy_type(foreign_type_id, &sig.type_arena);
+      translated.insert(*binding_name, local_id);
+    }
+    checker.translated_imports.insert(*module_name, translated);
+    for (type_name, variants) in &sig.types {
+      checker.type_defs.insert(*type_name, variants.clone());
+    }
+    for (trait_name, fields) in &sig.traits {
+      let local_fields: Vec<(Sym, TypeId)> = fields.iter().map(|(n, t)| (*n, checker.type_arena.copy_type(*t, &sig.type_arena))).collect();
+      checker.trait_fields.insert(*trait_name, local_fields);
+    }
+  }
+  checker.import_signatures = import_signatures;
+  checker.check_program(program);
+  let semantic = checker.sem.build(checker.expr_types, checker.type_defs, checker.trait_fields, checker.type_arena);
+  CheckResult { diagnostics: checker.diagnostics, source, semantic }
 }

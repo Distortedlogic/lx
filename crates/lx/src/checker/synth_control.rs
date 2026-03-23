@@ -3,7 +3,7 @@ use crate::sym::intern;
 use miette::SourceSpan;
 
 use super::diagnostics::DiagnosticKind;
-use super::symbol_table::DefKind;
+use super::semantic::{DefKind, ScopeKind};
 use super::type_arena::TypeId;
 use super::types::Type;
 use super::unification::TypeContext;
@@ -15,36 +15,37 @@ impl Checker<'_> {
       WithKind::Binding { name, value, .. } => {
         let vt = self.synth_expr(*value);
         let vspan = self.arena.expr_span(*value);
-        self.symbols.push_scope();
-        self.symbols.define(*name, DefKind::WithBinding, vspan);
-        self.symbols.set_type(*name, vt);
+        self.sem.push_scope(ScopeKind::With, vspan);
+        let def_id = self.sem.add_definition(*name, DefKind::WithBinding, vspan, false);
+        self.sem.set_definition_type(def_id, vt);
         let result = self.check_stmts(body);
-        self.symbols.pop_scope();
+        self.sem.pop_scope();
         result
       },
       WithKind::Resources { resources } => {
-        self.symbols.push_scope();
+        let rspan = resources.first().map(|(e, _)| self.arena.expr_span(*e)).unwrap_or((0, 0).into());
+        self.sem.push_scope(ScopeKind::With, rspan);
         for (expr, name) in resources {
           let vt = self.synth_expr(*expr);
-          let rspan = self.arena.expr_span(*expr);
-          self.symbols.define(*name, DefKind::ResourceBinding, rspan);
-          self.symbols.set_type(*name, vt);
+          let espan = self.arena.expr_span(*expr);
+          let def_id = self.sem.add_definition(*name, DefKind::ResourceBinding, espan, false);
+          self.sem.set_definition_type(def_id, vt);
         }
         let result = self.check_stmts(body);
-        self.symbols.pop_scope();
+        self.sem.pop_scope();
         result
       },
       WithKind::Context { fields } => {
-        self.symbols.push_scope();
+        let fspan = fields.first().map(|f| self.arena.expr_span(f.1)).unwrap_or((0, 0).into());
+        self.sem.push_scope(ScopeKind::With, fspan);
         for (_, expr) in fields {
           self.synth_expr(*expr);
         }
-        let fspan = fields.first().map(|f| self.arena.expr_span(f.1)).unwrap_or((0, 0).into());
         let unknown = self.type_arena.unknown();
-        self.symbols.define(intern("context"), DefKind::WithBinding, fspan);
-        self.symbols.set_type(intern("context"), unknown);
+        let def_id = self.sem.add_definition(intern("context"), DefKind::WithBinding, fspan, false);
+        self.sem.set_definition_type(def_id, unknown);
         let result = self.check_stmts(body);
-        self.symbols.pop_scope();
+        self.sem.pop_scope();
         result
       },
     }
@@ -61,10 +62,21 @@ impl Checker<'_> {
     if resolved != bool_id && resolved != unknown_id && resolved != todo_id && resolved != error_id {
       self.emit(DiagLevel::Error, DiagnosticKind::TernaryCondNotBool, cond_span);
     }
+    let branch_info = super::narrowing::analyze_condition(cond, self.arena, &self.type_arena);
+    self.narrowing.push();
+    for (name, ty) in &branch_info.then_narrowings {
+      self.narrowing.narrow(*name, *ty);
+    }
     let tt = self.synth_expr(then_);
+    self.narrowing.pop();
     if let Some(e) = else_ {
+      self.narrowing.push();
+      for (name, ty) in &branch_info.else_narrowings {
+        self.narrowing.narrow(*name, *ty);
+      }
       let else_span = self.arena.expr_span(e);
       let et = self.synth_expr(e);
+      self.narrowing.pop();
       match self.table.unify_with_context(tt, et, TypeContext::General, &mut self.type_arena) {
         Ok(t) => t,
         Err(te) => {

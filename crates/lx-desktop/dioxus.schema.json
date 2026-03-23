@@ -235,19 +235,22 @@
           "type": "array",
           "items": {
             "type": "array",
-            "items": [
-              { "type": "string" },
-              { "type": ["string", "null"] }
-            ],
+            "items": [{ "type": "string" }, { "type": ["string", "null"] }],
             "minItems": 2,
             "maxItems": 2
           }
         },
         "template": { "type": "string" },
         "fragment_paths": { "type": "array", "items": { "type": "string" } },
-        "component_group_refs": { "type": "array", "items": { "type": "string" } },
+        "component_group_refs": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
         "component_refs": { "type": "array", "items": { "type": "string" } },
-        "feature_group_refs": { "type": "array", "items": { "type": "string" } },
+        "feature_group_refs": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
         "feature_refs": { "type": "array", "items": { "type": "string" } },
         "merge_refs": { "type": "array", "items": { "type": "string" } },
         "skip_webview_install": { "type": "boolean", "default": false },

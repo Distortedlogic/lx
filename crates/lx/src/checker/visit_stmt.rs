@@ -1,55 +1,15 @@
-use crate::ast::{AstArena, BindTarget, Binding, Pattern, PatternId, Stmt, StmtId, TraitEntry, UseKind, UseStmt};
+use std::collections::HashMap;
+
+use crate::ast::{AstArena, BindTarget, Binding, Stmt, StmtId, TraitEntry, UseKind, UseStmt};
 use crate::sym::Sym;
 use miette::SourceSpan;
 
 use super::diagnostics::DiagnosticKind;
-use super::symbol_table::DefKind;
+use super::semantic::DefKind;
 use super::type_arena::TypeId;
 use super::types::{Type, Variant};
 use super::unification::TypeContext;
 use super::{Checker, DiagLevel, Diagnostic};
-
-impl Checker<'_> {
-  pub(crate) fn bind_pattern_names_to_symbols(&mut self, pid: PatternId) {
-    let span = self.arena.pattern_span(pid);
-    match self.arena.pattern(pid).clone() {
-      Pattern::Bind(name) => {
-        self.symbols.define(name, DefKind::PatternBind, span);
-      },
-      Pattern::Constructor(c) => {
-        for arg in &c.args {
-          self.bind_pattern_names_to_symbols(*arg);
-        }
-      },
-      Pattern::Tuple(pats) => {
-        for p in &pats {
-          self.bind_pattern_names_to_symbols(*p);
-        }
-      },
-      Pattern::List(pl) => {
-        for p in &pl.elems {
-          self.bind_pattern_names_to_symbols(*p);
-        }
-        if let Some(rest) = pl.rest {
-          self.symbols.define(rest, DefKind::PatternBind, span);
-        }
-      },
-      Pattern::Record(pr) => {
-        for f in &pr.fields {
-          if let Some(p) = f.pattern {
-            self.bind_pattern_names_to_symbols(p);
-          } else {
-            self.symbols.define(f.name, DefKind::PatternBind, span);
-          }
-        }
-        if let Some(rest) = pr.rest {
-          self.symbols.define(rest, DefKind::PatternBind, span);
-        }
-      },
-      Pattern::Literal(_) | Pattern::Wildcard => {},
-    }
-  }
-}
 
 impl Checker<'_> {
   pub(crate) fn check_stmts(&mut self, stmts: &[StmtId]) -> TypeId {
@@ -70,21 +30,29 @@ impl Checker<'_> {
         self.type_arena.unit()
       },
       Stmt::TypeDef(td) => {
-        self.symbols.define(td.name, DefKind::TypeDef, span);
+        if !td.type_params.is_empty() {
+          let bounds: Vec<(Sym, Option<TypeId>)> = td.type_params.iter().map(|s| (*s, None)).collect();
+          self.push_generic_scope(&bounds);
+        }
+        self.sem.add_definition(td.name, DefKind::TypeDef, span, false);
         let variant_names: Vec<Sym> = td.variants.iter().map(|(n, _)| *n).collect();
         let unknown = self.type_arena.unknown();
         let variant_types: Vec<Variant> = td.variants.iter().map(|(n, arity)| Variant { name: *n, fields: vec![unknown; *arity] }).collect();
         self.type_defs.insert(td.name, variant_names);
         let union_type = self.type_arena.alloc(Type::Union { name: td.name, variants: variant_types });
         for (ctor_name, _) in &td.variants {
-          self.symbols.define(*ctor_name, DefKind::TypeDef, span);
-          self.symbols.set_type(*ctor_name, union_type);
+          let def_id = self.sem.add_definition(*ctor_name, DefKind::TypeDef, span, false);
+          self.sem.set_definition_type(def_id, union_type);
+        }
+        if !td.type_params.is_empty() {
+          self.pop_generic_scope();
         }
         self.type_arena.unit()
       },
       Stmt::TraitUnion(_) => self.type_arena.unit(),
       Stmt::TraitDecl(data) => {
-        self.symbols.define(data.name, DefKind::TraitDef, span);
+        let unknown = self.type_arena.unknown();
+        let def_id = self.sem.add_definition(data.name, DefKind::TraitDef, span, false);
         let fields: Vec<(Sym, TypeId)> = data
           .entries
           .iter()
@@ -93,11 +61,11 @@ impl Checker<'_> {
         if !fields.is_empty() {
           self.trait_fields.insert(data.name, fields);
         }
-        self.symbols.set_type(data.name, self.type_arena.unknown());
+        self.sem.set_definition_type(def_id, unknown);
         self.type_arena.unit()
       },
       Stmt::ClassDecl(data) => {
-        self.symbols.define(data.name, DefKind::ClassDef, span);
+        self.sem.add_definition(data.name, DefKind::ClassDef, span, false);
         for f in &data.fields {
           self.synth_expr(f.default);
         }
@@ -120,31 +88,88 @@ impl Checker<'_> {
 
   fn resolve_use(&mut self, u: &UseStmt, span: SourceSpan) {
     let unknown = self.type_arena.unknown();
+    let module_name = u.path.last().copied();
+    let is_std = u.path.first().is_some_and(|s| s.as_str() == "std");
+
+    let std_data: Option<(Vec<(Sym, TypeId)>, super::type_arena::TypeArena)> = if is_std && u.path.len() >= 2 {
+      let module_key = u.path[1].as_str();
+      self.stdlib_sigs.get(module_key).map(|sig| {
+        let pairs: Vec<_> = sig.bindings.iter().map(|(n, &t)| (*n, t)).collect();
+        (pairs, sig.type_arena.clone())
+      })
+    } else {
+      None
+    };
+
+    let std_translated: Option<HashMap<Sym, TypeId>> =
+      std_data.map(|(pairs, src_arena)| pairs.into_iter().map(|(n, t)| (n, self.type_arena.copy_type(t, &src_arena))).collect());
+
     match &u.kind {
       UseKind::Whole => {
-        if let Some(name) = u.path.last() {
-          self.check_import_conflict(*name, span);
-          self.symbols.define(*name, DefKind::Import, span);
-          self.symbols.set_type(*name, unknown);
+        if let Some(name) = module_name {
+          self.check_import_conflict(name, span);
+          let ty = if let Some(ref translated) = std_translated {
+            let fields: Vec<_> = translated.iter().map(|(n, t)| (*n, *t)).collect();
+            self.type_arena.alloc(Type::Record(fields))
+          } else {
+            self.record_type_for_module(name, unknown)
+          };
+          let def_id = self.sem.add_definition(name, DefKind::Import, span, false);
+          self.sem.set_definition_type(def_id, ty);
         }
       },
       UseKind::Alias(alias) => {
-        self.symbols.define(*alias, DefKind::Import, span);
-        self.symbols.set_type(*alias, unknown);
+        let ty = if let Some(ref translated) = std_translated {
+          let fields: Vec<_> = translated.iter().map(|(n, t)| (*n, *t)).collect();
+          self.type_arena.alloc(Type::Record(fields))
+        } else {
+          module_name.map(|m| self.record_type_for_module(m, unknown)).unwrap_or(unknown)
+        };
+        let def_id = self.sem.add_definition(*alias, DefKind::Import, span, false);
+        self.sem.set_definition_type(def_id, ty);
       },
       UseKind::Selective(names) => {
         for name in names {
           self.check_import_conflict(*name, span);
-          self.symbols.define(*name, DefKind::Import, span);
-          self.symbols.set_type(*name, unknown);
+          let ty = std_translated
+            .as_ref()
+            .and_then(|t| t.get(name).copied())
+            .or_else(|| module_name.and_then(|m| self.translated_imports.get(&m).and_then(|t| t.get(name).copied())))
+            .unwrap_or(unknown);
+          let def_id = self.sem.add_definition(*name, DefKind::Import, span, false);
+          self.sem.set_definition_type(def_id, ty);
+          if std_translated.as_ref().is_some_and(|t| !t.contains_key(name)) {
+            self.emit(DiagLevel::Error, DiagnosticKind::UnknownImport { name: *name, module: module_name.unwrap_or(*name) }, span);
+          } else if std_translated.is_none()
+            && let Some(mod_sym) = module_name
+            && let Some(sig) = self.import_signatures.get(&mod_sym)
+            && !sig.bindings.contains_key(name)
+            && !sig.types.contains_key(name)
+            && !sig.traits.contains_key(name)
+          {
+            self.emit(DiagLevel::Error, DiagnosticKind::UnknownImport { name: *name, module: mod_sym }, span);
+          }
         }
       },
     }
   }
 
+  fn record_type_for_module(&mut self, module: Sym, fallback: TypeId) -> TypeId {
+    let fields: Option<Vec<(Sym, TypeId)>> = self.translated_imports.get(&module).map(|t| t.iter().map(|(n, id)| (*n, *id)).collect());
+    match fields {
+      Some(f) if !f.is_empty() => self.type_arena.alloc(Type::Record(f)),
+      _ => fallback,
+    }
+  }
+
   fn check_import_conflict(&mut self, name: Sym, span: SourceSpan) {
     if let Some(&existing) = self.import_sources.get(&name) {
-      let original_span = self.symbols.resolve(name).filter(|def| matches!(def.kind, DefKind::Import)).map(|def| def.span).unwrap_or(existing);
+      let original_span = self
+        .sem
+        .resolve_in_scope(name)
+        .filter(|&id| matches!(self.sem.definitions[id].kind, DefKind::Import))
+        .map(|id| self.sem.definitions[id].span)
+        .unwrap_or(existing);
       let kind = DiagnosticKind::DuplicateImport { name, original_span };
       let secondary = vec![(original_span, "previously imported here".into())];
       let fix = kind.suggest_fix(span, &self.type_arena);
@@ -178,14 +203,11 @@ impl Checker<'_> {
     };
     match &b.target {
       BindTarget::Name(name) => {
-        self.symbols.define(*name, DefKind::Binding, _span);
-        if b.mutable {
-          self.mutables.insert(*name);
-        }
-        self.symbols.set_type(*name, val_type);
+        let def_id = self.sem.add_definition(*name, DefKind::Binding, _span, b.mutable);
+        self.sem.set_definition_type(def_id, val_type);
       },
       BindTarget::Reassign(name) => {
-        if let Some(existing) = self.symbols.lookup_type(*name) {
+        if let Some(existing) = self.sem.lookup_type(*name) {
           let resolved = self.table.resolve(existing, &self.type_arena);
           let ctx = TypeContext::Binding { name: name.to_string() };
           if let Err(te) = self.table.unify_with_context(resolved, val_type, ctx, &mut self.type_arena) {
@@ -194,7 +216,7 @@ impl Checker<'_> {
         }
       },
       BindTarget::Pattern(pid) => {
-        self.bind_pattern_names_to_symbols(*pid);
+        self.infer_pattern_bindings(*pid, val_type);
       },
     }
   }

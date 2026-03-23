@@ -1,0 +1,23 @@
+graph TD
+    start(["Start"]):::teal
+    start --> groups["Collect groups"]:::blue
+    groups --> loop_start["For each group"]:::purple
+
+    loop_start --> implement["1. Spawn subagent: Implement"]:::orange
+    implement --> audit["2. Spawn subagent: Audit\nscore 0-100"]:::yellow
+    audit --> check{{"score >= 93?"}}:::teal
+
+    check -- "yes" --> next_group["Next group"]:::blue
+    check -- "no" --> stuck{{"stuck?"}}:::red
+
+    stuck -- "no" --> fix["3. Spawn subagent: Fix findings"]:::orange
+    fix --> audit
+
+    stuck -- "yes" --> bail["Bail — log stuck state"]:::red
+    bail --> next_group
+
+    next_group --> more{{"more groups?"}}:::purple
+    more -- "yes" --> loop_start
+    more -- "no" --> done(["Done"]):::teal
+
+    linkStyle default stroke:#6fc3df,stroke-width:1.5px

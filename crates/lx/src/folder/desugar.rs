@@ -18,7 +18,7 @@ fn gensym(prefix: &str) -> Sym {
 }
 
 fn make_lambda_expr(name: Sym, body: ExprId) -> Expr {
-  Expr::Func(ExprFunc { params: vec![Param { name, type_ann: None, default: None }], ret_type: None, guard: None, body })
+  Expr::Func(ExprFunc { params: vec![Param { name, type_ann: None, default: None }], type_params: vec![], ret_type: None, guard: None, body })
 }
 
 fn alloc_lambda(name: Sym, body: ExprId, span: SourceSpan, arena: &mut AstArena) -> ExprId {

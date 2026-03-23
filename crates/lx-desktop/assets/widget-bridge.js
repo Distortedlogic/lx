@@ -7282,28 +7282,28 @@ var WidgetBridge = (function(exports) {
 			fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
 			lineHeight: 1.3,
 			theme: {
-				background: "#0E0E0E",
-				foreground: "#DCC1AE",
-				cursor: "#FFB87B",
-				cursorAccent: "#0E0E0E",
-				selectionBackground: "rgba(255,184,123,0.2)",
-				selectionForeground: "#E6E1DD",
-				black: "#1A1A1A",
-				red: "#EF5350",
-				green: "#66BB6A",
-				yellow: "#FFB300",
-				blue: "#87CFFF",
-				magenta: "#DCC1AE",
-				cyan: "#87CFFF",
-				white: "#E6E1DD",
-				brightBlack: "#564334",
+				background: "#0A0A10",
+				foreground: "#D4D4D4",
+				cursor: "#FFD600",
+				cursorAccent: "#0A0A10",
+				selectionBackground: "rgba(255,214,0,0.2)",
+				selectionForeground: "#FFFFFF",
+				black: "#1A1A22",
+				red: "#F44336",
+				green: "#4CAF50",
+				yellow: "#FFD600",
+				blue: "#42A5F5",
+				magenta: "#CE93D8",
+				cyan: "#26C6DA",
+				white: "#E0E0E0",
+				brightBlack: "#555565",
 				brightRed: "#EF5350",
 				brightGreen: "#66BB6A",
-				brightYellow: "#FFB87B",
-				brightBlue: "#87CFFF",
-				brightMagenta: "#DCC1AE",
-				brightCyan: "#87CFFF",
-				brightWhite: "#E6E1DD"
+				brightYellow: "#FFEB3B",
+				brightBlue: "#90CAF9",
+				brightMagenta: "#CE93D8",
+				brightCyan: "#4DD0E1",
+				brightWhite: "#FFFFFF"
 			}
 		});
 		const fitAddon = new import_addon_fit.FitAddon();
@@ -7390,6 +7390,7 @@ var WidgetBridge = (function(exports) {
 	async function runDividerDrag(dx) {
 		const args = await dx.recv();
 		startDividerDrag(args.containerId, args.direction, args.parentStart, args.parentSize, dx);
+		await dx.recv();
 	}
 	//#endregion
 	//#region src/registry.ts
@@ -7553,55 +7554,15 @@ var WidgetBridge = (function(exports) {
 		});
 	}
 	function mountCdp(elementId, cfg, dx) {
-		const container = document.createElement("div");
-		container.style.display = "flex";
-		container.style.flexDirection = "column";
-		container.style.height = "100%";
-		const toolbar = document.createElement("div");
-		toolbar.style.height = "36px";
-		toolbar.style.display = "flex";
-		toolbar.style.alignItems = "center";
-		toolbar.style.gap = "4px";
-		toolbar.style.padding = "0 8px";
-		toolbar.style.background = "#1a1a2e";
-		toolbar.style.borderBottom = "1px solid #333";
-		const makeBtn = (label) => {
-			const btn = document.createElement("button");
-			btn.innerHTML = label;
-			btn.style.background = "none";
-			btn.style.border = "none";
-			btn.style.color = "#e0e0e0";
-			btn.style.cursor = "pointer";
-			btn.style.fontSize = "16px";
-			btn.style.padding = "2px 6px";
-			return btn;
-		};
-		const backBtn = makeBtn("←");
-		const fwdBtn = makeBtn("→");
-		const refreshBtn = makeBtn("↻");
-		const input = document.createElement("input");
-		input.type = "text";
-		input.style.flex = "1";
-		input.style.background = "#0a0a0a";
-		input.style.border = "1px solid #444";
-		input.style.color = "#e0e0e0";
-		input.style.fontSize = "13px";
-		input.style.padding = "4px 8px";
-		input.style.borderRadius = "4px";
-		input.value = cfg?.url ?? "";
-		toolbar.appendChild(backBtn);
-		toolbar.appendChild(fwdBtn);
-		toolbar.appendChild(refreshBtn);
-		toolbar.appendChild(input);
 		const wrapper = document.createElement("div");
-		wrapper.style.flex = "1";
+		wrapper.style.width = "100%";
+		wrapper.style.height = "100%";
 		wrapper.style.position = "relative";
 		wrapper.style.overflow = "hidden";
 		const canvas = document.createElement("canvas");
 		canvas.style.width = "100%";
 		canvas.style.height = "100%";
 		canvas.style.display = "block";
-		canvas.style.cursor = "crosshair";
 		const textarea = document.createElement("textarea");
 		textarea.style.position = "absolute";
 		textarea.style.top = "0";
@@ -7609,14 +7570,22 @@ var WidgetBridge = (function(exports) {
 		textarea.style.width = "100%";
 		textarea.style.height = "100%";
 		textarea.style.opacity = "0";
-		textarea.style.cursor = "crosshair";
 		textarea.style.resize = "none";
 		wrapper.appendChild(canvas);
 		wrapper.appendChild(textarea);
-		container.appendChild(toolbar);
-		container.appendChild(wrapper);
 		const el = document.getElementById(elementId);
-		if (el) el.appendChild(container);
+		if (el) el.appendChild(wrapper);
+		canvas.width = 800;
+		canvas.height = 600;
+		const ctx = canvas.getContext("2d");
+		if (ctx) {
+			ctx.fillStyle = "#0e0e0e";
+			ctx.fillRect(0, 0, 800, 600);
+			ctx.fillStyle = "#757575";
+			ctx.font = "24px monospace";
+			ctx.textAlign = "center";
+			ctx.fillText("CDP backend not connected", 400, 300);
+		}
 		canvas.addEventListener("click", (e) => {
 			const rect = canvas.getBoundingClientRect();
 			const scaleX = canvas.width / rect.width;
@@ -7639,15 +7608,6 @@ var WidgetBridge = (function(exports) {
 				textarea.value = "";
 			}
 		});
-		input.addEventListener("keydown", (e) => {
-			if (e.key === "Enter") dx.send({
-				type: "navigate",
-				url: input.value
-			});
-		});
-		backBtn.addEventListener("click", () => dx.send({ type: "back" }));
-		fwdBtn.addEventListener("click", () => dx.send({ type: "forward" }));
-		refreshBtn.addEventListener("click", () => dx.send({ type: "refresh" }));
 	}
 	registerWidget("browser", browserWidget);
 	//#endregion
@@ -7673,6 +7633,24 @@ var WidgetBridge = (function(exports) {
 			container.textContent = content;
 			container.contentEditable = "true";
 			container.spellcheck = false;
+			container.classList.add("border-l-2", "border-[var(--outline-variant)]");
+			const placeholderText = "Empty — start typing";
+			function updatePlaceholder() {
+				if (!container.textContent) {
+					container.style.color = "#757575";
+					container.textContent = placeholderText;
+				}
+			}
+			container.addEventListener("focus", () => {
+				if (container.textContent === placeholderText) {
+					container.textContent = "";
+					container.style.color = "#e0e0e0";
+				}
+			});
+			container.addEventListener("blur", () => {
+				updatePlaceholder();
+			});
+			updatePlaceholder();
 			container.addEventListener("keydown", (e) => {
 				if ((e.ctrlKey || e.metaKey) && e.key === "s") {
 					e.preventDefault();
@@ -7946,6 +7924,12 @@ var WidgetBridge = (function(exports) {
 			container.style.padding = "8px";
 			container.style.lineHeight = "1.4";
 			el.appendChild(container);
+			const placeholder = document.createElement("div");
+			placeholder.textContent = "Log viewer — awaiting log entries";
+			placeholder.style.color = "#757575";
+			placeholder.style.padding = "8px";
+			placeholder.dataset.placeholder = "true";
+			container.appendChild(placeholder);
 			const state = {
 				container,
 				userScrolled: false
@@ -7958,6 +7942,8 @@ var WidgetBridge = (function(exports) {
 		update(elementId, data) {
 			const state = states$1.get(elementId);
 			if (!state) return;
+			const ph = state?.container.querySelector("[data-placeholder]");
+			if (ph) ph.remove();
 			if (Array.isArray(data)) for (const line of data) appendLine(state, line);
 			else appendLine(state, data);
 		},
@@ -7996,6 +7982,7 @@ var WidgetBridge = (function(exports) {
 			container.style.background = "#0a0a0a";
 			el.appendChild(style);
 			el.appendChild(container);
+			container.innerHTML = "<p style=\"color: #757575;\">Markdown viewer — no content loaded</p>";
 		},
 		update(elementId, data) {
 			const el = document.getElementById(elementId);
@@ -8083,6 +8070,10 @@ var WidgetBridge = (function(exports) {
 			container.style.color = "#e0e0e0";
 			container.className = "json-viewer-container";
 			el.appendChild(container);
+			const placeholder = document.createElement("div");
+			placeholder.textContent = "JSON viewer — no data loaded";
+			placeholder.style.color = "#757575";
+			container.appendChild(placeholder);
 		},
 		update(elementId, data) {
 			const el = document.getElementById(elementId);

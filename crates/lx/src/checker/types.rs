@@ -38,7 +38,7 @@ impl UnifyValue for TypeVarValue {
   }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Type {
   Int,
   Float,
@@ -58,13 +58,15 @@ pub enum Type {
 
   Union { name: Sym, variants: Vec<Variant> },
 
+  Param { name: Sym, bound: Option<TypeId> },
+
   Var(TypeVarKey),
   Unknown,
   Todo,
   Error,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Variant {
   pub name: Sym,
   pub fields: Vec<TypeId>,

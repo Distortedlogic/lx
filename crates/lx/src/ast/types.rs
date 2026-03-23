@@ -47,6 +47,7 @@ pub type FieldDecl = Field<ExprId, ExprId>;
 #[derive(Debug, Clone, PartialEq)]
 pub struct TraitUnionDef {
   pub name: Sym,
+  pub type_params: Vec<Sym>,
   pub variants: Vec<Sym>,
   pub exported: bool,
 }
@@ -75,6 +76,7 @@ pub struct ClassField {
 #[derive(Debug, Clone, PartialEq)]
 pub struct TraitDeclData {
   pub name: Sym,
+  pub type_params: Vec<Sym>,
   pub entries: Vec<TraitEntry>,
   pub methods: Vec<TraitMethodDecl>,
   pub defaults: Vec<AgentMethod>,
@@ -87,6 +89,7 @@ pub struct TraitDeclData {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ClassDeclData {
   pub name: Sym,
+  pub type_params: Vec<Sym>,
   pub traits: Vec<Sym>,
   pub fields: Vec<ClassField>,
   pub methods: Vec<AgentMethod>,
@@ -167,6 +170,7 @@ pub enum UnaryOp {
 #[derive(Debug, Clone, PartialEq)]
 pub struct StmtTypeDef {
   pub name: Sym,
+  pub type_params: Vec<Sym>,
   pub variants: Vec<(Sym, usize)>,
   pub exported: bool,
 }

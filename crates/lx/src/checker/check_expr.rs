@@ -1,7 +1,8 @@
 use crate::ast::{Expr, ExprFunc, ExprId, ListElem, MatchArm, Stmt, StmtId};
 
 use super::Checker;
-use super::symbol_table::DefKind;
+use super::narrowing;
+use super::semantic::{DefKind, ScopeKind};
 use super::type_arena::TypeId;
 use super::types::Type;
 use super::unification::TypeContext;
@@ -57,8 +58,8 @@ impl Checker<'_> {
   }
 
   fn check_func_against(&mut self, func: &ExprFunc, exp_params: &[TypeId], exp_ret: TypeId) -> TypeId {
-    self.symbols.push_scope();
     let func_span = self.arena.expr_span(func.body);
+    self.sem.push_scope(ScopeKind::Function, func_span);
     let mut param_types = Vec::new();
     for (i, p) in func.params.iter().enumerate() {
       let ty = match p.type_ann {
@@ -71,12 +72,12 @@ impl Checker<'_> {
           }
         },
       };
-      self.symbols.define(p.name, DefKind::FuncParam, func_span);
-      self.symbols.set_type(p.name, ty);
+      let def_id = self.sem.add_definition(p.name, DefKind::FuncParam, func_span, false);
+      self.sem.set_definition_type(def_id, ty);
       param_types.push(ty);
     }
     let body_type = self.check_expr(func.body, exp_ret);
-    self.symbols.pop_scope();
+    self.sem.pop_scope();
     let mut func_type = body_type;
     for &p in param_types.iter().rev() {
       func_type = self.type_arena.alloc(Type::Func { param: p, ret: func_type });
@@ -101,13 +102,22 @@ impl Checker<'_> {
     let span = self.arena.expr_span(scrutinee);
     self.check_match_exhaustiveness(resolved_scrut, arms, span);
     for arm in arms {
-      self.symbols.push_scope();
-      self.bind_pattern_vars(arm.pattern);
+      let arm_span = self.arena.pattern_span(arm.pattern);
+      self.sem.push_scope(ScopeKind::MatchArm, arm_span);
+      self.infer_pattern_bindings(arm.pattern, resolved_scrut);
+      self.narrowing.push();
+      if let Expr::Ident(scrut_name) = self.arena.expr(scrutinee) {
+        let pattern = self.arena.pattern(arm.pattern).clone();
+        let resolved_type = self.type_arena.get(resolved_scrut).clone();
+        let narrowed = narrowing::compute_narrowed_type(&pattern, resolved_scrut, &mut self.type_arena, &resolved_type);
+        self.narrowing.narrow(*scrut_name, narrowed);
+      }
       if let Some(guard) = arm.guard {
         self.synth_expr(guard);
       }
       self.check_expr(arm.body, expected);
-      self.symbols.pop_scope();
+      self.narrowing.pop();
+      self.sem.pop_scope();
     }
     self.table.resolve(expected, &self.type_arena)
   }

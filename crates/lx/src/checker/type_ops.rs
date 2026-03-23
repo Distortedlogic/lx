@@ -20,8 +20,18 @@ impl Checker<'_> {
     let span = arena.expr_span(eid);
     match expr {
       Expr::Literal(lit) => self.synth_literal(lit),
-      Expr::Ident(name) => self.symbols.lookup_type(*name).unwrap_or(self.type_arena.unknown()),
-      Expr::TypeConstructor(_) => self.type_arena.unknown(),
+      Expr::Ident(name) => {
+        if let Some(def_id) = self.sem.resolve_in_scope(*name) {
+          self.sem.add_reference(eid, def_id);
+        }
+        if let Some(narrowed) = self.narrowing.lookup(*name) { narrowed } else { self.sem.lookup_type(*name).unwrap_or(self.type_arena.unknown()) }
+      },
+      Expr::TypeConstructor(name) => {
+        if let Some(def_id) = self.sem.resolve_in_scope(*name) {
+          self.sem.add_reference(eid, def_id);
+        }
+        self.type_arena.unknown()
+      },
       Expr::Binary(binary) => {
         let lt = self.synth_expr(binary.left);
         let rt = self.synth_expr(binary.right);
@@ -62,7 +72,7 @@ impl Checker<'_> {
       },
       Expr::Func(func) => {
         let func = func.clone();
-        self.synth_func_type(&func.params, &func.ret_type, func.body)
+        self.synth_func_type(&func.type_params, &func.params, &func.ret_type, func.body)
       },
       Expr::Match(m) => {
         let m = m.clone();

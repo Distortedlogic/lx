@@ -5,7 +5,7 @@ use super::expr::{ident, type_name};
 use super::{ArenaRef, Span, TypeExprId, ss};
 use crate::ast::{TypeExpr, TypeField};
 use crate::lexer::token::TokenKind;
-use crate::sym::intern;
+use crate::sym::{Sym, intern};
 
 pub(super) fn type_parser<'a, I>(arena: ArenaRef) -> impl Parser<'a, I, TypeExprId, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
 where
@@ -111,4 +111,17 @@ where
     });
 
   choice((list_ty, record_ty, map_ty, unit_ty, grouped_or_tuple, named, var))
+}
+
+pub(super) fn generic_params<'a, I>() -> impl Parser<'a, I, Vec<Sym>, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
+where
+  I: ValueInput<'a, Token = TokenKind, Span = Span>,
+{
+  ident()
+    .separated_by(just(TokenKind::Semi))
+    .allow_trailing()
+    .collect::<Vec<_>>()
+    .delimited_by(just(TokenKind::LBracket), just(TokenKind::RBracket))
+    .or_not()
+    .map(|opt| opt.unwrap_or_default())
 }

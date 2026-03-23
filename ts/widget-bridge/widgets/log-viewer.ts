@@ -59,6 +59,13 @@ const logViewerWidget: Widget = {
 
     el.appendChild(container);
 
+    const placeholder = document.createElement("div");
+    placeholder.textContent = "Log viewer — awaiting log entries";
+    placeholder.style.color = "#757575";
+    placeholder.style.padding = "8px";
+    placeholder.dataset.placeholder = "true";
+    container.appendChild(placeholder);
+
     const state: LogViewerState = { container, userScrolled: false };
 
     container.addEventListener("scroll", () => {
@@ -73,6 +80,9 @@ const logViewerWidget: Widget = {
   update(elementId: string, data: unknown) {
     const state = states.get(elementId);
     if (!state) return;
+
+    const ph = state?.container.querySelector("[data-placeholder]");
+    if (ph) ph.remove();
 
     if (Array.isArray(data)) {
       for (const line of data as LogLine[]) {
