@@ -22,6 +22,12 @@ struct SourceFile {
   source: Arc<str>,
 }
 
+impl Default for SourceDb {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 impl SourceDb {
   pub fn new() -> Self {
     Self { files: Vec::new() }
