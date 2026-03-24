@@ -16,8 +16,7 @@ use crate::std_module;
 use crate::stdlib::helpers::require_str_field;
 use crate::sym::{Sym, intern};
 use crate::value::LxVal;
-use crate::visitor::walk_program;
-use miette::SourceSpan;
+use crate::visitor::prelude::*;
 
 use diag_walk::{DiagEdge, DiagNode, EdgeStyle, EdgeType, Graph, NodeKind, Walker};
 use echart::graph_to_echart_json;

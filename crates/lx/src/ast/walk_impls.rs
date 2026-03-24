@@ -3,9 +3,9 @@ use std::ops::ControlFlow;
 use smallvec::SmallVec;
 
 use super::{AgentMethod, AstArena, ClassDeclData, ClassField, FieldDecl, NodeId, TraitDeclData, TraitEntry, TraitMethodDecl, WithKind};
+use crate::visitor::prelude::*;
 use crate::visitor::transformer::AstTransformer;
 use crate::visitor::walk_transform::walk_transform_expr;
-use crate::visitor::{AstVisitor, dispatch_expr};
 
 impl WithKind {
   pub fn recurse_children<T: AstTransformer + ?Sized>(self, t: &mut T, arena: &mut AstArena) -> Self {

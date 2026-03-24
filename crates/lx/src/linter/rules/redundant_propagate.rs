@@ -1,11 +1,10 @@
-use crate::ast::{AstArena, Expr, ExprId, ExprPropagate, StmtId};
+use crate::ast::ExprPropagate;
 use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::SemanticModel;
 use crate::checker::types::Type;
 use crate::checker::{DiagLevel, Diagnostic};
 use crate::linter::rule::{LintRule, RuleCategory};
-use crate::visitor::{AstVisitor, VisitAction, dispatch_stmt};
-use miette::SourceSpan;
+use crate::visitor::prelude::*;
 
 pub struct RedundantPropagate {
   diagnostics: Vec<Diagnostic>,

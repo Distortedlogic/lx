@@ -1,9 +1,9 @@
-use crate::ast::{AstArena, Stmt, StmtId, UseKind};
+use crate::ast::UseKind;
 use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::{DefKind, DefinitionId, SemanticModel};
 use crate::checker::{DiagLevel, Diagnostic};
 use crate::linter::rule::{LintRule, RuleCategory};
-use crate::visitor::AstVisitor;
+use crate::visitor::prelude::*;
 
 pub struct UnusedImport {
   diagnostics: Vec<Diagnostic>,

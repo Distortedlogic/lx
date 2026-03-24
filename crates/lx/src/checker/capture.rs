@@ -5,8 +5,8 @@ use crate::ast::{
   AstArena, BindTarget, Binding, ExprBlock, ExprFunc, ExprId, ExprLoop, ExprMatch, ExprPar, ExprWith, FieldPattern, PatternId, StmtId, WithKind,
 };
 use crate::sym::Sym;
-use crate::visitor::{AstVisitor, VisitAction, dispatch_expr, dispatch_stmt, walk_binding, walk_func, walk_pattern_dispatch};
-use miette::SourceSpan;
+use crate::visitor::prelude::*;
+use crate::visitor::{walk_binding, walk_func};
 
 struct FreeVarCollector<'a> {
   arena: &'a AstArena,

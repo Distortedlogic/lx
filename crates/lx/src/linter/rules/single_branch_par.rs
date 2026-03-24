@@ -1,10 +1,9 @@
-use crate::ast::{AstArena, Expr, ExprId, ExprPar, StmtId};
+use crate::ast::ExprPar;
 use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::SemanticModel;
 use crate::checker::{DiagLevel, Diagnostic};
 use crate::linter::rule::{LintRule, RuleCategory};
-use crate::visitor::{AstVisitor, VisitAction, dispatch_stmt};
-use miette::SourceSpan;
+use crate::visitor::prelude::*;
 
 pub struct SingleBranchPar {
   diagnostics: Vec<Diagnostic>,

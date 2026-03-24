@@ -10,13 +10,10 @@ mod diag_helpers;
 use std::collections::{HashMap, HashSet};
 use std::ops::ControlFlow;
 
-use crate::ast::{
-  AstArena, BindTarget, Binding, Expr, ExprApply, ExprFunc, ExprId, ExprLoop, ExprMatch, ExprPar, ExprTernary, MapEntry, Program, SelArm, Stmt, StmtId,
-  StmtTypeDef, TraitDeclData, UseStmt,
-};
+use crate::ast::{BindTarget, Binding, ExprApply, ExprFunc, ExprLoop, ExprMatch, ExprPar, ExprTernary, MapEntry, SelArm, StmtTypeDef, TraitDeclData, UseStmt};
 use crate::sym::{Sym, intern};
-use crate::visitor::{AstVisitor, VisitAction, dispatch_expr, walk_loop, walk_par};
-use miette::SourceSpan;
+use crate::visitor::prelude::*;
+use crate::visitor::{walk_loop, walk_par};
 
 pub(crate) use diag_types::*;
 

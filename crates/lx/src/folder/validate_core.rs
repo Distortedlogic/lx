@@ -1,6 +1,5 @@
-use crate::ast::{Core, Expr, ExprId, Program, WithKind};
-use crate::visitor::{AstVisitor, VisitAction, walk_program};
-use miette::SourceSpan;
+use crate::ast::{Core, WithKind};
+use crate::visitor::prelude::*;
 
 struct CoreValidator;
 

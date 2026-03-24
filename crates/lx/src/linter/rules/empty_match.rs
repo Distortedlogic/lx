@@ -1,10 +1,9 @@
-use crate::ast::{AstArena, Expr, ExprId, ExprMatch, StmtId};
+use crate::ast::ExprMatch;
 use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::SemanticModel;
 use crate::checker::{DiagLevel, Diagnostic};
 use crate::linter::rule::{LintRule, RuleCategory};
-use crate::visitor::{AstVisitor, VisitAction, dispatch_stmt};
-use miette::SourceSpan;
+use crate::visitor::prelude::*;
 
 pub struct EmptyMatch {
   diagnostics: Vec<Diagnostic>,

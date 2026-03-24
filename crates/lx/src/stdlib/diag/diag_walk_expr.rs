@@ -1,9 +1,8 @@
 use std::ops::ControlFlow;
 
-use crate::ast::{AstArena, Expr, ExprApply, ExprId};
+use crate::ast::ExprApply;
 use crate::sym::intern;
-use crate::visitor::dispatch_expr;
-use miette::SourceSpan;
+use crate::visitor::prelude::*;
 
 use super::diag_helpers::{extract_field_call_parts, is_resource_action, is_resource_create, is_resource_module};
 use super::{EdgeStyle, NodeKind, Walker};
