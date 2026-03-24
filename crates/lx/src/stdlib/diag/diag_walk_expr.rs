@@ -8,7 +8,7 @@ use miette::SourceSpan;
 use super::diag_helpers::{extract_field_call_parts, is_resource_action, is_resource_create, is_resource_module};
 use super::{EdgeStyle, NodeKind, Walker};
 
-pub(super) fn visit_apply_diag(w: &mut Walker, apply: &ExprApply, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+pub(super) fn visit_apply_diag(w: &mut Walker<'_>, apply: &ExprApply, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
   if let Some((module, method, args)) = uncurry_call(apply, arena) {
     if let Some(kind) = classify_call(module, method) {
       return handle_call(w, module, method, kind, &args, span, arena);
@@ -88,7 +88,7 @@ fn classify_call(module: &str, method: &str) -> Option<NodeKind> {
   }
 }
 
-fn handle_call(w: &mut Walker, module: &str, method: &str, kind: NodeKind, args: &[ExprId], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+fn handle_call(w: &mut Walker<'_>, module: &str, method: &str, kind: NodeKind, args: &[ExprId], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
   if let ("cron", "every") = (module, method) {
     let id = w.add_node_at("loop", "cron".into(), NodeKind::Loop, Some(span));
     let ctx = w.context.clone();

@@ -1,4 +1,4 @@
-use crate::ast::{Expr, ExprId, StmtId};
+use crate::ast::{AstArena, Expr, ExprId, StmtId};
 use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::SemanticModel;
 use crate::checker::{DiagLevel, Diagnostic};
@@ -26,7 +26,7 @@ impl BreakOutsideLoop {
 impl PatternVisitor for BreakOutsideLoop {}
 impl TypeVisitor for BreakOutsideLoop {}
 impl AstVisitor for BreakOutsideLoop {
-  fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan, _arena: &crate::ast::AstArena) -> VisitAction {
+  fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan) -> VisitAction {
     if matches!(expr, Expr::Loop(_)) {
       self.loop_depth += 1;
     }
@@ -63,7 +63,7 @@ impl LintRule for BreakOutsideLoop {
     RuleCategory::Correctness
   }
 
-  fn run(&mut self, stmts: &[StmtId], arena: &crate::ast::AstArena, _model: &SemanticModel) {
+  fn run(&mut self, stmts: &[StmtId], arena: &AstArena, _model: &SemanticModel) {
     for sid in stmts {
       if dispatch_stmt(self, *sid, arena).is_break() {
         break;

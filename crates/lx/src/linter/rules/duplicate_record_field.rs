@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::ast::{Expr, ExprId, RecordField, StmtId};
+use crate::ast::{AstArena, Expr, ExprId, RecordField, StmtId};
 use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::SemanticModel;
 use crate::checker::{DiagLevel, Diagnostic};
@@ -27,7 +27,7 @@ impl DuplicateRecordField {
 impl PatternVisitor for DuplicateRecordField {}
 impl TypeVisitor for DuplicateRecordField {}
 impl AstVisitor for DuplicateRecordField {
-  fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan, _arena: &crate::ast::AstArena) -> VisitAction {
+  fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan) -> VisitAction {
     if let Expr::Record(fields) = expr {
       let mut seen = HashSet::new();
       for field in fields {
@@ -62,7 +62,7 @@ impl LintRule for DuplicateRecordField {
     RuleCategory::Correctness
   }
 
-  fn run(&mut self, stmts: &[StmtId], arena: &crate::ast::AstArena, _model: &SemanticModel) {
+  fn run(&mut self, stmts: &[StmtId], arena: &AstArena, _model: &SemanticModel) {
     for sid in stmts {
       if dispatch_stmt(self, *sid, arena).is_break() {
         break;

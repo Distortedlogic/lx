@@ -9,7 +9,7 @@ use crate::visitor::{AstVisitor, VisitAction};
 pub(crate) fn walk_type_expr_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: TypeExprId, arena: &AstArena) -> ControlFlow<()> {
   let span = arena.type_expr_span(id);
   let type_expr = arena.type_expr(id);
-  let action = v.visit_type_expr(id, type_expr, span, arena);
+  let action = v.visit_type_expr(id, type_expr, span);
   match action {
     VisitAction::Stop => ControlFlow::Break(()),
     VisitAction::Skip => {
@@ -23,13 +23,13 @@ pub(crate) fn walk_type_expr_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: Typ
 pub fn walk_type_expr<V: AstVisitor + ?Sized>(v: &mut V, id: TypeExprId, type_expr: &TypeExpr, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
   match type_expr {
     TypeExpr::Named(name) => {
-      let action = v.visit_type_named(id, *name, span, arena);
+      let action = v.visit_type_named(id, *name, span);
       if action.is_stop() {
         return ControlFlow::Break(());
       }
     },
     TypeExpr::Var(name) => {
-      let action = v.visit_type_var(id, *name, span, arena);
+      let action = v.visit_type_var(id, *name, span);
       if action.is_stop() {
         return ControlFlow::Break(());
       }
@@ -54,7 +54,7 @@ fn walk_type_applied_dispatch<V: AstVisitor + ?Sized>(
   span: SourceSpan,
   arena: &AstArena,
 ) -> ControlFlow<()> {
-  let action = v.visit_type_applied(id, name, args, span, arena);
+  let action = v.visit_type_applied(id, name, args, span);
   match action {
     VisitAction::Stop => ControlFlow::Break(()),
     VisitAction::Skip => {
@@ -81,7 +81,7 @@ pub fn walk_type_applied<V: AstVisitor + ?Sized>(
 }
 
 fn walk_type_list_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: TypeExprId, inner: TypeExprId, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  let action = v.visit_type_list(id, inner, span, arena);
+  let action = v.visit_type_list(id, inner, span);
   match action {
     VisitAction::Stop => ControlFlow::Break(()),
     VisitAction::Skip => {
@@ -106,7 +106,7 @@ fn walk_type_map_dispatch<V: AstVisitor + ?Sized>(
   span: SourceSpan,
   arena: &AstArena,
 ) -> ControlFlow<()> {
-  let action = v.visit_type_map(id, key, value, span, arena);
+  let action = v.visit_type_map(id, key, value, span);
   match action {
     VisitAction::Stop => ControlFlow::Break(()),
     VisitAction::Skip => {
@@ -132,7 +132,7 @@ pub fn walk_type_map<V: AstVisitor + ?Sized>(
 }
 
 fn walk_type_record_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: TypeExprId, fields: &[TypeField], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  let action = v.visit_type_record(id, fields, span, arena);
+  let action = v.visit_type_record(id, fields, span);
   match action {
     VisitAction::Stop => ControlFlow::Break(()),
     VisitAction::Skip => {
@@ -152,7 +152,7 @@ pub fn walk_type_record<V: AstVisitor + ?Sized>(v: &mut V, id: TypeExprId, field
 }
 
 fn walk_type_tuple_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: TypeExprId, elems: &[TypeExprId], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  let action = v.visit_type_tuple(id, elems, span, arena);
+  let action = v.visit_type_tuple(id, elems, span);
   match action {
     VisitAction::Stop => ControlFlow::Break(()),
     VisitAction::Skip => {
@@ -179,7 +179,7 @@ fn walk_type_func_dispatch<V: AstVisitor + ?Sized>(
   span: SourceSpan,
   arena: &AstArena,
 ) -> ControlFlow<()> {
-  let action = v.visit_type_func(id, param, ret, span, arena);
+  let action = v.visit_type_func(id, param, ret, span);
   match action {
     VisitAction::Stop => ControlFlow::Break(()),
     VisitAction::Skip => {
@@ -212,7 +212,7 @@ fn walk_type_fallible_dispatch<V: AstVisitor + ?Sized>(
   span: SourceSpan,
   arena: &AstArena,
 ) -> ControlFlow<()> {
-  let action = v.visit_type_fallible(id, ok, err, span, arena);
+  let action = v.visit_type_fallible(id, ok, err, span);
   match action {
     VisitAction::Stop => ControlFlow::Break(()),
     VisitAction::Skip => {

@@ -39,12 +39,12 @@ impl<'a> FreeVarCollector<'a> {
 impl TypeVisitor for FreeVarCollector<'_> {}
 
 impl PatternVisitor for FreeVarCollector<'_> {
-  fn visit_pattern_bind(&mut self, _id: PatternId, name: Sym, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
+  fn visit_pattern_bind(&mut self, _id: PatternId, name: Sym, _span: SourceSpan) -> VisitAction {
     self.bind(name);
     VisitAction::Descend
   }
 
-  fn visit_pattern_list(&mut self, _id: PatternId, elems: &[PatternId], rest: Option<Sym>, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
+  fn visit_pattern_list(&mut self, _id: PatternId, elems: &[PatternId], rest: Option<Sym>, _span: SourceSpan) -> VisitAction {
     for &e in elems {
       let pattern = self.arena.pattern(e);
       let pspan = self.arena.pattern_span(e);
@@ -58,7 +58,7 @@ impl PatternVisitor for FreeVarCollector<'_> {
     VisitAction::Skip
   }
 
-  fn visit_pattern_record(&mut self, _id: PatternId, fields: &[FieldPattern], rest: Option<Sym>, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
+  fn visit_pattern_record(&mut self, _id: PatternId, fields: &[FieldPattern], rest: Option<Sym>, _span: SourceSpan) -> VisitAction {
     for f in fields {
       if let Some(pid) = f.pattern {
         let pattern = self.arena.pattern(pid);
@@ -78,14 +78,14 @@ impl PatternVisitor for FreeVarCollector<'_> {
 }
 
 impl AstVisitor for FreeVarCollector<'_> {
-  fn visit_ident(&mut self, _id: ExprId, name: Sym, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
+  fn visit_ident(&mut self, _id: ExprId, name: Sym, _span: SourceSpan) -> VisitAction {
     if !self.is_bound(name) {
       self.free.insert(name);
     }
     VisitAction::Descend
   }
 
-  fn visit_binding(&mut self, id: StmtId, binding: &Binding, span: SourceSpan, _arena: &AstArena) -> VisitAction {
+  fn visit_binding(&mut self, id: StmtId, binding: &Binding, span: SourceSpan) -> VisitAction {
     if walk_binding(self, id, binding, span, self.arena).is_break() {
       return VisitAction::Stop;
     }
@@ -101,7 +101,7 @@ impl AstVisitor for FreeVarCollector<'_> {
     VisitAction::Skip
   }
 
-  fn visit_func(&mut self, _id: ExprId, func: &ExprFunc, span: SourceSpan, _arena: &AstArena) -> VisitAction {
+  fn visit_func(&mut self, _id: ExprId, func: &ExprFunc, span: SourceSpan) -> VisitAction {
     self.push_scope();
     for p in &func.params {
       self.bind(p.name);
@@ -114,7 +114,7 @@ impl AstVisitor for FreeVarCollector<'_> {
     }
   }
 
-  fn visit_block(&mut self, _id: ExprId, stmts: &[StmtId], _span: SourceSpan, _arena: &AstArena) -> VisitAction {
+  fn visit_block(&mut self, _id: ExprId, stmts: &[StmtId], _span: SourceSpan) -> VisitAction {
     self.push_scope();
     for &s in stmts {
       if dispatch_stmt(self, s, self.arena).is_break() {
@@ -126,7 +126,7 @@ impl AstVisitor for FreeVarCollector<'_> {
     VisitAction::Skip
   }
 
-  fn visit_with(&mut self, _id: ExprId, with: &ExprWith, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
+  fn visit_with(&mut self, _id: ExprId, with: &ExprWith, _span: SourceSpan) -> VisitAction {
     match &with.kind {
       WithKind::Binding { name, value, .. } => {
         if dispatch_expr(self, *value, self.arena).is_break() {
@@ -176,7 +176,7 @@ impl AstVisitor for FreeVarCollector<'_> {
     VisitAction::Skip
   }
 
-  fn visit_loop(&mut self, _id: ExprId, stmts: &[StmtId], _span: SourceSpan, _arena: &AstArena) -> VisitAction {
+  fn visit_loop(&mut self, _id: ExprId, stmts: &[StmtId], _span: SourceSpan) -> VisitAction {
     self.push_scope();
     for &s in stmts {
       if dispatch_stmt(self, s, self.arena).is_break() {
@@ -188,7 +188,7 @@ impl AstVisitor for FreeVarCollector<'_> {
     VisitAction::Skip
   }
 
-  fn visit_par(&mut self, _id: ExprId, stmts: &[StmtId], _span: SourceSpan, _arena: &AstArena) -> VisitAction {
+  fn visit_par(&mut self, _id: ExprId, stmts: &[StmtId], _span: SourceSpan) -> VisitAction {
     self.push_scope();
     for &s in stmts {
       if dispatch_stmt(self, s, self.arena).is_break() {
@@ -200,7 +200,7 @@ impl AstVisitor for FreeVarCollector<'_> {
     VisitAction::Skip
   }
 
-  fn visit_match(&mut self, _id: ExprId, m: &ExprMatch, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
+  fn visit_match(&mut self, _id: ExprId, m: &ExprMatch, _span: SourceSpan) -> VisitAction {
     if dispatch_expr(self, m.scrutinee, self.arena).is_break() {
       return VisitAction::Stop;
     }

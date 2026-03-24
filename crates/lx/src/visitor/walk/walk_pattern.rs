@@ -9,7 +9,7 @@ use crate::visitor::{AstVisitor, VisitAction};
 pub(crate) fn walk_pattern_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: PatternId, arena: &AstArena) -> ControlFlow<()> {
   let span = arena.pattern_span(id);
   let pattern = arena.pattern(id);
-  let action = v.visit_pattern(id, pattern, span, arena);
+  let action = v.visit_pattern(id, pattern, span);
   match action {
     VisitAction::Stop => ControlFlow::Break(()),
     VisitAction::Skip => {
@@ -23,19 +23,19 @@ pub(crate) fn walk_pattern_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: Patte
 pub fn walk_pattern<V: AstVisitor + ?Sized>(v: &mut V, id: PatternId, pattern: &Pattern, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
   match pattern {
     Pattern::Literal(lit) => {
-      let action = v.visit_pattern_literal(id, lit, span, arena);
+      let action = v.visit_pattern_literal(id, lit, span);
       if action.is_stop() {
         return ControlFlow::Break(());
       }
     },
     Pattern::Bind(name) => {
-      let action = v.visit_pattern_bind(id, *name, span, arena);
+      let action = v.visit_pattern_bind(id, *name, span);
       if action.is_stop() {
         return ControlFlow::Break(());
       }
     },
     Pattern::Wildcard => {
-      let action = v.visit_pattern_wildcard(id, span, arena);
+      let action = v.visit_pattern_wildcard(id, span);
       if action.is_stop() {
         return ControlFlow::Break(());
       }
@@ -56,7 +56,7 @@ pub fn walk_pattern<V: AstVisitor + ?Sized>(v: &mut V, id: PatternId, pattern: &
 }
 
 fn walk_pattern_tuple_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: PatternId, elems: &[PatternId], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  let action = v.visit_pattern_tuple(id, elems, span, arena);
+  let action = v.visit_pattern_tuple(id, elems, span);
   match action {
     VisitAction::Stop => ControlFlow::Break(()),
     VisitAction::Skip => {
@@ -83,7 +83,7 @@ fn walk_pattern_list_dispatch<V: AstVisitor + ?Sized>(
   span: SourceSpan,
   arena: &AstArena,
 ) -> ControlFlow<()> {
-  let action = v.visit_pattern_list(id, elems, rest, span, arena);
+  let action = v.visit_pattern_list(id, elems, rest, span);
   match action {
     VisitAction::Stop => ControlFlow::Break(()),
     VisitAction::Skip => {
@@ -117,7 +117,7 @@ fn walk_pattern_record_dispatch<V: AstVisitor + ?Sized>(
   span: SourceSpan,
   arena: &AstArena,
 ) -> ControlFlow<()> {
-  let action = v.visit_pattern_record(id, fields, rest, span, arena);
+  let action = v.visit_pattern_record(id, fields, rest, span);
   match action {
     VisitAction::Stop => ControlFlow::Break(()),
     VisitAction::Skip => {
@@ -151,7 +151,7 @@ fn walk_pattern_constructor_dispatch<V: AstVisitor + ?Sized>(
   span: SourceSpan,
   arena: &AstArena,
 ) -> ControlFlow<()> {
-  let action = v.visit_pattern_constructor(id, name, args, span, arena);
+  let action = v.visit_pattern_constructor(id, name, args, span);
   match action {
     VisitAction::Stop => ControlFlow::Break(()),
     VisitAction::Skip => {

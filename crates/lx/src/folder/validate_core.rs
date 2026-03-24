@@ -7,7 +7,7 @@ struct CoreValidator;
 impl PatternVisitor for CoreValidator {}
 impl TypeVisitor for CoreValidator {}
 impl AstVisitor for CoreValidator {
-  fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan, _arena: &crate::ast::AstArena) -> VisitAction {
+  fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan) -> VisitAction {
     match expr {
       Expr::Pipe(_) => panic!("Core AST contains Expr::Pipe at offset {}. The desugarer should have converted this to Expr::Apply.", span.offset()),
       Expr::Section(_) => panic!("Core AST contains Expr::Section at offset {}. The desugarer should have converted this to a lambda.", span.offset()),

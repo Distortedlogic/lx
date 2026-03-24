@@ -22,7 +22,7 @@ pub(crate) use diag_types::*;
 
 use diag_helpers::{extract_field_call_parts, is_resource_create, is_resource_module, unwrap_propagate};
 
-pub(crate) struct Walker {
+pub(crate) struct Walker<'a> {
   pub nodes: Vec<DiagNode>,
   pub edges: Vec<DiagEdge>,
   pub(super) next_id: usize,
@@ -34,11 +34,11 @@ pub(crate) struct Walker {
   pub(super) context_stack: Vec<String>,
   current_fn: Option<Sym>,
   subgraph_nodes: HashMap<String, Vec<String>>,
-  arena: *const AstArena,
+  arena: &'a AstArena,
 }
 
-impl Walker {
-  pub fn new() -> Self {
+impl<'a> Walker<'a> {
+  pub fn with_arena(arena: &'a AstArena) -> Self {
     let main = DiagNode { id: "main".into(), label: "main".into(), kind: NodeKind::Agent, children: vec![], source_offset: None };
     Self {
       nodes: vec![main],
@@ -52,7 +52,7 @@ impl Walker {
       context_stack: Vec::new(),
       current_fn: Some(intern("main")),
       subgraph_nodes: HashMap::from([("main".into(), vec!["main".into()])]),
-      arena: std::ptr::null(),
+      arena,
     }
   }
 
@@ -84,9 +84,9 @@ impl Walker {
   }
 }
 
-impl PatternVisitor for Walker {}
-impl TypeVisitor for Walker {}
-impl AstVisitor for Walker {
+impl PatternVisitor for Walker<'_> {}
+impl TypeVisitor for Walker<'_> {}
+impl AstVisitor for Walker<'_> {
   fn leave_par(&mut self, _id: ExprId, _stmts: &[StmtId], _span: SourceSpan) {
     self.context = self.context_stack.pop().expect("diag: context_stack underflow");
   }
@@ -108,8 +108,7 @@ impl AstVisitor for Walker {
   }
 
   fn visit_program<P>(&mut self, program: &Program<P>) -> VisitAction {
-    self.arena = &program.arena as *const AstArena;
-    let arena = unsafe { &*self.arena };
+    let arena = self.arena;
     let saved_fn = self.current_fn.take();
     for &sid in &program.stmts {
       let stmt = arena.stmt(sid);
@@ -127,8 +126,8 @@ impl AstVisitor for Walker {
     VisitAction::Descend
   }
 
-  fn visit_binding(&mut self, _id: StmtId, binding: &Binding, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    let arena = unsafe { &*self.arena };
+  fn visit_binding(&mut self, _id: StmtId, binding: &Binding, _span: SourceSpan) -> VisitAction {
+    let arena = self.arena;
     let name = match &binding.target {
       BindTarget::Name(n) | BindTarget::Reassign(n) => Some(*n),
       _ => None,
@@ -191,7 +190,7 @@ impl AstVisitor for Walker {
     VisitAction::Skip
   }
 
-  fn visit_use(&mut self, _id: StmtId, stmt: &UseStmt, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
+  fn visit_use(&mut self, _id: StmtId, stmt: &UseStmt, _span: SourceSpan) -> VisitAction {
     let is_base_std = stmt.path.first().is_some_and(|p| *p == "std") && stmt.path.len() == 2;
     if !is_base_std && let Some(last) = stmt.path.last() {
       self.imported_modules.insert(*last);
@@ -199,18 +198,18 @@ impl AstVisitor for Walker {
     VisitAction::Descend
   }
 
-  fn visit_type_def(&mut self, _id: StmtId, def: &StmtTypeDef, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
+  fn visit_type_def(&mut self, _id: StmtId, def: &StmtTypeDef, _span: SourceSpan) -> VisitAction {
     self.add_node("type", def.name.to_string(), NodeKind::Type);
     VisitAction::Descend
   }
 
-  fn visit_trait_decl(&mut self, _id: StmtId, data: &TraitDeclData, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
+  fn visit_trait_decl(&mut self, _id: StmtId, data: &TraitDeclData, _span: SourceSpan) -> VisitAction {
     self.add_node("type", data.name.to_string(), NodeKind::Type);
     VisitAction::Skip
   }
 
-  fn visit_par(&mut self, _id: ExprId, stmts: &[StmtId], span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    let arena = unsafe { &*self.arena };
+  fn visit_par(&mut self, _id: ExprId, stmts: &[StmtId], span: SourceSpan) -> VisitAction {
+    let arena = self.arena;
     let fork_id = self.add_node_at("fork", "par".into(), NodeKind::Fork, Some(span));
     let ctx = self.context.clone();
     self.add_edge(&ctx, &fork_id, String::new(), EdgeStyle::Solid);
@@ -222,8 +221,8 @@ impl AstVisitor for Walker {
     VisitAction::Skip
   }
 
-  fn visit_sel(&mut self, _id: ExprId, arms: &[SelArm], span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    let arena = unsafe { &*self.arena };
+  fn visit_sel(&mut self, _id: ExprId, arms: &[SelArm], span: SourceSpan) -> VisitAction {
+    let arena = self.arena;
     let dec_id = self.add_node_at("sel", "sel".into(), NodeKind::Decision, Some(span));
     let ctx = self.context.clone();
     self.add_edge(&ctx, &dec_id, String::new(), EdgeStyle::Solid);
@@ -237,8 +236,8 @@ impl AstVisitor for Walker {
     VisitAction::Skip
   }
 
-  fn visit_match(&mut self, _id: ExprId, m: &ExprMatch, span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    let arena = unsafe { &*self.arena };
+  fn visit_match(&mut self, _id: ExprId, m: &ExprMatch, span: SourceSpan) -> VisitAction {
+    let arena = self.arena;
     let label = format!("{}?", diag_helpers::expr_label(arena.expr(m.scrutinee), arena));
     let dec_id = self.add_node_at("match", label, NodeKind::Decision, Some(span));
     let ctx = self.context.clone();
@@ -253,8 +252,8 @@ impl AstVisitor for Walker {
     VisitAction::Skip
   }
 
-  fn visit_ternary(&mut self, _id: ExprId, ternary: &ExprTernary, span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    let arena = unsafe { &*self.arena };
+  fn visit_ternary(&mut self, _id: ExprId, ternary: &ExprTernary, span: SourceSpan) -> VisitAction {
+    let arena = self.arena;
     let label = format!("{}?", diag_helpers::expr_label(arena.expr(ternary.cond), arena));
     let dec_id = self.add_node_at("cond", label, NodeKind::Decision, Some(span));
     let ctx = self.context.clone();
@@ -273,8 +272,8 @@ impl AstVisitor for Walker {
     VisitAction::Skip
   }
 
-  fn visit_loop(&mut self, _id: ExprId, stmts: &[StmtId], span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    let arena = unsafe { &*self.arena };
+  fn visit_loop(&mut self, _id: ExprId, stmts: &[StmtId], span: SourceSpan) -> VisitAction {
+    let arena = self.arena;
     let loop_id = self.add_node_at("loop", "loop".into(), NodeKind::Loop, Some(span));
     let ctx = self.context.clone();
     self.add_edge(&ctx, &loop_id, String::new(), EdgeStyle::Solid);
@@ -286,8 +285,8 @@ impl AstVisitor for Walker {
     VisitAction::Skip
   }
 
-  fn visit_apply(&mut self, _id: ExprId, apply: &ExprApply, span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    let arena = unsafe { &*self.arena };
+  fn visit_apply(&mut self, _id: ExprId, apply: &ExprApply, span: SourceSpan) -> VisitAction {
+    let arena = self.arena;
     match diag_walk_expr::visit_apply_diag(self, apply, span, arena) {
       ControlFlow::Continue(()) => VisitAction::Skip,
       ControlFlow::Break(()) => VisitAction::Stop,

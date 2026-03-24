@@ -22,7 +22,7 @@ walk_dispatch_id_slice!(walk_par_dispatch, walk_par, visit_par, leave_par, StmtI
 walk_dispatch_id_slice!(walk_sel_dispatch, walk_sel, visit_sel, leave_sel, SelArm, ExprId);
 
 pub(crate) fn walk_propagate_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, inner: ExprId, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  let action = v.visit_propagate(id, inner, span, arena);
+  let action = v.visit_propagate(id, inner, span);
   match action {
     VisitAction::Stop => ControlFlow::Break(()),
     VisitAction::Skip => {
@@ -34,7 +34,7 @@ pub(crate) fn walk_propagate_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: Exp
 }
 
 pub(crate) fn walk_break_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, value: Option<ExprId>, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  let action = v.visit_break(id, value, span, arena);
+  let action = v.visit_break(id, value, span);
   match action {
     VisitAction::Stop => ControlFlow::Break(()),
     VisitAction::Skip => {
