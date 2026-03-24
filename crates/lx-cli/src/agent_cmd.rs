@@ -11,14 +11,14 @@ pub fn run_agent(script_path: &str) -> ExitCode {
       return ExitCode::from(1);
     },
   };
-  let tokens = match lx::lexer::lex(&source) {
+  let (tokens, comments) = match lx::lexer::lex(&source) {
     Ok(t) => t,
     Err(e) => {
       eprintln!("agent error: {e}");
       return ExitCode::from(1);
     },
   };
-  let result = lx::parser::parse(tokens);
+  let result = lx::parser::parse(tokens, lx::source::FileId::new(0), comments);
   let surface = match result.program {
     Some(p) => {
       for e in &result.errors {

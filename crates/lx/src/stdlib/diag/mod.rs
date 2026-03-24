@@ -69,8 +69,8 @@ pub fn extract_echart_json<P>(program: &Program<P>) -> String {
 }
 
 fn extract_graph(src: &str, span: SourceSpan) -> Result<Graph, LxError> {
-  let tokens = lex(src).map_err(|e| LxError::runtime(format!("diag: lex error: {e}"), span))?;
-  let result = parse(tokens);
+  let (tokens, comments) = lex(src).map_err(|e| LxError::runtime(format!("diag: lex error: {e}"), span))?;
+  let result = parse(tokens, crate::source::FileId::new(0), comments);
   let program = result.program.ok_or_else(|| {
     let msgs: Vec<String> = result.errors.iter().map(|e| format!("{e}")).collect();
     LxError::runtime(format!("diag: parse errors: {}", msgs.join("; ")), span)

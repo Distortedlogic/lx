@@ -18,6 +18,7 @@ use miette::SourceSpan;
 use crate::ast::{AstArena, BinOp, ExprId, PatternId, Program, StmtId, Surface, TypeExprId};
 use crate::error::LxError;
 use crate::lexer::token::{Token, TokenKind};
+use crate::source::{CommentStore, FileId};
 
 type Span = SimpleSpan;
 type ArenaRef = Rc<RefCell<AstArena>>;
@@ -54,11 +55,11 @@ pub struct ParseResult {
   pub errors: Vec<LxError>,
 }
 
-pub fn parse(tokens: Vec<Token>) -> ParseResult {
-  parse_with_recovery(tokens)
+pub fn parse(tokens: Vec<Token>, file: FileId, comments: CommentStore) -> ParseResult {
+  parse_with_recovery(tokens, file, comments)
 }
 
-fn parse_with_recovery(tokens: Vec<Token>) -> ParseResult {
+fn parse_with_recovery(tokens: Vec<Token>, file: FileId, comments: CommentStore) -> ParseResult {
   let len = tokens.last().map(|t| t.span.offset() + t.span.len()).unwrap_or(0);
   let eoi: Span = (len..len).into();
 
@@ -80,7 +81,7 @@ fn parse_with_recovery(tokens: Vec<Token>) -> ParseResult {
 
   let program = output.map(|stmts| {
     let arena = Rc::try_unwrap(arena).expect("arena still borrowed").into_inner();
-    Program { stmts, arena, _phase: PhantomData }
+    Program { stmts, arena, comments, file, _phase: PhantomData }
   });
 
   ParseResult { program, errors }

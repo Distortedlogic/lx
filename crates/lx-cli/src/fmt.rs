@@ -13,7 +13,7 @@ use crate::manifest::{find_manifest_root, find_workspace_root, load_workspace};
 struct FmtFailed;
 
 fn fmt_source(path_str: &str, source: &str) -> Result<String, FmtFailed> {
-  let tokens = match lex(source) {
+  let (tokens, comments) = match lex(source) {
     Ok(t) => t,
     Err(err) => {
       let named = NamedSource::new(path_str, source.to_string());
@@ -21,7 +21,7 @@ fn fmt_source(path_str: &str, source: &str) -> Result<String, FmtFailed> {
       return Err(FmtFailed);
     },
   };
-  let result = parse(tokens);
+  let result = parse(tokens, lx::source::FileId::new(0), comments);
   let program = match result.program {
     Some(p) => p,
     None => {

@@ -12,8 +12,8 @@ pub(super) fn invoke_flow(flow_path: &str, input: &LxVal, ctx: &Arc<RuntimeCtx>,
     std::path::PathBuf::from(flow_path)
   };
   let source = std::fs::read_to_string(&path).map_err(|e| LxError::runtime(format!("test.run: cannot read flow '{flow_path}': {e}"), span))?;
-  let tokens = crate::lexer::lex(&source).map_err(|e| LxError::runtime(format!("test.run: lex error in '{flow_path}': {e}"), span))?;
-  let result = crate::parser::parse(tokens);
+  let (tokens, comments) = crate::lexer::lex(&source).map_err(|e| LxError::runtime(format!("test.run: lex error in '{flow_path}': {e}"), span))?;
+  let result = crate::parser::parse(tokens, crate::source::FileId::new(0), comments);
   let surface = result.program.ok_or_else(|| {
     let msgs: Vec<String> = result.errors.iter().map(|e| format!("{e}")).collect();
     LxError::runtime(format!("test.run: parse errors in '{flow_path}': {}", msgs.join("; ")), span)

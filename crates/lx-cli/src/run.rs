@@ -6,8 +6,8 @@ use lx::error::LxError;
 use lx::runtime::RuntimeCtx;
 
 pub fn run(source: &str, filename: &str, ctx: &Arc<RuntimeCtx>) -> Result<(), Vec<LxError>> {
-  let tokens = lx::lexer::lex(source).map_err(|e| vec![e])?;
-  let result = lx::parser::parse(tokens);
+  let (tokens, comments) = lx::lexer::lex(source).map_err(|e| vec![e])?;
+  let result = lx::parser::parse(tokens, lx::source::FileId::new(0), comments);
   let surface = result.program.ok_or(result.errors.clone())?;
   if !result.errors.is_empty() {
     for e in &result.errors {
@@ -35,12 +35,12 @@ pub fn read_and_parse(path: &str) -> Result<(String, lx::ast::Program<lx::ast::C
     eprintln!("error: cannot read {path}: {e}");
     ExitCode::from(1)
   })?;
-  let tokens = lx::lexer::lex(&source).map_err(|e| {
+  let (tokens, comments) = lx::lexer::lex(&source).map_err(|e| {
     let named = miette::NamedSource::new(path, source.clone());
     eprintln!("{:?}", miette::Report::new(e).with_source_code(named));
     ExitCode::from(1)
   })?;
-  let result = lx::parser::parse(tokens);
+  let result = lx::parser::parse(tokens, lx::source::FileId::new(0), comments);
   let surface = result.program.ok_or_else(|| {
     for e in &result.errors {
       let named = miette::NamedSource::new(path, source.clone());

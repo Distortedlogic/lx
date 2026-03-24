@@ -15,16 +15,17 @@ pub(crate) struct Lexer<'src> {
   source: &'src str,
   pos: usize,
   tokens: Vec<Token>,
+  comments: Vec<crate::source::Comment>,
   depth: i32,
   last_was_semi: bool,
   brace_stack: Vec<bool>,
 }
 
-pub fn lex(source: &str) -> Result<Vec<Token>, LxError> {
-  let mut lexer = Lexer { source, pos: 0, tokens: Vec::new(), depth: 0, last_was_semi: true, brace_stack: Vec::new() };
+pub fn lex(source: &str) -> Result<(Vec<Token>, crate::source::CommentStore), LxError> {
+  let mut lexer = Lexer { source, pos: 0, tokens: Vec::new(), comments: Vec::new(), depth: 0, last_was_semi: true, brace_stack: Vec::new() };
   lexer.run()?;
   lexer.tokens.push(Token::new(TokenKind::Eof, SourceSpan::new(SourceOffset::from(source.len()), 0)));
-  Ok(lexer.tokens)
+  Ok((lexer.tokens, crate::source::CommentStore::from_vec(lexer.comments)))
 }
 
 impl<'src> Lexer<'src> {
@@ -104,7 +105,10 @@ impl<'src> Lexer<'src> {
           self.emit(Token::new(TokenKind::Semi, span));
         }
       },
-      RawToken::Comment => {},
+      RawToken::Comment => {
+        let text = self.source[start..end].to_string();
+        self.comments.push(crate::source::Comment { span: self.sp(start, end), text });
+      },
       RawToken::LParen => {
         self.depth += 1;
         self.emit(Token::new(TokenKind::LParen, span));

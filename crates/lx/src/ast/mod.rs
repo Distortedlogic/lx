@@ -23,6 +23,8 @@ pub struct Core;
 pub struct Program<Phase = Surface> {
   pub stmts: Vec<StmtId>,
   pub arena: AstArena,
+  pub comments: crate::source::CommentStore,
+  pub file: crate::source::FileId,
   pub _phase: PhantomData<Phase>,
 }
 

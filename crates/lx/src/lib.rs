@@ -10,6 +10,7 @@ pub mod lexer;
 pub mod linter;
 pub mod parser;
 pub mod runtime;
+pub mod source;
 pub mod stdlib;
 pub mod sym;
 pub mod value;
