@@ -5,9 +5,9 @@ use miette::SourceSpan;
 
 use super::{AstVisitor, VisitAction};
 
-macro_rules! walk_dispatch_id {
+macro_rules! define_walk_and_dispatch {
   ($dispatch_name:ident, $walk_name:ident, $visit:ident, $leave:ident, $node_ty:ty, $id_ty:ty) => {
-    pub(crate) fn $dispatch_name<V: AstVisitor + ?Sized>(v: &mut V, id: $id_ty, node: &$node_ty, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+    pub fn $dispatch_name<V: AstVisitor + ?Sized>(v: &mut V, id: $id_ty, node: &$node_ty, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
       let action = v.$visit(id, node, span);
       match action {
         VisitAction::Stop => ControlFlow::Break(()),
@@ -15,41 +15,34 @@ macro_rules! walk_dispatch_id {
           v.$leave(id, node, span);
           ControlFlow::Continue(())
         },
-        VisitAction::Descend => $walk_name(v, id, node, span, arena),
-      }
-    }
-  };
-}
-
-macro_rules! walk_dispatch_id_slice {
-  ($dispatch_name:ident, $walk_name:ident, $visit:ident, $leave:ident, $elem_ty:ty, $id_ty:ty) => {
-    pub(crate) fn $dispatch_name<V: AstVisitor + ?Sized>(v: &mut V, id: $id_ty, elems: &[$elem_ty], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-      let action = v.$visit(id, elems, span);
-      match action {
-        VisitAction::Stop => ControlFlow::Break(()),
-        VisitAction::Skip => {
-          v.$leave(id, elems, span);
+        VisitAction::Descend => {
+          $walk_name(v, id, node, span, arena)?;
+          v.$leave(id, node, span);
           ControlFlow::Continue(())
         },
-        VisitAction::Descend => $walk_name(v, id, elems, span, arena),
       }
+    }
+
+    pub fn $walk_name<V: AstVisitor + ?Sized>(v: &mut V, _id: $id_ty, node: &$node_ty, _span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+      node.walk_children(v, arena)?;
+      ControlFlow::Continue(())
     }
   };
 }
 
-mod walk_expr;
-mod walk_expr2;
+pub(crate) use define_walk_and_dispatch;
+
+mod generated;
 mod walk_pattern;
 mod walk_type;
 
-pub use walk_expr::*;
-pub use walk_expr2::*;
+pub use generated::*;
 pub use walk_pattern::*;
 pub use walk_type::*;
 
-walk_dispatch_id!(walk_trait_decl_dispatch, walk_trait_decl, visit_trait_decl, leave_trait_decl, TraitDeclData, StmtId);
-walk_dispatch_id!(walk_class_decl_dispatch, walk_class_decl, visit_class_decl, leave_class_decl, ClassDeclData, StmtId);
-walk_dispatch_id!(walk_field_update_dispatch, walk_field_update, visit_field_update, leave_field_update, StmtFieldUpdate, StmtId);
+define_walk_and_dispatch!(walk_trait_decl_dispatch, walk_trait_decl, visit_trait_decl, leave_trait_decl, TraitDeclData, StmtId);
+define_walk_and_dispatch!(walk_class_decl_dispatch, walk_class_decl, visit_class_decl, leave_class_decl, ClassDeclData, StmtId);
+define_walk_and_dispatch!(walk_field_update_dispatch, walk_field_update, visit_field_update, leave_field_update, StmtFieldUpdate, StmtId);
 
 fn dispatch_child<V: AstVisitor + ?Sized>(v: &mut V, child: NodeId, arena: &AstArena) -> ControlFlow<()> {
   match child {
@@ -221,23 +214,5 @@ pub fn walk_expr<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, arena: &AstArena
     Expr::Yield(yld) => walk_yield_dispatch(v, id, yld, span, arena)?,
     Expr::With(with) => walk_with_dispatch(v, id, with, span, arena)?,
   }
-  ControlFlow::Continue(())
-}
-
-pub fn walk_trait_decl<V: AstVisitor + ?Sized>(v: &mut V, id: StmtId, data: &TraitDeclData, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_children(v, &data.children(), arena)?;
-  v.leave_trait_decl(id, data, span);
-  ControlFlow::Continue(())
-}
-
-pub fn walk_class_decl<V: AstVisitor + ?Sized>(v: &mut V, id: StmtId, data: &ClassDeclData, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_children(v, &data.children(), arena)?;
-  v.leave_class_decl(id, data, span);
-  ControlFlow::Continue(())
-}
-
-pub fn walk_field_update<V: AstVisitor + ?Sized>(v: &mut V, id: StmtId, fu: &StmtFieldUpdate, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  fu.walk_children(v, arena)?;
-  v.leave_field_update(id, fu, span);
   ControlFlow::Continue(())
 }
