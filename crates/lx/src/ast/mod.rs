@@ -2,7 +2,6 @@ pub mod arena;
 mod comment_attach;
 mod display;
 mod expr_types;
-mod parent_map;
 mod types;
 mod walk_impls;
 
@@ -15,7 +14,6 @@ use crate::sym::Sym;
 pub use arena::{AstArena, AstNode, ExprId, NodeId, PatternId, Spanned, StmtId, TypeExprId};
 pub use comment_attach::attach_comments;
 pub use expr_types::*;
-pub use parent_map::build_parent_map;
 pub use types::*;
 
 pub struct Surface;
