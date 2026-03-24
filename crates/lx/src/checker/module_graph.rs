@@ -1,9 +1,6 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::Arc;
 
 use crate::ast::{BindTarget, Core, Program, Stmt};
-use crate::source::FileId;
 use crate::sym::Sym;
 
 use super::semantic::SemanticModel;
@@ -15,50 +12,6 @@ pub struct ModuleSignature {
   pub types: HashMap<Sym, Vec<Sym>>,
   pub traits: HashMap<Sym, Vec<(Sym, TypeId)>>,
   pub type_arena: TypeArena,
-}
-
-pub struct SourceFile {
-  pub id: FileId,
-  pub path: PathBuf,
-  pub source: Arc<str>,
-}
-
-pub struct ModuleGraph {
-  pub files: Vec<SourceFile>,
-  pub file_by_path: HashMap<PathBuf, FileId>,
-  pub signatures: HashMap<FileId, ModuleSignature>,
-}
-
-impl Default for ModuleGraph {
-  fn default() -> Self {
-    Self::new()
-  }
-}
-
-impl ModuleGraph {
-  pub fn new() -> Self {
-    Self { files: Vec::new(), file_by_path: HashMap::new(), signatures: HashMap::new() }
-  }
-
-  pub fn add_file(&mut self, path: PathBuf, source: Arc<str>) -> FileId {
-    let id = FileId::new(self.files.len() as u32);
-    self.file_by_path.insert(path.clone(), id);
-    self.files.push(SourceFile { id, path, source });
-    id
-  }
-
-  pub fn get_file(&self, id: FileId) -> &SourceFile {
-    &self.files[id.index() as usize]
-  }
-
-  pub fn resolve_use_path(&self, path: &[Sym], _from: FileId) -> Option<FileId> {
-    let mut file_path = PathBuf::new();
-    for seg in path {
-      file_path.push(seg.as_str());
-    }
-    file_path.set_extension("lx");
-    self.file_by_path.get(&file_path).copied()
-  }
 }
 
 pub fn extract_signature(program: &Program<Core>, semantic: &SemanticModel) -> ModuleSignature {

@@ -1,5 +1,4 @@
 use miette::SourceSpan;
-use std::sync::Arc;
 
 use crate::ast::{ExprId, PatternId, StmtId, TypeExprId};
 
@@ -13,47 +12,6 @@ impl FileId {
   pub fn index(self) -> u32 {
     self.0
   }
-}
-
-pub struct SourceDb {
-  files: Vec<SourceFile>,
-}
-
-struct SourceFile {
-  path: String,
-  source: Arc<str>,
-}
-
-impl Default for SourceDb {
-  fn default() -> Self {
-    Self::new()
-  }
-}
-
-impl SourceDb {
-  pub fn new() -> Self {
-    Self { files: Vec::new() }
-  }
-
-  pub fn add_file(&mut self, path: String, source: Arc<str>) -> FileId {
-    let id = FileId(self.files.len() as u32);
-    self.files.push(SourceFile { path, source });
-    id
-  }
-
-  pub fn source(&self, id: FileId) -> &str {
-    &self.files[id.0 as usize].source
-  }
-
-  pub fn path(&self, id: FileId) -> &str {
-    &self.files[id.0 as usize].path
-  }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct FullSpan {
-  pub file: FileId,
-  pub span: SourceSpan,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
