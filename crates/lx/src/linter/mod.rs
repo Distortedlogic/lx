@@ -1,4 +1,3 @@
-pub mod matcher;
 mod registry;
 mod rule;
 pub mod rules;
