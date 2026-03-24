@@ -104,7 +104,7 @@ impl<'a> Checker<'a> {
   }
 
   pub(crate) fn is_mutable(&self, name: Sym) -> bool {
-    self.sem.resolve_in_scope(name).map(|id| self.sem.definitions[id].mutable).unwrap_or(false)
+    self.sem.resolve_in_scope(name).map(|id| self.sem.definitions[id.index()].mutable).unwrap_or(false)
   }
 
   pub(crate) fn emit(&mut self, level: DiagLevel, kind: DiagnosticKind, span: SourceSpan) {

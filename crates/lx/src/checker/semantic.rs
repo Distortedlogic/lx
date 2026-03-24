@@ -8,8 +8,29 @@ use miette::SourceSpan;
 
 use super::type_arena::{TypeArena, TypeId};
 
-pub type ScopeId = usize;
-pub type DefinitionId = usize;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ScopeId(u32);
+
+impl ScopeId {
+  pub fn new(id: usize) -> Self {
+    Self(id as u32)
+  }
+  pub fn index(self) -> usize {
+    self.0 as usize
+  }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct DefinitionId(u32);
+
+impl DefinitionId {
+  pub fn new(id: usize) -> Self {
+    Self(id as u32)
+  }
+  pub fn index(self) -> usize {
+    self.0 as usize
+  }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScopeKind {
@@ -59,6 +80,7 @@ pub struct SemanticModel {
   pub scopes: Vec<Scope>,
   pub definitions: Vec<DefinitionInfo>,
   pub references: Vec<Reference>,
+  pub def_references: HashMap<DefinitionId, Vec<ExprId>>,
   pub expr_types: ArenaMap<ExprId, TypeId>,
   pub type_defs: HashMap<Sym, Vec<Sym>>,
   pub trait_fields: HashMap<Sym, Vec<(Sym, TypeId)>>,
@@ -71,15 +93,15 @@ impl SemanticModel {
   }
 
   pub fn type_of_def(&self, id: DefinitionId) -> Option<TypeId> {
-    self.definitions[id].ty
+    self.definitions[id.index()].ty
   }
 
   pub fn display_type(&self, id: TypeId) -> String {
     self.type_arena.display(id)
   }
 
-  pub fn references_to(&self, def: DefinitionId) -> Vec<ExprId> {
-    self.references.iter().filter(|r| r.definition == def).map(|r| r.expr_id).collect()
+  pub fn references_to(&self, def: DefinitionId) -> &[ExprId] {
+    self.def_references.get(&def).map(|v| v.as_slice()).unwrap_or(&[])
   }
 }
 
@@ -87,8 +109,10 @@ pub struct SemanticModelBuilder {
   pub(crate) scopes: Vec<Scope>,
   pub(crate) definitions: Vec<DefinitionInfo>,
   pub(crate) references: Vec<Reference>,
+  def_references: HashMap<DefinitionId, Vec<ExprId>>,
   scope_stack: Vec<ScopeId>,
   def_lookup: HashMap<(ScopeId, Sym), DefinitionId>,
+  scope_definitions: HashMap<ScopeId, Vec<DefinitionId>>,
 }
 
 impl Default for SemanticModelBuilder {
@@ -100,11 +124,19 @@ impl Default for SemanticModelBuilder {
 impl SemanticModelBuilder {
   pub fn new() -> Self {
     let root = Scope { parent: None, span: (0, 0).into(), kind: ScopeKind::Module };
-    Self { scopes: vec![root], definitions: Vec::new(), references: Vec::new(), scope_stack: vec![0], def_lookup: HashMap::new() }
+    Self {
+      scopes: vec![root],
+      definitions: Vec::new(),
+      references: Vec::new(),
+      def_references: HashMap::new(),
+      scope_stack: vec![ScopeId::new(0)],
+      def_lookup: HashMap::new(),
+      scope_definitions: HashMap::new(),
+    }
   }
 
   pub fn push_scope(&mut self, kind: ScopeKind, span: SourceSpan) -> ScopeId {
-    let id = self.scopes.len();
+    let id = ScopeId::new(self.scopes.len());
     let parent = Some(self.current_scope());
     self.scopes.push(Scope { parent, span, kind });
     self.scope_stack.push(id);
@@ -121,18 +153,20 @@ impl SemanticModelBuilder {
 
   pub fn add_definition(&mut self, name: Sym, kind: DefKind, span: SourceSpan, mutable: bool) -> DefinitionId {
     let scope = self.current_scope();
-    let id = self.definitions.len();
+    let id = DefinitionId::new(self.definitions.len());
     self.definitions.push(DefinitionInfo { name, kind, span, ty: None, scope, mutable });
     self.def_lookup.insert((scope, name), id);
+    self.scope_definitions.entry(scope).or_default().push(id);
     id
   }
 
   pub fn set_definition_type(&mut self, id: DefinitionId, ty: TypeId) {
-    self.definitions[id].ty = Some(ty);
+    self.definitions[id.index()].ty = Some(ty);
   }
 
   pub fn add_reference(&mut self, expr_id: ExprId, def_id: DefinitionId) {
     self.references.push(Reference { expr_id, definition: def_id });
+    self.def_references.entry(def_id).or_default().push(expr_id);
   }
 
   pub fn resolve_in_scope(&self, name: Sym) -> Option<DefinitionId> {
@@ -145,15 +179,15 @@ impl SemanticModelBuilder {
   }
 
   pub fn lookup_type(&self, name: Sym) -> Option<TypeId> {
-    self.resolve_in_scope(name).and_then(|id| self.definitions[id].ty)
+    self.resolve_in_scope(name).and_then(|id| self.definitions[id.index()].ty)
   }
 
   pub fn names_in_scope(&self) -> Vec<Sym> {
     let mut names = Vec::new();
     for &scope_id in &self.scope_stack {
-      for &(sid, name) in self.def_lookup.keys() {
-        if sid == scope_id {
-          names.push(name);
+      if let Some(defs) = self.scope_definitions.get(&scope_id) {
+        for &def_id in defs {
+          names.push(self.definitions[def_id.index()].name);
         }
       }
     }
@@ -169,6 +203,15 @@ impl SemanticModelBuilder {
     trait_fields: HashMap<Sym, Vec<(Sym, TypeId)>>,
     type_arena: TypeArena,
   ) -> SemanticModel {
-    SemanticModel { scopes: self.scopes, definitions: self.definitions, references: self.references, expr_types, type_defs, trait_fields, type_arena }
+    SemanticModel {
+      scopes: self.scopes,
+      definitions: self.definitions,
+      references: self.references,
+      def_references: self.def_references,
+      expr_types,
+      type_defs,
+      trait_fields,
+      type_arena,
+    }
   }
 }

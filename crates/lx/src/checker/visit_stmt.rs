@@ -180,8 +180,8 @@ impl Checker<'_> {
       let original_span = self
         .sem
         .resolve_in_scope(name)
-        .filter(|&id| matches!(self.sem.definitions[id].kind, DefKind::Import))
-        .map(|id| self.sem.definitions[id].span)
+        .filter(|&id| matches!(self.sem.definitions[id.index()].kind, DefKind::Import))
+        .map(|id| self.sem.definitions[id.index()].span)
         .unwrap_or(existing);
       let kind = DiagnosticKind::DuplicateImport { name, original_span };
       let secondary = vec![(original_span, "previously imported here".into())];

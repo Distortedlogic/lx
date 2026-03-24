@@ -1,6 +1,6 @@
 use crate::ast::{AstArena, Stmt, StmtId, UseKind};
 use crate::checker::diagnostics::DiagnosticKind;
-use crate::checker::semantic::{DefKind, SemanticModel};
+use crate::checker::semantic::{DefKind, DefinitionId, SemanticModel};
 use crate::checker::{DiagLevel, Diagnostic};
 use crate::linter::rule::{LintRule, RuleCategory};
 use crate::visitor::{AstVisitor, PatternVisitor, TypeVisitor};
@@ -55,8 +55,8 @@ impl LintRule for UnusedImport {
       for name in &names_to_check {
         let def = model.definitions.iter().enumerate().find(|(_, d)| matches!(d.kind, DefKind::Import) && d.name == *name && d.span == span);
 
-        if let Some((def_id, _)) = def {
-          let refs = model.references_to(def_id);
+        if let Some((idx, _)) = def {
+          let refs = model.references_to(DefinitionId::new(idx));
           if refs.is_empty() {
             self.diagnostics.push(Diagnostic {
               level: DiagLevel::Warning,
