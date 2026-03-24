@@ -5,19 +5,6 @@ use miette::SourceSpan;
 
 use super::{AstVisitor, VisitAction};
 
-macro_rules! walk_dispatch {
-  ($dispatch_name:ident, $walk_name:ident, $visit:ident, $leave:ident, $node_ty:ty) => {
-    pub(crate) fn $dispatch_name<V: AstVisitor + ?Sized>(v: &mut V, node: &$node_ty, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-      let action = v.$visit(node, span, arena);
-      match action {
-        VisitAction::Stop => ControlFlow::Break(()),
-        VisitAction::Skip => v.$leave(node, span, arena),
-        VisitAction::Descend => $walk_name(v, node, span, arena),
-      }
-    }
-  };
-}
-
 macro_rules! walk_dispatch_id {
   ($dispatch_name:ident, $walk_name:ident, $visit:ident, $leave:ident, $node_ty:ty, $id_ty:ty) => {
     pub(crate) fn $dispatch_name<V: AstVisitor + ?Sized>(v: &mut V, id: $id_ty, node: &$node_ty, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
