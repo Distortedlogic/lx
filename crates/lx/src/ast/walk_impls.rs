@@ -99,6 +99,33 @@ impl TraitDeclData {
     }
     result
   }
+
+  pub fn walk_children<V: AstVisitor + ?Sized>(&self, v: &mut V, arena: &AstArena) -> ControlFlow<()> {
+    for entry in &self.entries {
+      if let TraitEntry::Field(f) = entry {
+        if let Some(id) = f.default {
+          dispatch_expr(v, id, arena)?;
+        }
+        if let Some(id) = f.constraint {
+          dispatch_expr(v, id, arena)?;
+        }
+      }
+    }
+    for method in &self.methods {
+      for input in &method.input {
+        if let Some(id) = input.default {
+          dispatch_expr(v, id, arena)?;
+        }
+        if let Some(id) = input.constraint {
+          dispatch_expr(v, id, arena)?;
+        }
+      }
+    }
+    for d in &self.defaults {
+      dispatch_expr(v, d.handler, arena)?;
+    }
+    ControlFlow::Continue(())
+  }
 }
 
 impl ClassDeclData {
@@ -117,6 +144,16 @@ impl ClassDeclData {
       result.push(NodeId::Expr(m.handler));
     }
     result
+  }
+
+  pub fn walk_children<V: AstVisitor + ?Sized>(&self, v: &mut V, arena: &AstArena) -> ControlFlow<()> {
+    for f in &self.fields {
+      dispatch_expr(v, f.default, arena)?;
+    }
+    for m in &self.methods {
+      dispatch_expr(v, m.handler, arena)?;
+    }
+    ControlFlow::Continue(())
   }
 }
 

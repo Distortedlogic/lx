@@ -22,7 +22,7 @@ pub fn generate_single_field_walk_arm(enum_name: &syn::Ident, variant_name: &syn
         quote! {
             #enum_name::#variant_name(inner) => {
                 if let Some(id) = #field_ref {
-                    #dispatch_fn(v, id, arena)?;
+                    #dispatch_fn(v, *id, arena)?;
                 }
             }
         }
