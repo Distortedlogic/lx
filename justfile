@@ -26,7 +26,7 @@ test:
     #!/usr/bin/env bash
     set -euo pipefail
     cargo test --workspace --exclude inference-server --exclude lx-desktop --all-targets --all-features -q 2>&1
-    cargo run -p lx-cli -- test tests || echo "lx test suite had failures (see above)"
+    cargo run -p lx-cli -- test tests
 
 rust-diagnose:
     #!/usr/bin/env bash

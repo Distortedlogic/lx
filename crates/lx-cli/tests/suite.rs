@@ -11,6 +11,10 @@ fn lx_test_suite() {
   let stdout = String::from_utf8_lossy(&output.stdout);
   let stderr = String::from_utf8_lossy(&output.stderr);
 
+  if !output.status.success() {
+    panic!("lx test suite failed (exit code {:?}):\nstdout:\n{}\nstderr:\n{}", output.status.code(), stdout, stderr);
+  }
+
   let has_pass = stdout.contains("passed");
   let zero_passed = stdout.contains("0 passed");
 
