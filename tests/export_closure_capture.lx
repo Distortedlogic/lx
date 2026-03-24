@@ -1,0 +1,23 @@
+-- export closure capture test
+-- verifies closures inside + functions can capture sibling bindings
+
+double = (x) x * 2
+
++apply_double = (items) {
+  items | map (x) { double x }
+}
+
+result = apply_double [1, 2, 3]
+assert (result == [2, 4, 6])
+
+-- also test with each (side-effect HOF)
+-- acc must be declared mutable with := to allow reassignment via <-
+acc := []
+add_doubled = (items) {
+  items | each (x) {
+    doubled = double x
+    acc <- acc ++ [doubled]
+  }
+}
+add_doubled [10, 20]
+assert (acc == [20, 40])

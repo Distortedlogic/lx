@@ -92,7 +92,6 @@ impl Interpreter {
     let mut forward_names = Vec::new();
     for &sid in &program.stmts {
       if let Stmt::Binding(b) = self.arena.stmt(sid)
-        && !b.exported
         && let BindTarget::Name(name) = b.target
         && matches!(self.arena.expr(b.value), Expr::Func(_))
       {
