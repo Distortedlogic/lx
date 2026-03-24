@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use la_arena::ArenaMap;
+
 use crate::ast::ExprId;
 use crate::sym::Sym;
 use miette::SourceSpan;
@@ -57,7 +59,7 @@ pub struct SemanticModel {
   pub scopes: Vec<Scope>,
   pub definitions: Vec<DefinitionInfo>,
   pub references: Vec<Reference>,
-  pub expr_types: HashMap<ExprId, TypeId>,
+  pub expr_types: ArenaMap<ExprId, TypeId>,
   pub type_defs: HashMap<Sym, Vec<Sym>>,
   pub trait_fields: HashMap<Sym, Vec<(Sym, TypeId)>>,
   pub type_arena: TypeArena,
@@ -65,7 +67,7 @@ pub struct SemanticModel {
 
 impl SemanticModel {
   pub fn type_of_expr(&self, id: ExprId) -> Option<TypeId> {
-    self.expr_types.get(&id).copied()
+    self.expr_types.get(id).copied()
   }
 
   pub fn type_of_def(&self, id: DefinitionId) -> Option<TypeId> {
@@ -162,7 +164,7 @@ impl SemanticModelBuilder {
 
   pub fn build(
     self,
-    expr_types: HashMap<ExprId, TypeId>,
+    expr_types: ArenaMap<ExprId, TypeId>,
     type_defs: HashMap<Sym, Vec<Sym>>,
     trait_fields: HashMap<Sym, Vec<(Sym, TypeId)>>,
     type_arena: TypeArena,

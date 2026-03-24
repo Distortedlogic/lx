@@ -72,7 +72,7 @@ pub fn extract_signature(program: &Program<Core>, semantic: &SemanticModel) -> M
     match stmt {
       Stmt::Binding(b) if b.exported => {
         if let BindTarget::Name(name) = &b.target {
-          let ty = semantic.expr_types.get(&b.value).copied().unwrap_or(semantic.type_arena.unknown());
+          let ty = semantic.expr_types.get(b.value).copied().unwrap_or(semantic.type_arena.unknown());
           bindings.insert(*name, ty);
         }
       },
@@ -88,7 +88,14 @@ pub fn extract_signature(program: &Program<Core>, semantic: &SemanticModel) -> M
         let unknown = semantic.type_arena.unknown();
         bindings.insert(data.name, unknown);
       },
-      _ => {},
+      Stmt::Binding(_)
+      | Stmt::TypeDef(_)
+      | Stmt::TraitDecl(_)
+      | Stmt::ClassDecl(_)
+      | Stmt::TraitUnion(_)
+      | Stmt::FieldUpdate(_)
+      | Stmt::Use(_)
+      | Stmt::Expr(_) => {},
     }
   }
 

@@ -25,6 +25,8 @@ use std::collections::HashMap;
 
 use std::sync::Arc;
 
+use la_arena::ArenaMap;
+
 use crate::ast::{AstArena, Core, ExprId, Program, TypeExpr, TypeExprId};
 use diagnostics::{DiagnosticKind, Fix};
 use miette::SourceSpan;
@@ -71,7 +73,7 @@ pub(crate) struct Checker<'a> {
   pub(crate) trait_fields: HashMap<Sym, Vec<(Sym, TypeId)>>,
   pub(crate) arena: &'a AstArena,
   pub(crate) sem: SemanticModelBuilder,
-  pub(crate) expr_types: HashMap<ExprId, TypeId>,
+  pub(crate) expr_types: ArenaMap<ExprId, TypeId>,
   generic_scope: Vec<HashMap<Sym, TypeId>>,
   pub(crate) narrowing: NarrowingEnv,
   stdlib_sigs: HashMap<String, ModuleSignature>,
@@ -90,7 +92,7 @@ impl<'a> Checker<'a> {
       trait_fields: HashMap::new(),
       arena,
       sem: SemanticModelBuilder::new(),
-      expr_types: HashMap::new(),
+      expr_types: ArenaMap::default(),
       generic_scope: Vec::new(),
       narrowing: NarrowingEnv::new(),
       stdlib_sigs: stdlib_sigs::build_stdlib_signatures(),

@@ -43,7 +43,32 @@ impl Checker<'_> {
       },
       Expr::Match(m) => self.check_match(m.scrutinee, &m.arms, expected),
       Expr::Block(stmts) => self.check_block(stmts, expected),
-      _ => {
+      Expr::Literal(_)
+      | Expr::Ident(_)
+      | Expr::TypeConstructor(_)
+      | Expr::Binary(_)
+      | Expr::Unary(_)
+      | Expr::Pipe(_)
+      | Expr::Apply(_)
+      | Expr::Section(_)
+      | Expr::FieldAccess(_)
+      | Expr::Tuple(_)
+      | Expr::Record(_)
+      | Expr::Map(_)
+      | Expr::Ternary(_)
+      | Expr::Propagate(_)
+      | Expr::Coalesce(_)
+      | Expr::Slice(_)
+      | Expr::NamedArg(_)
+      | Expr::Loop(_)
+      | Expr::Break(_)
+      | Expr::Assert(_)
+      | Expr::Par(_)
+      | Expr::Sel(_)
+      | Expr::Timeout(_)
+      | Expr::Emit(_)
+      | Expr::Yield(_)
+      | Expr::With(_) => {
         let actual = self.synth_expr(eid);
         let span = arena.expr_span(eid);
         match self.table.unify_with_context(expected, actual, TypeContext::General, &mut self.type_arena) {
@@ -133,7 +158,7 @@ impl Checker<'_> {
     let last_stmt = arena.stmt(last);
     match last_stmt {
       Stmt::Expr(e) => self.check_expr(*e, expected),
-      _ => {
+      Stmt::Binding(_) | Stmt::TypeDef(_) | Stmt::TraitUnion(_) | Stmt::TraitDecl(_) | Stmt::ClassDecl(_) | Stmt::FieldUpdate(_) | Stmt::Use(_) => {
         self.check_stmt(last, arena);
         self.type_arena.unit()
       },
