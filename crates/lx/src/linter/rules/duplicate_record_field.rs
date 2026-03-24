@@ -12,6 +12,12 @@ pub struct DuplicateRecordField {
   diagnostics: Vec<Diagnostic>,
 }
 
+impl Default for DuplicateRecordField {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 impl DuplicateRecordField {
   pub fn new() -> Self {
     Self { diagnostics: Vec::new() }
@@ -56,7 +62,9 @@ impl LintRule for DuplicateRecordField {
 
   fn run(&mut self, stmts: &[StmtId], arena: &AstArena, _model: &SemanticModel) {
     for sid in stmts {
-      let _ = dispatch_stmt(self, *sid, arena);
+      if dispatch_stmt(self, *sid, arena).is_break() {
+        break;
+      }
     }
   }
 

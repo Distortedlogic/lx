@@ -3,55 +3,25 @@ use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::{DefKind, SemanticModel};
 use crate::checker::{DiagLevel, Diagnostic};
 use crate::linter::rule::{LintRule, RuleCategory};
-use crate::visitor::{AstVisitor, VisitAction, dispatch_stmt};
-use miette::SourceSpan;
+use crate::visitor::AstVisitor;
 
 pub struct UnusedImport {
   diagnostics: Vec<Diagnostic>,
-  model: Option<*const SemanticModel>,
+}
+
+impl Default for UnusedImport {
+  fn default() -> Self {
+    Self::new()
+  }
 }
 
 impl UnusedImport {
   pub fn new() -> Self {
-    Self { diagnostics: Vec::new(), model: None }
+    Self { diagnostics: Vec::new() }
   }
 }
 
-impl AstVisitor for UnusedImport {
-  fn visit_stmt(&mut self, _id: StmtId, stmt: &Stmt, span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    let Stmt::Use(use_stmt) = stmt else {
-      return VisitAction::Descend;
-    };
-
-    let model = unsafe { &*self.model.unwrap() };
-
-    let names_to_check: Vec<_> = match &use_stmt.kind {
-      UseKind::Whole => use_stmt.path.last().map(|n| vec![*n]).unwrap_or_default(),
-      UseKind::Alias(alias) => vec![*alias],
-      UseKind::Selective(names) => names.clone(),
-    };
-
-    for name in &names_to_check {
-      let def = model.definitions.iter().enumerate().find(|(_, d)| matches!(d.kind, DefKind::Import) && d.name == *name && d.span == span);
-
-      if let Some((def_id, _)) = def {
-        let refs = model.references_to(def_id);
-        if refs.is_empty() {
-          self.diagnostics.push(Diagnostic {
-            level: DiagLevel::Warning,
-            kind: DiagnosticKind::LintWarning { rule_name: "unused_import".into(), message: format!("unused import '{name}'") },
-            code: "L005",
-            span,
-            secondary: vec![],
-            fix: None,
-          });
-        }
-      }
-    }
-
-    VisitAction::Descend
-  }
-}
+impl AstVisitor for UnusedImport {}
 
 impl LintRule for UnusedImport {
   fn name(&self) -> &'static str {
@@ -67,11 +37,37 @@ impl LintRule for UnusedImport {
   }
 
   fn run(&mut self, stmts: &[StmtId], arena: &AstArena, model: &SemanticModel) {
-    self.model = Some(model as *const _);
     for sid in stmts {
-      let _ = dispatch_stmt(self, *sid, arena);
+      let span = arena.stmt_span(*sid);
+      let stmt = arena.stmt(*sid);
+      let Stmt::Use(use_stmt) = stmt else {
+        continue;
+      };
+
+      let names_to_check: Vec<_> = match &use_stmt.kind {
+        UseKind::Whole => use_stmt.path.last().map(|n| vec![*n]).unwrap_or_default(),
+        UseKind::Alias(alias) => vec![*alias],
+        UseKind::Selective(names) => names.clone(),
+      };
+
+      for name in &names_to_check {
+        let def = model.definitions.iter().enumerate().find(|(_, d)| matches!(d.kind, DefKind::Import) && d.name == *name && d.span == span);
+
+        if let Some((def_id, _)) = def {
+          let refs = model.references_to(def_id);
+          if refs.is_empty() {
+            self.diagnostics.push(Diagnostic {
+              level: DiagLevel::Warning,
+              kind: DiagnosticKind::LintWarning { rule_name: "unused_import".into(), message: format!("unused import '{name}'") },
+              code: "L005",
+              span,
+              secondary: vec![],
+              fix: None,
+            });
+          }
+        }
+      }
     }
-    self.model = None;
   }
 
   fn take_diagnostics(&mut self) -> Vec<Diagnostic> {
