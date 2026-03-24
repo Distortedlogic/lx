@@ -6,23 +6,21 @@ macro_rules! walk_transform_fn {
   ($fn_name:ident, $id_ty:ty, $transform:ident, $leave:ident, $get_span:ident, $get_node:ident, $alloc:ident) => {
     pub fn $fn_name<T: AstTransformer + ?Sized>(t: &mut T, id: $id_ty, arena: &mut AstArena) -> $id_ty {
       let span = arena.$get_span(id);
-      let original = arena.$get_node(id).clone();
-      match t.$transform(id, original.clone(), span, arena) {
+      let action = {
+        let node_ref = arena.$get_node(id);
+        t.$transform(id, node_ref, span, arena)
+      };
+      match action {
         TransformOp::Stop => id,
-        TransformOp::Skip(node) => {
-          let final_node = t.$leave(id, node, span, arena);
-          if final_node == original {
-            return id;
-          }
-          arena.$alloc(final_node, span)
+        TransformOp::Replace(node) => {
+          let (final_node, final_span) = t.$leave(id, node, span, arena);
+          arena.$alloc(final_node, final_span)
         },
-        TransformOp::Continue(node) => {
+        TransformOp::Continue => {
+          let node = arena.$get_node(id).clone();
           let recursed = node.recurse_children(t, arena);
-          let final_node = t.$leave(id, recursed, span, arena);
-          if final_node == original {
-            return id;
-          }
-          arena.$alloc(final_node, span)
+          let (final_node, final_span) = t.$leave(id, recursed, span, arena);
+          arena.$alloc(final_node, final_span)
         },
       }
     }

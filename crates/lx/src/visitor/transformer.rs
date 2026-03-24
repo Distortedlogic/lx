@@ -2,8 +2,8 @@ use crate::ast::{AstArena, Expr, ExprId, Pattern, PatternId, Program, Stmt, Stmt
 use miette::SourceSpan;
 
 pub enum TransformOp<T> {
-  Continue(T),
-  Skip(T),
+  Continue,
+  Replace(T),
   Stop,
 }
 
@@ -12,35 +12,35 @@ pub trait AstTransformer {
     super::walk_transform::walk_transform_program(self, program)
   }
 
-  fn transform_stmt(&mut self, _id: StmtId, stmt: Stmt, _span: SourceSpan, _arena: &mut AstArena) -> TransformOp<Stmt> {
-    TransformOp::Continue(stmt)
+  fn transform_stmt(&mut self, _id: StmtId, _stmt: &Stmt, _span: SourceSpan, _arena: &AstArena) -> TransformOp<Stmt> {
+    TransformOp::Continue
   }
 
-  fn transform_expr(&mut self, _id: ExprId, expr: Expr, _span: SourceSpan, _arena: &mut AstArena) -> TransformOp<Expr> {
-    TransformOp::Continue(expr)
+  fn transform_expr(&mut self, _id: ExprId, _expr: &Expr, _span: SourceSpan, _arena: &AstArena) -> TransformOp<Expr> {
+    TransformOp::Continue
   }
 
-  fn transform_pattern(&mut self, _id: PatternId, pattern: Pattern, _span: SourceSpan, _arena: &mut AstArena) -> TransformOp<Pattern> {
-    TransformOp::Continue(pattern)
+  fn transform_pattern(&mut self, _id: PatternId, _pattern: &Pattern, _span: SourceSpan, _arena: &AstArena) -> TransformOp<Pattern> {
+    TransformOp::Continue
   }
 
-  fn transform_type_expr(&mut self, _id: TypeExprId, te: TypeExpr, _span: SourceSpan, _arena: &mut AstArena) -> TransformOp<TypeExpr> {
-    TransformOp::Continue(te)
+  fn transform_type_expr(&mut self, _id: TypeExprId, _te: &TypeExpr, _span: SourceSpan, _arena: &AstArena) -> TransformOp<TypeExpr> {
+    TransformOp::Continue
   }
 
-  fn leave_stmt(&mut self, _id: StmtId, stmt: Stmt, _span: SourceSpan, _arena: &mut AstArena) -> Stmt {
-    stmt
+  fn leave_stmt(&mut self, _id: StmtId, stmt: Stmt, span: SourceSpan, _arena: &mut AstArena) -> (Stmt, SourceSpan) {
+    (stmt, span)
   }
 
-  fn leave_expr(&mut self, _id: ExprId, expr: Expr, _span: SourceSpan, _arena: &mut AstArena) -> Expr {
-    expr
+  fn leave_expr(&mut self, _id: ExprId, expr: Expr, span: SourceSpan, _arena: &mut AstArena) -> (Expr, SourceSpan) {
+    (expr, span)
   }
 
-  fn leave_pattern(&mut self, _id: PatternId, pattern: Pattern, _span: SourceSpan, _arena: &mut AstArena) -> Pattern {
-    pattern
+  fn leave_pattern(&mut self, _id: PatternId, pattern: Pattern, span: SourceSpan, _arena: &mut AstArena) -> (Pattern, SourceSpan) {
+    (pattern, span)
   }
 
-  fn leave_type_expr(&mut self, _id: TypeExprId, te: TypeExpr, _span: SourceSpan, _arena: &mut AstArena) -> TypeExpr {
-    te
+  fn leave_type_expr(&mut self, _id: TypeExprId, te: TypeExpr, span: SourceSpan, _arena: &mut AstArena) -> (TypeExpr, SourceSpan) {
+    (te, span)
   }
 }
