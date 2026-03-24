@@ -4,8 +4,8 @@ pub mod tab_bar;
 pub mod toolbar;
 pub mod view;
 
+use common_pane_tree::{PaneNode, Tab, TabsState};
 use dioxus::prelude::*;
-use pane_tree::{PaneNode, Tab, TabsState};
 
 use crate::panes::DesktopPane;
 

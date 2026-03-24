@@ -1,4 +1,4 @@
-use pane_tree::Pane;
+use common_pane_tree::Pane;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

@@ -7,3 +7,5 @@ pub mod routes;
 pub mod server;
 pub mod terminal;
 pub mod voice_backend;
+#[cfg(feature = "desktop")]
+pub mod webview_permissions;

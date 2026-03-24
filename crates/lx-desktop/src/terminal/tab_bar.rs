@@ -1,5 +1,5 @@
+use common_pane_tree::{NotificationLevel, PaneNode, Rect, TabsState};
 use dioxus::prelude::*;
-use pane_tree::{NotificationLevel, PaneNode, Rect, TabsState};
 use uuid::Uuid;
 
 use super::add_tab;

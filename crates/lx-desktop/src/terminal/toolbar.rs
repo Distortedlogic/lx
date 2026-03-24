@@ -1,5 +1,5 @@
+use common_pane_tree::PaneNode;
 use dioxus::prelude::*;
-use pane_tree::PaneNode;
 use uuid::Uuid;
 
 use crate::panes::{DesktopPane, PaneKind};

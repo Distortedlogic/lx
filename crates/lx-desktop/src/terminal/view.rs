@@ -1,13 +1,13 @@
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as B64;
+use common_pane_tree::TabsState;
+use common_pane_tree::{NotificationLevel, PaneNotification};
 use dioxus::logger::tracing::error;
 use dioxus::prelude::*;
-use pane_tree::TabsState;
-use pane_tree::{NotificationLevel, PaneNotification};
+use dioxus_widget_bridge::use_ts_widget;
 use serde_json::Value;
 use tokio::sync::broadcast::error::RecvError;
 use uuid::Uuid;
-use widget_bridge::use_ts_widget;
 
 use super::use_tabs_state;
 use crate::panes::DesktopPane;
@@ -27,7 +27,7 @@ pub fn TerminalView(terminal_id: String, working_dir: String, command: Option<St
     let wd = working_dir.clone();
     let cmd = command.clone();
     async move {
-      let session = match pty_mux::get_or_create(&element_id, 80, 24, Some(&wd), cmd.as_deref()) {
+      let session = match common_pty::get_or_create(&element_id, 80, 24, Some(&wd), cmd.as_deref()) {
         Ok(s) => s,
         Err(e) => {
           error!("pty session create failed: {e}");
@@ -142,11 +142,11 @@ pub fn ChartView(chart_id: String, chart_json: String, title: Option<String>) ->
     if json.is_empty() {
       return;
     }
-    document::eval(&format!("DxCharts.initChart('{id}', {json})"));
+    document::eval(&format!("DioxusCharts.initChart('{id}', {json})"));
   });
   let id_drop = div_id.clone();
   use_drop(move || {
-    document::eval(&format!("DxCharts.disposeChart('{id_drop}')"));
+    document::eval(&format!("DioxusCharts.disposeChart('{id_drop}')"));
   });
   rsx! {
     div {

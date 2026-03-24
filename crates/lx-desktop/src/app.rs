@@ -4,11 +4,16 @@ use crate::routes::Route;
 
 static TAILWIND_CSS: Asset = asset!("/assets/tailwind.css", AssetOptions::css().with_static_head(true));
 static _ECHARTS_JS: Asset = asset!("/assets/echarts-5.5.1.min.js", AssetOptions::js().with_static_head(true));
-static _DX_CHARTS_JS: Asset = asset!("/assets/dx-charts.js", AssetOptions::js().with_static_head(true));
 static _WIDGET_BRIDGE_JS: Asset = asset!("/assets/widget-bridge.js", AssetOptions::js().with_static_head(true));
 
 #[component]
 pub fn App() -> Element {
+  #[cfg(feature = "desktop")]
+  use_hook(|| {
+    let desktop = dioxus::desktop::window();
+    crate::webview_permissions::enable_media_permissions(&desktop);
+  });
+
   rsx! {
     document::Link {
       rel: "stylesheet",

@@ -2,18 +2,8 @@
 members = [
   "crates/lx",
   "crates/lx-cli",
-  "crates/pane-tree",
-  "crates/pty-mux",
-  "crates/widget-bridge",
-  "crates/dx-charts",
-  "crates/inference-client",
-  "crates/whisper-client",
-  "crates/kokoro-client",
-  "crates/audio-core",
-  "crates/voice-agent",
   "crates/lx-desktop",
   "crates/lx-macros",
-  "crates/browser-cdp",
 ]
 exclude = ["reference/chumsky"]
 resolver = "2"

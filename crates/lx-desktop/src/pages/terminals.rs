@@ -1,8 +1,8 @@
 use std::sync::{Arc, Mutex};
 
+use common_pane_tree::{DividerInfo, Pane, PaneNode, Rect, SplitDirection, TabsState};
 use dioxus::logger::tracing::error;
 use dioxus::prelude::*;
-use pane_tree::{DividerInfo, Pane, PaneNode, Rect, SplitDirection, TabsState};
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
@@ -86,7 +86,7 @@ pub fn Terminals() -> Element {
 
 fn render_tab(
   tabs_state: Signal<TabsState<DesktopPane>>,
-  tab: &pane_tree::Tab<DesktopPane>,
+  tab: &common_pane_tree::Tab<DesktopPane>,
   active_tab_id: &Option<String>,
   focused_pane_id: &Option<String>,
 ) -> Element {

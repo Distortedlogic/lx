@@ -2223,7 +2223,7 @@ var WidgetBridge = (function(exports) {
 						};
 					};
 					Object.defineProperty(t, "__esModule", { value: !0 }), t.SelectionService = void 0;
-					const n = i(9806), o = i(9504), a = i(456), h = i(4725), c = i(8460), l = i(844), d = i(6114), _ = i(4841), u = i(511), f = i(2585), p = new RegExp(String.fromCharCode(160), "g");
+					const n = i(9806), o = i(9504), a = i(456), h = i(4725), c = i(8460), l = i(844), d = i(6114), _ = i(4841), u = i(511), f = i(2585), v = String.fromCharCode(160), p = new RegExp(v, "g");
 					let g = t.SelectionService = class extends l.Disposable {
 						constructor(e, t, i, s, r, n, o, h, d) {
 							super(), this._element = e, this._screenElement = t, this._linkifier = i, this._bufferService = s, this._coreService = r, this._mouseService = n, this._optionsService = o, this._renderService = h, this._coreBrowserService = d, this._dragScrollAmount = 0, this._enabled = !0, this._workCell = new u.CellData(), this._mouseDownTimeStamp = 0, this._oldHasSelection = !1, this._oldSelectionStart = void 0, this._oldSelectionEnd = void 0, this._onLinuxMouseSelection = this.register(new c.EventEmitter()), this.onLinuxMouseSelection = this._onLinuxMouseSelection.event, this._onRedrawRequest = this.register(new c.EventEmitter()), this.onRequestRedraw = this._onRedrawRequest.event, this._onSelectionChange = this.register(new c.EventEmitter()), this.onSelectionChange = this._onSelectionChange.event, this._onRequestScrollLines = this.register(new c.EventEmitter()), this.onRequestScrollLines = this._onRequestScrollLines.event, this._mouseMoveListener = (e) => this._handleMouseMove(e), this._mouseUpListener = (e) => this._handleMouseUp(e), this._coreService.onUserInput((() => {
@@ -38842,7 +38842,7 @@ Please report this to https://github.com/markedjs/marked.`, e) {
 		}
 	});
 	//#endregion
-	//#region ../audio-capture/dist/audio-capture.js
+	//#region ../audio-capture/src/worklet.ts
 	var CAPTURE_WORKLET_CODE = `
 class Capture extends AudioWorkletProcessor {
   constructor() {
@@ -38865,14 +38865,15 @@ class Capture extends AudioWorkletProcessor {
 }
 registerProcessor('capture', Capture);
 `;
+	//#endregion
+	//#region ../audio-capture/src/vad.ts
 	var DEFAULT_VAD_CONFIG = {
 		threshold: .01,
 		silenceTimeoutMs: 2e3
 	};
 	var VoiceActivityDetector = class {
-		silenceStart = Date.now();
-		config;
 		constructor(config = {}) {
+			this.silenceStart = Date.now();
 			this.config = {
 				...DEFAULT_VAD_CONFIG,
 				...config
@@ -38893,17 +38894,17 @@ registerProcessor('capture', Capture);
 			this.silenceStart = Date.now();
 		}
 	};
+	//#endregion
+	//#region ../audio-capture/src/capture.ts
 	var AudioCapture = class {
-		audioCtx = null;
-		mediaStream = null;
-		workletNode = null;
-		vad;
-		sampleRate;
-		seq = 0;
-		running = false;
-		onChunk = null;
-		onSilence = null;
 		constructor(config = {}) {
+			this.audioCtx = null;
+			this.mediaStream = null;
+			this.workletNode = null;
+			this.seq = 0;
+			this.running = false;
+			this.onChunk = null;
+			this.onSilence = null;
 			this.sampleRate = config.sampleRate ?? 16e3;
 			this.vad = new VoiceActivityDetector(config.vad);
 		}
@@ -38964,12 +38965,14 @@ registerProcessor('capture', Capture);
 		}
 	};
 	//#endregion
-	//#region ../audio-playback/dist/audio-playback.js
+	//#region ../audio-playback/src/playback.ts
 	var AudioPlayback = class {
-		audioCtx = null;
-		queue = [];
-		playing = false;
-		onComplete = null;
+		constructor() {
+			this.audioCtx = null;
+			this.queue = [];
+			this.playing = false;
+			this.onComplete = null;
+		}
 		get isPlaying() {
 			return this.playing;
 		}
@@ -39101,7 +39104,9 @@ registerProcessor('capture', Capture);
 			}
 		}
 	});
-	window.WidgetBridge = /* @__PURE__ */ __exportAll({
+	//#endregion
+	//#region src/index.ts
+	var src_exports = /* @__PURE__ */ __exportAll({
 		disposeTerminal: () => disposeTerminal,
 		fitTerminal: () => fitTerminal,
 		mountTerminal: () => mountTerminal,
@@ -39111,6 +39116,7 @@ registerProcessor('capture', Capture);
 		startDividerDrag: () => startDividerDrag,
 		writeTerminal: () => writeTerminal
 	});
+	window.WidgetBridge = src_exports;
 	//#endregion
 	exports.disposeTerminal = disposeTerminal;
 	exports.fitTerminal = fitTerminal;

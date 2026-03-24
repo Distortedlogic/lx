@@ -1,4 +1,4 @@
-use voice_agent::AgentBackend;
+use common_voice::AgentBackend;
 
 pub struct ClaudeCliBackend;
 

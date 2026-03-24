@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
+use common_pane_tree::{PaneNode, TabsState};
 use dioxus::prelude::*;
-use pane_tree::{PaneNode, TabsState};
 use tokio::sync::mpsc;
 
 use super::menu_bar::MenuBar;
@@ -14,7 +14,7 @@ use crate::terminal::{add_tab, use_provide_tabs};
 #[cfg(feature = "desktop")]
 const ECHARTS_JS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/echarts-5.5.1.min.js"));
 #[cfg(feature = "desktop")]
-const DX_CHARTS_JS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/dx-charts.js"));
+const CHARTS_JS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/charts.js"));
 #[cfg(feature = "desktop")]
 const WIDGET_BRIDGE_JS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/widget-bridge.js"));
 
@@ -32,7 +32,7 @@ pub fn Shell() -> Element {
   #[cfg(feature = "desktop")]
   use_hook(|| {
     document::eval(ECHARTS_JS);
-    document::eval(DX_CHARTS_JS);
+    document::eval(CHARTS_JS);
     document::eval(WIDGET_BRIDGE_JS);
   });
   let spawn_channel = use_hook(|| {

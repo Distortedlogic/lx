@@ -14,7 +14,7 @@ fn roundtrip_check(path: &str) {
 
   let (tokens2, comments2) = lex(&formatted).expect("re-lex failed");
   let result2 = parse(tokens2, FileId::new(0), comments2, &formatted);
-  assert!(result2.program.is_some(), "round-trip failed for {}: formatted output does not re-parse.\nFormatted:\n{}", path, formatted);
+  assert!(result2.program.is_some(), "round-trip failed for {path}: formatted output does not re-parse.\nFormatted:\n{formatted}");
 }
 
 #[test]

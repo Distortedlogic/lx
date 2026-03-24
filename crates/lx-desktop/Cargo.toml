@@ -18,14 +18,16 @@ path = "src/lib.rs"
 workspace = true
 
 [dependencies]
-pane-tree = { path = "../pane-tree" }
-pty-mux = { path = "../pty-mux" }
-widget-bridge = { path = "../widget-bridge" }
-audio-core = { path = "../audio-core" }
-whisper-client = { path = "../whisper-client" }
-kokoro-client = { path = "../kokoro-client" }
-voice-agent = { path = "../voice-agent" }
-browser-cdp = { path = "../browser-cdp" }
+common-pane-tree = { path = "../../../dioxus-common/crates/common-pane-tree" }
+common-pty = { path = "../../../dioxus-common/crates/common-pty" }
+dioxus-widget-bridge = { path = "../../../dioxus-common/crates/dioxus-widget-bridge" }
+common-audio = { path = "../../../dioxus-common/crates/common-audio" }
+common-whisper = { path = "../../../dioxus-common/crates/common-whisper" }
+common-kokoro = { path = "../../../dioxus-common/crates/common-kokoro" }
+common-voice = { path = "../../../dioxus-common/crates/common-voice" }
+common-cdp = { path = "../../../dioxus-common/crates/common-cdp" }
+common-charts = { path = "../../../dioxus-common/crates/common-charts" }
+common-inference = { path = "../../../dioxus-common/crates/common-inference" }
 anyhow = "1"
 async-trait = "0.1"
 base64 = "0.22"
@@ -36,8 +38,9 @@ serde_json = { workspace = true }
 tokio = { workspace = true, features = ["process"] }
 uuid = { version = "1", features = ["v4"] }
 axum = { version = "0.8", optional = true }
+webkit2gtk = { version = "=2.0.1", features = ["v2_38"], optional = true }
 
 [features]
 default = []
-desktop = ["dioxus/desktop"]
+desktop = ["dioxus/desktop", "dep:webkit2gtk"]
 server = ["dioxus/server", "dep:axum"]

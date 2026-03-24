@@ -1,11 +1,11 @@
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as B64;
+use common_inference::InferenceClient as _;
+use common_kokoro::SpeechRequest;
+use common_voice::AgentBackend as _;
+use common_whisper::TranscribeRequest;
 use dioxus::prelude::*;
-use kokoro_client::SpeechRequest;
-use voice_agent::AgentBackend as _;
-use whisper_client::InferenceClient as _;
-use whisper_client::TranscribeRequest;
-use widget_bridge::use_ts_widget;
+use dioxus_widget_bridge::use_ts_widget;
 
 #[derive(Clone, Copy, PartialEq)]
 enum VoiceStatus {
@@ -136,10 +136,14 @@ pub fn VoiceBanner() -> Element {
   }
 }
 
-async fn process_voice_pipeline(pcm: &[u8], widget: widget_bridge::TsWidgetHandle, mut transcript: Signal<Vec<TranscriptEntry>>) -> anyhow::Result<bool> {
-  let wav = audio_core::wrap_pcm_as_wav(pcm, audio_core::SAMPLE_RATE, audio_core::CHANNELS, audio_core::BITS_PER_SAMPLE);
+async fn process_voice_pipeline(
+  pcm: &[u8],
+  widget: dioxus_widget_bridge::TsWidgetHandle,
+  mut transcript: Signal<Vec<TranscriptEntry>>,
+) -> anyhow::Result<bool> {
+  let wav = common_audio::wrap_pcm_as_wav(pcm, common_audio::SAMPLE_RATE, common_audio::CHANNELS, common_audio::BITS_PER_SAMPLE);
   let audio_data = B64.encode(&wav);
-  let transcription = whisper_client::WHISPER.infer(&TranscribeRequest { audio_data, language: None }).await?;
+  let transcription = common_whisper::WHISPER.infer(&TranscribeRequest { audio_data, language: None }).await?;
   let text = transcription.text.trim().to_owned();
   if text.is_empty() {
     return Ok(false);
@@ -148,8 +152,8 @@ async fn process_voice_pipeline(pcm: &[u8], widget: widget_bridge::TsWidgetHandl
   let response = crate::voice_backend::ClaudeCliBackend.query(&text).await?;
   transcript.write().push(TranscriptEntry { is_user: false, text: response.clone() });
   let speech_req = SpeechRequest { text: response, voice: "af_heart".into(), lang_code: "a".into(), speed: 1.0 };
-  let wav_bytes = kokoro_client::KOKORO.infer(&speech_req).await?;
-  let chunks = audio_core::chunk_wav(&wav_bytes, 32768);
+  let wav_bytes = common_kokoro::KOKORO.infer(&speech_req).await?;
+  let chunks = common_audio::chunk_wav(&wav_bytes, 32768);
   for chunk in chunks {
     widget.send_update(serde_json::json!({
         "type": "audio_response",

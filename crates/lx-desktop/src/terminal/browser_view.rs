@@ -2,10 +2,10 @@ use std::sync::{Arc, Mutex};
 
 use dioxus::logger::tracing::error;
 use dioxus::prelude::*;
+use dioxus_widget_bridge::use_ts_widget;
 use futures::StreamExt;
 use serde_json::Value;
 use tokio::sync::mpsc;
-use widget_bridge::use_ts_widget;
 
 #[derive(Clone)]
 pub struct BrowserNavCtx {
@@ -26,7 +26,7 @@ pub fn BrowserView(browser_id: String, url: String, devtools: bool) -> Element {
     let url = url.clone();
     let mut nav_ctx = nav_ctx.clone();
     async move {
-      let session = match browser_cdp::get_or_create_session(&browser_id).await {
+      let session = match common_cdp::get_or_create_session(&browser_id).await {
         Ok(s) => s,
         Err(e) => {
           error!("browser session create failed: {e:#}");
@@ -154,7 +154,7 @@ pub fn BrowserView(browser_id: String, url: String, devtools: bool) -> Element {
   });
 
   use_drop(move || {
-    browser_cdp::remove_session(&bid_drop);
+    common_cdp::remove_session(&bid_drop);
   });
 
   rsx! {

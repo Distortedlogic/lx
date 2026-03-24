@@ -4,28 +4,25 @@ use std::process::Command;
 fn main() {
   let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
   let root = Path::new(&manifest_dir).parent().expect("crates dir").parent().expect("repo root");
+  let dioxus_common = root.join("../dioxus-common");
   let assets = Path::new(&manifest_dir).join("assets");
 
-  let ts_packages = [("widget-bridge", &["src", "widgets"][..]), ("dx-charts", &["src"][..])];
-
-  for (pkg, source_dirs) in &ts_packages {
-    let pkg_dir = root.join(format!("ts/{pkg}"));
-    for dir in *source_dirs {
-      println!("cargo:rerun-if-changed={}", pkg_dir.join(dir).display());
-    }
-    if pkg_dir.join("package.json").exists() {
-      let status = Command::new("pnpm").arg("build").current_dir(&pkg_dir).status();
-      match status {
-        Ok(s) if s.success() => {},
-        Ok(s) => eprintln!("cargo:warning=pnpm build for {pkg} exited with {s}"),
-        Err(e) => eprintln!("cargo:warning=pnpm build for {pkg} not available: {e}"),
-      }
+  let widget_bridge_dir = dioxus_common.join("ts/widget-bridge");
+  for dir in &["src", "widgets"] {
+    println!("cargo:rerun-if-changed={}", widget_bridge_dir.join(dir).display());
+  }
+  if widget_bridge_dir.join("package.json").exists() {
+    let status = Command::new("pnpm").arg("build").current_dir(&widget_bridge_dir).status();
+    match status {
+      Ok(s) if s.success() => {},
+      Ok(s) => eprintln!("cargo:warning=pnpm build for widget-bridge exited with {s}"),
+      Err(e) => eprintln!("cargo:warning=pnpm build for widget-bridge not available: {e}"),
     }
   }
 
   let copies = [
-    (root.join("ts/widget-bridge/dist/widget-bridge.js"), assets.join("widget-bridge.js")),
-    (root.join("ts/dx-charts/dist/dx-charts.js"), assets.join("dx-charts.js")),
+    (widget_bridge_dir.join("dist/widget-bridge.js"), assets.join("widget-bridge.js")),
+    (dioxus_common.join("crates/common-charts/assets/charts.js"), assets.join("charts.js")),
   ];
 
   for (src, dst) in &copies {
