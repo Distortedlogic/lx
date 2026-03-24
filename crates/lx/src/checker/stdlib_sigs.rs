@@ -20,7 +20,7 @@ pub fn build_stdlib_signatures() -> HashMap<String, ModuleSignature> {
 }
 
 fn empty_sig() -> ModuleSignature {
-  ModuleSignature { bindings: HashMap::new(), types: HashMap::new(), traits: HashMap::new(), type_arena: TypeArena::new() }
+  ModuleSignature { file: None, bindings: HashMap::new(), types: HashMap::new(), traits: HashMap::new(), type_arena: TypeArena::new() }
 }
 
 fn func1(ta: &mut TypeArena, param: TypeId, ret: TypeId) -> TypeId {
@@ -50,7 +50,7 @@ fn build_math() -> ModuleSignature {
   b.insert(intern("e"), float);
   b.insert(intern("inf"), float);
 
-  ModuleSignature { bindings: b, types: HashMap::new(), traits: HashMap::new(), type_arena: ta }
+  ModuleSignature { file: None, bindings: b, types: HashMap::new(), traits: HashMap::new(), type_arena: ta }
 }
 
 fn build_fs() -> ModuleSignature {
@@ -75,7 +75,7 @@ fn build_fs() -> ModuleSignature {
   b.insert(intern("ls"), func1(&mut ta, str_t, result_list));
   b.insert(intern("stat"), func1(&mut ta, str_t, unknown));
 
-  ModuleSignature { bindings: b, types: HashMap::new(), traits: HashMap::new(), type_arena: ta }
+  ModuleSignature { file: None, bindings: b, types: HashMap::new(), traits: HashMap::new(), type_arena: ta }
 }
 
 fn build_env() -> ModuleSignature {
@@ -94,7 +94,7 @@ fn build_env() -> ModuleSignature {
   b.insert(intern("args"), func1(&mut ta, unit, list_str));
   b.insert(intern("vars"), func1(&mut ta, unit, unknown));
 
-  ModuleSignature { bindings: b, types: HashMap::new(), traits: HashMap::new(), type_arena: ta }
+  ModuleSignature { file: None, bindings: b, types: HashMap::new(), traits: HashMap::new(), type_arena: ta }
 }
 
 fn build_channel() -> ModuleSignature {
@@ -115,7 +115,7 @@ fn build_channel() -> ModuleSignature {
   b.insert(intern("try_recv"), func1(&mut ta, unknown, maybe_unknown));
   b.insert(intern("close"), func1(&mut ta, unknown, unit));
 
-  ModuleSignature { bindings: b, types: HashMap::new(), traits: HashMap::new(), type_arena: ta }
+  ModuleSignature { file: None, bindings: b, types: HashMap::new(), traits: HashMap::new(), type_arena: ta }
 }
 
 fn build_time() -> ModuleSignature {
@@ -133,5 +133,5 @@ fn build_time() -> ModuleSignature {
   b.insert(intern("format"), func2(&mut ta, str_t, unknown, str_t));
   b.insert(intern("parse"), func2(&mut ta, str_t, str_t, result_unknown));
 
-  ModuleSignature { bindings: b, types: HashMap::new(), traits: HashMap::new(), type_arena: ta }
+  ModuleSignature { file: None, bindings: b, types: HashMap::new(), traits: HashMap::new(), type_arena: ta }
 }

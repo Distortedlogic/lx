@@ -10,6 +10,7 @@ use super::semantic::SemanticModel;
 use super::type_arena::{TypeArena, TypeId};
 
 pub struct ModuleSignature {
+  pub file: Option<crate::source::FileId>,
   pub bindings: HashMap<Sym, TypeId>,
   pub types: HashMap<Sym, Vec<Sym>>,
   pub traits: HashMap<Sym, Vec<(Sym, TypeId)>>,
@@ -98,5 +99,5 @@ pub fn extract_signature(program: &Program<Core>, semantic: &SemanticModel) -> M
   }
 
   let type_arena = semantic.type_arena.clone();
-  ModuleSignature { bindings, types, traits, type_arena }
+  ModuleSignature { file: Some(program.file), bindings, types, traits, type_arena }
 }
