@@ -43,8 +43,8 @@ impl AstVisitor for FreeVarCollector {
     VisitAction::Descend
   }
 
-  fn visit_binding(&mut self, binding: &Binding, span: SourceSpan, arena: &AstArena) -> VisitAction {
-    if walk_binding(self, binding, span, arena).is_break() {
+  fn visit_binding(&mut self, id: StmtId, binding: &Binding, span: SourceSpan, arena: &AstArena) -> VisitAction {
+    if walk_binding(self, id, binding, span, arena).is_break() {
       return VisitAction::Stop;
     }
     match &binding.target {

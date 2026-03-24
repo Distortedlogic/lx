@@ -23,7 +23,7 @@ impl<'a> LintRunner<'a> {
 }
 
 impl AstVisitor for LintRunner<'_> {
-  fn on_expr(&mut self, id: ExprId, expr: &Expr, span: SourceSpan, arena: &AstArena) -> VisitAction {
+  fn visit_expr(&mut self, id: ExprId, expr: &Expr, span: SourceSpan, arena: &AstArena) -> VisitAction {
     for rule in self.rules.iter_mut() {
       rule.enter_expr(id, expr, span, arena);
       let mut diags = rule.check_expr(id, expr, span, self.model, arena);
@@ -39,7 +39,7 @@ impl AstVisitor for LintRunner<'_> {
     ControlFlow::Continue(())
   }
 
-  fn on_stmt(&mut self, id: StmtId, stmt: &Stmt, span: SourceSpan, arena: &AstArena) -> VisitAction {
+  fn visit_stmt(&mut self, id: StmtId, stmt: &Stmt, span: SourceSpan, arena: &AstArena) -> VisitAction {
     for rule in self.rules.iter_mut() {
       let mut diags = rule.check_stmt(id, stmt, span, self.model, arena);
       self.diagnostics.append(&mut diags);

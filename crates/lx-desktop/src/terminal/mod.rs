@@ -1,3 +1,4 @@
+pub mod browser_view;
 pub mod status_badge;
 pub mod tab_bar;
 pub mod toolbar;

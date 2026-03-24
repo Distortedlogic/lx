@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 use chromiumoxide::cdp::browser_protocol::input::{
   DispatchKeyEventParams, DispatchKeyEventType, DispatchMouseEventParams, DispatchMouseEventType, MouseButton,
 };
+use chromiumoxide::cdp::browser_protocol::network::DisableParams as NetworkDisableParams;
 use chromiumoxide::cdp::browser_protocol::page::{
   EventScreencastFrame, GetNavigationHistoryParams, NavigateToHistoryEntryParams, ScreencastFrameAckParams, StartScreencastFormat, StartScreencastParams,
 };
@@ -77,6 +78,52 @@ impl BrowserSession {
     Ok(())
   }
 
+  pub async fn dispatch_key(&self, key: &str, code: &str, modifiers: i64) -> Result<()> {
+    let page = self.page.lock().await;
+    let is_printable = key.len() == 1 && modifiers & !8 == 0;
+
+    let mut down = DispatchKeyEventParams::new(DispatchKeyEventType::KeyDown);
+    down.key = Some(key.to_owned());
+    down.code = Some(code.to_owned());
+    if modifiers != 0 {
+      down.modifiers = Some(modifiers);
+    }
+    if is_printable {
+      down.text = Some(key.to_owned());
+    }
+    page.execute(down).await.context("dispatch_key KeyDown failed")?;
+
+    if is_printable {
+      let mut char_evt = DispatchKeyEventParams::new(DispatchKeyEventType::Char);
+      char_evt.key = Some(key.to_owned());
+      char_evt.code = Some(code.to_owned());
+      char_evt.text = Some(key.to_owned());
+      char_evt.unmodified_text = Some(key.to_owned());
+      if modifiers != 0 {
+        char_evt.modifiers = Some(modifiers);
+      }
+      page.execute(char_evt).await.context("dispatch_key Char failed")?;
+    }
+
+    let mut up = DispatchKeyEventParams::new(DispatchKeyEventType::KeyUp);
+    up.key = Some(key.to_owned());
+    up.code = Some(code.to_owned());
+    if modifiers != 0 {
+      up.modifiers = Some(modifiers);
+    }
+    page.execute(up).await.context("dispatch_key KeyUp failed")?;
+    Ok(())
+  }
+
+  pub async fn scroll(&self, x: f64, y: f64, delta_x: f64, delta_y: f64) -> Result<()> {
+    let page = self.page.lock().await;
+    let mut params = DispatchMouseEventParams::new(DispatchMouseEventType::MouseWheel, x, y);
+    params.delta_x = Some(delta_x);
+    params.delta_y = Some(delta_y);
+    page.execute(params).await.context("scroll failed")?;
+    Ok(())
+  }
+
   pub async fn start_screencast(&self) -> Result<EventStream<EventScreencastFrame>> {
     let page = self.page.lock().await;
     let stream = page.event_listener::<EventScreencastFrame>().await.context("screencast listener failed")?;
@@ -135,6 +182,7 @@ pub async fn get_or_create_session(id: &str) -> Result<Arc<BrowserSession>> {
   let browser_arc = get_browser().await?;
   let browser = browser_arc.lock().await;
   let page = browser.new_page("about:blank").await.context("failed to create new page")?;
+  page.execute(NetworkDisableParams {}).await.context("failed to disable network events")?;
 
   let session = Arc::new(BrowserSession { page: Mutex::new(page) });
   SESSIONS.insert(id.to_owned(), Arc::clone(&session));

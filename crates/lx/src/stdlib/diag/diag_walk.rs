@@ -130,7 +130,7 @@ impl AstVisitor for Walker {
     }
   }
 
-  fn visit_binding(&mut self, binding: &Binding, _span: SourceSpan, arena: &AstArena) -> VisitAction {
+  fn visit_binding(&mut self, _id: StmtId, binding: &Binding, _span: SourceSpan, arena: &AstArena) -> VisitAction {
     let name = match &binding.target {
       BindTarget::Name(n) | BindTarget::Reassign(n) => Some(*n),
       _ => None,
@@ -193,7 +193,7 @@ impl AstVisitor for Walker {
     VisitAction::Skip
   }
 
-  fn visit_use(&mut self, stmt: &UseStmt, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
+  fn visit_use(&mut self, _id: StmtId, stmt: &UseStmt, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
     let is_base_std = stmt.path.first().is_some_and(|p| *p == "std") && stmt.path.len() == 2;
     if !is_base_std && let Some(last) = stmt.path.last() {
       self.imported_modules.insert(*last);
@@ -201,12 +201,12 @@ impl AstVisitor for Walker {
     VisitAction::Descend
   }
 
-  fn visit_type_def(&mut self, def: &StmtTypeDef, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
+  fn visit_type_def(&mut self, _id: StmtId, def: &StmtTypeDef, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
     self.add_node("type", def.name.to_string(), NodeKind::Type);
     VisitAction::Descend
   }
 
-  fn visit_trait_decl(&mut self, data: &TraitDeclData, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
+  fn visit_trait_decl(&mut self, _id: StmtId, data: &TraitDeclData, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
     self.add_node("type", data.name.to_string(), NodeKind::Type);
     VisitAction::Skip
   }

@@ -258,12 +258,14 @@ fn render_divider_item(mut tabs_state: Signal<TabsState<DesktopPane>>, divider: 
           let p_size = if is_h { parent_rect.width } else { parent_rect.height };
           spawn(async move {
               let mut eval = document::eval("WidgetBridge.runDividerDrag(dioxus)");
-              let _ = eval.send(serde_json::json!({
-                  "containerId": cid,
-                  "direction": if is_h { "horizontal" } else { "vertical" },
-                  "parentStart": p_start,
-                  "parentSize": p_size
-              }));
+              let _ = eval
+                  .send(
+                      serde_json::json!(
+                          { "containerId" : cid, "direction" : if is_h { "horizontal" }
+                          else { "vertical" }, "parentStart" : p_start, "parentSize" :
+                          p_size }
+                      ),
+                  );
               while let Ok(msg) = eval.recv::<serde_json::Value>().await {
                   match msg["type"].as_str() {
                       Some("ratio") => {

@@ -69,7 +69,7 @@ pub fn PaneToolbar(
           class: "flex-1 bg-[var(--surface-container-lowest)] rounded text-xs px-1.5 py-0.5 outline-none focus:bg-[var(--surface-container-low)] focus:border-b focus:border-[var(--primary)] transition-colors duration-150",
           value: "{url_input}",
           oninput: move |evt| url_input.set(evt.value()),
-          onkeypress: move |evt: KeyboardEvent| {
+          onkeydown: move |evt: KeyboardEvent| {
               if evt.key() == Key::Enter && let Some(ref h) = nav4 {
                   h.call(url_input());
               }

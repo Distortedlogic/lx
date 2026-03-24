@@ -167,7 +167,7 @@ function mountCdp(elementId: string, cfg: { url?: string; viewport?: { width: nu
     ctx.fillText("CDP backend not connected", 400, 300);
   }
 
-  canvas.addEventListener("click", (e) => {
+  textarea.addEventListener("click", (e) => {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
@@ -176,12 +176,24 @@ function mountCdp(elementId: string, cfg: { url?: string; viewport?: { width: nu
     dx.send({ type: "click", x, y });
   });
 
-  textarea.addEventListener("input", () => {
-    const text = textarea.value;
-    if (text) {
-      dx.send({ type: "type", text });
-      textarea.value = "";
-    }
+  textarea.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+    dx.send({ type: "scroll", x, y, deltaX: e.deltaX, deltaY: e.deltaY });
+  }, { passive: false });
+
+  textarea.addEventListener("keydown", (e) => {
+    e.preventDefault();
+    dx.send({
+      type: "key",
+      key: e.key,
+      code: e.code,
+      modifiers: { ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey },
+    });
   });
 }
 

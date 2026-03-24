@@ -9,9 +9,6 @@ fn main() {
 
 #[cfg(not(feature = "server"))]
 fn main() {
-  if std::env::var("RUST_LOG").is_err() {
-    std::env::set_var("RUST_LOG", "info,chromiumoxide=error,chromiumoxide::conn=error");
-  }
   let builder = dioxus::LaunchBuilder::new();
   #[cfg(feature = "desktop")]
   let builder = builder.with_cfg(

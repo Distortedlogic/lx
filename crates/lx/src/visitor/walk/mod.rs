@@ -54,9 +54,9 @@ pub use walk_expr2::*;
 pub use walk_pattern::*;
 pub use walk_type::*;
 
-walk_dispatch!(walk_trait_decl_dispatch, walk_trait_decl, visit_trait_decl, leave_trait_decl, TraitDeclData);
-walk_dispatch!(walk_class_decl_dispatch, walk_class_decl, visit_class_decl, leave_class_decl, ClassDeclData);
-walk_dispatch!(walk_field_update_dispatch, walk_field_update, visit_field_update, leave_field_update, StmtFieldUpdate);
+walk_dispatch_id!(walk_trait_decl_dispatch, walk_trait_decl, visit_trait_decl, leave_trait_decl, TraitDeclData, StmtId);
+walk_dispatch_id!(walk_class_decl_dispatch, walk_class_decl, visit_class_decl, leave_class_decl, ClassDeclData, StmtId);
+walk_dispatch_id!(walk_field_update_dispatch, walk_field_update, visit_field_update, leave_field_update, StmtFieldUpdate, StmtId);
 
 fn dispatch_child<V: AstVisitor + ?Sized>(v: &mut V, child: NodeId, arena: &AstArena) -> ControlFlow<()> {
   match child {
@@ -85,7 +85,7 @@ pub fn walk_program<V: AstVisitor + ?Sized, P>(v: &mut V, program: &Program<P>) 
 pub fn dispatch_stmt<V: AstVisitor + ?Sized>(v: &mut V, id: StmtId, arena: &AstArena) -> ControlFlow<()> {
   let span = arena.stmt_span(id);
   let stmt = arena.stmt(id);
-  let action = v.on_stmt(id, stmt, span, arena);
+  let action = v.visit_stmt(id, stmt, span, arena);
   match action {
     VisitAction::Stop => return ControlFlow::Break(()),
     VisitAction::Skip => return v.leave_stmt(id, stmt, span, arena),
@@ -100,32 +100,32 @@ pub fn walk_stmt<V: AstVisitor + ?Sized>(v: &mut V, id: StmtId, arena: &AstArena
   let stmt = arena.stmt(id);
   match stmt {
     Stmt::Binding(binding) => {
-      let action = v.visit_binding(binding, span, arena);
+      let action = v.visit_binding(id, binding, span, arena);
       match action {
         VisitAction::Stop => return ControlFlow::Break(()),
         VisitAction::Skip => {},
         VisitAction::Descend => {
-          walk_binding(v, binding, span, arena)?;
+          walk_binding(v, id, binding, span, arena)?;
         },
       }
     },
     Stmt::TypeDef(def) => {
-      let action = v.visit_type_def(def, span, arena);
+      let action = v.visit_type_def(id, def, span, arena);
       if action.is_stop() {
         return ControlFlow::Break(());
       }
     },
     Stmt::TraitUnion(def) => {
-      let action = v.visit_trait_union(def, span, arena);
+      let action = v.visit_trait_union(id, def, span, arena);
       if action.is_stop() {
         return ControlFlow::Break(());
       }
     },
-    Stmt::TraitDecl(data) => walk_trait_decl_dispatch(v, data, span, arena)?,
-    Stmt::ClassDecl(data) => walk_class_decl_dispatch(v, data, span, arena)?,
-    Stmt::FieldUpdate(fu) => walk_field_update_dispatch(v, fu, span, arena)?,
+    Stmt::TraitDecl(data) => walk_trait_decl_dispatch(v, id, data, span, arena)?,
+    Stmt::ClassDecl(data) => walk_class_decl_dispatch(v, id, data, span, arena)?,
+    Stmt::FieldUpdate(fu) => walk_field_update_dispatch(v, id, fu, span, arena)?,
     Stmt::Use(use_stmt) => {
-      let action = v.visit_use(use_stmt, span, arena);
+      let action = v.visit_use(id, use_stmt, span, arena);
       if action.is_stop() {
         return ControlFlow::Break(());
       }
@@ -137,7 +137,7 @@ pub fn walk_stmt<V: AstVisitor + ?Sized>(v: &mut V, id: StmtId, arena: &AstArena
   ControlFlow::Continue(())
 }
 
-pub fn walk_binding<V: AstVisitor + ?Sized>(v: &mut V, binding: &Binding, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+pub fn walk_binding<V: AstVisitor + ?Sized>(v: &mut V, id: StmtId, binding: &Binding, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
   if let Some(ty_id) = binding.type_ann {
     walk_type_expr_dispatch(v, ty_id, arena)?;
   }
@@ -145,13 +145,13 @@ pub fn walk_binding<V: AstVisitor + ?Sized>(v: &mut V, binding: &Binding, span: 
     walk_pattern_dispatch(v, *pid, arena)?;
   }
   dispatch_expr(v, binding.value, arena)?;
-  v.leave_binding(binding, span, arena)
+  v.leave_binding(id, binding, span, arena)
 }
 
 pub fn dispatch_expr<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, arena: &AstArena) -> ControlFlow<()> {
   let expr = arena.expr(id);
   let span = arena.expr_span(id);
-  let action = v.on_expr(id, expr, span, arena);
+  let action = v.visit_expr(id, expr, span, arena);
   match action {
     VisitAction::Stop => ControlFlow::Break(()),
     VisitAction::Skip => v.leave_expr(id, expr, span, arena),
@@ -207,17 +207,17 @@ pub fn walk_expr<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, arena: &AstArena
   v.leave_expr(id, expr, span, arena)
 }
 
-pub fn walk_trait_decl<V: AstVisitor + ?Sized>(v: &mut V, data: &TraitDeclData, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+pub fn walk_trait_decl<V: AstVisitor + ?Sized>(v: &mut V, id: StmtId, data: &TraitDeclData, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
   dispatch_children(v, &data.children(), arena)?;
-  v.leave_trait_decl(data, span, arena)
+  v.leave_trait_decl(id, data, span, arena)
 }
 
-pub fn walk_class_decl<V: AstVisitor + ?Sized>(v: &mut V, data: &ClassDeclData, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+pub fn walk_class_decl<V: AstVisitor + ?Sized>(v: &mut V, id: StmtId, data: &ClassDeclData, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
   dispatch_children(v, &data.children(), arena)?;
-  v.leave_class_decl(data, span, arena)
+  v.leave_class_decl(id, data, span, arena)
 }
 
-pub fn walk_field_update<V: AstVisitor + ?Sized>(v: &mut V, fu: &StmtFieldUpdate, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+pub fn walk_field_update<V: AstVisitor + ?Sized>(v: &mut V, id: StmtId, fu: &StmtFieldUpdate, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
   dispatch_children(v, &fu.children(), arena)?;
-  v.leave_field_update(fu, span, arena)
+  v.leave_field_update(id, fu, span, arena)
 }
