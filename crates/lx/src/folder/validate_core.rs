@@ -1,11 +1,9 @@
 use crate::ast::{Core, Expr, ExprId, Program, WithKind};
-use crate::visitor::{AstVisitor, PatternVisitor, TypeVisitor, VisitAction, walk_program};
+use crate::visitor::{AstVisitor, VisitAction, walk_program};
 use miette::SourceSpan;
 
 struct CoreValidator;
 
-impl PatternVisitor for CoreValidator {}
-impl TypeVisitor for CoreValidator {}
 impl AstVisitor for CoreValidator {
   fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan) -> VisitAction {
     match expr {

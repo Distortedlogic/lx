@@ -3,7 +3,7 @@ use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::{DefKind, DefinitionId, SemanticModel};
 use crate::checker::{DiagLevel, Diagnostic};
 use crate::linter::rule::{LintRule, RuleCategory};
-use crate::visitor::{AstVisitor, PatternVisitor, TypeVisitor};
+use crate::visitor::AstVisitor;
 
 pub struct UnusedImport {
   diagnostics: Vec<Diagnostic>,
@@ -21,8 +21,6 @@ impl UnusedImport {
   }
 }
 
-impl PatternVisitor for UnusedImport {}
-impl TypeVisitor for UnusedImport {}
 impl AstVisitor for UnusedImport {}
 
 impl LintRule for UnusedImport {

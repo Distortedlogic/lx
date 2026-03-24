@@ -4,7 +4,7 @@ use crate::checker::semantic::SemanticModel;
 use crate::checker::types::Type;
 use crate::checker::{DiagLevel, Diagnostic};
 use crate::linter::rule::{LintRule, RuleCategory};
-use crate::visitor::{AstVisitor, PatternVisitor, TypeVisitor, VisitAction, dispatch_stmt};
+use crate::visitor::{AstVisitor, VisitAction, dispatch_stmt};
 use miette::SourceSpan;
 
 pub struct RedundantPropagate {
@@ -24,8 +24,6 @@ impl RedundantPropagate {
   }
 }
 
-impl PatternVisitor for RedundantPropagate {}
-impl TypeVisitor for RedundantPropagate {}
 impl AstVisitor for RedundantPropagate {
   fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan) -> VisitAction {
     if let Expr::Propagate(ExprPropagate { inner: inner_id }) = expr {

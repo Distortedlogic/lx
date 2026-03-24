@@ -3,7 +3,7 @@ use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::SemanticModel;
 use crate::checker::{DiagLevel, Diagnostic};
 use crate::linter::rule::{LintRule, RuleCategory};
-use crate::visitor::{AstVisitor, PatternVisitor, TypeVisitor, VisitAction, dispatch_stmt};
+use crate::visitor::{AstVisitor, VisitAction, dispatch_stmt};
 use miette::SourceSpan;
 
 pub struct BreakOutsideLoop {
@@ -23,8 +23,6 @@ impl BreakOutsideLoop {
   }
 }
 
-impl PatternVisitor for BreakOutsideLoop {}
-impl TypeVisitor for BreakOutsideLoop {}
 impl AstVisitor for BreakOutsideLoop {
   fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan) -> VisitAction {
     if matches!(expr, Expr::Loop(_)) {

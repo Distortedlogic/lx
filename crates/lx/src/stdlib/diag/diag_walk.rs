@@ -15,7 +15,7 @@ use crate::ast::{
   StmtTypeDef, TraitDeclData, UseStmt,
 };
 use crate::sym::{Sym, intern};
-use crate::visitor::{AstVisitor, PatternVisitor, TypeVisitor, VisitAction, dispatch_expr, walk_loop, walk_par};
+use crate::visitor::{AstVisitor, VisitAction, dispatch_expr, walk_loop, walk_par};
 use miette::SourceSpan;
 
 pub(crate) use diag_types::*;
@@ -84,8 +84,6 @@ impl<'a> Walker<'a> {
   }
 }
 
-impl PatternVisitor for Walker<'_> {}
-impl TypeVisitor for Walker<'_> {}
 impl AstVisitor for Walker<'_> {
   fn leave_par(&mut self, _id: ExprId, _par: &ExprPar, _span: SourceSpan) {
     self.context = self.context_stack.pop().expect("diag: context_stack underflow");
