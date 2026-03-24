@@ -10,7 +10,7 @@ use crate::panes::DesktopPane;
 use crate::terminal::tab_bar::TabBar;
 use crate::terminal::toolbar::PaneToolbar;
 use crate::terminal::use_tabs_state;
-use crate::terminal::view::{AgentView, BrowserNavCtx, BrowserView, CanvasView, ChartView, EditorView, TerminalView, VoiceView};
+use crate::terminal::view::{AgentView, BrowserNavCtx, BrowserView, CanvasView, ChartView, EditorView, TerminalView};
 
 fn create_new_tab(tabs_state: Signal<TabsState<DesktopPane>>) {
   let working_dir = std::env::current_dir().ok().map(|p| p.display().to_string()).unwrap_or_else(|| ".".into());
@@ -221,9 +221,6 @@ fn render_pane_view(pane: &DesktopPane) -> Element {
         chart_json: chart_json.clone(),
         title: title.clone(),
       }
-    },
-    DesktopPane::Voice { id, .. } => rsx! {
-      VoiceView { voice_id: id.clone() }
     },
   }
 }

@@ -13,7 +13,6 @@ use super::use_tabs_state;
 use crate::panes::DesktopPane;
 
 pub use super::browser_view::{BrowserNavCtx, BrowserView};
-pub use super::voice_view::VoiceView;
 
 #[component]
 pub fn TerminalView(terminal_id: String, working_dir: String, command: Option<String>) -> Element {

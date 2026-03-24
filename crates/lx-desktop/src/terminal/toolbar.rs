@@ -197,6 +197,5 @@ fn derive_pane_title(pane: &DesktopPane) -> String {
     DesktopPane::Agent { model, .. } => model.clone(),
     DesktopPane::Canvas { widget_type, .. } => widget_type.clone(),
     DesktopPane::Chart { title, .. } => title.as_deref().unwrap_or("chart").to_string(),
-    DesktopPane::Voice { .. } => "voice".to_string(),
   }
 }

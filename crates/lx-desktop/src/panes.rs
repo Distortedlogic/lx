@@ -9,7 +9,6 @@ pub enum DesktopPane {
   Agent { id: String, session_id: String, model: String, name: Option<String> },
   Canvas { id: String, widget_type: String, config: serde_json::Value, name: Option<String> },
   Chart { id: String, chart_json: String, title: Option<String>, name: Option<String> },
-  Voice { id: String, name: Option<String> },
 }
 
 impl Pane for DesktopPane {
@@ -20,8 +19,7 @@ impl Pane for DesktopPane {
       | Self::Editor { id, .. }
       | Self::Agent { id, .. }
       | Self::Canvas { id, .. }
-      | Self::Chart { id, .. }
-      | Self::Voice { id, .. } => id,
+      | Self::Chart { id, .. } => id,
     }
   }
 }
@@ -34,7 +32,6 @@ pub enum PaneKind {
   Agent,
   Canvas,
   Chart,
-  Voice,
 }
 
 impl DesktopPane {
@@ -46,7 +43,6 @@ impl DesktopPane {
       Self::Agent { .. } => PaneKind::Agent,
       Self::Canvas { .. } => PaneKind::Canvas,
       Self::Chart { .. } => PaneKind::Chart,
-      Self::Voice { .. } => PaneKind::Voice,
     }
   }
 
@@ -57,8 +53,7 @@ impl DesktopPane {
       | Self::Editor { name, .. }
       | Self::Agent { name, .. }
       | Self::Canvas { name, .. }
-      | Self::Chart { name, .. }
-      | Self::Voice { name, .. } => name.as_deref(),
+      | Self::Chart { name, .. } => name.as_deref(),
     }
   }
 
@@ -70,7 +65,6 @@ impl DesktopPane {
       PaneKind::Agent => Self::Agent { id: id.clone(), session_id: uuid::Uuid::new_v4().to_string(), model: "claude-sonnet-4-6".into(), name: None },
       PaneKind::Canvas => Self::Canvas { id, widget_type: "markdown".into(), config: serde_json::Value::Object(Default::default()), name: None },
       PaneKind::Chart => Self::Chart { id, chart_json: String::new(), title: None, name: None },
-      PaneKind::Voice => Self::Voice { id, name: None },
     }
   }
 
@@ -82,13 +76,12 @@ impl DesktopPane {
       Self::Agent { .. } => "\u{25CF}",
       Self::Canvas { .. } => "\u{25FB}",
       Self::Chart { .. } => "\u{25A3}",
-      Self::Voice { .. } => "\u{1F3A4}",
     }
   }
 }
 
 impl PaneKind {
-  pub const ALL: &[PaneKind] = &[PaneKind::Terminal, PaneKind::Browser, PaneKind::Editor, PaneKind::Agent, PaneKind::Canvas, PaneKind::Chart, PaneKind::Voice];
+  pub const ALL: &[PaneKind] = &[PaneKind::Terminal, PaneKind::Browser, PaneKind::Editor, PaneKind::Agent, PaneKind::Canvas, PaneKind::Chart];
 
   pub fn icon(self) -> &'static str {
     match self {
@@ -98,7 +91,6 @@ impl PaneKind {
       Self::Agent => "\u{25CF}",
       Self::Canvas => "\u{25FB}",
       Self::Chart => "\u{25A3}",
-      Self::Voice => "\u{1F3A4}",
     }
   }
 
@@ -110,7 +102,6 @@ impl PaneKind {
       Self::Agent => "Agent",
       Self::Canvas => "Canvas",
       Self::Chart => "Chart",
-      Self::Voice => "Voice",
     }
   }
 }
