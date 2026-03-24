@@ -3,7 +3,7 @@ use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::SemanticModel;
 use crate::checker::{DiagLevel, Diagnostic};
 use crate::linter::rule::{LintRule, RuleCategory};
-use crate::visitor::{AstVisitor, VisitAction, dispatch_stmt};
+use crate::visitor::{AstVisitor, PatternVisitor, TypeVisitor, VisitAction, dispatch_stmt};
 use miette::SourceSpan;
 
 pub struct SingleBranchPar {
@@ -22,6 +22,8 @@ impl SingleBranchPar {
   }
 }
 
+impl PatternVisitor for SingleBranchPar {}
+impl TypeVisitor for SingleBranchPar {}
 impl AstVisitor for SingleBranchPar {
   fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan, _arena: &AstArena) -> VisitAction {
     if let Expr::Par(stmts) = expr

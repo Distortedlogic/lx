@@ -5,7 +5,7 @@ use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::SemanticModel;
 use crate::checker::{DiagLevel, Diagnostic};
 use crate::linter::rule::{LintRule, RuleCategory};
-use crate::visitor::{AstVisitor, VisitAction, dispatch_stmt};
+use crate::visitor::{AstVisitor, PatternVisitor, TypeVisitor, VisitAction, dispatch_stmt};
 use miette::SourceSpan;
 
 pub struct DuplicateRecordField {
@@ -24,6 +24,8 @@ impl DuplicateRecordField {
   }
 }
 
+impl PatternVisitor for DuplicateRecordField {}
+impl TypeVisitor for DuplicateRecordField {}
 impl AstVisitor for DuplicateRecordField {
   fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan, _arena: &AstArena) -> VisitAction {
     if let Expr::Record(fields) = expr {

@@ -3,13 +3,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::ast::{BindTarget, Core, Program, Stmt};
+use crate::source::FileId;
 use crate::sym::Sym;
 
 use super::semantic::SemanticModel;
 use super::type_arena::{TypeArena, TypeId};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct FileId(pub u32);
 
 pub struct ModuleSignature {
   pub bindings: HashMap<Sym, TypeId>,
@@ -42,14 +40,14 @@ impl ModuleGraph {
   }
 
   pub fn add_file(&mut self, path: PathBuf, source: Arc<str>) -> FileId {
-    let id = FileId(self.files.len() as u32);
+    let id = FileId::new(self.files.len() as u32);
     self.file_by_path.insert(path.clone(), id);
     self.files.push(SourceFile { id, path, source });
     id
   }
 
   pub fn get_file(&self, id: FileId) -> &SourceFile {
-    &self.files[id.0 as usize]
+    &self.files[id.index() as usize]
   }
 
   pub fn resolve_use_path(&self, path: &[Sym], _from: FileId) -> Option<FileId> {

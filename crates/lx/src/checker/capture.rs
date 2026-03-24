@@ -3,7 +3,7 @@ use std::ops::ControlFlow;
 
 use crate::ast::{AstArena, BindTarget, Binding, ExprFunc, ExprId, ExprMatch, ExprWith, FieldPattern, PatternId, StmtId, WithKind};
 use crate::sym::Sym;
-use crate::visitor::{AstVisitor, VisitAction, dispatch_expr, dispatch_stmt, walk_binding, walk_func, walk_pattern};
+use crate::visitor::{AstVisitor, PatternVisitor, TypeVisitor, VisitAction, dispatch_expr, dispatch_stmt, walk_binding, walk_func, walk_pattern};
 use miette::SourceSpan;
 
 struct FreeVarCollector {
@@ -32,6 +32,47 @@ impl FreeVarCollector {
     if let Some(scope) = self.scopes.last_mut() {
       scope.insert(name);
     }
+  }
+}
+
+impl TypeVisitor for FreeVarCollector {}
+
+impl PatternVisitor for FreeVarCollector {
+  fn visit_pattern_bind(&mut self, _id: PatternId, name: Sym, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
+    self.bind(name);
+    VisitAction::Descend
+  }
+
+  fn visit_pattern_list(&mut self, _id: PatternId, elems: &[PatternId], rest: Option<Sym>, _span: SourceSpan, arena: &AstArena) -> VisitAction {
+    for &e in elems {
+      let pattern = arena.pattern(e);
+      let pspan = arena.pattern_span(e);
+      if walk_pattern(self, e, pattern, pspan, arena).is_break() {
+        return VisitAction::Stop;
+      }
+    }
+    if let Some(r) = rest {
+      self.bind(r);
+    }
+    VisitAction::Skip
+  }
+
+  fn visit_pattern_record(&mut self, _id: PatternId, fields: &[FieldPattern], rest: Option<Sym>, _span: SourceSpan, arena: &AstArena) -> VisitAction {
+    for f in fields {
+      if let Some(pid) = f.pattern {
+        let pattern = arena.pattern(pid);
+        let pspan = arena.pattern_span(pid);
+        if walk_pattern(self, pid, pattern, pspan, arena).is_break() {
+          return VisitAction::Stop;
+        }
+      } else {
+        self.bind(f.name);
+      }
+    }
+    if let Some(r) = rest {
+      self.bind(r);
+    }
+    VisitAction::Skip
   }
 }
 
@@ -81,43 +122,6 @@ impl AstVisitor for FreeVarCollector {
       }
     }
     self.pop_scope();
-    VisitAction::Skip
-  }
-
-  fn visit_pattern_bind(&mut self, _id: PatternId, name: Sym, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    self.bind(name);
-    VisitAction::Descend
-  }
-
-  fn visit_pattern_list(&mut self, _id: PatternId, elems: &[PatternId], rest: Option<Sym>, _span: SourceSpan, arena: &AstArena) -> VisitAction {
-    for &e in elems {
-      let pattern = arena.pattern(e);
-      let pspan = arena.pattern_span(e);
-      if walk_pattern(self, e, pattern, pspan, arena).is_break() {
-        return VisitAction::Stop;
-      }
-    }
-    if let Some(r) = rest {
-      self.bind(r);
-    }
-    VisitAction::Skip
-  }
-
-  fn visit_pattern_record(&mut self, _id: PatternId, fields: &[FieldPattern], rest: Option<Sym>, _span: SourceSpan, arena: &AstArena) -> VisitAction {
-    for f in fields {
-      if let Some(pid) = f.pattern {
-        let pattern = arena.pattern(pid);
-        let pspan = arena.pattern_span(pid);
-        if walk_pattern(self, pid, pattern, pspan, arena).is_break() {
-          return VisitAction::Stop;
-        }
-      } else {
-        self.bind(f.name);
-      }
-    }
-    if let Some(r) = rest {
-      self.bind(r);
-    }
     VisitAction::Skip
   }
 

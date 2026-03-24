@@ -2,15 +2,15 @@ use std::ops::ControlFlow;
 
 use crate::ast::{
   AstArena, Binding, ClassDeclData, Expr, ExprApply, ExprAssert, ExprBinary, ExprCoalesce, ExprEmit, ExprFieldAccess, ExprFunc, ExprId, ExprMatch,
-  ExprNamedArg, ExprPipe, ExprSlice, ExprTernary, ExprTimeout, ExprUnary, ExprWith, ExprYield, FieldPattern, ListElem, Literal, MapEntry, Pattern, PatternId,
-  Program, RecordField, Section, SelArm, Stmt, StmtFieldUpdate, StmtId, StmtTypeDef, TraitDeclData, TraitUnionDef, TypeExpr, TypeExprId, TypeField, UseStmt,
+  ExprNamedArg, ExprPipe, ExprSlice, ExprTernary, ExprTimeout, ExprUnary, ExprWith, ExprYield, ListElem, Literal, MapEntry, Program, RecordField, Section,
+  SelArm, Stmt, StmtFieldUpdate, StmtId, StmtTypeDef, TraitDeclData, TraitUnionDef, UseStmt,
 };
 use crate::sym::Sym;
 use miette::SourceSpan;
 
-use super::{VisitAction, walk_program};
+use super::{PatternVisitor, TypeVisitor, VisitAction, walk_program};
 
-pub trait AstVisitor {
+pub trait AstVisitor: PatternVisitor + TypeVisitor {
   fn visit_program<P>(&mut self, program: &Program<P>) -> VisitAction {
     match walk_program(self, program) {
       ControlFlow::Continue(()) => VisitAction::Descend,
@@ -237,99 +237,6 @@ pub trait AstVisitor {
     VisitAction::Descend
   }
   fn leave_with(&mut self, _id: ExprId, _with: &ExprWith, _span: SourceSpan, _arena: &AstArena) -> ControlFlow<()> {
-    ControlFlow::Continue(())
-  }
-  fn visit_pattern(&mut self, _id: PatternId, _pattern: &Pattern, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    VisitAction::Descend
-  }
-  fn leave_pattern(&mut self, _id: PatternId, _pattern: &Pattern, _span: SourceSpan, _arena: &AstArena) -> ControlFlow<()> {
-    ControlFlow::Continue(())
-  }
-  fn visit_pattern_literal(&mut self, _id: PatternId, _lit: &Literal, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    VisitAction::Descend
-  }
-  fn visit_pattern_bind(&mut self, _id: PatternId, _name: Sym, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    VisitAction::Descend
-  }
-  fn visit_pattern_wildcard(&mut self, _id: PatternId, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    VisitAction::Descend
-  }
-  fn visit_pattern_tuple(&mut self, _id: PatternId, _elems: &[PatternId], _span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    VisitAction::Descend
-  }
-  fn leave_pattern_tuple(&mut self, _id: PatternId, _elems: &[PatternId], _span: SourceSpan, _arena: &AstArena) -> ControlFlow<()> {
-    ControlFlow::Continue(())
-  }
-  fn visit_pattern_list(&mut self, _id: PatternId, _elems: &[PatternId], _rest: Option<Sym>, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    VisitAction::Descend
-  }
-  fn leave_pattern_list(&mut self, _id: PatternId, _elems: &[PatternId], _rest: Option<Sym>, _span: SourceSpan, _arena: &AstArena) -> ControlFlow<()> {
-    ControlFlow::Continue(())
-  }
-  fn visit_pattern_record(&mut self, _id: PatternId, _fields: &[FieldPattern], _rest: Option<Sym>, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    VisitAction::Descend
-  }
-  fn leave_pattern_record(&mut self, _id: PatternId, _fields: &[FieldPattern], _rest: Option<Sym>, _span: SourceSpan, _arena: &AstArena) -> ControlFlow<()> {
-    ControlFlow::Continue(())
-  }
-  fn visit_pattern_constructor(&mut self, _id: PatternId, _name: Sym, _args: &[PatternId], _span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    VisitAction::Descend
-  }
-  fn leave_pattern_constructor(&mut self, _id: PatternId, _name: Sym, _args: &[PatternId], _span: SourceSpan, _arena: &AstArena) -> ControlFlow<()> {
-    ControlFlow::Continue(())
-  }
-  fn visit_type_expr(&mut self, _id: TypeExprId, _type_expr: &TypeExpr, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    VisitAction::Descend
-  }
-  fn leave_type_expr(&mut self, _id: TypeExprId, _type_expr: &TypeExpr, _span: SourceSpan, _arena: &AstArena) -> ControlFlow<()> {
-    ControlFlow::Continue(())
-  }
-  fn visit_type_named(&mut self, _id: TypeExprId, _name: Sym, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    VisitAction::Descend
-  }
-  fn visit_type_var(&mut self, _id: TypeExprId, _name: Sym, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    VisitAction::Descend
-  }
-  fn visit_type_applied(&mut self, _id: TypeExprId, _name: Sym, _args: &[TypeExprId], _span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    VisitAction::Descend
-  }
-  fn leave_type_applied(&mut self, _id: TypeExprId, _name: Sym, _args: &[TypeExprId], _span: SourceSpan, _arena: &AstArena) -> ControlFlow<()> {
-    ControlFlow::Continue(())
-  }
-  fn visit_type_list(&mut self, _id: TypeExprId, _inner: TypeExprId, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    VisitAction::Descend
-  }
-  fn leave_type_list(&mut self, _id: TypeExprId, _inner: TypeExprId, _span: SourceSpan, _arena: &AstArena) -> ControlFlow<()> {
-    ControlFlow::Continue(())
-  }
-  fn visit_type_map(&mut self, _id: TypeExprId, _key: TypeExprId, _value: TypeExprId, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    VisitAction::Descend
-  }
-  fn leave_type_map(&mut self, _id: TypeExprId, _key: TypeExprId, _value: TypeExprId, _span: SourceSpan, _arena: &AstArena) -> ControlFlow<()> {
-    ControlFlow::Continue(())
-  }
-  fn visit_type_record(&mut self, _id: TypeExprId, _fields: &[TypeField], _span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    VisitAction::Descend
-  }
-  fn leave_type_record(&mut self, _id: TypeExprId, _fields: &[TypeField], _span: SourceSpan, _arena: &AstArena) -> ControlFlow<()> {
-    ControlFlow::Continue(())
-  }
-  fn visit_type_tuple(&mut self, _id: TypeExprId, _elems: &[TypeExprId], _span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    VisitAction::Descend
-  }
-  fn leave_type_tuple(&mut self, _id: TypeExprId, _elems: &[TypeExprId], _span: SourceSpan, _arena: &AstArena) -> ControlFlow<()> {
-    ControlFlow::Continue(())
-  }
-  fn visit_type_func(&mut self, _id: TypeExprId, _param: TypeExprId, _ret: TypeExprId, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    VisitAction::Descend
-  }
-  fn leave_type_func(&mut self, _id: TypeExprId, _param: TypeExprId, _ret: TypeExprId, _span: SourceSpan, _arena: &AstArena) -> ControlFlow<()> {
-    ControlFlow::Continue(())
-  }
-  fn visit_type_fallible(&mut self, _id: TypeExprId, _ok: TypeExprId, _err: TypeExprId, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
-    VisitAction::Descend
-  }
-  fn leave_type_fallible(&mut self, _id: TypeExprId, _ok: TypeExprId, _err: TypeExprId, _span: SourceSpan, _arena: &AstArena) -> ControlFlow<()> {
     ControlFlow::Continue(())
   }
 }
