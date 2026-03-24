@@ -6,7 +6,7 @@ use lx::parser::parse;
 use lx::source::FileId;
 
 fn roundtrip_check(path: &str) {
-  let source = fs::read_to_string(path).unwrap();
+  let source = fs::read_to_string(path).expect("failed to read test file");
   let (tokens, comments) = lex(&source).expect("lex failed");
   let result = parse(tokens, FileId::new(0), comments, &source);
   let program = result.program.expect("parse failed");

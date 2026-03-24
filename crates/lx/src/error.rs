@@ -19,6 +19,20 @@ impl From<LxError> for EvalSignal {
 }
 
 #[derive(Debug, Clone, Error, Diagnostic)]
+#[error("assertion failed: {expr}")]
+#[diagnostic(code(lx::assert))]
+pub struct AssertError {
+  pub expr: String,
+  pub message: Option<String>,
+  pub expected: Option<String>,
+  pub actual: Option<String>,
+  #[help]
+  pub help: Option<String>,
+  #[label("assertion failed")]
+  pub span: SourceSpan,
+}
+
+#[derive(Debug, Clone, Error, Diagnostic)]
 pub enum LxError {
   #[error("parse error: {msg}")]
   #[diagnostic(code(lx::parse))]
@@ -38,18 +52,9 @@ pub enum LxError {
     span: SourceSpan,
   },
 
-  #[error("assertion failed: {expr}")]
-  #[diagnostic(code(lx::assert))]
-  Assert {
-    expr: String,
-    message: Option<String>,
-    expected: Option<String>,
-    actual: Option<String>,
-    #[help]
-    help: Option<String>,
-    #[label("assertion failed")]
-    span: SourceSpan,
-  },
+  #[error(transparent)]
+  #[diagnostic(transparent)]
+  Assert(Box<AssertError>),
 
   #[error("type error: {msg}")]
   #[diagnostic(code(lx::type_error))]
@@ -92,7 +97,7 @@ impl LxError {
       help_parts.push(format!("  actual: {act}"));
     }
     let help = if help_parts.is_empty() { None } else { Some(help_parts.join("\n")) };
-    Self::Assert { expr: expr.into(), message, expected, actual, help, span }
+    Self::Assert(Box::new(AssertError { expr: expr.into(), message, expected, actual, help, span }))
   }
 
   pub fn type_err(msg: impl Into<String>, span: SourceSpan, help: Option<String>) -> Self {

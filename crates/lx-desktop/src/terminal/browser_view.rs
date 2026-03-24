@@ -45,8 +45,15 @@ pub fn BrowserView(browser_id: String, url: String, devtools: bool) -> Element {
         }
       }
 
-      let Some(mut nav_rx) = nav_ctx.rx.lock().unwrap().take() else {
-        return;
+      let mut nav_rx = {
+        let Ok(mut guard) = nav_ctx.rx.lock() else {
+          error!("browser nav_rx mutex poisoned");
+          return;
+        };
+        let Some(rx) = guard.take() else {
+          return;
+        };
+        rx
       };
 
       let mut frames = match session.start_screencast().await {

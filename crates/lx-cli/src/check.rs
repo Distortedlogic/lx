@@ -13,10 +13,10 @@ use miette::{NamedSource, Report};
 use crate::{manifest, run};
 
 enum FixOutcome {
-  Applied(CheckResult, String),
+  Applied(Box<CheckResult>, String),
   NoFixes,
   WriteFailed(std::io::Error),
-  RecheckFailed(String),
+  RecheckFailed,
 }
 
 pub fn check_file(path: &str, strict: bool, fix: bool) -> ExitCode {
@@ -79,13 +79,13 @@ fn try_apply_fixes(path: &str, source: &str, result: &CheckResult) -> FixOutcome
   }
   eprintln!("applied fixes to {path}");
   match recheck_source(&fixed_source) {
-    Ok(recheck_result) => FixOutcome::Applied(recheck_result, fixed_source),
+    Ok(recheck_result) => FixOutcome::Applied(Box::new(recheck_result), fixed_source),
     Err(detail) => {
       eprintln!("warning: fix produced invalid syntax in {path}, reverting ({detail})");
       if let Err(e) = std::fs::write(path, source) {
         eprintln!("error: cannot revert {path}: {e}");
       }
-      FixOutcome::RecheckFailed(detail)
+      FixOutcome::RecheckFailed
     },
   }
 }
@@ -144,7 +144,7 @@ pub fn check_workspace(member_filter: Option<&str>, strict: bool, fix: bool) -> 
             match try_apply_fixes(&path_str, &source, &result) {
               FixOutcome::Applied(r, s) => {
                 member_fixed += 1;
-                (r, s)
+                (*r, s)
               },
               FixOutcome::NoFixes => (result, source),
               FixOutcome::WriteFailed(e) => {
@@ -152,7 +152,7 @@ pub fn check_workspace(member_filter: Option<&str>, strict: bool, fix: bool) -> 
                 any_failure = true;
                 continue;
               },
-              FixOutcome::RecheckFailed(_) => {
+              FixOutcome::RecheckFailed => {
                 any_failure = true;
                 continue;
               },

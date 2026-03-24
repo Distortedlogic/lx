@@ -22,15 +22,12 @@ fn fmt_source(path_str: &str, source: &str) -> Result<String, FmtFailed> {
     },
   };
   let result = parse(tokens, lx::source::FileId::new(0), comments, source);
-  let program = match result.program {
-    Some(p) => p,
-    None => {
-      for e in &result.errors {
-        let named = NamedSource::new(path_str, source.to_string());
-        eprintln!("{:?}", Report::new(e.clone()).with_source_code(named));
-      }
-      return Err(FmtFailed);
-    },
+  let Some(program) = result.program else {
+    for e in &result.errors {
+      let named = NamedSource::new(path_str, source.to_string());
+      eprintln!("{:?}", Report::new(e.clone()).with_source_code(named));
+    }
+    return Err(FmtFailed);
   };
   if !result.errors.is_empty() {
     for e in &result.errors {
@@ -49,9 +46,8 @@ pub fn fmt_file(path: &str, check: bool) -> ExitCode {
       return ExitCode::from(1);
     },
   };
-  let formatted = match fmt_source(path, &source) {
-    Ok(f) => f,
-    Err(_) => return ExitCode::from(1),
+  let Ok(formatted) = fmt_source(path, &source) else {
+    return ExitCode::from(1);
   };
   if check {
     if formatted != source {
@@ -69,7 +65,10 @@ pub fn fmt_file(path: &str, check: bool) -> ExitCode {
 }
 
 pub fn fmt_workspace(member_filter: Option<&str>, check: bool) -> ExitCode {
-  let cwd = current_dir().unwrap();
+  let Ok(cwd) = current_dir() else {
+    eprintln!("error: cannot determine cwd");
+    return ExitCode::from(1);
+  };
   let root = if let Some(r) = find_workspace_root(&cwd) {
     r
   } else if let Some(r) = find_manifest_root(&cwd) {
@@ -107,12 +106,9 @@ pub fn fmt_workspace(member_filter: Option<&str>, check: bool) -> ExitCode {
           continue;
         },
       };
-      let output = match fmt_source(&path_str, &source) {
-        Ok(f) => f,
-        Err(_) => {
-          failed += 1;
-          continue;
-        },
+      let Ok(output) = fmt_source(&path_str, &source) else {
+        failed += 1;
+        continue;
       };
       if output != source {
         if check {

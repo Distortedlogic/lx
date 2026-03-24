@@ -6,7 +6,6 @@ use crate::terminal::status_badge::{BadgeVariant, StatusBadge};
 pub enum AgentStatus {
   Idle,
   Active,
-  Running,
 }
 
 impl AgentStatus {
@@ -14,7 +13,6 @@ impl AgentStatus {
     match self {
       Self::Idle => "IDLE",
       Self::Active => "ACTIVE",
-      Self::Running => "RUNNING",
     }
   }
 
@@ -22,7 +20,6 @@ impl AgentStatus {
     match self {
       Self::Idle => BadgeVariant::Idle,
       Self::Active => BadgeVariant::Active,
-      Self::Running => BadgeVariant::Running,
     }
   }
 }

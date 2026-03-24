@@ -38981,6 +38981,7 @@ registerProcessor('capture', Capture);
 		}
 		ensureContext() {
 			if (!this.audioCtx) this.audioCtx = new AudioContext();
+			if (this.audioCtx.state === "suspended") this.audioCtx.resume();
 			return this.audioCtx;
 		}
 		enqueue(base64Wav) {
