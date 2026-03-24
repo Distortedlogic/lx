@@ -8,6 +8,7 @@ use miette::SourceSpan;
 
 pub struct UnreachableCode {
   diagnostics: Vec<Diagnostic>,
+  arena: *const AstArena,
 }
 
 impl Default for UnreachableCode {
@@ -18,14 +19,15 @@ impl Default for UnreachableCode {
 
 impl UnreachableCode {
   pub fn new() -> Self {
-    Self { diagnostics: Vec::new() }
+    Self { diagnostics: Vec::new(), arena: std::ptr::null() }
   }
 }
 
 impl PatternVisitor for UnreachableCode {}
 impl TypeVisitor for UnreachableCode {}
 impl AstVisitor for UnreachableCode {
-  fn visit_expr(&mut self, _id: ExprId, expr: &Expr, _span: SourceSpan, arena: &AstArena) -> VisitAction {
+  fn visit_expr(&mut self, _id: ExprId, expr: &Expr, _span: SourceSpan, _arena: &AstArena) -> VisitAction {
+    let arena = unsafe { &*self.arena };
     let (Expr::Block(stmts) | Expr::Loop(stmts)) = expr else {
       return VisitAction::Descend;
     };
@@ -72,6 +74,7 @@ impl LintRule for UnreachableCode {
   }
 
   fn run(&mut self, stmts: &[StmtId], arena: &AstArena, _model: &SemanticModel) {
+    self.arena = arena as *const AstArena;
     for sid in stmts {
       if dispatch_stmt(self, *sid, arena).is_break() {
         break;

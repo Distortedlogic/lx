@@ -12,7 +12,10 @@ pub(crate) fn walk_type_expr_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: Typ
   let action = v.visit_type_expr(id, type_expr, span, arena);
   match action {
     VisitAction::Stop => ControlFlow::Break(()),
-    VisitAction::Skip => v.leave_type_expr(id, type_expr, span, arena),
+    VisitAction::Skip => {
+      v.leave_type_expr(id, type_expr, span);
+      ControlFlow::Continue(())
+    },
     VisitAction::Descend => walk_type_expr(v, id, type_expr, span, arena),
   }
 }
@@ -39,7 +42,8 @@ pub fn walk_type_expr<V: AstVisitor + ?Sized>(v: &mut V, id: TypeExprId, type_ex
     TypeExpr::Func { param, ret } => walk_type_func_dispatch(v, id, *param, *ret, span, arena)?,
     TypeExpr::Fallible { ok, err } => walk_type_fallible_dispatch(v, id, *ok, *err, span, arena)?,
   }
-  v.leave_type_expr(id, type_expr, span, arena)
+  v.leave_type_expr(id, type_expr, span);
+  ControlFlow::Continue(())
 }
 
 fn walk_type_applied_dispatch<V: AstVisitor + ?Sized>(
@@ -53,7 +57,10 @@ fn walk_type_applied_dispatch<V: AstVisitor + ?Sized>(
   let action = v.visit_type_applied(id, name, args, span, arena);
   match action {
     VisitAction::Stop => ControlFlow::Break(()),
-    VisitAction::Skip => v.leave_type_applied(id, name, args, span, arena),
+    VisitAction::Skip => {
+      v.leave_type_applied(id, name, args, span);
+      ControlFlow::Continue(())
+    },
     VisitAction::Descend => walk_type_applied(v, id, name, args, span, arena),
   }
 }
@@ -69,21 +76,26 @@ pub fn walk_type_applied<V: AstVisitor + ?Sized>(
   for &a in args {
     walk_type_expr_dispatch(v, a, arena)?;
   }
-  v.leave_type_applied(id, name, args, span, arena)
+  v.leave_type_applied(id, name, args, span);
+  ControlFlow::Continue(())
 }
 
 fn walk_type_list_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: TypeExprId, inner: TypeExprId, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
   let action = v.visit_type_list(id, inner, span, arena);
   match action {
     VisitAction::Stop => ControlFlow::Break(()),
-    VisitAction::Skip => v.leave_type_list(id, inner, span, arena),
+    VisitAction::Skip => {
+      v.leave_type_list(id, inner, span);
+      ControlFlow::Continue(())
+    },
     VisitAction::Descend => walk_type_list(v, id, inner, span, arena),
   }
 }
 
 pub fn walk_type_list<V: AstVisitor + ?Sized>(v: &mut V, id: TypeExprId, inner: TypeExprId, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
   walk_type_expr_dispatch(v, inner, arena)?;
-  v.leave_type_list(id, inner, span, arena)
+  v.leave_type_list(id, inner, span);
+  ControlFlow::Continue(())
 }
 
 fn walk_type_map_dispatch<V: AstVisitor + ?Sized>(
@@ -97,7 +109,10 @@ fn walk_type_map_dispatch<V: AstVisitor + ?Sized>(
   let action = v.visit_type_map(id, key, value, span, arena);
   match action {
     VisitAction::Stop => ControlFlow::Break(()),
-    VisitAction::Skip => v.leave_type_map(id, key, value, span, arena),
+    VisitAction::Skip => {
+      v.leave_type_map(id, key, value, span);
+      ControlFlow::Continue(())
+    },
     VisitAction::Descend => walk_type_map(v, id, key, value, span, arena),
   }
 }
@@ -112,14 +127,18 @@ pub fn walk_type_map<V: AstVisitor + ?Sized>(
 ) -> ControlFlow<()> {
   walk_type_expr_dispatch(v, key, arena)?;
   walk_type_expr_dispatch(v, value, arena)?;
-  v.leave_type_map(id, key, value, span, arena)
+  v.leave_type_map(id, key, value, span);
+  ControlFlow::Continue(())
 }
 
 fn walk_type_record_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: TypeExprId, fields: &[TypeField], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
   let action = v.visit_type_record(id, fields, span, arena);
   match action {
     VisitAction::Stop => ControlFlow::Break(()),
-    VisitAction::Skip => v.leave_type_record(id, fields, span, arena),
+    VisitAction::Skip => {
+      v.leave_type_record(id, fields, span);
+      ControlFlow::Continue(())
+    },
     VisitAction::Descend => walk_type_record(v, id, fields, span, arena),
   }
 }
@@ -128,14 +147,18 @@ pub fn walk_type_record<V: AstVisitor + ?Sized>(v: &mut V, id: TypeExprId, field
   for field in fields {
     field.walk_children(v, arena)?;
   }
-  v.leave_type_record(id, fields, span, arena)
+  v.leave_type_record(id, fields, span);
+  ControlFlow::Continue(())
 }
 
 fn walk_type_tuple_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: TypeExprId, elems: &[TypeExprId], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
   let action = v.visit_type_tuple(id, elems, span, arena);
   match action {
     VisitAction::Stop => ControlFlow::Break(()),
-    VisitAction::Skip => v.leave_type_tuple(id, elems, span, arena),
+    VisitAction::Skip => {
+      v.leave_type_tuple(id, elems, span);
+      ControlFlow::Continue(())
+    },
     VisitAction::Descend => walk_type_tuple(v, id, elems, span, arena),
   }
 }
@@ -144,7 +167,8 @@ pub fn walk_type_tuple<V: AstVisitor + ?Sized>(v: &mut V, id: TypeExprId, elems:
   for &e in elems {
     walk_type_expr_dispatch(v, e, arena)?;
   }
-  v.leave_type_tuple(id, elems, span, arena)
+  v.leave_type_tuple(id, elems, span);
+  ControlFlow::Continue(())
 }
 
 fn walk_type_func_dispatch<V: AstVisitor + ?Sized>(
@@ -158,7 +182,10 @@ fn walk_type_func_dispatch<V: AstVisitor + ?Sized>(
   let action = v.visit_type_func(id, param, ret, span, arena);
   match action {
     VisitAction::Stop => ControlFlow::Break(()),
-    VisitAction::Skip => v.leave_type_func(id, param, ret, span, arena),
+    VisitAction::Skip => {
+      v.leave_type_func(id, param, ret, span);
+      ControlFlow::Continue(())
+    },
     VisitAction::Descend => walk_type_func(v, id, param, ret, span, arena),
   }
 }
@@ -173,7 +200,8 @@ pub fn walk_type_func<V: AstVisitor + ?Sized>(
 ) -> ControlFlow<()> {
   walk_type_expr_dispatch(v, param, arena)?;
   walk_type_expr_dispatch(v, ret, arena)?;
-  v.leave_type_func(id, param, ret, span, arena)
+  v.leave_type_func(id, param, ret, span);
+  ControlFlow::Continue(())
 }
 
 fn walk_type_fallible_dispatch<V: AstVisitor + ?Sized>(
@@ -187,7 +215,10 @@ fn walk_type_fallible_dispatch<V: AstVisitor + ?Sized>(
   let action = v.visit_type_fallible(id, ok, err, span, arena);
   match action {
     VisitAction::Stop => ControlFlow::Break(()),
-    VisitAction::Skip => v.leave_type_fallible(id, ok, err, span, arena),
+    VisitAction::Skip => {
+      v.leave_type_fallible(id, ok, err, span);
+      ControlFlow::Continue(())
+    },
     VisitAction::Descend => walk_type_fallible(v, id, ok, err, span, arena),
   }
 }
@@ -202,5 +233,6 @@ pub fn walk_type_fallible<V: AstVisitor + ?Sized>(
 ) -> ControlFlow<()> {
   walk_type_expr_dispatch(v, ok, arena)?;
   walk_type_expr_dispatch(v, err, arena)?;
-  v.leave_type_fallible(id, ok, err, span, arena)
+  v.leave_type_fallible(id, ok, err, span);
+  ControlFlow::Continue(())
 }

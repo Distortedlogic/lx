@@ -9,6 +9,7 @@ use miette::SourceSpan;
 
 pub struct EmptyMatch {
   diagnostics: Vec<Diagnostic>,
+  arena: *const AstArena,
 }
 
 impl Default for EmptyMatch {
@@ -19,14 +20,15 @@ impl Default for EmptyMatch {
 
 impl EmptyMatch {
   pub fn new() -> Self {
-    Self { diagnostics: Vec::new() }
+    Self { diagnostics: Vec::new(), arena: std::ptr::null() }
   }
 }
 
 impl PatternVisitor for EmptyMatch {}
 impl TypeVisitor for EmptyMatch {}
 impl AstVisitor for EmptyMatch {
-  fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan, arena: &AstArena) -> VisitAction {
+  fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan, _arena: &AstArena) -> VisitAction {
+    let arena = unsafe { &*self.arena };
     if ExprMatcher::empty_match().matches(expr, arena) {
       self.diagnostics.push(Diagnostic {
         level: DiagLevel::Warning,
@@ -55,6 +57,7 @@ impl LintRule for EmptyMatch {
   }
 
   fn run(&mut self, stmts: &[StmtId], arena: &AstArena, _model: &SemanticModel) {
+    self.arena = arena as *const AstArena;
     for sid in stmts {
       if dispatch_stmt(self, *sid, arena).is_break() {
         break;

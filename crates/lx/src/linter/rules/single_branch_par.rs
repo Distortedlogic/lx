@@ -1,4 +1,4 @@
-use crate::ast::{AstArena, Expr, ExprId, StmtId};
+use crate::ast::{Expr, ExprId, StmtId};
 use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::SemanticModel;
 use crate::checker::{DiagLevel, Diagnostic};
@@ -25,7 +25,7 @@ impl SingleBranchPar {
 impl PatternVisitor for SingleBranchPar {}
 impl TypeVisitor for SingleBranchPar {}
 impl AstVisitor for SingleBranchPar {
-  fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan, _arena: &AstArena) -> VisitAction {
+  fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan, _arena: &crate::ast::AstArena) -> VisitAction {
     if let Expr::Par(stmts) = expr
       && stmts.len() <= 1
     {
@@ -58,7 +58,7 @@ impl LintRule for SingleBranchPar {
     RuleCategory::Correctness
   }
 
-  fn run(&mut self, stmts: &[StmtId], arena: &AstArena, _model: &SemanticModel) {
+  fn run(&mut self, stmts: &[StmtId], arena: &crate::ast::AstArena, _model: &SemanticModel) {
     for sid in stmts {
       if dispatch_stmt(self, *sid, arena).is_break() {
         break;

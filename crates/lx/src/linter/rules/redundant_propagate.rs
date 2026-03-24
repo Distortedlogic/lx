@@ -1,4 +1,4 @@
-use crate::ast::{AstArena, Expr, ExprId, StmtId};
+use crate::ast::{Expr, ExprId, StmtId};
 use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::SemanticModel;
 use crate::checker::types::Type;
@@ -27,7 +27,7 @@ impl RedundantPropagate {
 impl PatternVisitor for RedundantPropagate {}
 impl TypeVisitor for RedundantPropagate {}
 impl AstVisitor for RedundantPropagate {
-  fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan, _arena: &AstArena) -> VisitAction {
+  fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan, _arena: &crate::ast::AstArena) -> VisitAction {
     if let Expr::Propagate(inner_id) = expr {
       self.candidates.push((*inner_id, span));
     }
@@ -48,7 +48,7 @@ impl LintRule for RedundantPropagate {
     RuleCategory::Correctness
   }
 
-  fn run(&mut self, stmts: &[StmtId], arena: &AstArena, model: &SemanticModel) {
+  fn run(&mut self, stmts: &[StmtId], arena: &crate::ast::AstArena, model: &SemanticModel) {
     for sid in stmts {
       if dispatch_stmt(self, *sid, arena).is_break() {
         break;

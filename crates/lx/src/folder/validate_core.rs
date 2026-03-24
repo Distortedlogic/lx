@@ -1,5 +1,5 @@
-use crate::ast::{AstArena, Core, Expr, ExprId, Program, WithKind};
-use crate::visitor::{AstVisitor, PatternVisitor, TypeVisitor, VisitAction};
+use crate::ast::{Core, Expr, ExprId, Program, WithKind};
+use crate::visitor::{AstVisitor, PatternVisitor, TypeVisitor, VisitAction, walk_program};
 use miette::SourceSpan;
 
 struct CoreValidator;
@@ -7,7 +7,7 @@ struct CoreValidator;
 impl PatternVisitor for CoreValidator {}
 impl TypeVisitor for CoreValidator {}
 impl AstVisitor for CoreValidator {
-  fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan, _arena: &AstArena) -> VisitAction {
+  fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan, _arena: &crate::ast::AstArena) -> VisitAction {
     match expr {
       Expr::Pipe(_) => panic!("Core AST contains Expr::Pipe at offset {}. The desugarer should have converted this to Expr::Apply.", span.offset()),
       Expr::Section(_) => panic!("Core AST contains Expr::Section at offset {}. The desugarer should have converted this to a lambda.", span.offset()),
@@ -23,5 +23,5 @@ impl AstVisitor for CoreValidator {
 
 pub(super) fn validate_core(program: &Program<Core>) {
   let mut validator = CoreValidator;
-  validator.visit_program(program);
+  let _ = walk_program(&mut validator, program);
 }

@@ -16,7 +16,7 @@ use crate::std_module;
 use crate::stdlib::helpers::require_str_field;
 use crate::sym::{Sym, intern};
 use crate::value::LxVal;
-use crate::visitor::AstVisitor;
+use crate::visitor::walk_program;
 use miette::SourceSpan;
 
 use diag_walk::{DiagEdge, DiagNode, EdgeStyle, EdgeType, Graph, NodeKind, Walker};
@@ -57,13 +57,13 @@ fn bi_to_graph_chart(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -
 
 pub fn extract_mermaid<P>(program: &Program<P>) -> String {
   let mut walker = Walker::new();
-  let _ = walker.visit_program(program);
+  let _ = walk_program(&mut walker, program);
   to_mermaid(&walker.into_graph())
 }
 
 pub fn extract_echart_json<P>(program: &Program<P>) -> String {
   let mut walker = Walker::new();
-  let _ = walker.visit_program(program);
+  let _ = walk_program(&mut walker, program);
   let graph = walker.into_graph();
   graph_to_echart_json(&graph)
 }
@@ -80,7 +80,7 @@ fn extract_graph(src: &str, span: SourceSpan) -> Result<Graph, LxError> {
     eprintln!("diag: parse warnings: {}", msgs.join("; "));
   }
   let mut walker = Walker::new();
-  let _ = walker.visit_program(&program);
+  let _ = walk_program(&mut walker, &program);
   Ok(walker.into_graph())
 }
 
