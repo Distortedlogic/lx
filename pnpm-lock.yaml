@@ -39,18 +39,6 @@ importers:
 
   ts/dx-charts: {}
 
-  ts/voice-client:
-    dependencies:
-      '@lx/audio-capture':
-        specifier: workspace:*
-        version: link:../audio-capture
-      '@lx/audio-playback':
-        specifier: workspace:*
-        version: link:../audio-playback
-      '@lx/widget-bridge':
-        specifier: workspace:*
-        version: link:../widget-bridge
-
   ts/widget-bridge:
     dependencies:
       '@codemirror/lang-css':

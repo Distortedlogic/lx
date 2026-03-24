@@ -135,7 +135,7 @@ In `toolbar.rs`, derive a meaningful title from the pane's working directory or 
 
 ### T16. Other view container backgrounds
 
-`view.rs` BrowserView, EditorView, AgentView, CanvasView, VoiceView all use bare `w-full h-full` with no background. Add `bg-[var(--surface-container-lowest)]` to Editor and Voice (recessed content). Add `bg-[var(--surface-container)]` to Browser, Agent, Canvas.
+`view.rs` BrowserView, EditorView, AgentView, CanvasView all use bare `w-full h-full` with no background. Add `bg-[var(--surface-container-lowest)]` to Editor (recessed content). Add `bg-[var(--surface-container)]` to Browser, Agent, Canvas.
 
 ### T17. Collapsed sidebar state
 
