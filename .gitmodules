@@ -4,3 +4,6 @@
 [submodule "reference/dioxus"]
 	path = reference/dioxus
 	url = https://github.com/DioxusLabs/dioxus.git
+[submodule "reference/webkit2gtk"]
+	path = reference/webkit2gtk
+	url = https://github.com/tauri-apps/webkit2gtk-rs.git
