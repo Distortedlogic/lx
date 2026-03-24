@@ -16,10 +16,10 @@ pub type TypeExprId = Idx<Spanned<TypeExpr>>;
 
 #[derive(Debug, Clone, Default)]
 pub struct AstArena {
-  pub exprs: Arena<Spanned<Expr>>,
-  pub stmts: Arena<Spanned<Stmt>>,
-  pub patterns: Arena<Spanned<Pattern>>,
-  pub type_exprs: Arena<Spanned<TypeExpr>>,
+  pub(crate) exprs: Arena<Spanned<Expr>>,
+  pub(crate) stmts: Arena<Spanned<Stmt>>,
+  pub(crate) patterns: Arena<Spanned<Pattern>>,
+  pub(crate) type_exprs: Arena<Spanned<TypeExpr>>,
 }
 
 impl AstArena {
@@ -89,6 +89,22 @@ impl AstArena {
 
   pub fn type_expr_span(&self, id: TypeExprId) -> SourceSpan {
     self.type_exprs[id].span
+  }
+
+  pub fn iter_exprs(&self) -> impl Iterator<Item = (ExprId, &Spanned<Expr>)> {
+    self.exprs.iter()
+  }
+
+  pub fn iter_stmts(&self) -> impl Iterator<Item = (StmtId, &Spanned<Stmt>)> {
+    self.stmts.iter()
+  }
+
+  pub fn iter_patterns(&self) -> impl Iterator<Item = (PatternId, &Spanned<Pattern>)> {
+    self.patterns.iter()
+  }
+
+  pub fn iter_type_exprs(&self) -> impl Iterator<Item = (TypeExprId, &Spanned<TypeExpr>)> {
+    self.type_exprs.iter()
   }
 }
 
