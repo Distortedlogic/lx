@@ -20,7 +20,7 @@ macro_rules! walk_transform_fn {
           let node = arena.$get_node(id).clone();
           let recursed = node.recurse_children(t, arena);
           let (final_node, final_span) = t.$leave(id, recursed, span, arena);
-          arena.$alloc(final_node, final_span)
+          if final_span == span && final_node == *arena.$get_node(id) { id } else { arena.$alloc(final_node, final_span) }
         },
       }
     }
