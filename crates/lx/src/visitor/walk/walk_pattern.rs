@@ -16,7 +16,13 @@ pub(crate) fn walk_pattern_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: Patte
       v.leave_pattern(id, pattern, span);
       ControlFlow::Continue(())
     },
-    VisitAction::Descend => walk_pattern(v, id, pattern, span, arena),
+    VisitAction::Descend => {
+      walk_pattern(v, id, pattern, span, arena)?;
+      let pattern = arena.pattern(id);
+      let span = arena.pattern_span(id);
+      v.leave_pattern(id, pattern, span);
+      ControlFlow::Continue(())
+    },
   }
 }
 
@@ -51,7 +57,6 @@ pub fn walk_pattern<V: AstVisitor + ?Sized>(v: &mut V, id: PatternId, pattern: &
       walk_pattern_constructor_dispatch(v, id, *name, args, span, arena)?;
     },
   }
-  v.leave_pattern(id, pattern, span);
   ControlFlow::Continue(())
 }
 

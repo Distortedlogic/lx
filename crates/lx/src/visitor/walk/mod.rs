@@ -166,7 +166,13 @@ pub fn dispatch_expr<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, arena: &AstA
       v.leave_expr(id, expr, span);
       ControlFlow::Continue(())
     },
-    VisitAction::Descend => walk_expr(v, id, arena),
+    VisitAction::Descend => {
+      walk_expr(v, id, arena)?;
+      let expr = arena.expr(id);
+      let span = arena.expr_span(id);
+      v.leave_expr(id, expr, span);
+      ControlFlow::Continue(())
+    },
   }
 }
 
@@ -215,7 +221,6 @@ pub fn walk_expr<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, arena: &AstArena
     Expr::Yield(yld) => walk_yield_dispatch(v, id, yld, span, arena)?,
     Expr::With(with) => walk_with_dispatch(v, id, with, span, arena)?,
   }
-  v.leave_expr(id, expr, span);
   ControlFlow::Continue(())
 }
 

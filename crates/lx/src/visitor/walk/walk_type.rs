@@ -16,7 +16,13 @@ pub(crate) fn walk_type_expr_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: Typ
       v.leave_type_expr(id, type_expr, span);
       ControlFlow::Continue(())
     },
-    VisitAction::Descend => walk_type_expr(v, id, type_expr, span, arena),
+    VisitAction::Descend => {
+      walk_type_expr(v, id, type_expr, span, arena)?;
+      let type_expr = arena.type_expr(id);
+      let span = arena.type_expr_span(id);
+      v.leave_type_expr(id, type_expr, span);
+      ControlFlow::Continue(())
+    },
   }
 }
 
@@ -42,7 +48,6 @@ pub fn walk_type_expr<V: AstVisitor + ?Sized>(v: &mut V, id: TypeExprId, type_ex
     TypeExpr::Func { param, ret } => walk_type_func_dispatch(v, id, *param, *ret, span, arena)?,
     TypeExpr::Fallible { ok, err } => walk_type_fallible_dispatch(v, id, *ok, *err, span, arena)?,
   }
-  v.leave_type_expr(id, type_expr, span);
   ControlFlow::Continue(())
 }
 
