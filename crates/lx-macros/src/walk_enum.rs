@@ -4,6 +4,7 @@ use syn::{Data, DeriveInput, Fields, PathArguments, Result, Type};
 
 use crate::field_strategy::{WalkStrategy, classify_type, walk_fn_path};
 use crate::walk_enum_children::{generate_multi_unnamed_children_arm, generate_named_fields_children_arm, generate_single_field_children_arm};
+use crate::walk_enum_walk::{generate_multi_unnamed_walk_arm, generate_named_fields_walk_arm, generate_single_field_walk_arm};
 
 pub fn generate_enum_walk(input: &DeriveInput) -> Result<TokenStream> {
   let name = &input.ident;
@@ -14,6 +15,7 @@ pub fn generate_enum_walk(input: &DeriveInput) -> Result<TokenStream> {
 
   let mut recurse_arms = Vec::new();
   let mut children_arms = Vec::new();
+  let mut walk_arms = Vec::new();
 
   for variant in &data.variants {
     let vname = &variant.ident;
@@ -23,26 +25,31 @@ pub fn generate_enum_walk(input: &DeriveInput) -> Result<TokenStream> {
       let (recurse_arm, children_arm) = generate_skip_arms(name, vname, &variant.fields);
       recurse_arms.push(recurse_arm);
       children_arms.push(children_arm);
+      walk_arms.push(generate_skip_walk_arm(name, vname, &variant.fields));
       continue;
     }
 
     match &variant.fields {
       Fields::Unit => {
         recurse_arms.push(quote! { #name::#vname => #name::#vname });
-        children_arms.push(quote! { #name::#vname => Vec::new() });
+        children_arms.push(quote! { #name::#vname => smallvec::smallvec![] });
+        walk_arms.push(quote! { #name::#vname => {} });
       },
       Fields::Unnamed(fields) if fields.unnamed.len() == 1 => {
         let field_ty = &fields.unnamed[0].ty;
         recurse_arms.push(generate_single_field_recurse_arm(name, vname, field_ty));
         children_arms.push(generate_single_field_children_arm(name, vname, field_ty));
+        walk_arms.push(generate_single_field_walk_arm(name, vname, field_ty));
       },
       Fields::Named(fields) => {
         recurse_arms.push(generate_named_fields_recurse_arm(name, vname, fields)?);
         children_arms.push(generate_named_fields_children_arm(name, vname, fields)?);
+        walk_arms.push(generate_named_fields_walk_arm(name, vname, fields)?);
       },
       Fields::Unnamed(fields) => {
         recurse_arms.push(generate_multi_unnamed_recurse_arm(name, vname, fields)?);
         children_arms.push(generate_multi_unnamed_children_arm(name, vname, fields)?);
+        walk_arms.push(generate_multi_unnamed_walk_arm(name, vname, fields)?);
       },
     }
   }
@@ -59,20 +66,39 @@ pub fn generate_enum_walk(input: &DeriveInput) -> Result<TokenStream> {
               }
           }
 
-          pub fn children(&self) -> Vec<crate::ast::NodeId> {
+          pub fn children(&self) -> smallvec::SmallVec<[crate::ast::NodeId; 4]> {
               match self {
                   #(#children_arms,)*
               }
+          }
+
+          pub fn walk_children<V: crate::visitor::AstVisitor + ?Sized>(
+              &self,
+              v: &mut V,
+              arena: &crate::ast::AstArena,
+          ) -> std::ops::ControlFlow<()> {
+              match self {
+                  #(#walk_arms,)*
+              }
+              std::ops::ControlFlow::Continue(())
           }
       }
   })
 }
 
+fn generate_skip_walk_arm(enum_name: &syn::Ident, variant_name: &syn::Ident, fields: &Fields) -> TokenStream {
+  match fields {
+    Fields::Unit => quote! { #enum_name::#variant_name => {} },
+    Fields::Unnamed(_) => quote! { #enum_name::#variant_name(_) => {} },
+    Fields::Named(_) => quote! { #enum_name::#variant_name { .. } => {} },
+  }
+}
+
 fn generate_skip_arms(enum_name: &syn::Ident, variant_name: &syn::Ident, fields: &Fields) -> (TokenStream, TokenStream) {
   match fields {
-    Fields::Unit => (quote! { #enum_name::#variant_name => #enum_name::#variant_name }, quote! { #enum_name::#variant_name => Vec::new() }),
+    Fields::Unit => (quote! { #enum_name::#variant_name => #enum_name::#variant_name }, quote! { #enum_name::#variant_name => smallvec::smallvec![] }),
     Fields::Unnamed(_) => {
-      (quote! { #enum_name::#variant_name(inner) => #enum_name::#variant_name(inner) }, quote! { #enum_name::#variant_name(_) => Vec::new() })
+      (quote! { #enum_name::#variant_name(inner) => #enum_name::#variant_name(inner) }, quote! { #enum_name::#variant_name(_) => smallvec::smallvec![] })
     },
     Fields::Named(fields) => {
       let field_names: Vec<_> = fields.named.iter().map(|f| f.ident.as_ref().expect("named field")).collect();
@@ -81,7 +107,7 @@ fn generate_skip_arms(enum_name: &syn::Ident, variant_name: &syn::Ident, fields:
             #enum_name::#variant_name { #(#field_names),* } => #enum_name::#variant_name { #(#field_names),* }
         },
         quote! {
-            #enum_name::#variant_name { .. } => Vec::new()
+            #enum_name::#variant_name { .. } => smallvec::smallvec![]
         },
       )
     },

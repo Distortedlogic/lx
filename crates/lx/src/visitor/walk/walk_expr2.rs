@@ -6,7 +6,6 @@ use crate::ast::{
 use miette::SourceSpan;
 
 use super::super::{AstVisitor, VisitAction};
-use super::dispatch_children;
 
 walk_dispatch_id!(walk_ternary_dispatch, walk_ternary, visit_ternary, leave_ternary, ExprTernary, ExprId);
 walk_dispatch_id!(walk_coalesce_dispatch, walk_coalesce, visit_coalesce, leave_coalesce, ExprCoalesce, ExprId);
@@ -41,7 +40,7 @@ pub(crate) fn walk_break_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId,
 }
 
 pub fn walk_ternary<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, ternary: &ExprTernary, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_children(v, &ternary.children(), arena)?;
+  ternary.walk_children(v, arena)?;
   v.leave_ternary(id, ternary, span, arena)
 }
 
@@ -51,17 +50,17 @@ pub fn walk_propagate<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, inner: Expr
 }
 
 pub fn walk_coalesce<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, coalesce: &ExprCoalesce, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_children(v, &coalesce.children(), arena)?;
+  coalesce.walk_children(v, arena)?;
   v.leave_coalesce(id, coalesce, span, arena)
 }
 
 pub fn walk_slice<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, slice: &ExprSlice, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_children(v, &slice.children(), arena)?;
+  slice.walk_children(v, arena)?;
   v.leave_slice(id, slice, span, arena)
 }
 
 pub fn walk_named_arg<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, na: &ExprNamedArg, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_children(v, &na.children(), arena)?;
+  na.walk_children(v, arena)?;
   v.leave_named_arg(id, na, span, arena)
 }
 
@@ -80,7 +79,7 @@ pub fn walk_break<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, value: Option<E
 }
 
 pub fn walk_assert<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, assert: &ExprAssert, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_children(v, &assert.children(), arena)?;
+  assert.walk_children(v, arena)?;
   v.leave_assert(id, assert, span, arena)
 }
 
@@ -92,26 +91,28 @@ pub fn walk_par<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, stmts: &[StmtId],
 }
 
 pub fn walk_sel<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, arms: &[SelArm], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_children(v, &arms.iter().flat_map(|a| a.children()).collect::<Vec<_>>(), arena)?;
+  for arm in arms {
+    arm.walk_children(v, arena)?;
+  }
   v.leave_sel(id, arms, span, arena)
 }
 
 pub fn walk_timeout<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, timeout: &ExprTimeout, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_children(v, &timeout.children(), arena)?;
+  timeout.walk_children(v, arena)?;
   v.leave_timeout(id, timeout, span, arena)
 }
 
 pub fn walk_emit<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, emit: &ExprEmit, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_children(v, &emit.children(), arena)?;
+  emit.walk_children(v, arena)?;
   v.leave_emit(id, emit, span, arena)
 }
 
 pub fn walk_yield<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, yld: &ExprYield, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_children(v, &yld.children(), arena)?;
+  yld.walk_children(v, arena)?;
   v.leave_yield(id, yld, span, arena)
 }
 
 pub fn walk_with<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, with: &ExprWith, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_children(v, &with.children(), arena)?;
+  with.walk_children(v, arena)?;
   v.leave_with(id, with, span, arena)
 }

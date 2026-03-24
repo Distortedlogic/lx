@@ -1,6 +1,11 @@
+use std::ops::ControlFlow;
+
+use smallvec::SmallVec;
+
 use super::{AgentMethod, AstArena, ClassDeclData, ClassField, FieldDecl, NodeId, TraitDeclData, TraitEntry, TraitMethodDecl, WithKind};
 use crate::visitor::transformer::AstTransformer;
 use crate::visitor::walk_transform::walk_transform_expr;
+use crate::visitor::{AstVisitor, dispatch_expr};
 
 impl WithKind {
   pub fn recurse_children<T: AstTransformer + ?Sized>(self, t: &mut T, arena: &mut AstArena) -> Self {
@@ -17,12 +22,29 @@ impl WithKind {
     }
   }
 
-  pub fn children(&self) -> Vec<NodeId> {
+  pub fn children(&self) -> SmallVec<[NodeId; 4]> {
     match self {
-      WithKind::Binding { value, .. } => vec![NodeId::Expr(*value)],
+      WithKind::Binding { value, .. } => smallvec::smallvec![NodeId::Expr(*value)],
       WithKind::Resources { resources } => resources.iter().map(|(e, _)| NodeId::Expr(*e)).collect(),
       WithKind::Context { fields } => fields.iter().map(|(_, e)| NodeId::Expr(*e)).collect(),
     }
+  }
+
+  pub fn walk_children<V: AstVisitor + ?Sized>(&self, v: &mut V, arena: &AstArena) -> ControlFlow<()> {
+    match self {
+      WithKind::Binding { value, .. } => dispatch_expr(v, *value, arena)?,
+      WithKind::Resources { resources } => {
+        for (e, _) in resources {
+          dispatch_expr(v, *e, arena)?;
+        }
+      },
+      WithKind::Context { fields } => {
+        for (_, e) in fields {
+          dispatch_expr(v, *e, arena)?;
+        }
+      },
+    }
+    ControlFlow::Continue(())
   }
 }
 
@@ -58,8 +80,8 @@ impl TraitDeclData {
     }
   }
 
-  pub fn children(&self) -> Vec<NodeId> {
-    let mut result = Vec::new();
+  pub fn children(&self) -> SmallVec<[NodeId; 4]> {
+    let mut result = SmallVec::new();
     for entry in &self.entries {
       if let TraitEntry::Field(f) = entry {
         result.extend(f.default.iter().map(|id| NodeId::Expr(*id)));
@@ -86,8 +108,8 @@ impl ClassDeclData {
     ClassDeclData { name: self.name, type_params: self.type_params, traits: self.traits, fields, methods, exported: self.exported }
   }
 
-  pub fn children(&self) -> Vec<NodeId> {
-    let mut result = Vec::new();
+  pub fn children(&self) -> SmallVec<[NodeId; 4]> {
+    let mut result = SmallVec::new();
     for f in &self.fields {
       result.push(NodeId::Expr(f.default));
     }

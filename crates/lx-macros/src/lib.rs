@@ -1,6 +1,7 @@
 mod field_strategy;
 mod walk_enum;
 mod walk_enum_children;
+mod walk_enum_walk;
 mod walk_struct;
 
 use proc_macro::TokenStream;

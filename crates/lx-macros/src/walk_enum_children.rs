@@ -18,7 +18,7 @@ pub fn generate_single_field_children_arm(enum_name: &syn::Ident, variant_name: 
       quote! { #enum_name::#variant_name(inner) => #expr }
     },
     None => {
-      quote! { #enum_name::#variant_name(_) => Vec::new() }
+      quote! { #enum_name::#variant_name(_) => smallvec::smallvec![] }
     },
   }
 }
@@ -46,12 +46,12 @@ pub fn generate_named_fields_children_arm(enum_name: &syn::Ident, variant_name: 
 
   if !has_any_children {
     Ok(quote! {
-        #enum_name::#variant_name { .. } => Vec::new()
+        #enum_name::#variant_name { .. } => smallvec::smallvec![]
     })
   } else {
     Ok(quote! {
         #enum_name::#variant_name { #(#bindings,)* .. } => {
-            let mut result = Vec::new();
+            let mut result = smallvec::SmallVec::new();
             #(#child_extends)*
             result
         }
@@ -80,12 +80,12 @@ pub fn generate_multi_unnamed_children_arm(enum_name: &syn::Ident, variant_name:
 
   if child_extends.is_empty() {
     Ok(quote! {
-        #enum_name::#variant_name(..) => Vec::new()
+        #enum_name::#variant_name(..) => smallvec::smallvec![]
     })
   } else {
     Ok(quote! {
         #enum_name::#variant_name(#(#bindings),*) => {
-            let mut result = Vec::new();
+            let mut result = smallvec::SmallVec::new();
             #(#child_extends)*
             result
         }

@@ -48,46 +48,6 @@ fn inner_type_from_generic(seg: &PathSegment) -> Option<&Type> {
 const PASSTHROUGH_TYPES: &[&str] =
   &["Sym", "BinOp", "UnaryOp", "bool", "i64", "f64", "usize", "String", "BigInt", "UseKind", "UseStmt", "StmtTypeDef", "TraitUnionDef"];
 
-const WALKABLE_TYPES: &[&str] = &[
-  "ExprBinary",
-  "ExprUnary",
-  "ExprPipe",
-  "ExprApply",
-  "ExprFieldAccess",
-  "ExprFunc",
-  "ExprMatch",
-  "ExprTernary",
-  "ExprCoalesce",
-  "ExprSlice",
-  "ExprNamedArg",
-  "ExprAssert",
-  "ExprTimeout",
-  "ExprEmit",
-  "ExprYield",
-  "ExprWith",
-  "Literal",
-  "StrPart",
-  "Section",
-  "FieldKind",
-  "ListElem",
-  "RecordField",
-  "MapEntry",
-  "Param",
-  "MatchArm",
-  "SelArm",
-  "Binding",
-  "BindTarget",
-  "WithKind",
-  "StmtFieldUpdate",
-  "TraitDeclData",
-  "ClassDeclData",
-  "PatternList",
-  "PatternRecord",
-  "PatternConstructor",
-  "FieldPattern",
-  "TypeField",
-];
-
 pub fn classify_type(ty: &Type) -> WalkStrategy {
   let Some(seg) = last_segment(ty) else {
     return WalkStrategy::Passthrough;
@@ -108,8 +68,8 @@ pub fn classify_type(ty: &Type) -> WalkStrategy {
         "StmtId" => WalkStrategy::VecStmtId,
         "PatternId" => WalkStrategy::VecPatternId,
         "TypeExprId" => WalkStrategy::VecTypeExprId,
-        _ if WALKABLE_TYPES.contains(&inner_name.as_str()) => WalkStrategy::WalkableStruct,
-        _ => WalkStrategy::Passthrough,
+        _ if PASSTHROUGH_TYPES.contains(&inner_name.as_str()) => WalkStrategy::Passthrough,
+        _ => WalkStrategy::WalkableStruct,
       };
     }
     return WalkStrategy::Passthrough;
@@ -125,8 +85,8 @@ pub fn classify_type(ty: &Type) -> WalkStrategy {
         "StmtId" => WalkStrategy::OptionStmtId,
         "PatternId" => WalkStrategy::OptionPatternId,
         "TypeExprId" => WalkStrategy::OptionTypeExprId,
-        _ if WALKABLE_TYPES.contains(&inner_name.as_str()) => WalkStrategy::OptionWalkableStruct,
-        _ => WalkStrategy::Passthrough,
+        _ if PASSTHROUGH_TYPES.contains(&inner_name.as_str()) => WalkStrategy::Passthrough,
+        _ => WalkStrategy::OptionWalkableStruct,
       };
     }
     return WalkStrategy::Passthrough;
@@ -136,11 +96,7 @@ pub fn classify_type(ty: &Type) -> WalkStrategy {
     return WalkStrategy::Passthrough;
   }
 
-  if WALKABLE_TYPES.contains(&name.as_str()) {
-    return WalkStrategy::WalkableStruct;
-  }
-
-  WalkStrategy::Passthrough
+  WalkStrategy::WalkableStruct
 }
 
 pub fn walk_fn_path(strategy: &WalkStrategy) -> Option<proc_macro2::TokenStream> {
@@ -161,21 +117,21 @@ pub fn walk_fn_path(strategy: &WalkStrategy) -> Option<proc_macro2::TokenStream>
 pub fn node_id_expr(strategy: &WalkStrategy, field_expr: &proc_macro2::TokenStream, is_vec_walkable: bool) -> Option<proc_macro2::TokenStream> {
   use quote::quote;
   match strategy {
-    WalkStrategy::ExprId => Some(quote! { vec![crate::ast::NodeId::Expr(#field_expr)] }),
-    WalkStrategy::StmtId => Some(quote! { vec![crate::ast::NodeId::Stmt(#field_expr)] }),
-    WalkStrategy::PatternId => Some(quote! { vec![crate::ast::NodeId::Pattern(#field_expr)] }),
-    WalkStrategy::TypeExprId => Some(quote! { vec![crate::ast::NodeId::TypeExpr(#field_expr)] }),
-    WalkStrategy::VecExprId => Some(quote! { #field_expr.iter().map(|id| crate::ast::NodeId::Expr(*id)).collect::<Vec<_>>() }),
-    WalkStrategy::VecStmtId => Some(quote! { #field_expr.iter().map(|id| crate::ast::NodeId::Stmt(*id)).collect::<Vec<_>>() }),
-    WalkStrategy::VecPatternId => Some(quote! { #field_expr.iter().map(|id| crate::ast::NodeId::Pattern(*id)).collect::<Vec<_>>() }),
-    WalkStrategy::VecTypeExprId => Some(quote! { #field_expr.iter().map(|id| crate::ast::NodeId::TypeExpr(*id)).collect::<Vec<_>>() }),
-    WalkStrategy::OptionExprId => Some(quote! { #field_expr.iter().map(|id| crate::ast::NodeId::Expr(*id)).collect::<Vec<_>>() }),
-    WalkStrategy::OptionStmtId => Some(quote! { #field_expr.iter().map(|id| crate::ast::NodeId::Stmt(*id)).collect::<Vec<_>>() }),
-    WalkStrategy::OptionPatternId => Some(quote! { #field_expr.iter().map(|id| crate::ast::NodeId::Pattern(*id)).collect::<Vec<_>>() }),
-    WalkStrategy::OptionTypeExprId => Some(quote! { #field_expr.iter().map(|id| crate::ast::NodeId::TypeExpr(*id)).collect::<Vec<_>>() }),
+    WalkStrategy::ExprId => Some(quote! { smallvec::smallvec![crate::ast::NodeId::Expr(#field_expr)] }),
+    WalkStrategy::StmtId => Some(quote! { smallvec::smallvec![crate::ast::NodeId::Stmt(#field_expr)] }),
+    WalkStrategy::PatternId => Some(quote! { smallvec::smallvec![crate::ast::NodeId::Pattern(#field_expr)] }),
+    WalkStrategy::TypeExprId => Some(quote! { smallvec::smallvec![crate::ast::NodeId::TypeExpr(#field_expr)] }),
+    WalkStrategy::VecExprId => Some(quote! { #field_expr.iter().map(|id| crate::ast::NodeId::Expr(*id)).collect::<smallvec::SmallVec<_>>() }),
+    WalkStrategy::VecStmtId => Some(quote! { #field_expr.iter().map(|id| crate::ast::NodeId::Stmt(*id)).collect::<smallvec::SmallVec<_>>() }),
+    WalkStrategy::VecPatternId => Some(quote! { #field_expr.iter().map(|id| crate::ast::NodeId::Pattern(*id)).collect::<smallvec::SmallVec<_>>() }),
+    WalkStrategy::VecTypeExprId => Some(quote! { #field_expr.iter().map(|id| crate::ast::NodeId::TypeExpr(*id)).collect::<smallvec::SmallVec<_>>() }),
+    WalkStrategy::OptionExprId => Some(quote! { #field_expr.iter().map(|id| crate::ast::NodeId::Expr(*id)).collect::<smallvec::SmallVec<_>>() }),
+    WalkStrategy::OptionStmtId => Some(quote! { #field_expr.iter().map(|id| crate::ast::NodeId::Stmt(*id)).collect::<smallvec::SmallVec<_>>() }),
+    WalkStrategy::OptionPatternId => Some(quote! { #field_expr.iter().map(|id| crate::ast::NodeId::Pattern(*id)).collect::<smallvec::SmallVec<_>>() }),
+    WalkStrategy::OptionTypeExprId => Some(quote! { #field_expr.iter().map(|id| crate::ast::NodeId::TypeExpr(*id)).collect::<smallvec::SmallVec<_>>() }),
     WalkStrategy::WalkableStruct => {
       if is_vec_walkable {
-        Some(quote! { #field_expr.iter().flat_map(|item| item.children()).collect::<Vec<_>>() })
+        Some(quote! { #field_expr.iter().flat_map(|item| item.children()).collect::<smallvec::SmallVec<_>>() })
       } else {
         Some(quote! { #field_expr.children() })
       }
@@ -187,4 +143,15 @@ pub fn node_id_expr(strategy: &WalkStrategy, field_expr: &proc_macro2::TokenStre
 
 pub fn is_single_id(strategy: &WalkStrategy) -> bool {
   matches!(strategy, WalkStrategy::ExprId | WalkStrategy::StmtId | WalkStrategy::PatternId | WalkStrategy::TypeExprId)
+}
+
+pub fn visitor_dispatch_path(strategy: &WalkStrategy) -> Option<proc_macro2::TokenStream> {
+  use quote::quote;
+  match strategy {
+    WalkStrategy::ExprId | WalkStrategy::VecExprId | WalkStrategy::OptionExprId => Some(quote! { crate::visitor::dispatch_expr }),
+    WalkStrategy::StmtId | WalkStrategy::VecStmtId | WalkStrategy::OptionStmtId => Some(quote! { crate::visitor::dispatch_stmt }),
+    WalkStrategy::PatternId | WalkStrategy::VecPatternId | WalkStrategy::OptionPatternId => Some(quote! { crate::visitor::walk::walk_pattern_dispatch }),
+    WalkStrategy::TypeExprId | WalkStrategy::VecTypeExprId | WalkStrategy::OptionTypeExprId => Some(quote! { crate::visitor::walk::walk_type_expr_dispatch }),
+    _ => None,
+  }
 }

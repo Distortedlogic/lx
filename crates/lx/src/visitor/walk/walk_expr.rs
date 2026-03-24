@@ -6,7 +6,7 @@ use crate::ast::{
 use miette::SourceSpan;
 
 use super::super::{AstVisitor, VisitAction};
-use super::{dispatch_children, dispatch_expr};
+use super::dispatch_expr;
 
 walk_dispatch_id!(walk_literal_dispatch, walk_literal, visit_literal, leave_literal, Literal, ExprId);
 walk_dispatch_id!(walk_binary_dispatch, walk_binary, visit_binary, leave_binary, ExprBinary, ExprId);
@@ -25,37 +25,37 @@ walk_dispatch_id_slice!(walk_record_dispatch, walk_record, visit_record, leave_r
 walk_dispatch_id_slice!(walk_map_dispatch, walk_map, visit_map, leave_map, MapEntry, ExprId);
 
 pub fn walk_literal<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, lit: &Literal, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_children(v, &lit.children(), arena)?;
+  lit.walk_children(v, arena)?;
   v.leave_literal(id, lit, span, arena)
 }
 
 pub fn walk_binary<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, binary: &ExprBinary, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_children(v, &binary.children(), arena)?;
+  binary.walk_children(v, arena)?;
   v.leave_binary(id, binary, span, arena)
 }
 
 pub fn walk_unary<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, unary: &ExprUnary, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_children(v, &unary.children(), arena)?;
+  unary.walk_children(v, arena)?;
   v.leave_unary(id, unary, span, arena)
 }
 
 pub fn walk_pipe<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, pipe: &ExprPipe, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_children(v, &pipe.children(), arena)?;
+  pipe.walk_children(v, arena)?;
   v.leave_pipe(id, pipe, span, arena)
 }
 
 pub fn walk_apply<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, apply: &ExprApply, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_children(v, &apply.children(), arena)?;
+  apply.walk_children(v, arena)?;
   v.leave_apply(id, apply, span, arena)
 }
 
 pub fn walk_section<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, section: &Section, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_children(v, &section.children(), arena)?;
+  section.walk_children(v, arena)?;
   v.leave_section(id, section, span, arena)
 }
 
 pub fn walk_field_access<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, fa: &ExprFieldAccess, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_children(v, &fa.children(), arena)?;
+  fa.walk_children(v, arena)?;
   v.leave_field_access(id, fa, span, arena)
 }
 
@@ -74,26 +74,32 @@ pub fn walk_tuple<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, elems: &[ExprId
 }
 
 pub fn walk_list<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, elems: &[ListElem], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_children(v, &elems.iter().flat_map(|e| e.children()).collect::<Vec<_>>(), arena)?;
+  for elem in elems {
+    elem.walk_children(v, arena)?;
+  }
   v.leave_list(id, elems, span, arena)
 }
 
 pub fn walk_record<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, fields: &[RecordField], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_children(v, &fields.iter().flat_map(|f| f.children()).collect::<Vec<_>>(), arena)?;
+  for field in fields {
+    field.walk_children(v, arena)?;
+  }
   v.leave_record(id, fields, span, arena)
 }
 
 pub fn walk_map<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, entries: &[MapEntry], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_children(v, &entries.iter().flat_map(|e| e.children()).collect::<Vec<_>>(), arena)?;
+  for entry in entries {
+    entry.walk_children(v, arena)?;
+  }
   v.leave_map(id, entries, span, arena)
 }
 
 pub fn walk_func<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, func: &ExprFunc, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_children(v, &func.children(), arena)?;
+  func.walk_children(v, arena)?;
   v.leave_func(id, func, span, arena)
 }
 
 pub fn walk_match<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, m: &ExprMatch, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_children(v, &m.children(), arena)?;
+  m.walk_children(v, arena)?;
   v.leave_match(id, m, span, arena)
 }

@@ -54,7 +54,7 @@ fn dispatch_child<V: AstVisitor + ?Sized>(v: &mut V, child: NodeId, arena: &AstA
   }
 }
 
-fn dispatch_children<V: AstVisitor + ?Sized>(v: &mut V, children: &[NodeId], arena: &AstArena) -> ControlFlow<()> {
+pub fn dispatch_children<V: AstVisitor + ?Sized>(v: &mut V, children: &[NodeId], arena: &AstArena) -> ControlFlow<()> {
   for &child in children {
     dispatch_child(v, child, arena)?;
   }
@@ -205,6 +205,6 @@ pub fn walk_class_decl<V: AstVisitor + ?Sized>(v: &mut V, id: StmtId, data: &Cla
 }
 
 pub fn walk_field_update<V: AstVisitor + ?Sized>(v: &mut V, id: StmtId, fu: &StmtFieldUpdate, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  dispatch_children(v, &fu.children(), arena)?;
+  fu.walk_children(v, arena)?;
   v.leave_field_update(id, fu, span, arena)
 }
