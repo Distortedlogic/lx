@@ -6,7 +6,7 @@ use miette::SourceSpan;
 
 use crate::visitor::{AstVisitor, VisitAction};
 
-pub(crate) fn walk_type_expr_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: TypeExprId, arena: &AstArena) -> ControlFlow<()> {
+pub fn walk_type_expr_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: TypeExprId, arena: &AstArena) -> ControlFlow<()> {
   let span = arena.type_expr_span(id);
   let type_expr = arena.type_expr(id);
   let action = v.visit_type_expr(id, type_expr, span);

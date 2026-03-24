@@ -6,7 +6,7 @@ use miette::SourceSpan;
 
 use crate::visitor::{AstVisitor, VisitAction};
 
-pub(crate) fn walk_pattern_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: PatternId, arena: &AstArena) -> ControlFlow<()> {
+pub fn walk_pattern_dispatch<V: AstVisitor + ?Sized>(v: &mut V, id: PatternId, arena: &AstArena) -> ControlFlow<()> {
   let span = arena.pattern_span(id);
   let pattern = arena.pattern(id);
   let action = v.visit_pattern(id, pattern, span);

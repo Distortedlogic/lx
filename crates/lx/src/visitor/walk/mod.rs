@@ -30,8 +30,6 @@ macro_rules! define_walk_and_dispatch {
   };
 }
 
-pub(crate) use define_walk_and_dispatch;
-
 mod generated;
 mod walk_pattern;
 mod walk_type;

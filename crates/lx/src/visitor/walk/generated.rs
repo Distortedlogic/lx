@@ -8,7 +8,6 @@ use crate::ast::{
 use miette::SourceSpan;
 
 use super::super::{AstVisitor, VisitAction};
-use super::define_walk_and_dispatch;
 
 define_walk_and_dispatch!(walk_literal_dispatch, walk_literal, visit_literal, leave_literal, Literal, ExprId);
 define_walk_and_dispatch!(walk_binary_dispatch, walk_binary, visit_binary, leave_binary, ExprBinary, ExprId);
