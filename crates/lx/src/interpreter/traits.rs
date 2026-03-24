@@ -19,7 +19,7 @@ impl Interpreter {
   ) -> Result<(), LxError> {
     for tn in traits {
       let Some(LxVal::Trait(t)) = env.get(*tn) else {
-        continue;
+        return Err(LxError::runtime(format!("{kind} '{name}' declares Trait '{tn}' but it is not defined — add `use` to import it"), span));
       };
       for (k, v) in t.defaults.iter() {
         if !methods.contains_key(k) {
