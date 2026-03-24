@@ -55,7 +55,7 @@ pub fn check_file(path: &str, strict: bool, fix: bool) -> ExitCode {
 
 fn recheck_source(fixed_source: &str) -> Result<CheckResult, String> {
   let (tokens, comments) = lex(fixed_source).map_err(|e| format!("lex error: {e}"))?;
-  let parse_result = parse(tokens, lx::source::FileId::new(0), comments);
+  let parse_result = parse(tokens, lx::source::FileId::new(0), comments, fixed_source);
   let surface = parse_result.program.ok_or_else(|| {
     let msgs: Vec<String> = parse_result.errors.iter().map(|e| format!("{e}")).collect();
     format!("parse errors: {}", msgs.join("; "))

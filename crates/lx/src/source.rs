@@ -84,3 +84,18 @@ impl CommentStore {
     &self.comments[lo..hi]
   }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommentPlacement {
+  Leading,
+  Trailing,
+  Dangling,
+}
+
+#[derive(Debug, Clone)]
+pub struct AttachedComment {
+  pub comment_idx: usize,
+  pub placement: CommentPlacement,
+}
+
+pub type CommentMap = std::collections::HashMap<crate::ast::NodeId, Vec<AttachedComment>>;

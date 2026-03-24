@@ -55,11 +55,11 @@ pub struct ParseResult {
   pub errors: Vec<LxError>,
 }
 
-pub fn parse(tokens: Vec<Token>, file: FileId, comments: CommentStore) -> ParseResult {
-  parse_with_recovery(tokens, file, comments)
+pub fn parse(tokens: Vec<Token>, file: FileId, comments: CommentStore, source: &str) -> ParseResult {
+  parse_with_recovery(tokens, file, comments, source)
 }
 
-fn parse_with_recovery(tokens: Vec<Token>, file: FileId, comments: CommentStore) -> ParseResult {
+fn parse_with_recovery(tokens: Vec<Token>, file: FileId, comments: CommentStore, source: &str) -> ParseResult {
   let len = tokens.last().map(|t| t.span.offset() + t.span.len()).unwrap_or(0);
   let eoi: Span = (len..len).into();
 
@@ -81,7 +81,8 @@ fn parse_with_recovery(tokens: Vec<Token>, file: FileId, comments: CommentStore)
 
   let program = output.map(|stmts| {
     let arena = Rc::try_unwrap(arena).expect("arena still borrowed").into_inner();
-    Program { stmts, arena, comments, file, _phase: PhantomData }
+    let comment_map = crate::ast::attach_comments(&stmts, &arena, &comments, source);
+    Program { stmts, arena, comments, comment_map, file, _phase: PhantomData }
   });
 
   ParseResult { program, errors }

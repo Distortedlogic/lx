@@ -18,7 +18,7 @@ pub fn run_agent(script_path: &str) -> ExitCode {
       return ExitCode::from(1);
     },
   };
-  let result = lx::parser::parse(tokens, lx::source::FileId::new(0), comments);
+  let result = lx::parser::parse(tokens, lx::source::FileId::new(0), comments, &source);
   let surface = match result.program {
     Some(p) => {
       for e in &result.errors {

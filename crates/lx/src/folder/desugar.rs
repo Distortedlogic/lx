@@ -159,7 +159,8 @@ fn desugar_interp(parts: Vec<StrPart>, span: SourceSpan, arena: &mut AstArena) -
 pub fn desugar(program: Program<Surface>) -> Program<Core> {
   let mut desugarer = Desugarer;
   let folded = desugarer.transform_program(program);
-  let core = Program { stmts: folded.stmts, arena: folded.arena, comments: folded.comments, file: folded.file, _phase: PhantomData };
+  let core =
+    Program { stmts: folded.stmts, arena: folded.arena, comments: folded.comments, comment_map: folded.comment_map, file: folded.file, _phase: PhantomData };
   if cfg!(debug_assertions) {
     super::validate_core::validate_core(&core);
   }

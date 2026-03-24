@@ -105,7 +105,7 @@ impl Interpreter {
     }
     let source = std::fs::read_to_string(file_path).map_err(|e| LxError::runtime(format!("cannot read module '{}': {e}", file_path.display()), span))?;
     let (tokens, comments) = crate::lexer::lex(&source).map_err(|e| LxError::runtime(format!("module '{}': {e}", file_path.display()), span))?;
-    let result = crate::parser::parse(tokens, crate::source::FileId::new(0), comments);
+    let result = crate::parser::parse(tokens, crate::source::FileId::new(0), comments, &source);
     let surface = result.program.ok_or_else(|| {
       let msgs: Vec<String> = result.errors.iter().map(|e| format!("{e}")).collect();
       LxError::runtime(format!("module '{}': {}", file_path.display(), msgs.join("; ")), span)

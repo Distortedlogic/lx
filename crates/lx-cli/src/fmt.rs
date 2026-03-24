@@ -21,7 +21,7 @@ fn fmt_source(path_str: &str, source: &str) -> Result<String, FmtFailed> {
       return Err(FmtFailed);
     },
   };
-  let result = parse(tokens, lx::source::FileId::new(0), comments);
+  let result = parse(tokens, lx::source::FileId::new(0), comments, source);
   let program = match result.program {
     Some(p) => p,
     None => {
