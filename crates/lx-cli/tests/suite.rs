@@ -14,4 +14,6 @@ fn lx_test_suite() {
   if !output.status.success() {
     panic!("lx test suite failed (exit code {:?}):\nstdout:\n{}\nstderr:\n{}", output.status.code(), stdout, stderr);
   }
+
+  assert!(stdout.contains("passed"), "lx test produced no output — may not have found any test files");
 }
