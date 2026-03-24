@@ -1,4 +1,4 @@
-use crate::ast::{BinOp, Expr, ExprId, FieldKind, ListElem, MapEntry, RecordField};
+use crate::ast::{BinOp, Expr, ExprBlock, ExprBreak, ExprId, ExprLoop, ExprPar, ExprPropagate, ExprTuple, FieldKind, ListElem, MapEntry, RecordField};
 
 use super::Formatter;
 
@@ -43,22 +43,22 @@ impl Formatter<'_> {
       Expr::Apply(a) => self.emit_apply(a, parent_prec),
       Expr::Section(s) => self.emit_section(s),
       Expr::FieldAccess(fa) => self.emit_field_access(fa),
-      Expr::Block(stmts) => self.emit_block(stmts),
-      Expr::Tuple(elems) => self.emit_tuple(elems),
+      Expr::Block(ExprBlock { stmts }) => self.emit_block(stmts),
+      Expr::Tuple(ExprTuple { elems }) => self.emit_tuple(elems),
       Expr::List(elems) => self.emit_list(elems),
       Expr::Record(fields) => self.emit_record(fields),
       Expr::Map(entries) => self.emit_map(entries),
       Expr::Func(func) => self.emit_func(func),
       Expr::Match(m) => self.emit_match(m),
       Expr::Ternary(t) => self.emit_ternary(t, parent_prec),
-      Expr::Propagate(inner) => self.emit_propagate(*inner),
+      Expr::Propagate(ExprPropagate { inner }) => self.emit_propagate(*inner),
       Expr::Coalesce(c) => self.emit_coalesce(c, parent_prec),
       Expr::Slice(s) => self.emit_slice(s),
       Expr::NamedArg(na) => self.emit_named_arg(na),
-      Expr::Loop(stmts) => self.emit_block_keyword("loop", stmts),
-      Expr::Break(val) => self.emit_break(val),
+      Expr::Loop(ExprLoop { stmts }) => self.emit_block_keyword("loop", stmts),
+      Expr::Break(ExprBreak { value: val }) => self.emit_break(val),
       Expr::Assert(a) => self.emit_assert(a),
-      Expr::Par(stmts) => self.emit_block_keyword("par", stmts),
+      Expr::Par(ExprPar { stmts }) => self.emit_block_keyword("par", stmts),
       Expr::Sel(arms) => self.emit_sel(arms),
       Expr::Timeout(t) => self.emit_timeout(t),
       Expr::Emit(e) => {

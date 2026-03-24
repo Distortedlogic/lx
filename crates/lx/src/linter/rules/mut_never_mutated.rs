@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::ast::{AstArena, BindTarget, Expr, ExprId, Program, Stmt, StmtId};
+use crate::ast::{AstArena, BindTarget, Expr, ExprBlock, ExprId, ExprLoop, ExprPar, Program, Stmt, StmtId};
 use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::{DefKind, DefinitionInfo, SemanticModel};
 use crate::checker::{DiagLevel, Diagnostic};
@@ -55,7 +55,7 @@ fn collect_mutations(sid: StmtId, arena: &AstArena, mutated: &mut HashSet<Sym>) 
 fn collect_mutations_expr(eid: ExprId, arena: &AstArena, mutated: &mut HashSet<Sym>) {
   let expr = arena.expr(eid);
   match expr {
-    Expr::Block(stmts) | Expr::Loop(stmts) | Expr::Par(stmts) => {
+    Expr::Block(ExprBlock { stmts }) | Expr::Loop(ExprLoop { stmts }) | Expr::Par(ExprPar { stmts }) => {
       for &sid in stmts {
         collect_mutations(sid, arena, mutated);
       }

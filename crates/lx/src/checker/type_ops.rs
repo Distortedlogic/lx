@@ -1,4 +1,4 @@
-use crate::ast::{BinOp, Expr, ExprId, FieldKind, ListElem, Literal, RecordField, UnaryOp};
+use crate::ast::{BinOp, Expr, ExprBlock, ExprBreak, ExprId, ExprLoop, ExprPar, ExprPropagate, ExprTuple, FieldKind, ListElem, Literal, RecordField, UnaryOp};
 use miette::SourceSpan;
 
 use super::diagnostics::DiagnosticKind;
@@ -54,11 +54,11 @@ impl Checker<'_> {
         }
         self.type_arena.todo()
       },
-      Expr::Block(stmts) => {
+      Expr::Block(ExprBlock { stmts }) => {
         let stmts = stmts.clone();
         self.check_stmts(&stmts)
       },
-      Expr::Tuple(elems) => {
+      Expr::Tuple(ExprTuple { elems }) => {
         let elems = elems.clone();
         let types: Vec<TypeId> = elems.iter().map(|e| self.synth_expr(*e)).collect();
         self.type_arena.alloc(Type::Tuple(types))
@@ -84,7 +84,7 @@ impl Checker<'_> {
         self.synth_match_type(m.scrutinee, &m.arms, span)
       },
       Expr::Ternary(ternary) => self.synth_ternary_type(ternary.cond, ternary.then_, ternary.else_),
-      Expr::Propagate(inner) => self.synth_propagate(*inner, span),
+      Expr::Propagate(ExprPropagate { inner }) => self.synth_propagate(*inner, span),
       Expr::Coalesce(_) => self.type_arena.todo(),
       Expr::Slice(slice) => {
         if let Some(s) = slice.start {
@@ -96,12 +96,12 @@ impl Checker<'_> {
         self.synth_expr(slice.expr)
       },
       Expr::NamedArg(na) => self.synth_expr(na.value),
-      Expr::Loop(stmts) => {
+      Expr::Loop(ExprLoop { stmts }) => {
         let stmts = stmts.clone();
         self.check_stmts(&stmts);
         self.type_arena.unit()
       },
-      Expr::Break(value) => {
+      Expr::Break(ExprBreak { value }) => {
         if let Some(v) = *value {
           self.synth_expr(v);
         }
@@ -114,7 +114,7 @@ impl Checker<'_> {
         }
         self.type_arena.unit()
       },
-      Expr::Par(stmts) => {
+      Expr::Par(ExprPar { stmts }) => {
         let stmts = stmts.clone();
         self.synth_par_type(&stmts, span)
       },

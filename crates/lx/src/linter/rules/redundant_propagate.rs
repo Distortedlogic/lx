@@ -1,4 +1,4 @@
-use crate::ast::{AstArena, Expr, ExprId, StmtId};
+use crate::ast::{AstArena, Expr, ExprId, ExprPropagate, StmtId};
 use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::SemanticModel;
 use crate::checker::types::Type;
@@ -28,7 +28,7 @@ impl PatternVisitor for RedundantPropagate {}
 impl TypeVisitor for RedundantPropagate {}
 impl AstVisitor for RedundantPropagate {
   fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan) -> VisitAction {
-    if let Expr::Propagate(inner_id) = expr {
+    if let Expr::Propagate(ExprPropagate { inner: inner_id }) = expr {
       self.candidates.push((*inner_id, span));
     }
     VisitAction::Descend

@@ -201,3 +201,33 @@ pub struct ExprWith {
   pub kind: WithKind,
   pub body: Vec<StmtId>,
 }
+
+#[derive(Debug, Clone, PartialEq, AstWalk)]
+pub struct ExprBlock {
+  pub stmts: Vec<StmtId>,
+}
+
+#[derive(Debug, Clone, PartialEq, AstWalk)]
+pub struct ExprTuple {
+  pub elems: Vec<ExprId>,
+}
+
+#[derive(Debug, Clone, PartialEq, AstWalk)]
+pub struct ExprLoop {
+  pub stmts: Vec<StmtId>,
+}
+
+#[derive(Debug, Clone, PartialEq, AstWalk)]
+pub struct ExprPar {
+  pub stmts: Vec<StmtId>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, AstWalk)]
+pub struct ExprPropagate {
+  pub inner: ExprId,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, AstWalk)]
+pub struct ExprBreak {
+  pub value: Option<ExprId>,
+}

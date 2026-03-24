@@ -1,7 +1,9 @@
 use std::collections::HashSet;
 use std::ops::ControlFlow;
 
-use crate::ast::{AstArena, BindTarget, Binding, ExprFunc, ExprId, ExprMatch, ExprWith, FieldPattern, PatternId, StmtId, WithKind};
+use crate::ast::{
+  AstArena, BindTarget, Binding, ExprBlock, ExprFunc, ExprId, ExprLoop, ExprMatch, ExprPar, ExprWith, FieldPattern, PatternId, StmtId, WithKind,
+};
 use crate::sym::Sym;
 use crate::visitor::{AstVisitor, PatternVisitor, TypeVisitor, VisitAction, dispatch_expr, dispatch_stmt, walk_binding, walk_func, walk_pattern};
 use miette::SourceSpan;
@@ -114,9 +116,9 @@ impl AstVisitor for FreeVarCollector<'_> {
     }
   }
 
-  fn visit_block(&mut self, _id: ExprId, stmts: &[StmtId], _span: SourceSpan) -> VisitAction {
+  fn visit_block(&mut self, _id: ExprId, block: &ExprBlock, _span: SourceSpan) -> VisitAction {
     self.push_scope();
-    for &s in stmts {
+    for &s in &block.stmts {
       if dispatch_stmt(self, s, self.arena).is_break() {
         self.pop_scope();
         return VisitAction::Stop;
@@ -176,9 +178,9 @@ impl AstVisitor for FreeVarCollector<'_> {
     VisitAction::Skip
   }
 
-  fn visit_loop(&mut self, _id: ExprId, stmts: &[StmtId], _span: SourceSpan) -> VisitAction {
+  fn visit_loop(&mut self, _id: ExprId, loop_node: &ExprLoop, _span: SourceSpan) -> VisitAction {
     self.push_scope();
-    for &s in stmts {
+    for &s in &loop_node.stmts {
       if dispatch_stmt(self, s, self.arena).is_break() {
         self.pop_scope();
         return VisitAction::Stop;
@@ -188,9 +190,9 @@ impl AstVisitor for FreeVarCollector<'_> {
     VisitAction::Skip
   }
 
-  fn visit_par(&mut self, _id: ExprId, stmts: &[StmtId], _span: SourceSpan) -> VisitAction {
+  fn visit_par(&mut self, _id: ExprId, par: &ExprPar, _span: SourceSpan) -> VisitAction {
     self.push_scope();
-    for &s in stmts {
+    for &s in &par.stmts {
       if dispatch_stmt(self, s, self.arena).is_break() {
         self.pop_scope();
         return VisitAction::Stop;

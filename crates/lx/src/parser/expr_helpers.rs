@@ -3,7 +3,7 @@ use chumsky::prelude::*;
 
 use super::expr::{ident, skip_semis};
 use super::{ArenaRef, ExprId, Span, ss};
-use crate::ast::{Expr, ListElem, MapEntry, Param, RecordField};
+use crate::ast::{Expr, ExprBlock, ListElem, MapEntry, Param, RecordField};
 use crate::lexer::token::TokenKind;
 use crate::sym::intern;
 
@@ -54,7 +54,7 @@ where
   let block = just(TokenKind::LBrace)
     .ignore_then(super::expr::stmts_block(expr, a3.clone()))
     .then_ignore(just(TokenKind::RBrace))
-    .map_with(move |stmts, e| a3.borrow_mut().alloc_expr(Expr::Block(stmts), ss(e.span())));
+    .map_with(move |stmts, e| a3.borrow_mut().alloc_expr(Expr::Block(ExprBlock { stmts }), ss(e.span())));
 
   choice((empty_record, record, block))
 }

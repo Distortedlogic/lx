@@ -3,7 +3,7 @@ use chumsky::prelude::*;
 
 use super::expr_helpers::{block_or_record_parser, list_parser, map_parser};
 use super::{ArenaRef, ExprId, Span, StmtId, ss};
-use crate::ast::{Expr, ExprAssert, ExprEmit, ExprTimeout, ExprYield, Literal, SelArm};
+use crate::ast::{Expr, ExprAssert, ExprBreak, ExprEmit, ExprLoop, ExprPar, ExprTimeout, ExprYield, Literal, SelArm};
 use crate::lexer::token::TokenKind;
 use crate::sym::Sym;
 
@@ -83,7 +83,7 @@ where
         .ignore_then(just(TokenKind::LBrace))
         .ignore_then(stmts_block(expr.clone(), a9.clone()))
         .then_ignore(just(TokenKind::RBrace))
-        .map_with(move |stmts, e| al.borrow_mut().alloc_expr(Expr::Loop(stmts), ss(e.span())))
+        .map_with(move |stmts, e| al.borrow_mut().alloc_expr(Expr::Loop(ExprLoop { stmts }), ss(e.span())))
     };
 
     let par_expr = {
@@ -92,7 +92,7 @@ where
         .ignore_then(just(TokenKind::LBrace))
         .ignore_then(stmts_block(expr.clone(), a10.clone()))
         .then_ignore(just(TokenKind::RBrace))
-        .map_with(move |stmts, e| al.borrow_mut().alloc_expr(Expr::Par(stmts), ss(e.span())))
+        .map_with(move |stmts, e| al.borrow_mut().alloc_expr(Expr::Par(ExprPar { stmts }), ss(e.span())))
     };
 
     let sel_arm = expr.clone().then_ignore(just(TokenKind::Arrow)).then(expr.clone()).map(|(ex, handler)| SelArm { expr: ex, handler });
@@ -110,7 +110,9 @@ where
 
     let break_expr = {
       let al = arena.clone();
-      just(TokenKind::Break).ignore_then(expr.clone().or_not()).map_with(move |val, e| al.borrow_mut().alloc_expr(Expr::Break(val), ss(e.span())))
+      just(TokenKind::Break)
+        .ignore_then(expr.clone().or_not())
+        .map_with(move |val, e| al.borrow_mut().alloc_expr(Expr::Break(ExprBreak { value: val }), ss(e.span())))
     };
 
     let assert_expr = {

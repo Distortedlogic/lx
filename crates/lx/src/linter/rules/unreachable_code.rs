@@ -1,4 +1,4 @@
-use crate::ast::{AstArena, Expr, Stmt, StmtId};
+use crate::ast::{AstArena, Expr, ExprBlock, ExprBreak, ExprLoop, ExprPar, ExprPropagate, ExprTuple, Stmt, StmtId};
 use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::SemanticModel;
 use crate::checker::{DiagLevel, Diagnostic};
@@ -54,7 +54,7 @@ impl UnreachableCode {
 
   fn walk_expr(&mut self, eid: crate::ast::ExprId, arena: &AstArena) {
     match arena.expr(eid) {
-      Expr::Block(stmts) | Expr::Loop(stmts) => self.walk_stmts(stmts, arena),
+      Expr::Block(ExprBlock { stmts }) | Expr::Loop(ExprLoop { stmts }) => self.walk_stmts(stmts, arena),
       Expr::Func(f) => self.walk_expr(f.body, arena),
       Expr::Match(m) => {
         self.walk_expr(m.scrutinee, arena);
@@ -78,7 +78,7 @@ impl UnreachableCode {
         self.walk_expr(a.func, arena);
         self.walk_expr(a.arg, arena);
       },
-      Expr::Par(stmts) => {
+      Expr::Par(ExprPar { stmts }) => {
         for &sid in stmts {
           self.walk_stmt(sid, arena);
         }
@@ -89,7 +89,7 @@ impl UnreachableCode {
           self.walk_expr(arm.handler, arena);
         }
       },
-      Expr::Propagate(inner) | Expr::Break(Some(inner)) => self.walk_expr(*inner, arena),
+      Expr::Propagate(ExprPropagate { inner }) | Expr::Break(ExprBreak { value: Some(inner) }) => self.walk_expr(*inner, arena),
       Expr::Pipe(p) => {
         self.walk_expr(p.left, arena);
         self.walk_expr(p.right, arena);
@@ -108,7 +108,7 @@ impl UnreachableCode {
         }
       },
       Expr::FieldAccess(fa) => self.walk_expr(fa.expr, arena),
-      Expr::Tuple(elems) => {
+      Expr::Tuple(ExprTuple { elems }) => {
         for &e in elems {
           self.walk_expr(e, arena);
         }

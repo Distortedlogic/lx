@@ -11,8 +11,8 @@ use std::collections::{HashMap, HashSet};
 use std::ops::ControlFlow;
 
 use crate::ast::{
-  AstArena, BindTarget, Binding, Expr, ExprApply, ExprFunc, ExprId, ExprMatch, ExprTernary, MapEntry, Program, SelArm, Stmt, StmtId, StmtTypeDef,
-  TraitDeclData, UseStmt,
+  AstArena, BindTarget, Binding, Expr, ExprApply, ExprFunc, ExprId, ExprLoop, ExprMatch, ExprPar, ExprTernary, MapEntry, Program, SelArm, Stmt, StmtId,
+  StmtTypeDef, TraitDeclData, UseStmt,
 };
 use crate::sym::{Sym, intern};
 use crate::visitor::{AstVisitor, PatternVisitor, TypeVisitor, VisitAction, dispatch_expr, walk_loop, walk_par};
@@ -87,7 +87,7 @@ impl<'a> Walker<'a> {
 impl PatternVisitor for Walker<'_> {}
 impl TypeVisitor for Walker<'_> {}
 impl AstVisitor for Walker<'_> {
-  fn leave_par(&mut self, _id: ExprId, _stmts: &[StmtId], _span: SourceSpan) {
+  fn leave_par(&mut self, _id: ExprId, _par: &ExprPar, _span: SourceSpan) {
     self.context = self.context_stack.pop().expect("diag: context_stack underflow");
   }
 
@@ -103,7 +103,7 @@ impl AstVisitor for Walker<'_> {
     self.context = self.context_stack.pop().expect("diag: context_stack underflow");
   }
 
-  fn leave_loop(&mut self, _id: ExprId, _stmts: &[StmtId], _span: SourceSpan) {
+  fn leave_loop(&mut self, _id: ExprId, _loop: &ExprLoop, _span: SourceSpan) {
     self.context = self.context_stack.pop().expect("diag: context_stack underflow");
   }
 
@@ -208,14 +208,14 @@ impl AstVisitor for Walker<'_> {
     VisitAction::Skip
   }
 
-  fn visit_par(&mut self, _id: ExprId, stmts: &[StmtId], span: SourceSpan) -> VisitAction {
+  fn visit_par(&mut self, _id: ExprId, par: &ExprPar, span: SourceSpan) -> VisitAction {
     let arena = self.arena;
     let fork_id = self.add_node_at("fork", "par".into(), NodeKind::Fork, Some(span));
     let ctx = self.context.clone();
     self.add_edge(&ctx, &fork_id, String::new(), EdgeStyle::Solid);
     self.context_stack.push(self.context.clone());
     self.context = fork_id;
-    if walk_par(self, _id, stmts, span, arena).is_break() {
+    if walk_par(self, _id, par, span, arena).is_break() {
       return VisitAction::Stop;
     }
     VisitAction::Skip
@@ -272,14 +272,14 @@ impl AstVisitor for Walker<'_> {
     VisitAction::Skip
   }
 
-  fn visit_loop(&mut self, _id: ExprId, stmts: &[StmtId], span: SourceSpan) -> VisitAction {
+  fn visit_loop(&mut self, _id: ExprId, loop_node: &ExprLoop, span: SourceSpan) -> VisitAction {
     let arena = self.arena;
     let loop_id = self.add_node_at("loop", "loop".into(), NodeKind::Loop, Some(span));
     let ctx = self.context.clone();
     self.add_edge(&ctx, &loop_id, String::new(), EdgeStyle::Solid);
     self.context_stack.push(self.context.clone());
     self.context = loop_id;
-    if walk_loop(self, _id, stmts, span, arena).is_break() {
+    if walk_loop(self, _id, loop_node, span, arena).is_break() {
       return VisitAction::Stop;
     }
     VisitAction::Skip

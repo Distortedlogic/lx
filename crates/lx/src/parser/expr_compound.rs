@@ -4,7 +4,7 @@ use chumsky::prelude::*;
 use super::expr::ident;
 use super::expr_pratt::{section_op, tok_to_op};
 use super::{ArenaRef, ExprId, Span, ss};
-use crate::ast::{Expr, ExprFunc, ExprWith, Literal, Section, WithKind};
+use crate::ast::{Expr, ExprFunc, ExprTuple, ExprWith, Literal, Section, WithKind};
 use crate::lexer::token::TokenKind;
 use crate::sym::intern;
 
@@ -115,7 +115,7 @@ where
   let tuple = just(TokenKind::LParen)
     .ignore_then(expr.clone().separated_by(just(TokenKind::Semi).or_not()).at_least(2).collect::<Vec<_>>())
     .then_ignore(just(TokenKind::RParen))
-    .map_with(move |elems, e| a8.borrow_mut().alloc_expr(Expr::Tuple(elems), ss(e.span())));
+    .map_with(move |elems, e| a8.borrow_mut().alloc_expr(Expr::Tuple(ExprTuple { elems }), ss(e.span())));
 
   let grouped = just(TokenKind::LParen).ignore_then(expr).then_ignore(just(TokenKind::RParen)).map_with(move |inner, e| {
     let node = arena.borrow().expr(inner).clone();

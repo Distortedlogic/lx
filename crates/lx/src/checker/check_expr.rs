@@ -1,4 +1,4 @@
-use crate::ast::{Expr, ExprFunc, ExprId, ListElem, MatchArm, Stmt, StmtId};
+use crate::ast::{Expr, ExprBlock, ExprFunc, ExprId, ListElem, MatchArm, Stmt, StmtId};
 
 use super::Checker;
 use super::narrowing;
@@ -42,7 +42,7 @@ impl Checker<'_> {
         }
       },
       Expr::Match(m) => self.check_match(m.scrutinee, &m.arms, expected),
-      Expr::Block(stmts) => self.check_block(stmts, expected),
+      Expr::Block(ExprBlock { stmts }) => self.check_block(stmts, expected),
       Expr::Literal(_)
       | Expr::Ident(_)
       | Expr::TypeConstructor(_)

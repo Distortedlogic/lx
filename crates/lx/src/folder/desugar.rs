@@ -4,8 +4,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use miette::SourceSpan;
 
 use crate::ast::{
-  AstArena, BindTarget, Binding, Core, Expr, ExprApply, ExprBinary, ExprFieldAccess, ExprFunc, ExprId, ExprMatch, ExprWith, FieldKind, Literal, MatchArm,
-  Param, Pattern, PatternConstructor, Program, Section, Stmt, StrPart, Surface, WithKind,
+  AstArena, BindTarget, Binding, Core, Expr, ExprApply, ExprBinary, ExprBlock, ExprFieldAccess, ExprFunc, ExprId, ExprMatch, ExprWith, FieldKind, Literal,
+  MatchArm, Param, Pattern, PatternConstructor, Program, Section, Stmt, StrPart, Surface, WithKind,
 };
 use crate::sym::{Sym, intern};
 use crate::visitor::transformer::AstTransformer;
@@ -130,7 +130,7 @@ fn desugar_with_binding(w: ExprWith, span: SourceSpan, arena: &mut AstArena) -> 
   let binding_stmt = arena.alloc_stmt(Stmt::Binding(Binding { exported: false, mutable, target: BindTarget::Name(name), type_ann: None, value }), span);
   let mut block_stmts = vec![binding_stmt];
   block_stmts.extend(w.body);
-  Expr::Block(block_stmts)
+  Expr::Block(ExprBlock { stmts: block_stmts })
 }
 
 fn desugar_interp(parts: Vec<StrPart>, span: SourceSpan, arena: &mut AstArena) -> Vec<StrPart> {

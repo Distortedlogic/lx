@@ -1,4 +1,4 @@
-use crate::ast::{AstArena, Expr, ExprId, StmtId};
+use crate::ast::{AstArena, Expr, ExprId, ExprPar, StmtId};
 use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::SemanticModel;
 use crate::checker::{DiagLevel, Diagnostic};
@@ -26,7 +26,7 @@ impl PatternVisitor for SingleBranchPar {}
 impl TypeVisitor for SingleBranchPar {}
 impl AstVisitor for SingleBranchPar {
   fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan) -> VisitAction {
-    if let Expr::Par(stmts) = expr
+    if let Expr::Par(ExprPar { stmts }) = expr
       && stmts.len() <= 1
     {
       self.diagnostics.push(Diagnostic {

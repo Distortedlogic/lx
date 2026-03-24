@@ -1,7 +1,8 @@
 use std::ops::ControlFlow;
 
 use crate::ast::{
-  AstArena, ExprApply, ExprBinary, ExprFieldAccess, ExprFunc, ExprId, ExprMatch, ExprPipe, ExprUnary, ListElem, Literal, MapEntry, RecordField, Section, StmtId,
+  AstArena, ExprApply, ExprBinary, ExprBlock, ExprFieldAccess, ExprFunc, ExprId, ExprMatch, ExprPipe, ExprTuple, ExprUnary, ListElem, Literal, MapEntry,
+  RecordField, Section,
 };
 use miette::SourceSpan;
 
@@ -18,8 +19,8 @@ walk_dispatch_id!(walk_field_access_dispatch, walk_field_access, visit_field_acc
 walk_dispatch_id!(walk_func_dispatch, walk_func, visit_func, leave_func, ExprFunc, ExprId);
 walk_dispatch_id!(walk_match_dispatch, walk_match, visit_match, leave_match, ExprMatch, ExprId);
 
-walk_dispatch_id_slice!(walk_block_dispatch, walk_block, visit_block, leave_block, StmtId, ExprId);
-walk_dispatch_id_slice!(walk_tuple_dispatch, walk_tuple, visit_tuple, leave_tuple, ExprId, ExprId);
+walk_dispatch_id!(walk_block_dispatch, walk_block, visit_block, leave_block, ExprBlock, ExprId);
+walk_dispatch_id!(walk_tuple_dispatch, walk_tuple, visit_tuple, leave_tuple, ExprTuple, ExprId);
 walk_dispatch_id_slice!(walk_list_dispatch, walk_list, visit_list, leave_list, ListElem, ExprId);
 walk_dispatch_id_slice!(walk_record_dispatch, walk_record, visit_record, leave_record, RecordField, ExprId);
 walk_dispatch_id_slice!(walk_map_dispatch, walk_map, visit_map, leave_map, MapEntry, ExprId);
@@ -66,19 +67,15 @@ pub fn walk_field_access<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, fa: &Exp
   ControlFlow::Continue(())
 }
 
-pub fn walk_block<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, stmts: &[StmtId], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  for &s in stmts {
-    super::dispatch_stmt(v, s, arena)?;
-  }
-  v.leave_block(id, stmts, span);
+pub fn walk_block<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, block: &ExprBlock, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  block.walk_children(v, arena)?;
+  v.leave_block(id, block, span);
   ControlFlow::Continue(())
 }
 
-pub fn walk_tuple<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, elems: &[ExprId], span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
-  for &e in elems {
-    dispatch_expr(v, e, arena)?;
-  }
-  v.leave_tuple(id, elems, span);
+pub fn walk_tuple<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, tuple: &ExprTuple, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+  tuple.walk_children(v, arena)?;
+  v.leave_tuple(id, tuple, span);
   ControlFlow::Continue(())
 }
 

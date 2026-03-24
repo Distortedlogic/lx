@@ -1,4 +1,4 @@
-use crate::ast::{AstArena, Expr, ExprBinary, ExprFieldAccess, FieldKind, Literal, StrPart};
+use crate::ast::{AstArena, Expr, ExprBinary, ExprFieldAccess, ExprPropagate, FieldKind, Literal, StrPart};
 
 pub(super) fn extract_field_call_parts<'a>(expr: &'a Expr, arena: &'a AstArena) -> Option<(&'a str, &'a str)> {
   let Expr::FieldAccess(ExprFieldAccess { expr: e, field: FieldKind::Named(f) }) = expr else {
@@ -12,7 +12,7 @@ pub(super) fn extract_field_call_parts<'a>(expr: &'a Expr, arena: &'a AstArena) 
 
 pub(super) fn unwrap_propagate<'a>(expr: &'a Expr, arena: &'a AstArena) -> &'a Expr {
   match expr {
-    Expr::Propagate(inner) => unwrap_propagate(arena.expr(*inner), arena),
+    Expr::Propagate(ExprPropagate { inner }) => unwrap_propagate(arena.expr(*inner), arena),
     other => other,
   }
 }

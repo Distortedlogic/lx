@@ -75,8 +75,8 @@ pub enum Expr {
 
   FieldAccess(ExprFieldAccess),
 
-  Block(Vec<StmtId>),
-  Tuple(Vec<ExprId>),
+  Block(ExprBlock),
+  Tuple(ExprTuple),
 
   List(Vec<ListElem>),
   Record(Vec<RecordField>),
@@ -86,17 +86,17 @@ pub enum Expr {
   Match(ExprMatch),
   Ternary(ExprTernary),
 
-  Propagate(ExprId),
+  Propagate(ExprPropagate),
   Coalesce(ExprCoalesce),
 
   Slice(ExprSlice),
   NamedArg(ExprNamedArg),
 
-  Loop(Vec<StmtId>),
-  Break(Option<ExprId>),
+  Loop(ExprLoop),
+  Break(ExprBreak),
   Assert(ExprAssert),
 
-  Par(Vec<StmtId>),
+  Par(ExprPar),
   Sel(Vec<SelArm>),
   Timeout(ExprTimeout),
 

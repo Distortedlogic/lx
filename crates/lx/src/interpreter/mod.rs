@@ -23,8 +23,8 @@ use parking_lot::Mutex;
 use indexmap::IndexMap;
 
 use crate::ast::{
-  AstArena, BindTarget, Core, Expr, ExprApply, ExprAssert, ExprBinary, ExprEmit, ExprFieldAccess, ExprFunc, ExprId, ExprMatch, ExprNamedArg, ExprSlice,
-  ExprTimeout, ExprUnary, ExprWith, ExprYield, Program, Stmt, WithKind,
+  AstArena, BindTarget, Core, Expr, ExprApply, ExprAssert, ExprBinary, ExprBlock, ExprBreak, ExprEmit, ExprFieldAccess, ExprFunc, ExprId, ExprLoop, ExprMatch,
+  ExprNamedArg, ExprPar, ExprPropagate, ExprSlice, ExprTimeout, ExprTuple, ExprUnary, ExprWith, ExprYield, Program, Stmt, WithKind,
 };
 use crate::env::Env;
 use crate::error::{EvalResult, EvalSignal, LxError};
@@ -149,8 +149,8 @@ impl Interpreter {
       },
       Expr::Section(_) => unreachable!(),
       Expr::FieldAccess(ExprFieldAccess { expr: e, ref field }) => self.eval_field_access(e, field, span).await,
-      Expr::Block(ref stmts) => self.eval_block(stmts).await,
-      Expr::Tuple(ref elems) => self.eval_tuple(elems).await,
+      Expr::Block(ExprBlock { ref stmts }) => self.eval_block(stmts).await,
+      Expr::Tuple(ExprTuple { ref elems }) => self.eval_tuple(elems).await,
       Expr::List(ref elems) => self.eval_list(elems).await,
       Expr::Record(ref fields) => self.eval_record(fields).await,
       Expr::Map(ref entries) => self.eval_map(entries).await,
@@ -158,7 +158,7 @@ impl Interpreter {
       Expr::Match(ExprMatch { scrutinee, ref arms }) => self.eval_match(scrutinee, arms, span).await,
       Expr::Ternary(_) => unreachable!(),
       Expr::Assert(ExprAssert { expr: e, msg }) => self.eval_assert(e, msg, span).await,
-      Expr::Propagate(inner) => {
+      Expr::Propagate(ExprPropagate { inner }) => {
         let v = self.eval(inner).await?;
         match v {
           LxVal::Ok(v) => Ok(*v),
@@ -171,15 +171,15 @@ impl Interpreter {
       Expr::Coalesce(_) => unreachable!(),
       Expr::Slice(ExprSlice { expr: e, start: s, end: en }) => self.eval_slice(e, s, en, span).await,
       Expr::NamedArg(ExprNamedArg { value, .. }) => self.eval(value).await,
-      Expr::Loop(ref stmts) => self.eval_loop(stmts).await,
-      Expr::Break(val) => {
+      Expr::Loop(ExprLoop { ref stmts }) => self.eval_loop(stmts).await,
+      Expr::Break(ExprBreak { value: val }) => {
         let v = match val {
           Some(e) => self.eval(e).await?,
           None => LxVal::Unit,
         };
         Err(EvalSignal::Break(v))
       },
-      Expr::Par(ref stmts) => self.eval_par(stmts).await,
+      Expr::Par(ExprPar { ref stmts }) => self.eval_par(stmts).await,
       Expr::Sel(ref arms) => self.eval_sel(arms, span).await,
       Expr::Timeout(ExprTimeout { ms, body }) => self.eval_timeout(ms, body, span).await,
       Expr::Emit(ExprEmit { value }) => {

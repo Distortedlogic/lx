@@ -5,8 +5,8 @@ use chumsky::prelude::*;
 use super::expr::{ident, semi_sep, skip_semis, type_name};
 use super::{ArenaRef, ExprId, Span, ss};
 use crate::ast::{
-  BinOp, Expr, ExprApply, ExprBinary, ExprCoalesce, ExprFieldAccess, ExprMatch, ExprPipe, ExprTernary, ExprUnary, FieldKind, Literal, MatchArm, StrPart,
-  UnaryOp,
+  BinOp, Expr, ExprApply, ExprBinary, ExprCoalesce, ExprFieldAccess, ExprMatch, ExprPipe, ExprPropagate, ExprTernary, ExprUnary, FieldKind, Literal, MatchArm,
+  StrPart, UnaryOp,
 };
 use crate::lexer::token::TokenKind;
 
@@ -137,7 +137,7 @@ where
       a3.borrow_mut().alloc_expr(Expr::FieldAccess(ExprFieldAccess { expr: l, field: f }), ss(e.span()))
     })
     .boxed(),
-    postfix(10, just(TokenKind::Caret), move |o: ExprId, _, e| a4.borrow_mut().alloc_expr(Expr::Propagate(o), ss(e.span()))).boxed(),
+    postfix(10, just(TokenKind::Caret), move |o: ExprId, _, e| a4.borrow_mut().alloc_expr(Expr::Propagate(ExprPropagate { inner: o }), ss(e.span()))).boxed(),
     postfix(3, just(TokenKind::Question).then(question_rhs), move |s: ExprId, (_, rhs), e| match rhs {
       QRhs::Match(arms) => a5.borrow_mut().alloc_expr(Expr::Match(ExprMatch { scrutinee: s, arms }), ss(e.span())),
       QRhs::Ternary(t, el) => a5.borrow_mut().alloc_expr(Expr::Ternary(ExprTernary { cond: s, then_: t, else_: el }), ss(e.span())),

@@ -1,7 +1,7 @@
 use crate::ast::{
-  Binding, ClassDeclData, Expr, ExprApply, ExprAssert, ExprBinary, ExprCoalesce, ExprEmit, ExprFieldAccess, ExprFunc, ExprId, ExprMatch, ExprNamedArg,
-  ExprPipe, ExprSlice, ExprTernary, ExprTimeout, ExprUnary, ExprWith, ExprYield, ListElem, Literal, MapEntry, Program, RecordField, Section, SelArm, Stmt,
-  StmtFieldUpdate, StmtId, StmtTypeDef, TraitDeclData, TraitUnionDef, UseStmt,
+  Binding, ClassDeclData, Expr, ExprApply, ExprAssert, ExprBinary, ExprBlock, ExprBreak, ExprCoalesce, ExprEmit, ExprFieldAccess, ExprFunc, ExprId, ExprLoop,
+  ExprMatch, ExprNamedArg, ExprPar, ExprPipe, ExprPropagate, ExprSlice, ExprTernary, ExprTimeout, ExprTuple, ExprUnary, ExprWith, ExprYield, ListElem, Literal,
+  MapEntry, Program, RecordField, Section, SelArm, Stmt, StmtFieldUpdate, StmtId, StmtTypeDef, TraitDeclData, TraitUnionDef, UseStmt,
 };
 use crate::sym::Sym;
 use miette::SourceSpan;
@@ -80,14 +80,14 @@ pub trait AstVisitor: PatternVisitor + TypeVisitor {
     VisitAction::Descend
   }
   fn leave_field_access(&mut self, _id: ExprId, _fa: &ExprFieldAccess, _span: SourceSpan) {}
-  fn visit_block(&mut self, _id: ExprId, _stmts: &[StmtId], _span: SourceSpan) -> VisitAction {
+  fn visit_block(&mut self, _id: ExprId, _block: &ExprBlock, _span: SourceSpan) -> VisitAction {
     VisitAction::Descend
   }
-  fn leave_block(&mut self, _id: ExprId, _stmts: &[StmtId], _span: SourceSpan) {}
-  fn visit_tuple(&mut self, _id: ExprId, _elems: &[ExprId], _span: SourceSpan) -> VisitAction {
+  fn leave_block(&mut self, _id: ExprId, _block: &ExprBlock, _span: SourceSpan) {}
+  fn visit_tuple(&mut self, _id: ExprId, _tuple: &ExprTuple, _span: SourceSpan) -> VisitAction {
     VisitAction::Descend
   }
-  fn leave_tuple(&mut self, _id: ExprId, _elems: &[ExprId], _span: SourceSpan) {}
+  fn leave_tuple(&mut self, _id: ExprId, _tuple: &ExprTuple, _span: SourceSpan) {}
   fn visit_list(&mut self, _id: ExprId, _elems: &[ListElem], _span: SourceSpan) -> VisitAction {
     VisitAction::Descend
   }
@@ -112,10 +112,10 @@ pub trait AstVisitor: PatternVisitor + TypeVisitor {
     VisitAction::Descend
   }
   fn leave_ternary(&mut self, _id: ExprId, _ternary: &ExprTernary, _span: SourceSpan) {}
-  fn visit_propagate(&mut self, _id: ExprId, _inner: ExprId, _span: SourceSpan) -> VisitAction {
+  fn visit_propagate(&mut self, _id: ExprId, _propagate: &ExprPropagate, _span: SourceSpan) -> VisitAction {
     VisitAction::Descend
   }
-  fn leave_propagate(&mut self, _id: ExprId, _inner: ExprId, _span: SourceSpan) {}
+  fn leave_propagate(&mut self, _id: ExprId, _propagate: &ExprPropagate, _span: SourceSpan) {}
   fn visit_coalesce(&mut self, _id: ExprId, _coalesce: &ExprCoalesce, _span: SourceSpan) -> VisitAction {
     VisitAction::Descend
   }
@@ -128,22 +128,22 @@ pub trait AstVisitor: PatternVisitor + TypeVisitor {
     VisitAction::Descend
   }
   fn leave_named_arg(&mut self, _id: ExprId, _na: &ExprNamedArg, _span: SourceSpan) {}
-  fn visit_loop(&mut self, _id: ExprId, _stmts: &[StmtId], _span: SourceSpan) -> VisitAction {
+  fn visit_loop(&mut self, _id: ExprId, _loop: &ExprLoop, _span: SourceSpan) -> VisitAction {
     VisitAction::Descend
   }
-  fn leave_loop(&mut self, _id: ExprId, _stmts: &[StmtId], _span: SourceSpan) {}
-  fn visit_break(&mut self, _id: ExprId, _value: Option<ExprId>, _span: SourceSpan) -> VisitAction {
+  fn leave_loop(&mut self, _id: ExprId, _loop: &ExprLoop, _span: SourceSpan) {}
+  fn visit_break(&mut self, _id: ExprId, _brk: &ExprBreak, _span: SourceSpan) -> VisitAction {
     VisitAction::Descend
   }
-  fn leave_break(&mut self, _id: ExprId, _value: Option<ExprId>, _span: SourceSpan) {}
+  fn leave_break(&mut self, _id: ExprId, _brk: &ExprBreak, _span: SourceSpan) {}
   fn visit_assert(&mut self, _id: ExprId, _assert: &ExprAssert, _span: SourceSpan) -> VisitAction {
     VisitAction::Descend
   }
   fn leave_assert(&mut self, _id: ExprId, _assert: &ExprAssert, _span: SourceSpan) {}
-  fn visit_par(&mut self, _id: ExprId, _stmts: &[StmtId], _span: SourceSpan) -> VisitAction {
+  fn visit_par(&mut self, _id: ExprId, _par: &ExprPar, _span: SourceSpan) -> VisitAction {
     VisitAction::Descend
   }
-  fn leave_par(&mut self, _id: ExprId, _stmts: &[StmtId], _span: SourceSpan) {}
+  fn leave_par(&mut self, _id: ExprId, _par: &ExprPar, _span: SourceSpan) {}
   fn visit_sel(&mut self, _id: ExprId, _arms: &[SelArm], _span: SourceSpan) -> VisitAction {
     VisitAction::Descend
   }
