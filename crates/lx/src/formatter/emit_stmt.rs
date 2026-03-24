@@ -19,7 +19,7 @@ impl Formatter<'_> {
 
   fn emit_binding(&mut self, b: &Binding) {
     if b.exported {
-      self.write("export ");
+      self.write("+");
     }
     match &b.target {
       BindTarget::Name(name) => {
@@ -52,7 +52,7 @@ impl Formatter<'_> {
 
   fn emit_type_def(&mut self, td: &StmtTypeDef) {
     if td.exported {
-      self.write("export ");
+      self.write("+");
     }
     self.write("type ");
     self.write(td.name.as_str());
@@ -70,9 +70,9 @@ impl Formatter<'_> {
 
   fn emit_trait_union(&mut self, tu: &TraitUnionDef) {
     if tu.exported {
-      self.write("export ");
+      self.write("+");
     }
-    self.write("trait ");
+    self.write("Trait ");
     self.write(tu.name.as_str());
     self.emit_type_params(&tu.type_params);
     self.write(" = ");
@@ -86,9 +86,9 @@ impl Formatter<'_> {
 
   fn emit_trait_decl(&mut self, data: &TraitDeclData) {
     if data.exported {
-      self.write("export ");
+      self.write("+");
     }
-    self.write("trait ");
+    self.write("Trait ");
     self.write(data.name.as_str());
     self.emit_type_params(&data.type_params);
     self.write(" = {");
@@ -137,9 +137,9 @@ impl Formatter<'_> {
 
   fn emit_class_decl(&mut self, data: &ClassDeclData) {
     if data.exported {
-      self.write("export ");
+      self.write("+");
     }
-    self.write("class ");
+    self.write("Class ");
     self.write(data.name.as_str());
     self.emit_type_params(&data.type_params);
     if !data.traits.is_empty() {

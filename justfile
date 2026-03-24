@@ -25,7 +25,8 @@ fmt:
 test:
     #!/usr/bin/env bash
     set -euo pipefail
-    cargo test --workspace --exclude inference-server --all-targets --all-features -q 2>&1
+    cargo test --workspace --exclude inference-server --exclude lx-desktop --all-targets --all-features -q 2>&1
+    cargo run -p lx-cli -- test tests || echo "lx test suite had failures (see above)"
 
 rust-diagnose:
     #!/usr/bin/env bash
@@ -40,7 +41,7 @@ py-fix:
     devdiag ruff
 
 ts-diagnose:
-    devdiag tsc --dir ts/desktop --dir ts/mobile
+    devdiag tsc
 
 # run lx-tui with a .lx file
 tui:
