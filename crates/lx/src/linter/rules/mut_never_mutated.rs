@@ -23,6 +23,7 @@ pub fn check_unused_mut<P>(program: &Program<P>, model: &SemanticModel, arena: &
           rule_name: "mut_never_mutated".into(),
           message: format!("binding '{}' declared as mut but never mutated", def.name),
         },
+        code: "L008",
         span: def.span,
         secondary: vec![],
         fix: None,

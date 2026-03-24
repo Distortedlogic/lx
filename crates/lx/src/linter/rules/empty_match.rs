@@ -1,32 +1,58 @@
-use crate::ast::{AstArena, Expr, ExprId};
+use crate::ast::{AstArena, Expr, ExprId, StmtId};
 use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::SemanticModel;
 use crate::checker::{DiagLevel, Diagnostic};
 use crate::linter::matcher::ExprMatcher;
 use crate::linter::rule::{LintRule, RuleCategory};
+use crate::visitor::{AstVisitor, VisitAction, dispatch_stmt};
 use miette::SourceSpan;
 
-pub struct EmptyMatch;
+pub struct EmptyMatch {
+  diagnostics: Vec<Diagnostic>,
+}
+
+impl EmptyMatch {
+  pub fn new() -> Self {
+    Self { diagnostics: Vec::new() }
+  }
+}
+
+impl AstVisitor for EmptyMatch {
+  fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan, arena: &AstArena) -> VisitAction {
+    if ExprMatcher::empty_match().matches(expr, arena) {
+      self.diagnostics.push(Diagnostic {
+        level: DiagLevel::Warning,
+        kind: DiagnosticKind::LintWarning { rule_name: "empty-match".into(), message: "match expression has zero arms".into() },
+        code: "L002",
+        span,
+        secondary: Vec::new(),
+        fix: None,
+      });
+    }
+    VisitAction::Descend
+  }
+}
 
 impl LintRule for EmptyMatch {
   fn name(&self) -> &'static str {
     "empty-match"
   }
 
+  fn code(&self) -> &'static str {
+    "L002"
+  }
+
   fn category(&self) -> RuleCategory {
     RuleCategory::Correctness
   }
 
-  fn check_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan, _model: &SemanticModel, arena: &AstArena) -> Vec<Diagnostic> {
-    if ExprMatcher::empty_match().matches(expr, arena) {
-      return vec![Diagnostic {
-        level: DiagLevel::Warning,
-        kind: DiagnosticKind::LintWarning { rule_name: self.name().into(), message: "match expression has zero arms".into() },
-        span,
-        secondary: Vec::new(),
-        fix: None,
-      }];
+  fn run(&mut self, stmts: &[StmtId], arena: &AstArena, _model: &SemanticModel) {
+    for sid in stmts {
+      let _ = dispatch_stmt(self, *sid, arena);
     }
-    vec![]
+  }
+
+  fn take_diagnostics(&mut self) -> Vec<Diagnostic> {
+    std::mem::take(&mut self.diagnostics)
   }
 }

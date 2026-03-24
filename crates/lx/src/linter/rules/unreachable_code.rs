@@ -1,35 +1,36 @@
-use crate::ast::{AstArena, Expr, ExprId, Stmt};
+use crate::ast::{AstArena, Expr, ExprId, Stmt, StmtId};
 use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::SemanticModel;
 use crate::checker::{DiagLevel, Diagnostic};
 use crate::linter::rule::{LintRule, RuleCategory};
+use crate::visitor::{AstVisitor, VisitAction, dispatch_stmt};
 use miette::SourceSpan;
 
-pub struct UnreachableCode;
+pub struct UnreachableCode {
+  diagnostics: Vec<Diagnostic>,
+}
 
-impl LintRule for UnreachableCode {
-  fn name(&self) -> &'static str {
-    "unreachable_code"
+impl UnreachableCode {
+  pub fn new() -> Self {
+    Self { diagnostics: Vec::new() }
   }
+}
 
-  fn category(&self) -> RuleCategory {
-    RuleCategory::Correctness
-  }
-
-  fn check_expr(&mut self, _id: ExprId, expr: &Expr, _span: SourceSpan, _model: &SemanticModel, arena: &AstArena) -> Vec<Diagnostic> {
+impl AstVisitor for UnreachableCode {
+  fn visit_expr(&mut self, _id: ExprId, expr: &Expr, _span: SourceSpan, arena: &AstArena) -> VisitAction {
     let (Expr::Block(stmts) | Expr::Loop(stmts)) = expr else {
-      return vec![];
+      return VisitAction::Descend;
     };
 
     let mut found_break = false;
-    let mut diags = vec![];
 
     for &sid in stmts {
       let stmt_span = arena.stmt_span(sid);
       if found_break {
-        diags.push(Diagnostic {
+        self.diagnostics.push(Diagnostic {
           level: DiagLevel::Warning,
           kind: DiagnosticKind::LintWarning { rule_name: "unreachable_code".into(), message: "unreachable code after break".into() },
+          code: "L004",
           span: stmt_span,
           secondary: vec![],
           fix: None,
@@ -45,6 +46,30 @@ impl LintRule for UnreachableCode {
       }
     }
 
-    diags
+    VisitAction::Descend
+  }
+}
+
+impl LintRule for UnreachableCode {
+  fn name(&self) -> &'static str {
+    "unreachable_code"
+  }
+
+  fn code(&self) -> &'static str {
+    "L004"
+  }
+
+  fn category(&self) -> RuleCategory {
+    RuleCategory::Correctness
+  }
+
+  fn run(&mut self, stmts: &[StmtId], arena: &AstArena, _model: &SemanticModel) {
+    for sid in stmts {
+      let _ = dispatch_stmt(self, *sid, arena);
+    }
+  }
+
+  fn take_diagnostics(&mut self) -> Vec<Diagnostic> {
+    std::mem::take(&mut self.diagnostics)
   }
 }

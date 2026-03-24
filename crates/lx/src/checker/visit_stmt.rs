@@ -186,7 +186,8 @@ impl Checker<'_> {
       let kind = DiagnosticKind::DuplicateImport { name, original_span };
       let secondary = vec![(original_span, "previously imported here".into())];
       let fix = kind.suggest_fix(span, &self.type_arena);
-      self.diagnostics.push(Diagnostic { level: DiagLevel::Warning, kind, span, secondary, fix });
+      let code = kind.code();
+      self.diagnostics.push(Diagnostic { level: DiagLevel::Warning, kind, code, span, secondary, fix });
     } else {
       self.import_sources.insert(name, span);
     }

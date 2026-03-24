@@ -52,6 +52,24 @@ pub enum DiagnosticKind {
 }
 
 impl DiagnosticKind {
+  pub fn code(&self) -> &'static str {
+    match self {
+      Self::NegationRequiresNumeric => "E001",
+      Self::PropagateRequiresResultOrMaybe => "E002",
+      Self::TernaryCondNotBool => "E003",
+      Self::TimeoutMsNotNumeric => "E004",
+      Self::LogicalOpRequiresBool => "E005",
+      Self::MutableCaptureInConcurrent { .. } => "E006",
+      Self::NonExhaustiveMatch { .. } => "E007",
+      Self::DuplicateImport { .. } => "W001",
+      Self::UnknownImport { .. } => "E008",
+      Self::TypeMismatch { .. } => "E009",
+      Self::LintWarning { .. } => "L000",
+      Self::UnknownIdent { .. } => "E010",
+      Self::UnknownModule { .. } => "E011",
+    }
+  }
+
   pub fn help(&self, ta: &TypeArena) -> Option<String> {
     match self {
       Self::TypeMismatch { error } => error.help(ta),

@@ -48,6 +48,7 @@ pub enum DiagLevel {
 pub struct Diagnostic {
   pub level: DiagLevel,
   pub kind: DiagnosticKind,
+  pub code: &'static str,
   pub span: SourceSpan,
   pub secondary: Vec<(SourceSpan, String)>,
   pub fix: Option<Fix>,
@@ -106,7 +107,8 @@ impl<'a> Checker<'a> {
 
   pub(crate) fn emit(&mut self, level: DiagLevel, kind: DiagnosticKind, span: SourceSpan) {
     let fix = kind.suggest_fix(span, &self.type_arena);
-    self.diagnostics.push(Diagnostic { level, kind, span, secondary: Vec::new(), fix });
+    let code = kind.code();
+    self.diagnostics.push(Diagnostic { level, kind, code, span, secondary: Vec::new(), fix });
   }
 
   pub(crate) fn make_type_error_diagnostic(&self, te: &TypeError, span: SourceSpan) -> Diagnostic {
@@ -116,7 +118,8 @@ impl<'a> Checker<'a> {
     if let Some(origin) = te.expected_origin {
       secondary.push((origin, "expected type declared here".into()));
     }
-    Diagnostic { level: DiagLevel::Error, kind, span, secondary, fix }
+    let code = kind.code();
+    Diagnostic { level: DiagLevel::Error, kind, code, span, secondary, fix }
   }
 
   pub(crate) fn emit_type_error(&mut self, te: &TypeError, span: SourceSpan) {

@@ -1,45 +1,66 @@
 use std::collections::HashSet;
 
-use crate::ast::{AstArena, Expr, ExprId, RecordField};
+use crate::ast::{AstArena, Expr, ExprId, RecordField, StmtId};
 use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::SemanticModel;
 use crate::checker::{DiagLevel, Diagnostic};
 use crate::linter::rule::{LintRule, RuleCategory};
+use crate::visitor::{AstVisitor, VisitAction, dispatch_stmt};
 use miette::SourceSpan;
 
-pub struct DuplicateRecordField;
+pub struct DuplicateRecordField {
+  diagnostics: Vec<Diagnostic>,
+}
+
+impl DuplicateRecordField {
+  pub fn new() -> Self {
+    Self { diagnostics: Vec::new() }
+  }
+}
+
+impl AstVisitor for DuplicateRecordField {
+  fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan, _arena: &AstArena) -> VisitAction {
+    if let Expr::Record(fields) = expr {
+      let mut seen = HashSet::new();
+      for field in fields {
+        if let RecordField::Named { name, .. } = field
+          && !seen.insert(*name)
+        {
+          self.diagnostics.push(Diagnostic {
+            level: DiagLevel::Error,
+            kind: DiagnosticKind::LintWarning { rule_name: "duplicate_record_field".into(), message: format!("duplicate field '{name}' in record literal") },
+            code: "L006",
+            span,
+            secondary: vec![],
+            fix: None,
+          });
+        }
+      }
+    }
+    VisitAction::Descend
+  }
+}
 
 impl LintRule for DuplicateRecordField {
   fn name(&self) -> &'static str {
     "duplicate_record_field"
   }
 
+  fn code(&self) -> &'static str {
+    "L006"
+  }
+
   fn category(&self) -> RuleCategory {
     RuleCategory::Correctness
   }
 
-  fn check_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan, _model: &SemanticModel, _arena: &AstArena) -> Vec<Diagnostic> {
-    let Expr::Record(fields) = expr else {
-      return vec![];
-    };
-
-    let mut seen = HashSet::new();
-    let mut diags = vec![];
-
-    for field in fields {
-      if let RecordField::Named { name, .. } = field
-        && !seen.insert(*name)
-      {
-        diags.push(Diagnostic {
-          level: DiagLevel::Error,
-          kind: DiagnosticKind::LintWarning { rule_name: "duplicate_record_field".into(), message: format!("duplicate field '{name}' in record literal") },
-          span,
-          secondary: vec![],
-          fix: None,
-        });
-      }
+  fn run(&mut self, stmts: &[StmtId], arena: &AstArena, _model: &SemanticModel) {
+    for sid in stmts {
+      let _ = dispatch_stmt(self, *sid, arena);
     }
+  }
 
-    diags
+  fn take_diagnostics(&mut self) -> Vec<Diagnostic> {
+    std::mem::take(&mut self.diagnostics)
   }
 }
