@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Data, DeriveInput, Fields, Result};
 
-use crate::field_strategy::{WalkStrategy, classify_type, node_id_expr, visitor_dispatch_path, walk_fn_path};
+use crate::field_strategy::{WalkStrategy, classify_type, is_vec_type, node_id_expr, visitor_dispatch_path, walk_fn_path};
 
 pub fn generate_struct_walk(input: &DeriveInput) -> Result<TokenStream> {
   let name = &input.ident;
@@ -138,13 +138,4 @@ pub fn generate_struct_walk(input: &DeriveInput) -> Result<TokenStream> {
           }
       }
   })
-}
-
-fn is_vec_type(ty: &syn::Type) -> bool {
-  if let syn::Type::Path(tp) = ty
-    && let Some(seg) = tp.path.segments.last()
-  {
-    return seg.ident == "Vec";
-  }
-  false
 }

@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Result, Type};
 
-use crate::field_strategy::{classify_type, is_single_id, node_id_expr};
+use crate::field_strategy::{classify_type, is_single_id, is_vec_type, node_id_expr};
 
 pub fn generate_single_field_children_arm(enum_name: &syn::Ident, variant_name: &syn::Ident, field_ty: &Type) -> TokenStream {
   let strategy = classify_type(field_ty);
@@ -91,15 +91,4 @@ pub fn generate_multi_unnamed_children_arm(enum_name: &syn::Ident, variant_name:
         }
     })
   }
-}
-
-fn is_vec_type(ty: &Type) -> bool {
-  if let syn::Type::Path(tp) = ty
-    && let Some(seg) = tp.path.segments.last()
-    && seg.ident == "Vec"
-    && let syn::PathArguments::AngleBracketed(args) = &seg.arguments
-  {
-    return !args.args.is_empty();
-  }
-  false
 }

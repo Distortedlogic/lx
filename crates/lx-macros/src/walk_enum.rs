@@ -1,8 +1,8 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{Data, DeriveInput, Fields, PathArguments, Result, Type};
+use syn::{Data, DeriveInput, Fields, Result, Type};
 
-use crate::field_strategy::{WalkStrategy, classify_type, walk_fn_path};
+use crate::field_strategy::{WalkStrategy, classify_type, is_vec_type, walk_fn_path};
 use crate::walk_enum_children::{generate_multi_unnamed_children_arm, generate_named_fields_children_arm, generate_single_field_children_arm};
 use crate::walk_enum_walk::{generate_multi_unnamed_walk_arm, generate_named_fields_walk_arm, generate_single_field_walk_arm};
 
@@ -265,15 +265,4 @@ fn generate_multi_unnamed_recurse_arm(enum_name: &syn::Ident, variant_name: &syn
           #enum_name::#variant_name(#(#exprs),*)
       }
   })
-}
-
-fn is_vec_type(ty: &Type) -> bool {
-  if let Type::Path(tp) = ty
-    && let Some(seg) = tp.path.segments.last()
-    && seg.ident == "Vec"
-    && let PathArguments::AngleBracketed(args) = &seg.arguments
-  {
-    return !args.args.is_empty();
-  }
-  false
 }

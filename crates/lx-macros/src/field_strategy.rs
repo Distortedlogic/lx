@@ -165,6 +165,17 @@ pub fn node_id_expr(strategy: &WalkStrategy, field_expr: &proc_macro2::TokenStre
   }
 }
 
+pub(crate) fn is_vec_type(ty: &Type) -> bool {
+  if let Type::Path(tp) = ty
+    && let Some(seg) = tp.path.segments.last()
+    && seg.ident == "Vec"
+    && let PathArguments::AngleBracketed(args) = &seg.arguments
+  {
+    return !args.args.is_empty();
+  }
+  false
+}
+
 pub fn is_single_id(strategy: &WalkStrategy) -> bool {
   matches!(strategy, WalkStrategy::ExprId | WalkStrategy::StmtId | WalkStrategy::PatternId | WalkStrategy::TypeExprId)
 }
