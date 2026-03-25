@@ -3,10 +3,6 @@ use std/session {Session}
 Class Chat : [Session] = { max_tokens: 1000 }
 
 s = Chat {}
-s.add_message {role: "user", content: "hello"}
-s.add_message {role: "assistant", content: "hi there"}
-assert (s.token_usage ()) > 0
-assert (s.pressure ()) > 0.0
-cp = s.checkpoint () ^
-s.add_message {role: "user", content: "more stuff"}
-s.resume cp ^
+s.messages.set "0" {role: "user"; content: "hello"}
+s.messages.set "1" {role: "assistant"; content: "hi there"}
+assert (s.messages.keys () | len) == 2

@@ -1,9 +1,3 @@
--- lx package: Agent trait — the base behavioral contract for all agents.
--- Provides the perceive-reason-act-reflect cognitive pipeline, message dispatch,
--- AI integration, tool execution, inter-agent communication, and self-description.
--- Any Class conforming to Agent gets these defaults. Override the phases you need.
-
-
 +Trait Agent = {
   init = () { }
 
@@ -31,15 +25,18 @@
 
   think = (prompt) { ai.prompt prompt }
   think_with = (config) { ai.prompt_with config }
-  think_structured = (schema prompt) { ai.prompt_structured schema prompt }
+  think_structured = (schema_def prompt) { ai.prompt_structured schema_def prompt }
 
   use_tool = (name input) { Err "no tools configured" }
   tools = () { [] }
 
   describe = () {
-    {name: to_str self  actions: methods_of self  tools: self.tools ()}
+    n = to_str self
+    a = methods_of self
+    t = self.tools ()
+    {name: n; actions: a; tools: t}
   }
 
-  ask = (agent msg) { agent ~>? msg }
-  tell = (agent msg) { agent ~> msg }
+  ask = (agent msg) { Err "agent.ask not yet implemented" }
+  tell = (agent msg) { Err "agent.tell not yet implemented" }
 }

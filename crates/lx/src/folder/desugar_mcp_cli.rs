@@ -25,9 +25,6 @@ pub(super) fn desugar_mcp(data: KeywordDeclData, span: SourceSpan, arena: &mut A
   let connector_path: Vec<Sym> = vec![intern("std"), intern("connector")];
   let use_connector = arena.alloc_stmt(Stmt::Use(UseStmt { path: connector_path, kind: UseKind::Selective(vec![connector_sym]) }), span);
 
-  let mcp_path: Vec<Sym> = vec![intern("std"), intern("mcp")];
-  let use_mcp = arena.alloc_stmt(Stmt::Use(UseStmt { path: mcp_path, kind: UseKind::Whole }), span);
-
   let mut fields = data.fields;
   let mut methods = data.methods;
 
@@ -54,7 +51,7 @@ pub(super) fn desugar_mcp(data: KeywordDeclData, span: SourceSpan, arena: &mut A
     span,
   );
 
-  vec![use_connector, use_mcp, class_stmt]
+  vec![use_connector, class_stmt]
 }
 
 fn build_mcp_connect(span: SourceSpan, arena: &mut AstArena) -> ExprId {

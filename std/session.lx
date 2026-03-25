@@ -54,11 +54,17 @@ use std/time
 
   handoff = () {
     all = self.messages.keys () | map (k) { self.messages.get k }
-    {messages: all, token_usage: self.token_usage (), pressure: self.pressure ()}
+    tu = self.token_usage ()
+    pr = self.pressure ()
+    {messages: all; token_usage: tu; pressure: pr}
   }
 
   token_usage = () {
-    self.messages.values () | map (m) { (to_str m | len) // 4 } | fold 0 (a b) { a + b }
+    total := 0
+    self.messages.values () | each (m) {
+      total <- total + ((to_str m | len) // 4)
+    }
+    total
   }
 
   pressure = () {

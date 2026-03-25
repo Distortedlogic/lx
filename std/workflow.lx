@@ -18,7 +18,7 @@
               self.status.set step.id "failed"
               self.on_fail == "abort" ? {
                 self.rollback ()
-                Err {step: step.id, error: e}
+                Err {step: step.id; error: e}
               }
             }
             Ok v -> {
@@ -45,7 +45,10 @@
   }
 
   step_status = () {
-    self.status.keys () | map (k) { {id: k, status: self.status.get k} }
+    self.status.keys () | map (k) {
+      s = self.status.get k
+      {id: k; status: s}
+    }
   }
 }
 
@@ -54,7 +57,8 @@ run_with_retry = (f context retries) {
   result := Err "not started"
   loop {
     attempt <- attempt + 1
-    result <- try (f context)
+    r = f context
+    result <- r
     result | ok? ? break
     attempt >= retries ? break
   }
@@ -72,8 +76,8 @@ topo_sort = (steps) {
     }
     (ready | len) == 0 ? (Err "cycle detected in workflow steps")
     ready | each (s) {
-      sorted <- [..sorted s]
-      done <- [..done s.id]
+      sorted <- [..sorted; s]
+      done <- [..done; s.id]
     }
     remaining <- remaining | filter (s) { not (done | any? (== s.id)) }
   }
