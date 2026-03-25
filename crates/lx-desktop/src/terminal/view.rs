@@ -19,6 +19,7 @@ pub use super::browser_view::{BrowserNavCtx, BrowserView};
 pub fn TerminalView(terminal_id: String, working_dir: String, command: Option<String>) -> Element {
   let (element_id, widget) = use_ts_widget("terminal", serde_json::json!({}));
   let mut tabs_state: Signal<TabsState<DesktopPane>> = use_tabs_state();
+  let activity_log = use_context::<crate::contexts::activity_log::ActivityLog>();
   let tid_notif = terminal_id.clone();
 
   let eid_rsx = element_id.clone();
@@ -53,6 +54,7 @@ pub fn TerminalView(terminal_id: String, working_dir: String, command: Option<St
                             &tid_notif,
                             PaneNotification { level: NotificationLevel::Success, message: None },
                         );
+                        activity_log.push("terminal", "Terminal session closed");
                         break;
                     }
                     Err(RecvError::Lagged(_)) => {}
