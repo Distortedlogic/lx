@@ -35,9 +35,7 @@ pub fn Agents() -> Element {
         VoiceBanner {}
         AgentCard {}
       }
-      div { class: "flex-1 min-h-0",
-        PaneArea {}
-      }
+      div { class: "flex-1 min-h-0", PaneArea {} }
     }
   }
 }
