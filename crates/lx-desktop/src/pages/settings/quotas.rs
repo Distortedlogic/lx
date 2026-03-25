@@ -20,37 +20,47 @@ pub fn QuotasPanel() -> Element {
   drop(data);
 
   rsx! {
-      div { class: "space-y-4",
-          span { class: "text-xs uppercase tracking-wider font-semibold text-white border-l-4 border-[var(--warning)] pl-3", "RESOURCE_QUOTAS" }
-          div { class: "flex gap-3",
-              for quota in quotas.iter() {
-                  {
-                      let pct_str = format!("{}%", quota.percent);
-                      let width = format!("width: {}%;", quota.percent);
-                      let color = if quota.percent > 90 { "bg-[var(--error)]" } else if quota.percent > 70 { "bg-[var(--warning)]" } else { "bg-[var(--primary)]" };
-                      let overload = quota.percent > 90;
-                      rsx! {
-                          div { class: "flex-1 bg-[var(--surface-container-lowest)] border-2 border-[var(--outline-variant)] p-4",
-                              div { class: "flex items-center justify-between mb-2",
-                                  span { class: "text-[10px] uppercase tracking-wider text-[var(--outline)]", "{quota.label}" }
-                                  if overload {
-                                      span { class: "text-[10px] uppercase tracking-wider text-[var(--error)] font-semibold", "OVERLOAD" }
-                                  } else {
-                                      span { class: "text-sm font-semibold text-[var(--on-surface)]", "{pct_str}" }
-                                  }
-                              }
-                              div { class: "h-2 bg-[var(--surface-container)] rounded-full overflow-hidden mb-2",
-                                  div { class: "h-full {color} rounded-full", style: "{width}" }
-                              }
-                              div { class: "flex justify-between text-[10px] text-[var(--outline)]",
-                                  span { "{quota.min_label}" }
-                                  span { "{quota.max_label}" }
-                              }
-                          }
+    div { class: "space-y-4",
+      span { class: "text-xs uppercase tracking-wider font-semibold text-white border-l-4 border-[var(--warning)] pl-3",
+        "RESOURCE_QUOTAS"
+      }
+      div { class: "flex gap-3",
+        for quota in quotas.iter() {
+          {
+              let pct_str = format!("{}%", quota.percent);
+              let width = format!("width: {}%;", quota.percent);
+              let color = if quota.percent > 90 {
+                  "bg-[var(--error)]"
+              } else if quota.percent > 70 {
+                  "bg-[var(--warning)]"
+              } else {
+                  "bg-[var(--primary)]"
+              };
+              let overload = quota.percent > 90;
+              rsx! {
+                div { class: "flex-1 bg-[var(--surface-container-lowest)] border-2 border-[var(--outline-variant)] p-4",
+                  div { class: "flex items-center justify-between mb-2",
+                    span { class: "text-[10px] uppercase tracking-wider text-[var(--outline)]", "{quota.label}" }
+                    if overload {
+                      span { class: "text-[10px] uppercase tracking-wider text-[var(--error)] font-semibold",
+                        "OVERLOAD"
                       }
+                    } else {
+                      span { class: "text-sm font-semibold text-[var(--on-surface)]", "{pct_str}" }
+                    }
                   }
+                  div { class: "h-2 bg-[var(--surface-container)] rounded-full overflow-hidden mb-2",
+                    div { class: "h-full {color} rounded-full", style: "{width}" }
+                  }
+                  div { class: "flex justify-between text-[10px] text-[var(--outline)]",
+                    span { "{quota.min_label}" }
+                    span { "{quota.max_label}" }
+                  }
+                }
               }
           }
+        }
       }
+    }
   }
 }
