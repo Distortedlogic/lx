@@ -43,4 +43,8 @@ pub trait AstTransformer {
   fn leave_type_expr(&mut self, _id: TypeExprId, te: TypeExpr, span: SourceSpan, _arena: &mut AstArena) -> (TypeExpr, SourceSpan) {
     (te, span)
   }
+
+  fn transform_stmts(&mut self, stmts: Vec<StmtId>, arena: &mut AstArena) -> Vec<StmtId> {
+    stmts.into_iter().map(|s| super::walk_transform::walk_transform_stmt(self, s, arena)).collect()
+  }
 }

@@ -39078,6 +39078,7 @@ registerProcessor('capture', Capture);
 			const state = states.get(elementId);
 			if (!state) return;
 			const msg = data;
+			console.log("[voice] update received:", msg.type);
 			switch (msg.type) {
 				case "start_capture":
 					if (state.status !== "idle") return;
@@ -39093,6 +39094,7 @@ registerProcessor('capture', Capture);
 					state.dx.send({ type: "cancel" });
 					break;
 				case "audio_response":
+					console.log("[voice] audio_response chunk, data length:", msg.data?.length ?? 0);
 					transition(state, "speaking");
 					if (msg.data) state.playback.enqueue(msg.data);
 					break;

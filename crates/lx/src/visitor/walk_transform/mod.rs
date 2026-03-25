@@ -34,7 +34,7 @@ walk_transform_fn!(walk_transform_type_expr, crate::ast::TypeExprId, transform_t
 
 pub fn walk_transform_program<T: AstTransformer + ?Sized, P>(t: &mut T, mut program: Program<P>) -> Program<P> {
   let stmts: Vec<StmtId> = program.stmts.clone();
-  let folded: Vec<StmtId> = stmts.into_iter().map(|s| walk_transform_stmt(t, s, &mut program.arena)).collect();
+  let folded: Vec<StmtId> = t.transform_stmts(stmts, &mut program.arena);
   program.stmts = folded;
   program
 }
