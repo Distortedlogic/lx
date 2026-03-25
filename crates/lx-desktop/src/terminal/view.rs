@@ -133,7 +133,13 @@ pub fn EditorView(editor_id: String, file_path: String, language: Option<String>
     }
   });
 
-  rsx! { div { id: "{element_id}", class: "w-full h-full bg-[var(--surface-container-lowest)]" } }
+  rsx! {
+    div {
+      id: "{element_id}",
+      class: "w-full h-full bg-[var(--surface-container-lowest)]",
+    }
+
+  }
 }
 
 #[component]
@@ -171,7 +177,13 @@ pub fn AgentView(agent_id: String, session_id: String, model: String) -> Element
     }
   });
 
-  rsx! { div { id: "{element_id}", class: "w-full h-full bg-[var(--surface-container)]" } }
+  rsx! {
+    div {
+      id: "{element_id}",
+      class: "w-full h-full bg-[var(--surface-container)]",
+    }
+
+  }
 }
 
 #[component]
@@ -189,7 +201,13 @@ pub fn CanvasView(canvas_id: String, widget_type: String, config: Value) -> Elem
     }
   });
 
-  rsx! { div { id: "{element_id}", class: "w-full h-full bg-[var(--surface-container)]" } }
+  rsx! {
+    div {
+      id: "{element_id}",
+      class: "w-full h-full bg-[var(--surface-container)]",
+    }
+
+  }
 }
 
 #[component]

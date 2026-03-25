@@ -80,23 +80,25 @@ pub fn PaneToolbar(
     DesktopPane::Editor { file_path, .. } => {
       let mut path_input = use_signal(|| file_path.clone());
       rsx! {
-        span { class: "text-[10px] text-[var(--outline)] uppercase tracking-wider mr-1", "FILE" }
+        span { class: "text-[10px] text-[var(--outline)] uppercase tracking-wider mr-1",
+          "FILE"
+        }
         input {
           class: "flex-1 bg-[var(--surface-container-lowest)] rounded text-xs px-1.5 py-0.5 outline-none focus:bg-[var(--surface-container-low)] focus:border-b focus:border-[var(--primary)] transition-colors duration-150 font-mono",
           value: "{path_input}",
           placeholder: "Enter file path...",
           oninput: move |evt| path_input.set(evt.value()),
           onkeydown: move |evt: KeyboardEvent| {
-            if evt.key() == Key::Enter {
-              let new_id = uuid::Uuid::new_v4().to_string();
-              let new_pane = PaneNode::Leaf(DesktopPane::Editor {
-                id: new_id,
-                file_path: path_input(),
-                language: None,
-                name: None,
-              });
-              on_convert.call(new_pane);
-            }
+              if evt.key() == Key::Enter {
+                  let new_id = uuid::Uuid::new_v4().to_string();
+                  let new_pane = PaneNode::Leaf(DesktopPane::Editor {
+                      id: new_id,
+                      file_path: path_input(),
+                      language: None,
+                      name: None,
+                  });
+                  on_convert.call(new_pane);
+              }
           },
         }
       }
@@ -172,14 +174,20 @@ pub fn PaneToolbar(
       div { class: "flex-1" }
       if pane.kind() == PaneKind::Terminal {
         {
-          let tabs = crate::terminal::use_tabs_state();
-          let notification = tabs.read().get_notification(pane.pane_id()).cloned();
-          let (label, variant) = match notification.as_ref().map(|n| n.level) {
-            Some(common_pane_tree::NotificationLevel::Success) => ("EXITED".to_string(), BadgeVariant::Idle),
-            Some(common_pane_tree::NotificationLevel::Error) => ("ERROR".to_string(), BadgeVariant::Idle),
-            _ => ("ACTIVE".to_string(), BadgeVariant::Active),
-          };
-          rsx! { StatusBadge { label, variant } }
+            let tabs = crate::terminal::use_tabs_state();
+            let notification = tabs.read().get_notification(pane.pane_id()).cloned();
+            let (label, variant) = match notification.as_ref().map(|n| n.level) {
+                Some(common_pane_tree::NotificationLevel::Success) => {
+                    ("EXITED".to_string(), BadgeVariant::Idle)
+                }
+                Some(common_pane_tree::NotificationLevel::Error) => {
+                    ("ERROR".to_string(), BadgeVariant::Idle)
+                }
+                _ => ("ACTIVE".to_string(), BadgeVariant::Active),
+            };
+            rsx! {
+              StatusBadge { label, variant }
+            }
         }
       }
       button {
