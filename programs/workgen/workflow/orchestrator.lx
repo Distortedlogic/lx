@@ -5,7 +5,7 @@ use std/fs
 use std/md
 use ../log : wg_log
 use ../store/status {save_debug}
-use ../agent/agents
+use ./agents
 use ../grader {Grader GradeResult}
 
 required_sections = ["Goal" "Why" "What changes" "Files affected" "Task List" "CRITICAL REMINDERS"]

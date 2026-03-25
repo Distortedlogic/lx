@@ -4,7 +4,7 @@ use ../schema/work_item {task_count task_summaries}
 
 use ../log
 use ../store/status
-use ../agent/agents
+use ./agents
 use ../schema/work_item
 
 run_task_impl = (wi task bootstrap_ctx max_rounds runner_dir) {
