@@ -40,24 +40,6 @@ pub fn AgentCard() -> Element {
           }
         }
       }
-      if !entries.is_empty() {
-        div {
-          div { class: "text-[10px] uppercase tracking-wider text-[var(--outline)] mb-2",
-            "CONVERSATION"
-          }
-          div { class: "bg-[var(--surface-container-low)] rounded p-3 font-mono text-xs max-h-64 overflow-y-auto",
-            for entry in entries.iter() {
-              if entry.is_user {
-                p { class: "mb-0.5 text-[#64b5f6]", "\u{203A} YOU: {entry.text}" }
-              } else {
-                p { class: "mb-0.5 text-[var(--success)]",
-                  "\u{203A} AGENT: {entry.text}"
-                }
-              }
-            }
-          }
-        }
-      }
       if is_active {
         div { class: "mt-3",
           button {
