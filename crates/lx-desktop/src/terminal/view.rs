@@ -24,12 +24,12 @@ pub fn TerminalView(terminal_id: String, working_dir: String, command: Option<St
 
   let eid_rsx = element_id.clone();
   use_future(move || {
-    let element_id = element_id.clone();
+    let _element_id = element_id.clone();
     let tid_notif = tid_notif.clone();
     let wd = working_dir.clone();
     let cmd = command.clone();
     async move {
-      let session = match common_pty::get_or_create(&element_id, 80, 24, Some(&wd), cmd.as_deref()) {
+      let session = match common_pty::get_or_create(&tid_notif, 80, 24, Some(&wd), cmd.as_deref()) {
         Ok(s) => s,
         Err(e) => {
           error!("pty session create failed: {e}");
