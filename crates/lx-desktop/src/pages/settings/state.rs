@@ -52,10 +52,12 @@ impl SettingsState {
   }
 
   pub fn discard(&self) {
-    self.data.set(self.saved.read().clone());
+    let mut data = self.data;
+    data.set(self.saved.read().clone());
   }
 
   pub fn execute(&self) {
-    self.saved.set(self.data.read().clone());
+    let mut saved = self.saved;
+    saved.set(self.data.read().clone());
   }
 }

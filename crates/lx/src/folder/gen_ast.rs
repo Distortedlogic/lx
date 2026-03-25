@@ -10,10 +10,6 @@ pub fn gen_ident(name: &str, span: SourceSpan, arena: &mut AstArena) -> ExprId {
   arena.alloc_expr(Expr::Ident(intern(name)), span)
 }
 
-pub fn gen_sym(sym: Sym, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-  arena.alloc_expr(Expr::Ident(sym), span)
-}
-
 pub fn gen_self_field(field: &str, span: SourceSpan, arena: &mut AstArena) -> ExprId {
   let self_id = arena.alloc_expr(Expr::Ident(intern("self")), span);
   arena.alloc_expr(Expr::FieldAccess(ExprFieldAccess { expr: self_id, field: FieldKind::Named(intern(field)) }), span)
@@ -56,23 +52,12 @@ pub fn gen_propagate(inner: ExprId, span: SourceSpan, arena: &mut AstArena) -> E
   arena.alloc_expr(Expr::Propagate(ExprPropagate { inner }), span)
 }
 
-pub fn gen_binding(name: &str, value: ExprId, span: SourceSpan, arena: &mut AstArena) -> StmtId {
-  arena.alloc_stmt(
-    Stmt::Binding(crate::ast::Binding { exported: false, mutable: false, target: crate::ast::BindTarget::Name(intern(name)), type_ann: None, value }),
-    span,
-  )
-}
-
 pub fn gen_field_update(obj: &str, field: &str, value: ExprId, span: SourceSpan, arena: &mut AstArena) -> StmtId {
   arena.alloc_stmt(Stmt::FieldUpdate(StmtFieldUpdate { name: intern(obj), fields: vec![intern(field)], value }), span)
 }
 
 pub fn gen_literal_str(s: &str, span: SourceSpan, arena: &mut AstArena) -> ExprId {
   arena.alloc_expr(Expr::Literal(Literal::Str(vec![StrPart::Text(s.to_string())])), span)
-}
-
-pub fn gen_literal_unit(span: SourceSpan, arena: &mut AstArena) -> ExprId {
-  arena.alloc_expr(Expr::Literal(Literal::Unit), span)
 }
 
 pub fn gen_none(span: SourceSpan, arena: &mut AstArena) -> ExprId {

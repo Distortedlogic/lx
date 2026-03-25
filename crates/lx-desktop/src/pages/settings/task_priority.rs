@@ -4,6 +4,7 @@ use dioxus::prelude::*;
 #[component]
 pub fn TaskPriorityPanel() -> Element {
   let settings = use_context::<SettingsState>();
+  let mut data = settings.data;
   let priority = settings.data.read().task_priority;
   let auto_scale = settings.data.read().auto_scale;
   let redundant_verify = settings.data.read().redundant_verify;
@@ -25,7 +26,7 @@ pub fn TaskPriorityPanel() -> Element {
               class: "w-full accent-[var(--warning)] mb-3",
               oninput: move |evt| {
                   if let Ok(v) = evt.value().parse::<f64>() {
-                      settings.data.write().task_priority = v;
+                      data.write().task_priority = v;
                   }
               },
           }
@@ -40,7 +41,7 @@ pub fn TaskPriorityPanel() -> Element {
                       checked: auto_scale,
                       class: "w-4 h-4 accent-[var(--warning)]",
                       onchange: move |_| {
-                          let mut d = settings.data.write();
+                          let mut d = data.write();
                           d.auto_scale = !d.auto_scale;
                       },
                   }
@@ -52,7 +53,7 @@ pub fn TaskPriorityPanel() -> Element {
                       checked: redundant_verify,
                       class: "w-4 h-4 accent-[var(--warning)]",
                       onchange: move |_| {
-                          let mut d = settings.data.write();
+                          let mut d = data.write();
                           d.redundant_verify = !d.redundant_verify;
                       },
                   }

@@ -4,6 +4,7 @@ use dioxus::prelude::*;
 #[component]
 pub fn EnvVarsPanel() -> Element {
   let settings = use_context::<SettingsState>();
+  let mut data = settings.data;
   let mut new_key = use_signal(String::new);
   let mut new_value = use_signal(String::new);
 
@@ -33,7 +34,7 @@ pub fn EnvVarsPanel() -> Element {
                                   span {
                                       class: "material-symbols-outlined text-sm text-[var(--outline)] cursor-pointer hover:text-[var(--error)]",
                                       onclick: move |_| {
-                                          settings.data.write().env_vars.remove(i);
+                                          data.write().env_vars.remove(i);
                                       },
                                       "delete"
                                   }
@@ -62,7 +63,7 @@ pub fn EnvVarsPanel() -> Element {
                       let k = new_key().trim().to_string();
                       let v = new_value().trim().to_string();
                       if !k.is_empty() {
-                          settings.data.write().env_vars.push(EnvEntry { key: k, value: v });
+                          data.write().env_vars.push(EnvEntry { key: k, value: v });
                           new_key.set(String::new());
                           new_value.set(String::new());
                       }
