@@ -7,8 +7,14 @@ impl AstVisitor for CoreValidator {
   fn visit_stmt(&mut self, _id: StmtId, stmt: &Stmt, span: SourceSpan) -> VisitAction {
     if let Stmt::KeywordDecl(data) = stmt {
       match data.keyword {
-        KeywordKind::Agent | KeywordKind::Tool | KeywordKind::Prompt | KeywordKind::Connector
-        | KeywordKind::Store | KeywordKind::Session | KeywordKind::Guard | KeywordKind::Workflow => {
+        KeywordKind::Agent
+        | KeywordKind::Tool
+        | KeywordKind::Prompt
+        | KeywordKind::Connector
+        | KeywordKind::Store
+        | KeywordKind::Session
+        | KeywordKind::Guard
+        | KeywordKind::Workflow => {
           panic!("KeywordDecl({:?}) should have been desugared at offset {}", data.keyword, span.offset())
         },
         _ => {},

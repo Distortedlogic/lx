@@ -98,9 +98,18 @@ pub struct ClassDeclData {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeywordKind {
-  Agent, Tool, Prompt, Connector, Store,
-  Session, Guard, Workflow, Schema,
-  Mcp, Cli, Http,
+  Agent,
+  Tool,
+  Prompt,
+  Connector,
+  Store,
+  Session,
+  Guard,
+  Workflow,
+  Schema,
+  Mcp,
+  Cli,
+  Http,
 }
 
 #[derive(Debug, Clone, PartialEq)]

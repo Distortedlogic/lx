@@ -64,7 +64,13 @@ impl DesktopPane {
       PaneKind::Editor => Self::Editor { id, file_path: String::new(), language: None, name: None },
       PaneKind::Agent => Self::Agent { id: id.clone(), session_id: uuid::Uuid::new_v4().to_string(), model: "claude-sonnet-4-6".into(), name: None },
       PaneKind::Canvas => Self::Canvas { id, widget_type: "markdown".into(), config: serde_json::Value::Object(Default::default()), name: None },
-      PaneKind::Chart => Self::Chart { id, chart_json: String::new(), title: None, name: None },
+      PaneKind::Chart => Self::Chart {
+        id,
+        chart_json:
+          r#"{"xAxis":{"type":"category","data":["A","B","C","D","E"]},"yAxis":{"type":"value"},"series":[{"data":[120,200,150,80,70],"type":"bar"}]}"#.into(),
+        title: None,
+        name: None,
+      },
     }
   }
 

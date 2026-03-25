@@ -1,16 +1,15 @@
 use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 
+use super::Span;
 use super::expr::type_name;
 use super::stmt_class::class_body;
-use super::{ArenaRef, Span, StmtId, ss};
-use crate::ast::{KeywordDeclData, KeywordKind, Stmt};
+use crate::ast::{ExprId, KeywordDeclData, KeywordKind};
 use crate::lexer::token::TokenKind;
 
 pub fn keyword_parser<'a, I>(
-  expr: impl Parser<'a, I, crate::ast::ExprId, extra::Err<Rich<'a, TokenKind, Span>>> + Clone,
-  arena: ArenaRef,
-) -> impl Parser<'a, I, StmtId, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
+  expr: impl Parser<'a, I, ExprId, extra::Err<Rich<'a, TokenKind, Span>>> + Clone,
+) -> impl Parser<'a, I, KeywordDeclData, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
 where
   I: ValueInput<'a, Token = TokenKind, Span = Span>,
 {
@@ -29,20 +28,13 @@ where
     just(TokenKind::HttpKw).to(KeywordKind::Http),
   ));
 
-  keyword
-    .then(type_name())
-    .then_ignore(just(TokenKind::Assign))
-    .then(class_body(expr))
-    .map_with(move |((kw, name), (fields, methods)), e| {
-      let data = KeywordDeclData {
-        keyword: kw,
-        name,
-        type_params: vec![],
-        fields,
-        methods,
-        trait_entries: None,
-        exported: false,
-      };
-      arena.borrow_mut().alloc_stmt(Stmt::KeywordDecl(data), ss(e.span()))
-    })
+  keyword.then(type_name()).then_ignore(just(TokenKind::Assign)).then(class_body(expr)).map(|((kw, name), (fields, methods))| KeywordDeclData {
+    keyword: kw,
+    name,
+    type_params: vec![],
+    fields,
+    methods,
+    trait_entries: None,
+    exported: false,
+  })
 }

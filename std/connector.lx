@@ -2,7 +2,7 @@
 -- MCP servers, CLI tools, HTTP APIs all implement this interface.
 -- Agent code calls connector.call regardless of backend.
 
-Trait +Connector = {
++Trait Connector = {
   connect: {} -> Result
   disconnect: {} -> Result
   call: {tool: Str  args: Any} -> Result

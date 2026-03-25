@@ -5,7 +5,7 @@ use super::expr_helpers::{block_or_record_parser, list_parser, map_parser};
 use super::{ArenaRef, ExprId, Span, StmtId, ss};
 use crate::ast::{Expr, ExprAssert, ExprBreak, ExprEmit, ExprLoop, ExprPar, ExprTimeout, ExprYield, Literal, SelArm};
 use crate::lexer::token::TokenKind;
-use crate::sym::Sym;
+use crate::sym::{Sym, intern};
 
 pub(super) fn ident<'a, I>() -> impl Parser<'a, I, Sym, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
 where
@@ -14,18 +14,38 @@ where
   select! { TokenKind::Ident(n) => n }
 }
 
+fn keyword_as_type_name<'a, I>() -> impl Parser<'a, I, Sym, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
+where
+  I: ValueInput<'a, Token = TokenKind, Span = Span>,
+{
+  select! {
+      TokenKind::AgentKw => intern("Agent"),
+      TokenKind::ToolKw => intern("Tool"),
+      TokenKind::PromptKw => intern("Prompt"),
+      TokenKind::ConnectorKw => intern("Connector"),
+      TokenKind::StoreKw => intern("Store"),
+      TokenKind::SessionKw => intern("Session"),
+      TokenKind::GuardKw => intern("Guard"),
+      TokenKind::WorkflowKw => intern("Workflow"),
+      TokenKind::SchemaKw => intern("Schema"),
+      TokenKind::McpKw => intern("Mcp"),
+      TokenKind::CliKw => intern("Cli"),
+      TokenKind::HttpKw => intern("Http"),
+  }
+}
+
 pub(super) fn type_name<'a, I>() -> impl Parser<'a, I, Sym, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
 where
   I: ValueInput<'a, Token = TokenKind, Span = Span>,
 {
-  select! { TokenKind::TypeName(n) => n }
+  select! { TokenKind::TypeName(n) => n }.or(keyword_as_type_name())
 }
 
 pub(super) fn name_or_type<'a, I>() -> impl Parser<'a, I, Sym, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
 where
   I: ValueInput<'a, Token = TokenKind, Span = Span>,
 {
-  select! { TokenKind::Ident(n) => n, TokenKind::TypeName(n) => n }
+  select! { TokenKind::Ident(n) => n, TokenKind::TypeName(n) => n }.or(keyword_as_type_name())
 }
 
 pub(super) fn skip_semis<'a, I>() -> impl Parser<'a, I, (), extra::Err<Rich<'a, TokenKind, Span>>> + Clone

@@ -38,11 +38,11 @@ impl AstTransformer for Desugarer {
         Stmt::KeywordDecl(data) => {
           let desugared = desugar_keyword(data, span, arena);
           result.extend(desugared);
-        }
+        },
         _ => {
           let transformed = crate::visitor::walk_transform::walk_transform_stmt(self, sid, arena);
           result.push(transformed);
-        }
+        },
       }
     }
     result
@@ -192,23 +192,13 @@ fn desugar_keyword(data: KeywordDeclData, span: SourceSpan, arena: &mut AstArena
   let trait_sym = intern(trait_name);
   let path: Vec<Sym> = import_path.iter().map(|s| intern(s)).collect();
 
-  let use_stmt = arena.alloc_stmt(
-    Stmt::Use(UseStmt { path, kind: UseKind::Selective(vec![trait_sym]) }),
-    span,
-  );
+  let use_stmt = arena.alloc_stmt(Stmt::Use(UseStmt { path, kind: UseKind::Selective(vec![trait_sym]) }), span);
 
   let fields = data.fields;
   let methods = data.methods;
 
   let class_stmt = arena.alloc_stmt(
-    Stmt::ClassDecl(ClassDeclData {
-      name: data.name,
-      type_params: data.type_params,
-      traits: vec![trait_sym],
-      fields,
-      methods,
-      exported: data.exported,
-    }),
+    Stmt::ClassDecl(ClassDeclData { name: data.name, type_params: data.type_params, traits: vec![trait_sym], fields, methods, exported: data.exported }),
     span,
   );
 
