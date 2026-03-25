@@ -4,7 +4,10 @@
 use std/store : kv
 use std/time
 use pkg/core/score
-use pkg/core/prompt
+
+Prompt PivotPrompt = {
+  system: "You suggest alternative approaches when current strategy isn't working."
+}
 
 keep = (pred list) filter pred list
 
@@ -73,7 +76,7 @@ pid_val = pid_result | split " " | first ^ | to_int ?? 1
   mark = (name) {
     self.ensure_markers ()
     t = time.now ()
-    new_acts = [..self.actions {type: "__marker", target: name, time: t.iso}]
+    new_acts = [..self.actions; {type: "__marker", target: name, time: t.iso}]
     self.actions <- new_acts
     kv.set self.markers name (len new_acts)
     ()
@@ -81,7 +84,7 @@ pid_val = pid_result | split " " | first ^ | to_int ?? 1
 
   record = (entry) {
     t = time.now ()
-    new_acts = [..self.actions {type: entry.type ?? "", target: entry.target ?? "", time: t.iso}]
+    new_acts = [..self.actions; {type: entry.type ?? "", target: entry.target ?? "", time: t.iso}]
     trimmed = (len new_acts) > 1000 ? (drop ((len new_acts) - 1000) new_acts) : new_acts
     self.actions <- trimmed
     ()
@@ -100,7 +103,7 @@ pid_val = pid_result | split " " | first ^ | to_int ?? 1
 
   strategy_shift = (reason) {
     t = time.now ()
-    self.actions <- [..self.actions {type: "strategy_shift", target: reason, time: t.iso}]
+    self.actions <- [..self.actions; {type: "strategy_shift", target: reason, time: t.iso}]
     ()
   }
 
@@ -184,7 +187,7 @@ pid_val = pid_result | split " " | first ^ | to_int ?? 1
     elapsed_ms: elapsed
     elapsed_pct
     remaining_ms: math.max 0 (budget_info.total_ms - elapsed)
-    pressure: score.tier [{min: 80.0  name: "critical"} {min: 60.0  name: "high"} {min: 40.0  name: "moderate"} {min: 0.0  name: "low"}] elapsed_pct
+    pressure: score.tier [{min: 80.0  name: "critical"}; {min: 60.0  name: "high"}; {min: 40.0  name: "moderate"}; {min: 0.0  name: "low"}] elapsed_pct
   }
 }
 
@@ -194,8 +197,8 @@ pid_val = pid_result | split " " | first ^ | to_int ?? 1
   time_info = time_pressure state
 
   status_text = [
-    "Turn {assessment.turns} | {assessment.action_count} actions | {assessment.action_diversity} unique types"
-    "Strategy: {strategy.current} — {strategy.recommendation}"
+    "Turn {assessment.turns} | {assessment.action_count} actions | {assessment.action_diversity} unique types";
+    "Strategy: {strategy.current} — {strategy.recommendation}";
     "Time: {time_info.pressure} ({time_info.elapsed_ms}ms elapsed)"
   ] | join "\n"
 
@@ -224,13 +227,12 @@ pid_val = pid_result | split " " | first ^ | to_int ?? 1
   strategy = strategy_analysis state
 
   strategy.current == "healthy" ? ["current approach is working"] : {
-    p = prompt.create ()
-      | prompt.system "You suggest alternative approaches when current strategy isn't working."
-      | prompt.section "Current Strategy" strategy.current
-      | prompt.section "Recent Actions" (assessment.recent_actions | map (.type) | join ", ")
-      | prompt.section "Recommendation" strategy.recommendation
-      | prompt.instruction "Suggest 2 concrete alternative approaches."
+    p = PivotPrompt {}
+    p.add_section "Current Strategy" strategy.current
+    p.add_section "Recent Actions" (assessment.recent_actions | map (.type) | join ", ")
+    p.add_section "Recommendation" strategy.recommendation
+    p.add_instruction "Suggest 2 concrete alternative approaches."
 
-    prompt.ask_lines p "try a different approach"
+    p.ask_lines "try a different approach"
   }
 }

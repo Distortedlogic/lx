@@ -2,8 +2,15 @@
 -- Source: extracted from brain/lib/perception.lx
 -- Provides: intent classification, entity extraction, complexity assessment, domain detection
 
-use pkg/core/prompt
 use pkg/kit/git
+
+Prompt IntentPrompt = {
+  system: `You classify user intent into exactly one category.`
+}
+
+Prompt EntityPrompt = {
+  system: `You extract key entities from text.`
+}
 
 Trait +Perception = {raw: Str  intent: Str  complexity: Str  entities: [Str]  domain: Str  urgency: Str = "normal"  requires_tools: Bool = false  requires_agents: Bool = false  ambiguity: Float = 0.0 where ambiguity >= 0.0 && ambiguity <= 1.0}
 
@@ -29,29 +36,27 @@ Trait +Perception = {raw: Str  intent: Str  complexity: Str  entities: [Str]  do
 }
 
 +classify_intent = (raw: Str) -> Str {
-  p = prompt.create ()
-    | prompt.system `You classify user intent into exactly one category.`
-    | prompt.instruction `Classify into: question, task, debug, explain, refactor, create, review, discuss, clarify`
-    | prompt.constraint `Reply with a single word — the category`
-    | prompt.section "Input" raw
-  prompt.ask p "question" | trim | lower
+  p = IntentPrompt {}
+  p.add_instruction `Classify into: question, task, debug, explain, refactor, create, review, discuss, clarify`
+  p.add_constraint `Reply with a single word — the category`
+  p.add_section "Input" raw
+  p.ask "question" | trim | lower
 }
 
 +extract_entities = (raw: Str) -> [Str] {
-  p = prompt.create ()
-    | prompt.system `You extract key entities from text.`
-    | prompt.instruction `List files, functions, types, concepts mentioned. One per line.`
-    | prompt.constraint `Only concrete entities, no filler words`
-    | prompt.section "Input" raw
-  prompt.ask_lines p ""
+  p = EntityPrompt {}
+  p.add_instruction `List files, functions, types, concepts mentioned. One per line.`
+  p.add_constraint `Only concrete entities, no filler words`
+  p.add_section "Input" raw
+  p.ask_lines ""
 }
 
 +assess_complexity = (raw: Str) -> Str {
   score = [
-    raw | split " " | len > 100
-    raw | split "?" | len > 2
-    raw | contains? "```"
-    raw | split "." | len > 3
+    raw | split " " | len > 100;
+    raw | split "?" | len > 2;
+    raw | contains? "```";
+    raw | split "." | len > 3;
     raw | split "." | len > 3
   ] | filter identity | len
 
@@ -66,12 +71,12 @@ Trait +Perception = {raw: Str  intent: Str  complexity: Str  entities: [Str]  do
 +detect_domain = (raw: Str) -> Str {
   raw_lower = raw | lower
   domains = [
-    ("rust" ["cargo" "struct" "impl" "fn " "enum" "trait" "crate" ".rs"])
-    ("lx" ["lx" "protocol" "agent" "yield" "refine" "emit" "~>" "pipe"])
-    ("git" ["commit" "branch" "merge" "rebase" "push" "pull" "diff"])
-    ("web" ["http" "api" "endpoint" "request" "response" "url" "fetch"])
-    ("testing" ["test" "assert" "expect" "mock" "fixture" "spec"])
-    ("devops" ["deploy" "ci" "docker" "kubernetes" "pipeline" "build"])
+    ("rust"; ["cargo"; "struct"; "impl"; "fn "; "enum"; "trait"; "crate"; ".rs"]);
+    ("lx"; ["lx"; "protocol"; "agent"; "yield"; "refine"; "emit"; "~>"; "pipe"]);
+    ("git"; ["commit"; "branch"; "merge"; "rebase"; "push"; "pull"; "diff"]);
+    ("web"; ["http"; "api"; "endpoint"; "request"; "response"; "url"; "fetch"]);
+    ("testing"; ["test"; "assert"; "expect"; "mock"; "fixture"; "spec"]);
+    ("devops"; ["deploy"; "ci"; "docker"; "kubernetes"; "pipeline"; "build"])
   ]
 
   best = domains
@@ -83,19 +88,19 @@ Trait +Perception = {raw: Str  intent: Str  complexity: Str  entities: [Str]  do
 }
 
 detect_urgency = (raw: Str) -> Str {
-  urgent_signals = ["urgent" "asap" "broken" "crash" "emergency" "fix now" "blocking"]
+  urgent_signals = ["urgent"; "asap"; "broken"; "crash"; "emergency"; "fix now"; "blocking"]
   urgent_signals | any? (s) raw | lower | contains? s ? "high" : "normal"
 }
 
 +git_context = (domain: Str) -> Str {
-  ["rust" "lx" "git" "testing"] | contains? domain ? {
+  ["rust"; "lx"; "git"; "testing"] | contains? domain ? {
     status = git.status () ?? {branch: "unknown"  modified: []}
     "branch: {status.branch ?? "unknown"} | {status.modified ?? [] | len} modified files"
   } : ""
 }
 
 needs_tools = (raw: Str  intent: Str) -> Bool {
-  ["task" "debug" "create" "refactor" "review"] | contains? intent
+  ["task"; "debug"; "create"; "refactor"; "review"] | contains? intent
 }
 
 needs_agents = (raw: Str  complexity: Str) -> Bool {

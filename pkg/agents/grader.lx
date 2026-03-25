@@ -1,7 +1,9 @@
 -- Grader agent — keyword-based quick grading + LLM full grading.
 -- Replaces std/agents/grader.
 
-use pkg/core/prompt
+Prompt GradingPrompt = {
+  system: "You are a grader. Score the work against each rubric category 0-100."
+}
 
 keyword_score = (work description) {
   lo = work | lower
@@ -37,7 +39,7 @@ keyword_score = (work description) {
         total_score <- total_score + (c.score * (c.weight ?? 1))
         total_weight <- total_weight + (c.weight ?? 1)
         (c.score < 70) ? {
-          true -> { failed <- [..failed c.name] }
+          true -> { failed <- [..failed; c.name] }
           false -> ()
         }
       }
@@ -57,15 +59,14 @@ keyword_score = (work description) {
   (rubric | len) == 0 ? no_rubric_err : {
     rubric_text = rubric | map (r) "- {r.name} (weight {r.weight ?? 1}): {r.description ?? r.name}" | join "\n"
 
-    p = prompt.create ()
-      | prompt.system "You are a grader. Score the work against each rubric category 0-100."
-      | prompt.section "Task" task
-      | prompt.section "Work" work
-      | prompt.section "Rubric" rubric_text
-      | prompt.instruction `Return JSON: {score: int, passed: bool, feedback: str, categories: [{name, score, feedback}]}`
+    p = GradingPrompt {}
+    p.add_section "Task" task
+    p.add_section "Work" work
+    p.add_section "Rubric" rubric_text
+    p.add_instruction `Return JSON: {score: int, passed: bool, feedback: str, categories: [{name, score, feedback}]}`
 
     result = ai.prompt_with {
-      prompt: prompt.render p
+      prompt: p.render ()
       disable_tools: true
       json_schema: `{"type":"object","properties":{"score":{"type":"integer"},"passed":{"type":"boolean"},"feedback":{"type":"string"},"categories":{"type":"array","items":{"type":"object","properties":{"name":{"type":"string"},"score":{"type":"integer"},"feedback":{"type":"string"}}}}}}`
     } ^
@@ -86,7 +87,7 @@ keyword_score = (work description) {
           total_score <- total_score + (s * w)
           total_weight <- total_weight + w
           (s < 70) ? {
-            true -> { failed <- [..failed c.name] }
+            true -> { failed <- [..failed; c.name] }
             false -> ()
           }
         }

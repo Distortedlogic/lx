@@ -1,9 +1,20 @@
 -- Deep analysis specialist: investigates problems thoroughly
 -- Source: dispatched when perception flags a complex or ambiguous input
 
-use pkg/core/prompt
 use pkg/core/capability {advertise}
 use ../traits {Analyst}
+
+Prompt AnalysisPrompt = {
+  system: "You are an analytical specialist. You find what others miss."
+}
+
+Prompt ComparisonPrompt = {
+  system: "You compare options systematically against criteria."
+}
+
+Prompt InvestigationPrompt = {
+  system: "You investigate questions by forming hypotheses and identifying evidence."
+}
 
 Schema AnalysisResult = {
   summary: Str = "concise analysis summary"
@@ -22,14 +33,13 @@ Agent DeepAnalyst: Analyst = {
       _ -> "Provide a thorough analysis."
     }
 
-    p = prompt.create ()
-      | prompt.system "You are an analytical specialist. You find what others miss."
-      | prompt.section "Topic" msg.topic
-      | prompt.section "Context" msg.context
-      | prompt.instruction depth_instruction
-      | prompt.constraint "Structure: Summary, Findings (bulleted), Gaps, Recommendations"
+    p = AnalysisPrompt {}
+    p.add_section "Topic" msg.topic
+    p.add_section "Context" msg.context
+    p.add_instruction depth_instruction
+    p.add_constraint "Structure: Summary, Findings (bulleted), Gaps, Recommendations"
 
-    text = prompt.ask p "analysis unavailable"
+    text = p.ask "analysis unavailable"
     sections = text | lines | partition (starts? "- ")
     findings = sections.0 | map (drop 2) | map trim
 
@@ -48,25 +58,23 @@ Agent DeepAnalyst: Analyst = {
       | map (i item) "### Option {i + 1}\n{item}"
       | join "\n\n"
 
-    p = prompt.create ()
-      | prompt.system "You compare options systematically against criteria."
-      | prompt.section "Options" items_text
-      | prompt.section "Criteria" (msg.criteria | join ", ")
-      | prompt.section "Context" msg.context
-      | prompt.instruction "Evaluate each option against each criterion. Pick a winner."
+    p = ComparisonPrompt {}
+    p.add_section "Options" items_text
+    p.add_section "Criteria" (msg.criteria | join ", ")
+    p.add_section "Context" msg.context
+    p.add_instruction "Evaluate each option against each criterion. Pick a winner."
 
-    text = prompt.ask p "comparison unavailable"
+    text = p.ask "comparison unavailable"
     {comparison: text  winner_index: 0}
   }
 
   investigate = (msg) {
-    p = prompt.create ()
-      | prompt.system "You investigate questions by forming hypotheses and identifying evidence."
-      | prompt.section "Question" msg.question
-      | prompt.section "Available Tools" (msg.tools | join ", ")
-      | prompt.instruction "1) Form a hypothesis. 2) List evidence needed. 3) Suggest tool calls."
+    p = InvestigationPrompt {}
+    p.add_section "Question" msg.question
+    p.add_section "Available Tools" (msg.tools | join ", ")
+    p.add_instruction "1) Form a hypothesis. 2) List evidence needed. 3) Suggest tool calls."
 
-    text = prompt.ask p "investigation unavailable"
+    text = p.ask "investigation unavailable"
     {
       hypothesis: text | lines | first ?? ""
       evidence_needed: text | lines | filter (starts? "- ") | map (drop 2)
@@ -77,7 +85,7 @@ Agent DeepAnalyst: Analyst = {
 +main = () {
   advertise {
     traits: ["AnalysisResult"]
-    domains: ["analyst" "analysis" "investigation" "comparison"]
+    domains: ["analyst"; "analysis"; "investigation"; "comparison"]
     tools: ["ai"]
   }
 

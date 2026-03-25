@@ -2,16 +2,19 @@
 -- Replaces std/agents/auditor.
 
 use pkg/core/audit
-use pkg/core/prompt
+
+Prompt AuditPrompt = {
+  system: "You are a quality auditor. Evaluate the output against the task and rubric."
+}
 
 hedging_phrases = [
-  "i think" "maybe" "possibly" "i'm not sure" "perhaps"
-  "it might" "it could be" "i believe" "not entirely sure"
+  "i think"; "maybe"; "possibly"; "i'm not sure"; "perhaps";
+  "it might"; "it could be"; "i believe"; "not entirely sure"
 ]
 
 refusal_phrases = [
-  "i can't" "i'm unable" "as an ai" "i cannot"
-  "i'm not able" "i don't have the ability"
+  "i can't"; "i'm unable"; "as an ai"; "i cannot";
+  "i'm not able"; "i don't have the ability"
 ]
 
 count_matches = (text phrases) {
@@ -27,19 +30,19 @@ count_matches = (text phrases) {
   failed := []
 
   (trimmed | len) == 0 ? {
-    true -> { failed <- [..failed "empty"] }
+    true -> { failed <- [..failed; "empty"] }
     false -> ()
   }
 
   refusal_count = count_matches output refusal_phrases
   (refusal_count > 0) ? {
-    true -> { failed <- [..failed "refusal"] }
+    true -> { failed <- [..failed; "refusal"] }
     false -> ()
   }
 
   hedging_count = count_matches output hedging_phrases
   (hedging_count >= 3) ? {
-    true -> { failed <- [..failed "excessive_hedging"] }
+    true -> { failed <- [..failed; "excessive_hedging"] }
     false -> ()
   }
 
@@ -48,7 +51,7 @@ count_matches = (text phrases) {
     true -> {
       refs = audit.references_task output task
       (refs == false) ? {
-        true -> { failed <- [..failed "no_task_reference"] }
+        true -> { failed <- [..failed; "no_task_reference"] }
         false -> ()
       }
     }
@@ -69,16 +72,15 @@ count_matches = (text phrases) {
 
   quick = quick_audit opts
   not quick.passed ? quick : {
-    p = prompt.create ()
-      | prompt.system "You are a quality auditor. Evaluate the output against the task and rubric."
-      | prompt.section "Task" task
-      | prompt.section "Output" output
-      | prompt.section "Context" context
-      | prompt.section "Rubric" (rubric | map (r) "- {r.name}: {r.description}" | join "\n")
-      | prompt.instruction `Score each rubric category 0-100. Return JSON with: score (int), passed (bool), feedback (str), categories (list of {name, score, feedback}).`
+    p = AuditPrompt {}
+    p.add_section "Task" task
+    p.add_section "Output" output
+    p.add_section "Context" context
+    p.add_section "Rubric" (rubric | map (r) "- {r.name}: {r.description}" | join "\n")
+    p.add_instruction `Score each rubric category 0-100. Return JSON with: score (int), passed (bool), feedback (str), categories (list of {name, score, feedback}).`
 
     result = ai.prompt_with {
-      prompt: prompt.render p
+      prompt: p.render ()
       disable_tools: true
       json_schema: `{"type":"object","properties":{"score":{"type":"integer"},"passed":{"type":"boolean"},"feedback":{"type":"string"},"categories":{"type":"array","items":{"type":"object","properties":{"name":{"type":"string"},"score":{"type":"integer"},"feedback":{"type":"string"}}}}}}`
     } ^

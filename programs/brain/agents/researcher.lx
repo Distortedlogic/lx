@@ -1,10 +1,13 @@
 -- Information gathering specialist: searches, reads, explores codebases
 -- Source: dispatched when the brain needs facts before reasoning
 
-use pkg/core/prompt
 use std/fs
 use pkg/core/capability {advertise}
 use ../traits {Researcher}
+
+Prompt SynthesisPrompt = {
+  system: "You synthesize research findings into a clear answer."
+}
 
 Schema Finding = {
   source: Str = "where the information came from"
@@ -78,7 +81,7 @@ search_filesystem = (question: Str) -> [Finding] {
 }
 
 extract_keywords = (text: Str) -> [Str] {
-  stop_words = ["the" "a" "an" "is" "are" "was" "were" "in" "on" "at" "to" "for" "of" "and" "or"]
+  stop_words = ["the"; "a"; "an"; "is"; "are"; "was"; "were"; "in"; "on"; "at"; "to"; "for"; "of"; "and"; "or"]
   text | lower | split " "
     | filter (w) len w > 2
     | filter (w) not (stop_words | contains? w)
@@ -91,21 +94,20 @@ synthesize_findings = (findings: [Finding]  question: Str) -> Str {
     | map (i f) "[{i + 1}] ({f.source}): {f.content}"
     | join "\n\n"
 
-  p = prompt.create ()
-    | prompt.system "You synthesize research findings into a clear answer."
-    | prompt.section "Question" question
-    | prompt.section "Findings" findings_text
-    | prompt.instruction "Answer the question based on the findings. Cite sources by number."
-    | prompt.constraint "If findings are insufficient, say what's missing."
+  p = SynthesisPrompt {}
+  p.add_section "Question" question
+  p.add_section "Findings" findings_text
+  p.add_instruction "Answer the question based on the findings. Cite sources by number."
+  p.add_constraint "If findings are insufficient, say what's missing."
 
-  prompt.ask p findings_text
+  p.ask findings_text
 }
 
 +main = () {
   advertise {
-    traits: ["ResearchResult" "Finding"]
-    domains: ["researcher" "research" "search" "information"]
-    tools: ["ai" "fs"]
+    traits: ["ResearchResult"; "Finding"]
+    domains: ["researcher"; "research"; "search"; "information"]
+    tools: ["ai"; "fs"]
   }
 
   receive {

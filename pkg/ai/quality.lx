@@ -2,7 +2,6 @@
 -- Source: merged from brain/lib/quality.lx + flows/lib/grading.lx + critic.lx check_safety
 -- Provides: rubrics, grading, refinement, safety scanning, draft grading workflows
 
-use pkg/core/prompt
 use pkg/core/audit
 use pkg/data/trace {TraceStore}
 use pkg/agents/grader
@@ -18,20 +17,20 @@ Trait +QualityGrade = {
 
 +response_rubric = () -> Any {
   audit.rubric [
-    {name: "accuracy" description: "factually correct, no hallucinations" weight: 30}
-    {name: "relevance" description: "directly answers what was asked" weight: 25}
-    {name: "completeness" description: "covers all aspects of the question" weight: 20}
-    {name: "clarity" description: "clear, well-structured, easy to follow" weight: 15}
+    {name: "accuracy" description: "factually correct, no hallucinations" weight: 30};
+    {name: "relevance" description: "directly answers what was asked" weight: 25};
+    {name: "completeness" description: "covers all aspects of the question" weight: 20};
+    {name: "clarity" description: "clear, well-structured, easy to follow" weight: 15};
     {name: "conciseness" description: "no unnecessary filler or repetition" weight: 10}
   ]
 }
 
 +code_rubric = () -> Any {
   audit.rubric [
-    {name: "correctness" description: "code works as intended" weight: 35}
-    {name: "safety" description: "no security vulnerabilities" weight: 25}
-    {name: "style" description: "clean, idiomatic, no unnecessary complexity" weight: 15}
-    {name: "completeness" description: "handles edge cases, error paths" weight: 15}
+    {name: "correctness" description: "code works as intended" weight: 35};
+    {name: "safety" description: "no security vulnerabilities" weight: 25};
+    {name: "style" description: "clean, idiomatic, no unnecessary complexity" weight: 15};
+    {name: "completeness" description: "handles edge cases, error paths" weight: 15};
     {name: "scope" description: "only changes what was asked, nothing extra" weight: 10}
   ]
 }
@@ -65,6 +64,10 @@ grade_to_quality = (result: Any) -> QualityGrade {
     : true
 }
 
+Prompt RevisionPrompt = {
+  system: "You improve work based on feedback."
+}
+
 +refine_work = (initial: Str  task: Str  grader_fn: Any  revise_system: Str  threshold: Int = 80) -> Str {
   with TraceStore () as trace {
     result = refine initial {
@@ -76,14 +79,13 @@ grade_to_quality = (result: Any) -> QualityGrade {
       revise: (work feedback) {
         stop = trace.should_stop {min_delta: 2.0  window: 3}
         stop ? work : {
-          p = prompt.create ()
-            | prompt.system revise_system
-            | prompt.section "Work" work
-            | prompt.section "Feedback" feedback
-            | prompt.section "Task" task
-            | prompt.instruction `Improve the work addressing the feedback.`
+          p = Prompt {system: revise_system}
+          p.add_section "Work" work
+          p.add_section "Feedback" feedback
+          p.add_section "Task" task
+          p.add_instruction `Improve the work addressing the feedback.`
 
-          prompt.ask p work
+          p.ask work
         }
       }
       threshold
@@ -116,4 +118,3 @@ grade_to_quality = (result: Any) -> QualityGrade {
     reasons: quick.reasons ?? []
   }
 }
-

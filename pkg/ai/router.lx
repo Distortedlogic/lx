@@ -2,7 +2,9 @@
 -- route: uses AI to match prompt to catalog entry.
 -- quick_route: keyword overlap heuristic, no AI call.
 
-use pkg/core/prompt
+Prompt RoutingPrompt = {
+  system: "You are a prompt router. Given a user prompt and a catalog of specialist agents, classify which agent should handle the prompt.\n\nRespond with ONLY a JSON object, no markdown fences:\n{`{\"domain\": \"...\", \"agent\": \"...\", \"confidence\": 0.0-1.0}`}\n\nIf no agent matches well, respond: {`{\"domain\": \"none\", \"agent\": \"\", \"confidence\": 0.0}`}\nConfidence 0.8+ means strong match. 0.5-0.8 partial. Below 0.5 means no good match."
+}
 
 no_match = {domain: "none"  agent: ""  confidence: 0.0  terminal: false}
 
@@ -13,12 +15,11 @@ no_match = {domain: "none"  agent: ""  confidence: 0.0  terminal: false}
   catalog | empty? ? no_match : {
     catalog_text = catalog | enumerate | map (i entry) "{i + 1}. name={entry.name} domain={entry.domain} description={entry.description ?? ""}" | join "\n"
 
-    p = prompt.create ()
-      | prompt.system "You are a prompt router. Given a user prompt and a catalog of specialist agents, classify which agent should handle the prompt.\n\nRespond with ONLY a JSON object, no markdown fences:\n{`{\"domain\": \"...\", \"agent\": \"...\", \"confidence\": 0.0-1.0}`}\n\nIf no agent matches well, respond: {`{\"domain\": \"none\", \"agent\": \"\", \"confidence\": 0.0}`}\nConfidence 0.8+ means strong match. 0.5-0.8 partial. Below 0.5 means no good match."
-      | prompt.section "Catalog" catalog_text
-      | prompt.section "Prompt to Route" prompt_text
+    p = RoutingPrompt {}
+    p.add_section "Catalog" catalog_text
+    p.add_section "Prompt to Route" prompt_text
 
-    text = prompt.ask p ""
+    text = p.ask ""
     parsed = text | json.parse ?? {domain: "none"  agent: ""  confidence: 0.0}
 
     domain = parsed.domain ?? "none"
@@ -39,7 +40,7 @@ no_match = {domain: "none"  agent: ""  confidence: 0.0  terminal: false}
       desc_words = (entry.description ?? "") | lower | split " " | filter (w) { len w > 3 }
       dom_words = (entry.domain ?? "") | lower | split " " | filter (w) { len w > 2 }
       name_words = (entry.name ?? "") | lower | split " " | filter (w) { len w > 2 }
-      words = [..desc_words ..dom_words ..name_words]
+      words = [..desc_words; ..dom_words; ..name_words]
       hits = words | filter (w) { prompt_text | lower | contains? w } | len
       score = words | len == 0 ? 0.0 : hits / (words | len)
       {..entry  score: score}

@@ -2,7 +2,9 @@
 -- plan: uses AI to decompose a complex task.
 -- quick_plan: sentence-splitting heuristic, no AI call.
 
-use pkg/core/prompt
+Prompt TaskPlanPrompt = {
+  system: "You are a task planner. Decompose a complex task into ordered subtasks.\n\nRules:\n- Each step must have a clear, actionable title and description\n- Specify dependencies as step IDs (0-indexed)\n- Estimate complexity as 'low', 'medium', or 'high'\n\nRespond with ONLY a JSON object, no markdown fences:\n{`{\"steps\": [{\"id\": 0, \"title\": \"...\", \"description\": \"...\", \"deps\": [], \"complexity\": \"low|medium|high\"}]}`}"
+}
 
 empty_plan = {steps: []  task: ""  step_count: 0}
 
@@ -14,13 +16,14 @@ empty_plan = {steps: []  task: ""  step_count: 0}
 
   task | trim | empty? ? empty_plan : {
     constraint_text = constraints | map (c) "- Constraint: {c}" | join "\n"
-    p = prompt.create ()
-      | prompt.system "You are a task planner. Decompose a complex task into ordered subtasks.\n\nRules:\n- Maximum {max_steps} steps\n- Each step must have a clear, actionable title and description\n- Specify dependencies as step IDs (0-indexed)\n- Estimate complexity as 'low', 'medium', or 'high'\n{constraint_text}\n\nRespond with ONLY a JSON object, no markdown fences:\n{`{\"steps\": [{\"id\": 0, \"title\": \"...\", \"description\": \"...\", \"deps\": [], \"complexity\": \"low|medium|high\"}]}`}"
-      | prompt.section "Task" task
+    p = Prompt {
+      system: "You are a task planner. Decompose a complex task into ordered subtasks.\n\nRules:\n- Maximum {max_steps} steps\n- Each step must have a clear, actionable title and description\n- Specify dependencies as step IDs (0-indexed)\n- Estimate complexity as 'low', 'medium', or 'high'\n{constraint_text}\n\nRespond with ONLY a JSON object, no markdown fences:\n{`{\"steps\": [{\"id\": 0, \"title\": \"...\", \"description\": \"...\", \"deps\": [], \"complexity\": \"low|medium|high\"}]}`}"
+    }
+    p.add_section "Task" task
 
-    p = context | empty? ? p : (prompt.section "Context" context p)
+    p = context | empty? ? p : { p.add_section "Context" context; p }
 
-    text = prompt.ask p ""
+    text = p.ask ""
     steps = text | lines | filter (l) { trim l | not empty? }
       | enumerate | map (pair) {id: pair.0  title: trim pair.1  description: trim pair.1  deps: pair.0 > 0 ? [pair.0 - 1] : []  complexity: "medium"  status: "pending"}
 

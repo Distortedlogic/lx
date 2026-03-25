@@ -1,28 +1,32 @@
 -- Response synthesis: combines reasoning, results, and identity into output
 -- Source: final stage — assembles everything into a coherent response for the human
 
-use pkg/core/prompt
 use pkg/data/md
 use pkg/ai/reasoning {ReasoningChain}
 use pkg/core/capability {advertise}
 use ../contracts {Response Identity}
 use ../traits {Synthesizer}
 
+Prompt SynthesisPrompt = {
+  system: "You synthesize responses."
+}
+
 Agent ResponseSynth: Synthesizer = {
   synthesize = (msg) {
     style_config = style_for (msg.user_style ?? "concise")
     evidence = gather_evidence msg
 
-    p = prompt.create ()
-      | prompt.system "You are {msg.identity.name}, {msg.identity.role}. {style_config.system_note}"
-      | prompt.section "Task" msg.task
-      | prompt.section "Reasoning" (msg.reasoning.conclusion ?? "{msg.reasoning}")
-      | prompt.section "Evidence" evidence
-      | prompt.instruction style_config.instruction
-      | prompt.constraint "Be direct. Lead with the answer. No filler."
-      | prompt.constraint "If uncertain, say so with your confidence level."
+    p = Prompt {
+      system: "You are {msg.identity.name}, {msg.identity.role}. {style_config.system_note}"
+    }
+    p.add_section "Task" msg.task
+    p.add_section "Reasoning" (msg.reasoning.conclusion ?? "{msg.reasoning}")
+    p.add_section "Evidence" evidence
+    p.add_instruction style_config.instruction
+    p.add_constraint "Be direct. Lead with the answer. No filler."
+    p.add_constraint "If uncertain, say so with your confidence level."
 
-    content = prompt.ask p (msg.reasoning.conclusion ?? msg.task)
+    content = p.ask (msg.reasoning.conclusion ?? msg.task)
 
     sources = msg.tool_results | map (r) "{r.tool ?? "tool"}" | uniq
 
@@ -81,25 +85,25 @@ gather_evidence = (request: Any) -> Str {
   reasoning_evidence = request.reasoning.thoughts ?? []
     | map (t) "- {(t.content ?? "{t}") | take 150}"
 
-  [..tool_evidence  ..reasoning_evidence] | join "\n"
+  [..tool_evidence; ..reasoning_evidence] | join "\n"
 }
 
 suggest_follow_ups = (task: Str  response: Str) -> [Str] {
   rl = response | lower
   [
-    ("error" "want me to fix this error?")
-    ("todo" "want me to implement the TODOs?")
+    ("error"; "want me to fix this error?")
+    ("todo"; "want me to implement the TODOs?")
   ]
     | filter (kw _) rl | contains? kw
     | map (.1)
-    | (s) task | lower | contains? "explain" ? [..s  "want me to go deeper on any part?"] : s
+    | (s) task | lower | contains? "explain" ? [..s; "want me to go deeper on any part?"] : s
     | take 3
 }
 
 +main = () {
   advertise {
     traits: ["Response"]
-    domains: ["synthesizer" "response" "formatting" "composition"]
+    domains: ["synthesizer"; "response"; "formatting"; "composition"]
     tools: ["ai"]
   }
 

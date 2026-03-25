@@ -1,8 +1,11 @@
 -- Context manager -- pressure monitoring, eviction, and AI compression for ContextWindow.
--- Composes pkg/data/context + pkg/core/prompt + pkg/core/score into reusable policies.
+-- Composes pkg/data/context + Prompt keyword + pkg/core/score into reusable policies.
 
 use pkg/data/context {ContextWindow}
-use pkg/core/prompt
+
+Prompt CompressionPrompt = {
+  system: "You compress text to its essential meaning."
+}
 
 +init = (capacity) ContextWindow {capacity}
 
@@ -58,12 +61,11 @@ use pkg/core/prompt
 }
 
 compress_item = (item) {
-  p = prompt.create ()
-    | prompt.system "You compress text to its essential meaning."
-    | prompt.section "Content" item.content
-    | prompt.instruction "Compress to ~25% of original length. Keep all facts."
+  p = CompressionPrompt {}
+  p.add_section "Content" item.content
+  p.add_instruction "Compress to ~25% of original length. Keep all facts."
 
-  prompt.ask p item.content
+  p.ask item.content
 }
 
 +snapshot = (win) {

@@ -2,8 +2,15 @@
 -- Source: extracted from brain/lib/reflection.lx
 -- Provides: action reflection, pattern extraction, strategy updates, feedback processing
 
-use pkg/core/prompt
 use pkg/data/trace {TraceStore}
+
+Prompt ReflectionPrompt = {
+  system: "You reflect on actions and extract lessons. Be honest about what worked and what didn't."
+}
+
+Prompt ImprovementPrompt = {
+  system: "You suggest improvements based on action patterns."
+}
 
 Trait +Reflection = {action: Str  outcome: Str  quality: Float where quality >= 0.0 && quality <= 1.0  lesson: Str  should_remember: Bool  strategy_worked: Bool}
 Trait +FeedbackSignal = {kind: Str  score: Float where score >= 0.0 && score <= 1.0  detail: Str  source: Str}
@@ -11,15 +18,14 @@ Trait +FeedbackSignal = {kind: Str  score: Float where score >= 0.0 && score <= 
 +reflect = (action: Str  outcome: Str  expectation: Str) -> Reflection {
   quality = assess_quality outcome expectation
 
-  p = prompt.create ()
-    | prompt.system "You reflect on actions and extract lessons. Be honest about what worked and what didn't."
-    | prompt.section "Action Taken" action
-    | prompt.section "Outcome" outcome
-    | prompt.section "Expectation" expectation
-    | prompt.instruction "1) Did it achieve its goal? 2) What worked? 3) What didn't? 4) Lesson?"
-    | prompt.constraint "One sentence per answer. No fluff."
+  p = ReflectionPrompt {}
+  p.add_section "Action Taken" action
+  p.add_section "Outcome" outcome
+  p.add_section "Expectation" expectation
+  p.add_instruction "1) Did it achieve its goal? 2) What worked? 3) What didn't? 4) Lesson?"
+  p.add_constraint "One sentence per answer. No fluff."
 
-  lesson = prompt.ask_lines p ""
+  lesson = p.ask_lines ""
     | last ?? "no lesson extracted"
 
   Reflection {
@@ -104,7 +110,7 @@ assess_quality = (outcome: Str  expectation: Str) -> Float {
     input: reflection.action
     output: reflection.lesson
     tags: [
-      reflection.strategy_worked ? "success" : "failure"
+      reflection.strategy_worked ? "success" : "failure";
       reflection.should_remember ? "memorable" : "routine"
     ]
   } ?? ()
@@ -117,12 +123,11 @@ assess_quality = (outcome: Str  expectation: Str) -> Float {
   winning = patterns.winning_patterns | join ", "
 
   losing | empty? ? ["current approach is working well"] : {
-    p = prompt.create ()
-      | prompt.system "You suggest improvements based on action patterns."
-      | prompt.section "Actions that keep failing" losing
-      | prompt.section "Actions that work" winning
-      | prompt.instruction "Suggest 2-3 concrete changes to improve success rate."
+    p = ImprovementPrompt {}
+    p.add_section "Actions that keep failing" losing
+    p.add_section "Actions that work" winning
+    p.add_instruction "Suggest 2-3 concrete changes to improve success rate."
 
-    prompt.ask_lines p "continue current approach"
+    p.ask_lines "continue current approach"
   }
 }

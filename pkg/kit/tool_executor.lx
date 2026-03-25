@@ -1,22 +1,28 @@
 -- Tool executor -- AI-powered tool selection, retry execution, result integration.
--- Composes pkg/core/prompt + pkg/core/circuit + std/retry into a reusable pipeline.
+-- Composes Prompt keyword + pkg/core/circuit + std/retry into a reusable pipeline.
 
-use pkg/core/prompt
 use pkg/core/retry
 use pkg/core/circuit {CircuitBreaker}
 use std/time
 use pkg/core/score
 use pkg/core/contracts {ToolRequest ToolResult}
 
-+select = (task tools) {
-  p = prompt.create ()
-    | prompt.system "You select the minimal set of tools needed for a task."
-    | prompt.section "Task" task
-    | prompt.section "Available Tools" (tools | map (t) "{t.name}: {t.description ?? t.name}" | join "\n")
-    | prompt.instruction "List only the tool names needed, one per line."
-    | prompt.constraint "Prefer cheaper tools. Only include what's strictly necessary."
+Prompt ToolSelectionPrompt = {
+  system: "You select the minimal set of tools needed for a task."
+}
 
-  selected_names = prompt.ask_lines p ""
+Prompt IntegrationPrompt = {
+  system: "You integrate tool results into a coherent answer."
+}
+
++select = (task tools) {
+  p = ToolSelectionPrompt {}
+  p.add_section "Task" task
+  p.add_section "Available Tools" (tools | map (t) "{t.name}: {t.description ?? t.name}" | join "\n")
+  p.add_instruction "List only the tool names needed, one per line."
+  p.add_constraint "Prefer cheaper tools. Only include what's strictly necessary."
+
+  selected_names = p.ask_lines ""
   tools | filter (t) selected_names | contains? t.name
 }
 
@@ -70,14 +76,13 @@ execute_single = (request dispatch_fn) {
 
   outputs = successful | map (r) "## {r.tool}\n{r.output}" | join "\n\n"
 
-  p = prompt.create ()
-    | prompt.system "You integrate tool results into a coherent answer."
-    | prompt.section "Goal" goal
-    | prompt.section "Tool Outputs" outputs
-    | prompt.instruction "Synthesize these results into a clear, direct answer."
-    | prompt.constraint "Don't mention the tools themselves. Just present the answer."
+  p = IntegrationPrompt {}
+  p.add_section "Goal" goal
+  p.add_section "Tool Outputs" outputs
+  p.add_instruction "Synthesize these results into a clear, direct answer."
+  p.add_constraint "Don't mention the tools themselves. Just present the answer."
 
-  prompt.ask p outputs
+  p.ask outputs
 }
 
 +total_cost = (results) {

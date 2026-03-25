@@ -1,11 +1,22 @@
 -- Inner critic: challenges assumptions, finds flaws, prevents overconfidence
 -- Source: adversarial self-review before committing to a response
 
-use pkg/core/prompt
 use pkg/agents/guard
 use pkg/core/score
 use pkg/core/capability {advertise}
 use ../traits {Critic}
+
+Prompt CritiquePrompt = {
+  system: "You are a rigorous critic. Find flaws, gaps, and risks. Be honest, not kind."
+}
+
+Prompt ChallengePrompt = {
+  system: "You challenge assumptions by finding counterexamples and edge cases."
+}
+
+Prompt CorrectnessPrompt = {
+  system: "You verify code correctness."
+}
 
 Schema Critique = {
   flaws: List = "logical or factual flaws found"
@@ -19,15 +30,14 @@ Schema Critique = {
 
 Agent InnerCritic: Critic = {
   critique = (msg) {
-    p = prompt.create ()
-      | prompt.system "You are a rigorous critic. Find flaws, gaps, and risks. Be honest, not kind."
-      | prompt.section "Content ({msg.content_type})" msg.content
-      | prompt.section "Original Task" msg.task
-      | prompt.section "Claimed Confidence" "{msg.confidence}"
-      | prompt.instruction "Find: 1) Factual errors 2) Logical gaps 3) Missing edge cases 4) Security risks"
-      | prompt.constraint "If the content is actually good, say so briefly. Don't manufacture issues."
+    p = CritiquePrompt {}
+    p.add_section "Content ({msg.content_type})" msg.content
+    p.add_section "Original Task" msg.task
+    p.add_section "Claimed Confidence" "{msg.confidence}"
+    p.add_instruction "Find: 1) Factual errors 2) Logical gaps 3) Missing edge cases 4) Security risks"
+    p.add_constraint "If the content is actually good, say so briefly. Don't manufacture issues."
 
-    resp = ai.prompt (prompt.render p) ^
+    resp = ai.prompt (p.render ()) ^
     issues = resp.text | lines | filter (starts? "- ") | map (drop 2)
 
     flaws = issues | filter (contains? "error")
@@ -37,19 +47,18 @@ Agent InnerCritic: Critic = {
     {
       flaws
       risks
-      severity: score.tier [{min: 6  name: "high"} {min: 3  name: "medium"} {min: 1  name: "low"} {min: 0  name: "none"}] issue_count
+      severity: score.tier [{min: 6  name: "high"}; {min: 3  name: "medium"}; {min: 1  name: "low"}; {min: 0  name: "none"}] issue_count
       revised_confidence: msg.confidence - issue_count * 0.1 | math.max 0.1
     }
   }
 
   challenge = (msg) {
-    p = prompt.create ()
-      | prompt.system "You challenge assumptions by finding counterexamples and edge cases."
-      | prompt.section "Assumption" msg.assumption
-      | prompt.section "Context" msg.context
-      | prompt.instruction "1) State the assumption. 2) Find counterexamples. 3) Where does it break?"
+    p = ChallengePrompt {}
+    p.add_section "Assumption" msg.assumption
+    p.add_section "Context" msg.context
+    p.add_instruction "1) State the assumption. 2) Find counterexamples. 3) Where does it break?"
 
-    resp = ai.prompt (prompt.render p) ^
+    resp = ai.prompt (p.render ()) ^
     counterexamples = resp.text | lines | filter (starts? "- ") | map (drop 2)
     {holds: counterexamples | empty?  counterexamples: counterexamples}
   }
@@ -64,13 +73,12 @@ Agent InnerCritic: Critic = {
 }
 
 check_correctness = (code: Str  task: Str) -> {ok: Bool  issues: [Str]} {
-  p = prompt.create ()
-    | prompt.system "You verify code correctness."
-    | prompt.section "Code" code
-    | prompt.section "Task" task
-    | prompt.instruction "Does this code correctly accomplish the task? List any bugs."
+  p = CorrectnessPrompt {}
+  p.add_section "Code" code
+  p.add_section "Task" task
+  p.add_instruction "Does this code correctly accomplish the task? List any bugs."
 
-  resp = ai.prompt (prompt.render p) ^
+  resp = ai.prompt (p.render ()) ^
   bugs = resp.text | lines | filter (starts? "- ") | map (drop 2)
   {ok: bugs | empty?  issues: bugs}
 }
@@ -78,7 +86,7 @@ check_correctness = (code: Str  task: Str) -> {ok: Bool  issues: [Str]} {
 +main = () {
   advertise {
     traits: ["Critique"]
-    domains: ["critic" "review" "verification" "quality"]
+    domains: ["critic"; "review"; "verification"; "quality"]
     tools: ["ai"]
   }
 

@@ -5,8 +5,11 @@
 use pkg/core/budget
 use pkg/kit/tool_executor : executor
 use pkg/core/contracts {ToolRequest ToolResult ActionPlan}
-use pkg/core/prompt
 use pkg/core/score
+
+Prompt ExecutionPlanPrompt = {
+  system: "You create step-by-step execution plans using available tools."
+}
 
 MCP CognitiveTools = {
   Read {path: Str} -> {content: Str}
@@ -27,7 +30,7 @@ tool_costs = %{
 }
 
 +available_tools = () -> [Any] {
-  ["Read" "Write" "Edit" "Glob" "Grep" "Bash" "Agent" "WebSearch" "WebFetch"]
+  ["Read"; "Write"; "Edit"; "Glob"; "Grep"; "Bash"; "Agent"; "WebSearch"; "WebFetch"]
     | map (name) {name  cost: get name tool_costs ?? 0.01}
 }
 
@@ -41,14 +44,13 @@ tool_costs = %{
   budget_ok = budget.remaining b | (r) r.tokens > to_int (estimated * 1000.0)
   budget_ok ? () : log.warn "budget tight for planned execution"
 
-  p = prompt.create ()
-    | prompt.system "You create step-by-step execution plans using available tools."
-    | prompt.section "Goal" goal
-    | prompt.section "Tools" (selected_tools | map (.name) | join ", ")
-    | prompt.instruction "Create ordered steps. Each step: tool name + arguments + what it achieves."
-    | prompt.constraint "Minimize steps. Parallelize when dependencies allow."
+  p = ExecutionPlanPrompt {}
+  p.add_section "Goal" goal
+  p.add_section "Tools" (selected_tools | map (.name) | join ", ")
+  p.add_instruction "Create ordered steps. Each step: tool name + arguments + what it achieves."
+  p.add_constraint "Minimize steps. Parallelize when dependencies allow."
 
-  text = prompt.ask p goal
+  text = p.ask goal
 
   steps = text | lines
     | filter (l) trim l | not empty?
@@ -65,7 +67,7 @@ tool_costs = %{
     goal
     steps
     estimated_cost: estimated
-    risk: score.tier [{min: 1.0  name: "high"} {min: 0.3  name: "medium"} {min: 0.0  name: "low"}] estimated
+    risk: score.tier [{min: 1.0  name: "high"}; {min: 0.3  name: "medium"}; {min: 0.0  name: "low"}] estimated
     fallback: "simplify approach and retry with fewer tools"
   }
 }
