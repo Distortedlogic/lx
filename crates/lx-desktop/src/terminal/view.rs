@@ -94,13 +94,7 @@ pub fn EditorView(editor_id: String, file_path: String, language: Option<String>
   let fp = file_path.clone();
   let content = use_resource(move || {
     let fp = fp.clone();
-    async move {
-      if fp.is_empty() {
-        String::new()
-      } else {
-        tokio::fs::read_to_string(&fp).await.unwrap_or_default()
-      }
-    }
+    async move { if fp.is_empty() { String::new() } else { tokio::fs::read_to_string(&fp).await.unwrap_or_default() } }
   });
 
   let (element_id, widget) = use_ts_widget("editor", serde_json::json!({}));
@@ -111,7 +105,10 @@ pub fn EditorView(editor_id: String, file_path: String, language: Option<String>
     }
   });
 
-  use_future(move || async move {
+  let file_path_save = file_path.clone();
+  use_future(move || {
+    let file_path = file_path_save.clone();
+    async move {
     loop {
       let Ok(msg) = widget.recv::<serde_json::Value>().await else { break };
       match msg["type"].as_str() {
@@ -120,7 +117,7 @@ pub fn EditorView(editor_id: String, file_path: String, language: Option<String>
           let col = msg["col"].as_u64().unwrap_or(1) as u32;
           let ctx = use_context::<crate::contexts::status_bar::StatusBarState>();
           ctx.update_cursor(line, col);
-        }
+        },
         Some("save") => {
           if let Some(text) = msg["content"].as_str() {
             let fp = file_path.clone();
@@ -129,8 +126,8 @@ pub fn EditorView(editor_id: String, file_path: String, language: Option<String>
               let _ = tokio::fs::write(&fp, &text).await;
             }
           }
-        }
-        _ => {}
+        },
+        _ => {},
       }
     }
   });
@@ -140,10 +137,7 @@ pub fn EditorView(editor_id: String, file_path: String, language: Option<String>
 
 #[component]
 pub fn AgentView(agent_id: String, session_id: String, model: String) -> Element {
-  let (element_id, widget) = use_ts_widget(
-    "agent",
-    serde_json::json!({ "sessionId": session_id, "model": model }),
-  );
+  let (element_id, widget) = use_ts_widget("agent", serde_json::json!({ "sessionId": session_id, "model": model }));
 
   use_future(move || async move {
     loop {
@@ -151,7 +145,9 @@ pub fn AgentView(agent_id: String, session_id: String, model: String) -> Element
       match msg["type"].as_str() {
         Some("user_message") => {
           let content = msg["content"].as_str().unwrap_or("").to_owned();
-          if content.is_empty() { continue; }
+          if content.is_empty() {
+            continue;
+          }
           match crate::voice_backend::ClaudeCliBackend.query(&content).await {
             Ok(response) => {
               widget.send_update(serde_json::json!({
@@ -159,17 +155,17 @@ pub fn AgentView(agent_id: String, session_id: String, model: String) -> Element
                 "text": response,
               }));
               widget.send_update(serde_json::json!({ "type": "assistant_done" }));
-            }
+            },
             Err(e) => {
               widget.send_update(serde_json::json!({
                 "type": "error",
                 "message": format!("{e:#}"),
               }));
-            }
+            },
           }
-        }
-        Some("tool_decision") => {}
-        _ => {}
+        },
+        Some("tool_decision") => {},
+        _ => {},
       }
     }
   });
@@ -185,9 +181,9 @@ pub fn CanvasView(canvas_id: String, widget_type: String, config: Value) -> Elem
     loop {
       let Ok(msg) = widget.recv::<serde_json::Value>().await else { break };
       match msg["type"].as_str() {
-        Some("content_update") => {}
-        Some("interaction") => {}
-        _ => {}
+        Some("content_update") => {},
+        Some("interaction") => {},
+        _ => {},
       }
     }
   });

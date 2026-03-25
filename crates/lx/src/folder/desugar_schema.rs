@@ -1,8 +1,8 @@
 use miette::SourceSpan;
 
 use crate::ast::{
-  AgentMethod, AstArena, BindTarget, Binding, BinOp, Expr, ExprApply, ExprBinary, ExprBlock, ExprFunc, ExprId, KeywordDeclData, Literal, ListElem, Param,
-  RecordField, Section, Stmt, StmtId, StrPart, TraitDeclData, TraitEntry, UseKind, UseStmt,
+  AgentMethod, AstArena, BinOp, BindTarget, Binding, Expr, ExprApply, ExprBinary, ExprBlock, ExprFunc, ExprId, KeywordDeclData, ListElem, Literal, Param,
+  RecordField, Stmt, StmtId, StrPart, TraitDeclData, TraitEntry, UseKind, UseStmt,
 };
 use crate::sym::intern;
 
@@ -92,10 +92,7 @@ fn build_schema_method(entries: &[TraitEntry], span: SourceSpan, arena: &mut Ast
     span,
   );
 
-  let schema_fn = arena.alloc_expr(
-    Expr::Func(ExprFunc { params: vec![], type_params: vec![], ret_type: None, guard: None, body: envelope }),
-    span,
-  );
+  let schema_fn = arena.alloc_expr(Expr::Func(ExprFunc { params: vec![], type_params: vec![], ret_type: None, guard: None, body: envelope }), span);
   AgentMethod { name: intern("schema"), handler: schema_fn }
 }
 
@@ -113,13 +110,25 @@ fn build_validate_method(entries: &[TraitEntry], span: SourceSpan, arena: &mut A
   let names_list = arena.alloc_expr(Expr::List(field_names), span);
 
   let k_sym = intern("k");
-  let k_ref = arena.alloc_expr(Expr::Ident(k_sym), span);
   let keys_fn = arena.alloc_expr(Expr::Ident(intern("keys")), span);
   let data_ref2 = arena.alloc_expr(Expr::Ident(data_sym), span);
   let data_keys = arena.alloc_expr(Expr::Apply(ExprApply { func: keys_fn, arg: data_ref2 }), span);
-  let eq_section = arena.alloc_expr(Expr::Section(Section::Right { op: BinOp::Eq, operand: k_ref }), span);
+  let eq_x_sym = intern("__eq_x");
+  let eq_x_ref = arena.alloc_expr(Expr::Ident(eq_x_sym), span);
+  let k_ref_eq = arena.alloc_expr(Expr::Ident(k_sym), span);
+  let eq_body = arena.alloc_expr(Expr::Binary(ExprBinary { op: BinOp::Eq, left: eq_x_ref, right: k_ref_eq }), span);
+  let eq_lambda = arena.alloc_expr(
+    Expr::Func(ExprFunc {
+      params: vec![Param { name: eq_x_sym, type_ann: None, default: None }],
+      type_params: vec![],
+      ret_type: None,
+      guard: None,
+      body: eq_body,
+    }),
+    span,
+  );
   let any_fn = arena.alloc_expr(Expr::Ident(intern("any?")), span);
-  let any_with_pred = arena.alloc_expr(Expr::Apply(ExprApply { func: any_fn, arg: eq_section }), span);
+  let any_with_pred = arena.alloc_expr(Expr::Apply(ExprApply { func: any_fn, arg: eq_lambda }), span);
   let keys_any = arena.alloc_expr(Expr::Apply(ExprApply { func: any_with_pred, arg: data_keys }), span);
   let not_fn = arena.alloc_expr(Expr::Ident(intern("not")), span);
   let not_any = arena.alloc_expr(Expr::Apply(ExprApply { func: not_fn, arg: keys_any }), span);
@@ -137,16 +146,8 @@ fn build_validate_method(entries: &[TraitEntry], span: SourceSpan, arena: &mut A
   let filter_with_pred = arena.alloc_expr(Expr::Apply(ExprApply { func: filter_fn, arg: filter_body }), span);
   let missing_val = arena.alloc_expr(Expr::Apply(ExprApply { func: filter_with_pred, arg: names_list }), span);
 
-  let missing_binding = arena.alloc_stmt(
-    Stmt::Binding(Binding {
-      exported: false,
-      mutable: false,
-      target: BindTarget::Name(missing_sym),
-      type_ann: None,
-      value: missing_val,
-    }),
-    span,
-  );
+  let missing_binding = arena
+    .alloc_stmt(Stmt::Binding(Binding { exported: false, mutable: false, target: BindTarget::Name(missing_sym), type_ann: None, value: missing_val }), span);
 
   let missing_ref = arena.alloc_expr(Expr::Ident(missing_sym), span);
   let len_fn = arena.alloc_expr(Expr::Ident(intern("len")), span);
@@ -170,13 +171,7 @@ fn build_validate_method(entries: &[TraitEntry], span: SourceSpan, arena: &mut A
   let body = arena.alloc_expr(Expr::Block(ExprBlock { stmts: vec![missing_binding, ternary_stmt] }), span);
 
   let validate_fn = arena.alloc_expr(
-    Expr::Func(ExprFunc {
-      params: vec![Param { name: data_sym, type_ann: None, default: None }],
-      type_params: vec![],
-      ret_type: None,
-      guard: None,
-      body,
-    }),
+    Expr::Func(ExprFunc { params: vec![Param { name: data_sym, type_ann: None, default: None }], type_params: vec![], ret_type: None, guard: None, body }),
     span,
   );
   AgentMethod { name: intern("validate"), handler: validate_fn }

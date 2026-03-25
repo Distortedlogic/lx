@@ -14,7 +14,8 @@ impl AstVisitor for CoreValidator {
         | KeywordKind::Store
         | KeywordKind::Session
         | KeywordKind::Guard
-        | KeywordKind::Workflow => {
+        | KeywordKind::Workflow
+        | KeywordKind::Schema => {
           panic!("KeywordDecl({:?}) should have been desugared at offset {}", data.keyword, span.offset())
         },
         _ => {},
