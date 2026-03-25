@@ -1,4 +1,4 @@
-use workrunner/lib/work_item
+use workrunner/schema/work_item
 
 wi = work_item.load "workrunner/tests/fixtures/test_work_item.md"
 

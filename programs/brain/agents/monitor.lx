@@ -2,7 +2,7 @@
 -- Source: health monitoring from brain/lib/monitor.lx; introspection moved to pkg/core/introspect
 -- Provides: health checks, budget tracking, strategy suggestion
 
-use ./lib/introspect {Inspector}
+use ./introspect {Inspector}
 use pkg/guard/circuit {CircuitBreaker}
 use pkg/agent/budget
 use std/time

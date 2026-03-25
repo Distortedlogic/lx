@@ -1,4 +1,4 @@
-use workrunner/lib/grader {Grader}
+use workrunner/grader {Grader}
 
 g = Grader {
   threshold: 80

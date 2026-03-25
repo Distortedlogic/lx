@@ -1,8 +1,8 @@
-use workrunner/lib/work_item
-use workrunner/lib/log
-use workrunner/lib/orchestrator
-use workrunner/lib/grader {Grader}
-use workrunner/lib/context
+use workrunner/schema/work_item
+use workrunner/log
+use workrunner/workflow/orchestrator
+use workrunner/grader {Grader}
+use workrunner/context
 
 wi = work_item.load "workrunner/tests/fixtures/tiny_work_item.md"
 assert (wi.task_count () == 1) "tiny has 1 task"

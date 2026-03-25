@@ -5,11 +5,11 @@
 
 use std/time
 use std/cron
-use workrunner/lib/log
-use workrunner/lib/context
-use workrunner/lib/persistence {RunStatus}
-use workrunner/lib/grader {Grader}
-use workrunner/lib/orchestrator
+use workrunner/log
+use workrunner/context
+use workrunner/store/status {RunStatus}
+use workrunner/grader {Grader}
+use workrunner/workflow/orchestrator
 
 target_grade = 93
 max_fix_rounds = 3

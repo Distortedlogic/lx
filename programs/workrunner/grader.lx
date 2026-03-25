@@ -1,25 +1,7 @@
--- Work Item Grader -- scores work against a rubric.
--- Uses Prompt keyword for prompt assembly, ai.prompt_with with structured output.
--- Returns GradeResult with per-category scores, overall pass/fail, feedback.
+-- Work Item Grader — scores work against a rubric.
 
-Schema +GradeResult = {
-  score: Int = "0-100 weighted score across all rubric categories"
-  passed: Bool = "true if score >= threshold and no category failed"
-  categories: List = "per-category scores with name, score, passed, feedback"
-  feedback: Str = "human-readable summary of what passed and failed"
-  failed: List = "names of categories that scored below 70"
-}
-
-Schema +CategoryScore = {
-  name: Str = "rubric category name"
-  score: Int = "0-100 score for this category"
-  passed: Bool = "true if score >= 70"
-  feedback: Str = "evaluator feedback for this category"
-}
-
-Prompt GradePrompt = {
-  system: "You are a grader scoring work against a rubric. For each category, assign a score 0-100 and brief feedback. A category passes at score >= 70."
-}
+use workrunner/schema/grade {GradeResult CategoryScore}
+use workrunner/prompt/agents {GradePrompt}
 
 Class +Grader = {
   rubric: []
@@ -61,12 +43,12 @@ Class +Grader = {
     parsed = json.parse text
     parsed ? {
       Err e -> self.empty_result "JSON parse error: {e}"
-      Ok json -> self.assemble json
+      Ok json_val -> self.assemble json_val
     }
   }
 
-  assemble = (json) {
-    raw_cats = json.categories ?? []
+  assemble = (json_val) {
+    raw_cats = json_val.categories ?? []
     total_score := 0
     total_weight := 0
     failed := []
@@ -84,7 +66,7 @@ Class +Grader = {
       total_weight <- total_weight + weight
       cat_score = CategoryScore {name: rub.name  score: score  passed: cat_passed  feedback: fb}
       categories <- [..categories; cat_score]
-      new_failed = not cat_passed ? [..failed; rub.name] : failed
+      new_failed = cat_passed == false ? [..failed; rub.name] : failed
       failed <- new_failed
     }
 

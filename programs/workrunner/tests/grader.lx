@@ -1,4 +1,4 @@
-use workrunner/lib/grader {Grader GradeResult CategoryScore}
+use workrunner/grader {Grader GradeResult CategoryScore}
 
 g = Grader {
   threshold: 80

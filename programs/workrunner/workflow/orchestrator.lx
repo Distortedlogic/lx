@@ -1,10 +1,10 @@
 -- Orchestrator — runs tasks within a work item, grades, fixes.
 -- Pure logic: takes dependencies as arguments, no globals.
 
-use workrunner/lib/log
-use workrunner/lib/persistence
-use workrunner/lib/agents
-use workrunner/lib/work_item
+use workrunner/log
+use workrunner/store/status
+use workrunner/agent/agents
+use workrunner/schema/work_item
 
 run_task_impl = (wi task bootstrap_ctx max_rounds runner_dir) {
   log.log "  --- task {task.num}/{wi.task_count ()}: {task.subject} ---"

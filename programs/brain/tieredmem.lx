@@ -3,8 +3,8 @@
 -- Provides: multi-tier recall, consolidation, decay, preferences, skills, tiered promotion
 
 use ./memory {MemoryStore}
-use ./lib/knowledge {KnowledgeBase}
-use ./lib/profile
+use ./store/knowledge {KnowledgeBase}
+use ./store/profile
 use std/time
 use std/fs
 

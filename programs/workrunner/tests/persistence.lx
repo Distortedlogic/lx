@@ -1,4 +1,4 @@
-use workrunner/lib/persistence {RunStatus}
+use workrunner/store/status {RunStatus}
 
 runner_dir = "/tmp/lx_test_persistence"
 $rm -rf {runner_dir}

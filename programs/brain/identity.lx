@@ -1,11 +1,11 @@
 -- Core identity: values, personality, self-model, preference learning
 -- Source: the persistent self — who I am, what I value, how I adapt
 
-use ./lib/profile
-use ./lib/knowledge {KnowledgeBase}
+use ./store/profile
+use ./store/knowledge {KnowledgeBase}
 use std/user
 use std/fs
-use ../contracts {Identity}
+use ../schema/contracts {Identity}
 use pkg/agent/reflect {FeedbackSignal}
 
 dangerous_patterns = ["delete all" "drop table" "rm -rf /" "force push main" "ignore error"]

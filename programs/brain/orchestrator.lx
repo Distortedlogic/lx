@@ -5,23 +5,23 @@
 use pkg/workflow/saga
 use pkg/agent/budget
 use std/cron
-use ./lib/workflow
+use ./workflow/workflow
 use pkg/store/tasks {TaskStore}
 use std/diag
 use std/time
 
-use ./lib/monitor {CognitiveState}
-use ./contracts {Response PerceptionEvent ReasoningEvent ResponseEvent}
+use ./agents/monitor {CognitiveState}
+use ./schema/contracts {Response PerceptionEvent ReasoningEvent ResponseEvent}
 use pkg/agent/perception : perceive
 use pkg/agent/reasoning : reason
-use ./lib/tieredmem : mem
-use ./lib/context_mgr : ctx_mgr
-use ./lib/identity : identity
+use ./tieredmem : mem
+use ./context_mgr : ctx_mgr
+use ./identity : identity
 use pkg/agent/quality
-use ./lib/monitor : monitor
+use ./agents/monitor : monitor
 use pkg/agent/reflect : reflection
-use ./lib/dialogue : dialogue
-use ./lib/cognitive_saga : cognitive_saga
+use ./dialogue : dialogue
+use ./workflow/cognitive_saga : cognitive_saga
 use ./agents/dispatcher : dispatch
 
 +run = (input: Str) -> Any {

@@ -1,7 +1,7 @@
 -- Deep analysis specialist: investigates problems thoroughly
 -- Source: dispatched when perception flags a complex or ambiguous input
 
-use ../lib/capability {advertise}
+use ../schema/capability {advertise}
 use ../traits {Analyst}
 
 Prompt AnalysisPrompt = {

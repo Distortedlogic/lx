@@ -1,4 +1,4 @@
-use workrunner/lib/work_item
+use workrunner/schema/work_item
 use std/fs
 
 wi = work_item.load "work_items/PKG_CDP.md"

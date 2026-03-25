@@ -1,4 +1,4 @@
-use workrunner/lib/log : ts_log
+use workrunner/log : ts_log
 
 ts_log.log "test message from log module"
 

@@ -1,4 +1,4 @@
-use workrunner/lib/context
+use workrunner/context
 
 ctx = context.load_bootstrap ()
 assert (ctx | len > 0) "bootstrap context is non-empty"
