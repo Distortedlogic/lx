@@ -3,7 +3,7 @@
 -- Domain-specific: create, get (wraps in Ok/Err), state machine transitions.
 
 use std/time
-use pkg/core/collection {Collection}
+use std/collection {Collection}
 
 task_counter := 0
 

@@ -6,7 +6,7 @@
 
 use std/time
 use std/fs
-use pkg/core/collection {Collection}
+use std/collection {Collection}
 
 keep = (pred list) filter pred list
 

@@ -2,7 +2,7 @@
 -- Holds session state. connect/disconnect manage the lifecycle.
 -- call delegates to mcp.call, tools delegates to mcp.list_tools.
 
-use pkg/core/connector {Connector}
+use std/connector {Connector}
 
 Class +McpConnector : [Connector] = {
   command: ""

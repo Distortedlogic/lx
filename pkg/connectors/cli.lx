@@ -2,7 +2,7 @@
 -- Stateless connect/disconnect. call builds CLI commands from tool_defs.
 -- Each tool_def maps a tool name to a subcommand + flag pattern.
 
-use pkg/core/connector {Connector}
+use std/connector {Connector}
 
 build_cli_args = (tool_def args) {
   base = tool_def.subcommand ?? ""

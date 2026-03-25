@@ -1,5 +1,5 @@
 use std/math
-use pkg/core/collection {Collection}
+use std/collection {Collection}
 
 cosine_sim = (a b) {
   sums = zip a b | fold {dot: 0.0  na: 0.0  nb: 0.0} (acc pair) {

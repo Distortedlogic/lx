@@ -3,7 +3,7 @@
 -- Generic operations (get/keys/query/remove/save/load) come from Collection.
 
 use std/time
-use pkg/core/collection {Collection}
+use std/collection {Collection}
 
 +Class KnowledgeBase : [Collection] = {
   entries: Store ()

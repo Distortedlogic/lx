@@ -3,7 +3,7 @@
 -- Domain-specific: store, recall, promote/demote, consolidate, tier filtering.
 
 use std/time
-use pkg/core/collection {Collection}
+use std/collection {Collection}
 
 keep = (pred list) filter pred list
 
