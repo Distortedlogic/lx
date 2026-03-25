@@ -3,8 +3,8 @@
 -- Provides: health checks, budget tracking, strategy suggestion
 
 use ./lib/introspect {Inspector}
-use pkg/patterns/circuit {CircuitBreaker}
-use pkg/ai/budget
+use pkg/guard/circuit {CircuitBreaker}
+use pkg/agent/budget
 use std/time
 
 Trait +CognitiveState = {

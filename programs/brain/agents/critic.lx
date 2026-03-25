@@ -2,7 +2,7 @@
 -- Source: adversarial self-review before committing to a response
 
 use ../lib/guard
-use pkg/ai/score
+use pkg/agent/score
 use ../lib/capability {advertise}
 use ../traits {Critic}
 

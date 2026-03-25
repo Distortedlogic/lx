@@ -6,8 +6,8 @@ use ../lib/intercept {intercept}
 use ../lib/capability {capabilities}
 use ../lib/reconcile {reconcile}
 use ../lib/negotiate {negotiate}
-use pkg/data/trace {TraceStore}
-use pkg/types/contracts {AgentTask AgentResult}
+use pkg/store/trace {TraceStore}
+use pkg/schema/contracts {AgentTask AgentResult}
 
 +create_workforce = () -> Any {
   (analyst critic researcher) = par {

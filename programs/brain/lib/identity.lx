@@ -6,7 +6,7 @@ use ./lib/knowledge {KnowledgeBase}
 use std/user
 use std/fs
 use ../contracts {Identity}
-use pkg/ai/reflect {FeedbackSignal}
+use pkg/agent/reflect {FeedbackSignal}
 
 dangerous_patterns = ["delete all" "drop table" "rm -rf /" "force push main" "ignore error"]
 

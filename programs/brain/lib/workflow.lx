@@ -4,7 +4,7 @@
 -- and must return Ok result or Err reason.
 -- Returns the work function's Result unchanged after recording outcome.
 
-use pkg/data/trace {TraceStore}
+use pkg/store/trace {TraceStore}
 
 +run = (name source work_fn) {
   session = TraceStore {path: name}

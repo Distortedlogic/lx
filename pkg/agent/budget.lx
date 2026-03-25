@@ -2,7 +2,7 @@
 -- Replaces the Rust std/budget module with Store-backed lx implementation.
 
 use std/time
-use pkg/types/errors {BudgetExhausted}
+use pkg/schema/errors {BudgetExhausted}
 
 budgets = Store ()
 

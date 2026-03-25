@@ -2,24 +2,24 @@
 -- Source: pub/sub event bus, middleware tracing, human gates, cron scheduling, task lifecycle
 -- Architecture: saga-based pipeline with reactive specialist agents
 
-use pkg/patterns/saga
-use pkg/ai/budget
+use pkg/workflow/saga
+use pkg/agent/budget
 use std/cron
 use ./lib/workflow
-use pkg/data/tasks {TaskStore}
+use pkg/store/tasks {TaskStore}
 use std/diag
 use std/time
 
 use ./lib/monitor {CognitiveState}
 use ./contracts {Response PerceptionEvent ReasoningEvent ResponseEvent}
-use pkg/ai/perception : perceive
-use pkg/ai/reasoning : reason
+use pkg/agent/perception : perceive
+use pkg/agent/reasoning : reason
 use ./lib/tieredmem : mem
 use ./lib/context_mgr : ctx_mgr
 use ./lib/identity : identity
-use pkg/ai/quality
+use pkg/agent/quality
 use ./lib/monitor : monitor
-use pkg/ai/reflect : reflection
+use pkg/agent/reflect : reflection
 use ./lib/dialogue : dialogue
 use ./lib/cognitive_saga : cognitive_saga
 use ./agents/dispatcher : dispatch

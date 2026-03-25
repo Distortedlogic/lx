@@ -2,9 +2,9 @@
 -- Source: merged from brain/lib/quality.lx + flows/lib/grading.lx + critic.lx check_safety
 -- Provides: rubrics, grading, refinement, safety scanning, draft grading workflows
 
-use pkg/ai/audit
-use pkg/data/trace {TraceStore}
-use pkg/ai/auditor
+use pkg/agent/audit
+use pkg/store/trace {TraceStore}
+use pkg/agent/auditor
 
 Trait +QualityGrade = {
   score: Float where score >= 0.0 && score <= 100.0

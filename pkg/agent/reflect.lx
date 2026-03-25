@@ -2,7 +2,7 @@
 -- Source: extracted from brain/lib/reflection.lx
 -- Provides: action reflection, pattern extraction, strategy updates, feedback processing
 
-use pkg/data/trace {TraceStore}
+use pkg/store/trace {TraceStore}
 
 Prompt ReflectionPrompt = {
   system: "You reflect on actions and extract lessons. Be honest about what worked and what didn't."

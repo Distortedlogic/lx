@@ -2,10 +2,10 @@
 -- Source: bridges cognitive intent to concrete actions via MCP/shell/AI
 -- Delegates generic tool operations to pkg/kit/tool_executor.
 
-use pkg/ai/budget
+use pkg/agent/budget
 use ./tool_executor : executor
-use pkg/types/contracts {ToolRequest ToolResult ActionPlan}
-use pkg/ai/score
+use pkg/schema/contracts {ToolRequest ToolResult ActionPlan}
+use pkg/agent/score
 
 Prompt ExecutionPlanPrompt = {
   system: "You create step-by-step execution plans using available tools."
