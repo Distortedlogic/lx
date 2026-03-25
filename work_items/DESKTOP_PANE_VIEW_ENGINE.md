@@ -108,9 +108,8 @@ use_future(move || async move {
             Some("cursor") => {
                 let line = msg["line"].as_u64().unwrap_or(1) as u32;
                 let col = msg["col"].as_u64().unwrap_or(1) as u32;
-                if let Some(ctx) = dioxus::prelude::try_consume_context::<crate::contexts::status_bar::StatusBarState>() {
-                    ctx.update_cursor(line, col);
-                }
+                let ctx = use_context::<crate::contexts::status_bar::StatusBarState>();
+                ctx.update_cursor(line, col);
             }
             Some("save") => {
                 if let Some(text) = msg["content"].as_str() {
@@ -129,7 +128,7 @@ use_future(move || async move {
 
 5. Render the same div: `rsx! { div { id: "{element_id}", class: "w-full h-full bg-[var(--surface-container-lowest)]" } }`
 
-Keep the same component signature: `pub fn EditorView(editor_id: String, file_path: String, language: Option<String>) -> Element`. The `editor_id` and `language` props remain available for future use.
+Keep the same component signature: `pub fn EditorView(editor_id: String, file_path: String, language: Option<String>) -> Element`.
 
 **ActiveForm:** Rewriting EditorView with async file loading and widget message loop
 
@@ -185,7 +184,7 @@ use_future(move || async move {
 });
 ```
 
-This uses `ClaudeCliBackend` which is the existing agent backend (it shells out to the `claude` CLI). The response comes back as a single string (not streaming), so it is sent as one `assistant_chunk` followed by `assistant_done`. The `tool_decision` arm is a no-op stub for now since ClaudeCliBackend doesn't support tool use — it's present so the match is explicit.
+This uses `ClaudeCliBackend` which is the existing agent backend (it shells out to the `claude` CLI). The response comes back as a single string (not streaming), so it is sent as one `assistant_chunk` followed by `assistant_done`. The `tool_decision` arm is a no-op because `ClaudeCliBackend` returns plain text without tool use. The arm exists so the match is explicit about the agent.ts protocol.
 
 3. Add the import at the top of view.rs: `use common_voice::AgentBackend as _;`
 
@@ -222,7 +221,7 @@ use_future(move || async move {
 });
 ```
 
-The match arms are stubs — each canvas widget type (log-viewer, markdown, json-viewer) has different event semantics that will be fleshed out as those widgets mature. The critical fix is that the widget message channel is now drained instead of silently accumulating in the recv buffer. Without this loop, the channel buffer grows unboundedly for long-lived canvas panes.
+The match arms are no-ops. Canvas widget event handling is type-specific and outside this unit's scope. The critical fix is that the widget message channel is now drained instead of silently accumulating in the recv buffer. Without this loop, the channel buffer grows unboundedly for long-lived canvas panes.
 
 3. Render: `rsx! { div { id: "{element_id}", class: "w-full h-full bg-[var(--surface-container)]" } }`
 

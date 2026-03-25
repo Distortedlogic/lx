@@ -59,6 +59,10 @@ impl AstArena {
     &self.stmts[id].node
   }
 
+  pub fn stmt_mut(&mut self, id: StmtId) -> &mut Stmt {
+    &mut self.stmts[id].node
+  }
+
   pub fn stmt_spanned(&self, id: StmtId) -> &Spanned<Stmt> {
     &self.stmts[id]
   }

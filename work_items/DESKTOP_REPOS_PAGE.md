@@ -146,8 +146,8 @@ pub async fn run_analysis(root: &str) -> AnalysisResults {
         while let Ok(Some(entry)) = entries.next_entry().await {
             let name = entry.file_name().to_string_lossy().to_string();
             if name.starts_with('.') { continue; }
-            let ft = entry.file_type().await.unwrap_or(std::fs::FileType::from(std::fs::metadata(".").unwrap()));
-            if ft.is_dir() {
+            let is_dir = entry.metadata().await.map(|m| m.is_dir()).unwrap_or(false);
+            if is_dir {
                 stack.push(entry.path().display().to_string());
             } else {
                 file_count += 1;
@@ -178,9 +178,7 @@ pub async fn run_analysis(root: &str) -> AnalysisResults {
 }
 ```
 
-The `read_dir_tree` function does a breadth-first directory scan skipping dotfiles, returning `TreeNode` entries sorted directories-first. The `run_analysis` function counts files by extension as a placeholder analysis, producing `ChunkResult` entries ordered by frequency.
-
-The `std::fs::FileType::from` fallback may not compile — if it doesn't, replace the `ft` line with a simpler approach: check `entry.path().is_dir()` synchronously, or use `entry.metadata().await.map(|m| m.is_dir()).unwrap_or(false)` instead.
+The `read_dir_tree` function does a depth-first directory scan skipping dotfiles, returning `TreeNode` entries sorted directories-first within each level. The `run_analysis` function counts files by extension, producing `ChunkResult` entries ordered by frequency. This is a placeholder analysis — replace `run_analysis` with a real AST engine when one exists.
 
 **ActiveForm:** Creating ReposState context and analysis functions
 

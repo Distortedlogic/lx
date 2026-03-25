@@ -12,7 +12,7 @@ A single `Signal<Option<usize>>` tracks which menu is open (by index). Clicking 
 
 Menu actions that operate on panes use the `TabsState` context (already provided at Shell level). The existing helper functions `create_new_tab`, `split_pane`, and `close_pane` in `pages/terminals.rs` are the right operations but they're private functions — the menu bar needs access to the same operations. Rather than making those public and creating a cross-module dependency, the menu bar operates directly on `TabsState` via `use_context`.
 
-This unit depends on WU-2 because RUN menu actions dispatch pane operations. But the RUN menu can start as a stub and be enhanced later.
+This unit depends on WU-2 because RUN menu actions dispatch pane operations. The RUN menu is a stub with no actions in this unit.
 
 # Files Affected
 
@@ -36,7 +36,7 @@ This unit depends on WU-2 because RUN menu actions dispatch pane operations. But
 struct MenuItem {
     label: &'static str,
     shortcut: Option<&'static str>,
-    action: Option<EventHandler>,
+    action: Option<EventHandler<()>>,
 }
 ```
 
@@ -118,7 +118,7 @@ Each menu item renders as a button with label on the left and shortcut on the ri
 
 6. Keep the existing title bar drag behavior (`onmousedown` on the outer div calls `dioxus::desktop::window().drag()`), the "TERMINAL_MONOLITH" brand, and the window control buttons (minimize, maximize, close) unchanged. Only the middle section with menu items changes.
 
-The full file will be near the 300-line limit. If it exceeds 300 lines, extract the menu definitions (the `Vec<Menu>` construction) into a separate `menu_items.rs` file and import it.
+The full file will be approximately 200 lines — under the 300-line limit.
 
 Required imports:
 ```rust

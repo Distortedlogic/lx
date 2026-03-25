@@ -10,7 +10,7 @@ Build the Accounts page with persistent credential management, the Activity page
 
 # Prerequisites
 
-WU-1 (Shell Shared State) must be completed first. The Activity page consumes the `ActivityLog` context provided at Shell level.
+WU-1 (Shell Shared State) must be completed first — the Activity page consumes the `ActivityLog` context provided at Shell level. WU-3 (Settings Page) must also be completed first — it adds `dioxus-storage` to Cargo.toml which the Accounts page uses.
 
 # Architecture
 
@@ -153,9 +153,22 @@ pub fn Accounts() -> Element {
 }
 ```
 
-Note: The `stored` from `use_persistent_store` initializes the signal. Mutations to `creds` are local. For full persistence, the `stored` value should be updated when the user explicitly saves. However, since the Settings page pattern uses explicit APPLY, and Accounts is simpler, auto-persist is acceptable here. If `Store<T>` provides a `set()` method, call `stored.set(creds.read().clone())` after each mutation. Otherwise, keep the local signal approach — persistence can be enhanced later.
+`dioxus_storage::use_persistent` returns a `Signal<T>` that auto-persists to localStorage on every `.set()` call. For the Accounts page, auto-persist on every mutation is acceptable (unlike Settings which has explicit DISCARD/EXECUTE). So `creds` IS the persistent signal — use `dioxus_storage::use_persistent` directly as the `creds` signal instead of copying into a separate signal.
 
-The `use_persistent_store` call requires the `dioxus-storage` dependency added in WU-3. If WU-3 has not landed yet, replace with a simple `use_signal(|| default_creds)` and mark persistence as a follow-up.
+Replace the two lines:
+```rust
+let stored = dioxus_storage::use_persistent_store("lx_accounts", || { ... });
+let mut creds: Signal<Vec<Credential>> = use_signal(|| (*stored.get()).clone());
+```
+
+With the single line:
+```rust
+let mut creds = dioxus_storage::use_persistent("lx_accounts", || vec![
+    Credential { provider: "ANTHROPIC".into(), api_key: String::new(), active: true },
+]);
+```
+
+This auto-persists every add/remove/toggle immediately. The `dioxus-storage` dependency is added in WU-3 Task 1.
 
 **ActiveForm:** Building Accounts page with credential management
 
@@ -243,8 +256,7 @@ async fn load_mcp_servers() -> Vec<String> {
 
 #[component]
 pub fn McpPanel() -> Element {
-    let servers = use_resource(|| async { load_mcp_servers().await });
-    let mut refresh_counter = use_signal(|| 0u32);
+    let mut servers = use_resource(|| async { load_mcp_servers().await });
 
     rsx! {
         div { class: "flex items-center gap-3 mb-4",
@@ -253,10 +265,7 @@ pub fn McpPanel() -> Element {
             div { class: "h-px flex-1 bg-[var(--outline-variant)]" }
             button {
                 class: "text-xs text-[var(--outline)] hover:text-[var(--primary)] transition-colors duration-150",
-                onclick: move |_| {
-                    refresh_counter += 1;
-                    servers.restart();
-                },
+                onclick: move |_| servers.restart(),
                 span { class: "material-symbols-outlined text-sm", "refresh" }
             }
         }
@@ -282,11 +291,9 @@ pub fn McpPanel() -> Element {
 
 Key changes:
 - `load_mcp_server_names` becomes `load_mcp_servers` and uses `tokio::fs::read_to_string` (async) instead of `std::fs::read_to_string` (sync, blocks UI thread)
-- `use_hook` replaced with `use_resource` which provides loading/ready states
-- Added a refresh button that calls `servers.restart()` to re-trigger the resource
-- The `refresh_counter` signal exists only to satisfy the borrow checker if `restart()` needs a reactive dependency — if `use_resource` in Dioxus 0.7 supports `restart()` without it, the counter can be removed
-
-Check the actual Dioxus 0.7 `Resource` API: if `restart()` is not available, use `servers.clear()` or `servers.cancel()` followed by the resource re-executing on the next render. Adapt to whatever re-trigger mechanism the API provides.
+- `use_hook` replaced with `use_resource` which provides loading/ready states via `Resource::value() -> ReadSignal<Option<T>>`
+- Added a refresh button that calls `servers.restart()` — `Resource::restart(&mut self)` cancels the current task and re-runs the closure (verified in `reference/dioxus/packages/hooks/src/use_resource.rs:191`)
+- The `servers` binding must be `let mut servers` because `restart()` takes `&mut self`
 
 **ActiveForm:** Rewriting McpPanel with use_resource and refresh button
 

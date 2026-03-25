@@ -126,6 +126,7 @@ pub fn walk_stmt<V: AstVisitor + ?Sized>(v: &mut V, id: StmtId, arena: &AstArena
     },
     Stmt::TraitDecl(data) => walk_trait_decl_dispatch(v, id, data, span, arena)?,
     Stmt::ClassDecl(data) => walk_class_decl_dispatch(v, id, data, span, arena)?,
+    Stmt::KeywordDecl(_) => {},
     Stmt::FieldUpdate(fu) => walk_field_update_dispatch(v, id, fu, span, arena)?,
     Stmt::Use(use_stmt) => {
       let action = v.visit_use(id, use_stmt, span);

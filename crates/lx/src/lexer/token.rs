@@ -83,6 +83,10 @@ pub enum TokenKind {
   Timeout,
   As,
 
+  AgentKw, ToolKw, PromptKw, ConnectorKw, StoreKw,
+  SessionKw, GuardKw, WorkflowKw, SchemaKw,
+  McpKw, CliKw, HttpKw,
+
   Export,
   Semi,
   Eof,

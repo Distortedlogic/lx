@@ -39,10 +39,13 @@ where
   let a3 = arena.clone();
   let a4 = arena.clone();
   let a5 = arena.clone();
+  let a_kw = arena.clone();
+  let a_kw_ref = arena.clone();
 
   let use_stmt = use_parser(arena.clone());
   let exported = just(TokenKind::Export).or_not().map(|e| e.is_some());
 
+  let keyword_stmt = super::stmt_keyword::keyword_parser(expr.clone(), a_kw.clone());
   let trait_stmt = trait_parser(expr.clone(), arena.clone());
   let class_stmt = super::stmt_class::class_parser(expr.clone());
   let type_def = type_def_parser();
@@ -53,6 +56,11 @@ where
 
   choice((
     use_stmt,
+    exported.clone().then(keyword_stmt).map_with(move |(exp, sid), _e| {
+      let stmt = a_kw_ref.borrow_mut().stmt_mut(sid);
+      if let Stmt::KeywordDecl(ref mut d) = stmt { d.exported = exp; }
+      sid
+    }),
     exported.clone().then(trait_stmt).map_with(move |(exp, mut stmt), e| {
       match &mut stmt {
         Stmt::TraitDecl(d) => d.exported = exp,

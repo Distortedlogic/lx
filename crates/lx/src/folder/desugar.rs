@@ -4,8 +4,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use miette::SourceSpan;
 
 use crate::ast::{
-  AstArena, BindTarget, Binding, Core, Expr, ExprApply, ExprBinary, ExprBlock, ExprFieldAccess, ExprFunc, ExprId, ExprMatch, ExprWith, FieldKind, Literal,
-  MatchArm, Param, Pattern, PatternConstructor, Program, Section, Stmt, StrPart, Surface, WithKind,
+  AstArena, BindTarget, Binding, ClassDeclData, Core, Expr, ExprApply, ExprBinary, ExprBlock, ExprFieldAccess, ExprFunc, ExprId, ExprMatch, ExprWith,
+  FieldKind, KeywordDeclData, KeywordKind, Literal, MatchArm, Param, Pattern, PatternConstructor, Program, Section, Stmt, StmtId, StrPart, Surface, UseKind,
+  UseStmt, WithKind,
 };
 use crate::sym::{Sym, intern};
 use crate::visitor::transformer::AstTransformer;
@@ -28,6 +29,25 @@ fn alloc_lambda(name: Sym, body: ExprId, span: SourceSpan, arena: &mut AstArena)
 struct Desugarer;
 
 impl AstTransformer for Desugarer {
+  fn transform_stmts(&mut self, stmts: Vec<StmtId>, arena: &mut AstArena) -> Vec<StmtId> {
+    let mut result = Vec::new();
+    for sid in stmts {
+      let span = arena.stmt_span(sid);
+      let stmt = arena.stmt(sid).clone();
+      match stmt {
+        Stmt::KeywordDecl(data) => {
+          let desugared = desugar_keyword(data, span, arena);
+          result.extend(desugared);
+        }
+        _ => {
+          let transformed = crate::visitor::walk_transform::walk_transform_stmt(self, sid, arena);
+          result.push(transformed);
+        }
+      }
+    }
+    result
+  }
+
   fn leave_expr(&mut self, _id: ExprId, expr: Expr, span: SourceSpan, arena: &mut AstArena) -> (Expr, SourceSpan) {
     let result = match expr {
       Expr::Pipe(p) => Expr::Apply(ExprApply { func: p.right, arg: p.left }),
@@ -154,6 +174,45 @@ fn desugar_interp(parts: Vec<StrPart>, span: SourceSpan, arena: &mut AstArena) -
     result.push(StrPart::Text(pending.join("")));
   }
   result
+}
+
+fn desugar_keyword(data: KeywordDeclData, span: SourceSpan, arena: &mut AstArena) -> Vec<StmtId> {
+  let (import_path, trait_name) = match data.keyword {
+    KeywordKind::Agent => (vec!["std", "agent"], "Agent"),
+    KeywordKind::Tool => (vec!["std", "tool"], "Tool"),
+    KeywordKind::Prompt => (vec!["std", "prompt"], "Prompt"),
+    KeywordKind::Connector => (vec!["std", "connector"], "Connector"),
+    KeywordKind::Store => (vec!["std", "collection"], "Collection"),
+    KeywordKind::Session => (vec!["std", "session"], "Session"),
+    KeywordKind::Guard => (vec!["std", "guard"], "Guard"),
+    KeywordKind::Workflow => (vec!["std", "workflow"], "Workflow"),
+    _ => return vec![arena.alloc_stmt(Stmt::KeywordDecl(data), span)],
+  };
+
+  let trait_sym = intern(trait_name);
+  let path: Vec<Sym> = import_path.iter().map(|s| intern(s)).collect();
+
+  let use_stmt = arena.alloc_stmt(
+    Stmt::Use(UseStmt { path, kind: UseKind::Selective(vec![trait_sym]) }),
+    span,
+  );
+
+  let fields = data.fields;
+  let methods = data.methods;
+
+  let class_stmt = arena.alloc_stmt(
+    Stmt::ClassDecl(ClassDeclData {
+      name: data.name,
+      type_params: data.type_params,
+      traits: vec![trait_sym],
+      fields,
+      methods,
+      exported: data.exported,
+    }),
+    span,
+  );
+
+  vec![use_stmt, class_stmt]
 }
 
 pub fn desugar(program: Program<Surface>) -> Program<Core> {

@@ -11,6 +11,7 @@ impl Formatter<'_> {
       Stmt::TraitUnion(tu) => self.emit_trait_union(tu),
       Stmt::TraitDecl(data) => self.emit_trait_decl(data),
       Stmt::ClassDecl(data) => self.emit_class_decl(data),
+      Stmt::KeywordDecl(_) => unreachable!("keyword not desugared"),
       Stmt::FieldUpdate(fu) => self.emit_field_update(fu),
       Stmt::Use(u) => self.emit_use(u),
       Stmt::Expr(eid) => self.emit_expr(*eid),

@@ -113,6 +113,7 @@ impl Interpreter {
         self.env = Arc::new(env);
         Ok(LxVal::Unit)
       },
+      Stmt::KeywordDecl(_) => unreachable!("keyword not desugared"),
       Stmt::ClassDecl(data) => {
         let mut defaults_map = IndexMap::new();
         for f in &data.fields {

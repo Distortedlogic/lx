@@ -1,9 +1,22 @@
-use crate::ast::{Core, WithKind};
+use crate::ast::{Core, KeywordKind, WithKind};
 use crate::visitor::prelude::*;
 
 struct CoreValidator;
 
 impl AstVisitor for CoreValidator {
+  fn visit_stmt(&mut self, _id: StmtId, stmt: &Stmt, span: SourceSpan) -> VisitAction {
+    if let Stmt::KeywordDecl(data) = stmt {
+      match data.keyword {
+        KeywordKind::Agent | KeywordKind::Tool | KeywordKind::Prompt | KeywordKind::Connector
+        | KeywordKind::Store | KeywordKind::Session | KeywordKind::Guard | KeywordKind::Workflow => {
+          panic!("KeywordDecl({:?}) should have been desugared at offset {}", data.keyword, span.offset())
+        },
+        _ => {},
+      }
+    }
+    VisitAction::Descend
+  }
+
   fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan) -> VisitAction {
     match expr {
       Expr::Pipe(_) => panic!("Core AST contains Expr::Pipe at offset {}. The desugarer should have converted this to Expr::Apply.", span.offset()),

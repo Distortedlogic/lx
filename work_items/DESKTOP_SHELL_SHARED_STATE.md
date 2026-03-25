@@ -133,23 +133,20 @@ use crate::contexts::activity_log::ActivityLog;
 In the `Shell` component function body, after the existing `let tabs_state = use_provide_tabs();` line (currently line 31), add:
 
 ```rust
-let _status_bar_state = StatusBarState::provide();
+let status_bar_state = StatusBarState::provide();
 let _activity_log = ActivityLog::provide();
 ```
 
-The underscore prefix is intentional — Shell provides these contexts but doesn't read them. Downstream components (StatusBar, TerminalView, Activity page) will consume them via `use_context`. Both must be provided before the `rsx!` block.
+`_activity_log` has an underscore prefix because Shell provides it but never reads it. `status_bar_state` does NOT have an underscore because it is read in the effect below. Both must be provided before the `rsx!` block.
 
-Also add a `use_effect` after the context providers that keeps `notification_count` in sync with `TabsState::notifications`:
+Add a `use_effect` after the context providers that keeps `notification_count` in sync with `TabsState::notifications`:
 
 ```rust
-let status_bar = use_context::<StatusBarState>();
 use_effect(move || {
     let count = tabs_state.read().notifications.len();
-    status_bar.notification_count.set(count);
+    status_bar_state.notification_count.set(count);
 });
 ```
-
-This requires adding `use crate::contexts::status_bar::StatusBarState;` if not already imported (it will be from the earlier step).
 
 **ActiveForm:** Providing shared contexts at Shell level
 
@@ -166,7 +163,7 @@ Add import:
 use crate::contexts::status_bar::StatusBarState;
 ```
 
-In the `StatusBar` component, get the context: `let state = use_context::<StatusBarState>();`
+In the `StatusBar` component, get the context once at the top: `let state = use_context::<StatusBarState>();`
 
 Read each signal in the rsx:
 - Replace `"SYSTEM_READY_V1.0.4"` with `"{pane_label}"` where `let pane_label = (state.pane_label)();`
@@ -177,10 +174,9 @@ Read each signal in the rsx:
 
 Keep the same Tailwind classes and layout structure. The only change is replacing static strings with signal reads.
 
-Add a `use_effect` at the top of the component that reads the git branch on mount:
+Add a `use_effect` after the `use_context` call that reads the git branch on mount (reuse the `state` variable from above):
 
 ```rust
-let status = use_context::<StatusBarState>();
 use_effect(move || {
     spawn(async move {
         if let Ok(output) = tokio::process::Command::new("git")
@@ -190,7 +186,7 @@ use_effect(move || {
         {
             if output.status.success() {
                 let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                status.branch.set(branch);
+                state.branch.set(branch);
             }
         }
     });

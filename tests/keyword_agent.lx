@@ -1,0 +1,9 @@
+Agent TestAgent = {
+  perceive = (msg) { {intent: msg} }
+}
+
+a = TestAgent {}
+result = a.perceive "hello"
+assert result.intent == "hello"
+assert (methods_of a | any? (== "think"))
+assert (methods_of a | any? (== "handle"))

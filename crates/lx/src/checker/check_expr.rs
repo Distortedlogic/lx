@@ -158,7 +158,7 @@ impl Checker<'_> {
     let last_stmt = arena.stmt(last);
     match last_stmt {
       Stmt::Expr(e) => self.check_expr(*e, expected),
-      Stmt::Binding(_) | Stmt::TypeDef(_) | Stmt::TraitUnion(_) | Stmt::TraitDecl(_) | Stmt::ClassDecl(_) | Stmt::FieldUpdate(_) | Stmt::Use(_) => {
+      Stmt::Binding(_) | Stmt::TypeDef(_) | Stmt::TraitUnion(_) | Stmt::TraitDecl(_) | Stmt::ClassDecl(_) | Stmt::KeywordDecl(_) | Stmt::FieldUpdate(_) | Stmt::Use(_) => {
         self.check_stmt(last, arena);
         self.type_arena.unit()
       },

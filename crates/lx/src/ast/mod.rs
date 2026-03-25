@@ -38,6 +38,8 @@ pub enum Stmt {
   TraitUnion(TraitUnionDef),
   TraitDecl(TraitDeclData),
   ClassDecl(ClassDeclData),
+  #[walk(skip)]
+  KeywordDecl(KeywordDeclData),
   FieldUpdate(StmtFieldUpdate),
   #[walk(skip)]
   Use(UseStmt),

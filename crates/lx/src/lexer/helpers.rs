@@ -36,6 +36,18 @@ pub(super) fn type_name_or_keyword(text: &str) -> TokenKind {
   match text {
     "Trait" => TokenKind::Trait,
     "Class" => TokenKind::ClassKw,
+    "Agent" => TokenKind::AgentKw,
+    "Tool" => TokenKind::ToolKw,
+    "Prompt" => TokenKind::PromptKw,
+    "Connector" => TokenKind::ConnectorKw,
+    "Store" => TokenKind::StoreKw,
+    "Session" => TokenKind::SessionKw,
+    "Guard" => TokenKind::GuardKw,
+    "Workflow" => TokenKind::WorkflowKw,
+    "Schema" => TokenKind::SchemaKw,
+    "MCP" => TokenKind::McpKw,
+    "CLI" => TokenKind::CliKw,
+    "HTTP" => TokenKind::HttpKw,
     _ => TokenKind::TypeName(crate::sym::intern(text)),
   }
 }

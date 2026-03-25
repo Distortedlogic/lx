@@ -8,13 +8,13 @@ Every control on the Settings page is inert. Environment variables are hardcoded
 
 # Architecture
 
-One `SettingsState` context struct holds all settings as a single `Signal<SettingsData>` plus a `snapshot: Signal<SettingsData>` for DISCARD support. `SettingsData` is a serializable struct persisted via `use_persistent_store` from the `dioxus-storage` crate (already available at `dioxus-common/crates/dioxus-storage`).
+One `SettingsState` context struct holds two signals: `data: Signal<SettingsData>` (the live working copy) and `saved: Signal<SettingsData>` (the persisted copy). `SettingsData` is a serializable struct. The `saved` signal is created via `dioxus_storage::use_persistent` which returns a `Signal<T>` that auto-persists to localStorage on every write. The `data` signal is a plain `Signal<T>` for live editing without triggering persistence on every keystroke.
 
 Flow:
-- On mount: `use_persistent_store("lx_settings", || SettingsData::default())` loads persisted data or creates defaults.
-- Live edits update the `data` signal. The page renders from `data`.
-- DISCARD: reset `data` to `snapshot`.
-- EXECUTE: copy `data` into `snapshot`, and the persistent store auto-saves.
+- On mount: `use_persistent("lx_settings", SettingsData::default)` loads persisted data into `saved`. `data` is initialized as a clone of `saved`.
+- Live edits update `data` only. The page renders from `data`.
+- DISCARD: copy `saved` into `data` (reverts unsaved edits).
+- EXECUTE: copy `data` into `saved` (the `use_persistent` signal auto-persists this write to localStorage).
 
 This requires adding `dioxus-storage` as a dependency.
 
@@ -85,34 +85,29 @@ impl Default for SettingsData {
 #[derive(Clone, Copy)]
 pub struct SettingsState {
     pub data: Signal<SettingsData>,
-    pub snapshot: Signal<SettingsData>,
+    pub saved: Signal<SettingsData>,
 }
 
 impl SettingsState {
     pub fn provide() -> Self {
-        let stored = dioxus_storage::use_persistent_store("lx_settings", SettingsData::default);
-        let initial = stored.cloned();
-        let ctx = Self {
-            data: Signal::new(initial.clone()),
-            snapshot: Signal::new(initial),
-        };
+        let saved = dioxus_storage::use_persistent("lx_settings", SettingsData::default);
+        let data = use_signal(|| saved.read().clone());
+        let ctx = Self { data, saved };
         use_context_provider(|| ctx);
         ctx
     }
 
     pub fn discard(&self) {
-        self.data.set(self.snapshot.read().clone());
+        self.data.set(self.saved.read().clone());
     }
 
     pub fn execute(&self) {
-        self.snapshot.set(self.data.read().clone());
+        self.saved.set(self.data.read().clone());
     }
 }
 ```
 
-Note: `dioxus_storage::use_persistent_store` returns a `Store<T>`. The `cloned()` method returns `T`. We copy the stored value into our own signals for fine-grained reactivity. The `execute` method updates `snapshot` to match `data`; the persistent store observes and auto-saves.
-
-If `Store<T>` does not have a `cloned()` method, use `stored.read().clone()` or `(*stored.get()).clone()` — check the actual API in `dioxus-common/crates/dioxus-storage/src/persistent_store.rs` and adapt accordingly.
+`dioxus_storage::use_persistent` returns a `Signal<T>` that auto-persists to localStorage on every `.set()` call. `data` is a plain `Signal<T>` for live editing. `execute()` writes into `saved` which triggers auto-persistence. `discard()` copies `saved` back into `data`.
 
 **ActiveForm:** Creating SettingsData model and SettingsState context
 
@@ -125,10 +120,10 @@ If `Store<T>` does not have a `cloned()` method, use `stored.read().clone()` or 
 **Description:** Edit `crates/lx-desktop/src/pages/settings/mod.rs`. Add:
 
 ```rust
-mod state;
+pub mod state;
 ```
 
-to the module declarations. Add `use self::state::SettingsState;` to the imports.
+to the module declarations (must be `pub` because WU-7 server API imports `SettingsData` via `crate::pages::settings::state::SettingsData`). Add `use self::state::SettingsState;` to the imports.
 
 In the `Settings` component function body, add as the first line:
 

@@ -102,7 +102,7 @@ pub fn router() -> Router {
 }
 ```
 
-This requires adding `dirs` as a dependency for config directory resolution. Add to `Cargo.toml`:
+This requires adding `dirs` as an optional dependency. Add to `crates/lx-desktop/Cargo.toml`:
 
 ```toml
 dirs = { version = "6", optional = true }
@@ -114,9 +114,9 @@ And update the server feature:
 server = ["dioxus/server", "dep:axum", "dep:dirs"]
 ```
 
-If adding `dirs` is undesirable, replace `dirs::config_dir()` with a hardcoded path like `$HOME/.config/lx/settings.json` using `std::env::var("HOME")`.
-
-Also, `ActivityEvent` must be accessible from the server module. Currently it's defined in `contexts/activity_log.rs`. Ensure the struct is `pub` and its fields are `pub` (they should be from WU-1). Similarly, `SettingsData` must be re-exported or accessible — it's in `pages/settings/state.rs` which should already be `pub`.
+Visibility requirements from upstream WUs:
+- `ActivityEvent` in `contexts/activity_log.rs` must be `pub` with `pub` fields and must derive `Serialize, Deserialize` — WU-1 handles this.
+- `SettingsData` in `pages/settings/state.rs` must be accessible — WU-3 makes the module `pub mod state;`.
 
 **ActiveForm:** Creating server shared state and health endpoint
 
@@ -227,9 +227,7 @@ pub fn routes() -> Router<Arc<ServerState>> {
 
 `GET /api/activity?limit=50` returns the most recent N events (default 100, max 500). `POST /api/activity` accepts an `ActivityEvent` body and pushes it to the front of the deque. The deque is capped at 500 entries.
 
-For `ActivityEvent` to work with JSON serialization, it must derive `Serialize` and `Deserialize`. If WU-1 did not add these derives, add them now:
-
-In `src/contexts/activity_log.rs`, change `#[derive(Clone, PartialEq)]` on `ActivityEvent` to `#[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]`.
+`ActivityEvent` derives `Serialize, Deserialize` from WU-1 — no changes needed here.
 
 **ActiveForm:** Creating activity stream API handler
 

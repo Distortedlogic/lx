@@ -96,6 +96,24 @@ pub struct ClassDeclData {
   pub exported: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeywordKind {
+  Agent, Tool, Prompt, Connector, Store,
+  Session, Guard, Workflow, Schema,
+  Mcp, Cli, Http,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct KeywordDeclData {
+  pub keyword: KeywordKind,
+  pub name: Sym,
+  pub type_params: Vec<Sym>,
+  pub fields: Vec<ClassField>,
+  pub methods: Vec<AgentMethod>,
+  pub trait_entries: Option<Vec<TraitEntry>>,
+  pub exported: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, AstWalk)]
 pub struct FieldPattern {
   pub name: Sym,

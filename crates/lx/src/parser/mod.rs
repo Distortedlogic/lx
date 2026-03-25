@@ -5,6 +5,7 @@ mod expr_pratt;
 mod pattern;
 mod stmt;
 mod stmt_class;
+pub mod stmt_keyword;
 mod type_ann;
 
 use std::cell::RefCell;
