@@ -1,45 +1,46 @@
-use workrunner/grader {Grader GradeResult CategoryScore}
+use ../grader {Grader}
+use ../schema/grade {GradeResult CategoryScore}
 
 g = Grader {
   threshold: 80
   rubric: [
-    {name: "alpha"; description: "test a"; weight: 60}
+    {name: "alpha"; description: "test a"; weight: 60};
     {name: "beta"; description: "test b"; weight: 40}
   ]
 }
 
 json_input = {categories: [
-  {name: "alpha"; score: 90; feedback: "good"}
+  {name: "alpha"; score: 90; feedback: "good"};
   {name: "beta"; score: 50; feedback: "bad"}
 ]}
 
 result = g.assemble json_input
-assert (result.score > 0) "score is positive"
-assert (result.passed == false) "not passed — beta below 70"
-assert (result.categories | len == 2) "2 categories"
-assert (result.failed | len == 1) "1 failed"
+assert (result.score > 0)
+assert (result.passed == false)
+assert (result.categories | len == 2)
+assert (result.failed | len == 1)
 first_failed = (result.failed | first) ?? ""
-assert (first_failed == "beta") "beta failed"
+assert (first_failed == "beta")
 
 alpha_cat = (result.categories | find (c) { c.name == "alpha" }) ?? {passed: false}
-assert (alpha_cat.passed == true) "alpha passed"
+assert (alpha_cat.passed == true)
 
 beta_cat = (result.categories | find (c) { c.name == "beta" }) ?? {passed: true}
-assert (beta_cat.passed == false) "beta failed"
+assert (beta_cat.passed == false)
 
 all_pass_json = {categories: [
-  {name: "alpha"; score: 95; feedback: "great"}
+  {name: "alpha"; score: 95; feedback: "great"};
   {name: "beta"; score: 85; feedback: "fine"}
 ]}
 all_pass = g.assemble all_pass_json
-assert (all_pass.passed == true) "all pass when both above 70 and weighted score above threshold"
-assert (all_pass.failed | len == 0) "no failures"
-assert (all_pass.feedback == "All categories passed") "feedback says all passed"
+assert (all_pass.passed == true)
+assert (all_pass.failed | len == 0)
+assert (all_pass.feedback == "All categories passed")
 
 empty = g.empty_result "test error"
-assert (empty.score == 0) "empty score 0"
-assert (empty.passed == false) "empty not passed"
-assert (empty.failed | len == 2) "empty has all categories failed"
-assert (empty.feedback == "test error") "empty has error message"
+assert (empty.score == 0)
+assert (empty.passed == false)
+assert (empty.failed | len == 2)
+assert (empty.feedback == "test error")
 
 log.info "grader_assemble: all passed"

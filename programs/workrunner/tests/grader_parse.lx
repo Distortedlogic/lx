@@ -1,35 +1,35 @@
-use workrunner/grader {Grader}
+use ../grader {Grader}
 
 g = Grader {
   threshold: 80
   rubric: [
-    {name: "files"; description: "files exist"; weight: 50}
+    {name: "files"; description: "files exist"; weight: 50};
     {name: "tests"; description: "tests pass"; weight: 50}
   ]
 }
 
 good_json = `{"categories":[{"name":"files","score":95,"feedback":"all present"},{"name":"tests","score":88,"feedback":"all pass"}]}`
 result = g.parse_response good_json
-assert (result.score > 80) "good json scores above threshold"
-assert (result.passed == true) "good json passes"
+assert (result.score > 80)
+assert (result.passed == true)
 
 bad_json = `{"categories":[{"name":"files","score":30,"feedback":"missing"},{"name":"tests","score":20,"feedback":"failing"}]}`
 result2 = g.parse_response bad_json
-assert (result2.passed == false) "bad json fails"
-assert (result2.failed | len == 2) "both categories failed"
+assert (result2.passed == false)
+assert (result2.failed | len == 2)
 
 invalid_json = "not json at all"
 result3 = g.parse_response invalid_json
-assert (result3.score == 0) "invalid json scores 0"
-assert (result3.passed == false) "invalid json fails"
+assert (result3.score == 0)
+assert (result3.passed == false)
 
 empty = ""
 result4 = g.parse_response empty
-assert (result4.score == 0) "empty string scores 0"
+assert (result4.score == 0)
 
 missing_cats = `{"categories":[]}`
 result5 = g.parse_response missing_cats
-assert (result5.categories | len == 2) "missing cats still has rubric categories"
-assert (result5.failed | len == 2) "missing cats means all failed"
+assert (result5.categories | len == 2)
+assert (result5.failed | len == 2)
 
 log.info "grader_parse: all passed"

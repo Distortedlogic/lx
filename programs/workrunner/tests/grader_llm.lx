@@ -1,9 +1,9 @@
-use workrunner/grader {Grader}
+use ../grader {Grader}
 
 g = Grader {
   threshold: 80
   rubric: [
-    {name: "completeness"; description: "all tasks done"; weight: 50}
+    {name: "completeness"; description: "all tasks done"; weight: 50};
     {name: "quality"; description: "code is correct"; weight: 50}
   ]
 }
@@ -18,8 +18,8 @@ result.categories | each (cat) {
   emit "  [{icon}] {cat.name}: {cat.score}/100 — {cat.feedback}"
 }
 
-assert (result.score >= 0) "score is non-negative"
-assert (result.categories | len == 2) "has 2 categories"
-assert (result.feedback | len > 0) "has feedback"
+assert (result.score >= 0)
+assert (result.categories | len == 2)
+assert (result.feedback | len > 0)
 
 log.info "grader_llm: all passed"

@@ -1,18 +1,18 @@
-use workrunner/schema/work_item
-use workrunner/schema/work_item {task_count get_task task_context context_for_implement context_for_investigate task_summaries task_summary}
-use workrunner/log
-use workrunner/workflow/orchestrator
-use workrunner/grader {Grader}
-use workrunner/context
+use ../schema/work_item
+use ../schema/work_item {task_count get_task task_context context_for_implement context_for_investigate task_summaries task_summary}
+use ../log
+use ../workflow/orchestrator
+use ../grader {Grader}
+use ../context
 
-wi = work_item.load "workrunner/tests/fixtures/tiny_work_item.md"
-assert (task_count wi == 1) "tiny has 1 task"
-assert (wi.slug | len > 0) "slug set"
+wi = work_item.load "programs/workrunner/tests/fixtures/tiny_work_item.md"
+assert (task_count wi == 1)
+assert (wi.slug | len > 0)
 
 log.log "orchestrator test: parsing OK"
 
 bootstrap_ctx = context.load_bootstrap ()
-assert (bootstrap_ctx | len > 0) "bootstrap loaded"
+assert (bootstrap_ctx | len > 0)
 
 grader_inst = Grader {
   threshold: 50
@@ -26,8 +26,8 @@ result = orchestrator.run_work_item wi.path 0 1 grader_inst bootstrap_ctx 2 ".lx
 
 log.log "result status: {result.status}"
 log.log "result score: {result.score}"
-assert (result.path == wi.path) "result has path"
-assert (result.status == "pass" || result.status == "fail") "result has valid status"
-assert (result.score >= 0) "result has score"
+assert (result.path == wi.path)
+assert (result.status == "pass" || result.status == "fail")
+assert (result.score >= 0)
 
 log.log "orchestrator: all passed"
