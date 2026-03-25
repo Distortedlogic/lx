@@ -38989,9 +38989,11 @@ registerProcessor('capture', Capture);
 			const bytes = new Uint8Array(binary.length);
 			for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
 			this.queue.push(bytes.buffer);
+			console.log("[audio-playback] enqueue, playing:", this.playing, "queue:", this.queue.length);
 			if (!this.playing) this.playNext();
 		}
 		playNext() {
+			console.log("[audio-playback] playNext, queue:", this.queue.length);
 			if (this.queue.length === 0) {
 				this.playing = false;
 				this.onComplete?.();
@@ -38999,8 +39001,11 @@ registerProcessor('capture', Capture);
 			}
 			this.playing = true;
 			const ctx = this.ensureContext();
+			console.log("[audio-playback] ctx state:", ctx.state, "sampleRate:", ctx.sampleRate);
 			const buffer = this.queue.shift();
+			console.log("[audio-playback] buffer byteLength:", buffer.byteLength);
 			ctx.decodeAudioData(buffer.slice(0), (decoded) => {
+				console.log("[audio-playback] decoded OK, duration:", decoded.duration, "ctx state:", ctx.state);
 				const source = ctx.createBufferSource();
 				source.buffer = decoded;
 				source.connect(ctx.destination);
