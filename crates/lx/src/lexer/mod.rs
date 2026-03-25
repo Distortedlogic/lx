@@ -16,13 +16,13 @@ pub(crate) struct Lexer<'src> {
   pos: usize,
   tokens: Vec<Token>,
   comments: Vec<crate::source::Comment>,
-  depth: i32,
+  paren_bracket_depth: i32,
   last_was_semi: bool,
-  brace_stack: Vec<bool>,
+  brace_stack: Vec<i32>,
 }
 
 pub fn lex(source: &str) -> Result<(Vec<Token>, crate::source::CommentStore), LxError> {
-  let mut lexer = Lexer { source, pos: 0, tokens: Vec::new(), comments: Vec::new(), depth: 0, last_was_semi: true, brace_stack: Vec::new() };
+  let mut lexer = Lexer { source, pos: 0, tokens: Vec::new(), comments: Vec::new(), paren_bracket_depth: 0, last_was_semi: true, brace_stack: Vec::new() };
   lexer.run()?;
   lexer.tokens.push(Token::new(TokenKind::Eof, SourceSpan::new(SourceOffset::from(source.len()), 0)));
   Ok((lexer.tokens, crate::source::CommentStore::from_vec(lexer.comments)))
@@ -101,7 +101,7 @@ impl<'src> Lexer<'src> {
     let span = self.sp(start, end);
     match raw {
       RawToken::Newline => {
-        if self.depth <= 0 {
+        if self.paren_bracket_depth <= 0 {
           self.emit(Token::new(TokenKind::Semi, span));
         }
       },
@@ -110,34 +110,33 @@ impl<'src> Lexer<'src> {
         self.comments.push(crate::source::Comment { span: self.sp(start, end), text });
       },
       RawToken::LParen => {
-        self.depth += 1;
+        self.paren_bracket_depth += 1;
         self.emit(Token::new(TokenKind::LParen, span));
       },
       RawToken::RParen => {
-        self.depth -= 1;
+        self.paren_bracket_depth -= 1;
         self.emit(Token::new(TokenKind::RParen, span));
       },
       RawToken::LBracket => {
-        self.depth += 1;
+        self.paren_bracket_depth += 1;
         self.emit(Token::new(TokenKind::LBracket, span));
       },
       RawToken::RBracket => {
-        self.depth -= 1;
+        self.paren_bracket_depth -= 1;
         self.emit(Token::new(TokenKind::RBracket, span));
       },
       RawToken::LBrace => {
-        self.brace_stack.push(false);
+        self.brace_stack.push(self.paren_bracket_depth);
+        self.paren_bracket_depth = 0;
         self.emit(Token::new(TokenKind::LBrace, span));
       },
       RawToken::RBrace => {
-        if let Some(true) = self.brace_stack.pop() {
-          self.depth -= 1;
-        }
+        self.paren_bracket_depth = self.brace_stack.pop().unwrap_or(0);
         self.emit(Token::new(TokenKind::RBrace, span));
       },
       RawToken::PercentLBrace => {
-        self.depth += 1;
-        self.brace_stack.push(true);
+        self.brace_stack.push(self.paren_bracket_depth);
+        self.paren_bracket_depth = 1;
         self.emit(Token::new(TokenKind::PercentLBrace, span));
       },
       RawToken::Semi | RawToken::Comma => self.emit(Token::new(TokenKind::Semi, span)),

@@ -15,9 +15,9 @@
 
 +scenarios = [
   {
-    name: "rust-audit"
-    audit: "workgen/rules/rust-audit.md"
-    root: "workgen/tests/fixtures/rust_audit"
+    name: "rust-audit";
+    audit: "workgen/rules/rust-audit.md";
+    root: "workgen/tests/fixtures/rust_audit";
     expected_findings: [
       "inline import";
       "self-assignment";
@@ -27,13 +27,13 @@
       "swallowed error";
       "intermediate collect";
       "string literal"
-    ]
+    ];
     tags: ["rust"; "smoke"]
   };
   {
-    name: "python-audit"
-    audit: "workgen/rules/python-audit.md"
-    root: "workgen/tests/fixtures/python_audit"
+    name: "python-audit";
+    audit: "workgen/rules/python-audit.md";
+    root: "workgen/tests/fixtures/python_audit";
     expected_findings: [
       "string literal";
       "free function";
@@ -42,13 +42,13 @@
       "intermediate list";
       "dict instead of dataclass";
       "StrEnum"
-    ]
+    ];
     tags: ["python"]
   };
   {
-    name: "performance-audit"
-    audit: "workgen/rules/performance-audit.md"
-    root: "workgen/tests/fixtures/perf_audit"
+    name: "performance-audit";
+    audit: "workgen/rules/performance-audit.md";
+    root: "workgen/tests/fixtures/perf_audit";
     expected_findings: [
       "intermediate collect into Vec";
       "unnecessary clone";
@@ -57,52 +57,52 @@
       "full sort for partial result";
       "repeated HashMap lookup";
       "missing with_capacity"
-    ]
+    ];
     tags: ["perf"]
   };
   {
-    name: "topology-audit"
-    audit: "workgen/rules/topology-audit.md"
-    root: "workgen/tests/fixtures/topology_audit"
+    name: "topology-audit";
+    audit: "workgen/rules/topology-audit.md";
+    root: "workgen/tests/fixtures/topology_audit";
     expected_findings: [
       "proxy type";
       "shuttle type";
       "call chain depth";
       "repeated lock acquisition";
       "config parameter threading"
-    ]
+    ];
     tags: ["topology"]
   };
   {
-    name: "diagram-audit"
-    audit: "workgen/rules/diagram-audit.md"
-    root: "workgen/tests/fixtures/diagram_audit"
+    name: "diagram-audit";
+    audit: "workgen/rules/diagram-audit.md";
+    root: "workgen/tests/fixtures/diagram_audit";
     expected_findings: [
       "vertical bloat";
       "invisible edge";
       "spaghetti edges";
       "dummy cluster";
       "pause/resume on same edge"
-    ]
+    ];
     tags: ["diagram"]
   };
   {
-    name: "diesel-audit"
-    audit: "workgen/rules/diesel-audit.md"
-    root: "workgen/tests/fixtures/diesel_audit"
+    name: "diesel-audit";
+    audit: "workgen/rules/diesel-audit.md";
+    root: "workgen/tests/fixtures/diesel_audit";
     expected_findings: [
       "sequential queries";
       "raw SQL";
       "loop of individual upserts";
       "filter after load";
       "missing transaction"
-    ]
+    ];
     tags: ["diesel"]
   };
   {
-    name: "perf-libs-audit"
-    audit: "workgen/rules/performance-audit-libs.md"
-    root: "workgen/tests/fixtures/perf_libs_audit"
+    name: "perf-libs-audit";
+    audit: "workgen/rules/performance-audit-libs.md";
+    root: "workgen/tests/fixtures/perf_libs_audit";
     expected_findings: [
       "premature collect";
       "element-wise iteration";
@@ -110,13 +110,13 @@
       "eager read instead of scan";
       "lock per parallel iteration";
       "nested parallelism"
-    ]
+    ];
     tags: ["perf-libs"]
   };
   {
-    name: "dioxus-audit"
-    audit: "workgen/rules/dioxus-audit.md"
-    root: "workgen/tests/fixtures/dioxus_audit"
+    name: "dioxus-audit";
+    audit: "workgen/rules/dioxus-audit.md";
+    root: "workgen/tests/fixtures/dioxus_audit";
     expected_findings: [
       "#[server] instead of HTTP method";
       "use_resource instead of use_loader";
@@ -124,13 +124,13 @@
       "wrapper component";
       "string interpolation in class";
       "Signal instead of Store"
-    ]
+    ];
     tags: ["dioxus"]
   };
   {
-    name: "tailwind-audit"
-    audit: "workgen/rules/tailwind-audit.md"
-    root: "workgen/tests/fixtures/tailwind_audit"
+    name: "tailwind-audit";
+    audit: "workgen/rules/tailwind-audit.md";
+    root: "workgen/tests/fixtures/tailwind_audit";
     expected_findings: [
       "@tailwind directives";
       "component class in @utility";
@@ -139,13 +139,13 @@
       "outline-none";
       "bare ring";
       "focus: instead of focus-visible:"
-    ]
+    ];
     tags: ["tailwind"]
   };
   {
-    name: "bevy-audit"
-    audit: "workgen/rules/bevy-audit.md"
-    root: "workgen/tests/fixtures/bevy_audit"
+    name: "bevy-audit";
+    audit: "workgen/rules/bevy-audit.md";
+    root: "workgen/tests/fixtures/bevy_audit";
     expected_findings: [
       "monolithic plugin";
       "chain without data dependency";
@@ -153,31 +153,31 @@
       "missing reflect";
       "insert_resource instead of init_resource";
       "missing Deref/DerefMut"
-    ]
+    ];
     tags: ["bevy"]
   };
   {
-    name: "bevy-ecosystem-audit"
-    audit: "workgen/rules/bevy-ecosystem-audit.md"
-    root: "workgen/tests/fixtures/bevy_eco_audit"
+    name: "bevy-ecosystem-audit";
+    audit: "workgen/rules/bevy-ecosystem-audit.md";
+    root: "workgen/tests/fixtures/bevy_eco_audit";
     expected_findings: [
       "raw rand instead of bevy_rand";
       "unconfigured audio playback";
       "manual physics instead of Rapier";
       "unscoped egui window"
-    ]
+    ];
     tags: ["bevy-eco"]
   };
   {
-    name: "primitives-audit"
-    audit: "workgen/rules/primitives-audit.md"
-    root: "workgen/tests/fixtures/primitives_audit"
+    name: "primitives-audit";
+    audit: "workgen/rules/primitives-audit.md";
+    root: "workgen/tests/fixtures/primitives_audit";
     expected_findings: [
       "custom dialog/AlertDialog";
       "custom tooltip";
       "custom select/dropdown";
       "custom tabs"
-    ]
+    ];
     tags: ["primitives"]
   }
 ]
