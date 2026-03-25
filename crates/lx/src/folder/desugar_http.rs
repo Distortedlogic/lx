@@ -1,8 +1,6 @@
 use miette::SourceSpan;
 
-use crate::ast::{
-  AstArena, BinOp, ClassDeclData, ClassField, Expr, ExprBinary, ExprCoalesce, ExprFieldAccess, FieldKind, KeywordDeclData, Stmt, StmtId, UseKind, UseStmt,
-};
+use crate::ast::{AstArena, BinOp, ClassDeclData, ClassField, Expr, ExprBinary, ExprFieldAccess, FieldKind, KeywordDeclData, Stmt, StmtId, UseKind, UseStmt};
 use crate::folder::gen_ast::{gen_block, gen_field_call, gen_func, gen_ident, gen_list, gen_literal_str, gen_method, gen_ok_unit, gen_record, gen_self_field};
 use crate::sym::{Sym, intern};
 
@@ -88,7 +86,8 @@ fn build_http_call(span: SourceSpan, arena: &mut AstArena) -> crate::ast::ExprId
     arena.alloc_expr(Expr::FieldAccess(ExprFieldAccess { expr: args, field: FieldKind::Named(intern("method")) }), span)
   };
   let default_get = gen_literal_str("GET", span, arena);
-  let method_coalesced = arena.alloc_expr(Expr::Coalesce(ExprCoalesce { expr: req_args_method, default: default_get }), span);
+  let coalesce_expr = super::desugar::desugar_coalesce(req_args_method, default_get, span, arena);
+  let method_coalesced = arena.alloc_expr(coalesce_expr, span);
 
   let url_ref = gen_ident("url", span, arena);
 

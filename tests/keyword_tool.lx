@@ -10,5 +10,5 @@ r = t.run {text: "hi"}
 assert r == Ok "hi"
 v = t.validate {text: "hello"}
 assert (v | ok?)
-bad = t.validate {}
+bad = t.validate {wrong: 1}
 assert (bad | err?)

@@ -7,7 +7,7 @@
 
   render = () {
     parts := []
-    self.system | len > 0 ? (parts <- [..parts self.system])
+    (self.system | len) > 0 ? { parts <- [..parts self.system] }
     self.sections | each (sec) {
       parts <- [..parts "{sec.name}:\n{sec.content}"]
     }
@@ -45,7 +45,7 @@
   }
 
   compose = (other) {
-    (other.system | len) > 0 ? (self.system <- other.system)
+    (other.system | len) > 0 ? { self.system <- other.system }
     self.sections <- [..self.sections ..other.sections]
     self.constraints <- [..self.constraints ..other.constraints]
     self.instructions <- [..self.instructions ..other.instructions]

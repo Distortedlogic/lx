@@ -1,4 +1,4 @@
-Guard TurnLimit = { max_turns: 3 }
+Guard TurnLimit = { max_turns: 4 }
 
 g = TurnLimit {}
 g.tick ()

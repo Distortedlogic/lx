@@ -3,8 +3,8 @@
 -- Agent code calls connector.call regardless of backend.
 
 +Trait Connector = {
-  connect: {} -> Result
-  disconnect: {} -> Result
-  call: {tool: Str  args: Any} -> Result
-  tools: {} -> [Any]
+  connect = () { Err "Connector.connect not implemented" }
+  disconnect = () { Err "Connector.disconnect not implemented" }
+  call = (req) { Err "Connector.call not implemented" }
+  tools = () { [] }
 }

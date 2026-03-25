@@ -1,8 +1,8 @@
 use miette::SourceSpan;
 
 use crate::ast::{
-  AgentMethod, AstArena, BinOp, ClassDeclData, ClassField, Expr, ExprBinary, ExprFieldAccess, ExprId, ExprTernary, FieldKind, KeywordDeclData, Stmt, StmtId,
-  UseKind, UseStmt,
+  AgentMethod, AstArena, BinOp, ClassDeclData, ClassField, Expr, ExprBinary, ExprFieldAccess, ExprId, ExprMatch, FieldKind, KeywordDeclData, Literal, MatchArm,
+  Pattern, Stmt, StmtId, UseKind, UseStmt,
 };
 use crate::folder::gen_ast::{
   gen_apply, gen_block, gen_field_call, gen_field_update, gen_func, gen_ident, gen_list, gen_literal_str, gen_method, gen_none, gen_ok_unit, gen_propagate,
@@ -81,8 +81,16 @@ fn build_mcp_disconnect(span: SourceSpan, arena: &mut AstArena) -> ExprId {
   let ok2 = gen_ok_unit(span, arena);
   let ok2_stmt = arena.alloc_stmt(Stmt::Expr(ok2), span);
   let else_body = gen_block(vec![close_stmt, ok2_stmt], span, arena);
-  let ternary = arena.alloc_expr(Expr::Ternary(ExprTernary { cond, then_: ok_branch, else_: Some(else_body) }), span);
-  gen_func(&[], ternary, span, arena)
+  let true_pat = arena.alloc_pattern(Pattern::Literal(Literal::Bool(true)), span);
+  let false_pat = arena.alloc_pattern(Pattern::Literal(Literal::Bool(false)), span);
+  let match_expr = arena.alloc_expr(
+    Expr::Match(ExprMatch {
+      scrutinee: cond,
+      arms: vec![MatchArm { pattern: true_pat, guard: None, body: ok_branch }, MatchArm { pattern: false_pat, guard: None, body: else_body }],
+    }),
+    span,
+  );
+  gen_func(&[], match_expr, span, arena)
 }
 
 fn build_mcp_call(span: SourceSpan, arena: &mut AstArena) -> ExprId {
@@ -108,8 +116,16 @@ fn build_mcp_tools(span: SourceSpan, arena: &mut AstArena) -> ExprId {
   let self_session2 = gen_self_field("session", span, arena);
   let list_tools = gen_field_call("mcp", "list_tools", &[self_session2], span, arena);
   let propagated = gen_propagate(list_tools, span, arena);
-  let ternary = arena.alloc_expr(Expr::Ternary(ExprTernary { cond, then_: empty_list, else_: Some(propagated) }), span);
-  gen_func(&[], ternary, span, arena)
+  let true_pat = arena.alloc_pattern(Pattern::Literal(Literal::Bool(true)), span);
+  let false_pat = arena.alloc_pattern(Pattern::Literal(Literal::Bool(false)), span);
+  let match_expr = arena.alloc_expr(
+    Expr::Match(ExprMatch {
+      scrutinee: cond,
+      arms: vec![MatchArm { pattern: true_pat, guard: None, body: empty_list }, MatchArm { pattern: false_pat, guard: None, body: propagated }],
+    }),
+    span,
+  );
+  gen_func(&[], match_expr, span, arena)
 }
 
 pub(super) fn desugar_cli(data: KeywordDeclData, span: SourceSpan, arena: &mut AstArena) -> Vec<StmtId> {

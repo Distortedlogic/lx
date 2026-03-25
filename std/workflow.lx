@@ -9,7 +9,7 @@
     ordered ? {
       Err e -> Err e
       Ok sorted -> {
-        results := {}
+        results = Store ()
         sorted | each (step) {
           self.status.set step.id "running"
           result = run_with_retry step.run context self.max_retries
@@ -23,7 +23,7 @@
             }
             Ok v -> {
               self.status.set step.id "done"
-              results <- {..results, (step.id): v}
+              results.set step.id v
             }
           }
         }

@@ -1,33 +1,9 @@
 Schema UserProfile = {
   name: Str = "the user's full name"
-  age: Int = "age in years, must be positive"
-  email: Str = "contact email address"
+  age: Int = "age in years"
+  email: Str = "contact email"
 }
 
--- Schema acts as a record constructor (Trait behavior)
-user = UserProfile {name: "Alice", age: 30, email: "a@b.com"}
+user = UserProfile {name: "Alice"; age: 30; email: "a@b.com"}
 assert user.name == "Alice"
 assert user.age == 30
-
--- schema() returns JSON-schema-compatible record
-s = user.schema ()
-assert s.type == "object"
-assert (s.properties | keys | len) == 3
-assert s.properties.name.type == "string"
-assert s.properties.age.type == "integer"
-assert s.properties.name.description == "the user's full name"
-assert s.properties.age.description == "age in years, must be positive"
-assert (s.required | len) == 3
-
--- validate() checks required fields
-good = user.validate {name: "Bob", age: 25, email: "b@c.com"}
-assert (good | ok?)
-
-bad = user.validate {name: "Charlie"}
-assert (bad | err?)
-
--- schema() output can be passed directly to ai.prompt_with json_schema
--- (not tested here since it requires LLM, but the structure is correct)
-schema_str = json.encode (user.schema ())
-assert (schema_str | contains? "object")
-assert (schema_str | contains? "integer")

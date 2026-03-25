@@ -11,24 +11,24 @@ use std/time
   tripped: Str = None
 
   tick = () {
-    self.start_ms == 0 ? (self.start_ms <- (time.now ()).ms)
+    self.start_ms == 0 ? { self.start_ms <- (time.now ()).ms }
     self.turns <- self.turns + 1
-    self.turns >= self.max_turns ? (self.tripped <- "max_turns: {self.turns} >= {self.max_turns}")
+    self.turns >= self.max_turns ? { self.tripped <- "max_turns: {self.turns} >= {self.max_turns}" }
     elapsed = (time.now ()).ms - self.start_ms
-    elapsed >= self.max_time_ms ? (self.tripped <- "max_time: {elapsed}ms >= {self.max_time_ms}ms")
+    elapsed >= self.max_time_ms ? { self.tripped <- "max_time: {elapsed}ms >= {self.max_time_ms}ms" }
     Ok ()
   }
 
   record = (action) {
-    self.start_ms == 0 ? (self.start_ms <- (time.now ()).ms)
+    self.start_ms == 0 ? { self.start_ms <- (time.now ()).ms }
     self.actions <- [..self.actions action]
-    (self.actions | len) >= self.max_actions ? (self.tripped <- "max_actions: {self.actions | len} >= {self.max_actions}")
+    (self.actions | len) >= self.max_actions ? { self.tripped <- "max_actions: {self.actions | len} >= {self.max_actions}" }
     w = self.repetition_window
     w > 0 && (self.actions | len) >= w ? {
       window = self.actions | drop ((self.actions | len) - w)
       head = window | first ^
       all_same = window | all? (== head)
-      all_same ? (self.tripped <- "repetition: last {w} actions identical")
+      all_same ? { self.tripped <- "repetition: last {w} actions identical" }
     }
     Ok ()
   }

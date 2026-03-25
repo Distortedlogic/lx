@@ -37,7 +37,10 @@ impl AstTransformer for Desugarer {
       match stmt {
         Stmt::KeywordDecl(data) => {
           let desugared = desugar_keyword(data, span, arena);
-          result.extend(desugared);
+          for sid in desugared {
+            let transformed = crate::visitor::walk_transform::walk_transform_stmt(self, sid, arena);
+            result.push(transformed);
+          }
         },
         _ => {
           let transformed = crate::visitor::walk_transform::walk_transform_stmt(self, sid, arena);
@@ -120,7 +123,7 @@ pub(super) fn desugar_ternary(cond: ExprId, then_: ExprId, else_: Option<ExprId>
   })
 }
 
-fn desugar_coalesce(expr: ExprId, default: ExprId, span: SourceSpan, arena: &mut AstArena) -> Expr {
+pub(super) fn desugar_coalesce(expr: ExprId, default: ExprId, span: SourceSpan, arena: &mut AstArena) -> Expr {
   let v = gensym("v");
   let v_bind = |arena: &mut AstArena| arena.alloc_pattern(Pattern::Bind(v), span);
   let v_ref = |arena: &mut AstArena| arena.alloc_expr(Expr::Ident(v), span);

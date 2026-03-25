@@ -58,7 +58,7 @@ use std/time
   }
 
   token_usage = () {
-    self.messages.values () | map (m) { (to_str m | len) // 4 } | fold 0 (+)
+    self.messages.values () | map (m) { (to_str m | len) // 4 } | fold 0 (a b) { a + b }
   }
 
   pressure = () {

@@ -1,12 +1,12 @@
 HTTP TestApi = {
   base_url: "https://httpbin.org"
-  headers: {Accept: "application/json"}
+  headers: {accept: "application/json"}
   endpoints: [{name: "/get", method: "GET"}]
 }
 
 api = TestApi {}
 assert api.base_url == "https://httpbin.org"
-assert api.headers.Accept == "application/json"
+assert api.headers.accept == "application/json"
 assert (methods_of api | any? (== "connect"))
 assert (methods_of api | any? (== "call"))
 assert (methods_of api | any? (== "tools"))

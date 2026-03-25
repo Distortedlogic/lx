@@ -3,7 +3,7 @@ use std/schema_trait {Schema}
 Class UserValidator : [Schema] = {
   validate = (data) {
     (type_of data) != "Record" ? (Err "not a record") : {
-      missing = ["name" "age"] | filter (k) { not (data | keys | any? (== k)) }
+      missing = ["name"; "age"] | filter (k) { not (data | keys | any? (== k)) }
       (missing | len) == 0 ? Ok data : Err {missing: missing}
     }
   }

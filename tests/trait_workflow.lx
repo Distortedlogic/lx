@@ -2,8 +2,8 @@ use std/workflow {Workflow}
 
 Class TwoStep : [Workflow] = {
   steps: [
-    {id: "a", run: (ctx) { 1 }, depends: [], undo: None}
-    {id: "b", run: (ctx) { 2 }, depends: ["a"], undo: None}
+    {id: "a"; run: (ctx) { 1 }; depends: []; undo: None};
+    {id: "b"; run: (ctx) { 2 }; depends: ["a"]; undo: None}
   ]
 }
 

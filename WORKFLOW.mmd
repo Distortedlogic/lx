@@ -67,7 +67,7 @@ every unresolved finding`"]:::red
 
     more -- "yes" --> loop_start
     more -- "no" --> sys_audit["`**4.0.0 System Audit (Spawn Subagent)**
-———
+——— phase 1: code quality ———
 ⟳ for each file in codebase {
 → empty function bodies
 → functions returning placeholders
@@ -75,12 +75,23 @@ every unresolved finding`"]:::red
 → pub items with no external users
 → TODO/FIXME/unimplemented left behind
 }
-——— check ———
 code compiles with 0 warnings
 all tests pass
+——— phase 2: spec compliance ———
+⟳ for each work item that was executed {
+→ read the work item spec
+→ read the committed diff for that group
+→ for each task in the work item {
+→→ did the diff do what the task asked?
+→→ did it leave anything incomplete?
+→→ did it add anything not in the task?
+  }
+}
 ——— returns ———
 grade 0–100
-list of {file, issue, severity}`"]:::cyan
+list of {file, issue, severity}
+(includes both code quality
+and spec compliance findings)`"]:::cyan
     sys_audit --> sys_check{{"4.1.0 grade >= 93?"}}:::teal
 
     sys_check -- "no" --> sys_stuck{{"4.2.0 stuck?\n——————\n3+ attempts ·\ngrade not improving ·\nsame findings repeating"}}:::red
