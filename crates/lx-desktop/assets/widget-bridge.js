@@ -38887,7 +38887,8 @@ registerProcessor('capture', Capture);
 			if (isSpeech) this.silenceStart = Date.now();
 			return {
 				isSpeech,
-				silenceExceeded: !isSpeech && Date.now() - this.silenceStart > this.config.silenceTimeoutMs
+				silenceExceeded: !isSpeech && Date.now() - this.silenceStart > this.config.silenceTimeoutMs,
+				rms
 			};
 		}
 		reset() {
@@ -38905,6 +38906,7 @@ registerProcessor('capture', Capture);
 			this.running = false;
 			this.onChunk = null;
 			this.onSilence = null;
+			this.onRms = null;
 			this.sampleRate = config.sampleRate ?? 16e3;
 			this.vad = new VoiceActivityDetector(config.vad);
 		}
@@ -38931,7 +38933,8 @@ registerProcessor('capture', Capture);
 			this.workletNode.port.onmessage = (evt) => {
 				if (!this.running) return;
 				const samples = evt.data;
-				const { silenceExceeded } = this.vad.feed(samples);
+				const { silenceExceeded, rms } = this.vad.feed(samples);
+				this.onRms?.(rms);
 				if (silenceExceeded) {
 					this.onSilence?.();
 					return;
@@ -38968,10 +38971,11 @@ registerProcessor('capture', Capture);
 	//#region ../audio-playback/src/playback.ts
 	var AudioPlayback = class {
 		constructor() {
-			this.audioCtx = null;
 			this.queue = [];
 			this.playing = false;
+			this.currentAudio = null;
 			this.onComplete = null;
+			this.onItemStart = null;
 		}
 		get isPlaying() {
 			return this.playing;
@@ -38979,45 +38983,47 @@ registerProcessor('capture', Capture);
 		get queueLength() {
 			return this.queue.length;
 		}
-		ensureContext() {
-			if (!this.audioCtx) this.audioCtx = new AudioContext();
-			if (this.audioCtx.state === "suspended") this.audioCtx.resume();
-			return this.audioCtx;
-		}
-		enqueue(base64Wav) {
-			const binary = atob(base64Wav);
-			const bytes = new Uint8Array(binary.length);
-			for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-			this.queue.push(bytes.buffer);
-			console.log("[audio-playback] enqueue, playing:", this.playing, "queue:", this.queue.length);
+		enqueue(base64Wav, id = "") {
+			this.queue.push({
+				data: base64Wav,
+				id
+			});
 			if (!this.playing) this.playNext();
 		}
 		playNext() {
-			console.log("[audio-playback] playNext, queue:", this.queue.length);
 			if (this.queue.length === 0) {
 				this.playing = false;
 				this.onComplete?.();
 				return;
 			}
 			this.playing = true;
-			const ctx = this.ensureContext();
-			console.log("[audio-playback] ctx state:", ctx.state, "sampleRate:", ctx.sampleRate);
-			const buffer = this.queue.shift();
-			console.log("[audio-playback] buffer byteLength:", buffer.byteLength);
-			ctx.decodeAudioData(buffer.slice(0), (decoded) => {
-				console.log("[audio-playback] decoded OK, duration:", decoded.duration, "ctx state:", ctx.state);
-				const source = ctx.createBufferSource();
-				source.buffer = decoded;
-				source.connect(ctx.destination);
-				source.onended = () => this.playNext();
-				source.start();
-			}, (err) => {
-				console.error("[audio-playback] decodeAudioData failed:", err);
+			const item = this.queue.shift();
+			const binary = atob(item.data);
+			const bytes = new Uint8Array(binary.length);
+			for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+			const blob = new Blob([bytes], { type: "audio/wav" });
+			const url = URL.createObjectURL(blob);
+			const audio = new Audio(url);
+			this.currentAudio = audio;
+			this.onItemStart?.(item.id);
+			audio.onended = () => {
+				URL.revokeObjectURL(url);
+				this.currentAudio = null;
+				this.playNext();
+			};
+			audio.onerror = () => {
+				URL.revokeObjectURL(url);
+				this.currentAudio = null;
+				this.playNext();
+			};
+			audio.play().catch(() => {
+				URL.revokeObjectURL(url);
+				this.currentAudio = null;
 				this.playNext();
 			});
 		}
 		playAlertTone(frequency = 440, duration = .2, volume = .3) {
-			const ctx = this.ensureContext();
+			const ctx = new AudioContext();
 			const osc = ctx.createOscillator();
 			const gain = ctx.createGain();
 			osc.frequency.value = frequency;
@@ -39030,13 +39036,13 @@ registerProcessor('capture', Capture);
 		stop() {
 			this.queue.length = 0;
 			this.playing = false;
+			if (this.currentAudio) {
+				this.currentAudio.pause();
+				this.currentAudio = null;
+			}
 		}
 		dispose() {
 			this.stop();
-			if (this.audioCtx) {
-				this.audioCtx.close();
-				this.audioCtx = null;
-			}
 		}
 	};
 	//#endregion
@@ -39074,16 +39080,27 @@ registerProcessor('capture', Capture);
 					dx.send({ type: "silence_detected" });
 				}
 			};
+			capture.onRms = (rms) => {
+				dx.send({
+					type: "rms",
+					level: rms
+				});
+			};
 			playback.onComplete = () => {
 				transition(state, "idle");
 				dx.send({ type: "playback_complete" });
+			};
+			playback.onItemStart = (id) => {
+				dx.send({
+					type: "audio_playing",
+					id
+				});
 			};
 		},
 		update(elementId, data) {
 			const state = states.get(elementId);
 			if (!state) return;
 			const msg = data;
-			console.log("[voice] update received:", msg.type);
 			switch (msg.type) {
 				case "start_capture":
 					if (state.status !== "idle") return;
@@ -39099,9 +39116,8 @@ registerProcessor('capture', Capture);
 					state.dx.send({ type: "cancel" });
 					break;
 				case "audio_response":
-					console.log("[voice] audio_response chunk, data length:", msg.data?.length ?? 0);
 					transition(state, "speaking");
-					if (msg.data) state.playback.enqueue(msg.data);
+					if (msg.data) state.playback.enqueue(msg.data, msg.id ?? "");
 					break;
 			}
 		},

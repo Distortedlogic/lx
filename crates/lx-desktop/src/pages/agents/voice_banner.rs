@@ -52,6 +52,11 @@ pub fn VoiceBanner() -> Element {
             }
           }
         },
+        Some("rms") => {
+          if let Some(level) = msg["level"].as_f64() {
+            ctx.rms.set(level as f32);
+          }
+        },
         Some("status_change") => match msg["status"].as_str() {
           Some("idle") => ctx.status.set(VoiceStatus::Idle),
           Some("listening") => ctx.status.set(VoiceStatus::Listening),
@@ -72,6 +77,7 @@ pub fn VoiceBanner() -> Element {
   let bar_glow = if is_active { "shadow-[0_0_12px_var(--primary)]" } else { "" };
   let icon = if is_active { "\u{1F534}" } else { "\u{1F512}" };
   let button_label = if (ctx.status)() == VoiceStatus::Idle { "PUSH TO TALK" } else { "STOP" };
+  let volume = ((ctx.rms)() / 0.3).min(1.0);
 
   rsx! {
     div { class: "flex flex-col gap-2",
@@ -81,8 +87,23 @@ pub fn VoiceBanner() -> Element {
           "{status_text}"
         }
         if is_active {
-          span { class: "text-[var(--primary)] text-sm ml-1 animate-pulse",
-            "\u{2581}\u{2582}\u{2583}\u{2584}"
+          div { class: "flex items-end gap-[2px] h-4 ml-1",
+            span {
+              class: "w-1 bg-[var(--primary)] rounded-sm transition-all duration-75",
+              style: "height: {(volume * 40.0).max(2.0)}%;",
+            }
+            span {
+              class: "w-1 bg-[var(--primary)] rounded-sm transition-all duration-75",
+              style: "height: {(volume * 70.0).max(2.0)}%;",
+            }
+            span {
+              class: "w-1 bg-[var(--primary)] rounded-sm transition-all duration-75",
+              style: "height: {(volume * 100.0).max(2.0)}%;",
+            }
+            span {
+              class: "w-1 bg-[var(--primary)] rounded-sm transition-all duration-75",
+              style: "height: {(volume * 60.0).max(2.0)}%;",
+            }
           }
         }
         div { class: "flex-1" }
