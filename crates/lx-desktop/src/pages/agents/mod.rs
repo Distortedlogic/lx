@@ -12,8 +12,7 @@ use self::voice_context::VoiceContext;
 
 #[component]
 pub fn Agents() -> Element {
-  use_context_provider(VoiceContext::new);
-  let ctx = use_context::<VoiceContext>();
+  let ctx = VoiceContext::provide();
   let session_short = &crate::voice_backend::SESSION_ID[..8];
   let status_text = (ctx.status)().to_string();
 

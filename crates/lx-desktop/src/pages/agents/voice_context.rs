@@ -57,15 +57,17 @@ pub struct VoiceContext {
 }
 
 impl VoiceContext {
-  pub fn new() -> Self {
-    Self {
-      status: use_signal(|| VoiceStatus::Idle),
-      transcript: use_signal(Vec::new),
-      pending: use_signal(HashMap::new),
-      pcm_buffer: use_signal(Vec::new),
-      rms: use_signal(|| 0.0),
-      pipeline_stage: use_signal(|| PipelineStage::Idle),
-      widget: use_signal(|| None),
-    }
+  pub fn provide() -> Self {
+    let ctx = Self {
+      status: Signal::new(VoiceStatus::Idle),
+      transcript: Signal::new(Vec::new()),
+      pending: Signal::new(HashMap::new()),
+      pcm_buffer: Signal::new(Vec::new()),
+      rms: Signal::new(0.0),
+      pipeline_stage: Signal::new(PipelineStage::Idle),
+      widget: Signal::new(None),
+    };
+    use_context_provider(|| ctx);
+    ctx
   }
 }
