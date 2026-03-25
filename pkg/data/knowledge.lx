@@ -3,10 +3,8 @@
 -- Generic operations (get/keys/query/remove/save/load) come from Collection.
 
 use std/time
-use std/collection {Collection}
 
-+Class KnowledgeBase : [Collection] = {
-  entries: Store ()
+Store +KnowledgeBase = {
 
   store = (key val meta) {
     now = time.now ()

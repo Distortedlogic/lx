@@ -3,10 +3,8 @@
 -- Generic operations (get/keys/remove/save/load) come from Collection.
 -- Domain-specific: capacity, eviction, pinning, pressure.
 
-use std/collection {Collection}
 
-+Class ContextWindow : [Collection] = {
-  entries: Store ()
+Store +ContextWindow = {
   capacity: 8000
   seq: 0
 

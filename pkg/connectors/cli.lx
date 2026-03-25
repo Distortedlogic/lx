@@ -2,8 +2,6 @@
 -- Stateless connect/disconnect. call builds CLI commands from tool_defs.
 -- Each tool_def maps a tool name to a subcommand + flag pattern.
 
-use std/connector {Connector}
-
 build_cli_args = (tool_def args) {
   base = tool_def.subcommand ?? ""
   has_args = args != ()
@@ -11,13 +9,10 @@ build_cli_args = (tool_def args) {
   base != "" ? (flags != "" ? "{base} {flags}" : base) : flags
 }
 
-Class +CliConnector : [Connector] = {
+CLI +CliConnector = {
   command: ""
   tool_defs: []
   env: {}
-
-  connect = () Ok ()
-  disconnect = () Ok ()
 
   call = (req) {
     tool = self.tool_defs | find (t) { t.name == req.tool }

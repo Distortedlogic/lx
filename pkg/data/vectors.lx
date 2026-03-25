@@ -1,5 +1,4 @@
 use std/math
-use std/collection {Collection}
 
 cosine_sim = (a b) {
   sums = zip a b | fold {dot: 0.0  na: 0.0  nb: 0.0} (acc pair) {
@@ -10,8 +9,7 @@ cosine_sim = (a b) {
   (denom == 0.0) ? 0.0 : sums.dot / denom
 }
 
-+Class VectorIndex : [Collection] = {
-  entries: Store ()
+Store +VectorIndex = {
 
   add = (id text metadata) {
     result = ai.embed [text]

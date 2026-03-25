@@ -6,7 +6,6 @@
 
 use std/time
 use std/fs
-use std/collection {Collection}
 
 keep = (pred list) filter pred list
 
@@ -43,8 +42,7 @@ classify_trend = (avg_delta recent_delta) {
   recent_delta < 0.0 ? "regressing" : (avg_delta < 0.001 ? "plateau" : (recent_delta < avg_delta * 0.5 ? "diminishing" : (avg_delta > 0.01 ? "improving" : "steady")))
 }
 
-+Class TraceStore : [Collection] = {
-  entries: Store ()
+Store +TraceStore = {
   provenance: Store ()
   provenance_enabled: false
 

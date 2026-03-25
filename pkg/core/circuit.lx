@@ -1,6 +1,4 @@
--- lx package: CircuitBreaker class for agentic loop termination
-use std/time
-
+-- lx package: CircuitBreaker — agentic loop termination guard
 check_repetition = (acts w) {
   can_check = w > 0 && (len acts) >= w
   can_check ? (check_rep_window acts w) : None
@@ -25,7 +23,7 @@ find_trip_reason = (st) {
   turns_trip ? "max_turns: {st.turns} >= {st.max_turns}" : (time_trip ? "max_time: exceeded {st.max_time}s" : (action_trip ? "max_actions: {len st.actions} >= {st.max_actions}" : rep))
 }
 
-+Class CircuitBreaker = {
+Guard +CircuitBreaker = {
   turns: 0
   max_turns: 100
   max_time: 300.0

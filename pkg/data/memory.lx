@@ -3,7 +3,6 @@
 -- Domain-specific: store, recall, promote/demote, consolidate, tier filtering.
 
 use std/time
-use std/collection {Collection}
 
 keep = (pred list) filter pred list
 
@@ -28,8 +27,7 @@ score_keywords = (content query_words) {
 
 has_positive_score = (e) e.score > 0.0
 
-+Class MemoryStore : [Collection] = {
-  entries: Store ()
+Store +MemoryStore = {
 
   store = (entry_rec) {
     id = next_entry_id ()

@@ -2,27 +2,7 @@
 -- Holds session state. connect/disconnect manage the lifecycle.
 -- call delegates to mcp.call, tools delegates to mcp.list_tools.
 
-use std/connector {Connector}
-
-Class +McpConnector : [Connector] = {
+MCP +McpConnector = {
   command: ""
   args: []
-  session: None
-
-  connect = () {
-    self.session <- mcp.connect {command: self.command  args: self.args} ^
-    Ok ()
-  }
-
-  disconnect = () {
-    self.session == None ? (Ok ()) : { mcp.close self.session; Ok () }
-  }
-
-  call = (req) {
-    mcp.call self.session req.tool req.args ^
-  }
-
-  tools = () {
-    self.session == None ? [] : (mcp.list_tools self.session ^)
-  }
 }
