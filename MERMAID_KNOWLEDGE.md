@@ -86,6 +86,11 @@ Everything here was discovered through trial and error in this repo. None of it 
 - `A ~~~ B ~~~ C` places A, B, C side by side without visible edges
 - Useful inside subgraphs to create column layouts
 
+## Rendering
+
+- After every `.mmd` edit, run `just diagrams` to regenerate PNGs
+- Stale PNGs after a diagram edit is incomplete work
+
 ## Node Numbering Convention (x.y.z)
 
 - `x` — each agent gets its own major number

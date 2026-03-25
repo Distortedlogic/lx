@@ -7,6 +7,7 @@ pub fn enable_media_permissions(desktop: &dioxus::desktop::DesktopContext) {
 
   if let Some(settings) = WebViewExt::settings(&wk_webview) {
     settings.set_enable_media_stream(true);
+    settings.set_media_playback_requires_user_gesture(false);
   }
 
   wk_webview.connect_permission_request(|_webview, request: &webkit2gtk::PermissionRequest| {
