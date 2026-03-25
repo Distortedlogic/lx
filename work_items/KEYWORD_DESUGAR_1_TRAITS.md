@@ -6,6 +6,14 @@ Write Trait .lx files for each keyword's contract: Tool, Prompt, Session, Guard,
 
 The keyword desugaring pipeline (Units 2-5) converts `Agent X = { ... }` into `Class X : [Agent] = { ... }`. The traits must exist before the desugaring can inject them. Writing traits first validates the contract design before building compiler infrastructure.
 
+# Critical design fact: trait fields do NOT transfer to Classes
+
+`inject_traits()` copies only `defaults` (method implementations) into classes. Trait field declarations (`entries`) are NOT injected. This means `Class X : [Guard] = {}` would NOT get `turns`, `actions`, etc. from the Guard trait — the class must redeclare them. The keyword desugaring (Unit 2) handles this by injecting default fields automatically. Manual `Class : [Trait]` users must provide all fields themselves.
+
+Consequence for traits: declare methods that reference `self.field` — those methods ARE injected via trait defaults. Don't expect field defaults to transfer. Traits should still declare fields for documentation and for record-constructor usage, but the practical value for Class implementors is methods only.
+
+Consequence for tests: Unit 1 tests that use manual `Class : [Trait]` must redeclare ALL fields the trait methods reference.
+
 # What Changes
 
 Six new .lx files in `pkg/core/`. All traits are exported with `+Trait`.
@@ -402,21 +410,21 @@ topo_sort = (steps) {
 
 **Subject:** Create pkg/core/schema.lx
 
-**Description:** Create `pkg/core/schema.lx`. The Schema trait provides `validate` — it checks that a data record has the required fields. Note: `TraitDeclData.requires` does NOT work at runtime (the `requires` field is stored but `inject_traits()` never reads it). So Schema cannot be inherited via `requires`. Instead, when the Schema keyword desugars a trait (Unit 3), it will directly inject these methods as defaults on the generated TraitDecl. For now, write the standalone trait:
+**Description:** Create `pkg/core/schema.lx`. The Schema trait provides base `validate` and `schema` methods. Note: `TraitDeclData.requires` does NOT work at runtime — the `requires` field is stored but `inject_traits()` never reads it. So Schema cannot be inherited via `requires`. When the Schema keyword desugars (Unit 3), it directly injects richer `schema()` and `validate()` that include field descriptions and JSON-schema-compatible output with `type`, `properties` (each with `type` + `description`), and `required` array. This base trait exists for manual use and provides the method signatures:
 
 ```lx
 +Trait Schema = {
   validate = (data) {
-    type_of data != "Record" ? (Err {error: "expected Record, got {type_of data}"}) : (Ok data)
+    (type_of data) != "Record" ? (Err {error: "expected Record, got {type_of data}"}) : (Ok data)
   }
 
   schema = () {
-    {type: "object"}
+    {type: "object", properties: {}, required: []}
   }
 }
 ```
 
-This is intentionally minimal. The Schema keyword desugaring (Unit 3) will generate richer `schema()` and `validate()` implementations based on the declared fields. This trait exists as the base contract.
+The base `schema()` returns a minimal JSON-schema envelope. The Schema keyword desugaring (Unit 3) overrides this with generated implementations that populate `properties` with per-field `{type, description}` records and `required` with field name strings. Type mapping: `Int` → `"integer"`, `Float` → `"number"`, `Str` → `"string"`, `Bool` → `"boolean"`, `List` → `"array"`, other → `"object"`.
 
 **ActiveForm:** Writing Schema trait
 

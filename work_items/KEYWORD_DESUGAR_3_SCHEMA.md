@@ -1,10 +1,34 @@
 # Goal
 
-Add Schema keyword desugaring. `Schema GradeResult = { score: Int, passed: Bool, feedback: Str }` desugars to a `Trait GradeResult` with auto-injected `schema()` and `validate()` default methods. This is the only keyword that desugars to Trait instead of Class.
+Add Schema keyword desugaring. Schema fields declare type AND description so the generated JSON schema tells the model what each field means:
+
+```lx
+Schema GradeResult = {
+  score: Int = "0-100 weighted score across all rubric categories"
+  passed: Bool = "true if score >= threshold and no category failed"
+  feedback: Str = "human-readable summary of what passed and failed"
+}
+```
+
+Desugars to a `Trait GradeResult` with auto-injected `schema()` and `validate()` defaults. `schema()` returns a proper JSON-schema-compatible record:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "score": {"type": "integer", "description": "0-100 weighted score across all rubric categories"},
+    "passed": {"type": "boolean", "description": "true if score >= threshold and no category failed"},
+    "feedback": {"type": "string", "description": "human-readable summary of what passed and failed"}
+  },
+  "required": ["score", "passed", "feedback"]
+}
+```
+
+This is the only keyword that desugars to Trait instead of Class.
 
 # Why
 
-Every `ai.prompt_with { json_schema: ... }` hand-writes a JSON schema string. Schema keyword auto-generates `schema()` and `validate()` from typed field declarations. Schema desugars to Trait (not Class) because data contracts are lightweight record constructors, not heap-allocated objects.
+Every `ai.prompt_with { json_schema: ... }` hand-writes a JSON schema string. The model needs field descriptions to know what to put in each field — bare type names are not enough. Schema keyword auto-generates complete JSON schemas from typed, described field declarations. Schema desugars to Trait (not Class) because data contracts are lightweight record constructors, not heap-allocated objects.
 
 # Critical fact: `requires` does not work
 
@@ -91,28 +115,54 @@ The Schema keyword has `trait_entries: Some(entries)` with `TraitEntry::Field(Fi
 
 Generate two default methods:
 
-**schema() method:** Build a record literal expression where each field in `entries` that is `TraitEntry::Field(f)` produces a record field `f.name: Literal::Str(f.type_name.as_str())`. Example: for `{ score: Int, passed: Bool }`, generate the expression `{score: "Int", passed: "Bool"}`.
+**schema() method:** Build a JSON-schema-compatible record. The trait body syntax `field: Type = "description"` is parsed as `FieldDecl { name, type_name, default: Some(description_expr), constraint }`. The `default` field holds the description string literal. The `type_name` holds the lx type name.
+
+Type mapping for JSON schema: `Int` → `"integer"`, `Float` → `"number"`, `Str` → `"string"`, `Bool` → `"boolean"`, `List` → `"array"`, everything else → `"object"`.
+
+For each `TraitEntry::Field(f)`, generate a property record: `{type: json_type_str, description: desc_str}`. Then wrap in the JSON schema envelope: `{type: "object", properties: {field1: prop1, field2: prop2, ...}, required: ["field1", "field2", ...]}`.
 
 ```rust
-let schema_fields: Vec<RecordField> = entries.iter().filter_map(|e| {
+// For each field, build: {type: "integer", description: "0-100 score"}
+let property_fields: Vec<RecordField> = entries.iter().filter_map(|e| {
     if let TraitEntry::Field(f) = e {
-        let name = f.name;
-        let type_str = arena.alloc_expr(Expr::Literal(Literal::Str(vec![StrPart::Text(f.type_name.as_str().to_string())])), span);
-        Some(RecordField::Named { name, value: type_str })
+        let json_type = match f.type_name.as_str() {
+            "Int" => "integer", "Float" => "number", "Str" => "string",
+            "Bool" => "boolean", "List" => "array", _ => "object",
+        };
+        let type_val = gen_literal_str(json_type, span, arena);
+        let mut prop_fields = vec![(intern("type"), type_val)];
+        // If default is a string literal, use it as description
+        if let Some(desc_id) = f.default {
+            if let Expr::Literal(Literal::Str(parts)) = arena.expr(desc_id) {
+                if let [StrPart::Text(desc_text)] = parts.as_slice() {
+                    prop_fields.push((intern("description"), gen_literal_str(desc_text, span, arena)));
+                }
+            }
+        }
+        let prop_record = gen_record(prop_fields, span, arena);
+        Some(RecordField::Named { name: f.name, value: prop_record })
     } else { None }
 }).collect();
-let schema_record = arena.alloc_expr(Expr::Record(schema_fields), span);
-let schema_fn = arena.alloc_expr(Expr::Func(ExprFunc {
-    params: vec![],
-    type_params: vec![],
-    ret_type: None,
-    guard: None,
-    body: schema_record,
-}), span);
+let properties = arena.alloc_expr(Expr::Record(property_fields), span);
+
+// Build required array: ["score", "passed", "feedback"]
+let required_elems: Vec<ExprId> = entries.iter().filter_map(|e| {
+    if let TraitEntry::Field(f) = e { Some(gen_literal_str(f.name.as_str(), span, arena)) } else { None }
+}).collect();
+let required = gen_list(required_elems, span, arena);
+
+// Envelope: {type: "object", properties: {...}, required: [...]}
+let envelope = gen_record(vec![
+    (intern("type"), gen_literal_str("object", span, arena)),
+    (intern("properties"), properties),
+    (intern("required"), required),
+], span, arena);
+
+let schema_fn = gen_func(&[], envelope, span, arena);
 let schema_method = AgentMethod { name: intern("schema"), handler: schema_fn };
 ```
 
-**validate(data) method:** Generate a function that checks each field name exists in `data`. Build an expression like:
+**validate(data) method:** Generate a function that checks all required field names exist in `data`:
 
 ```lx
 (data) {
@@ -121,9 +171,11 @@ let schema_method = AgentMethod { name: intern("schema"), handler: schema_fn };
 }
 ```
 
-Construct this AST: Func with param "data", body is a Block with binding `missing` and a ternary.
+Construct this AST: Func with param "data", body is a Block with binding `missing` (list of field name strings piped through filter) and a ternary returning Ok or Err.
 
-This is verbose AST construction. Use the same arena allocation pattern as the Desugarer's existing `desugar_ternary` and `desugar_coalesce` functions for reference on how to build complex expression trees.
+Use the gen_ast helpers from Unit 4's `gen_ast.rs` for building expressions. Reference the Desugarer's existing `desugar_ternary` and `desugar_coalesce` in `desugar.rs` for how to build complex expression trees with arena allocation.
+
+**Important:** When the desugaring strips the description from `default`, the generated TraitDecl's `entries` should have `default: None` on each FieldDecl — otherwise the runtime would try to use the description string as the field's default value, which is wrong. Clear `default` on each field entry before emitting the TraitDecl.
 
 Assemble the TraitDecl:
 
@@ -165,9 +217,9 @@ Return `vec![use_stmt, arena.alloc_stmt(Stmt::TraitDecl(trait_decl), span)]`.
 
 ```lx
 Schema UserProfile = {
-  name: Str
-  age: Int
-  email: Str
+  name: Str = "the user's full name"
+  age: Int = "age in years, must be positive"
+  email: Str = "contact email address"
 }
 
 -- Schema acts as a record constructor (Trait behavior)
@@ -175,21 +227,31 @@ user = UserProfile {name: "Alice", age: 30, email: "a@b.com"}
 assert user.name == "Alice"
 assert user.age == 30
 
--- schema() returns field type map
-s = UserProfile.schema ()
-assert (s | keys | len) == 3
-assert s.name == "Str"
-assert s.age == "Int"
+-- schema() returns JSON-schema-compatible record
+s = user.schema ()
+assert s.type == "object"
+assert (s.properties | keys | len) == 3
+assert s.properties.name.type == "string"
+assert s.properties.age.type == "integer"
+assert s.properties.name.description == "the user's full name"
+assert s.properties.age.description == "age in years, must be positive"
+assert (s.required | len) == 3
 
 -- validate() checks required fields
-good = UserProfile.validate {name: "Bob", age: 25, email: "b@c.com"}
+good = user.validate {name: "Bob", age: 25, email: "b@c.com"}
 assert (good | ok?)
 
-bad = UserProfile.validate {name: "Charlie"}
+bad = user.validate {name: "Charlie"}
 assert (bad | err?)
+
+-- schema() output can be passed directly to ai.prompt_with json_schema
+-- (not tested here since it requires LLM, but the structure is correct)
+schema_str = json.encode (user.schema ())
+assert (schema_str | contains? "object")
+assert (schema_str | contains? "integer")
 ```
 
-Note: `UserProfile.schema()` calls schema as a static method on the trait value itself. If the trait system doesn't support static method calls (only instance method calls), then test via an instance: `user.schema()`. Verify which pattern works by reading how trait defaults are accessed in the interpreter — `pkg/agent.lx`'s Agent trait defaults are called on instances, e.g., `a.think "prompt"` after `a = MyAgent {}`. So test via instance.
+Note: Schema methods are accessed via instance (`user.schema()`) not static call (`UserProfile.schema()`). Trait defaults in lx are injected as instance methods when a Class implements the trait. Since Schema desugars to a Trait, and Traits act as record constructors, calling `.schema()` on the constructed record invokes the default.
 
 Run `just test`.
 
