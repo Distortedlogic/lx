@@ -20,57 +20,61 @@ pub fn VoiceBanner() -> Element {
     ctx.widget.set(Some(widget));
   });
 
-  use_future(move || async move {
-    loop {
-      let Ok(msg) = widget.recv::<serde_json::Value>().await else { break };
-      match msg["type"].as_str() {
-        Some("audio_chunk") => {
-          if let Some(data) = msg["data"].as_str()
-            && let Ok(bytes) = B64.decode(data)
-          {
-            ctx.pcm_buffer.write().extend_from_slice(&bytes);
-          }
-        },
-        Some("silence_detected") => {
-          let buffer = std::mem::take(&mut *ctx.pcm_buffer.write());
-          if buffer.is_empty() {
-            widget.send_update(serde_json::json!({ "type": "stop_capture" }));
-            continue;
-          }
-          spawn(async move {
-            if let Err(e) = run_pipeline(buffer, widget, ctx, spawn_tx.clone()).await {
-              ctx.transcript.write().push(TranscriptEntry { is_user: false, text: format!("Error: {e}") });
-              ctx.pipeline_stage.set(PipelineStage::Idle);
+  use_future(move || {
+    let spawn_tx = spawn_tx.clone();
+    async move {
+      loop {
+        let Ok(msg) = widget.recv::<serde_json::Value>().await else { break };
+        match msg["type"].as_str() {
+          Some("audio_chunk") => {
+            if let Some(data) = msg["data"].as_str()
+              && let Ok(bytes) = B64.decode(data)
+            {
+              ctx.pcm_buffer.write().extend_from_slice(&bytes);
+            }
+          },
+          Some("silence_detected") => {
+            let buffer = std::mem::take(&mut *ctx.pcm_buffer.write());
+            if buffer.is_empty() {
               widget.send_update(serde_json::json!({ "type": "stop_capture" }));
+              continue;
             }
-          });
-        },
-        Some("audio_playing") => {
-          if let Some(id) = msg["id"].as_str()
-            && let Some(text) = ctx.pending.write().remove(id)
-          {
-            let mut t = ctx.transcript.write();
-            match t.last_mut() {
-              Some(entry) if !entry.is_user => entry.text.push_str(&format!(" {text}")),
-              _ => t.push(TranscriptEntry { is_user: false, text }),
+            let tx = spawn_tx.clone();
+            spawn(async move {
+              if let Err(e) = run_pipeline(buffer, widget, ctx, tx).await {
+                ctx.transcript.write().push(TranscriptEntry { is_user: false, text: format!("Error: {e}") });
+                ctx.pipeline_stage.set(PipelineStage::Idle);
+                widget.send_update(serde_json::json!({ "type": "stop_capture" }));
+              }
+            });
+          },
+          Some("audio_playing") => {
+            if let Some(id) = msg["id"].as_str()
+              && let Some(text) = ctx.pending.write().remove(id)
+            {
+              let mut t = ctx.transcript.write();
+              match t.last_mut() {
+                Some(entry) if !entry.is_user => entry.text.push_str(&format!(" {text}")),
+                _ => t.push(TranscriptEntry { is_user: false, text }),
+              }
             }
-          }
-        },
-        Some("rms") => {
-          if let Some(level) = msg["level"].as_f64() {
-            ctx.rms.set(level as f32);
-          }
-        },
-        Some("status_change") => match msg["status"].as_str() {
-          Some("idle") => ctx.status.set(VoiceStatus::Idle),
-          Some("listening") => ctx.status.set(VoiceStatus::Listening),
-          Some("processing") => ctx.status.set(VoiceStatus::Processing),
-          Some("speaking") => ctx.status.set(VoiceStatus::Speaking),
+          },
+          Some("rms") => {
+            if let Some(level) = msg["level"].as_f64() {
+              ctx.rms.set(level as f32);
+            }
+          },
+          Some("status_change") => match msg["status"].as_str() {
+            Some("idle") => ctx.status.set(VoiceStatus::Idle),
+            Some("listening") => ctx.status.set(VoiceStatus::Listening),
+            Some("processing") => ctx.status.set(VoiceStatus::Processing),
+            Some("speaking") => ctx.status.set(VoiceStatus::Speaking),
+            _ => {},
+          },
+          Some("start_standby") | Some("cancel") => ctx.pcm_buffer.write().clear(),
+          Some("playback_complete") => {},
           _ => {},
-        },
-        Some("start_standby") | Some("cancel") => ctx.pcm_buffer.write().clear(),
-        Some("playback_complete") => {},
-        _ => {},
+        }
       }
     }
   });
