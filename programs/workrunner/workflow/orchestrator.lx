@@ -1,33 +1,21 @@
 -- Orchestrator — runs tasks within a work item, grades, fixes.
-use ../schema/work_item {task_count task_summaries}
--- Pure logic: takes dependencies as arguments, no globals.
-
+use ../schema/work_item {task_count task_summaries load}
 use ../log
-use ../store/status
-use ./agents
-use ../schema/work_item
+use ../store/status {save_debug}
+use ./agents {diagnose}
+use ../agent/implementer {Implementer}
+use ../agent/fixer {TaskFixer WorkItemFixer}
+use ../agent/investigator {Investigator}
 
-run_task_impl = (wi task bootstrap_ctx max_rounds runner_dir) {
-  log.log "  --- task {task.num}/{task_count wi}: {task.subject} ---"
-  agents.implement wi task bootstrap_ctx runner_dir
-
-  clean = agents.diagnose task runner_dir wi.slug
-  round := 0
-  loop {
-    clean ? break ()
-    round <- round + 1
-    round >= max_rounds ? break ()
-
-    agents.fix wi task bootstrap_ctx "just diagnose has errors or warnings — fix compilation issues" runner_dir
-    clean = agents.diagnose task runner_dir wi.slug
-  }
-}
-+run_task = run_task_impl
+implementer = Implementer {}
+task_fixer = TaskFixer {}
+wi_fixer = WorkItemFixer {}
+investigator = Investigator {}
 
 grade_and_log_impl = (wi grader_inst report runner_dir) {
   log.log "  > grader: full work item..."
   grade = grader_inst.grade report "Verify full implementation of {wi.path}"
-  persistence.save_debug runner_dir wi.slug "grade_final.json" (json.encode_pretty grade)
+  save_debug runner_dir wi.slug "grade_final.json" (json.encode_pretty grade)
   log.log "  GRADE: {grade.score}/100 | passed: {grade.passed} | {grade.feedback}"
   grade.categories | each (cat) {
     icon = cat.passed ? "+" : "x"
@@ -40,31 +28,31 @@ grade_and_log_impl = (wi grader_inst report runner_dir) {
   log.log ""
   log.log "=== [{idx + 1}/{total}] {path} ==="
 
-  wi = work_item.load path
-  log.log "; parsed: {task_count wi} tasks"
+  wi = load path
+  log.log "  parsed: {task_count wi} tasks"
   task_summaries wi | each (s) log.log "    {s}"
 
   wi.tasks | each (task) {
     log.log "  --- task {task.num}/{task_count wi}: {task.subject} ---"
-    agents.implement wi task bootstrap_ctx runner_dir
+    implementer.act {wi: wi; task: task; bootstrap_ctx: bootstrap_ctx; runner_dir: runner_dir}
 
-    clean = agents.diagnose task runner_dir wi.slug
+    clean = diagnose task runner_dir wi.slug
     fix_round := 0
     loop {
       clean ? break ()
       fix_round <- fix_round + 1
       fix_round >= max_rounds ? break ()
-      agents.fix wi task bootstrap_ctx "just diagnose has errors or warnings — fix compilation issues" runner_dir
-      clean = agents.diagnose task runner_dir wi.slug
+      task_fixer.act {wi: wi; task: task; bootstrap_ctx: bootstrap_ctx; feedback: "just diagnose has errors or warnings — fix compilation issues"; runner_dir: runner_dir}
+      clean = diagnose task runner_dir wi.slug
     }
   }
 
   log.log "  --- all tasks done, grading full work item ---"
-  report = agents.investigate wi bootstrap_ctx runner_dir
+  report = investigator.act {wi: wi; runner_dir: runner_dir}
   grade = grade_and_log_impl wi grader_inst report runner_dir
 
-  score := grade.score ?? 0
-  passed := grade.passed ?? false
+  score := grade.score
+  passed := grade.passed
 
   round := 0
   loop {
@@ -72,19 +60,19 @@ grade_and_log_impl = (wi grader_inst report runner_dir) {
     round <- round + 1
     round > max_rounds ? break ()
 
-    failed_list = grade.failed ?? []
+    failed_list = grade.failed
     has_failed = failed_list | len > 0
     not has_failed ? break ()
 
     failed_text = failed_list | map to_str | join "\n- "
-    agents.fix_work_item wi bootstrap_ctx grade.feedback failed_text runner_dir
+    wi_fixer.act {wi: wi; bootstrap_ctx: bootstrap_ctx; feedback: grade.feedback; failed_text: failed_text; runner_dir: runner_dir}
 
-    report = agents.investigate wi bootstrap_ctx runner_dir
+    report = investigator.act {wi: wi; runner_dir: runner_dir}
     grade = grade_and_log_impl wi grader_inst report runner_dir
-    score <- grade.score ?? 0
-    passed <- grade.passed ?? false
+    score <- grade.score
+    passed <- grade.passed
   }
 
   status_str = passed ? "pass" : "fail"
-  {status: status_str; score: score; rounds: round; path: path; feedback: grade.feedback ?? ""}
+  {status: status_str; score: score; rounds: round; path: path; feedback: grade.feedback}
 }

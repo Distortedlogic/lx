@@ -1,0 +1,26 @@
+use ../prompt/agents {RevisePrompt}
+use ../store/status {save_debug}
+use ../log : wg_log
+
++Agent Reviser = {
+  act = (msg) {
+    wg_log.log "  > claude: revise draft (round {msg.round_num})..."
+
+    p = RevisePrompt {}
+    p.add_section "Current Document" msg.draft
+    p.add_section "Feedback to Fix" msg.feedback
+    p.add_instruction "Fix ALL feedback items. Return the complete revised markdown document."
+    p.add_constraint "Do not remove content to avoid checks — fix issues properly"
+    p.add_constraint "Start with '# Goal' — nothing before it"
+
+    result = self.think_with {
+      prompt: p.render ()
+      disable_tools: true
+    } ^
+
+    revised = result.text
+    save_debug msg.runner_dir msg.slug "revise_round_{msg.round_num}.md" revised
+    wg_log.log "  < revise done ({revised | lines | len} lines)"
+    revised
+  }
+}

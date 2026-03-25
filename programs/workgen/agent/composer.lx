@@ -1,0 +1,28 @@
+use ../prompt/agents {ComposePrompt}
+use ../store/status {save_debug}
+use ../log : wg_log
+
++Agent Composer = {
+  act = (msg) {
+    wg_log.log "  > claude: compose work item document..."
+
+    p = ComposePrompt {}
+    p.add_section "Audit Checklist" msg.audit_content
+    p.add_section "Process Rules" msg.rules_content
+    p.add_section "Investigation Findings" msg.findings
+    p.add_instruction "Produce a single markdown work item document following the Process Rules exactly"
+    p.add_instruction "Required sections: # Goal, # Why, # What changes, # Files affected, # Task List, # CRITICAL REMINDERS"
+    p.add_constraint "Output ONLY the raw markdown — no preamble, no commentary"
+    p.add_constraint "Start with '# Goal' — nothing before it"
+
+    result = self.think_with {
+      prompt: p.render ()
+      disable_tools: true
+    } ^
+
+    draft = result.text
+    save_debug msg.runner_dir msg.slug "compose.md" draft
+    wg_log.log "  < compose done ({draft | lines | len} lines)"
+    draft
+  }
+}

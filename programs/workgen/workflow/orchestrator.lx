@@ -5,10 +5,16 @@ use std/fs
 use std/md
 use ../log : wg_log
 use ../store/status {save_debug}
-use ./agents
+use ../agent/investigator {Investigator}
+use ../agent/composer {Composer}
+use ../agent/reviser {Reviser}
 use ../grader {Grader GradeResult}
 
-required_sections = ["Goal" "Why" "What changes" "Files affected" "Task List" "CRITICAL REMINDERS"]
+investigator = Investigator {}
+composer = Composer {}
+reviser = Reviser {}
+
+required_sections = ["Goal"; "Why"; "What changes"; "Files affected"; "Task List"; "CRITICAL REMINDERS"]
 
 check_sections_impl = (draft) {
   headings = md.parse draft | md.headings
@@ -17,7 +23,7 @@ check_sections_impl = (draft) {
     heading_texts | any? (ht) { ht | contains? req } | not
   }
   missing_count = missing | len
-  missing_count == 0 ? wg_log.log "; sections: all {required_sections | len} present" : wg_log.log "; sections: missing {missing | join ", "}"
+  missing_count == 0 ? wg_log.log "  sections: all {required_sections | len} present" : wg_log.log "  sections: missing {missing | join ", "}"
   missing_count == 0
 }
 
@@ -25,20 +31,20 @@ check_sections_impl = (draft) {
   slug = audit.name | lower
   wg_log.log ""
   wg_log.log "=== workgen: {audit.name} ==="
-  wg_log.log "; audit: {audit.path} ({item_count audit} items)"
-  wg_log.log "; root: {root}"
+  wg_log.log "  audit: {audit.path} ({item_count audit} items)"
+  wg_log.log "  root: {root}"
   summaries audit | each (s) wg_log.log "    {s}"
 
   wg_log.log "  PHASE: investigate"
-  findings = agents.investigate audit.raw root runner_dir slug
+  findings = investigator.act {audit_content: audit.raw; root: root; runner_dir: runner_dir; slug: slug}
 
   wg_log.log "  PHASE: compose"
-  draft = agents.compose audit.raw rules_content findings runner_dir slug
+  draft = composer.act {audit_content: audit.raw; rules_content: rules_content; findings: findings; runner_dir: runner_dir; slug: slug}
 
   out_path = "work_items/{audit.name}.md"
   fs.mkdir "work_items" ^
   fs.write out_path draft ^
-  wg_log.log "; written: {out_path}"
+  wg_log.log "  written: {out_path}"
 
   check_sections_impl draft
 
@@ -52,23 +58,23 @@ check_sections_impl = (draft) {
     round <- round + 1
     round > max_rounds ? break ()
 
-    failed_list = grade.failed ?? []
+    failed_list = grade.failed
     has_failed = failed_list | len > 0
     has_failed == false ? break ()
 
-    current_draft <- agents.revise current_draft grade.feedback runner_dir slug round
+    current_draft <- reviser.act {draft: current_draft; feedback: grade.feedback; runner_dir: runner_dir; slug: slug; round_num: round}
     fs.write out_path current_draft ^
 
     check_sections_impl current_draft
     grade = grade_and_log grader_inst current_draft "work item for {audit.name}" runner_dir slug
   }
 
-  score = grade.score ?? 0
-  passed = grade.passed ?? false
+  score = grade.score
+  passed = grade.passed
   status_str = passed ? "pass" : "fail"
 
   wg_log.log "  >>> {status_str | upper} {audit.name} — {score}/100 in {round} revision rounds"
-  {status: status_str; score: score; rounds: round; name: audit.name; path: out_path; feedback: grade.feedback ?? ""}
+  {status: status_str; score: score; rounds: round; name: audit.name; path: out_path; feedback: grade.feedback}
 }
 
 grade_and_log = (grader_inst draft task runner_dir slug) {

@@ -1,0 +1,29 @@
+use ../prompt/agents {ImplementPrompt}
+use ../schema/work_item {task_context context_for_implement}
+use ../store/status {save_debug}
+use ../log
+
++Agent Implementer = {
+  act = (msg) {
+    log.log "    > claude: implement task {msg.task.num} (max 25 turns)..."
+    ctx = task_context msg.task
+
+    p = ImplementPrompt {}
+    p.add_section "Context Bootstrap" msg.bootstrap_ctx
+    p.add_section "Work Item Context" (context_for_implement msg.wi)
+    p.add_section "Current Task" ctx
+    p.add_instruction "Run `just diagnose` after implementation to verify compilation."
+    p.add_constraint "Do not add code comments or doc strings"
+    p.add_constraint "No #[allow()] macros"
+
+    result = self.think_with {
+      prompt: (p.render ())
+      tools: ["Read"; "Edit"; "Write"; "Bash"; "Glob"; "Grep"]
+      max_turns: 25
+    } ^
+
+    save_debug msg.runner_dir msg.wi.slug "task_{msg.task.num}_implement.md" result.text
+    log.log "    < done ({result.turns ?? 0} turns)"
+    result
+  }
+}
