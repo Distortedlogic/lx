@@ -2,7 +2,6 @@
 -- Source: extracted from brain/lib/perception.lx
 -- Provides: intent classification, entity extraction, complexity assessment, domain detection
 
-use pkg/git/git
 
 Prompt IntentPrompt = {
   system: `You classify user intent into exactly one category.`
@@ -94,8 +93,11 @@ detect_urgency = (raw: Str) -> Str {
 
 +git_context = (domain: Str) -> Str {
   ["rust"; "lx"; "git"; "testing"] | contains? domain ? {
-    status = git.status () ?? {branch: "unknown"  modified: []}
-    "branch: {status.branch ?? "unknown"} | {status.modified ?? [] | len} modified files"
+    branch_raw = try ($git rev-parse --abbrev-ref HEAD 2>&1)
+    status_raw = try ($git status --porcelain 2>&1)
+    branch_name = branch_raw ?? "unknown" | trim
+    modified_count = status_raw ?? "" | lines | filter (l) (l | len) > 0 | len
+    "branch: {branch_name} | {modified_count} modified files"
   } : ""
 }
 

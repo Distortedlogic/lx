@@ -1,134 +1,59 @@
--- Git operations — shell-based git CLI wrapper.
--- Replaces std/git core functions.
+-- Git CLI — minimal surface for common agentic git operations.
+-- For anything beyond these, use direct bash: $git diff --stat
 
-use pkg/git/branch
-use pkg/git/status
-use pkg/git/worktree
-
-+create_branch = git_branch.create_branch
-+create_branch_at = git_branch.create_branch_at
-+delete_branch = git_branch.delete_branch
-+checkout = git_branch.checkout
-+checkout_create = git_branch.checkout_create
-+merge = git_branch.merge
-+stash = git_branch.stash
-+stash_with = git_branch.stash_with
-+stash_pop = git_branch.stash_pop
-+stash_list = git_branch.stash_list
-+stash_drop = git_branch.stash_drop
-+fetch = git_branch.fetch
-+pull = git_branch.pull
-+push = git_branch.push
-+push_with = git_branch.push_with
-+branches = git_status.branches
-+remotes = git_status.remotes
-+worktree_add = git_worktree.worktree_add
-+worktree_remove = git_worktree.worktree_remove
-+worktree_list = git_worktree.worktree_list
-
-run_git = (args) {
-  result = $sh -c "git {args} 2>&1"
-  result ? {
-    Ok r -> r.code == 0 ? (Ok r.out) : (Err r.out)
-    Err e -> Err (to_str e)
-  }
+CLI +Git = {
+  command: "git"
+  tool_defs: [
+    {name: "status"   subcommand: "status --porcelain"}
+    {name: "branch"   subcommand: "rev-parse --abbrev-ref HEAD"}
+    {name: "log"      subcommand: "log --oneline -20"}
+    {name: "diff"     subcommand: "diff"}
+    {name: "add"      subcommand: "add"}
+    {name: "commit"   subcommand: "commit"}
+    {name: "push"     subcommand: "push"}
+    {name: "pull"     subcommand: "pull"}
+    {name: "checkout" subcommand: "checkout"}
+    {name: "stash"    subcommand: "stash"}
+  ]
 }
 
-+status = (_) {
-  raw = run_git "--porcelain=v2 --branch status" ^
-  git_status.parse_status raw
+CLI +Gh = {
+  command: "gh"
+  tool_defs: [
+    {name: "pr_list"     subcommand: "pr list"}
+    {name: "pr_create"   subcommand: "pr create"}
+    {name: "pr_view"     subcommand: "pr view"}
+    {name: "issue_list"  subcommand: "issue list"}
+    {name: "issue_view"  subcommand: "issue view"}
+    {name: "repo_view"   subcommand: "repo view"}
+  ]
 }
 
-+branch = (_) {
-  raw = run_git "rev-parse --abbrev-ref HEAD" ^
-  raw | trim
-}
++status = () { $git status --porcelain 2>&1 }
++branch = () { ($git rev-parse --abbrev-ref HEAD 2>&1) | trim }
++root = () { ($git rev-parse --show-toplevel 2>&1) | trim }
 
-+root = (_) {
-  raw = run_git "rev-parse --show-toplevel" ^
-  raw | trim
-}
-
-+is_repo = (_) {
-  result = try run_git "rev-parse --is-inside-work-tree"
-  ok? result
-}
-
-+log = (opts) {
-  n = opts.n ?? 10
-  ref_str = opts.ref ?? ""
-  path = opts.path ?? ""
-  n_str = to_str n
-  cmd = "log --format=%H%x09%an%x09%ae%x09%at%x09%s -n " ++ n_str
-  cmd = ref_str != "" ? (cmd ++ " " ++ ref_str) : cmd
-  cmd = path != "" ? (cmd ++ " -- " ++ path) : cmd
-  raw = run_git cmd ^
-  raw | trim | split "\n" | filter (x) { (x | trim | len) > 0 } | map (line) {
-    parts = line | split "\t"
-    {hash: parts | get 0 ?? ""  author: parts | get 1 ?? ""  email: parts | get 2 ?? ""  timestamp: parts | get 3 ?? ""  subject: parts | get 4 ?? ""}
-  }
-}
-
-+show = (ref_str) {
-  raw = run_git "show --format=%H%n%an%n%s%n%b --no-patch {ref_str}" ^
-  parts = raw | trim | split "\n"
-  {hash: parts | get 0 ?? ""  author: parts | get 1 ?? ""  subject: parts | get 2 ?? ""  body: parts | drop 3 | join "\n"}
-}
-
-+blame = (path) {
-  raw = run_git "blame --porcelain {path}" ^
-  raw
-}
-
-+blame_range = (path start end) {
-  raw = run_git "blame -L{start},{end} --porcelain {path}" ^
-  raw
++log = (n) {
+  count = n ?? 10
+  $git log --oneline -{count} 2>&1
 }
 
 +diff = (opts) {
-  ref_str = opts.ref ?? ""
-  path = opts.path ?? ""
+  ref_val = opts.ref ?? ""
   staged = opts.staged ?? false
-  cmd = staged ? "diff --cached" : "diff"
-  cmd = ref_str != "" ? "{cmd} {ref_str}" : cmd
-  cmd = path != "" ? "{cmd} -- {path}" : cmd
-  run_git cmd ^
-}
-
-+diff_stat = (opts) {
-  ref_str = opts.ref ?? ""
-  cmd = ref_str != "" ? "diff --stat {ref_str}" : "diff --stat"
-  run_git cmd ^
-}
-
-+grep = (pattern path) {
-  cmd = path != "" ? "grep -n {pattern} -- {path}" : "grep -n {pattern}"
-  result = try run_git cmd
-  result ? { Ok out -> out; Err _ -> "" }
+  cmd = staged ? "git diff --cached" : "git diff"
+  cmd = ref_val != "" ? "{cmd} {ref_val}" : cmd
+  $sh -c "{cmd} 2>&1"
 }
 
 +add = (paths) {
-  path_str = paths ? { [] -> "."; _ -> paths | join " " }
-  run_git "add {path_str}" ^
+  path_str = paths ?? "."
+  $sh -c "git add {path_str} 2>&1"
 }
 
-+commit = (msg) { run_git "commit -m \"{msg}\"" ^ }
-
-+commit_with = (opts) {
-  msg = opts.message ?? opts.msg ?? ""
-  cmd = "commit -m \"{msg}\""
-  cmd = (opts.author ?? "") != "" ? "{cmd} --author=\"{opts.author}\"" : cmd
-  cmd = (opts.amend ?? false) ? "{cmd} --amend" : cmd
-  cmd = (opts.allow_empty ?? false) ? "{cmd} --allow-empty" : cmd
-  run_git cmd ^
++commit = (msg) {
+  $sh -c "git commit -m \"{msg}\" 2>&1"
 }
 
-+tag = (name) { run_git "tag {name}" ^ }
-
-+tag_with = (name opts) {
-  msg = opts.message ?? ""
-  ref_str = opts.ref ?? ""
-  cmd = msg != "" ? "tag -a {name} -m \"{msg}\"" : "tag {name}"
-  cmd = ref_str != "" ? "{cmd} {ref_str}" : cmd
-  run_git cmd ^
-}
++push = () { $git push 2>&1 }
++pull = () { $git pull 2>&1 }
