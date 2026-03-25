@@ -196,14 +196,14 @@ fn render_menu_item(open_menu: Signal<Option<usize>>, item: &MenuItem) -> Elemen
 
   rsx! {
     button {
-      class: "w-full flex items-center justify-between px-3 py-1.5 text-sm hover:bg-[var(--surface-container-highest)] transition-colors duration-100 {disabled_class}",
+      class: if has_action { "w-full flex items-center justify-between px-3 py-1.5 text-sm hover:bg-[var(--surface-container-highest)] transition-colors duration-100 {disabled_class}" } else { "w-full flex items-center justify-between px-3 py-1.5 text-sm transition-colors duration-100 {disabled_class}" },
       disabled: !has_action,
       onclick: move |_| {
           if let Some(ref action) = action {
               action.call(());
+              let mut sig = open_menu;
+              sig.set(None);
           }
-          let mut sig = open_menu;
-          sig.set(None);
       },
       span { "{label}" }
       if let Some(shortcut) = shortcut {
