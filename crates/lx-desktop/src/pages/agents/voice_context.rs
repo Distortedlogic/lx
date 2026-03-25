@@ -39,7 +39,7 @@ impl std::fmt::Display for PipelineStage {
   }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct TranscriptEntry {
   pub is_user: bool,
   pub text: String,
