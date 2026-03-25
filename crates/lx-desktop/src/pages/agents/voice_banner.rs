@@ -1,3 +1,4 @@
+use super::voice_context::{PipelineStage, TranscriptEntry, VoiceContext, VoiceStatus};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as B64;
 use common_inference::InferenceClient as _;
@@ -7,91 +8,71 @@ use common_whisper::TranscribeRequest;
 use dioxus::prelude::*;
 use dioxus_widget_bridge::use_ts_widget;
 
-#[derive(Clone, Copy, PartialEq)]
-enum VoiceStatus {
-  Idle,
-  Listening,
-  Processing,
-  Speaking,
-}
-
-impl std::fmt::Display for VoiceStatus {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match self {
-      Self::Idle => write!(f, "IDLE"),
-      Self::Listening => write!(f, "LISTENING"),
-      Self::Processing => write!(f, "PROCESSING"),
-      Self::Speaking => write!(f, "SPEAKING"),
-    }
-  }
-}
-
-#[derive(Clone)]
-struct TranscriptEntry {
-  is_user: bool,
-  text: String,
-}
-
 #[component]
 pub fn VoiceBanner() -> Element {
   let (element_id, widget) = use_ts_widget("voice", serde_json::json!({}));
-  let mut status: Signal<VoiceStatus> = use_signal(|| VoiceStatus::Idle);
-  let mut pcm_buffer: Signal<Vec<u8>> = use_signal(Vec::new);
-  let mut transcript: Signal<Vec<TranscriptEntry>> = use_signal(Vec::new);
+  let mut ctx = use_context::<VoiceContext>();
+  use_effect(move || {
+    ctx.widget.set(Some(widget));
+  });
 
   use_future(move || async move {
     loop {
-      let Ok(msg) = widget.recv::<serde_json::Value>().await else {
-        break;
-      };
+      let Ok(msg) = widget.recv::<serde_json::Value>().await else { break };
       match msg["type"].as_str() {
         Some("audio_chunk") => {
           if let Some(data) = msg["data"].as_str()
             && let Ok(bytes) = B64.decode(data)
           {
-            pcm_buffer.write().extend_from_slice(&bytes);
+            ctx.pcm_buffer.write().extend_from_slice(&bytes);
           }
         },
         Some("silence_detected") => {
-          let buffer = std::mem::take(&mut *pcm_buffer.write());
+          let buffer = std::mem::take(&mut *ctx.pcm_buffer.write());
           if buffer.is_empty() {
             widget.send_update(serde_json::json!({ "type": "stop_capture" }));
             continue;
           }
-          match process_voice_pipeline(&buffer, widget, transcript).await {
-            Ok(true) => {},
-            Ok(false) => {
+          spawn(async move {
+            if let Err(e) = run_pipeline(buffer, widget, ctx).await {
+              ctx.transcript.write().push(TranscriptEntry { is_user: false, text: format!("Error: {e}") });
+              ctx.pipeline_stage.set(PipelineStage::Idle);
               widget.send_update(serde_json::json!({ "type": "stop_capture" }));
-            },
-            Err(e) => {
-              transcript.write().push(TranscriptEntry { is_user: false, text: format!("Error: {e}") });
-              widget.send_update(serde_json::json!({ "type": "stop_capture" }));
-            },
+            }
+          });
+        },
+        Some("audio_playing") => {
+          if let Some(id) = msg["id"].as_str()
+            && let Some(text) = ctx.pending.write().remove(id)
+          {
+            let mut t = ctx.transcript.write();
+            match t.last_mut() {
+              Some(entry) if !entry.is_user => entry.text.push_str(&format!(" {text}")),
+              _ => t.push(TranscriptEntry { is_user: false, text }),
+            }
           }
         },
         Some("status_change") => match msg["status"].as_str() {
-          Some("idle") => status.set(VoiceStatus::Idle),
-          Some("listening") => status.set(VoiceStatus::Listening),
-          Some("processing") => status.set(VoiceStatus::Processing),
-          Some("speaking") => status.set(VoiceStatus::Speaking),
+          Some("idle") => ctx.status.set(VoiceStatus::Idle),
+          Some("listening") => ctx.status.set(VoiceStatus::Listening),
+          Some("processing") => ctx.status.set(VoiceStatus::Processing),
+          Some("speaking") => ctx.status.set(VoiceStatus::Speaking),
           _ => {},
         },
-        Some("start_standby") | Some("cancel") => {
-          pcm_buffer.write().clear();
-        },
+        Some("start_standby") | Some("cancel") => ctx.pcm_buffer.write().clear(),
         Some("playback_complete") => {},
         _ => {},
       }
     }
   });
 
-  let current_status = status();
+  let current_status = (ctx.status)();
   let is_active = current_status != VoiceStatus::Idle;
   let status_text = current_status.to_string();
-  let entries = transcript.read().clone();
+  let entries = ctx.transcript.read().clone();
   let bar_glow = if is_active { "shadow-[0_0_12px_var(--primary)]" } else { "" };
   let icon = if is_active { "\u{1F534}" } else { "\u{1F512}" };
-  let button_label = if status() == VoiceStatus::Idle { "PUSH TO TALK" } else { "STOP" };
+  let button_label = if (ctx.status)() == VoiceStatus::Idle { "PUSH TO TALK" } else { "STOP" };
 
   rsx! {
     div { class: "flex flex-col gap-2",
@@ -109,7 +90,7 @@ pub fn VoiceBanner() -> Element {
         button {
           class: "border border-[var(--primary)] text-[var(--primary)] rounded px-4 py-1.5 text-sm uppercase hover:bg-[var(--primary)]/10 transition-colors duration-150 font-semibold",
           onclick: move |_| {
-              if status() == VoiceStatus::Idle {
+              if (ctx.status)() == VoiceStatus::Idle {
                   widget.send_update(serde_json::json!({ "type" : "start_capture" }));
               } else {
                   widget.send_update(serde_json::json!({ "type" : "stop_capture" }));
@@ -136,29 +117,74 @@ pub fn VoiceBanner() -> Element {
   }
 }
 
-async fn process_voice_pipeline(
-  pcm: &[u8],
-  widget: dioxus_widget_bridge::TsWidgetHandle,
-  mut transcript: Signal<Vec<TranscriptEntry>>,
-) -> anyhow::Result<bool> {
-  let wav = common_audio::wrap_pcm_as_wav(pcm, common_audio::SAMPLE_RATE, common_audio::CHANNELS, common_audio::BITS_PER_SAMPLE);
-  let audio_data = B64.encode(&wav);
-  let transcription = common_whisper::WHISPER.infer(&TranscribeRequest { audio_data, language: None }).await?;
+fn split_sentences(text: &str) -> Vec<String> {
+  let mut sentences = Vec::new();
+  let mut current = String::new();
+  for ch in text.chars() {
+    current.push(ch);
+    if matches!(ch, '.' | '!' | '?') {
+      let trimmed = current.trim().to_owned();
+      if !trimmed.is_empty() {
+        sentences.push(trimmed);
+      }
+      current.clear();
+    }
+  }
+  let trimmed = current.trim().to_owned();
+  if !trimmed.is_empty() {
+    sentences.push(trimmed);
+  }
+  sentences
+}
+
+async fn tts(text: &str) -> anyhow::Result<Vec<u8>> {
+  let req = SpeechRequest { text: text.to_owned(), voice: "am_michael".into(), lang_code: "a".into(), speed: 1.0 };
+  common_kokoro::KOKORO.infer(&req).await
+}
+
+async fn run_pipeline(pcm: Vec<u8>, widget: dioxus_widget_bridge::TsWidgetHandle, mut ctx: VoiceContext) -> anyhow::Result<()> {
+  ctx.pipeline_stage.set(PipelineStage::Transcribing);
+  let wav = common_audio::wrap_pcm_as_wav(&pcm, common_audio::SAMPLE_RATE, common_audio::CHANNELS, common_audio::BITS_PER_SAMPLE);
+  let transcription = common_whisper::WHISPER.infer(&TranscribeRequest { audio_data: B64.encode(&wav), language: Some("en".into()) }).await?;
   let text = transcription.text.trim().to_owned();
   if text.is_empty() {
-    return Ok(false);
+    ctx.pipeline_stage.set(PipelineStage::Idle);
+    widget.send_update(serde_json::json!({ "type": "stop_capture" }));
+    return Ok(());
   }
-  transcript.write().push(TranscriptEntry { is_user: true, text: text.clone() });
+  ctx.transcript.write().push(TranscriptEntry { is_user: true, text: text.clone() });
+
+  ctx.pipeline_stage.set(PipelineStage::QueryingLlm);
   let response = crate::voice_backend::ClaudeCliBackend.query(&text).await?;
-  transcript.write().push(TranscriptEntry { is_user: false, text: response.clone() });
-  let speech_req = SpeechRequest { text: response, voice: "af_heart".into(), lang_code: "a".into(), speed: 1.0 };
-  let wav_bytes = common_kokoro::KOKORO.infer(&speech_req).await?;
-  let chunks = common_audio::chunk_wav(&wav_bytes, 32768);
-  for chunk in chunks {
+  let sentences = split_sentences(&response);
+  if sentences.is_empty() {
+    ctx.pipeline_stage.set(PipelineStage::Idle);
+    return Ok(());
+  }
+
+  ctx.pipeline_stage.set(PipelineStage::SynthesizingSpeech);
+  let mut next_tts: Option<tokio::task::JoinHandle<anyhow::Result<Vec<u8>>>> = {
+    let s = sentences[0].clone();
+    Some(tokio::spawn(async move { tts(&s).await }))
+  };
+
+  for (i, sentence) in sentences.iter().enumerate() {
+    let Some(handle) = next_tts.take() else { break };
+    let wav_bytes = handle.await??;
+
+    if i + 1 < sentences.len() {
+      let s = sentences[i + 1].clone();
+      next_tts = Some(tokio::spawn(async move { tts(&s).await }));
+    }
+
+    let id = format!("s{i}");
+    ctx.pending.write().insert(id.clone(), sentence.clone());
     widget.send_update(serde_json::json!({
         "type": "audio_response",
-        "data": B64.encode(&chunk),
+        "data": B64.encode(&wav_bytes),
+        "id": id,
     }));
   }
-  Ok(true)
+  ctx.pipeline_stage.set(PipelineStage::Idle);
+  Ok(())
 }

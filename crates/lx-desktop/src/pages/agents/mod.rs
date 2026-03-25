@@ -1,6 +1,7 @@
 mod agent_card;
 mod mcp_panel;
 mod voice_banner;
+mod voice_context;
 
 use dioxus::prelude::*;
 
@@ -10,6 +11,7 @@ use self::voice_banner::VoiceBanner;
 
 #[component]
 pub fn Agents() -> Element {
+  use_context_provider(voice_context::VoiceContext::new);
   rsx! {
     div { class: "flex flex-col h-full gap-4 p-4 overflow-auto",
       VoiceBanner {}
