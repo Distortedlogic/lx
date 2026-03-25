@@ -84,8 +84,12 @@ pub fn VoiceBanner() -> Element {
   let status_text = current_status.to_string();
   let bar_glow = if is_active { "shadow-[0_0_12px_var(--primary)]" } else { "" };
   let icon = if is_active { "\u{1F534}" } else { "\u{1F512}" };
-  let button_label = if (ctx.status)() == VoiceStatus::Idle { "PUSH TO TALK" } else { "STOP" };
   let volume = ((ctx.rms)() / 0.3).min(1.0);
+
+  let stage = (ctx.pipeline_stage)();
+  let entries = ctx.transcript.read();
+  let turn_count = entries.iter().filter(|e| e.is_user).count();
+  drop(entries);
 
   rsx! {
     div { class: "flex flex-col gap-2",
@@ -113,18 +117,30 @@ pub fn VoiceBanner() -> Element {
               style: "height: {(volume * 60.0).max(2.0)}%;",
             }
           }
+          span { class: "text-[10px] text-[var(--outline)] uppercase tracking-wider",
+            "{stage}"
+          }
+          span { class: "text-[10px] text-[var(--outline)] uppercase tracking-wider",
+            "TURNS: {turn_count}"
+          }
         }
         div { class: "flex-1" }
-        button {
-          class: "border border-[var(--primary)] text-[var(--primary)] rounded px-4 py-1.5 text-sm uppercase hover:bg-[var(--primary)]/10 transition-colors duration-150 font-semibold",
-          onclick: move |_| {
-              if (ctx.status)() == VoiceStatus::Idle {
-                  widget.send_update(serde_json::json!({ "type" : "start_capture" }));
-              } else {
-                  widget.send_update(serde_json::json!({ "type" : "stop_capture" }));
-              }
-          },
-          "{button_label}"
+        if is_active {
+          button {
+            class: "border border-[var(--outline)] text-[var(--on-surface)] rounded px-4 py-1.5 text-sm uppercase hover:bg-[var(--surface-container-high)] transition-colors duration-150 font-semibold",
+            onclick: move |_| {
+                widget.send_update(serde_json::json!({ "type" : "stop_capture" }));
+            },
+            "STOP"
+          }
+        } else {
+          button {
+            class: "border border-[var(--primary)] text-[var(--primary)] rounded px-4 py-1.5 text-sm uppercase hover:bg-[var(--primary)]/10 transition-colors duration-150 font-semibold",
+            onclick: move |_| {
+                widget.send_update(serde_json::json!({ "type" : "start_capture" }));
+            },
+            "PUSH TO TALK"
+          }
         }
       }
       div { id: "{element_id}", class: "hidden" }

@@ -1,11 +1,9 @@
-mod agent_card;
 mod pane_area;
 mod voice_banner;
 mod voice_context;
 
 use dioxus::prelude::*;
 
-use self::agent_card::AgentCard;
 use self::pane_area::PaneArea;
 use self::voice_banner::VoiceBanner;
 use self::voice_context::VoiceContext;
@@ -33,7 +31,6 @@ pub fn Agents() -> Element {
           }
         }
         VoiceBanner {}
-        AgentCard {}
       }
       div { class: "flex-1 min-h-0", PaneArea {} }
     }
