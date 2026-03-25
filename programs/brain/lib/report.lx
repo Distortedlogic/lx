@@ -2,7 +2,7 @@
 -- Composes std/md into high-level operations: section, bullets, table, quote.
 -- write: render full document to disk, return path for downstream reference.
 
-use pkg/data/md
+use std/md
 use std/fs
 
 +write = (path title sections) {

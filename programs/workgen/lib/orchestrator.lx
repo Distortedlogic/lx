@@ -1,7 +1,7 @@
 -- Orchestrator for workgen — runs the audit pipeline: investigate, compose, grade, revise.
 
 use std/fs
-use pkg/data/md
+use std/md
 use workgen/lib/log : wg_log
 use workgen/lib/persistence
 use workgen/lib/agents

@@ -1,7 +1,7 @@
 -- Response synthesis: combines reasoning, results, and identity into output
 -- Source: final stage — assembles everything into a coherent response for the human
 
-use pkg/data/md
+use std/md
 use pkg/agent/reasoning {ReasoningChain}
 use ../lib/capability {advertise}
 use ../contracts {Response Identity}

@@ -1,7 +1,7 @@
 -- Audit parser — reads an audit checklist markdown and extracts structured items.
 
 use std/fs
-use pkg/data/md
+use std/md
 
 Class +AuditItem = {
   num: 0
