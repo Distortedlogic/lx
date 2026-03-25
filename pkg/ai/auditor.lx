@@ -1,7 +1,7 @@
 -- Auditor agent — structural quality checks + optional LLM audit.
 -- Replaces std/agents/auditor.
 
-use pkg/core/audit
+use pkg/ai/audit
 
 Prompt AuditPrompt = {
   system: "You are a quality auditor. Evaluate the output against the task and rubric."

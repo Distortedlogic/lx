@@ -3,7 +3,7 @@
 -- generate_status, should_pivot, narrate_thinking, suggest_pivot
 use std/store : kv
 use std/time
-use pkg/core/score
+use pkg/ai/score
 
 Prompt PivotPrompt = {
   system: "You suggest alternative approaches when current strategy isn't working."

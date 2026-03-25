@@ -1,10 +1,10 @@
 -- Task decomposition and planning specialist
 -- Source: breaks down complex goals into executable step sequences
 
-use pkg/core/plan
+use pkg/patterns/plan
 use ../traits {Planner}
-use pkg/core/score
-use pkg/core/contracts {ActionPlan}
+use pkg/ai/score
+use pkg/types/contracts {ActionPlan}
 
 Prompt PlanningPrompt = {
   system: "You create precise, minimal execution plans."

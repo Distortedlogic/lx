@@ -2,7 +2,7 @@
 -- Replaces the Rust std/saga module with pure lx logic.
 
 use std/time
-use pkg/core/retry {compute_delay}
+use pkg/patterns/retry {compute_delay}
 
 step_id = (step) { step.id ?? "unknown" }
 step_deps = (step) { step.depends ?? [] }

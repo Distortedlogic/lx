@@ -2,12 +2,12 @@
 -- Source: the brain's workforce coordinator — spawn, route, fan-out, reconcile, supervise
 -- Architecture: agents spawned as subprocesses, communicate via ~>?, pub/sub for events
 
-use ./lib/intercept {intercept}
-use pkg/core/capability {capabilities}
-use pkg/core/reconcile {reconcile}
-use ./lib/negotiate {negotiate}
+use ../lib/intercept {intercept}
+use ../lib/capability {capabilities}
+use ../lib/reconcile {reconcile}
+use ../lib/negotiate {negotiate}
 use pkg/data/trace {TraceStore}
-use pkg/core/contracts {AgentTask AgentResult}
+use pkg/types/contracts {AgentTask AgentResult}
 
 +create_workforce = () -> Any {
   (analyst critic researcher) = par {

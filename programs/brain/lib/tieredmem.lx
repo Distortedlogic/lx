@@ -2,9 +2,9 @@
 -- Source: merged from brain/lib/memory_mgr.lx + flows/lib/memory.lx
 -- Provides: multi-tier recall, consolidation, decay, preferences, skills, tiered promotion
 
-use pkg/data/memory {MemoryStore}
-use pkg/data/knowledge {KnowledgeBase}
-use pkg/data/profile
+use ./memory {MemoryStore}
+use ./lib/knowledge {KnowledgeBase}
+use ./lib/profile
 use std/time
 use std/fs
 

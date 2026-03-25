@@ -1,11 +1,11 @@
 -- Tool executor -- AI-powered tool selection, retry execution, result integration.
 -- Composes Prompt keyword + pkg/core/circuit + std/retry into a reusable pipeline.
 
-use pkg/core/retry
-use pkg/core/circuit {CircuitBreaker}
+use pkg/patterns/retry
+use pkg/patterns/circuit {CircuitBreaker}
 use std/time
-use pkg/core/score
-use pkg/core/contracts {ToolRequest ToolResult}
+use pkg/ai/score
+use pkg/types/contracts {ToolRequest ToolResult}
 
 Prompt ToolSelectionPrompt = {
   system: "You select the minimal set of tools needed for a task."

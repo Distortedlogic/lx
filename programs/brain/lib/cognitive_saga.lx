@@ -2,11 +2,11 @@
 -- Source: each step has a do/undo pair — undo actually reverses side effects
 
 use pkg/data/trace {TraceStore}
-use pkg/core/handoff {as_context}
+use ./lib/handoff {as_context}
 use ../contracts {Response}
 use pkg/ai/perception : perceive
 use pkg/ai/reasoning : reason
-use pkg/data/tieredmem : mem
+use ./lib/tieredmem : mem
 use ../lib/tools : tools
 use ../lib/context_mgr : ctx_mgr
 

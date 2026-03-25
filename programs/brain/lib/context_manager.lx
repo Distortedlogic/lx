@@ -1,7 +1,7 @@
 -- Context manager -- pressure monitoring, eviction, and AI compression for ContextWindow.
 -- Composes pkg/data/context + Prompt keyword + pkg/core/score into reusable policies.
 
-use pkg/data/context {ContextWindow}
+use ./lib/context {ContextWindow}
 
 Prompt CompressionPrompt = {
   system: "You compress text to its essential meaning."

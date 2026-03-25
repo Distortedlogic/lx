@@ -3,7 +3,7 @@
 -- Delegates generic operations to pkg/kit/context_manager, adds brain-specific typed wrappers.
 
 use ./context_manager : cm
-use pkg/core/contracts {ContextItem}
+use pkg/types/contracts {ContextItem}
 use std/time
 
 +init = (capacity: Int) -> Any { cm.init capacity }

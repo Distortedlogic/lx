@@ -2,9 +2,9 @@
 -- Source: health monitoring from brain/lib/monitor.lx; introspection moved to pkg/core/introspect
 -- Provides: health checks, budget tracking, strategy suggestion
 
-use pkg/core/introspect {Inspector}
-use pkg/core/circuit {CircuitBreaker}
-use pkg/core/budget
+use ./lib/introspect {Inspector}
+use pkg/patterns/circuit {CircuitBreaker}
+use pkg/ai/budget
 use std/time
 
 Trait +CognitiveState = {
