@@ -19,7 +19,7 @@ use ./identity : id
 use pkg/agent/quality
 use ./agents/monitor : mon
 
-+think = (input: Str  history: [Any]) -> Any {
++think = (input: Str; history: [Any]) -> Any {
   state := mon.init ()
   context_win = ctx.init 128000
   identity = id.core ()
@@ -58,7 +58,7 @@ use ./agents/monitor : mon
       mon.checkpoint state "reasoned"
 
       tool_results = perception ? {
-        {requires_tools: true  requires_agents: true ..} -> execute_tools chain perception state ^
+        {requires_tools: true; requires_agents: true ..} -> execute_tools chain perception state ^
         {requires_tools: true ..} -> execute_tools chain perception state ^
         _ -> []
       }
@@ -88,7 +88,7 @@ use ./agents/monitor : mon
   }
 }
 
-race_reasoning = (perception: Perception  state: Any  memory_store: Any  context_win: Any) -> ReasoningChain {
+race_reasoning = (perception: Perception; state: Any; memory_store: Any; context_win: Any) -> ReasoningChain {
   mon.guard state "reasoning" ^
 
   recalled = mem.recall memory_store perception.raw perception.domain
@@ -99,7 +99,7 @@ race_reasoning = (perception: Perception  state: Any  memory_store: Any  context
     {complexity: "simple" ..} -> reason_mod.reason perception.raw context_from_memory []
     {complexity: "moderate" ..} -> reason_mod.reason perception.raw context_from_memory
       ["consider edge cases" "verify assumptions"]
-    {complexity: "complex"  ambiguity: a ..} & (a > 0.5) -> {
+    {complexity: "complex"; ambiguity: a ..} & (a > 0.5) -> {
       sel {
         reason_mod.reason perception.raw context_from_memory
           ["decompose into sub-problems" "challenge assumptions" "resolve ambiguity first"] -> it
@@ -117,7 +117,7 @@ race_reasoning = (perception: Perception  state: Any  memory_store: Any  context
   }
 }
 
-execute_tools = (chain: ReasoningChain  perception: Perception  state: Any) -> [Any] {
+execute_tools = (chain: ReasoningChain; perception: Perception; state: Any) -> [Any] {
   available = tool_mod.available_tools ()
   selected = tool_mod.select_tools chain.conclusion available ^
   state <- mon.spend state (len selected * 500) (len selected)
@@ -125,18 +125,18 @@ execute_tools = (chain: ReasoningChain  perception: Perception  state: Any) -> [
   mon.guard state "tool execution" ^
 
   selected | map (tool) {
-    request = {tool: tool.name  args: chain.conclusion  reason: perception.intent  priority: "normal"  timeout_ms: 30000}
+    request = {tool: tool.name; args: chain.conclusion; reason: perception.intent; priority: "normal"; timeout_ms: 30000}
     tool_mod.execute_with_retry request state.breaker ? {
       Ok r -> r
       Err e -> {
         log.warn "tool {tool.name} failed: {e}"
-        {tool: tool.name  success: false  output: e  tokens_used: 0  duration_ms: 0}
+        {tool: tool.name; success: false; output: e; tokens_used: 0; duration_ms: 0}
       }
     }
   }
 }
 
-assemble_response = (chain: ReasoningChain  tool_results: [Any]  perception: Perception  identity: Any  state: Any) -> Response {
+assemble_response = (chain: ReasoningChain; tool_results: [Any]; perception: Perception; identity: Any; state: Any) -> Response {
   content = tool_results | not empty? ? tool_mod.integrate_results tool_results chain.goal ^ : chain.conclusion
 
   Response {
@@ -149,19 +149,19 @@ assemble_response = (chain: ReasoningChain  tool_results: [Any]  perception: Per
   }
 }
 
-ensure_quality = (response: Response  task: Str  state: Any) -> (Response Any) {
+ensure_quality = (response: Response; task: Str; state: Any) -> (Response Any) {
   mon.should_simplify state ? (response  quality.quick_check response.content task) : {
     grade = quality.grade_response response.content task
 
     grade.passed ? (response grade) : {
       log.info "below threshold ({grade.score}), refining..."
       refined_content = quality.refine_response response.content task ?? response.content
-      ({..response  content: refined_content}  quality.grade_response refined_content task)
+      ({..response; content: refined_content}  quality.grade_response refined_content task)
     }
   }
 }
 
-reflect_and_learn = (response: Response  perception: Perception  memory_store: Any  state: Any) -> Any {
+reflect_and_learn = (response: Response; perception: Perception; memory_store: Any; state: Any) -> Any {
   response.confidence > 0.7 && perception.complexity != "trivial" ? {
     mem.remember memory_store {
       content: "Q: {perception.raw | take 100} → A approach: {perception.intent}/{perception.domain}"

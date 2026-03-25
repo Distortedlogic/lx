@@ -3,8 +3,8 @@ use workrunner/grader {Grader}
 g = Grader {
   threshold: 80
   rubric: [
-    {name: "files"  description: "files exist"  weight: 50}
-    {name: "tests"  description: "tests pass"  weight: 50}
+    {name: "files"; description: "files exist"; weight: 50}
+    {name: "tests"; description: "tests pass"; weight: 50}
   ]
 }
 

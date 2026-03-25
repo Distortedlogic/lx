@@ -68,12 +68,12 @@ Agent ResponseSynth: Synthesizer = {
   }
 }
 
-style_for = (style: Str) -> {system_note: Str  instruction: Str} {
+style_for = (style: Str) -> {system_note: Str; instruction: Str} {
   style ? {
-    "terse" -> {system_note: "Be extremely brief."  instruction: "Answer in 1-3 sentences max."}
-    "detailed" -> {system_note: "Be thorough and educational."  instruction: "Explain reasoning. Use examples."}
-    "technical" -> {system_note: "Use precise technical language."  instruction: "Be specific. Include types, paths."}
-    _ -> {system_note: "Be concise and direct."  instruction: "Answer clearly. Only necessary detail."}
+    "terse" -> {system_note: "Be extremely brief."; instruction: "Answer in 1-3 sentences max."}
+    "detailed" -> {system_note: "Be thorough and educational."; instruction: "Explain reasoning. Use examples."}
+    "technical" -> {system_note: "Use precise technical language."; instruction: "Be specific. Include types, paths."}
+    _ -> {system_note: "Be concise and direct."; instruction: "Answer clearly. Only necessary detail."}
   }
 }
 
@@ -88,7 +88,7 @@ gather_evidence = (request: Any) -> Str {
   [..tool_evidence; ..reasoning_evidence] | join "\n"
 }
 
-suggest_follow_ups = (task: Str  response: Str) -> [Str] {
+suggest_follow_ups = (task: Str; response: Str) -> [Str] {
   rl = response | lower
   [
     ("error"; "want me to fix this error?")

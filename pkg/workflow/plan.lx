@@ -17,9 +17,9 @@ next_ready_fn = (remaining completed_ids) {
 +continue = {__action: "continue"}
 +skip = {__action: "skip"}
 
-+replan = (steps) { {__action: "replan"  steps: steps} }
-+abort = (reason) { {__action: "abort"  reason: reason} }
-+insert_after = (after_id steps) { {__action: "insert_after"  after: after_id  steps: steps} }
++replan = (steps) { {__action: "replan"; steps: steps} }
++abort = (reason) { {__action: "abort"; reason: reason} }
++insert_after = (after_id steps) { {__action: "insert_after"; after: after_id; steps: steps} }
 
 find_successors_fn = (current_id remaining si sd) {
   to_skip = Store ()
@@ -78,9 +78,9 @@ run_fn = (steps executor on_step) {
     remaining <- remaining | filter (s) { (si s) != sid }
     ctx = {completed: completed}
     result = executor step ctx
-    plan_state = {completed: completed  remaining: remaining  current: step}
+    plan_state = {completed: completed; remaining: remaining; current: step}
     action = on_step step result plan_state
-    completed <- completed ++ [{id: sid  result: result}]
+    completed <- completed ++ [{id: sid; result: result}]
     completed_ids <- completed_ids ++ [sid]
     act = action.__action ?? "continue"
     abort_reason = action.reason ?? "aborted"

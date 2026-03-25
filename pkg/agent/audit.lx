@@ -72,17 +72,17 @@ evaluate = (categories data) {
     check_fn = cat.check
     passed = check_fn data == true
     score = passed ? 100 : 0
-    {name: name  weight: weight  score: score  passed: passed}
+    {name: name; weight: weight; score: score; passed: passed}
   }
   total_weight = results | fold 0 (acc item) { acc + item.weight }
   total_score = results | fold 0 (acc item) { acc + item.score * item.weight }
   final_score = total_weight > 0 ? total_score // total_weight : 0
-  cat_records = results | map (r) { {name: r.name  score: r.score  passed: r.passed} }
+  cat_records = results | map (r) { {name: r.name; score: r.score; passed: r.passed} }
   failed_names = results | filter (r) { r.passed == false } | map (.name)
   feedback_parts = results | filter (r) { r.passed == false } | map (r) { r.name ++ ": failed" }
   feedback = feedback_parts | join "; "
   passed = final_score >= threshold
-  {score: final_score  passed: passed  categories: cat_records  feedback: feedback  failed: failed_names}
+  {score: final_score; passed: passed; categories: cat_records; feedback: feedback; failed: failed_names}
 }
 +evaluate = evaluate
 
@@ -103,6 +103,6 @@ quick_check = (opts) {
   refs = has_task ? (references_task output task_str) : true
   reasons = (refs == false) ? reasons ++ ["output doesn't reference task"] : reasons
   passed = (len reasons) == 0
-  {passed: passed  reasons: reasons}
+  {passed: passed; reasons: reasons}
 }
 +quick_check = quick_check

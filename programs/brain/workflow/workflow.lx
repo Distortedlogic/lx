@@ -10,8 +10,8 @@ use pkg/store/trace {TraceStore}
   session = TraceStore {path: name}
   result = work_fn session
   result ? {
-    Ok r -> session.record {name: "complete"  input: source  output: r  success: true} ?? ()
-    Err e -> session.record {name: "failed"  input: source  output: e  success: false} ?? ()
+    Ok r -> session.record {name: "complete"; input: source; output: r; success: true} ?? ()
+    Err e -> session.record {name: "failed"; input: source; output: e; success: false} ?? ()
   }
   result
 }

@@ -9,11 +9,11 @@
 use std/fs
 use std/time
 use std/cron
-use workgen/log : wg_log
-use workgen/store/status {RunStatus}
-use workgen/schema/audit
-use workgen/grader {Grader}
-use workgen/workflow/orchestrator
+use ./log : wg_log
+use ./store/status {RunStatus}
+use ./schema/audit
+use ./grader {Grader}
+use ./workflow/orchestrator
 
 max_rounds = 3
 runner_dir = ".lx/workgen"
@@ -22,10 +22,10 @@ rules_dir = "{source_dir ()}/rules"
 wi_grader = Grader {
   threshold: 75
   rubric: [
-    {name: "coverage"  description: "every audit item has a finding and task"  weight: 25}
-    {name: "task_quality"  description: "tasks are unambiguous, correctly ordered, with exact files and changes"  weight: 25}
-    {name: "compliance"  description: "follows work-item.md format: required sections, CRITICAL REMINDERS footer"  weight: 25}
-    {name: "correctness"  description: "proposed fixes are correct for the codebase"  weight: 25}
+    {name: "coverage"; description: "every audit item has a finding and task"; weight: 25}
+    {name: "task_quality"; description: "tasks are unambiguous, correctly ordered, with exact files and changes"; weight: 25}
+    {name: "compliance"; description: "follows work-item.md format: required sections, CRITICAL REMINDERS footer"; weight: 25}
+    {name: "correctness"; description: "proposed fixes are correct for the codebase"; weight: 25}
   ]
 }
 
@@ -75,8 +75,8 @@ run_interactive = () {
   wg_log.log "=== DONE ==="
   icon = result.status == "pass" ? "OK" : "FAIL"
   wg_log.log "  [{icon}] {result.name} — {result.score}/100 ({result.rounds} rounds, {elapsed}s)"
-  result.status == "pass" ? wg_log.log "  output: {result.path}"
-  result.status != "pass" ? wg_log.log "  feedback: {result.feedback}"
+  result.status == "pass" ? wg_log.log "; output: {result.path}"
+  result.status != "pass" ? wg_log.log "; feedback: {result.feedback}"
 }
 
 main ()

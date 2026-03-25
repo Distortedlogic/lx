@@ -3,14 +3,14 @@ use workrunner/grader {Grader GradeResult CategoryScore}
 g = Grader {
   threshold: 80
   rubric: [
-    {name: "alpha"  description: "test a"  weight: 60}
-    {name: "beta"  description: "test b"  weight: 40}
+    {name: "alpha"; description: "test a"; weight: 60}
+    {name: "beta"; description: "test b"; weight: 40}
   ]
 }
 
 json_input = {categories: [
-  {name: "alpha"  score: 90  feedback: "good"}
-  {name: "beta"  score: 50  feedback: "bad"}
+  {name: "alpha"; score: 90; feedback: "good"}
+  {name: "beta"; score: 50; feedback: "bad"}
 ]}
 
 result = g.assemble json_input
@@ -28,8 +28,8 @@ beta_cat = (result.categories | find (c) { c.name == "beta" }) ?? {passed: true}
 assert (beta_cat.passed == false) "beta failed"
 
 all_pass_json = {categories: [
-  {name: "alpha"  score: 95  feedback: "great"}
-  {name: "beta"  score: 85  feedback: "fine"}
+  {name: "alpha"; score: 95; feedback: "great"}
+  {name: "beta"; score: 85; feedback: "fine"}
 ]}
 all_pass = g.assemble all_pass_json
 assert (all_pass.passed == true) "all pass when both above 70 and weighted score above threshold"

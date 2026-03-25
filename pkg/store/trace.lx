@@ -42,7 +42,7 @@ classify_trend = (avg_delta recent_delta) {
   recent_delta < 0.0 ? "regressing" : (avg_delta < 0.001 ? "plateau" : (recent_delta < avg_delta * 0.5 ? "diminishing" : (avg_delta > 0.01 ? "improving" : "steady")))
 }
 
-Store +TraceStore = {
++Store TraceStore = {
   provenance: Store ()
   provenance_enabled: false
 
@@ -94,7 +94,7 @@ Store +TraceStore = {
     dur_spans = spans | keep has_duration
     durations = dur_spans | map (.duration_ms)
     avg_dur = (len durations) > 0 ? ((durations | fold 0 (+)) // (len durations)) : 0
-    {total: total  scored: scored  avg_score: avg_score  avg_duration_ms: avg_dur}
+    {total: total; scored: scored; avg_score: avg_score; avg_duration_ms: avg_dur}
   }
 
   query = (criteria) {
@@ -119,15 +119,15 @@ Store +TraceStore = {
   improvement_rate = (window) {
     scores = self.progress_scores ()
     n = len scores
-    n < 2 ? ({avg_delta: 0.0  recent_delta: 0.0  trend: "insufficient"  samples: n}) : {
+    n < 2 ? ({avg_delta: 0.0; recent_delta: 0.0; trend: "insufficient"; samples: n}) : {
       deltas = compute_deltas scores window
       num_deltas = len deltas
       actual = window < n ? window : n
-      num_deltas == 0 ? ({avg_delta: 0.0  recent_delta: 0.0  trend: "insufficient"  samples: actual}) : {
+      num_deltas == 0 ? ({avg_delta: 0.0; recent_delta: 0.0; trend: "insufficient"; samples: actual}) : {
         avg_d = (deltas | fold 0.0 (+)) / num_deltas
         recent_d = last deltas ^
         trend = classify_trend avg_d recent_d
-        {avg_delta: avg_d  recent_delta: recent_d  trend: trend  samples: actual}
+        {avg_delta: avg_d; recent_delta: recent_d; trend: trend; samples: actual}
       }
     }
   }
@@ -184,7 +184,7 @@ Store +TraceStore = {
     avg_score = scored_count > 0 ? ((scored_spans | map (.score) | fold 0 (+)) / scored_count) : 0.0
     dur_spans = spans | keep has_duration
     avg_dur = (len dur_spans) > 0 ? ((dur_spans | map (.duration_ms) | fold 0 (+)) // (len dur_spans)) : 0
-    {agent: agent_name  span_count: span_count  hop_count: hop_count  avg_score: avg_score  avg_duration_ms: avg_dur  scored_count: scored_count}
+    {agent: agent_name; span_count: span_count; hop_count: hop_count; avg_score: avg_score; avg_duration_ms: avg_dur; scored_count: scored_count}
   }
 
   agent_rank = () {

@@ -1,12 +1,12 @@
 -- Orchestrator for workgen — runs the audit pipeline: investigate, compose, grade, revise.
-use workgen/schema/audit {item_count summaries}
+use ../schema/audit {item_count summaries}
 
 use std/fs
 use std/md
-use workgen/log : wg_log
-use workgen/store/status {save_debug}
-use workgen/agent/agents
-use workgen/grader {Grader GradeResult}
+use ../log : wg_log
+use ../store/status {save_debug}
+use ../agent/agents
+use ../grader {Grader GradeResult}
 
 required_sections = ["Goal" "Why" "What changes" "Files affected" "Task List" "CRITICAL REMINDERS"]
 
@@ -17,7 +17,7 @@ check_sections_impl = (draft) {
     heading_texts | any? (ht) { ht | contains? req } | not
   }
   missing_count = missing | len
-  missing_count == 0 ? wg_log.log "    sections: all {required_sections | len} present" : wg_log.log "    sections: missing {missing | join ", "}"
+  missing_count == 0 ? wg_log.log "; sections: all {required_sections | len} present" : wg_log.log "; sections: missing {missing | join ", "}"
   missing_count == 0
 }
 
@@ -25,8 +25,8 @@ check_sections_impl = (draft) {
   slug = audit.name | lower
   wg_log.log ""
   wg_log.log "=== workgen: {audit.name} ==="
-  wg_log.log "  audit: {audit.path} ({item_count audit} items)"
-  wg_log.log "  root: {root}"
+  wg_log.log "; audit: {audit.path} ({item_count audit} items)"
+  wg_log.log "; root: {root}"
   summaries audit | each (s) wg_log.log "    {s}"
 
   wg_log.log "  PHASE: investigate"
@@ -38,7 +38,7 @@ check_sections_impl = (draft) {
   out_path = "work_items/{audit.name}.md"
   fs.mkdir "work_items" ^
   fs.write out_path draft ^
-  wg_log.log "  written: {out_path}"
+  wg_log.log "; written: {out_path}"
 
   check_sections_impl draft
 
@@ -68,7 +68,7 @@ check_sections_impl = (draft) {
   status_str = passed ? "pass" : "fail"
 
   wg_log.log "  >>> {status_str | upper} {audit.name} — {score}/100 in {round} revision rounds"
-  {status: status_str  score: score  rounds: round  name: audit.name  path: out_path  feedback: grade.feedback ?? ""}
+  {status: status_str; score: score; rounds: round; name: audit.name; path: out_path; feedback: grade.feedback ?? ""}
 }
 
 grade_and_log = (grader_inst draft task runner_dir slug) {

@@ -19,7 +19,7 @@ Trait +ToolResult = {
 
 Trait +ActionPlan = {
   goal: Str
-  steps: [{id: Str  action: Str  tool: Str  args: Any  depends: [Str]}]
+  steps: [{id: Str; action: Str; tool: Str; args: Any; depends: [Str]}]
   estimated_cost: Float where estimated_cost >= 0.0
   risk: Str
   fallback: Str

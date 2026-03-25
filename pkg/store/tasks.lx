@@ -13,7 +13,7 @@ next_id = () {
 
 now_iso = () { (time.now ()).iso }
 
-Store +TaskStore = {
++Store TaskStore = {
 
   create = (opts) {
     id = next_id ()

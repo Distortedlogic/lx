@@ -1,8 +1,8 @@
 -- AI agent calls for workgen — investigate, compose, revise.
 
-use workgen/prompt/agents {InvestigatePrompt ComposePrompt RevisePrompt}
-use workgen/store/status {save_debug}
-use workgen/log : wg_log
+use ../prompt/agents {InvestigatePrompt ComposePrompt RevisePrompt}
+use ../store/status {save_debug}
+use ../log : wg_log
 
 +investigate = (audit_content root runner_dir slug) {
   wg_log.log "  > claude: investigate codebase (max 30 turns)..."

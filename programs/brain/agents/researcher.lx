@@ -54,18 +54,18 @@ Agent InfoGatherer: Researcher = {
   }
 }
 
-investigate_source = (source: Str  question: Str) -> [Finding] {
+investigate_source = (source: Str; question: Str) -> [Finding] {
   source ? {
     "codebase" -> search_codebase question
     "filesystem" -> search_filesystem question
-    _ -> [Finding {source: source  content: "unknown source: {source}"  relevance: 0.0  confidence: 0.0}]
+    _ -> [Finding {source: source; content: "unknown source: {source}"; relevance: 0.0; confidence: 0.0}]
   }
 }
 
 search_codebase = (question: Str) -> [Finding] {
   keywords = extract_keywords question
   results = keywords | flat_map (kw) {
-    [Finding {source: "codebase"  content: "search for: {kw}"  relevance: 0.5  confidence: 0.5}]
+    [Finding {source: "codebase"; content: "search for: {kw}"; relevance: 0.5; confidence: 0.5}]
   } | take 10
 
   results
@@ -74,7 +74,7 @@ search_codebase = (question: Str) -> [Finding] {
 search_filesystem = (question: Str) -> [Finding] {
   keywords = extract_keywords question
   results = keywords | flat_map (kw) {
-    [Finding {source: "filesystem"  content: "search for: {kw}"  relevance: 0.3  confidence: 0.5}]
+    [Finding {source: "filesystem"; content: "search for: {kw}"; relevance: 0.3; confidence: 0.5}]
   } | take 10
 
   results
@@ -88,7 +88,7 @@ extract_keywords = (text: Str) -> [Str] {
     | uniq | take 5
 }
 
-synthesize_findings = (findings: [Finding]  question: Str) -> Str {
+synthesize_findings = (findings: [Finding]; question: Str) -> Str {
   findings_text = findings | take 10
     | enumerate
     | map (i f) "[{i + 1}] ({f.source}): {f.content}"

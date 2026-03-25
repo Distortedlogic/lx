@@ -1,19 +1,19 @@
-Prompt +ImplementPrompt = {
++Prompt ImplementPrompt = {
   system: "You are implementing one task from a work item. Follow the task description exactly. Use justfile recipes. No code comments. 300 line file limit."
 }
 
-Prompt +FixPrompt = {
++Prompt FixPrompt = {
   system: "Fix the issues found in this task. Fix ONLY what the grader flagged."
 }
 
-Prompt +InvestigatePrompt = {
++Prompt InvestigatePrompt = {
   system: "Investigate whether a work item is fully implemented. Be terse."
 }
 
-Prompt +FixWiPrompt = {
++Prompt FixWiPrompt = {
   system: "Fix issues found in work item grading. Fix ONLY what failed."
 }
 
-Prompt +GradePrompt = {
++Prompt GradePrompt = {
   system: "You are a grader scoring work against a rubric. For each category, assign a score 0-100 and brief feedback. A category passes at score >= 70."
 }

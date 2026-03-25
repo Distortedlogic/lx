@@ -10,12 +10,12 @@ Prompt CompressionPrompt = {
 +init = (capacity) ContextWindow {capacity}
 
 +add = (win item) {
-  win.add {key: item.key  content: item.content  tokens: item.tokens  priority: item.priority}
+  win.add {key: item.key; content: item.content; tokens: item.tokens; priority: item.priority}
 }
 
 +pin = (win key content) {
   tokens = len content / 4
-  win.add {key  content  tokens  priority: "high"}
+  win.add {key  content  tokens; priority: "high"}
   win.pin key
 }
 
@@ -71,7 +71,7 @@ compress_item = (item) {
 +snapshot = (win) {
   usage = win.usage ()
   items = win.items ()
-  {..usage  item_count: len items  pinned_count: items | filter (.pinned ?? false) | len}
+  {..usage; item_count: len items; pinned_count: items | filter (.pinned ?? false) | len}
 }
 
 +clear_ephemeral = (win) {

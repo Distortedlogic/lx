@@ -5,7 +5,7 @@
 use std/time
 
 ConversationState = {
-  turns: [{role: Str  content: Str  timestamp: Int}]
+  turns: [{role: Str; content: Str; timestamp: Int}]
   topics: [Str]
   user_style: Str
   rapport: Float
@@ -13,12 +13,12 @@ ConversationState = {
 }
 
 +init_conversation = () -> ConversationState {
-  {turns: []  topics: []  user_style: "unknown"  rapport: 0.5  context_established: false}
+  {turns: []; topics: []; user_style: "unknown"; rapport: 0.5; context_established: false}
 }
 
-+add_turn = (state: ConversationState  role: Str  content: Str) -> ConversationState {
++add_turn = (state: ConversationState; role: Str; content: Str) -> ConversationState {
   {
-    turns: [..state.turns  {role  content  timestamp: time.now ()}]
+    turns: [..state.turns  {role  content; timestamp: time.now ()}]
     topics: role == "user" ? detect_topic_shift state content : state.topics
     user_style: role == "user" && state.user_style == "unknown" ? detect_style content : state.user_style
     rapport: update_rapport state.rapport role content
@@ -26,7 +26,7 @@ ConversationState = {
   }
 }
 
-+recent_context = (state: ConversationState  n: Int = 6) -> Str {
++recent_context = (state: ConversationState; n: Int = 6) -> Str {
   state.turns | rev | take n | rev | map (t) "{t.role}: {t.content}" | join "\n"
 }
 
@@ -34,7 +34,7 @@ ConversationState = {
   "Conversation: {state.turns | len} turns. Topics: {state.topics | uniq | join ", "}. Style: {state.user_style}. Rapport: {state.rapport}"
 }
 
-detect_topic_shift = (state: ConversationState  content: Str) -> [Str] {
+detect_topic_shift = (state: ConversationState; content: Str) -> [Str] {
   current_topics = state.topics
   content_lower = content | lower
 
@@ -57,7 +57,7 @@ detect_style = (content: Str) -> Str {
   is_terse ? "terse" : is_formal ? "formal" : has_greeting ? "friendly" : "neutral"
 }
 
-update_rapport = (current_rapport: Float  role: Str  content: Str) -> Float {
+update_rapport = (current_rapport: Float; role: Str; content: Str) -> Float {
   role != "user" ? current_rapport : {
     positive_signals = ["thanks" "great" "perfect" "awesome" "nice" "good"]
     negative_signals = ["wrong" "no" "bad" "incorrect" "stop" "don't"]
@@ -76,7 +76,7 @@ update_rapport = (current_rapport: Float  role: Str  content: Str) -> Float {
   state.turns | len
 }
 
-+is_follow_up = (state: ConversationState  content: Str) -> Bool {
++is_follow_up = (state: ConversationState; content: Str) -> Bool {
   follow_up_signals = ["also" "and" "what about" "another thing" "one more" "additionally"]
   content_lower = content | lower
   follow_up_signals | any? (s) content_lower | starts? s

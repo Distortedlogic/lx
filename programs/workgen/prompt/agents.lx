@@ -1,15 +1,15 @@
-Prompt +InvestigatePrompt = {
++Prompt InvestigatePrompt = {
   system: "You are a code auditor. Investigate the codebase thoroughly — read files, search for patterns. Produce a numbered findings list."
 }
 
-Prompt +ComposePrompt = {
++Prompt ComposePrompt = {
   system: "You are a markdown document generator. Output the document directly. Start with '# Goal'. No conversation."
 }
 
-Prompt +RevisePrompt = {
++Prompt RevisePrompt = {
   system: "You are revising a work item document. Fix every feedback item. Output the complete revised document."
 }
 
-Prompt +GradingPrompt = {
++Prompt GradingPrompt = {
   system: "You are a grader scoring work against a rubric. For each category, assign a score 0-100 and brief feedback. A category passes at score >= 70."
 }

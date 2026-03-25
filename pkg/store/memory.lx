@@ -27,7 +27,7 @@ score_keywords = (content query_words) {
 
 has_positive_score = (e) e.score > 0.0
 
-Store +MemoryStore = {
++Store MemoryStore = {
 
   store = (entry_rec) {
     id = next_entry_id ()
@@ -109,7 +109,7 @@ Store +MemoryStore = {
       v = self.entries.get id
       v != None ? (self.entries.set id {..v, tier: v.tier - 1}) : ()
     }
-    {promoted: len to_promote  demoted: len to_demote  removed: len to_remove}
+    {promoted: len to_promote; demoted: len to_demote; removed: len to_remove}
   }
 
   tier = (level) {
@@ -119,15 +119,15 @@ Store +MemoryStore = {
   all = () { self.entries.values () }
 }
 
-+tiers = {l1: "L1"  l2: "L2"  l3: "L3"}
++tiers = {l1: "L1"; l2: "L2"; l3: "L3"}
 
-+thresholds = {promote: 0.7  consolidate: 0.95  demote: 0.1}
++thresholds = {promote: 0.7; consolidate: 0.95; demote: 0.1}
 
 +create = (name) MemoryStore {path: name}
 
 +seed = (mem entries) {
   entries | each (e) {
-    mem.store {content: e.content  confidence: e.confidence  source: "seeded"  tier: tiers.l1}
+    mem.store {content: e.content; confidence: e.confidence; source: "seeded"; tier: tiers.l1}
   }
   entries | len
 }
@@ -138,7 +138,7 @@ Store +MemoryStore = {
   promoted | each (e) mem.promote e.id
   demoted = l1 | filter (e) e.confidence < thresholds.demote
   demoted | each (e) mem.demote e.id
-  {promoted: (promoted | len)  demoted: (demoted | len)}
+  {promoted: (promoted | len); demoted: (demoted | len)}
 }
 
 +weekly = (mem) {

@@ -5,11 +5,11 @@
 
 use std/time
 use std/cron
-use workrunner/log
-use workrunner/context
-use workrunner/store/status {RunStatus}
-use workrunner/grader {Grader}
-use workrunner/workflow/orchestrator
+use ./log
+use ./context
+use ./store/status {RunStatus}
+use ./grader {Grader}
+use ./workflow/orchestrator
 
 target_grade = 93
 max_fix_rounds = 3
@@ -36,11 +36,11 @@ work_item_paths = [
 grader = Grader {
   threshold: target_grade
   rubric: [
-    {name: "files_created"  description: "All files in Files Affected exist"  weight: 20}
-    {name: "compilation"  description: "just diagnose 0 errors 0 warnings"  weight: 25}
-    {name: "tests_pass"  description: "just test passes all tests"  weight: 25}
-    {name: "api_correct"  description: "Functions registered in mod.rs, API matches spec"  weight: 15}
-    {name: "completeness"  description: "All tasks implemented"  weight: 15}
+    {name: "files_created"; description: "All files in Files Affected exist"; weight: 20}
+    {name: "compilation"; description: "just diagnose 0 errors 0 warnings"; weight: 25}
+    {name: "tests_pass"; description: "just test passes all tests"; weight: 25}
+    {name: "api_correct"; description: "Functions registered in mod.rs, API matches spec"; weight: 15}
+    {name: "completeness"; description: "All tasks implemented"; weight: 15}
   ]
 }
 

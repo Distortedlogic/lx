@@ -47,7 +47,7 @@ Agent InnerCritic: Critic = {
     {
       flaws
       risks
-      severity: score.tier [{min: 6  name: "high"}; {min: 3  name: "medium"}; {min: 1  name: "low"}; {min: 0  name: "none"}] issue_count
+      severity: score.tier [{min: 6; name: "high"}; {min: 3; name: "medium"}; {min: 1; name: "low"}; {min: 0; name: "none"}] issue_count
       revised_confidence: msg.confidence - issue_count * 0.1 | math.max 0.1
     }
   }
@@ -60,7 +60,7 @@ Agent InnerCritic: Critic = {
 
     resp = ai.prompt (p.render ()) ^
     counterexamples = resp.text | lines | filter (starts? "- ") | map (drop 2)
-    {holds: counterexamples | empty?  counterexamples: counterexamples}
+    {holds: counterexamples | empty?; counterexamples: counterexamples}
   }
 
   verify_code = (msg) {
@@ -72,7 +72,7 @@ Agent InnerCritic: Critic = {
   }
 }
 
-check_correctness = (code: Str  task: Str) -> {ok: Bool  issues: [Str]} {
+check_correctness = (code: Str; task: Str) -> {ok: Bool; issues: [Str]} {
   p = CorrectnessPrompt {}
   p.add_section "Code" code
   p.add_section "Task" task
@@ -80,7 +80,7 @@ check_correctness = (code: Str  task: Str) -> {ok: Bool  issues: [Str]} {
 
   resp = ai.prompt (p.render ()) ^
   bugs = resp.text | lines | filter (starts? "- ") | map (drop 2)
-  {ok: bugs | empty?  issues: bugs}
+  {ok: bugs | empty?; issues: bugs}
 }
 
 +main = () {

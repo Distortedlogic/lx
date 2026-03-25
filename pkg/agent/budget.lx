@@ -68,7 +68,7 @@ spend_fn = (b amounts) {
   resource = first_exceeded ? { Some s -> s; _ -> "unknown" }
   spent_val = (used_store.get resource) ?? 0.0
   limit_val = (initial.get resource) ?? 0.0
-  err_rec = BudgetExhausted {used: spent_val  limit: limit_val  resource: resource}
+  err_rec = BudgetExhausted {used: spent_val; limit: limit_val; resource: resource}
   budget_err = Err err_rec
   ok_unit = Ok ()
   has_exceeded ? budget_err : ok_unit
@@ -157,7 +157,7 @@ project_fn = (b opts) {
   }
   proj_rec = result_projected.to_record ()
   head_rec = result_headroom.to_record ()
-  {projected_total: proj_rec  headroom: head_rec  will_exceed: will_exceed}
+  {projected_total: proj_rec; headroom: head_rec; will_exceed: will_exceed}
 }
 +project = project_fn
 

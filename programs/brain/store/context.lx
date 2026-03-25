@@ -4,7 +4,7 @@
 -- Domain-specific: capacity, eviction, pinning, pressure.
 
 
-Store +ContextWindow = {
++Store ContextWindow = {
   capacity: 8000
   seq: 0
 
@@ -20,7 +20,7 @@ Store +ContextWindow = {
     pri = item.priority ?? "normal"
     seq = self.next_seq ()
     self.entries.remove key
-    self.entries.set key {key: key  content: content  tokens: tokens  priority: pri  pinned: false  seq: seq}
+    self.entries.set key {key: key; content: content; tokens: tokens; priority: pri; pinned: false; seq: seq}
     Ok ()
   }
 
@@ -36,7 +36,7 @@ Store +ContextWindow = {
     used = self.used_tokens ()
     avail = self.capacity - used
     pct = self.capacity > 0 ? (used * 100.0 / self.capacity) : 0.0
-    {used: used  capacity: self.capacity  available: avail  pct: pct}
+    {used: used; capacity: self.capacity; available: avail; pct: pct}
   }
 
   pressure = () {

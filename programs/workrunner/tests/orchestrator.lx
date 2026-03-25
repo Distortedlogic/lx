@@ -17,7 +17,7 @@ assert (bootstrap_ctx | len > 0) "bootstrap loaded"
 grader_inst = Grader {
   threshold: 50
   rubric: [
-    {name: "file_exists"  description: "tests/fixtures/tiny_test.txt exists"  weight: 100}
+    {name: "file_exists"; description: "tests/fixtures/tiny_test.txt exists"; weight: 100}
   ]
 }
 

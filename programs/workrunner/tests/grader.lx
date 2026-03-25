@@ -3,8 +3,8 @@ use workrunner/grader {Grader GradeResult CategoryScore}
 g = Grader {
   threshold: 80
   rubric: [
-    {name: "completeness"  description: "all tasks done"  weight: 50}
-    {name: "quality"  description: "code is correct"  weight: 50}
+    {name: "completeness"; description: "all tasks done"; weight: 50}
+    {name: "quality"; description: "code is correct"; weight: 50}
   ]
 }
 

@@ -65,7 +65,7 @@ Agent DeepAnalyst: Analyst = {
     p.add_instruction "Evaluate each option against each criterion. Pick a winner."
 
     text = p.ask "comparison unavailable"
-    {comparison: text  winner_index: 0}
+    {comparison: text; winner_index: 0}
   }
 
   investigate = (msg) {

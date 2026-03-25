@@ -3,7 +3,7 @@
 use std/fs
 use std/md
 
-Schema +Task = {
++Schema Task = {
   num: Int = "task number in the work item"
   subject: Str = "short task title"
   description: Str = "full task description"
@@ -11,7 +11,7 @@ Schema +Task = {
   full_text: Str = "raw section text"
 }
 
-Schema +WorkItem = {
++Schema WorkItem = {
   path: Str = "filesystem path to the work item markdown"
   slug: Str = "url-safe identifier derived from path"
   goal: Str = "the Goal section content"
@@ -57,7 +57,7 @@ parse_task_section = (sec num) {
   desc_tail = (body | split "Description:" | last) ?? body
   description = desc_start ? (desc_tail | trim) : body
 
-  Task {num: num  subject: subject  description: description  active_form: active_form  full_text: body}
+  Task {num: num; subject: subject; description: description; active_form: active_form; full_text: body}
 }
 
 extract_raw_section = (raw title) {

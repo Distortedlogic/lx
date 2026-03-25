@@ -63,27 +63,27 @@ use ./agents/dispatcher : dispatch
   }
 }
 
-handle_success = (outputs: Any  input: Str  conversation: Any  memory_store: Any  trace_session: Any  topics: Any  ts: Any) -> Any {
+handle_success = (outputs: Any; input: Str; conversation: Any; memory_store: Any; trace_session: Any; topics: Any; ts: Any) -> Any {
   response = outputs.respond
   conversation = dialogue.add_turn conversation "user" input
     | (c) dialogue.add_turn c "assistant" response.content
 
-  agent.publish topics.response ResponseEvent {response  confidence: response.confidence  timestamp: time.now ()}
+  agent.publish topics.response ResponseEvent {response; confidence: response.confidence; timestamp: time.now ()}
 
-  quality_check = quality.final_audit response.content input ?? {quick_passed: true  full_passed: true  score: 0.0  feedback: "audit skipped"  reasons: []}
+  quality_check = quality.final_audit response.content input ?? {quick_passed: true; full_passed: true; score: 0.0; feedback: "audit skipped"; reasons: []}
 
-  refl = reflection.reflect input response.content "high quality response" ?? {action: input  outcome: response.content  quality: 0.5  lesson: ""  should_remember: false  strategy_worked: true}
-  refl.should_remember ? mem.remember memory_store {content: refl.lesson  domain: "meta"  confidence: refl.quality  source: "reflection"  tags: ["lesson"]} ?? () : ()
+  refl = reflection.reflect input response.content "high quality response" ?? {action: input; outcome: response.content; quality: 0.5; lesson: ""; should_remember: false; strategy_worked: true}
+  refl.should_remember ? mem.remember memory_store {content: refl.lesson; domain: "meta"; confidence: refl.quality; source: "reflection"; tags: ["lesson"]} ?? () : ()
 
   ts.submit "cognitive_loop" {output: response.content} ?? ()
 
   mem.save memory_store ?? ()
   emit response.content
 
-  {response  quality: quality_check  conversation: dialogue.conversation_summary conversation  reflection: refl  trace: trace_session}
+  {response; quality: quality_check; conversation: dialogue.conversation_summary conversation; reflection: refl; trace: trace_session}
 }
 
-handle_failure = (failure: Any  input: Str  conversation: Any  trace_session: Any  workforce: Any  ts: Any) -> Any {
+handle_failure = (failure: Any; input: Str; conversation: Any; trace_session: Any; workforce: Any; ts: Any) -> Any {
   log.err "cognitive saga failed at step: {failure.failed_step ?? "unknown"}"
   ts.submit "cognitive_loop" {output: "saga failed"} ?? ()
   emit "I encountered an issue. Let me try a simpler approach."
@@ -92,23 +92,23 @@ handle_failure = (failure: Any  input: Str  conversation: Any  trace_session: An
   dispatch.shutdown workforce
 
   {
-    response: {content: fallback.conclusion  confidence: 0.3  reasoning_depth: 1  tools_used: []  sources: ["fallback"]  follow_up: []}
-    quality: {quick_passed: true  full_passed: false  score: 30.0  feedback: "fallback"  reasons: []}
+    response: {content: fallback.conclusion; confidence: 0.3; reasoning_depth: 1; tools_used: []; sources: ["fallback"]; follow_up: []}
+    quality: {quick_passed: true; full_passed: false; score: 30.0; feedback: "fallback"; reasons: []}
     conversation: "fallback"
-    reflection: {action: input  outcome: "saga failed"  quality: 0.3  lesson: "pipeline failed, used fallback"  should_remember: true  strategy_worked: false}
+    reflection: {action: input; outcome: "saga failed"; quality: 0.3; lesson: "pipeline failed, used fallback"; should_remember: true; strategy_worked: false}
     trace: trace_session
   }
 }
 
-+run_with_budget = (input: Str  token_budget: Int) -> Any {
-  b = budget.create {tokens: token_budget  api_calls: 20  wall_time: 300}
++run_with_budget = (input: Str; token_budget: Int) -> Any {
+  b = budget.create {tokens: token_budget; api_calls: 20; wall_time: 300}
   budget.remaining b | (r) log.info "budget: {r.tokens} tokens, {r.api_calls} calls"
 
   result = run input ^
 
   budget.used b | (spent) {
     log.info "finished — used {spent.tokens} tokens, {spent.api_calls} calls"
-    {..result  budget_used: spent}
+    {..result; budget_used: spent}
   }
 }
 

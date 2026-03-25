@@ -4,28 +4,28 @@
 CLI +Git = {
   command: "git"
   tool_defs: [
-    {name: "status"   subcommand: "status --porcelain"}
-    {name: "branch"   subcommand: "rev-parse --abbrev-ref HEAD"}
-    {name: "log"      subcommand: "log --oneline -20"}
-    {name: "diff"     subcommand: "diff"}
-    {name: "add"      subcommand: "add"}
-    {name: "commit"   subcommand: "commit"}
-    {name: "push"     subcommand: "push"}
-    {name: "pull"     subcommand: "pull"}
+    {name: "status"; subcommand: "status --porcelain"}
+    {name: "branch"; subcommand: "rev-parse --abbrev-ref HEAD"}
+    {name: "log"; subcommand: "log --oneline -20"}
+    {name: "diff"; subcommand: "diff"}
+    {name: "add"; subcommand: "add"}
+    {name: "commit"; subcommand: "commit"}
+    {name: "push"; subcommand: "push"}
+    {name: "pull"; subcommand: "pull"}
     {name: "checkout" subcommand: "checkout"}
-    {name: "stash"    subcommand: "stash"}
+    {name: "stash"; subcommand: "stash"}
   ]
 }
 
 CLI +Gh = {
   command: "gh"
   tool_defs: [
-    {name: "pr_list"     subcommand: "pr list"}
-    {name: "pr_create"   subcommand: "pr create"}
-    {name: "pr_view"     subcommand: "pr view"}
-    {name: "issue_list"  subcommand: "issue list"}
-    {name: "issue_view"  subcommand: "issue view"}
-    {name: "repo_view"   subcommand: "repo view"}
+    {name: "pr_list"; subcommand: "pr list"}
+    {name: "pr_create"; subcommand: "pr create"}
+    {name: "pr_view"; subcommand: "pr view"}
+    {name: "issue_list"; subcommand: "issue list"}
+    {name: "issue_view"; subcommand: "issue view"}
+    {name: "repo_view"; subcommand: "repo view"}
   ]
 }
 

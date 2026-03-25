@@ -10,7 +10,7 @@ use ./tieredmem : mem
 use ../lib/tools : tools
 use ../lib/context_mgr : ctx_mgr
 
-+build = (input: Str  state: Any  memory_store: Any  context_win: Any  workforce: Any  trace_session: Any  saga_ctx: Any) -> [Any] {
++build = (input: Str; state: Any; memory_store: Any; context_win: Any; workforce: Any; trace_session: Any; saga_ctx: Any) -> [Any] {
   [
     {
       id: "perceive"
@@ -51,7 +51,7 @@ use ../lib/context_mgr : ctx_mgr
         handoff = Handoff {
           from: "perception"
           to: "reasoning"
-          context: as_context {intent: perception.intent  domain: perception.domain  complexity: perception.complexity  memories}
+          context: as_context {intent: perception.intent; domain: perception.domain; complexity: perception.complexity  memories}
           task: perception.raw
         }
 
@@ -90,9 +90,9 @@ use ../lib/context_mgr : ctx_mgr
           selected = tools.select_tools chain.conclusion available ^
           selected | map (tool) {
             tools.execute_with_retry
-              {tool: tool.name  args: chain.conclusion  reason: perception.intent  priority: "normal"  timeout_ms: 30000}
+              {tool: tool.name; args: chain.conclusion; reason: perception.intent; priority: "normal"; timeout_ms: 30000}
               state.breaker
-              ? { Ok r -> r; Err e -> {tool: tool.name  success: false  output: e  tokens_used: 0  duration_ms: 0} }
+              ? { Ok r -> r; Err e -> {tool: tool.name; success: false; output: e; tokens_used: 0; duration_ms: 0} }
           }
         } : []
       }

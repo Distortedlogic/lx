@@ -20,11 +20,11 @@ Schema Identity = {
 
 Trait Timestamped = {timestamp: Int where timestamp >= 0}
 
-Trait PerceptionEvent = {..Timestamped  perception: Any}
-Trait ReasoningEvent = {..Timestamped  chain: Any  strategy: Str}
-Trait ExecutionEvent = {..Timestamped  results: [Any]  tool_count: Int where tool_count >= 0}
-Trait ResponseEvent = {..Timestamped  response: Any  confidence: Float where confidence >= 0.0 && confidence <= 1.0}
-Trait ReflectionEvent = {..Timestamped  reflection: Any  lesson: Str}
+Trait PerceptionEvent = {..Timestamped; perception: Any}
+Trait ReasoningEvent = {..Timestamped; chain: Any; strategy: Str}
+Trait ExecutionEvent = {..Timestamped; results: [Any]; tool_count: Int where tool_count >= 0}
+Trait ResponseEvent = {..Timestamped; response: Any; confidence: Float where confidence >= 0.0 && confidence <= 1.0}
+Trait ReflectionEvent = {..Timestamped; reflection: Any; lesson: Str}
 
 Trait CognitiveEvent =
   PerceptionEvent | ReasoningEvent | ExecutionEvent | ResponseEvent | ReflectionEvent

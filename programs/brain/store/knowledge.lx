@@ -4,11 +4,11 @@
 
 use std/time
 
-Store +KnowledgeBase = {
++Store KnowledgeBase = {
 
   store = (key val meta) {
     now = time.now ()
-    self.entries.set key {key: key  val: val  meta: meta  stored_at: now.iso}
+    self.entries.set key {key: key; val: val; meta: meta; stored_at: now.iso}
     Ok ()
   }
 

@@ -13,14 +13,14 @@ Prompt ExecutionPlanPrompt = {
 
 MCP CognitiveTools = {
   Read {path: Str} -> {content: Str}
-  Write {path: Str  content: Str} -> {success: Bool}
-  Edit {path: Str  old: Str  new: Str} -> {success: Bool}
+  Write {path: Str; content: Str} -> {success: Bool}
+  Edit {path: Str; old: Str; new: Str} -> {success: Bool}
   Glob {pattern: Str} -> [Str]
-  Grep {pattern: Str  path: Str} -> [{file: Str  line: Int  content: Str}]
-  Bash {command: Str} -> {stdout: Str  stderr: Str  code: Int}
+  Grep {pattern: Str; path: Str} -> [{file: Str; line: Int; content: Str}]
+  Bash {command: Str} -> {stdout: Str; stderr: Str; code: Int}
   Agent {prompt: Str} -> {result: Str}
-  WebSearch {query: Str} -> [{title: Str  url: Str  snippet: Str}]
-  WebFetch {url: Str} -> {body: Str  status: Int}
+  WebSearch {query: Str} -> [{title: Str; url: Str; snippet: Str}]
+  WebFetch {url: Str} -> {body: Str; status: Int}
 }
 
 tool_costs = %{
@@ -31,7 +31,7 @@ tool_costs = %{
 
 +available_tools = () -> [Any] {
   ["Read"; "Write"; "Edit"; "Glob"; "Grep"; "Bash"; "Agent"; "WebSearch"; "WebFetch"]
-    | map (name) {name  cost: get name tool_costs ?? 0.01}
+    | map (name) {name; cost: get name tool_costs ?? 0.01}
 }
 
 +select_tools = executor.select
@@ -39,7 +39,7 @@ tool_costs = %{
 +integrate_results = executor.integrate
 +total_cost = executor.total_cost
 
-+plan_execution = (goal: Str  selected_tools: [Any]  b: Any) -> ActionPlan {
++plan_execution = (goal: Str; selected_tools: [Any]; b: Any) -> ActionPlan {
   estimated = selected_tools | map (.cost) | sum
   budget_ok = budget.remaining b | (r) r.tokens > to_int (estimated * 1000.0)
   budget_ok ? () : log.warn "budget tight for planned execution"
@@ -67,7 +67,7 @@ tool_costs = %{
     goal
     steps
     estimated_cost: estimated
-    risk: score.tier [{min: 1.0  name: "high"}; {min: 0.3  name: "medium"}; {min: 0.0  name: "low"}] estimated
+    risk: score.tier [{min: 1.0; name: "high"}; {min: 0.3; name: "medium"}; {min: 0.0; name: "low"}] estimated
     fallback: "simplify approach and retry with fewer tools"
   }
 }

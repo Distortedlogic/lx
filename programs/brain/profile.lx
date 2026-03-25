@@ -4,7 +4,7 @@
 use std/fs
 use std/time
 
-Class +Profile = {
++Class Profile = {
   name: ""
   path: ""
   created: ""
@@ -21,7 +21,7 @@ Class +Profile = {
     true -> {
       raw = fs.read path ^
       data = json.parse raw ^
-      p = Profile {name: name  path: path}
+      p = Profile {name: name; path: path}
       entries = data.knowledge ?? {:}
       entries | keys | each (k) { p.knowledge.set k (entries | get k) }
       prefs = data.preferences ?? {:}
@@ -33,7 +33,7 @@ Class +Profile = {
     false -> {
       now = time.now () | time.format "%Y-%m-%dT%H:%M:%S"
       fs.mkdir ".lx/profiles" ^
-      Profile {name: name  path: path  created: now  updated: now}
+      Profile {name: name; path: path; created: now; updated: now}
     }
   }
 }
@@ -54,7 +54,7 @@ Class +Profile = {
 
 +learn = (profile domain data) {
   now = time.now ()
-  profile.knowledge.set domain {..data  timestamp: now.ms  confidence: data.confidence ?? 1.0}
+  profile.knowledge.set domain {..data; timestamp: now.ms; confidence: data.confidence ?? 1.0}
   profile.updated <- time.format "%Y-%m-%dT%H:%M:%S" now
 }
 
@@ -103,7 +103,7 @@ Class +Profile = {
   profile.knowledge.entries () | each (e) {
     conf = e.value.confidence ?? 1.0
     new_conf = conf * (factor ?? 0.9)
-    profile.knowledge.set e.key {..e.value  confidence: new_conf}
+    profile.knowledge.set e.key {..e.value; confidence: new_conf}
   }
 }
 
@@ -114,7 +114,7 @@ Class +Profile = {
 
 +rank_strategies = (profile domain) {
   entries = profile.knowledge.entries () | filter (e) { e.key | starts? "strategy:{domain}" }
-  entries | sort_by (e) e.value.score ?? 0 | rev | map (e) {strategy: e.key  score: e.value.score ?? 0}
+  entries | sort_by (e) e.value.score ?? 0 | rev | map (e) {strategy: e.key; score: e.value.score ?? 0}
 }
 
 +adapt_strategy = (profile domain result) {
@@ -122,5 +122,5 @@ Class +Profile = {
   existing = profile.knowledge.get key
   prev_score = existing ? { Some e -> e.score ?? 0; _ -> 0 }
   new_score = (prev_score + (result.score ?? 0)) // 2
-  profile.knowledge.set key {strategy: result.strategy ?? "default"  score: new_score  timestamp: (time.now ()).ms}
+  profile.knowledge.set key {strategy: result.strategy ?? "default"; score: new_score; timestamp: (time.now ()).ms}
 }

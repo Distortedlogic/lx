@@ -1,7 +1,7 @@
 -- Capabilities Trait + advertise/lookup for runtime capability discovery.
 -- Replaces agent_capability.rs.
 
-Trait +Capabilities = {traits: List = []  tools: List = []  domains: List = []  budget_remaining: Int = -1  accepts: List = []  status: Str = "ready"}
+Trait +Capabilities = {traits: List = []; tools: List = []; domains: List = []; budget_remaining: Int = -1; accepts: List = []; status: Str = "ready"}
 
 advertised = Store ()
 

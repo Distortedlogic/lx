@@ -1,24 +1,23 @@
 -- Satisfaction test runner for workgen.
 -- Runs workgen against each scenario's fixture codebase.
--- Usage: lx run workgen/tests/run.lx
--- Filter: TEST_TAG=smoke lx run workgen/tests/run.lx
 
 use std/env
 use std/fs
-use workgen/log : wg_log
-use workgen/schema/audit
-use workgen/grader {Grader}
-use workgen/workflow/orchestrator
+use ../log : wg_log
+use ../schema/audit {load}
+use ../grader {Grader}
+use ../workflow/orchestrator
 use ./spec
 
-wi_grader = Grader {threshold: spec.threshold_pct  rubric: spec.rubric}
-rules_content = fs.read "workgen/rules/work-item.md" ^
+wi_grader = Grader {threshold: spec.threshold_pct; rubric: spec.rubric}
+rules_dir = "{source_dir ()}/../../rules"
+rules_content = fs.read "{rules_dir}/work-item.md" ^
 
 run_scenario_impl = (scenario) {
   wg_log.log "  --- {scenario.name} ---"
-  audit = audit_parser.load scenario.audit
+  audit = load scenario.audit
   result = orchestrator.run_audit audit rules_content scenario.root wi_grader 3 ".lx/workgen_test"
-  {name: scenario.name  passed: result.status == "pass"  score: result.score}
+  {name: scenario.name; passed: result.status == "pass"; score: result.score}
 }
 
 +main = () {

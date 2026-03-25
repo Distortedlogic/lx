@@ -12,10 +12,10 @@ Prompt ImprovementPrompt = {
   system: "You suggest improvements based on action patterns."
 }
 
-Trait +Reflection = {action: Str  outcome: Str  quality: Float where quality >= 0.0 && quality <= 1.0  lesson: Str  should_remember: Bool  strategy_worked: Bool}
-Trait +FeedbackSignal = {kind: Str  score: Float where score >= 0.0 && score <= 1.0  detail: Str  source: Str}
+Trait +Reflection = {action: Str; outcome: Str; quality: Float where quality >= 0.0 && quality <= 1.0; lesson: Str; should_remember: Bool; strategy_worked: Bool}
+Trait +FeedbackSignal = {kind: Str; score: Float where score >= 0.0 && score <= 1.0; detail: Str; source: Str}
 
-+reflect = (action: Str  outcome: Str  expectation: Str) -> Reflection {
++reflect = (action: Str; outcome: Str; expectation: Str) -> Reflection {
   quality = assess_quality outcome expectation
 
   p = ReflectionPrompt {}
@@ -38,7 +38,7 @@ Trait +FeedbackSignal = {kind: Str  score: Float where score >= 0.0 && score <= 
   }
 }
 
-assess_quality = (outcome: Str  expectation: Str) -> Float {
+assess_quality = (outcome: Str; expectation: Str) -> Float {
   outcome_lower = outcome | lower
   expectation_lower = expectation | lower
 
@@ -64,9 +64,9 @@ assess_quality = (outcome: Str  expectation: Str) -> Float {
   }
 }
 
-+update_strategy = (current_strategy: Str  patterns: Any) -> Any {
++update_strategy = (current_strategy: Str; patterns: Any) -> Any {
   patterns.success_rate > 0.8 ? {
-    {strategy: current_strategy  action: "continue"  reason: "high success rate"}
+    {strategy: current_strategy; action: "continue"; reason: "high success rate"}
   } : patterns.success_rate < 0.3 ? {
     new_strategy = current_strategy ? {
       "direct" -> "decompose"
@@ -75,9 +75,9 @@ assess_quality = (outcome: Str  expectation: Str) -> Float {
       "adversarial" -> "direct"
       _ -> "decompose"
     }
-    {strategy: new_strategy  action: "switch"  reason: "low success rate ({patterns.success_rate})"}
+    {strategy: new_strategy; action: "switch"; reason: "low success rate ({patterns.success_rate})"}
   } : {
-    {strategy: current_strategy  action: "adapt"  reason: "moderate success, tweaking"}
+    {strategy: current_strategy; action: "adapt"; reason: "moderate success, tweaking"}
   }
 }
 
@@ -104,7 +104,7 @@ assess_quality = (outcome: Str  expectation: Str) -> Float {
   }
 }
 
-+trace_reflection = (session: Any  reflection: Reflection) -> Any {
++trace_reflection = (session: Any; reflection: Reflection) -> Any {
   session.record {
     name: "reflection"
     input: reflection.action

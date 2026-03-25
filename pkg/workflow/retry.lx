@@ -23,7 +23,7 @@ retry_with = (opts f) {
   loop {
     now_t = time.now ()
     el = now_t.ms - start_ms
-    exhausted = {type: "Exhausted"  attempts: max  last_error: last_err  elapsed_ms: el}
+    exhausted = {type: "Exhausted"; attempts: max; last_error: last_err; elapsed_ms: el}
     err_exhausted = Err exhausted
     past_max = attempt >= max
     past_max ? break err_exhausted
@@ -43,7 +43,7 @@ retry_with = (opts f) {
     should_retry = still_have_tries && pred_ok
     now_t2 = time.now ()
     el2 = now_t2.ms - start_ms
-    exhausted2 = {type: "Exhausted"  attempts: max  last_error: last_err  elapsed_ms: el2}
+    exhausted2 = {type: "Exhausted"; attempts: max; last_error: last_err; elapsed_ms: el2}
     err_exhausted2 = Err exhausted2
     (should_retry == false) ? break err_exhausted2
     delay = cd opts (attempt - 1)
@@ -53,5 +53,5 @@ retry_with = (opts f) {
 +retry_with = retry_with
 
 +retry = (f) {
-  retry_with {max: 3  backoff: "exponential"  base_ms: 100  max_delay_ms: 30000  jitter: false} f
+  retry_with {max: 3; backoff: "exponential"; base_ms: 100; max_delay_ms: 30000; jitter: false} f
 }

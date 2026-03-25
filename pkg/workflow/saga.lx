@@ -23,7 +23,7 @@ try_step = (do_fn prev retries) {
     is_err = err? raw
     (is_err == false) ? break raw
     is_last ? break raw
-    delay = cd {backoff: "exponential"  base_ms: 100  max_delay_ms: 30000} attempt
+    delay = cd {backoff: "exponential"; base_ms: 100; max_delay_ms: 30000} attempt
     time.sleep delay
     attempt <- attempt + 1
   }
@@ -40,15 +40,15 @@ compensate = (completed opts) {
     is_err = err? undo_result
     undo_err_val = undo_result ? { Err e -> e; _ -> "unknown" }
     compensated <- is_err ? compensated : compensated ++ [entry.id]
-    comp_errors <- is_err ? comp_errors ++ [{step: entry.id  error: undo_err_val}] : comp_errors
+    comp_errors <- is_err ? comp_errors ++ [{step: entry.id; error: undo_err_val}] : comp_errors
   }
-  {compensated: compensated  comp_errors: comp_errors}
+  {compensated: compensated; comp_errors: comp_errors}
 }
 
 make_saga_err = (failed_step error comp_result) {
-  base = {failed_step: failed_step  error: error  compensated: comp_result.compensated}
+  base = {failed_step: failed_step; error: error; compensated: comp_result.compensated}
   has_errors = (comp_result.comp_errors | len) > 0
-  with_errors = {..base  compensation_errors: comp_result.comp_errors}
+  with_errors = {..base; compensation_errors: comp_result.comp_errors}
   has_errors ? with_errors : base
 }
 
@@ -84,13 +84,13 @@ do_run = (steps initial_rec opts) {
     result = ts do_fn prev retries
     is_err = err? result
     err_val = result ? { Err e -> e; _ -> result }
-    no_comp = {compensated: []  comp_errors: []}
+    no_comp = {compensated: []; comp_errors: []}
     comp = is_err ? (cf completed opts) : no_comp
     fail_err = Err (me sid err_val comp)
     err_out <- is_err ? fail_err : err_out
     is_err ? break ()
     result_store.set sid result
-    completed <- completed ++ [{id: sid  result: result  undo: undo_fn}]
+    completed <- completed ++ [{id: sid; result: result; undo: undo_fn}]
     completed_ids <- completed_ids ++ [sid]
   }
   has_final_err = err_out != None
@@ -105,7 +105,7 @@ run_fn = (steps) { do_run steps {} {max_retries: 0} }
 run_with_fn = (steps opts) { do_run steps {} opts }
 +run_with = run_with_fn
 
-+define = (steps) { {__saga: true  steps: steps} }
++define = (steps) { {__saga: true; steps: steps} }
 
 execute_fn = (definition initial) {
   steps = definition.steps ?? []

@@ -1,11 +1,11 @@
 -- Orchestrator — runs tasks within a work item, grades, fixes.
-use workrunner/schema/work_item {task_count task_summaries}
+use ../schema/work_item {task_count task_summaries}
 -- Pure logic: takes dependencies as arguments, no globals.
 
-use workrunner/log
-use workrunner/store/status
-use workrunner/agent/agents
-use workrunner/schema/work_item
+use ../log
+use ../store/status
+use ../agent/agents
+use ../schema/work_item
 
 run_task_impl = (wi task bootstrap_ctx max_rounds runner_dir) {
   log.log "  --- task {task.num}/{task_count wi}: {task.subject} ---"
@@ -41,7 +41,7 @@ grade_and_log_impl = (wi grader_inst report runner_dir) {
   log.log "=== [{idx + 1}/{total}] {path} ==="
 
   wi = work_item.load path
-  log.log "  parsed: {task_count wi} tasks"
+  log.log "; parsed: {task_count wi} tasks"
   task_summaries wi | each (s) log.log "    {s}"
 
   wi.tasks | each (task) {
@@ -86,5 +86,5 @@ grade_and_log_impl = (wi grader_inst report runner_dir) {
   }
 
   status_str = passed ? "pass" : "fail"
-  {status: status_str  score: score  rounds: round  path: path  feedback: grade.feedback ?? ""}
+  {status: status_str; score: score; rounds: round; path: path; feedback: grade.feedback ?? ""}
 }

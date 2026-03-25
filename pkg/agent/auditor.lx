@@ -60,8 +60,8 @@ count_matches = (text phrases) {
 
   is_pass = (failed | len) == 0
   score = is_pass ? 100 : 0
-  cats = [{name: "structure"  score: score  passed: is_pass}]
-  {passed: is_pass  score: score  failed: failed  categories: cats}
+  cats = [{name: "structure"; score: score; passed: is_pass}]
+  {passed: is_pass; score: score; failed: failed; categories: cats}
 }
 
 +audit = (opts) {
@@ -88,12 +88,12 @@ count_matches = (text phrases) {
     text = result.structured_output ?? (result.text ?? "{}")
     parsed = try json.parse text
     parsed ? {
-      Err _ -> {score: 0  passed: false  feedback: "Failed to parse audit response"  categories: []  failed: ["parse_error"]}
+      Err _ -> {score: 0; passed: false; feedback: "Failed to parse audit response"; categories: []; failed: ["parse_error"]}
       Ok json_val -> {
         s = json_val.score ?? 0
         cats = json_val.categories ?? []
         f_list = cats | filter (c) { (c.score ?? 0) < 70 } | map (.name)
-        {score: s  passed: json_val.passed ?? false  feedback: json_val.feedback ?? ""  categories: cats  failed: f_list}
+        {score: s; passed: json_val.passed ?? false; feedback: json_val.feedback ?? ""; categories: cats; failed: f_list}
       }
     }
   }

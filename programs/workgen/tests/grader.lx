@@ -1,45 +1,43 @@
-use workgen/grader {Grader}
-use workgen/schema/grade {GradeResult CategoryScore}
+use ../grader {Grader}
+use ../schema/grade {GradeResult CategoryScore}
 
 g = Grader {
   threshold: 75
   rubric: [
-    {name: "coverage"  description: "findings match audit"  weight: 50}
-    {name: "quality"  description: "tasks are clear"  weight: 50}
+    {name: "coverage"; description: "findings match audit"; weight: 50};
+    {name: "quality"; description: "tasks are clear"; weight: 50}
   ]
 }
 
-assert (type_of g == "Object") "grader is Object"
-assert (g.rubric | len == 2) "2 rubric categories"
-assert (g.threshold == 75) "threshold 75"
+assert (type_of g == "Object")
+assert (g.rubric | len == 2)
+assert (g.threshold == 75)
 
 good_json = {categories: [
-  {name: "coverage"  score: 90  feedback: "good coverage"}
-  {name: "quality"  score: 85  feedback: "clear tasks"}
+  {name: "coverage"; score: 90; feedback: "good coverage"};
+  {name: "quality"; score: 85; feedback: "clear tasks"}
 ]}
 result = g.assemble good_json
-assert (result.passed == true) "good scores pass"
-assert (result.score > 75) "weighted score above threshold"
-assert (result.failed | len == 0) "no failures"
+assert (result.passed == true)
+assert (result.score > 75)
+assert (result.failed | len == 0)
 
 bad_json = {categories: [
-  {name: "coverage"  score: 40  feedback: "missing items"}
-  {name: "quality"  score: 30  feedback: "vague tasks"}
+  {name: "coverage"; score: 40; feedback: "missing items"};
+  {name: "quality"; score: 30; feedback: "vague tasks"}
 ]}
 result2 = g.assemble bad_json
-assert (result2.passed == false) "bad scores fail"
-assert (result2.failed | len == 2) "both failed"
+assert (result2.passed == false)
+assert (result2.failed | len == 2)
 
 empty = g.empty_result "test error"
-assert (empty.score == 0) "empty is 0"
-assert (empty.feedback == "test error") "error message preserved"
+assert (empty.score == 0)
+assert (empty.feedback == "test error")
 
 text_good = `{"categories":[{"name":"coverage","score":95,"feedback":"ok"},{"name":"quality","score":88,"feedback":"ok"}]}`
 parsed = g.parse_response text_good
-assert (parsed.passed == true) "parsed JSON passes"
+assert (parsed.passed == true)
 
 text_bad = "not json"
 parsed_bad = g.parse_response text_bad
-assert (parsed_bad.score == 0) "bad JSON scores 0"
-
-log.info "workgen_grader: all passed"
+assert (parsed_bad.score == 0)

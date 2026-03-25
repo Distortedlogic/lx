@@ -8,11 +8,11 @@ use std/time
 
 +init = (capacity: Int) -> Any { cm.init capacity }
 
-+add_item = (win: Any  item: ContextItem) -> Any {
-  cm.add win {key: item.key  content: item.content  tokens: item.tokens  priority: item.priority}
++add_item = (win: Any; item: ContextItem) -> Any {
+  cm.add win {key: item.key; content: item.content; tokens: item.tokens; priority: item.priority}
 }
 
-+add_perception = (win: Any  perception: Any) -> Any {
++add_perception = (win: Any; perception: Any) -> Any {
   cm.add win {
     key: "perception_{perception.intent}"
     content: "Intent: {perception.intent} | Domain: {perception.domain} | Input: {perception.raw}"
@@ -21,7 +21,7 @@ use std/time
   }
 }
 
-+add_reasoning = (win: Any  chain: Any) -> Any {
++add_reasoning = (win: Any; chain: Any) -> Any {
   summary = chain.thoughts | map (.content) | join " → "
   cm.add win {
     key: "reasoning_{chain.goal | take 20}"
@@ -31,7 +31,7 @@ use std/time
   }
 }
 
-+add_tool_result = (win: Any  result: Any) -> Any {
++add_tool_result = (win: Any; result: Any) -> Any {
   cm.add win {
     key: "tool_{result.tool}_{time.now ()}"
     content: "{result.output}"
@@ -40,7 +40,7 @@ use std/time
   }
 }
 
-+pin_identity = (win: Any  identity: Any) -> Any {
++pin_identity = (win: Any; identity: Any) -> Any {
   cm.pin win "identity" "I am {identity.name}, a {identity.role}. Values: {identity.values | join ", "}."
 }
 

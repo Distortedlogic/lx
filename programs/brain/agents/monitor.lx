@@ -19,8 +19,8 @@ Trait +CognitiveState = {
 
 +init = () -> Any {
   {
-    breaker: CircuitBreaker {max_turns: 50  max_actions: 200  max_time_ms: 600000  max_repeats: 4  repetition_window: 5}
-    budget: budget.create {tokens: 100000  api_calls: 50  wall_time: 600  tight_at: 50  critical_at: 85}
+    breaker: CircuitBreaker {max_turns: 50; max_actions: 200; max_time_ms: 600000; max_repeats: 4; repetition_window: 5}
+    budget: budget.create {tokens: 100000; api_calls: 50; wall_time: 600; tight_at: 50; critical_at: 85}
     inspector: Inspector ()
     start_time: time.now ()
   }
@@ -31,15 +31,15 @@ Trait +CognitiveState = {
   state
 }
 
-+record_action = (state: Any  action_type: Str  target: Str) -> Any {
-  state.inspector.record {type: action_type  target: target}
++record_action = (state: Any; action_type: Str; target: Str) -> Any {
+  state.inspector.record {type: action_type; target: target}
   state.breaker.record action_type
   state
 }
 
-+spend = (state: Any  tokens: Int  api_calls: Int) -> Any {
-  b = budget.spend state.budget {tokens: tokens  api_calls: api_calls} ?? state.budget
-  {..state  budget: b}
++spend = (state: Any; tokens: Int; api_calls: Int) -> Any {
+  b = budget.spend state.budget {tokens: tokens; api_calls: api_calls} ?? state.budget
+  {..state; budget: b}
 }
 
 +check_health = (state: Any) -> CognitiveState {
@@ -92,12 +92,12 @@ Trait +CognitiveState = {
   suggestion
 }
 
-+checkpoint = (state: Any  name: Str) -> Any {
++checkpoint = (state: Any; name: Str) -> Any {
   state.inspector.mark name
   log.info "checkpoint: {name} | turn: {state.inspector.turn_count ()} | budget: {budget.status state.budget}"
 }
 
-+actions_since = (state: Any  name: Str) -> [Any] {
++actions_since = (state: Any; name: Str) -> [Any] {
   state.inspector.actions_since name
 }
 
@@ -105,7 +105,7 @@ Trait +CognitiveState = {
   budget.remaining state.budget
 }
 
-+project_budget = (state: Any  remaining_steps: Int) -> Any {
++project_budget = (state: Any; remaining_steps: Int) -> Any {
   budget.project state.budget {remaining_steps: remaining_steps}
 }
 
@@ -124,7 +124,7 @@ Trait +CognitiveState = {
   }
 }
 
-+guard = (state: Any  action_description: Str) -> Any {
++guard = (state: Any; action_description: Str) -> Any {
   is_healthy state ? Ok state : {
     report = status_report state
     log.warn "guard blocked: {action_description} — {report.suggestion}"

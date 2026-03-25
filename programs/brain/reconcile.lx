@@ -17,7 +17,7 @@ flatten_results = (results config) {
 }
 
 make_result = (merged sources conflicts dropped) {
-  {merged: merged  sources: sources  conflicts: conflicts  dropped: dropped  rounds: 1  dissenting: []}
+  {merged: merged; sources: sources; conflicts: conflicts; dropped: dropped; rounds: 1; dissenting: []}
 }
 
 do_union = (results config) {
@@ -31,7 +31,7 @@ do_union = (results config) {
     already = seen.has k
     resolver = config.conflict
     has_resolver = resolver != None
-    new_conflicts = already ? conflicts ++ [{key: k  items: [seen.get k  item]}] : conflicts
+    new_conflicts = already ? conflicts ++ [{key: k; items: [seen.get k  item]}] : conflicts
     conflicts <- new_conflicts
     new_merged = (already == false) ? merged ++ [item] : merged
     merged <- new_merged
@@ -117,7 +117,7 @@ do_vote = (results config) {
     (to_str (vote_val ?? pair.1)) != best_key
   } | map (.0)
   merged = quorum_met ? best_val : None
-  {merged: merged  sources: total  conflicts: []  dropped: []  rounds: 1  dissenting: dissenting  quorum_met: quorum_met}
+  {merged: merged; sources: total; conflicts: []; dropped: []; rounds: 1; dissenting: dissenting; quorum_met: quorum_met}
 }
 
 do_highest_confidence = (results config) {
@@ -158,7 +158,7 @@ do_merge_fields = (results config) {
       resolver = config.conflict
       has_resolver = resolver != None
       resolved = has_existing && has_resolver && (is_list == false) ? (resolver existing v) : v
-      new_conflicts = has_existing && (is_list == false) ? conflicts ++ [{key: k  values: [existing  v]}] : conflicts
+      new_conflicts = has_existing && (is_list == false) ? conflicts ++ [{key: k; values: [existing  v]}] : conflicts
       conflicts <- new_conflicts
       merged.set k (has_existing && is_list ? existing ++ v : (has_existing ? resolved : v))
     }

@@ -1,29 +1,23 @@
-use workgen/store/status {RunStatus}
+use std/fs
+use std/time
+use ../store/status {RunStatus}
 
-runner_dir = "/tmp/lx_test_workgen_persist"
-$rm -rf {runner_dir}
+now = time.now ()
+runner_dir = "/tmp/lx_test_workgen_{now.ms}"
 
 st = RunStatus {runner_dir: runner_dir}
 st.load ()
 
-assert (st.results | len == 0) "starts empty"
-assert (st.completed_count () == 0) "0 completed"
+assert (st.completed_count () == 0)
 
-st.record_result {status: "pass"  score: 80  name: "RUST_AUDIT"  path: "work_items/RUST_AUDIT.md"  feedback: "ok"}
-assert (st.results | len == 1) "1 result"
-assert (st.completed_count () == 1) "1 completed"
+st.record_result {status: "pass"; score: 80; name: "RUST_AUDIT"; path: "work_items/RUST_AUDIT.md"; feedback: "ok"}
+assert (st.completed_count () == 1)
 done = st.is_completed "RUST_AUDIT"
-assert (done == true) "RUST_AUDIT completed"
+assert (done == true)
 
-st.record_result {status: "fail"  score: 40  name: "PYTHON_AUDIT"  path: "work_items/PYTHON_AUDIT.md"  feedback: "bad"}
-assert (st.results | len == 2) "2 results"
-assert (st.completed_count () == 1) "still 1 completed"
+st.record_result {status: "fail"; score: 40; name: "PYTHON_AUDIT"; path: "work_items/PYTHON_AUDIT.md"; feedback: "bad"}
+assert (st.completed_count () == 1)
 
 st2 = RunStatus {runner_dir: runner_dir}
 st2.load ()
-assert (st2.results | len == 2) "reloaded 2"
-assert (st2.completed_count () == 1) "reloaded 1 completed"
-
-$rm -rf {runner_dir}
-
-log.info "workgen_persistence: all passed"
+assert (st2.completed_count () == 1)

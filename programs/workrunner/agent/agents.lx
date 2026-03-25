@@ -1,9 +1,9 @@
 -- AI agent calls — implement, fix, investigate, diagnose.
-use workrunner/schema/work_item {task_context context_for_implement context_for_investigate}
+use ../schema/work_item {task_context context_for_implement context_for_investigate}
 
-use workrunner/prompt/agents {ImplementPrompt FixPrompt InvestigatePrompt FixWiPrompt}
-use workrunner/store/status {save_debug}
-use workrunner/log
+use ../prompt/agents {ImplementPrompt FixPrompt InvestigatePrompt FixWiPrompt}
+use ../store/status {save_debug}
+use ../log
 
 +implement = (wi task bootstrap_ctx runner_dir) {
   log.log "    > claude: implement task {task.num} (max 25 turns)..."
@@ -31,7 +31,7 @@ use workrunner/log
 +diagnose = (task runner_dir slug) {
   log.log "    > diagnose after task {task.num}..."
   diag = $just diagnose
-  diag_out = diag ?? {out: ""  err: "command failed"  code: 1}
+  diag_out = diag ?? {out: ""; err: "command failed"; code: 1}
   output = diag_out.out ?? diag_out.err ?? ""
   clean = output | contains? "0 errors" && (output | contains? "0 warnings")
   save_debug runner_dir slug "task_{task.num}_diagnose.txt" output

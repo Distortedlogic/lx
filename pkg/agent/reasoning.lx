@@ -26,11 +26,11 @@ Prompt SynthesisPrompt = {
   system: `You synthesize multiple reasoning threads into one conclusion.`
 }
 
-Trait +Thought = {id: Str  content: Str  kind: Str  confidence: Float where confidence >= 0.0 && confidence <= 1.0  evidence: [Str]  depends_on: [Str]  alternatives: [Str]}
-Trait +ReasoningChain = {goal: Str  thoughts: [Thought]  conclusion: Str  confidence: Float where confidence >= 0.0 && confidence <= 1.0  strategy: Str}
-Trait +Hypothesis = {claim: Str  evidence_for: [Str]  evidence_against: [Str]  confidence: Float where confidence >= 0.0 && confidence <= 1.0  testable: Bool  test_action: Str}
+Trait +Thought = {id: Str; content: Str; kind: Str; confidence: Float where confidence >= 0.0 && confidence <= 1.0; evidence: [Str]; depends_on: [Str]; alternatives: [Str]}
+Trait +ReasoningChain = {goal: Str; thoughts: [Thought]; conclusion: Str; confidence: Float where confidence >= 0.0 && confidence <= 1.0; strategy: Str}
+Trait +Hypothesis = {claim: Str; evidence_for: [Str]; evidence_against: [Str]; confidence: Float where confidence >= 0.0 && confidence <= 1.0; testable: Bool; test_action: Str}
 
-+reason = (goal: Str  context: Str  constraints: [Str]) -> ReasoningChain {
++reason = (goal: Str; context: Str; constraints: [Str]) -> ReasoningChain {
   strategy = select_strategy goal constraints
   strategy ? {
     "direct" -> reason_direct goal context
@@ -41,7 +41,7 @@ Trait +Hypothesis = {claim: Str  evidence_for: [Str]  evidence_against: [Str]  c
   }
 }
 
-+select_strategy = (goal: Str  constraints: [Str]) -> Str {
++select_strategy = (goal: Str; constraints: [Str]) -> Str {
   word_count = goal | split " " | len
   has_comparison = goal | lower | contains? "compare"
   has_why = goal | lower | contains? "why"
@@ -54,7 +54,7 @@ Trait +Hypothesis = {claim: Str  evidence_for: [Str]  evidence_against: [Str]  c
     : "direct"
 }
 
-reason_direct = (goal: Str  context: Str) -> ReasoningChain {
+reason_direct = (goal: Str; context: Str) -> ReasoningChain {
   p = DirectReasoningPrompt {}
   p.add_section "Goal" goal
   p.add_section "Context" context
@@ -73,7 +73,7 @@ reason_direct = (goal: Str  context: Str) -> ReasoningChain {
   }
 }
 
-reason_decompose = (goal: Str  context: Str) -> ReasoningChain {
+reason_decompose = (goal: Str; context: Str) -> ReasoningChain {
   sub_problems = decompose goal
   sub_chains = sub_problems | map (sub) reason_direct sub context
 
@@ -88,7 +88,7 @@ reason_decompose = (goal: Str  context: Str) -> ReasoningChain {
   }
 }
 
-reason_analogical = (goal: Str  context: Str) -> ReasoningChain {
+reason_analogical = (goal: Str; context: Str) -> ReasoningChain {
   p = AnalogicalPrompt {}
   p.add_section "Problem" goal
   p.add_section "Context" context
@@ -106,7 +106,7 @@ reason_analogical = (goal: Str  context: Str) -> ReasoningChain {
   }
 }
 
-reason_adversarial = (goal: Str  context: Str) -> ReasoningChain {
+reason_adversarial = (goal: Str; context: Str) -> ReasoningChain {
   (pro_chain con_chain) = par {
     reason_direct "Argue FOR: {goal}" context
     reason_direct "Argue AGAINST: {goal}" context
@@ -137,7 +137,7 @@ reason_adversarial = (goal: Str  context: Str) -> ReasoningChain {
   p.ask_lines problem
 }
 
-+hypothesize = (observation: Str  context: Str) -> Hypothesis {
++hypothesize = (observation: Str; context: Str) -> Hypothesis {
   p = HypothesisPrompt {}
   p.add_section "Observation" observation
   p.add_section "Context" context
@@ -155,7 +155,7 @@ reason_adversarial = (goal: Str  context: Str) -> ReasoningChain {
   }
 }
 
-+evaluate_hypothesis = (hypothesis: Hypothesis  new_evidence: [Any]) -> Hypothesis {
++evaluate_hypothesis = (hypothesis: Hypothesis; new_evidence: [Any]) -> Hypothesis {
   supports = new_evidence | filter (.supports) | map (.detail)
   contradicts = new_evidence | filter (e) not e.supports | map (.detail)
 
@@ -171,7 +171,7 @@ reason_adversarial = (goal: Str  context: Str) -> ReasoningChain {
   }
 }
 
-synthesize = (chains: [ReasoningChain]  goal: Str) -> Thought {
+synthesize = (chains: [ReasoningChain]; goal: Str) -> Thought {
   conclusions = chains | map (.conclusion) | join "\n---\n"
   p = SynthesisPrompt {}
   p.add_section "Sub-conclusions" conclusions

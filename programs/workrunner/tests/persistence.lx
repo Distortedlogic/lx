@@ -11,13 +11,13 @@ assert (st.completed_count () == 0) "starts with 0 completed"
 is_foo = st.is_completed "foo.md"
 assert (is_foo == false) "foo not completed initially"
 
-st.record_result {status: "pass"  score: 95  path: "foo.md"  feedback: "ok"}
+st.record_result {status: "pass"; score: 95; path: "foo.md"; feedback: "ok"}
 assert (st.results | len == 1) "1 result after recording pass"
 assert (st.completed_count () == 1) "1 completed after pass"
 foo_done = st.is_completed "foo.md"
 assert (foo_done == true) "foo completed after pass"
 
-st.record_result {status: "fail"  score: 40  path: "bar.md"  feedback: "bad"}
+st.record_result {status: "fail"; score: 40; path: "bar.md"; feedback: "bad"}
 assert (st.results | len == 2) "2 results total"
 assert (st.completed_count () == 1) "still 1 completed — fail doesnt add"
 bar_done = st.is_completed "bar.md"

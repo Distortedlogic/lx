@@ -3,14 +3,14 @@
 use std/fs
 use std/md
 
-Schema +AuditItem = {
++Schema AuditItem = {
   num: Int = "item number in the checklist"
   title: Str = "section heading"
   description: Str = "section content"
   full_text: Str = "raw section text"
 }
 
-Schema +AuditChecklist = {
++Schema AuditChecklist = {
   path: Str = "filesystem path to the audit file"
   name: Str = "derived name from filename"
   raw: Str = "full raw markdown text"
@@ -31,7 +31,7 @@ Schema +AuditChecklist = {
   items = item_sections | enumerate | map (pair) {
     idx = pair.0
     sec = pair.1
-    AuditItem {num: idx + 1  title: sec.title  description: sec.content  full_text: sec.content}
+    AuditItem {num: idx + 1; title: sec.title; description: sec.content; full_text: sec.content}
   }
 
   items | len == 0 ? assert false "audit.load: no items found in {path}"
@@ -41,5 +41,5 @@ Schema +AuditChecklist = {
   base = name_parts | split "." | first
   clean_name = (base ?? "audit") | replace "-" "_" | upper
 
-  AuditChecklist {path: path  name: clean_name  raw: raw  items: items}
+  AuditChecklist {path: path; name: clean_name; raw: raw; items: items}
 }

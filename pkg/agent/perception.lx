@@ -11,9 +11,9 @@ Prompt EntityPrompt = {
   system: `You extract key entities from text.`
 }
 
-Trait +Perception = {raw: Str  intent: Str  complexity: Str  entities: [Str]  domain: Str  urgency: Str = "normal"  requires_tools: Bool = false  requires_agents: Bool = false  ambiguity: Float = 0.0 where ambiguity >= 0.0 && ambiguity <= 1.0}
+Trait +Perception = {raw: Str; intent: Str; complexity: Str; entities: [Str]; domain: Str; urgency: Str = "normal"; requires_tools: Bool = false; requires_agents: Bool = false; ambiguity: Float = 0.0 where ambiguity >= 0.0 && ambiguity <= 1.0}
 
-+perceive = (raw: Str  history: [Any]) -> Perception {
++perceive = (raw: Str; history: [Any]) -> Perception {
   (intent complexity entities domain) = par {
     classify_intent raw
     assess_complexity raw
@@ -101,15 +101,15 @@ detect_urgency = (raw: Str) -> Str {
   } : ""
 }
 
-needs_tools = (raw: Str  intent: Str) -> Bool {
+needs_tools = (raw: Str; intent: Str) -> Bool {
   ["task"; "debug"; "create"; "refactor"; "review"] | contains? intent
 }
 
-needs_agents = (raw: Str  complexity: Str) -> Bool {
+needs_agents = (raw: Str; complexity: Str) -> Bool {
   complexity == "complex"
 }
 
-+measure_ambiguity = (raw: Str  entities: [Str]) -> Float {
++measure_ambiguity = (raw: Str; entities: [Str]) -> Float {
   entity_count = entities | len
   word_count = raw | split " " | len
 

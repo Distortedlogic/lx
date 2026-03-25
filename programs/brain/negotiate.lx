@@ -15,22 +15,22 @@ negotiate_fn = (agents config) {
     done ? break ()
     is_past = round > max_rounds
     is_past ? break ()
-    msg = {round: round  proposal: proposal  positions: positions}
+    msg = {round: round; proposal: proposal; positions: positions}
     responses = agents | map (agent) {
       resp = agent ~>? msg
-      {agent: agent.name ?? "unknown"  position: resp}
+      {agent: agent.name ?? "unknown"; position: resp}
     }
     has_on_round ? on_round_fn round responses
     converge_result = converge_fn responses
     is_ok = ok? converge_result
     inner = converge_result ?? converge_result
-    ok_val = Ok {result: inner  rounds: round  positions: responses  unanimous: true}
+    ok_val = Ok {result: inner; rounds: round; positions: responses; unanimous: true}
     result <- is_ok ? ok_val : result
     done <- is_ok ? true : done
     positions <- responses
     round <- round + 1
   }
   has_result = result != None
-  has_result ? result : Err {reason: "no_consensus"  rounds: max_rounds  positions: positions}
+  has_result ? result : Err {reason: "no_consensus"; rounds: max_rounds; positions: positions}
 }
 +negotiate = negotiate_fn

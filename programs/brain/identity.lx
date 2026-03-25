@@ -46,7 +46,7 @@ dangerous_patterns = ["delete all" "drop table" "rm -rf /" "force push main" "ig
   profile.load {name: "claude_brain" create: true} ^
 }
 
-+learn_from_feedback = (persona: Any  feedback: FeedbackSignal) -> Any {
++learn_from_feedback = (persona: Any; feedback: FeedbackSignal) -> Any {
   feedback.kind ? {
     "correction" -> {
       profile.learn persona "corrections" {
@@ -76,14 +76,14 @@ dangerous_patterns = ["delete all" "drop table" "rm -rf /" "force push main" "ig
   }
 }
 
-+recall_corrections = (persona: Any  domain: Str) -> [Any] {
++recall_corrections = (persona: Any; domain: Str) -> [Any] {
   profile.recall persona "corrections" ? {
     Ok data -> data | to_list ?? [data]
     Err _ -> []
   }
 }
 
-+get_user_preference = (persona: Any  key: Str) -> Any {
++get_user_preference = (persona: Any; key: Str) -> Any {
   profile.get_preference persona "user_{key}"
 }
 
@@ -94,7 +94,7 @@ dangerous_patterns = ["delete all" "drop table" "rm -rf /" "force push main" "ig
     confirmed = user.confirm "Destructive action detected: {violations | join ', '}. Proceed with: {action}?"
     confirmed ? {
       agent.gate "destructive_action" {
-        show: {action: action  violations: violations}
+        show: {action: action; violations: violations}
         timeout: 30
         on_timeout: "abort"
       }
@@ -107,7 +107,7 @@ dangerous_patterns = ["delete all" "drop table" "rm -rf /" "force push main" "ig
   violations | empty? ? Ok action : Err "action violates values: {violations | join ', '}"
 }
 
-+adapt_to_user = (persona: Any  user_info: Any) -> Any {
++adapt_to_user = (persona: Any; user_info: Any) -> Any {
   user_info.role | some? ? profile.preference persona "user_role" user_info.role ^ : ()
   user_info.expertise | some? ? profile.preference persona "user_expertise" user_info.expertise ^ : ()
   user_info.style | some? ? profile.preference persona "user_style" user_info.style ^ : ()
@@ -130,14 +130,14 @@ dangerous_patterns = ["delete all" "drop table" "rm -rf /" "force push main" "ig
   "I'm {id.name}, {id.role}. I value {id.values | take 3 | join ', '}. I'm good at {id.strengths | take 3 | join ', '}."
 }
 
-+alignment_check = (proposed_action: Str  context: Str) -> Any {
++alignment_check = (proposed_action: Str; context: Str) -> Any {
   safe = values_check proposed_action
   safe ? {
     Ok _ -> {
       honest = not (context | lower | contains? "pretend to be")
       helpful = not (proposed_action | lower | contains? "refuse")
-      {aligned: honest && helpful  reason: "passes alignment check"}
+      {aligned: honest && helpful; reason: "passes alignment check"}
     }
-    Err reason -> {aligned: false  reason: reason}
+    Err reason -> {aligned: false; reason: reason}
   }
 }

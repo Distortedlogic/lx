@@ -2,7 +2,7 @@
 -- the context string that gets injected into every AI prompt.
 
 use std/fs
-use workrunner/lib/log
+use ./log
 
 +load_bootstrap = () {
   log.log "loading context files..."

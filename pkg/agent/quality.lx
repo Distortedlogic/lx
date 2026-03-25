@@ -10,7 +10,7 @@ Trait +QualityGrade = {
   score: Float where score >= 0.0 && score <= 100.0
   passed: Bool
   feedback: Str
-  categories: [{name: Str  score: Float  weight: Float}]
+  categories: [{name: Str; score: Float; weight: Float}]
   suggestions: [Str]
 }
 
@@ -34,8 +34,8 @@ Trait +QualityGrade = {
   ]
 }
 
-+quick_check = (output: Str  task: Str) -> Any {
-  audit.quick_check {output: output  min_length: 10  no_hedging: true  no_refusal: true  task: task}
++quick_check = (output: Str; task: Str) -> Any {
+  audit.quick_check {output: output; min_length: 10; no_hedging: true; no_refusal: true; task: task}
 }
 
 grade_to_quality = (result: Any) -> QualityGrade {
@@ -48,15 +48,15 @@ grade_to_quality = (result: Any) -> QualityGrade {
   }
 }
 
-+grade_response = (response: Str  task: Str) -> QualityGrade {
-  audit.evaluate (response_rubric ()) {output: response  threshold: 75  task} | grade_to_quality
++grade_response = (response: Str; task: Str) -> QualityGrade {
+  audit.evaluate (response_rubric ()) {output: response; threshold: 75  task} | grade_to_quality
 }
 
-+grade_code = (code: Str  task: Str) -> QualityGrade {
-  audit.evaluate (code_rubric ()) {output: code  threshold: 80  task} | grade_to_quality
++grade_code = (code: Str; task: Str) -> QualityGrade {
+  audit.evaluate (code_rubric ()) {output: code; threshold: 80  task} | grade_to_quality
 }
 
-+should_refine = (grade: QualityGrade  round: Int  max_rounds: Int = 3) -> Bool {
++should_refine = (grade: QualityGrade; round: Int; max_rounds: Int = 3) -> Bool {
   round >= max_rounds ? false
     : grade.passed ? false
     : grade.score < 30 ? false
@@ -67,16 +67,16 @@ Prompt RevisionPrompt = {
   system: "You improve work based on feedback."
 }
 
-+refine_work = (initial: Str  task: Str  grader_fn: Any  revise_system: Str  threshold: Int = 80) -> Str {
++refine_work = (initial: Str; task: Str; grader_fn: Any; revise_system: Str; threshold: Int = 80) -> Str {
   with TraceStore () as trace {
     result = refine initial {
       grade: (work) {
         g = grader_fn work task
         trace.record {name: "refine_grade" input: task output: g.feedback score: g.score / 100.0} ?? ()
-        {score: to_int g.score  feedback: g.feedback}
+        {score: to_int g.score; feedback: g.feedback}
       }
       revise: (work feedback) {
-        stop = trace.should_stop {min_delta: 2.0  window: 3}
+        stop = trace.should_stop {min_delta: 2.0; window: 3}
         stop ? work : {
           p = Prompt {system: revise_system}
           p.add_section "Work" work
@@ -95,15 +95,15 @@ Prompt RevisionPrompt = {
   }
 }
 
-+refine_response = (initial_response: Str  task: Str) -> Str {
++refine_response = (initial_response: Str; task: Str) -> Str {
   refine_work initial_response task grade_response `You improve responses based on feedback.` 80
 }
 
-+refine_code = (initial_code: Str  task: Str) -> Str {
++refine_code = (initial_code: Str; task: Str) -> Str {
   refine_work initial_code task grade_code `You fix code based on review feedback.` 85
 }
 
-+final_audit = (response: Str  task: Str) -> Any {
++final_audit = (response: Str; task: Str) -> Any {
   (quick full) = par {
     quick_check response task
     auditor.audit {output: response  task}

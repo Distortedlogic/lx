@@ -61,7 +61,7 @@ Agent TaskPlanner: Planner = {
       goal: msg.goal
       steps
       estimated_cost: estimated
-      risk: score.tier [{min: 1.0  name: "high"}; {min: 0.3  name: "medium"}; {min: 0.0  name: "low"}] estimated
+      risk: score.tier [{min: 1.0; name: "high"}; {min: 0.3; name: "medium"}; {min: 0.0; name: "low"}] estimated
       fallback: "simplify approach and retry with fewer tools"
     }
   }
@@ -87,7 +87,7 @@ Agent TaskPlanner: Planner = {
           depends: i > 0 ? ["r{i - 1}"] : []
         }
 
-    {..msg.plan  steps: new_steps}
+    {..msg.plan; steps: new_steps}
   }
 
   estimate_cost = (msg) {
@@ -95,9 +95,9 @@ Agent TaskPlanner: Planner = {
   }
 }
 
-+execute_plan = (plan_result: PlanResult  executor: Any) -> Any {
++execute_plan = (plan_result: PlanResult; executor: Any) -> Any {
   steps = plan_result.steps | map (step) {
-    {id: step.id  action: {description: step.description  tool: step.tool}  depends: step.depends}
+    {id: step.id; action: {description: step.description; tool: step.tool}; depends: step.depends}
   }
 
   plan.run steps executor (step_id result) {
@@ -107,7 +107,7 @@ Agent TaskPlanner: Planner = {
         log.warn "step {step_id} failed recoverably: {e}, replanning"
         recovery_step = {
           id: "recovery_{step_id}"
-          action: {description: "retry {step_id} with simplified approach"  tool: "ai"}
+          action: {description: "retry {step_id} with simplified approach"; tool: "ai"}
           depends: []
         }
         plan.insert_after step_id recovery_step

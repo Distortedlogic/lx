@@ -1,9 +1,9 @@
 -- Work Item Grader — scores work against a rubric.
 
-use workrunner/schema/grade {GradeResult CategoryScore}
-use workrunner/prompt/agents {GradePrompt}
+use ./schema/grade {GradeResult CategoryScore}
+use ./prompt/agents {GradePrompt}
 
-Class +Grader = {
++Class Grader = {
   rubric: []
   threshold: 93
 
@@ -55,7 +55,7 @@ Class +Grader = {
     categories := []
 
     self.rubric | each (rub) {
-      default_match = {name: rub.name  score: 0  feedback: "not evaluated"}
+      default_match = {name: rub.name; score: 0; feedback: "not evaluated"}
       matched = (raw_cats | find (c) { c.name == rub.name }) ?? default_match
       score = matched.score ?? 0
       fb = matched.feedback ?? ""
@@ -64,7 +64,7 @@ Class +Grader = {
 
       total_score <- total_score + score * weight
       total_weight <- total_weight + weight
-      cat_score = CategoryScore {name: rub.name  score: score  passed: cat_passed  feedback: fb}
+      cat_score = CategoryScore {name: rub.name; score: score; passed: cat_passed; feedback: fb}
       categories <- [..categories; cat_score]
       new_failed = cat_passed == false ? [..failed; rub.name] : failed
       failed <- new_failed
@@ -75,14 +75,14 @@ Class +Grader = {
     overall = final_score >= self.threshold && no_failures
     feedback_str = no_failures ? "All categories passed" : "Failed: {failed | join ", "}"
 
-    GradeResult {score: final_score  passed: overall  categories: categories  feedback: feedback_str  failed: failed}
+    GradeResult {score: final_score; passed: overall; categories: categories; feedback: feedback_str; failed: failed}
   }
 
   empty_result = (reason) {
     cats = self.rubric | map (r) {
-      CategoryScore {name: r.name  score: 0  passed: false  feedback: reason}
+      CategoryScore {name: r.name; score: 0; passed: false; feedback: reason}
     }
     names = self.rubric | map (r) r.name
-    GradeResult {score: 0  passed: false  categories: cats  feedback: reason  failed: names}
+    GradeResult {score: 0; passed: false; categories: cats; feedback: reason; failed: names}
   }
 }

@@ -31,7 +31,7 @@ pid_val = pid_result | split " " | first ^ | to_int ?? 1
   }
 
   identity = () {
-    {name: "main"  role: "main"  pid: pid_val}
+    {name: "main"; role: "main"; pid: pid_val}
   }
 
   init_elapsed = () {
@@ -59,7 +59,7 @@ pid_val = pid_result | split " " | first ^ | to_int ?? 1
   }
 
   budget = () {
-    {total: 0 - 1  spent: 0  remaining: 0 - 1}
+    {total: 0 - 1; spent: 0; remaining: 0 - 1}
   }
 
   get_actions = () {
@@ -161,7 +161,7 @@ pid_val = pid_result | split " " | first ^ | to_int ?? 1
   actions = state.inspector.actions ()
   count = actions | len
 
-  early = {current: "too_early"  recommendation: "continue — not enough data"  actions_analyzed: count}
+  early = {current: "too_early"; recommendation: "continue — not enough data"; actions_analyzed: count}
   count < 5 ? early : {
     assessment = self_assess state
     loop_check = detect_doom_loop actions 10
@@ -187,7 +187,7 @@ pid_val = pid_result | split " " | first ^ | to_int ?? 1
     elapsed_ms: elapsed
     elapsed_pct
     remaining_ms: math.max 0 (budget_info.total_ms - elapsed)
-    pressure: score.tier [{min: 80.0  name: "critical"}; {min: 60.0  name: "high"}; {min: 40.0  name: "moderate"}; {min: 0.0  name: "low"}] elapsed_pct
+    pressure: score.tier [{min: 80.0; name: "critical"}; {min: 60.0; name: "high"}; {min: 40.0; name: "moderate"}; {min: 0.0; name: "low"}] elapsed_pct
   }
 }
 
