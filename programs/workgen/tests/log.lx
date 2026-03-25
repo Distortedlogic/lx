@@ -1,4 +1,4 @@
-use workgen/lib/log : wg_log
+use workgen/log : wg_log
 
 wg_log.log "test message from workgen log"
 assert (type_of wg_log.log == "Func") "log is a function"

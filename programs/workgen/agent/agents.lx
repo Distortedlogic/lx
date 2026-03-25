@@ -2,7 +2,7 @@
 
 use workgen/prompt/agents {InvestigatePrompt ComposePrompt RevisePrompt}
 use workgen/store/status {save_debug}
-use workgen/lib/log : wg_log
+use workgen/log : wg_log
 
 +investigate = (audit_content root runner_dir slug) {
   wg_log.log "  > claude: investigate codebase (max 30 turns)..."

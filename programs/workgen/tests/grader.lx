@@ -1,4 +1,4 @@
-use workgen/lib/grader {Grader}
+use workgen/grader {Grader}
 use workgen/schema/grade {GradeResult CategoryScore}
 
 g = Grader {

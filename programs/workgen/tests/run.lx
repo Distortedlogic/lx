@@ -5,10 +5,10 @@
 
 use std/env
 use std/fs
-use workgen/lib/log : wg_log
-use workgen/lib/audit_parser
-use workgen/lib/grader {Grader}
-use workgen/lib/orchestrator
+use workgen/log : wg_log
+use workgen/schema/audit
+use workgen/grader {Grader}
+use workgen/workflow/orchestrator
 use ./spec
 
 wi_grader = Grader {threshold: spec.threshold_pct  rubric: spec.rubric}

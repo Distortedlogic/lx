@@ -1,4 +1,4 @@
-use workgen/lib/audit_parser
+use workgen/schema/audit
 
 audit = audit_parser.load "workgen/tests/fixtures/tiny_audit.md"
 

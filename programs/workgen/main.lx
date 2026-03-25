@@ -9,11 +9,11 @@
 use std/fs
 use std/time
 use std/cron
-use workgen/lib/log : wg_log
+use workgen/log : wg_log
 use workgen/store/status {RunStatus}
-use workgen/lib/audit_parser
-use workgen/lib/grader {Grader}
-use workgen/lib/orchestrator
+use workgen/schema/audit
+use workgen/grader {Grader}
+use workgen/workflow/orchestrator
 
 max_rounds = 3
 runner_dir = ".lx/workgen"
