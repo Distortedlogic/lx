@@ -60,13 +60,12 @@ fn build_schema_method(entries: &[TraitEntry], span: SourceSpan, arena: &mut Ast
       let json_type = lx_type_to_json_type(f.type_name.as_str());
       let type_val = gen_str(json_type, span, arena);
       let mut prop_fields = vec![RecordField::Named { name: intern("type"), value: type_val }];
-      if let Some(desc_id) = f.default {
-        if let Expr::Literal(Literal::Str(parts)) = arena.expr(desc_id) {
-          if let [StrPart::Text(desc_text)] = parts.as_slice() {
-            let desc_text = desc_text.clone();
-            prop_fields.push(RecordField::Named { name: intern("description"), value: gen_str(&desc_text, span, arena) });
-          }
-        }
+      if let Some(desc_id) = f.default
+        && let Expr::Literal(Literal::Str(parts)) = arena.expr(desc_id)
+        && let [StrPart::Text(desc_text)] = parts.as_slice()
+      {
+        let desc_text = desc_text.clone();
+        prop_fields.push(RecordField::Named { name: intern("description"), value: gen_str(&desc_text, span, arena) });
       }
       let prop_record = arena.alloc_expr(Expr::Record(prop_fields), span);
       Some(RecordField::Named { name: f.name, value: prop_record })
@@ -83,9 +82,10 @@ fn build_schema_method(entries: &[TraitEntry], span: SourceSpan, arena: &mut Ast
     .collect();
   let required = arena.alloc_expr(Expr::List(required_elems), span);
 
+  let type_val = gen_str("object", span, arena);
   let envelope = arena.alloc_expr(
     Expr::Record(vec![
-      RecordField::Named { name: intern("type"), value: gen_str("object", span, arena) },
+      RecordField::Named { name: intern("type"), value: type_val },
       RecordField::Named { name: intern("properties"), value: properties },
       RecordField::Named { name: intern("required"), value: required },
     ]),

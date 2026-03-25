@@ -8,6 +8,7 @@ use super::stmt_class::class_body;
 use crate::ast::{AgentMethod, ClassField, ExprId, KeywordDeclData, KeywordKind, TraitEntry};
 use crate::lexer::token::TokenKind;
 
+#[derive(Clone)]
 enum KeywordBody {
   Class(Vec<ClassField>, Vec<AgentMethod>),
   Trait(Vec<TraitEntry>, Vec<AgentMethod>),

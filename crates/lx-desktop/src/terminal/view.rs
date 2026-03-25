@@ -109,25 +109,26 @@ pub fn EditorView(editor_id: String, file_path: String, language: Option<String>
   use_future(move || {
     let file_path = file_path_save.clone();
     async move {
-    loop {
-      let Ok(msg) = widget.recv::<serde_json::Value>().await else { break };
-      match msg["type"].as_str() {
-        Some("cursor") => {
-          let line = msg["line"].as_u64().unwrap_or(1) as u32;
-          let col = msg["col"].as_u64().unwrap_or(1) as u32;
-          let ctx = use_context::<crate::contexts::status_bar::StatusBarState>();
-          ctx.update_cursor(line, col);
-        },
-        Some("save") => {
-          if let Some(text) = msg["content"].as_str() {
-            let fp = file_path.clone();
-            if !fp.is_empty() {
-              let text = text.to_owned();
-              let _ = tokio::fs::write(&fp, &text).await;
+      loop {
+        let Ok(msg) = widget.recv::<serde_json::Value>().await else { break };
+        match msg["type"].as_str() {
+          Some("cursor") => {
+            let line = msg["line"].as_u64().unwrap_or(1) as u32;
+            let col = msg["col"].as_u64().unwrap_or(1) as u32;
+            let ctx = use_context::<crate::contexts::status_bar::StatusBarState>();
+            ctx.update_cursor(line, col);
+          },
+          Some("save") => {
+            if let Some(text) = msg["content"].as_str() {
+              let fp = file_path.clone();
+              if !fp.is_empty() {
+                let text = text.to_owned();
+                let _ = tokio::fs::write(&fp, &text).await;
+              }
             }
-          }
-        },
-        _ => {},
+          },
+          _ => {},
+        }
       }
     }
   });
