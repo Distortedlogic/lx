@@ -67,10 +67,12 @@ Import `dioxus::prelude::*`.
 
 **Description:** Create `crates/lx-desktop/src/contexts/activity_log.rs`. Define:
 
-A `#[derive(Clone, PartialEq)]` struct `ActivityEvent` with fields:
-- `pub timestamp: String` — ISO 8601 timestamp
+A `#[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]` struct `ActivityEvent` with fields:
+- `pub timestamp: String`
 - `pub kind: String` — event category (e.g., "terminal", "browser", "voice", "pane")
 - `pub message: String` — human-readable description
+
+The `Serialize`/`Deserialize` derives are required because WU-7 (server API) uses `ActivityEvent` in JSON request/response bodies.
 
 A `#[derive(Clone, Copy)]` struct `ActivityLog` with fields:
 - `pub events: Signal<std::collections::VecDeque<ActivityEvent>>`
@@ -79,7 +81,7 @@ Add an `impl ActivityLog` block with:
 
 - `pub fn provide() -> Self` — creates `events: Signal::new(VecDeque::new())`, calls `use_context_provider(|| ctx)`, returns `ctx`.
 
-- `pub fn push(&self, kind: &str, message: &str)` — constructs an `ActivityEvent` with the current timestamp (use `chrono::Local::now().to_rfc3339()` — but since chrono is not a dependency and adding it would be heavy, instead use a simpler approach: format the timestamp as the number of seconds since UNIX epoch via `std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)` and convert to string). Pushes to the front of the VecDeque via `push_front`. If the length exceeds 500, calls `pop_back()` to cap the queue.
+- `pub fn push(&self, kind: &str, message: &str)` — constructs an `ActivityEvent` with timestamp from `std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0).to_string()`. Pushes to the front of the VecDeque via `push_front`. If the length exceeds 500, calls `pop_back()` to cap the queue.
 
 Import `dioxus::prelude::*` and `std::collections::VecDeque`.
 

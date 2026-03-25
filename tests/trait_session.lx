@@ -1,0 +1,12 @@
+use std/session {Session}
+
+Class Chat : [Session] = { max_tokens: 1000 }
+
+s = Chat {}
+s.add_message {role: "user", content: "hello"}
+s.add_message {role: "assistant", content: "hi there"}
+assert (s.token_usage ()) > 0
+assert (s.pressure ()) > 0.0
+cp = s.checkpoint () ^
+s.add_message {role: "user", content: "more stuff"}
+s.resume cp ^

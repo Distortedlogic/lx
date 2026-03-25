@@ -1,0 +1,20 @@
+use std/tool {Tool}
+
+Class Echo : [Tool] = {
+  description: "echoes input"
+  params: {text: "Str"}
+  run = (args) { Ok args.text }
+}
+
+t = Echo {}
+assert t.description == "echoes input"
+s = t.schema ()
+assert s.type == "object"
+assert s.properties.text.type == "string"
+assert (s.required | len) == 1
+result = t.run {text: "hello"}
+assert result == Ok "hello"
+valid = t.validate {text: "hi"}
+assert (valid | ok?)
+invalid = t.validate {}
+assert (invalid | err?)

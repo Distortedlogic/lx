@@ -15,7 +15,13 @@ impl Interpreter {
   pub(super) async fn eval_use(&mut self, use_stmt: &UseStmt, span: SourceSpan) -> Result<(), LxError> {
     let str_path: Vec<&str> = use_stmt.path.iter().map(|s| s.as_str()).collect();
     let exports = if crate::stdlib::std_module_exists(&str_path) {
-      crate::stdlib::get_std_module(&str_path).ok_or_else(|| LxError::runtime(format!("unknown stdlib module: {}", str_path.join("/")), span))?
+      if let Some(rust_exports) = crate::stdlib::get_std_module(&str_path) {
+        rust_exports
+      } else if let Some(lx_source) = crate::stdlib::lx_std_module_source(str_path[1]) {
+        self.load_module_from_source(str_path[1], lx_source, span).await?
+      } else {
+        return Err(LxError::runtime(format!("unknown stdlib module: {}", str_path.join("/")), span));
+      }
     } else if let Some(file_path) = self.resolve_workspace_module(&str_path) {
       self.load_module(&file_path, span).await?
     } else if let Some(file_path) = self.resolve_dep_module(&str_path) {
@@ -87,6 +93,27 @@ impl Interpreter {
     }
     result.set_extension("lx");
     if result.exists() { Some(result) } else { None }
+  }
+
+  async fn load_module_from_source(&mut self, name: &str, source: &str, span: SourceSpan) -> Result<ModuleExports, LxError> {
+    let cache_key = PathBuf::from(format!("__std_lx_{name}"));
+    {
+      let cache = self.module_cache.lock();
+      if let Some(exports) = cache.get(&cache_key) {
+        return Ok(exports.clone());
+      }
+    }
+    let (tokens, comments) = crate::lexer::lex(source).map_err(|e| LxError::runtime(format!("std/{name}: {e}"), span))?;
+    let result = crate::parser::parse(tokens, crate::source::FileId::new(0), comments, source);
+    let surface = result.program.ok_or_else(|| LxError::runtime(format!("std/{name}: parse error"), span))?;
+    let program = desugar(surface);
+    let mut mod_interp = Interpreter::new(source, None, Arc::clone(&self.ctx));
+    mod_interp.module_cache = Arc::clone(&self.module_cache);
+    mod_interp.loading = Arc::clone(&self.loading);
+    mod_interp.exec(&program).await.map_err(|e| LxError::runtime(format!("std/{name}: {e}"), span))?;
+    let exports = collect_exports(&program, &mod_interp);
+    self.module_cache.lock().insert(cache_key, exports.clone());
+    Ok(exports)
   }
 
   async fn load_module(&mut self, file_path: &PathBuf, span: SourceSpan) -> Result<ModuleExports, LxError> {

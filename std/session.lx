@@ -1,0 +1,67 @@
+use std/time
+
++Trait Session = {
+  messages: Store = Store ()
+  max_tokens: Int = 200000
+  compaction_threshold: Float = 0.7
+  checkpoints: Store = Store ()
+  next_id: Int = 0
+
+  add_message = (msg) {
+    id = self.next_id
+    self.next_id <- id + 1
+    self.messages.set (to_str id) msg
+    pressure = self.pressure ()
+    pressure >= self.compaction_threshold ? (self.compact ())
+    Ok id
+  }
+
+  compact = () {
+    all_keys = self.messages.keys ()
+    count = all_keys | len
+    count <= 2 ? (Ok ())
+    half = count // 2
+    old_keys = all_keys | take half
+    summaries = old_keys | map (k) {
+      msg = self.messages.get k
+      msg ?? ""
+    }
+    summary_text = summaries | map to_str | join "\n---\n"
+    old_keys | each (k) { self.messages.remove k }
+    self.messages.set "__summary" {role: "summary", content: summary_text, at: time.now ().iso}
+    Ok ()
+  }
+
+  checkpoint = () {
+    cp_id = "cp_{self.next_id}"
+    self.next_id <- self.next_id + 1
+    snapshot = self.messages.keys () | map (k) { {key: k, value: self.messages.get k} }
+    self.checkpoints.set cp_id snapshot
+    Ok cp_id
+  }
+
+  resume = (cp_id) {
+    snapshot = self.checkpoints.get cp_id
+    snapshot ? {
+      None -> Err "checkpoint not found: {cp_id}"
+      Some entries -> {
+        self.messages.keys () | each (k) { self.messages.remove k }
+        entries | each (e) { self.messages.set e.key e.value }
+        Ok ()
+      }
+    }
+  }
+
+  handoff = () {
+    all = self.messages.keys () | map (k) { self.messages.get k }
+    {messages: all, token_usage: self.token_usage (), pressure: self.pressure ()}
+  }
+
+  token_usage = () {
+    self.messages.values () | map (m) { (to_str m | len) // 4 } | fold 0 (+)
+  }
+
+  pressure = () {
+    self.max_tokens == 0 ? 0.0 : ((self.token_usage () | to_float) / (self.max_tokens | to_float))
+  }
+}

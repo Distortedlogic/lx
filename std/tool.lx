@@ -1,0 +1,31 @@
++Trait Tool = {
+  description: Str = ""
+  params: Record = {}
+
+  run = (args) { Err "Tool.run not implemented" }
+
+  schema = () {
+    props = self.params | keys | fold {} (acc k) {
+      json_type = lx_type_to_json (self.params.get k)
+      {..acc, (k): {type: json_type}}
+    }
+    required = self.params | keys
+    {type: "object", properties: props, required: required}
+  }
+
+  validate = (args) {
+    missing = self.params | keys | filter (k) { not (args | keys | any? (== k)) }
+    (missing | len) == 0 ? Ok args : Err {missing: missing}
+  }
+}
+
+lx_type_to_json = (t) {
+  t ? {
+    "Int" -> "integer"
+    "Float" -> "number"
+    "Str" -> "string"
+    "Bool" -> "boolean"
+    "List" -> "array"
+    _ -> "object"
+  }
+}

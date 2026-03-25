@@ -125,6 +125,17 @@ impl Interpreter {
           method_map.insert(m.name, handler);
         }
         Self::inject_traits(&mut method_map, &data.traits, &self.env, "Class", data.name.as_str(), span)?;
+        for tn in &data.traits {
+          if let Some(LxVal::Trait(t)) = self.env.get(*tn) {
+            for f in t.fields.iter() {
+              if let Some(ref default) = f.default
+                && !defaults_map.contains_key(&f.name)
+              {
+                defaults_map.insert(f.name, default.clone());
+              }
+            }
+          }
+        }
         let val = LxVal::Class(Box::new(LxClass {
           name: data.name,
           traits: Arc::new(data.traits.clone()),

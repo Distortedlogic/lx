@@ -1,0 +1,81 @@
++Trait Workflow = {
+  steps: List = []
+  on_fail: Str = "abort"
+  max_retries: Int = 3
+  status: Store = Store ()
+
+  run = (context) {
+    ordered = topo_sort self.steps
+    ordered ? {
+      Err e -> Err e
+      Ok sorted -> {
+        results := {}
+        sorted | each (step) {
+          self.status.set step.id "running"
+          result = run_with_retry step.run context self.max_retries
+          result ? {
+            Err e -> {
+              self.status.set step.id "failed"
+              self.on_fail == "abort" ? {
+                self.rollback ()
+                Err {step: step.id, error: e}
+              }
+            }
+            Ok v -> {
+              self.status.set step.id "done"
+              results <- {..results, (step.id): v}
+            }
+          }
+        }
+        Ok results
+      }
+    }
+  }
+
+  rollback = () {
+    completed = self.status.keys () | filter (k) { self.status.get k == "done" } | reverse
+    completed | each (step_id) {
+      step = self.steps | find (s) s.id == step_id
+      step ? {
+        Some s -> s.undo != None ? (s.undo (self.status.get step_id))
+        None -> ()
+      }
+    }
+    Ok ()
+  }
+
+  step_status = () {
+    self.status.keys () | map (k) { {id: k, status: self.status.get k} }
+  }
+}
+
+run_with_retry = (f context retries) {
+  attempt := 0
+  result := Err "not started"
+  loop {
+    attempt <- attempt + 1
+    result <- try (f context)
+    result | ok? ? break
+    attempt >= retries ? break
+  }
+  result
+}
+
+topo_sort = (steps) {
+  sorted := []
+  remaining := steps
+  done := []
+  loop {
+    (remaining | len) == 0 ? break
+    ready = remaining | filter (s) {
+      s.depends | all? (d) { done | any? (== d) }
+    }
+    (ready | len) == 0 ? (Err "cycle detected in workflow steps")
+    ready | each (s) {
+      sorted <- [..sorted s]
+      done <- [..done s.id]
+    }
+    remaining <- remaining | filter (s) { not (done | any? (== s.id)) }
+  }
+  Ok sorted
+}

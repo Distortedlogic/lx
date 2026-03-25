@@ -1,0 +1,15 @@
+use std/guard {Guard}
+
+Class TurnLimit : [Guard] = { max_turns: 4 }
+
+g = TurnLimit {}
+g.tick ()
+g.tick ()
+g.tick ()
+assert (g.check () | ok?)
+g.tick ()
+assert (g.is_tripped ())
+assert (g.check () | err?)
+g.reset ()
+assert (not (g.is_tripped ()))
+assert (g.check () | ok?)

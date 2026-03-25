@@ -55,6 +55,21 @@ pub(crate) fn get_std_module(path: &[&str]) -> Option<ModuleExports> {
   Some(ModuleExports { bindings, variant_ctors: Vec::new() })
 }
 
+pub(crate) fn lx_std_module_source(name: &str) -> Option<&'static str> {
+  match name {
+    "agent" => Some(include_str!("../../../../std/agent.lx")),
+    "tool" => Some(include_str!("../../../../std/tool.lx")),
+    "prompt" => Some(include_str!("../../../../std/prompt.lx")),
+    "connector" => Some(include_str!("../../../../std/connector.lx")),
+    "collection" => Some(include_str!("../../../../std/collection.lx")),
+    "session" => Some(include_str!("../../../../std/session.lx")),
+    "guard" => Some(include_str!("../../../../std/guard.lx")),
+    "workflow" => Some(include_str!("../../../../std/workflow.lx")),
+    "schema_trait" => Some(include_str!("../../../../std/schema_trait.lx")),
+    _ => None,
+  }
+}
+
 pub(crate) fn std_module_exists(path: &[&str]) -> bool {
   if path.len() < 2 || path[0] != "std" {
     return false;
@@ -77,5 +92,5 @@ pub(crate) fn std_module_exists(path: &[&str]) -> bool {
       | "test"
       | "trait"
       | "schema"
-  )
+  ) || lx_std_module_source(path[1]).is_some()
 }
