@@ -69,7 +69,6 @@ pub fn VoiceBanner() -> Element {
   let current_status = (ctx.status)();
   let is_active = current_status != VoiceStatus::Idle;
   let status_text = current_status.to_string();
-  let entries = ctx.transcript.read().clone();
   let bar_glow = if is_active { "shadow-[0_0_12px_var(--primary)]" } else { "" };
   let icon = if is_active { "\u{1F534}" } else { "\u{1F512}" };
   let button_label = if (ctx.status)() == VoiceStatus::Idle { "PUSH TO TALK" } else { "STOP" };
@@ -97,19 +96,6 @@ pub fn VoiceBanner() -> Element {
               }
           },
           "{button_label}"
-        }
-      }
-      if !entries.is_empty() {
-        div { class: "bg-[var(--surface-container-lowest)] rounded-lg px-4 py-3 max-h-48 overflow-y-auto text-sm space-y-1",
-          for entry in entries.iter() {
-            div { class: if entry.is_user { "text-[#64b5f6]" } else { "text-[#81c784]" },
-              if entry.is_user {
-                "You: {entry.text}"
-              } else {
-                "Agent: {entry.text}"
-              }
-            }
-          }
         }
       }
       div { id: "{element_id}", class: "hidden" }
