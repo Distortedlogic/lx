@@ -1,6 +1,7 @@
 graph TD
     start(["0.0.1 Start"]):::teal
-    start --> loop_start["0.1.0 For each group"]:::purple
+    start --> guardrail["0.0.2 Commit baseline\n——————\ngit add -A && git commit\n--allow-empty -m baseline"]:::cyan
+    guardrail --> loop_start["0.1.0 For each group"]:::purple
 
     loop_start --> implement["`**1.0.0 Implement (Spawn Subagent)**
 ——— read ———
