@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 
-use crate::ast::RecordField;
+use crate::ast::{AstArena, Expr, ExprId, RecordField};
 use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::SemanticModel;
 use crate::checker::{DiagLevel, Diagnostic};
 use crate::linter::rule::{LintRule, RuleCategory};
-use crate::visitor::prelude::*;
+use miette::SourceSpan;
 
 pub struct DuplicateRecordField {
   diagnostics: Vec<Diagnostic>,
@@ -23,8 +23,20 @@ impl DuplicateRecordField {
   }
 }
 
-impl AstVisitor for DuplicateRecordField {
-  fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan) -> VisitAction {
+impl LintRule for DuplicateRecordField {
+  fn name(&self) -> &'static str {
+    "duplicate_record_field"
+  }
+
+  fn code(&self) -> &'static str {
+    "L006"
+  }
+
+  fn category(&self) -> RuleCategory {
+    RuleCategory::Correctness
+  }
+
+  fn check_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan, _arena: &AstArena, _model: &SemanticModel) {
     if let Expr::Record(fields) = expr {
       let mut seen = HashSet::new();
       for field in fields {
@@ -40,29 +52,6 @@ impl AstVisitor for DuplicateRecordField {
             fix: None,
           });
         }
-      }
-    }
-    VisitAction::Descend
-  }
-}
-
-impl LintRule for DuplicateRecordField {
-  fn name(&self) -> &'static str {
-    "duplicate_record_field"
-  }
-
-  fn code(&self) -> &'static str {
-    "L006"
-  }
-
-  fn category(&self) -> RuleCategory {
-    RuleCategory::Correctness
-  }
-
-  fn run(&mut self, stmts: &[StmtId], arena: &AstArena, _model: &SemanticModel) {
-    for sid in stmts {
-      if dispatch_stmt(self, *sid, arena).is_break() {
-        break;
       }
     }
   }

@@ -1,9 +1,8 @@
-use crate::ast::UseKind;
+use crate::ast::{Core, Program, Stmt, UseKind};
 use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::{DefKind, DefinitionId, SemanticModel};
 use crate::checker::{DiagLevel, Diagnostic};
 use crate::linter::rule::{LintRule, RuleCategory};
-use crate::visitor::prelude::*;
 
 pub struct UnusedImport {
   diagnostics: Vec<Diagnostic>,
@@ -21,8 +20,6 @@ impl UnusedImport {
   }
 }
 
-impl AstVisitor for UnusedImport {}
-
 impl LintRule for UnusedImport {
   fn name(&self) -> &'static str {
     "unused_import"
@@ -36,10 +33,10 @@ impl LintRule for UnusedImport {
     RuleCategory::Correctness
   }
 
-  fn run(&mut self, stmts: &[StmtId], arena: &AstArena, model: &SemanticModel) {
-    for sid in stmts {
-      let span = arena.stmt_span(*sid);
-      let stmt = arena.stmt(*sid);
+  fn run(&mut self, program: &Program<Core>, model: &SemanticModel) {
+    for sid in &program.stmts {
+      let span = program.arena.stmt_span(*sid);
+      let stmt = program.arena.stmt(*sid);
       let Stmt::Use(use_stmt) = stmt else {
         continue;
       };

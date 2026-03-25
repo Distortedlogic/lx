@@ -1,9 +1,9 @@
-use crate::ast::ExprMatch;
+use crate::ast::{AstArena, Expr, ExprId, ExprMatch};
 use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::SemanticModel;
 use crate::checker::{DiagLevel, Diagnostic};
 use crate::linter::rule::{LintRule, RuleCategory};
-use crate::visitor::prelude::*;
+use miette::SourceSpan;
 
 pub struct EmptyMatch {
   diagnostics: Vec<Diagnostic>,
@@ -21,24 +21,6 @@ impl EmptyMatch {
   }
 }
 
-impl AstVisitor for EmptyMatch {
-  fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan) -> VisitAction {
-    if let Expr::Match(ExprMatch { arms, .. }) = expr
-      && arms.is_empty()
-    {
-      self.diagnostics.push(Diagnostic {
-        level: DiagLevel::Warning,
-        kind: DiagnosticKind::LintWarning { rule_name: "empty-match".into(), message: "match expression has zero arms".into() },
-        code: "L002",
-        span,
-        secondary: Vec::new(),
-        fix: None,
-      });
-    }
-    VisitAction::Descend
-  }
-}
-
 impl LintRule for EmptyMatch {
   fn name(&self) -> &'static str {
     "empty-match"
@@ -52,11 +34,18 @@ impl LintRule for EmptyMatch {
     RuleCategory::Correctness
   }
 
-  fn run(&mut self, stmts: &[StmtId], arena: &AstArena, _model: &SemanticModel) {
-    for sid in stmts {
-      if dispatch_stmt(self, *sid, arena).is_break() {
-        break;
-      }
+  fn check_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan, _arena: &AstArena, _model: &SemanticModel) {
+    if let Expr::Match(ExprMatch { arms, .. }) = expr
+      && arms.is_empty()
+    {
+      self.diagnostics.push(Diagnostic {
+        level: DiagLevel::Warning,
+        kind: DiagnosticKind::LintWarning { rule_name: "empty-match".into(), message: "match expression has zero arms".into() },
+        code: "L002",
+        span,
+        secondary: Vec::new(),
+        fix: None,
+      });
     }
   }
 

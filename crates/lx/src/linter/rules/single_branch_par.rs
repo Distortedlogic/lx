@@ -1,9 +1,9 @@
-use crate::ast::ExprPar;
+use crate::ast::{AstArena, Expr, ExprId, ExprPar};
 use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::SemanticModel;
 use crate::checker::{DiagLevel, Diagnostic};
 use crate::linter::rule::{LintRule, RuleCategory};
-use crate::visitor::prelude::*;
+use miette::SourceSpan;
 
 pub struct SingleBranchPar {
   diagnostics: Vec<Diagnostic>,
@@ -21,8 +21,20 @@ impl SingleBranchPar {
   }
 }
 
-impl AstVisitor for SingleBranchPar {
-  fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan) -> VisitAction {
+impl LintRule for SingleBranchPar {
+  fn name(&self) -> &'static str {
+    "single_branch_par"
+  }
+
+  fn code(&self) -> &'static str {
+    "L007"
+  }
+
+  fn category(&self) -> RuleCategory {
+    RuleCategory::Correctness
+  }
+
+  fn check_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan, _arena: &AstArena, _model: &SemanticModel) {
     if let Expr::Par(ExprPar { stmts }) = expr
       && stmts.len() <= 1
     {
@@ -37,29 +49,6 @@ impl AstVisitor for SingleBranchPar {
         secondary: vec![],
         fix: None,
       });
-    }
-    VisitAction::Descend
-  }
-}
-
-impl LintRule for SingleBranchPar {
-  fn name(&self) -> &'static str {
-    "single_branch_par"
-  }
-
-  fn code(&self) -> &'static str {
-    "L007"
-  }
-
-  fn category(&self) -> RuleCategory {
-    RuleCategory::Correctness
-  }
-
-  fn run(&mut self, stmts: &[StmtId], arena: &AstArena, _model: &SemanticModel) {
-    for sid in stmts {
-      if dispatch_stmt(self, *sid, arena).is_break() {
-        break;
-      }
     }
   }
 

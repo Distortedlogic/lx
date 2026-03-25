@@ -1,8 +1,9 @@
-use crate::ast::{AstArena, Expr, ExprBlock, ExprBreak, ExprLoop, ExprPar, ExprPropagate, ExprTuple, Stmt, StmtId};
+use crate::ast::{AstArena, Expr, ExprBlock, ExprId, ExprLoop, ExprPar, Stmt, StmtId};
 use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::SemanticModel;
 use crate::checker::{DiagLevel, Diagnostic};
 use crate::linter::rule::{LintRule, RuleCategory};
+use miette::SourceSpan;
 
 pub struct UnreachableCode {
   diagnostics: Vec<Diagnostic>,
@@ -19,7 +20,7 @@ impl UnreachableCode {
     Self { diagnostics: Vec::new() }
   }
 
-  fn walk_stmts(&mut self, stmts: &[StmtId], arena: &AstArena) {
+  fn scan_stmts(&mut self, stmts: &[StmtId], arena: &AstArena) {
     let mut found_break = false;
     for &sid in stmts {
       let stmt_span = arena.stmt_span(sid);
@@ -40,80 +41,6 @@ impl UnreachableCode {
       {
         found_break = true;
       }
-      self.walk_stmt(sid, arena);
-    }
-  }
-
-  fn walk_stmt(&mut self, sid: StmtId, arena: &AstArena) {
-    match arena.stmt(sid) {
-      Stmt::Binding(b) => self.walk_expr(b.value, arena),
-      Stmt::Expr(eid) => self.walk_expr(*eid, arena),
-      _ => {},
-    }
-  }
-
-  fn walk_expr(&mut self, eid: crate::ast::ExprId, arena: &AstArena) {
-    match arena.expr(eid) {
-      Expr::Block(ExprBlock { stmts }) | Expr::Loop(ExprLoop { stmts }) => self.walk_stmts(stmts, arena),
-      Expr::Func(f) => self.walk_expr(f.body, arena),
-      Expr::Match(m) => {
-        self.walk_expr(m.scrutinee, arena);
-        for arm in &m.arms {
-          self.walk_expr(arm.body, arena);
-        }
-      },
-      Expr::Ternary(t) => {
-        self.walk_expr(t.cond, arena);
-        self.walk_expr(t.then_, arena);
-        if let Some(e) = t.else_ {
-          self.walk_expr(e, arena);
-        }
-      },
-      Expr::Binary(b) => {
-        self.walk_expr(b.left, arena);
-        self.walk_expr(b.right, arena);
-      },
-      Expr::Unary(u) => self.walk_expr(u.operand, arena),
-      Expr::Apply(a) => {
-        self.walk_expr(a.func, arena);
-        self.walk_expr(a.arg, arena);
-      },
-      Expr::Par(ExprPar { stmts }) => {
-        for &sid in stmts {
-          self.walk_stmt(sid, arena);
-        }
-      },
-      Expr::Sel(arms) => {
-        for arm in arms {
-          self.walk_expr(arm.expr, arena);
-          self.walk_expr(arm.handler, arena);
-        }
-      },
-      Expr::Propagate(ExprPropagate { inner }) | Expr::Break(ExprBreak { value: Some(inner) }) => self.walk_expr(*inner, arena),
-      Expr::Pipe(p) => {
-        self.walk_expr(p.left, arena);
-        self.walk_expr(p.right, arena);
-      },
-      Expr::Coalesce(c) => {
-        self.walk_expr(c.expr, arena);
-        self.walk_expr(c.default, arena);
-      },
-      Expr::Timeout(t) => {
-        self.walk_expr(t.ms, arena);
-        self.walk_expr(t.body, arena);
-      },
-      Expr::With(w) => {
-        for &sid in &w.body {
-          self.walk_stmt(sid, arena);
-        }
-      },
-      Expr::FieldAccess(fa) => self.walk_expr(fa.expr, arena),
-      Expr::Tuple(ExprTuple { elems }) => {
-        for &e in elems {
-          self.walk_expr(e, arena);
-        }
-      },
-      _ => {},
     }
   }
 }
@@ -131,8 +58,13 @@ impl LintRule for UnreachableCode {
     RuleCategory::Correctness
   }
 
-  fn run(&mut self, stmts: &[StmtId], arena: &AstArena, _model: &SemanticModel) {
-    self.walk_stmts(stmts, arena);
+  fn check_expr(&mut self, _id: ExprId, expr: &Expr, _span: SourceSpan, arena: &AstArena, _model: &SemanticModel) {
+    match expr {
+      Expr::Block(ExprBlock { stmts }) | Expr::Loop(ExprLoop { stmts }) | Expr::Par(ExprPar { stmts }) => {
+        self.scan_stmts(stmts, arena);
+      },
+      _ => {},
+    }
   }
 
   fn take_diagnostics(&mut self) -> Vec<Diagnostic> {

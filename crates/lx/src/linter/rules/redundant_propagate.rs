@@ -1,14 +1,13 @@
-use crate::ast::ExprPropagate;
+use crate::ast::{AstArena, Expr, ExprId, ExprPropagate};
 use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::SemanticModel;
 use crate::checker::types::Type;
 use crate::checker::{DiagLevel, Diagnostic};
 use crate::linter::rule::{LintRule, RuleCategory};
-use crate::visitor::prelude::*;
+use miette::SourceSpan;
 
 pub struct RedundantPropagate {
   diagnostics: Vec<Diagnostic>,
-  candidates: Vec<(ExprId, SourceSpan)>,
 }
 
 impl Default for RedundantPropagate {
@@ -19,16 +18,7 @@ impl Default for RedundantPropagate {
 
 impl RedundantPropagate {
   pub fn new() -> Self {
-    Self { diagnostics: Vec::new(), candidates: Vec::new() }
-  }
-}
-
-impl AstVisitor for RedundantPropagate {
-  fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan) -> VisitAction {
-    if let Expr::Propagate(ExprPropagate { inner: inner_id }) = expr {
-      self.candidates.push((*inner_id, span));
-    }
-    VisitAction::Descend
+    Self { diagnostics: Vec::new() }
   }
 }
 
@@ -45,14 +35,8 @@ impl LintRule for RedundantPropagate {
     RuleCategory::Correctness
   }
 
-  fn run(&mut self, stmts: &[StmtId], arena: &AstArena, model: &SemanticModel) {
-    for sid in stmts {
-      if dispatch_stmt(self, *sid, arena).is_break() {
-        break;
-      }
-    }
-
-    for (inner_id, span) in &self.candidates {
+  fn check_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan, _arena: &AstArena, model: &SemanticModel) {
+    if let Expr::Propagate(ExprPropagate { inner: inner_id }) = expr {
       if let Some(type_id) = model.type_of_expr(*inner_id) {
         let ty = model.type_arena.get(type_id);
         match ty {
@@ -65,7 +49,7 @@ impl LintRule for RedundantPropagate {
                 message: format!("propagate (^) on non-Result/Maybe type `{}`", model.type_arena.display(type_id)),
               },
               code: "L003",
-              span: *span,
+              span,
               secondary: Vec::new(),
               fix: None,
             });
@@ -73,8 +57,6 @@ impl LintRule for RedundantPropagate {
         }
       }
     }
-
-    self.candidates.clear();
   }
 
   fn take_diagnostics(&mut self) -> Vec<Diagnostic> {
