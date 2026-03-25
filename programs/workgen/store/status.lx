@@ -2,10 +2,8 @@
 
 use std/fs
 
-+Class RunStatus = {
++Store RunStatus = {
   runner_dir: ".lx/workgen"
-  results: []
-  completed: []
 
   status_file = () { "{self.runner_dir}/status.json" }
 
@@ -14,30 +12,34 @@ use std/fs
     exists = fs.exists path
     not exists ? () : {
       data = fs.read path ^ | json.parse ^
-      self.results <- data.results
-      self.completed <- data.completed
+      entries_list = data.entries
+      entries_list | each (e) { self.entries.set e.name e }
     }
   }
 
   save = () {
     fs.mkdir self.runner_dir ^
-    data = {results: self.results; completed: self.completed}
+    data = {entries: self.entries.values ()}
     fs.write (self.status_file ()) (json.encode_pretty data) ^
   }
 
   is_completed = (name) {
-    self.completed | any? (c) c == name
+    entry = self.entries.get name
+    entry ? {
+      None -> false
+      Some e -> e.status == "pass"
+    }
   }
 
   record_result = (result) {
-    self.results <- [..self.results; result]
-    is_pass = result.status == "pass"
-    new_completed = is_pass ? [..self.completed; result.name] : self.completed
-    self.completed <- new_completed
+    self.entries.set result.name result
     self.save ()
   }
 
-  completed_count = () { self.completed | len }
+  completed_count = () {
+    passed = self.entries.values () | filter (e) { e.status == "pass" }
+    passed | len
+  }
 }
 
 +save_debug = (runner_dir slug label content) {

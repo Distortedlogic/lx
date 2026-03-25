@@ -1,4 +1,7 @@
-use crate::ast::{BindTarget, Binding, ClassDeclData, KeywordDeclData, KeywordKind, Stmt, StmtFieldUpdate, StmtId, StmtTypeDef, TraitDeclData, TraitEntry, TraitUnionDef, UseKind, UseStmt};
+use crate::ast::{
+  BindTarget, Binding, ClassDeclData, KeywordDeclData, KeywordKind, Stmt, StmtFieldUpdate, StmtId, StmtTypeDef, TraitDeclData, TraitEntry, TraitUnionDef,
+  UseKind, UseStmt,
+};
 
 use super::Formatter;
 

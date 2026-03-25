@@ -24,7 +24,13 @@ fn render_node(val: &LxVal) -> Option<String> {
     },
     "para" => field_str(r, "text").unwrap_or_default(),
     "code" => {
-      let lang = r.get(&crate::sym::intern("lang")).and_then(|v| match v { LxVal::Some(inner) => inner.as_str().map(|s| s.to_string()), _ => None }).unwrap_or_default();
+      let lang = r
+        .get(&crate::sym::intern("lang"))
+        .and_then(|v| match v {
+          LxVal::Some(inner) => inner.as_str().map(|s| s.to_string()),
+          _ => None,
+        })
+        .unwrap_or_default();
       let code = field_str(r, "code").or_else(|| field_str(r, "text")).unwrap_or_default();
       format!("```{lang}\n{code}\n```")
     },

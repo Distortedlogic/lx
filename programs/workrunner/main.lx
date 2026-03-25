@@ -52,7 +52,8 @@ status.load ()
 total = work_item_paths | len
 log.log "Agentic Work Runner — {total} work items ({status.completed_count ()} already completed)"
 log.log "Target: work item >= {target_grade}/100 | max fix rounds: {max_fix_rounds}"
-status.completed_count () > 0 ? log.log "Skipping: {status.completed | join ", "}"
+completed_names = status.entries.values () | filter (e) { e.status == "pass" } | map (e) e.path
+status.completed_count () > 0 ? log.log "Skipping: {completed_names | join ", "}"
 
 start = time.now ()
 start_ms = start.ms
@@ -83,14 +84,15 @@ elapsed = time.now().ms - start.ms
 
 log.log ""
 log.log "=== SUMMARY ==="
-pass_list = status.results | filter (r) r.status == "pass"
-fail_list = status.results | filter (r) r.status != "pass"
+all_results = status.entries.values ()
+pass_list = all_results | filter (r) r.status == "pass"
+fail_list = all_results | filter (r) r.status != "pass"
 
 log.log "Passed: {pass_list | len}/{total}"
 log.log "Time: {elapsed // 1000}s"
 log.log ""
 
-status.results | each (r) {
+all_results | each (r) {
   icon = r.status == "pass" ? "OK" : "FAIL"
   log.log "  [{icon}] {r.path} — {r.score}/100"
 }
