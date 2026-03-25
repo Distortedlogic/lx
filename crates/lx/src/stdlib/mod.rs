@@ -5,6 +5,7 @@ pub mod diag;
 mod env;
 mod fs;
 pub(crate) mod helpers;
+mod http;
 mod introspect;
 mod math;
 mod md;
@@ -39,6 +40,7 @@ pub(crate) fn get_std_module(path: &[&str]) -> Option<ModuleExports> {
     "math" => math::build(),
     "fs" => fs::build(),
     "env" => env::build(),
+    "http" => http::build(),
     "md" => md::build(),
     "introspect" => introspect::build(),
     "time" => time::build(),
@@ -81,6 +83,7 @@ pub(crate) fn std_module_exists(path: &[&str]) -> bool {
       | "math"
       | "fs"
       | "env"
+      | "http"
       | "md"
       | "introspect"
       | "time"

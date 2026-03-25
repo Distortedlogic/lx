@@ -1,0 +1,16 @@
+use std/http
+
+-- Verify functions exist
+assert (type_of http.get) == "BuiltinFunc"
+assert (type_of http.post) == "BuiltinFunc"
+assert (type_of http.request) == "BuiltinFunc"
+
+-- Actual HTTP call (may fail if no network)
+result = try (http.get "https://httpbin.org/get")
+result ? {
+  Ok r -> {
+    assert (r | ok?)
+    log.info "stdlib_http: GET ok"
+  }
+  Err _ -> log.info "stdlib_http: GET skipped (network unavailable)"
+}

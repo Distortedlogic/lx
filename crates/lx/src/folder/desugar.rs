@@ -186,6 +186,9 @@ fn desugar_keyword(data: KeywordDeclData, span: SourceSpan, arena: &mut AstArena
   if data.keyword == KeywordKind::Cli {
     return super::desugar_mcp_cli::desugar_cli(data, span, arena);
   }
+  if data.keyword == KeywordKind::Http {
+    return super::desugar_http::desugar_http(data, span, arena);
+  }
 
   let (import_path, trait_name) = match data.keyword {
     KeywordKind::Agent => (vec!["std", "agent"], "Agent"),

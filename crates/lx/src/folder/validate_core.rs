@@ -17,10 +17,10 @@ impl AstVisitor for CoreValidator {
         | KeywordKind::Workflow
         | KeywordKind::Schema
         | KeywordKind::Mcp
-        | KeywordKind::Cli => {
+        | KeywordKind::Cli
+        | KeywordKind::Http => {
           panic!("KeywordDecl({:?}) should have been desugared at offset {}", data.keyword, span.offset())
         },
-        _ => {},
       }
     }
     VisitAction::Descend
