@@ -1,8 +1,0 @@
--- McpConnector -- wraps std/mcp in the Connector interface.
--- Holds session state. connect/disconnect manage the lifecycle.
--- call delegates to mcp.call, tools delegates to mcp.list_tools.
-
-MCP +McpConnector = {
-  command: ""
-  args: []
-}

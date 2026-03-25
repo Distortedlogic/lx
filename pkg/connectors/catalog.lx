@@ -1,22 +1,19 @@
--- Connector catalog -- MCP and CLI connectors for external tools.
+-- Connector catalog -- pre-configured MCP and CLI connectors.
 -- Import individual connectors: use pkg/connectors/catalog {gritql gh ...}
 
-use pkg/connectors/mcp {McpConnector}
-use pkg/connectors/cli {CliConnector}
+MCP +context_engine = {command: "context-engine-mcp"}
 
-+context_engine = McpConnector {command: "context-engine-mcp"}
+MCP +forgejo = {command: "forgejo-mcp"}
 
-+forgejo = McpConnector {command: "forgejo-mcp"}
+MCP +gritql = {command: "grit-mcp"}
 
-+gritql = McpConnector {command: "grit-mcp"}
+MCP +langfuse = {command: "langfuse-mcp"}
 
-+langfuse = McpConnector {command: "langfuse-mcp"}
+MCP +postgresql = {command: "postgresql-mcp"}
 
-+postgresql = McpConnector {command: "postgresql-mcp"}
+MCP +uptime_kuma = {command: "uptime-kuma-mcp"}
 
-+uptime_kuma = McpConnector {command: "uptime-kuma-mcp"}
-
-+gh = CliConnector {
+CLI +gh = {
   command: "gh"
   tool_defs: [
     {name: "pr_list"  subcommand: "pr list"  description: "List pull requests"}
@@ -25,14 +22,14 @@ use pkg/connectors/cli {CliConnector}
   ]
 }
 
-+jq_tool = CliConnector {
+CLI +jq_tool = {
   command: "jq"
   tool_defs: [
     {name: "query"  subcommand: ""  description: "Run a jq filter on JSON input"}
   ]
 }
 
-+curl = CliConnector {
+CLI +curl = {
   command: "curl"
   tool_defs: [
     {name: "get"  subcommand: ""  description: "HTTP GET request"}
