@@ -2,7 +2,7 @@
 -- Source: extracted from brain/lib/perception.lx
 -- Provides: intent classification, entity extraction, complexity assessment, domain detection
 
-use pkg/kit/git
+use pkg/git/git
 
 Prompt IntentPrompt = {
   system: `You classify user intent into exactly one category.`

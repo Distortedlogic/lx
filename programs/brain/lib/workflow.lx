@@ -17,7 +17,7 @@ use pkg/data/trace {TraceStore}
 }
 
 +run_with_report = (name source report_path report_title work_fn) {
-  use pkg/infra/report
+  use ./report
   run name source (session) {
     result = work_fn session
     result ? {

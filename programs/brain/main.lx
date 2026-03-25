@@ -3,11 +3,11 @@
 -- Architecture: sel racing for fast/thorough paths, with...as for scoped resources
 
 use std/time
-use pkg/infra/workflow
+use ./lib/workflow
 
 use pkg/ai/perception {Perception}
 use pkg/ai/reasoning {ReasoningChain}
-use pkg/agents/monitor {CognitiveState}
+use ./lib/monitor {CognitiveState}
 use pkg/ai/reflect {FeedbackSignal}
 use ./contracts {Response PerceptionEvent ReasoningEvent}
 use pkg/ai/perception : perceive_mod
@@ -17,7 +17,7 @@ use ./lib/tools : tool_mod
 use ./lib/context_mgr : ctx
 use ./lib/identity : id
 use pkg/ai/quality
-use pkg/agents/monitor : mon
+use ./lib/monitor : mon
 
 +think = (input: Str  history: [Any]) -> Any {
   state := mon.init ()

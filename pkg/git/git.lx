@@ -1,9 +1,9 @@
 -- Git operations — shell-based git CLI wrapper.
 -- Replaces std/git core functions.
 
-use pkg/kit/git_branch
-use pkg/kit/git_status
-use pkg/kit/git_worktree
+use pkg/git/branch
+use pkg/git/status
+use pkg/git/worktree
 
 +create_branch = git_branch.create_branch
 +create_branch_at = git_branch.create_branch_at

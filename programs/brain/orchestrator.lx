@@ -5,12 +5,12 @@
 use pkg/core/saga
 use pkg/core/budget
 use std/cron
-use pkg/infra/workflow
+use ./lib/workflow
 use pkg/data/tasks {TaskStore}
 use std/diag
 use std/time
 
-use pkg/agents/monitor {CognitiveState}
+use ./lib/monitor {CognitiveState}
 use ./contracts {Response PerceptionEvent ReasoningEvent ResponseEvent}
 use pkg/ai/perception : perceive
 use pkg/ai/reasoning : reason
@@ -18,9 +18,9 @@ use pkg/data/tieredmem : mem
 use ./lib/context_mgr : ctx_mgr
 use ./lib/identity : identity
 use pkg/ai/quality
-use pkg/agents/monitor : monitor
+use ./lib/monitor : monitor
 use pkg/ai/reflect : reflection
-use pkg/agents/dialogue : dialogue
+use ./lib/dialogue : dialogue
 use ./lib/cognitive_saga : cognitive_saga
 use ./agents/dispatcher : dispatch
 

@@ -54,6 +54,7 @@ pub struct VoiceContext {
   pub rms: Signal<f32>,
   pub pipeline_stage: Signal<PipelineStage>,
   pub widget: Signal<Option<dioxus_widget_bridge::TsWidgetHandle>>,
+  pub voice_turn_count: Signal<u32>,
 }
 
 impl VoiceContext {
@@ -66,6 +67,7 @@ impl VoiceContext {
       rms: Signal::new(0.0),
       pipeline_stage: Signal::new(PipelineStage::Idle),
       widget: Signal::new(None),
+      voice_turn_count: Signal::new(0),
     };
     use_context_provider(|| ctx);
     ctx

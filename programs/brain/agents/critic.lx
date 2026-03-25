@@ -1,7 +1,7 @@
 -- Inner critic: challenges assumptions, finds flaws, prevents overconfidence
 -- Source: adversarial self-review before committing to a response
 
-use pkg/agents/guard
+use ./lib/guard
 use pkg/core/score
 use pkg/core/capability {advertise}
 use ../traits {Critic}

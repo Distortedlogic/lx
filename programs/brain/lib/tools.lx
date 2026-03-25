@@ -3,7 +3,7 @@
 -- Delegates generic tool operations to pkg/kit/tool_executor.
 
 use pkg/core/budget
-use pkg/kit/tool_executor : executor
+use ./tool_executor : executor
 use pkg/core/contracts {ToolRequest ToolResult ActionPlan}
 use pkg/core/score
 

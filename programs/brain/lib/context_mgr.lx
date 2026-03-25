@@ -2,7 +2,7 @@
 -- Source: manages the finite attention window — what to keep, what to evict
 -- Delegates generic operations to pkg/kit/context_manager, adds brain-specific typed wrappers.
 
-use pkg/kit/context_manager : cm
+use ./context_manager : cm
 use pkg/core/contracts {ContextItem}
 use std/time
 

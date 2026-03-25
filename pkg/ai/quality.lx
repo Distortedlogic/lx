@@ -4,8 +4,7 @@
 
 use pkg/core/audit
 use pkg/data/trace {TraceStore}
-use pkg/agents/grader
-use pkg/agents/auditor
+use pkg/ai/auditor
 
 Trait +QualityGrade = {
   score: Float where score >= 0.0 && score <= 100.0

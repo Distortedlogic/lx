@@ -1,17 +1,21 @@
 use super::voice_context::{PipelineStage, TranscriptEntry, VoiceContext, VoiceStatus};
+use crate::layout::shell::TerminalSpawnRequest;
+use crate::panes::DesktopPane;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as B64;
 use common_inference::InferenceClient as _;
 use common_kokoro::SpeechRequest;
-use common_voice::AgentBackend as _;
+use common_pane_tree::PaneNode;
 use common_whisper::TranscribeRequest;
 use dioxus::prelude::*;
 use dioxus_widget_bridge::use_ts_widget;
+use tokio::sync::mpsc;
 
 #[component]
 pub fn VoiceBanner() -> Element {
   let (element_id, widget) = use_ts_widget("voice", serde_json::json!({}));
   let mut ctx = use_context::<VoiceContext>();
+  let spawn_tx = use_context::<mpsc::UnboundedSender<TerminalSpawnRequest>>();
   use_effect(move || {
     ctx.widget.set(Some(widget));
   });
@@ -34,7 +38,7 @@ pub fn VoiceBanner() -> Element {
             continue;
           }
           spawn(async move {
-            if let Err(e) = run_pipeline(buffer, widget, ctx).await {
+            if let Err(e) = run_pipeline(buffer, widget, ctx, spawn_tx.clone()).await {
               ctx.transcript.write().push(TranscriptEntry { is_user: false, text: format!("Error: {e}") });
               ctx.pipeline_stage.set(PipelineStage::Idle);
               widget.send_update(serde_json::json!({ "type": "stop_capture" }));
@@ -149,7 +153,26 @@ async fn tts(text: &str) -> anyhow::Result<Vec<u8>> {
   common_kokoro::KOKORO.infer(&req).await
 }
 
-async fn run_pipeline(pcm: Vec<u8>, widget: dioxus_widget_bridge::TsWidgetHandle, mut ctx: VoiceContext) -> anyhow::Result<()> {
+fn shell_escape(s: &str) -> String {
+  let mut escaped = String::with_capacity(s.len() + 10);
+  escaped.push('\'');
+  for ch in s.chars() {
+    if ch == '\'' {
+      escaped.push_str("'\\''");
+    } else {
+      escaped.push(ch);
+    }
+  }
+  escaped.push('\'');
+  escaped
+}
+
+async fn run_pipeline(
+  pcm: Vec<u8>,
+  widget: dioxus_widget_bridge::TsWidgetHandle,
+  mut ctx: VoiceContext,
+  spawn_tx: mpsc::UnboundedSender<TerminalSpawnRequest>,
+) -> anyhow::Result<()> {
   ctx.pipeline_stage.set(PipelineStage::Transcribing);
   let wav = common_audio::wrap_pcm_as_wav(&pcm, common_audio::SAMPLE_RATE, common_audio::CHANNELS, common_audio::BITS_PER_SAMPLE);
   let transcription = common_whisper::WHISPER.infer(&TranscribeRequest { audio_data: B64.encode(&wav), language: Some("en".into()) }).await?;
@@ -162,7 +185,47 @@ async fn run_pipeline(pcm: Vec<u8>, widget: dioxus_widget_bridge::TsWidgetHandle
   ctx.transcript.write().push(TranscriptEntry { is_user: true, text: text.clone() });
 
   ctx.pipeline_stage.set(PipelineStage::QueryingLlm);
-  let response = crate::voice_backend::ClaudeCliBackend.query(&text).await?;
+
+  let escaped = shell_escape(&text);
+  let system_escaped = shell_escape(crate::voice_backend::SYSTEM_PROMPT);
+  let session_id = &*crate::voice_backend::SESSION_ID;
+  let session_created = crate::voice_backend::SESSION_CREATED.load(std::sync::atomic::Ordering::Relaxed);
+  let cmd = if session_created {
+    format!("claude -p {escaped} --system-prompt {system_escaped} --resume {session_id}")
+  } else {
+    format!("claude -p {escaped} --system-prompt {system_escaped} --session-id {session_id}")
+  };
+
+  let terminal_id = uuid::Uuid::new_v4().to_string();
+  let session = common_pty::get_or_create(&terminal_id, 80, 24, Some("."), Some(&cmd)).map_err(|e| anyhow::anyhow!("pty create failed: {e}"))?;
+  let (_initial, mut rx) = session.subscribe();
+
+  let mut turn_count = ctx.voice_turn_count;
+  let count = turn_count() + 1;
+  turn_count.set(count);
+  let title = format!("Voice Turn {count}");
+  let pane = PaneNode::Leaf(DesktopPane::Terminal { id: terminal_id.clone(), working_dir: ".".into(), command: Some(cmd.clone()), name: Some(title.clone()) });
+
+  let _ = spawn_tx.send(TerminalSpawnRequest { id: terminal_id.clone(), title, pane });
+
+  let mut accumulated = Vec::new();
+  loop {
+    match rx.recv().await {
+      Ok(bytes) => accumulated.extend_from_slice(&bytes),
+      Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+      Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {},
+    }
+  }
+
+  crate::voice_backend::SESSION_CREATED.store(true, std::sync::atomic::Ordering::Relaxed);
+
+  let stripped = strip_ansi_escapes::strip(&accumulated);
+  let response = String::from_utf8_lossy(&stripped).trim().to_owned();
+  if response.is_empty() {
+    ctx.pipeline_stage.set(PipelineStage::Idle);
+    return Ok(());
+  }
+
   let sentences = split_sentences(&response);
   if sentences.is_empty() {
     ctx.pipeline_stage.set(PipelineStage::Idle);
