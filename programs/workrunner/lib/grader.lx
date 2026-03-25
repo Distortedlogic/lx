@@ -1,22 +1,24 @@
--- Work Item Grader -- Agent that scores work against a rubric.
--- Uses pkg/core/prompt for prompt assembly, ai.prompt_with with structured output.
+-- Work Item Grader -- scores work against a rubric.
+-- Uses Prompt keyword for prompt assembly, ai.prompt_with with structured output.
 -- Returns GradeResult with per-category scores, overall pass/fail, feedback.
 
-use pkg/core/prompt
-
-Trait +GradeResult = {
-  score: Int
-  passed: Bool
-  categories: List
-  feedback: Str
-  failed: List
+Schema +GradeResult = {
+  score: Int = "0-100 weighted score across all rubric categories"
+  passed: Bool = "true if score >= threshold and no category failed"
+  categories: List = "per-category scores with name, score, passed, feedback"
+  feedback: Str = "human-readable summary of what passed and failed"
+  failed: List = "names of categories that scored below 70"
 }
 
-Trait +CategoryScore = {
-  name: Str
-  score: Int
-  passed: Bool
-  feedback: Str
+Schema +CategoryScore = {
+  name: Str = "rubric category name"
+  score: Int = "0-100 score for this category"
+  passed: Bool = "true if score >= 70"
+  feedback: Str = "evaluator feedback for this category"
+}
+
+Prompt GradePrompt = {
+  system: "You are a grader scoring work against a rubric. For each category, assign a score 0-100 and brief feedback. A category passes at score >= 70."
 }
 
 Class +Grader = {
@@ -25,7 +27,7 @@ Class +Grader = {
 
   grade = (work task) {
     p = self.build_prompt work task
-    rendered = prompt.render p
+    rendered = p.render ()
     schema_str = self.schema ()
     result = ai.prompt_with {
       prompt: rendered
@@ -39,15 +41,16 @@ Class +Grader = {
 
   build_prompt = (work task) {
     category_lines = self.rubric | enumerate | map (pair) {
-      (idx cat) = pair
+      idx = pair.0
+      cat = pair.1
       "{idx + 1}. {cat.name} (weight {cat.weight}) — {cat.description}"
     } | join "\n"
 
-    prompt.create ()
-      | prompt.system "You are a grader scoring work against a rubric. For each category, assign a score 0-100 and brief feedback. A category passes at score >= 70."
-      | prompt.section "Task" task
-      | prompt.section "Work to Grade" work
-      | prompt.section "Rubric Categories" category_lines
+    p = GradePrompt {}
+    p.add_section "Task" task
+    p.add_section "Work to Grade" work
+    p.add_section "Rubric Categories" category_lines
+    p
   }
 
   schema = () {
@@ -80,8 +83,8 @@ Class +Grader = {
       total_score <- total_score + score * weight
       total_weight <- total_weight + weight
       cat_score = CategoryScore {name: rub.name  score: score  passed: cat_passed  feedback: fb}
-      categories <- [..categories cat_score]
-      new_failed = not cat_passed ? [..failed rub.name] : failed
+      categories <- [..categories; cat_score]
+      new_failed = not cat_passed ? [..failed; rub.name] : failed
       failed <- new_failed
     }
 

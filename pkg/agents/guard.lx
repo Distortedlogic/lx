@@ -6,7 +6,7 @@
 -- check: fast pass/fail gate for single input using default patterns.
 -- run_parallel/run_blocking: composable guard wrappers for agent execution.
 
-Trait +GuardResult = {pass: Bool  reason: Str}
+Schema +GuardResult = {pass: Bool = "whether the guard check passed"  reason: Str = "explanation of pass or failure"}
 Trait +Finding = {severity: Str  type: Str  evidence: Str  source: Str  agent_id: Str = ""}
 
 +default_patterns = [

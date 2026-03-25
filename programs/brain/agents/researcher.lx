@@ -6,20 +6,20 @@ use std/fs
 use pkg/core/capability {advertise}
 use ../traits {Researcher}
 
-Trait Finding = {
-  source: Str
-  content: Str
-  relevance: Float
-  confidence: Float
+Schema Finding = {
+  source: Str = "where the information came from"
+  content: Str = "the finding content"
+  relevance: Float = "0.0-1.0 how relevant to the query"
+  confidence: Float = "0.0-1.0 how confident in accuracy"
 }
 
-Trait ResearchResult = {
-  question: Str
-  findings: [Finding]
-  answer: Str
-  confidence: Float
-  sources_consulted: [Str]
-  gaps: [Str]
+Schema ResearchResult = {
+  question: Str = "the research question"
+  findings: List = "list of Finding records"
+  answer: Str = "synthesized answer"
+  confidence: Float = "0.0-1.0 overall confidence"
+  sources_consulted: List = "sources examined"
+  gaps: List = "identified knowledge gaps"
 }
 
 Agent InfoGatherer: Researcher = {

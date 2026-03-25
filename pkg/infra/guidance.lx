@@ -4,7 +4,7 @@
 
 use pkg/core/audit
 
-Trait +Signal = {proceed: Bool  feedback: Str  source: Str}
+Schema +Signal = {proceed: Bool = "true if the gate passed"  feedback: Str = "details about what passed or failed"  source: Str = "which check produced this signal"}
 
 +check_cargo = (subcommand flags path) {
   cmd = flags | empty? ? "cargo {subcommand} --manifest-path {path}/Cargo.toml" : "cargo {subcommand} --manifest-path {path}/Cargo.toml {flags}"

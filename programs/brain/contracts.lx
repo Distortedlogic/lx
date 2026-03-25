@@ -10,12 +10,12 @@ Trait Response = {
   follow_up: [Str]
 }
 
-Trait Identity = {
-  name: Str
-  role: Str
-  values: [Str]
-  strengths: [Str]
-  preferences: [{key: Str  value: Any}]
+Schema Identity = {
+  name: Str = "agent or user name"
+  role: Str = "functional role in the cognitive architecture"
+  values: List = "guiding principles"
+  strengths: List = "areas of expertise"
+  preferences: List = "key-value preference pairs"
 }
 
 Trait Timestamped = {timestamp: Int where timestamp >= 0}

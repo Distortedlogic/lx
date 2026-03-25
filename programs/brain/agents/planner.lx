@@ -1,42 +1,48 @@
 -- Task decomposition and planning specialist
 -- Source: breaks down complex goals into executable step sequences
 
-use pkg/core/prompt
 use pkg/core/plan
 use ../traits {Planner}
 use pkg/core/score
 use pkg/core/contracts {ActionPlan}
 
-Trait PlanStep = {
-  id: Str
-  description: Str
-  action: Str
-  tool: Str
-  depends: [Str]
-  estimated_tokens: Int
-  can_parallelize: Bool
+Prompt PlanningPrompt = {
+  system: "You create precise, minimal execution plans."
 }
 
-Trait PlanResult = {
-  steps: [PlanStep]
-  total_estimated_tokens: Int
-  parallel_groups: [[Str]]
-  critical_path: [Str]
-  risks: [Str]
+Prompt ReplanPrompt = {
+  system: "You adapt plans when steps fail."
+}
+
+Schema PlanStep = {
+  id: Str = "unique step identifier"
+  description: Str = "what this step accomplishes"
+  action: Str = "the action to take"
+  tool: Str = "tool to use for this step"
+  depends: List = "step IDs this depends on"
+  estimated_tokens: Int = "estimated token cost"
+  can_parallelize: Bool = "true if safe to run concurrently"
+}
+
+Schema PlanResult = {
+  steps: List = "ordered list of PlanStep records"
+  total_estimated_tokens: Int = "sum of all step token estimates"
+  parallel_groups: List = "groups of step IDs safe to parallelize"
+  critical_path: List = "longest dependency chain"
+  risks: List = "identified risks in the plan"
 }
 
 Agent TaskPlanner: Planner = {
   plan = (msg) {
     tools_text = msg.tools | join ", "
 
-    p = prompt.create ()
-      | prompt.system "You create precise, minimal execution plans."
-      | prompt.section "Goal" msg.goal
-      | prompt.section "Available Tools" tools_text
-      | prompt.instruction "Create 10 or fewer steps. Each step: ID, description, tool, dependencies."
-      | prompt.constraint "Minimize steps. Identify parallelizable ones. No circular deps."
+    p = PlanningPrompt {}
+    p.add_section "Goal" msg.goal
+    p.add_section "Available Tools" tools_text
+    p.add_instruction "Create 10 or fewer steps. Each step: ID, description, tool, dependencies."
+    p.add_constraint "Minimize steps. Identify parallelizable ones. No circular deps."
 
-    text = prompt.ask p msg.goal
+    text = p.ask msg.goal
 
     steps = text | lines
       | filter (l) trim l | not empty?
@@ -55,7 +61,7 @@ Agent TaskPlanner: Planner = {
       goal: msg.goal
       steps
       estimated_cost: estimated
-      risk: score.tier [{min: 1.0  name: "high"} {min: 0.3  name: "medium"} {min: 0.0  name: "low"}] estimated
+      risk: score.tier [{min: 1.0  name: "high"}; {min: 0.3  name: "medium"}; {min: 0.0  name: "low"}] estimated
       fallback: "simplify approach and retry with fewer tools"
     }
   }
@@ -64,13 +70,12 @@ Agent TaskPlanner: Planner = {
     remaining = msg.plan.steps
       | filter (s) not (s.depends | contains? msg.failure)
 
-    p = prompt.create ()
-      | prompt.system "You adapt plans when steps fail."
-      | prompt.section "Failed Step" msg.failure
-      | prompt.section "Remaining Steps" (remaining | map (.action) | join "\n")
-      | prompt.instruction "Create an alternative plan that works around the failure."
+    p = ReplanPrompt {}
+    p.add_section "Failed Step" msg.failure
+    p.add_section "Remaining Steps" (remaining | map (.action) | join "\n")
+    p.add_instruction "Create an alternative plan that works around the failure."
 
-    text = prompt.ask p ""
+    text = p.ask ""
     new_steps = text | lines
       | filter (l) trim l | not empty?
       | enumerate
@@ -123,15 +128,15 @@ find_parallel_groups = (steps: [PlanStep]) -> [[Str]] {
   steps | each (step) {
     has_new_dep = step.depends | len > 0 && step.depends != [last_dep]
     has_new_dep ? {
-      current_group | len > 0 ? { groups <- [..groups  current_group] } : ()
+      current_group | len > 0 ? { groups <- [..groups; current_group] } : ()
       current_group <- [step.id]
       last_dep <- step.id
     } : {
-      current_group <- [..current_group  step.id]
+      current_group <- [..current_group; step.id]
     }
   }
 
-  current_group | len > 0 ? [..groups  current_group] : groups
+  current_group | len > 0 ? [..groups; current_group] : groups
 }
 
 +main = () {

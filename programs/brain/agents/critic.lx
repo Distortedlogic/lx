@@ -7,14 +7,14 @@ use pkg/core/score
 use pkg/core/capability {advertise}
 use ../traits {Critic}
 
-Trait Critique = {
-  flaws: [Str]
-  risks: [Str]
-  missing: [Str]
-  overconfident: Bool
-  suggested_improvements: [Str]
-  severity: Str
-  revised_confidence: Float
+Schema Critique = {
+  flaws: List = "logical or factual flaws found"
+  risks: List = "potential risks or failure modes"
+  missing: List = "important considerations not addressed"
+  overconfident: Bool = "true if confidence exceeds evidence"
+  suggested_improvements: List = "specific actionable improvements"
+  severity: Str = "low, medium, or high"
+  revised_confidence: Float = "0.0-1.0 recommended confidence after critique"
 }
 
 Agent InnerCritic: Critic = {

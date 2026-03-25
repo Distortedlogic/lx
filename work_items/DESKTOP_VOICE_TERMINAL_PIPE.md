@@ -87,9 +87,11 @@ Add it after the `widget: Signal::new(None),` line.
 
 **Subject:** Replace ClaudeCliBackend.query() with PTY-based execution piped to a terminal pane
 
-**Description:** Edit `crates/lx-desktop/src/pages/agents/voice_banner.rs`.
+**Description:** Edit `crates/lx-desktop/src/pages/agents/voice_banner.rs`. This task has 4 sequential steps.
 
-**Add new imports** at the top of the file. Add these after the existing imports:
+**Step A — Make voice_backend items public.** Edit `crates/lx-desktop/src/voice_backend.rs`. Change line 5 from `const SYSTEM_PROMPT` to `pub const SYSTEM_PROMPT`. Change line 13 from `static SESSION_CREATED` to `pub static SESSION_CREATED`. These are accessed by the new `run_pipeline`.
+
+**Step B — Update imports in voice_banner.rs.** Remove `use common_voice::AgentBackend as _;`. Add these new imports after the existing ones:
 
 ```rust
 use common_pane_tree::PaneNode;
@@ -98,9 +100,27 @@ use crate::layout::shell::TerminalSpawnRequest;
 use crate::panes::DesktopPane;
 ```
 
-Remove `use common_voice::AgentBackend as _;` — the voice pipeline no longer calls `ClaudeCliBackend.query()`.
+**Step C — Capture spawn channel in VoiceBanner component body.** In the `VoiceBanner` component function, after the existing `let mut ctx = use_context::<VoiceContext>();` line, add:
 
-**Add a shell-escape helper function** before `run_pipeline`:
+```rust
+let spawn_tx = use_context::<mpsc::UnboundedSender<TerminalSpawnRequest>>();
+```
+
+The spawn channel is provided as context by `shell.rs` line 51 (`use_context_provider(|| spawn_channel.0.clone())`). `use_context` is called in the component body (not inside async), which is required by Dioxus.
+
+Then in the `use_future` loop, inside the `Some("silence_detected")` arm, change:
+
+```rust
+if let Err(e) = run_pipeline(buffer, widget, ctx).await {
+```
+
+to:
+
+```rust
+if let Err(e) = run_pipeline(buffer, widget, ctx, spawn_tx.clone()).await {
+```
+
+**Step D — Add shell_escape and rewrite run_pipeline.** Add this function before `run_pipeline`:
 
 ```rust
 fn shell_escape(s: &str) -> String {
@@ -118,10 +138,15 @@ fn shell_escape(s: &str) -> String {
 }
 ```
 
-**Rewrite `run_pipeline`**. Replace the entire function (lines 152-197) with:
+Replace the entire `run_pipeline` function with:
 
 ```rust
-async fn run_pipeline(pcm: Vec<u8>, widget: dioxus_widget_bridge::TsWidgetHandle, mut ctx: VoiceContext) -> anyhow::Result<()> {
+async fn run_pipeline(
+  pcm: Vec<u8>,
+  widget: dioxus_widget_bridge::TsWidgetHandle,
+  mut ctx: VoiceContext,
+  spawn_tx: mpsc::UnboundedSender<TerminalSpawnRequest>,
+) -> anyhow::Result<()> {
   ctx.pipeline_stage.set(PipelineStage::Transcribing);
   let wav = common_audio::wrap_pcm_as_wav(&pcm, common_audio::SAMPLE_RATE, common_audio::CHANNELS, common_audio::BITS_PER_SAMPLE);
   let transcription = common_whisper::WHISPER.infer(&TranscribeRequest { audio_data: B64.encode(&wav), language: Some("en".into()) }).await?;
@@ -161,13 +186,11 @@ async fn run_pipeline(pcm: Vec<u8>, widget: dioxus_widget_bridge::TsWidgetHandle
     name: Some(title.clone()),
   });
 
-  if let Some(spawn_tx) = dioxus::prelude::try_consume_context::<mpsc::UnboundedSender<TerminalSpawnRequest>>() {
-    let _ = spawn_tx.send(TerminalSpawnRequest {
-      id: terminal_id.clone(),
-      title,
-      pane,
-    });
-  }
+  let _ = spawn_tx.send(TerminalSpawnRequest {
+    id: terminal_id.clone(),
+    title,
+    pane,
+  });
 
   let mut accumulated = Vec::new();
   loop {
@@ -221,57 +244,7 @@ async fn run_pipeline(pcm: Vec<u8>, widget: dioxus_widget_bridge::TsWidgetHandle
 }
 ```
 
-Key differences from the old `run_pipeline`:
-- **Line 164-165**: The `ClaudeCliBackend.query(&text)` call is gone. Replaced with shell-escaping + PTY creation.
-- **Lines 166-172**: Build the claude command string with shell-escaped text and system prompt. Use `--session-id` on first turn, `--resume` on subsequent.
-- **Lines 174-176**: Create the PTY session via `common_pty::get_or_create`. The `sh -c` wrapping happens inside common_pty (from WU-A).
-- **Lines 178-192**: Subscribe to PTY output, increment turn counter, build the pane, send `TerminalSpawnRequest` through the spawn channel context. The TerminalView component mounts and connects to the same PTY session.
-- **Lines 194-199**: Accumulate all PTY output bytes until `RecvError::Closed` (process exited).
-- **Lines 201-203**: Strip ANSI escape codes, convert to string.
-- **Lines 205+**: The TTS pipeline (split_sentences → tts → audio_response) is unchanged from the old code.
-
-**IMPORTANT**: `SYSTEM_PROMPT` in `voice_backend.rs` is currently `const` (private). The pipeline needs to access it. Change line 5 of `voice_backend.rs` from `const SYSTEM_PROMPT` to `pub const SYSTEM_PROMPT`. Similarly, `SESSION_CREATED` on line 13 must be `pub` — change `static SESSION_CREATED` to `pub static SESSION_CREATED`.
-
-**IMPORTANT**: `try_consume_context` may not exist in Dioxus 0.7. If it doesn't compile, the spawn channel can be captured in the component body (where `use_context` works) and passed to `run_pipeline` as an additional parameter. Add `spawn_tx: mpsc::UnboundedSender<TerminalSpawnRequest>` to `run_pipeline`'s signature. In the VoiceBanner component's `use_future` loop, capture `let spawn_tx = use_context::<mpsc::UnboundedSender<TerminalSpawnRequest>>();` and pass it to `run_pipeline`.
-
-Actually — to avoid ambiguity, do the second approach unconditionally: capture the spawn channel in the component body and pass it to `run_pipeline`. Change `run_pipeline`'s signature to:
-
-```rust
-async fn run_pipeline(
-  pcm: Vec<u8>,
-  widget: dioxus_widget_bridge::TsWidgetHandle,
-  mut ctx: VoiceContext,
-  spawn_tx: mpsc::UnboundedSender<TerminalSpawnRequest>,
-) -> anyhow::Result<()> {
-```
-
-In the VoiceBanner component body (before the `use_future` loop), add:
-
-```rust
-let spawn_tx = use_context::<mpsc::UnboundedSender<TerminalSpawnRequest>>();
-```
-
-In the `use_future` loop where `run_pipeline` is called (inside the `Some("silence_detected")` arm), change:
-
-```rust
-if let Err(e) = run_pipeline(buffer, widget, ctx).await {
-```
-
-to:
-
-```rust
-if let Err(e) = run_pipeline(buffer, widget, ctx, spawn_tx.clone()).await {
-```
-
-Then inside `run_pipeline`, replace the `try_consume_context` block with:
-
-```rust
-let _ = spawn_tx.send(TerminalSpawnRequest {
-  id: terminal_id.clone(),
-  title,
-  pane,
-});
-```
+The transcription → text → PTY → accumulate → TTS flow replaces the old transcription → ClaudeCliBackend.query() → TTS flow. The TTS portion (split_sentences → tts → audio_response) is unchanged from the old code.
 
 **ActiveForm:** Rewriting run_pipeline to use PTY terminal pane
 

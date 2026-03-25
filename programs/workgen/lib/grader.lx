@@ -1,21 +1,23 @@
 -- Work Item Grader for workgen — scores generated work items against a rubric.
 -- Same pattern as workrunner/lib/grader.lx. Class-based, prompt-assembled, structured output.
 
-use pkg/core/prompt
-
-Trait +GradeResult = {
-  score: Int
-  passed: Bool
-  categories: List
-  feedback: Str
-  failed: List
+Prompt GradingPrompt = {
+  system: "You are a grader scoring work against a rubric. For each category, assign a score 0-100 and brief feedback. A category passes at score >= 70."
 }
 
-Trait +CategoryScore = {
-  name: Str
-  score: Int
-  passed: Bool
-  feedback: Str
+Schema +GradeResult = {
+  score: Int = "0-100 weighted score across all rubric categories"
+  passed: Bool = "true if score >= threshold and no category failed"
+  categories: List = "per-category scores with name, score, passed, feedback"
+  feedback: Str = "human-readable summary of what passed and failed"
+  failed: List = "names of categories that scored below 70"
+}
+
+Schema +CategoryScore = {
+  name: Str = "rubric category name"
+  score: Int = "0-100 score for this category"
+  passed: Bool = "true if score >= 70"
+  feedback: Str = "evaluator feedback for this category"
 }
 
 Class +Grader = {
@@ -24,7 +26,7 @@ Class +Grader = {
 
   grade = (work task) {
     p = self.build_prompt work task
-    rendered = prompt.render p
+    rendered = p.render ()
     schema_str = self.schema ()
     result = ai.prompt_with {
       prompt: rendered
@@ -38,15 +40,16 @@ Class +Grader = {
 
   build_prompt = (work task) {
     category_lines = self.rubric | enumerate | map (pair) {
-      (idx cat) = pair
+      idx = pair.0
+      cat = pair.1
       "{idx + 1}. {cat.name} (weight {cat.weight}) — {cat.description}"
     } | join "\n"
 
-    prompt.create ()
-      | prompt.system "You are a grader scoring work against a rubric. For each category, assign a score 0-100 and brief feedback. A category passes at score >= 70."
-      | prompt.section "Task" task
-      | prompt.section "Work to Grade" work
-      | prompt.section "Rubric Categories" category_lines
+    p = GradingPrompt {}
+    p.add_section "Task" task
+    p.add_section "Work to Grade" work
+    p.add_section "Rubric Categories" category_lines
+    p
   }
 
   schema = () {
@@ -79,8 +82,8 @@ Class +Grader = {
       total_score <- total_score + score * weight
       total_weight <- total_weight + weight
       cat_score = CategoryScore {name: rub.name  score: score  passed: cat_passed  feedback: fb}
-      categories <- [..categories cat_score]
-      new_failed = cat_passed == false ? [..failed rub.name] : failed
+      categories <- [..categories; cat_score]
+      new_failed = cat_passed == false ? [..failed; rub.name] : failed
       failed <- new_failed
     }
 

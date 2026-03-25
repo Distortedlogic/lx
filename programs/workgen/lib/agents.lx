@@ -1,25 +1,35 @@
 -- AI agent calls for workgen — investigate, compose, revise.
--- Each function builds a prompt via pkg/core/prompt and calls ai.prompt_with.
+-- Each function builds a prompt via Prompt keyword and calls ai.prompt_with.
 
-use pkg/core/prompt
 use workgen/lib/log : wg_log
 use workgen/lib/persistence
+
+Prompt InvestigatePrompt = {
+  system: "You are a code auditor. Investigate the codebase thoroughly — read files, search for patterns. Produce a numbered findings list."
+}
+
+Prompt ComposePrompt = {
+  system: "You are a markdown document generator. Output the document directly. Start with '# Goal'. No conversation."
+}
+
+Prompt RevisePrompt = {
+  system: "You are revising a work item document. Fix every feedback item. Output the complete revised document."
+}
 
 +investigate = (audit_content root runner_dir slug) {
   wg_log.log "  > claude: investigate codebase (max 30 turns)..."
 
-  p = prompt.create ()
-    | prompt.system "You are a code auditor. Investigate the codebase thoroughly — read files, search for patterns. Produce a numbered findings list."
-    | prompt.section "Audit Checklist" audit_content
-    | prompt.instruction "For each audit item, search the codebase under '{root}/' to determine if it is violated"
-    | prompt.instruction "Read every relevant file — do not guess from filenames alone"
-    | prompt.instruction "Return a numbered list of findings: concrete problem, root cause, single best fix, affected files"
-    | prompt.constraint "Report ONLY problems — do not list things that are correct"
-    | prompt.constraint "One fix per finding, verbal only, no code snippets"
+  p = InvestigatePrompt {}
+  p.add_section "Audit Checklist" audit_content
+  p.add_instruction "For each audit item, search the codebase under '{root}/' to determine if it is violated"
+  p.add_instruction "Read every relevant file — do not guess from filenames alone"
+  p.add_instruction "Return a numbered list of findings: concrete problem, root cause, single best fix, affected files"
+  p.add_constraint "Report ONLY problems — do not list things that are correct"
+  p.add_constraint "One fix per finding, verbal only, no code snippets"
 
   result = ai.prompt_with {
-    prompt: prompt.render p
-    tools: ["Read" "Glob" "Grep" "Bash"]
+    prompt: p.render ()
+    tools: ["Read"; "Glob"; "Grep"; "Bash"]
     max_turns: 30
   } ^
 
@@ -32,18 +42,17 @@ use workgen/lib/persistence
 +compose = (audit_content rules_content findings runner_dir slug) {
   wg_log.log "  > claude: compose work item document..."
 
-  p = prompt.create ()
-    | prompt.system "You are a markdown document generator. Output the document directly. Start with '# Goal'. No conversation."
-    | prompt.section "Audit Checklist" audit_content
-    | prompt.section "Process Rules" rules_content
-    | prompt.section "Investigation Findings" findings
-    | prompt.instruction "Produce a single markdown work item document following the Process Rules exactly"
-    | prompt.instruction "Required sections: # Goal, # Why, # What changes, # Files affected, # Task List, # CRITICAL REMINDERS"
-    | prompt.constraint "Output ONLY the raw markdown — no preamble, no commentary"
-    | prompt.constraint "Start with '# Goal' — nothing before it"
+  p = ComposePrompt {}
+  p.add_section "Audit Checklist" audit_content
+  p.add_section "Process Rules" rules_content
+  p.add_section "Investigation Findings" findings
+  p.add_instruction "Produce a single markdown work item document following the Process Rules exactly"
+  p.add_instruction "Required sections: # Goal, # Why, # What changes, # Files affected, # Task List, # CRITICAL REMINDERS"
+  p.add_constraint "Output ONLY the raw markdown — no preamble, no commentary"
+  p.add_constraint "Start with '# Goal' — nothing before it"
 
   result = ai.prompt_with {
-    prompt: prompt.render p
+    prompt: p.render ()
     disable_tools: true
   } ^
 
@@ -56,16 +65,15 @@ use workgen/lib/persistence
 +revise = (draft feedback runner_dir slug round_num) {
   wg_log.log "  > claude: revise draft (round {round_num})..."
 
-  p = prompt.create ()
-    | prompt.system "You are revising a work item document. Fix every feedback item. Output the complete revised document."
-    | prompt.section "Current Document" draft
-    | prompt.section "Feedback to Fix" feedback
-    | prompt.instruction "Fix ALL feedback items. Return the complete revised markdown document."
-    | prompt.constraint "Do not remove content to avoid checks — fix issues properly"
-    | prompt.constraint "Start with '# Goal' — nothing before it"
+  p = RevisePrompt {}
+  p.add_section "Current Document" draft
+  p.add_section "Feedback to Fix" feedback
+  p.add_instruction "Fix ALL feedback items. Return the complete revised markdown document."
+  p.add_constraint "Do not remove content to avoid checks — fix issues properly"
+  p.add_constraint "Start with '# Goal' — nothing before it"
 
   result = ai.prompt_with {
-    prompt: prompt.render p
+    prompt: p.render ()
     disable_tools: true
   } ^
 

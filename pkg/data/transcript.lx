@@ -5,7 +5,7 @@
 
 use std/fs
 
-Trait +TraceEntry = {type: Str  name: Str  input: Any  output: Any  success: Bool}
+Schema +TraceEntry = {type: Str = "entry type: tool_call, tool_result, etc"  name: Str = "tool or action name"  input: Any = "input data"  output: Any = "output data"  success: Bool = "whether the operation succeeded"}
 
 +read_recent = (dir mins) {
   $^find {dir} -name "*.jsonl" -mmin -{mins}

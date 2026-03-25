@@ -40,7 +40,7 @@ pub fn Tools() -> Element {
 }
 ```
 
-This is a temporary placeholder. WU-C will populate it with McpPanel.
+WU-C replaces this with McpPanel content.
 
 **ActiveForm:** Creating placeholder Tools page
 

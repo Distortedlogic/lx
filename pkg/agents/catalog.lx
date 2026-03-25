@@ -3,7 +3,7 @@
 -- by_name/by_domain: direct lookup into catalog entries.
 -- add: append a specialist entry to an existing catalog.
 
-Trait +Specialist = {name: Str  domain: Str  script: Str  terminal: Bool}
+Schema +Specialist = {name: Str = "specialist name"  domain: Str = "area of expertise"  script: Str = "script path to run"  terminal: Bool = "true if this is a terminal specialist"}
 
 +create = (entries keywords) {entries  keywords}
 

@@ -5,12 +5,12 @@ use pkg/core/prompt
 use pkg/core/capability {advertise}
 use ../traits {Analyst}
 
-Trait AnalysisResult = {
-  summary: Str
-  findings: [Str]
-  confidence: Float
-  gaps: [Str]
-  recommendations: [Str]
+Schema AnalysisResult = {
+  summary: Str = "concise analysis summary"
+  findings: List = "key findings from analysis"
+  confidence: Float = "0.0-1.0 confidence in analysis"
+  gaps: List = "areas needing further investigation"
+  recommendations: List = "suggested next actions"
 }
 
 Agent DeepAnalyst: Analyst = {

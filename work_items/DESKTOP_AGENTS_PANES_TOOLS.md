@@ -35,7 +35,7 @@ WU-B (Route Restructure) must be completed first. The Terminals route and termin
 
 **Description:** Create `crates/lx-desktop/src/pages/agents/pane_area.rs`. This file contains the entire pane rendering system that was previously in `pages/terminals.rs` (deleted in WU-B). The component is renamed from `Terminals` to `PaneArea`.
 
-Read the git history to get the exact content: run `git show HEAD~3:crates/lx-desktop/src/pages/terminals.rs` (the file existed 3 commits ago, before the route restructure deleted it). Copy the entire content into `pane_area.rs` with ONE change: rename the `Terminals` component to `PaneArea`:
+Retrieve the content from git history. Run `git log --all --oneline -- crates/lx-desktop/src/pages/terminals.rs | head -1` to find the last commit that touched the file. Then run `git show {that_sha}:crates/lx-desktop/src/pages/terminals.rs` to get the full content. Copy it into `pane_area.rs` with ONE change: rename the `Terminals` component to `PaneArea`:
 
 ```rust
 #[component]
