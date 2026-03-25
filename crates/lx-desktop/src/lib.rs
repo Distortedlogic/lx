@@ -1,4 +1,5 @@
 pub mod app;
+pub mod contexts;
 pub mod layout;
 pub mod pages;
 pub mod panes;
