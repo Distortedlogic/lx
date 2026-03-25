@@ -17,12 +17,7 @@ pub fn Sidebar() -> Element {
           label: "ACTIVITY",
           icon: "pulse_alert",
         }
-        NavItem {
-          to: Route::Terminals {},
-          label: "PANES",
-          icon: "dashboard",
-        }
-        NavItem { to: Route::Repos {}, label: "REPOS", icon: "database" }
+        NavItem { to: Route::Tools {}, label: "TOOLS", icon: "build" }
         NavItem {
           to: Route::Settings {},
           label: "SETTINGS",
