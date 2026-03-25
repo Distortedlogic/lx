@@ -1,36 +1,120 @@
 {
   "mcpServers": {
-    "context-engine": {
-      "command": "just",
-      "args": ["--justfile", "mcp.justfile", "context-engine"]
+    "postgresql": {
+      "type": "http",
+      "url": "http://localhost:9090/postgresql/mcp"
     },
-    "gritql": {
-      "command": "just",
-      "args": ["--justfile", "mcp.justfile", "gritql"]
+    "valkey": {
+      "type": "http",
+      "url": "http://localhost:9090/valkey/mcp"
     },
-    "inference": {
-      "command": "just",
-      "args": ["--justfile", "mcp.justfile", "inference"]
+    "influxdb": {
+      "type": "http",
+      "url": "http://localhost:9090/influxdb/mcp"
     },
-    "infisical": {
-      "command": "just",
-      "args": ["--justfile", "mcp.justfile", "infisical"]
+    "clickhouse": {
+      "type": "http",
+      "url": "http://localhost:9090/clickhouse/mcp"
+    },
+    "rabbitmq": {
+      "type": "http",
+      "url": "http://localhost:9090/rabbitmq/mcp"
+    },
+    "minio": {
+      "type": "http",
+      "url": "http://localhost:9090/minio/mcp"
+    },
+    "forgejo": {
+      "type": "http",
+      "url": "http://localhost:9090/forgejo/mcp"
+    },
+    "traefik": {
+      "type": "http",
+      "url": "http://localhost:9090/traefik/mcp"
+    },
+    "docker-registry": {
+      "type": "http",
+      "url": "http://localhost:9090/docker-registry/mcp"
+    },
+    "uptime-kuma": {
+      "type": "http",
+      "url": "http://localhost:9090/uptime-kuma/mcp"
+    },
+    "mattermost": {
+      "type": "http",
+      "url": "http://localhost:9090/mattermost/mcp"
+    },
+    "vaultwarden": {
+      "type": "http",
+      "url": "http://localhost:9090/vaultwarden/mcp"
+    },
+    "langfuse": {
+      "type": "http",
+      "url": "http://localhost:9090/langfuse/mcp"
+    },
+    "signoz": {
+      "type": "http",
+      "url": "http://localhost:9090/signoz/mcp"
     },
     "plane": {
-      "command": "just",
-      "args": ["--justfile", "mcp.justfile", "plane"]
+      "type": "http",
+      "url": "http://localhost:9090/plane/mcp"
     },
-    "playwright": {
-      "command": "just",
-      "args": ["--justfile", "mcp.justfile", "playwright"]
+    "bytestash": {
+      "type": "http",
+      "url": "http://localhost:9090/bytestash/mcp"
     },
-    "recipe": {
-      "command": "just",
-      "args": ["--justfile", "mcp.justfile", "recipe"]
+    "pictshare": {
+      "type": "http",
+      "url": "http://localhost:9090/pictshare/mcp"
+    },
+    "infisical": {
+      "type": "http",
+      "url": "http://localhost:9090/infisical/mcp"
+    },
+    "gritql": {
+      "type": "http",
+      "url": "http://localhost:9090/gritql/mcp"
+    },
+    "whisper-inference": {
+      "type": "http",
+      "url": "http://localhost:9090/whisper-inference/mcp"
+    },
+    "kokoro-inference": {
+      "type": "http",
+      "url": "http://localhost:9090/kokoro-inference/mcp"
+    },
+    "embedding-inference": {
+      "type": "http",
+      "url": "http://localhost:9090/embedding-inference/mcp"
+    },
+    "musicgen-inference": {
+      "type": "http",
+      "url": "http://localhost:9090/musicgen-inference/mcp"
+    },
+    "audioldm2-inference": {
+      "type": "http",
+      "url": "http://localhost:9090/audioldm2-inference/mcp"
+    },
+    "flux-inference": {
+      "type": "http",
+      "url": "http://localhost:9090/flux-inference/mcp"
+    },
+    "llm-inference": {
+      "type": "http",
+      "url": "http://localhost:9090/llm-inference/mcp"
+    },
+    "context-engine": {
+      "type": "http",
+      "url": "http://localhost:9090/context-engine/mcp"
     },
     "workflow": {
-      "command": "just",
-      "args": ["--justfile", "mcp.justfile", "workflow"]
+      "type": "http",
+      "url": "http://localhost:9090/workflow/mcp"
+    },
+    "openviking": {
+      "type": "http",
+      "url": "http://localhost:9090/openviking/mcp"
     }
   }
 }

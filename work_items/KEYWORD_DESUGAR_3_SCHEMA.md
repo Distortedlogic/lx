@@ -1,129 +1,213 @@
 # Goal
 
-Add Schema keyword desugaring. `Schema GradeResult = { score: Int, passed: Bool, feedback: Str }` desugars to a `Trait GradeResult : [Schema] = { score: Int, passed: Bool, feedback: Str }` with auto-injected `schema()` and `validate()` methods from the Schema trait. This is the only keyword that desugars to Trait instead of Class.
+Add Schema keyword desugaring. `Schema GradeResult = { score: Int, passed: Bool, feedback: Str }` desugars to a `Trait GradeResult` with auto-injected `schema()` and `validate()` default methods. This is the only keyword that desugars to Trait instead of Class.
 
 # Why
 
-- Every `ai.prompt_with { json_schema: ... }` call hand-writes a JSON schema string. Every tool needs parameter schemas. Every agent-to-agent message needs a data contract. Schema keyword auto-generates these from typed field declarations.
-- Schema desugars to Trait (not Class) because data contracts are lightweight record constructors, not heap-allocated objects with mutable state.
-- The parser infrastructure (keyword tokens, KeywordDeclData AST node) already exists from Unit 2. This unit only adds the Schema-specific desugaring codepath.
+Every `ai.prompt_with { json_schema: ... }` hand-writes a JSON schema string. Schema keyword auto-generates `schema()` and `validate()` from typed field declarations. Schema desugars to Trait (not Class) because data contracts are lightweight record constructors, not heap-allocated objects.
+
+# Critical fact: `requires` does not work
+
+`TraitDeclData.requires` is stored but **never read at runtime**. The `inject_traits()` function in `interpreter/traits.rs` only processes the `traits` list on ClassDecl — it never looks at a trait's `requires` field. This means Schema cannot rely on trait inheritance via `requires: [Schema]`. Instead, the desugaring must directly inject `schema()` and `validate()` as default methods on the generated TraitDecl.
 
 # What Changes
 
 **Parser — `crates/lx/src/parser/stmt_keyword.rs`:**
 
-Schema keyword needs trait-body parsing (field: Type syntax) instead of class-body parsing (field: defaultExpr syntax). Modify the keyword parser: when the keyword kind is `Schema`, delegate to the existing trait body parser instead of the class body parser. The trait body parser produces `(Vec<TraitEntry>, Vec<AgentMethod>)` which maps to TraitDeclData's `entries` and `defaults` fields.
+Schema keyword needs trait-body syntax (`field: Type`) not class-body syntax (`field: defaultExpr`). The trait body parser already exists as `trait_body()` at `stmt.rs:222`. It returns `(Vec<TraitEntry>, Vec<AgentMethod>)`.
+
+Branch the keyword parser: when keyword kind is Schema, parse body with `trait_body()` and store results in `data.trait_entries`. When keyword kind is anything else, parse with `class_body()` as before.
+
+The `trait_body()` function is NOT currently public. It's defined inside `stmt.rs`. Make it `pub(super)` so `stmt_keyword.rs` can call it. The function signature is:
+
+```rust
+fn trait_body<'a, I>(
+    expr: impl Parser<'a, I, ExprId, extra::Err<Rich<'a, TokenKind, Span>>> + Clone,
+) -> impl Parser<'a, I, (Vec<TraitEntry>, Vec<AgentMethod>), extra::Err<Rich<'a, TokenKind, Span>>> + Clone
+```
+
+Note: `trait_body()` does NOT parse the enclosing `{ }` braces — the caller (`trait_parser`) handles those. However, `class_body()` (extracted in Unit 2) DOES parse the braces. So for Schema, the keyword parser must parse `{` then call `trait_body()` then parse `}` explicitly.
 
 **Desugar — `crates/lx/src/folder/desugar.rs`:**
 
-In `transform_stmts`, handle `KeywordDecl { keyword: Schema, ... }`:
+In `desugar_keyword`, add the Schema branch. Convert `KeywordDeclData` into `TraitDeclData`:
 
-1. Create `Stmt::Use(UseStmt { path: [intern("pkg"), intern("core"), intern("schema")], kind: Selective([intern("Schema")]) })`.
-2. Convert the KeywordDeclData into `Stmt::TraitDecl(TraitDeclData { name: data.name, type_params: data.type_params, entries: <from parsed trait body>, methods: [], defaults: [], requires: [intern("Schema")], description: None, tags: [], exported: data.exported })`.
-3. The `requires: [intern("Schema")]` field tells the trait system that this trait extends Schema, inheriting `schema()` and `validate()` defaults.
-
-Note: The KeywordDeclData currently stores `fields: Vec<ClassField>` and `methods: Vec<AgentMethod>` (class-body format). For Schema, the parser produces trait-body format instead. Either: (a) add a `trait_entries: Vec<TraitEntry>` field to KeywordDeclData, or (b) store a union/enum of body formats. Option (a) is simpler — add an optional `trait_entries` field that Schema populates instead of `fields`.
+1. Create `Stmt::Use` for `pkg/core/schema {Schema}`.
+2. Convert `data.trait_entries` into the TraitDecl's `entries` field.
+3. Generate `schema()` default method: builds a record literal from the trait's field names and type names. For each `TraitEntry::Field(FieldDecl { name, type_name, .. })`, generate a record field `name: type_name_string`. The result is an expression like `{score: "Int", passed: "Bool", feedback: "Str"}`.
+4. Generate `validate(data)` default method: checks that `data` is a Record and has all required field names. For each field in entries, check `data | keys | any? (== field_name)`. Return `Ok data` or `Err {missing: [...]}`.
+5. Create `Stmt::TraitDecl(TraitDeclData { name, type_params, entries, methods: [], defaults: [schema_method, validate_method], requires: [], description: None, tags: [], exported })`.
 
 **Validate — `crates/lx/src/folder/validate_core.rs`:**
 
-Remove the temporary pass-through for Schema keyword. It should now be desugared and absent from Core AST.
+Add Schema to the desugared-keyword assertion list.
 
 # Files Affected
 
-- `crates/lx/src/parser/stmt_keyword.rs` — Branch on Schema for trait body parsing
-- `crates/lx/src/ast/types.rs` — Add optional trait_entries field to KeywordDeclData
-- `crates/lx/src/folder/desugar.rs` — Add Schema desugaring branch
-- `crates/lx/src/folder/validate_core.rs` — Remove Schema pass-through
-- `tests/keyword_schema.lx` — New test file
+- `crates/lx/src/parser/stmt.rs` — Make trait_body pub(super)
+- `crates/lx/src/parser/stmt_keyword.rs` — Branch for Schema body parsing
+- `crates/lx/src/folder/desugar.rs` — Add Schema desugaring with generated methods
+- `crates/lx/src/folder/validate_core.rs` — Add Schema to assertion
+- `tests/keyword_schema.lx` — New test
 
 # Task List
 
-### Task 1: Add trait_entries field to KeywordDeclData
+### Task 1: Make trait_body accessible to keyword parser
 
-**Subject:** Extend KeywordDeclData to support trait-body format for Schema
+**Subject:** Change trait_body visibility and branch keyword parser for Schema
 
-**Description:** Edit `crates/lx/src/ast/types.rs`. Add `pub trait_entries: Option<Vec<TraitEntry>>` field to `KeywordDeclData`. When this field is `Some`, it means the keyword was parsed with trait-body syntax (Schema). When `None`, the keyword uses class-body syntax (all other keywords). Also add `pub trait_methods: Option<Vec<TraitMethodDecl>>` for completeness. Default both to None in all existing parser code from Unit 2.
+**Description:** Edit `crates/lx/src/parser/stmt.rs`. Change `fn trait_body` at line 222 from private to `pub(super) fn trait_body`.
 
-**ActiveForm:** Extending KeywordDeclData for Schema body format
+Edit `crates/lx/src/parser/stmt_keyword.rs`. Modify the keyword parser to branch on Schema:
+
+After matching the keyword kind and name, and parsing `=`:
+
+- If keyword is Schema: parse `{` (just LBrace), call `super::stmt::trait_body(expr)`, parse `}` (just RBrace). Store the `(Vec<TraitEntry>, Vec<AgentMethod>)` result in `trait_entries: Some(entries)` and `methods: defaults`. Set `fields` to empty.
+- If keyword is anything else: call `class_body(expr)` as before. Set `trait_entries: None`.
+
+This requires restructuring the parser chain. Instead of a single `.then(class_body(expr))` at the end, use a conditional:
+
+```rust
+.then(
+    keyword_kind.clone().then_ignore(just(TokenKind::LBrace))
+    .ignore_then(trait_body_or_class_body)
+    .then_ignore(just(TokenKind::RBrace))
+)
+```
+
+The simplest approach: parse the keyword kind first, then decide which body parser to use. Since chumsky is combinator-based, the cleanest way is two branches in a choice: one for Schema keyword + trait body, one for other keywords + class body. Both produce the same output type.
+
+**ActiveForm:** Branching keyword parser for Schema
 
 ---
 
-### Task 2: Branch keyword parser for Schema body
+### Task 2: Implement Schema desugaring
 
-**Subject:** Make keyword parser use trait body parsing for Schema keyword
+**Subject:** Add Schema branch to desugar_keyword
 
-**Description:** Edit `crates/lx/src/parser/stmt_keyword.rs`. After matching the keyword kind and reading the `=` token:
+**Description:** Edit `crates/lx/src/folder/desugar.rs`. In `desugar_keyword`, add the Schema case.
 
-If keyword is Schema: delegate to the trait body parser (the same parser used by `trait_parser()` in `stmt.rs` — extract it into a shared helper if needed). Store results in `trait_entries` and `trait_methods` fields of KeywordDeclData. Set `fields` and `methods` to empty vecs.
+The Schema keyword has `trait_entries: Some(entries)` with `TraitEntry::Field(FieldDecl { name, type_name, default, constraint })` items.
 
-If keyword is anything else: use class body parser as before. Set `trait_entries` and `trait_methods` to None.
+Generate two default methods:
 
-**ActiveForm:** Branching keyword parser for Schema syntax
+**schema() method:** Build a record literal expression where each field in `entries` that is `TraitEntry::Field(f)` produces a record field `f.name: Literal::Str(f.type_name.as_str())`. Example: for `{ score: Int, passed: Bool }`, generate the expression `{score: "Int", passed: "Bool"}`.
 
----
+```rust
+let schema_fields: Vec<RecordField> = entries.iter().filter_map(|e| {
+    if let TraitEntry::Field(f) = e {
+        let name = f.name;
+        let type_str = arena.alloc_expr(Expr::Literal(Literal::Str(vec![StrPart::Text(f.type_name.as_str().to_string())])), span);
+        Some(RecordField::Named { name, value: type_str })
+    } else { None }
+}).collect();
+let schema_record = arena.alloc_expr(Expr::Record(schema_fields), span);
+let schema_fn = arena.alloc_expr(Expr::Func(ExprFunc {
+    params: vec![],
+    type_params: vec![],
+    ret_type: None,
+    guard: None,
+    body: schema_record,
+}), span);
+let schema_method = AgentMethod { name: intern("schema"), handler: schema_fn };
+```
 
-### Task 3: Implement Schema desugaring
+**validate(data) method:** Generate a function that checks each field name exists in `data`. Build an expression like:
 
-**Subject:** Add Schema desugaring branch to transform_stmts
+```lx
+(data) {
+  missing = ["score", "passed", "feedback"] | filter (k) { not (data | keys | any? (== k)) }
+  (missing | len) == 0 ? Ok data : Err {missing: missing}
+}
+```
 
-**Description:** Edit `crates/lx/src/folder/desugar.rs`. In the `transform_stmts` method, add a branch for `KeywordDecl { keyword: Schema, ... }`:
+Construct this AST: Func with param "data", body is a Block with binding `missing` and a ternary.
 
-1. Allocate `Stmt::Use` for `pkg/core/schema` importing `Schema`.
-2. Build `TraitDeclData` from the KeywordDeclData: `name` from data.name, `type_params` from data.type_params, `entries` from `data.trait_entries.unwrap_or_default()`, `methods` from `data.trait_methods.unwrap_or_default()`, `defaults` empty, `requires: vec![intern("Schema")]`, `description: None`, `tags: vec![]`, `exported` from data.exported.
-3. Allocate `Stmt::TraitDecl(trait_data)`.
-4. Return both Use and TraitDecl statements.
+This is verbose AST construction. Use the same arena allocation pattern as the Desugarer's existing `desugar_ternary` and `desugar_coalesce` functions for reference on how to build complex expression trees.
+
+Assemble the TraitDecl:
+
+```rust
+let trait_decl = TraitDeclData {
+    name: data.name,
+    type_params: data.type_params,
+    entries: data.trait_entries.unwrap_or_default(),
+    methods: vec![],
+    defaults: vec![schema_method, validate_method],
+    requires: vec![],
+    description: None,
+    tags: vec![],
+    exported: data.exported,
+};
+```
+
+Return `vec![use_stmt, arena.alloc_stmt(Stmt::TraitDecl(trait_decl), span)]`.
 
 **ActiveForm:** Implementing Schema desugaring
 
 ---
 
-### Task 4: Update validate_core for Schema
+### Task 3: Update validate_core
 
-**Subject:** Remove Schema pass-through in validate_core
+**Subject:** Add Schema to desugared assertion
 
-**Description:** Edit `crates/lx/src/folder/validate_core.rs`. Add Schema to the list of keyword kinds that must not survive into Core AST. It should now be desugared alongside the 8 simple keywords.
+**Description:** Edit `crates/lx/src/folder/validate_core.rs`. Add `KeywordKind::Schema` to the list that must not survive into Core AST.
 
 **ActiveForm:** Updating validate_core for Schema
 
 ---
 
-### Task 5: Write Schema keyword test
+### Task 4: Write Schema keyword test
 
-**Subject:** Create test file validating Schema keyword works end-to-end
+**Subject:** Test Schema keyword end-to-end
 
 **Description:** Create `tests/keyword_schema.lx`:
 
-Define `Schema UserProfile = { name: Str, age: Int, email: Str }`. This should desugar to a Trait with Schema's `schema()` and `validate()` defaults.
+```lx
+Schema UserProfile = {
+  name: Str
+  age: Int
+  email: Str
+}
 
-Instantiate: `user = UserProfile { name: "Alice", age: 30, email: "alice@example.com" }`. Assert `user.name == "Alice"`.
+-- Schema acts as a record constructor (Trait behavior)
+user = UserProfile {name: "Alice", age: 30, email: "a@b.com"}
+assert user.name == "Alice"
+assert user.age == 30
 
-Call `user_schema = UserProfile.schema()` (if Schema trait provides a static method) or test via `validate`: `result = UserProfile.validate { name: "Bob", age: 25, email: "bob@test.com" }`. Assert result is Ok.
+-- schema() returns field type map
+s = UserProfile.schema ()
+assert (s | keys | len) == 3
+assert s.name == "Str"
+assert s.age == "Int"
 
-Test validation failure: `bad = UserProfile.validate { name: "Charlie" }`. Assert result is Err with missing fields.
+-- validate() checks required fields
+good = UserProfile.validate {name: "Bob", age: 25, email: "b@c.com"}
+assert (good | ok?)
+
+bad = UserProfile.validate {name: "Charlie"}
+assert (bad | err?)
+```
+
+Note: `UserProfile.schema()` calls schema as a static method on the trait value itself. If the trait system doesn't support static method calls (only instance method calls), then test via an instance: `user.schema()`. Verify which pattern works by reading how trait defaults are accessed in the interpreter — `pkg/agent.lx`'s Agent trait defaults are called on instances, e.g., `a.think "prompt"` after `a = MyAgent {}`. So test via instance.
 
 Run `just test`.
 
-**ActiveForm:** Writing Schema keyword test
+**ActiveForm:** Writing Schema test
 
 ---
 
 ## CRITICAL REMINDERS — READ BEFORE EVERY TASK
 
-Re-read before starting each task:
-
-1. **Call `complete_task` after each task.** The MCP handles formatting, committing, and diagnostics automatically.
-2. **Call `next_task` to get the next task.** Do not look ahead in the task list.
-3. **Do not add tasks, skip tasks, reorder tasks, or combine tasks.** Execute the task list exactly as written.
-4. **Tasks are implementation-only.** No commit, verify, format, or cleanup tasks — the MCP handles these.
+1. **Call `complete_task` after each task.**
+2. **Call `next_task` to get the next task.**
+3. **Do not add, skip, reorder, or combine tasks.**
+4. **Tasks are implementation-only.**
 
 ---
 
 ## Task Loading Instructions
 
-To execute this work item, load it with the workflow MCP:
-
 ```
 mcp__workflow__load_work_item({ path: "work_items/KEYWORD_DESUGAR_3_SCHEMA.md" })
 ```
-
-Then call `next_task` to begin.

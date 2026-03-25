@@ -1,0 +1,98 @@
+graph TD
+    start(["0.0.1 Start\n——————\nraw concept from conversation"]):::teal
+
+    start --> validate["`**1.0.0 Validate (Spawn Subagent)**
+——— input ———
+concept · full techstack context
+———
+is this the best practice,
+highly standard, most idiomatic
+long term solution?
+———
+⟳ for each proposed change {
+→ performant?
+→ optimal?
+→ elegant?
+→ simple and concise?
+→ minimally knotted?
+}
+——— returns ———
+validated solution(s)
+or rejected with alternatives`"]:::orange
+    validate --> val_check{{"1.1.0 validated?"}}:::teal
+
+    val_check -- "no" --> rethink["`**1.2.0 Rethink (Spawn Subagent)**
+——— input ———
+rejection reasons · alternatives
+———
+→ revise approach
+→ re-evaluate tradeoffs
+→ produce new candidate`"]:::orange
+    rethink --> validate
+
+    val_check -- "yes" --> organize["`**2.0.0 Organize (Spawn Subagent)**
+——— input ———
+validated solution(s)
+———
+→ group into units of work
+→ each unit = one agent scope
+→ order by dependency
+→ minimize cross-unit coupling
+——— returns ———
+ordered list of work units`"]:::orange
+
+    organize --> spec["`**3.0.0 Spec (Spawn Subagent)**
+——— input ———
+work units · codebase context
+———
+⟳ for each unit of work {
+→ create mechanical task list
+→ fully detailed steps
+→ specify exact files affected
+→ specify exact functions/structs
+→ include verified preconditions
+→ one work item MD per unit
+}
+——— output ———
+work_items/*.md written`"]:::orange
+
+    spec --> audit["`**4.0.0 Audit (Spawn Subagent)**
+——— read ———
+every work item MD just written
+———
+⟳ for each work item {
+→ everything needed is present?
+→ no potential issues or gotchas?
+→ no deferred work?
+→ no postponed investigation?
+→ no vagueness or ambiguity?
+→ no useless convo context?
+→ no deferral language?
+→ executable by a separate agent
+  with zero additional context?
+}
+——— returns ———
+pass / fail with findings`"]:::yellow
+    audit --> audit_check{{"4.1.0 pass?"}}:::teal
+
+    audit_check -- "no" --> stuck{{"4.2.0 stuck?\n——————\n3+ attempts ·\nsame findings repeating"}}:::red
+    audit_check -- "yes" --> done(["4.0.1 Done\n——————\nwork items ready for execution"]):::teal
+
+    stuck -- "no" --> fix["`**4.3.0 Fix (Spawn Subagent)**
+——— input ———
+findings list from auditor
+———
+⟳ for each finding {
+→ open the flagged work item
+→ fix exactly the issue described
+→ add missing detail
+→ remove vague language
+→ resolve deferred items now
+}`"]:::orange
+    fix --> audit
+
+    stuck -- "yes" --> bail["`**4.0.2 Bail**
+——— log ———
+which work items failed
+every unresolved finding`"]:::red
+    bail --> done_fail(["4.0.3 Failed"]):::red

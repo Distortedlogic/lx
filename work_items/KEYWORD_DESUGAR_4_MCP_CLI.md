@@ -1,104 +1,141 @@
 # Goal
 
-Add MCP and CLI keyword desugaring with generated method bodies. `MCP Filesystem = { command: "npx", args: ["-y", "@anthropic/mcp-filesystem"] }` desugars to a `Class Filesystem : [Connector]` with auto-generated `connect()`, `disconnect()`, `call()`, and `tools()` methods that wrap `std/mcp`. `CLI GitTool = { command: "git", tool_defs: [...] }` desugars similarly with CLI-specific method bodies.
+Add MCP and CLI keyword desugaring with generated method bodies. `MCP Filesystem = { command: "npx", args: ["-y", "@anthropic/mcp-filesystem"] }` desugars to `Class Filesystem : [Connector]` with generated `connect()`, `disconnect()`, `call()`, `tools()` methods that wrap `std/mcp`. `CLI GitTool = { command: "git", tool_defs: [...] }` desugars similarly with CLI-specific method bodies.
 
 # Why
 
-- Every MCP connector in the codebase (`pkg/connectors/mcp.lx`) repeats ~30 lines of identical session lifecycle boilerplate. The only things that vary are `command` and `args`.
-- Every CLI connector (`pkg/connectors/cli.lx`) repeats ~20 lines of identical arg-building and subprocess execution. The only things that vary are `command` and `tool_defs`.
-- Unlike the simple keywords (Unit 2) which just inject a trait name, MCP and CLI generate actual method body AST expressions. This is the most complex desugaring in the pipeline.
+`pkg/connectors/mcp.lx` repeats ~30 lines of identical MCP session boilerplate per connector — only `command` and `args` vary. `pkg/connectors/cli.lx` repeats ~20 lines of CLI dispatch boilerplate — only `command` and `tool_defs` vary.
+
+# Exact method bodies to generate
+
+**MCP** (from `pkg/connectors/mcp.lx` McpConnector):
+
+```lx
+connect = () {
+  self.session <- mcp.connect {command: self.command  args: self.args} ^
+  Ok ()
+}
+disconnect = () {
+  self.session == None ? (Ok ()) : { mcp.close self.session; Ok () }
+}
+call = (req) {
+  mcp.call self.session req.tool req.args ^
+}
+tools = () {
+  self.session == None ? [] : (mcp.list_tools self.session ^)
+}
+```
+
+Auto-injected fields: `session: None` (if not provided by user).
+Auto-injected imports: `use pkg/core/connector {Connector}`, `use std/mcp`.
+
+**CLI** (from `pkg/connectors/cli.lx` CliConnector):
+
+```lx
+connect = () Ok ()
+disconnect = () Ok ()
+call = (req) {
+  tool = self.tool_defs | find (t) { t.name == req.tool }
+  tool ? {
+    None -> Err "unknown tool: {req.tool}"
+    Some t -> {
+      cli_args = build_cli_args t req.args
+      cmd_str = "{self.command} {cli_args}"
+      $^{cmd_str} ^
+    }
+  }
+}
+tools = () self.tool_defs
+```
+
+The `build_cli_args` helper function is also needed:
+```lx
+build_cli_args = (tool_def args) {
+  base = tool_def.subcommand ?? ""
+  has_args = args != ()
+  flags = has_args ? (args | keys | map (k) { "--{k} {args.get k}" } | join " ") : ""
+  base != "" ? (flags != "" ? "{base} {flags}" : base) : flags
+}
+```
+
+Auto-injected fields: `tool_defs: []`, `env: {}` (if not provided).
+Auto-injected imports: `use pkg/core/connector {Connector}`.
 
 # What Changes
 
+**AST generation helpers — `crates/lx/src/folder/gen_ast.rs`:**
+
+New file with helper functions for building expression ASTs. These are used by the MCP/CLI/HTTP desugarers. Each function allocates nodes in the arena and returns an ID.
+
+```rust
+pub fn gen_ident(name: &str, span: SourceSpan, arena: &mut AstArena) -> ExprId
+pub fn gen_sym(sym: Sym, span: SourceSpan, arena: &mut AstArena) -> ExprId
+pub fn gen_self_field(field: &str, span: SourceSpan, arena: &mut AstArena) -> ExprId  // self.field
+pub fn gen_apply(func: ExprId, arg: ExprId, span: SourceSpan, arena: &mut AstArena) -> ExprId
+pub fn gen_apply_chain(func: ExprId, args: &[ExprId], span: SourceSpan, arena: &mut AstArena) -> ExprId
+pub fn gen_field_call(obj: &str, method: &str, args: &[ExprId], span: SourceSpan, arena: &mut AstArena) -> ExprId  // obj.method arg1 arg2
+pub fn gen_block(stmts: Vec<StmtId>, span: SourceSpan, arena: &mut AstArena) -> ExprId
+pub fn gen_func(params: &[&str], body: ExprId, span: SourceSpan, arena: &mut AstArena) -> ExprId
+pub fn gen_ok_unit(span: SourceSpan, arena: &mut AstArena) -> ExprId  // Ok ()
+pub fn gen_propagate(inner: ExprId, span: SourceSpan, arena: &mut AstArena) -> ExprId  // expr ^
+pub fn gen_binding(name: &str, value: ExprId, span: SourceSpan, arena: &mut AstArena) -> StmtId
+pub fn gen_field_update(obj: &str, field: &str, value: ExprId, span: SourceSpan, arena: &mut AstArena) -> StmtId  // obj.field <- value
+pub fn gen_literal_str(s: &str, span: SourceSpan, arena: &mut AstArena) -> ExprId
+pub fn gen_literal_unit(span: SourceSpan, arena: &mut AstArena) -> ExprId
+pub fn gen_none(span: SourceSpan, arena: &mut AstArena) -> ExprId  // None identifier
+pub fn gen_record(fields: Vec<(Sym, ExprId)>, span: SourceSpan, arena: &mut AstArena) -> ExprId
+pub fn gen_list(elems: Vec<ExprId>, span: SourceSpan, arena: &mut AstArena) -> ExprId
+pub fn gen_method(name: &str, func: ExprId) -> AgentMethod
+```
+
+Each is straightforward arena allocation. For example:
+```rust
+pub fn gen_ident(name: &str, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    arena.alloc_expr(Expr::Ident(intern(name)), span)
+}
+pub fn gen_apply(func: ExprId, arg: ExprId, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    arena.alloc_expr(Expr::Apply(ExprApply { func, arg }), span)
+}
+pub fn gen_self_field(field: &str, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+    let self_id = arena.alloc_expr(Expr::Ident(intern("self")), span);
+    arena.alloc_expr(Expr::FieldAccess(ExprFieldAccess { expr: self_id, field: FieldKind::Named(intern(field)) }), span)
+}
+```
+
 **Desugar — `crates/lx/src/folder/desugar.rs`:**
 
-In `transform_stmts`, handle `KeywordDecl { keyword: Mcp, ... }`:
-
-1. Create two `Stmt::Use` statements:
-   - `use pkg/core/connector {Connector}`
-   - `use std/mcp`
-2. Inject `session: None` field if not present in user's fields.
-3. Generate four method AST expressions, each allocated in the arena:
-
-   `connect = () { s = mcp.connect self.command self.args ^; self.session <- s; Ok () }`
-   - Allocate: Ident `mcp`, FieldAccess `.connect`, Apply with `self.command`, Apply with `self.args`, Propagate `^`, Binding `s`, FieldUpdate `self.session <- s`, Apply `Ok` with `()`
-
-   `disconnect = () { mcp.disconnect self.session; Ok () }`
-   - Allocate: Ident `mcp`, FieldAccess `.disconnect`, Apply with `self.session`, Apply `Ok` with `()`
-
-   `call = (req) { mcp.call self.session req.tool req.args }`
-   - Allocate: chain of Applies
-
-   `tools = () { mcp.tools self.session }`
-   - Allocate: chain of Applies
-
-4. User-provided methods with the same names override generated ones (check before injecting).
-5. Create `Stmt::ClassDecl(ClassDeclData { name, traits: [intern("Connector")], fields: user_fields + session, methods: user_methods + generated, exported })`.
-
-Handle `KeywordDecl { keyword: Cli, ... }`:
-
-1. Create `Stmt::Use` for `pkg/core/connector {Connector}`.
-2. Inject `tool_defs: []` and `env: {}` fields if not present.
-3. Generate four method AST expressions:
-
-   `connect = () { Ok () }`
-
-   `disconnect = () { Ok () }`
-
-   `call = (req) { ... }` — look up req.tool in self.tool_defs, build CLI args, execute via bash builtin, return result. Simplified: `bash (self.command ++ " " ++ req.tool ++ " " ++ (req.args | to_str))`
-
-   `tools = () { self.tool_defs }`
-
-4. User-provided methods override generated ones.
-5. Create `Stmt::ClassDecl` with Connector trait.
-
-**Helper — `crates/lx/src/folder/desugar.rs` or new `crates/lx/src/folder/gen_ast.rs`:**
-
-Extract AST generation helpers since building expression trees by hand is verbose. Helper functions:
-- `gen_ident(sym, span, arena) -> ExprId` — allocates `Expr::Ident(sym)`
-- `gen_apply(func, arg, span, arena) -> ExprId` — allocates `Expr::Apply`
-- `gen_field_access(expr, field, span, arena) -> ExprId` — allocates `Expr::FieldAccess`
-- `gen_block(stmts, span, arena) -> ExprId` — allocates `Expr::Block`
-- `gen_func(params, body, span, arena) -> ExprId` — allocates `Expr::Func`
-- `gen_method(name, func_expr) -> AgentMethod` — wraps as method
-
-These keep the desugaring logic readable.
+Add Mcp and Cli branches to `desugar_keyword`. Each generates the method ASTs using `gen_ast` helpers, checks for user-provided method overrides (skip generating methods the user already defined), injects default fields, and produces Use + ClassDecl statements.
 
 **Validate — `crates/lx/src/folder/validate_core.rs`:**
 
-Remove the temporary pass-through for Mcp and Cli keywords.
+Add Mcp and Cli to desugared assertion.
 
 # Files Affected
 
-- `crates/lx/src/folder/desugar.rs` — Add MCP and CLI desugaring branches + AST generation helpers
-- `crates/lx/src/folder/gen_ast.rs` — New file: AST generation helper functions (optional, can inline)
-- `crates/lx/src/folder/mod.rs` — Add mod gen_ast if separate file
-- `crates/lx/src/folder/validate_core.rs` — Remove Mcp/Cli pass-through
-- `tests/keyword_mcp.lx` — New test file
-- `tests/keyword_cli.lx` — New test file
+- `crates/lx/src/folder/gen_ast.rs` — New file: AST generation helpers
+- `crates/lx/src/folder/mod.rs` — Add mod gen_ast
+- `crates/lx/src/folder/desugar.rs` — Add MCP and CLI desugaring
+- `crates/lx/src/folder/validate_core.rs` — Add Mcp/Cli assertion
+- `tests/keyword_mcp.lx` — New test
+- `tests/keyword_cli.lx` — New test
 
 # Task List
 
 ### Task 1: Create AST generation helpers
 
-**Subject:** Write helper functions for building expression ASTs in the desugarer
+**Subject:** Write gen_ast.rs with arena allocation helper functions
 
-**Description:** Create `crates/lx/src/folder/gen_ast.rs` (or add to desugar.rs if it stays under 300 lines). Write helper functions that allocate AST nodes in the arena:
+**Description:** Create `crates/lx/src/folder/gen_ast.rs`. Implement all helper functions listed in What Changes. Each is a small function that allocates one or two AST nodes.
 
-- `gen_ident(name: &str, span: SourceSpan, arena: &mut AstArena) -> ExprId` — `arena.alloc_expr(Expr::Ident(intern(name)), span)`
-- `gen_self_field(field: &str, span: SourceSpan, arena: &mut AstArena) -> ExprId` — `self.field` access
-- `gen_apply(func: ExprId, arg: ExprId, span: SourceSpan, arena: &mut AstArena) -> ExprId` — function application
-- `gen_apply_chain(func: ExprId, args: &[ExprId], span: SourceSpan, arena: &mut AstArena) -> ExprId` — curried application chain
-- `gen_field_call(obj: &str, method: &str, args: &[ExprId], span: SourceSpan, arena: &mut AstArena) -> ExprId` — `obj.method arg1 arg2`
-- `gen_block(stmts: Vec<StmtId>, span: SourceSpan, arena: &mut AstArena) -> ExprId`
-- `gen_func(param_names: &[&str], body: ExprId, span: SourceSpan, arena: &mut AstArena) -> ExprId` — lambda with named params
-- `gen_ok_unit(span: SourceSpan, arena: &mut AstArena) -> ExprId` — `Ok ()`
-- `gen_propagate(inner: ExprId, span: SourceSpan, arena: &mut AstArena) -> ExprId` — `expr ^`
-- `gen_binding(name: &str, value: ExprId, span: SourceSpan, arena: &mut AstArena) -> StmtId` — `let name = value`
-- `gen_field_update(name: &str, fields: &[&str], value: ExprId, span: SourceSpan, arena: &mut AstArena) -> StmtId` — `self.field <- value`
-- `gen_method(name: &str, func: ExprId) -> AgentMethod`
+Key patterns:
+- `gen_self_field("command", span, arena)` → allocates `Expr::Ident(intern("self"))` then `Expr::FieldAccess` with `FieldKind::Named(intern("command"))`.
+- `gen_field_call("mcp", "connect", &[arg1], span, arena)` → allocates `Expr::Ident(intern("mcp"))`, then `Expr::FieldAccess` for `.connect`, then `Expr::Apply` for each arg.
+- `gen_func(&["req"], body, span, arena)` → allocates `Expr::Func(ExprFunc { params: vec![Param { name: intern("req"), type_ann: None, default: None }], type_params: vec![], ret_type: None, guard: None, body })`.
+- `gen_field_update("self", "session", value, span, arena)` → allocates `Stmt::FieldUpdate(StmtFieldUpdate { name: intern("self"), fields: vec![intern("session")], value })`.
 
-Add `mod gen_ast;` to `crates/lx/src/folder/mod.rs`. Use `pub(crate)` visibility.
+Add `pub(crate) mod gen_ast;` to `crates/lx/src/folder/mod.rs`.
+
+Import requirements: `crate::ast::*`, `crate::sym::intern`, `miette::SourceSpan`.
 
 **ActiveForm:** Creating AST generation helpers
 
@@ -106,134 +143,133 @@ Add `mod gen_ast;` to `crates/lx/src/folder/mod.rs`. Use `pub(crate)` visibility
 
 ### Task 2: Implement MCP desugaring
 
-**Subject:** Add MCP keyword desugaring with generated connect/disconnect/call/tools methods
+**Subject:** Generate connect/disconnect/call/tools methods for MCP keyword
 
-**Description:** Edit `crates/lx/src/folder/desugar.rs`. In `transform_stmts`, add the Mcp branch.
+**Description:** Edit `crates/lx/src/folder/desugar.rs`. Add the Mcp branch to `desugar_keyword`.
 
-Read `pkg/connectors/mcp.lx` first to understand the exact method bodies that need to be generated. The generated code must be semantically equivalent to McpConnector's methods.
+Build the four method bodies using gen_ast helpers. For `connect()`:
 
-For `connect`: generate a block that calls `mcp.connect self.command self.args`, propagates with `^`, assigns to `s`, then does `self.session <- s`, then returns `Ok ()`. Use the gen_ast helpers.
+```rust
+// self.session <- mcp.connect {command: self.command, args: self.args} ^; Ok ()
+let self_cmd = gen_self_field("command", span, arena);
+let self_args = gen_self_field("args", span, arena);
+let config = gen_record(vec![(intern("command"), self_cmd), (intern("args"), self_args)], span, arena);
+let mcp_connect = gen_field_call("mcp", "connect", &[config], span, arena);
+let propagated = gen_propagate(mcp_connect, span, arena);
+let assign = gen_field_update("self", "session", propagated, span, arena);
+let ok = gen_ok_unit(span, arena);
+let ok_stmt = arena.alloc_stmt(Stmt::Expr(ok), span);
+let body = gen_block(vec![assign, ok_stmt], span, arena);
+let connect_fn = gen_func(&[], body, span, arena);
+```
 
-For `disconnect`: generate `mcp.disconnect self.session` then `Ok ()`.
+For `disconnect()`: check `self.session == None`, if true return `Ok ()`, else call `mcp.close self.session` then `Ok ()`. Use ternary or match — since ternary is desugared to match by the same Desugarer's `leave_expr`, a ternary expression works here.
 
-For `call`: generate `mcp.call self.session req.tool req.args` where `req` is the parameter.
+For `call(req)`: `mcp.call self.session req.tool req.args ^`.
 
-For `tools`: generate `mcp.tools self.session`.
+For `tools()`: `self.session == None ? [] : (mcp.list_tools self.session ^)`.
 
-Check user-provided methods: iterate `data.methods` and collect names into a HashSet. Only inject generated methods whose names are NOT in the user's set.
+Check user overrides: collect `data.methods` names into a set. Only inject generated methods whose names are NOT in the user's set.
 
-Inject `session: None` field if not in user's fields.
+Inject `session: None` field if user didn't provide it.
 
-Emit `Stmt::Use` for `pkg/core/connector` (selective: Connector) and `std/mcp` (whole).
+Emit `Stmt::Use` for `pkg/core/connector {Connector}` and `std/mcp` (UseKind::Whole).
 
-Emit `Stmt::ClassDecl` with traits `[intern("Connector")]`, merged fields and methods.
+Emit `Stmt::ClassDecl` with `traits: [intern("Connector")]`.
 
-**ActiveForm:** Implementing MCP keyword desugaring
+**ActiveForm:** Implementing MCP desugaring
 
 ---
 
 ### Task 3: Implement CLI desugaring
 
-**Subject:** Add CLI keyword desugaring with generated connect/disconnect/call/tools methods
+**Subject:** Generate connect/disconnect/call/tools methods for CLI keyword
 
-**Description:** Edit `crates/lx/src/folder/desugar.rs`. In `transform_stmts`, add the Cli branch.
+**Description:** Edit `crates/lx/src/folder/desugar.rs`. Add the Cli branch.
 
-Read `pkg/connectors/cli.lx` first to understand the exact method bodies that need to be generated.
+`connect()` and `disconnect()`: return `Ok ()`.
 
-For `connect`: generate `Ok ()`.
+`call(req)`: This is the most complex generated method. The actual CliConnector uses `build_cli_args` helper + `$^{cmd_str}` bash interpolation. For the desugared version, generate a simplified call body:
 
-For `disconnect`: generate `Ok ()`.
+The simplest correct approach: generate a `call` method that pipe-builds a command string and uses the `bash` builtin (which is a global function in lx). Generate the expression `bash (self.command ++ " " ++ req.tool)` wrapped in try. This is simpler than the full CliConnector's arg-building logic but functionally equivalent for basic use cases.
 
-For `call`: generate a body that extracts `req.tool` and `req.args`, looks up the tool in `self.tool_defs`, builds a CLI command string, and executes it. Simplified version: `bash (self.command ++ " " ++ req.tool ++ " " ++ (req.args | to_str))` wrapped in try. Use gen_ast helpers.
+For `tools()`: return `self.tool_defs`.
 
-For `tools`: generate `self.tool_defs`.
+Inject `tool_defs: []` field if not present (default is empty list literal). Inject `env: {}` field if not present (default is empty record literal).
 
-Same override logic as MCP: user-provided methods take precedence.
+Emit `Stmt::Use` for `pkg/core/connector {Connector}`.
 
-Inject `tool_defs: []` and `env: {}` fields if not present.
-
-Emit `Stmt::Use` for `pkg/core/connector` (selective: Connector).
-
-Emit `Stmt::ClassDecl` with traits `[intern("Connector")]`.
-
-**ActiveForm:** Implementing CLI keyword desugaring
+**ActiveForm:** Implementing CLI desugaring
 
 ---
 
-### Task 4: Update validate_core for MCP and CLI
+### Task 4: Update validate_core
 
-**Subject:** Remove Mcp/Cli pass-through in validate_core
+**Subject:** Add Mcp and Cli to desugared assertion
 
-**Description:** Edit `crates/lx/src/folder/validate_core.rs`. Add Mcp and Cli to the list of keyword kinds that must not survive into Core AST.
+**Description:** Edit `crates/lx/src/folder/validate_core.rs`. Add `KeywordKind::Mcp` and `KeywordKind::Cli` to the assertion list.
 
-**ActiveForm:** Updating validate_core for MCP and CLI
+**ActiveForm:** Updating validate_core
 
 ---
 
-### Task 5: Write MCP and CLI keyword tests
+### Task 5: Write MCP and CLI tests
 
-**Subject:** Create test files validating MCP and CLI keywords
+**Subject:** Test MCP and CLI keywords end-to-end
 
 **Description:** Create `tests/keyword_mcp.lx`:
 
-```
+```lx
 MCP TestServer = {
   command: "echo"
   args: ["test"]
 }
 
 s = TestServer {}
--- Verify fields exist
 assert s.command == "echo"
 assert s.args == ["test"]
--- Verify methods exist (they're generated)
-assert (method_of s "connect" | some?)
-assert (method_of s "disconnect" | some?)
-assert (method_of s "call" | some?)
-assert (method_of s "tools" | some?)
+assert (methods_of s | any? (== "connect"))
+assert (methods_of s | any? (== "disconnect"))
+assert (methods_of s | any? (== "call"))
+assert (methods_of s | any? (== "tools"))
 ```
 
 Create `tests/keyword_cli.lx`:
 
-```
+```lx
 CLI TestCli = {
   command: "echo"
-  tool_defs: [{name: "hello", args: ["world"]}]
+  tool_defs: [{name: "hello", subcommand: "hello"}]
 }
 
 c = TestCli {}
 assert c.command == "echo"
 assert (c.tool_defs | len) == 1
--- Verify Connector methods exist
-assert (method_of c "connect" | some?)
-assert (method_of c "tools" | some?)
--- tools() returns tool_defs
-assert (c.tools () | len) == 1
+assert (methods_of c | any? (== "connect"))
+assert (methods_of c | any? (== "tools"))
+result = c.tools ()
+assert (result | len) == 1
 ```
+
+Note: These tests verify the generated methods EXIST but don't call connect/call because that would require actual MCP servers or CLI commands. The method existence proves desugaring worked. The connect/call invocations are tested manually or in integration (Unit 6).
 
 Run `just test`.
 
-**ActiveForm:** Writing MCP and CLI keyword tests
+**ActiveForm:** Writing MCP and CLI tests
 
 ---
 
 ## CRITICAL REMINDERS — READ BEFORE EVERY TASK
 
-Re-read before starting each task:
-
-1. **Call `complete_task` after each task.** The MCP handles formatting, committing, and diagnostics automatically.
-2. **Call `next_task` to get the next task.** Do not look ahead in the task list.
-3. **Do not add tasks, skip tasks, reorder tasks, or combine tasks.** Execute the task list exactly as written.
-4. **Tasks are implementation-only.** No commit, verify, format, or cleanup tasks — the MCP handles these.
+1. **Call `complete_task` after each task.**
+2. **Call `next_task` to get the next task.**
+3. **Do not add, skip, reorder, or combine tasks.**
+4. **Tasks are implementation-only.**
 
 ---
 
 ## Task Loading Instructions
 
-To execute this work item, load it with the workflow MCP:
-
 ```
 mcp__workflow__load_work_item({ path: "work_items/KEYWORD_DESUGAR_4_MCP_CLI.md" })
 ```
-
-Then call `next_task` to begin.
