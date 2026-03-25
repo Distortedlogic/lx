@@ -1,4 +1,4 @@
-use workgen/lib/persistence {RunStatus}
+use workgen/store/status {RunStatus}
 
 runner_dir = "/tmp/lx_test_workgen_persist"
 $rm -rf {runner_dir}

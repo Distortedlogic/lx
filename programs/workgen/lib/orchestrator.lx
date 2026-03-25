@@ -3,7 +3,7 @@
 use std/fs
 use std/md
 use workgen/lib/log : wg_log
-use workgen/lib/persistence
+use workgen/store/status {save_debug}
 use workgen/lib/agents
 use workgen/lib/grader {Grader GradeResult}
 
@@ -73,7 +73,7 @@ check_sections_impl = (draft) {
 grade_and_log = (grader_inst draft task runner_dir slug) {
   wg_log.log "  > grader: scoring draft..."
   grade = grader_inst.grade draft task
-  persistence.save_debug runner_dir slug "grade.json" (json.encode_pretty grade)
+  save_debug runner_dir slug "grade.json" (json.encode_pretty grade)
   wg_log.log "  GRADE: {grade.score}/100 | passed: {grade.passed} | {grade.feedback}"
   grade.categories | each (cat) {
     icon = cat.passed ? "+" : "x"

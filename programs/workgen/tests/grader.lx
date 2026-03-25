@@ -1,4 +1,5 @@
-use workgen/lib/grader {Grader GradeResult CategoryScore}
+use workgen/lib/grader {Grader}
+use workgen/schema/grade {GradeResult CategoryScore}
 
 g = Grader {
   threshold: 75

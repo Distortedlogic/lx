@@ -10,7 +10,7 @@ use std/fs
 use std/time
 use std/cron
 use workgen/lib/log : wg_log
-use workgen/lib/persistence {RunStatus}
+use workgen/store/status {RunStatus}
 use workgen/lib/audit_parser
 use workgen/lib/grader {Grader}
 use workgen/lib/orchestrator
