@@ -48,7 +48,7 @@ use ./prompt/agents {GradingPrompt}
   }
 
   assemble = (json_val) {
-    raw_cats = json_val.categories ?? []
+    raw_cats = json_val.categories
     total_score := 0
     total_weight := 0
     failed := []
@@ -57,10 +57,10 @@ use ./prompt/agents {GradingPrompt}
     self.rubric | each (rub) {
       default_match = {name: rub.name; score: 0; feedback: "not evaluated"}
       matched = (raw_cats | find (c) { c.name == rub.name }) ?? default_match
-      score = matched.score ?? 0
-      fb = matched.feedback ?? ""
+      score = matched.score
+      fb = matched.feedback
       cat_passed = score >= 70
-      weight = rub.weight ?? 1
+      weight = rub.weight
 
       total_score <- total_score + score * weight
       total_weight <- total_weight + weight

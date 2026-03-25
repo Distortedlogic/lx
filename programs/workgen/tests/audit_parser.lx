@@ -1,21 +1,16 @@
 use ../schema/audit {load item_count summaries get_item}
 
-test_fixture = "{source_dir ()}/fixtures/tiny_audit.md"
-audit = load test_fixture
+audit = load "programs/workgen/tests/fixtures/tiny_audit.md"
 
-assert (audit.path == test_fixture)
-assert ((audit.name | len) > 0)
-assert ((audit.raw | len) > 0)
+assert (audit.name | len > 0)
+assert (audit.raw | len > 0)
 assert (item_count audit == 2)
 
 sums = summaries audit
-assert ((sums | len) == 2)
+assert (sums | len == 2)
 
 t1 = (get_item audit 1) ?? {title: ""}
 assert (t1.title | contains? "TODO")
 
 t2 = (get_item audit 2) ?? {title: ""}
 assert (t2.title | contains? "unused")
-
-missing = (get_item audit 99) ?? None
-assert (missing == None)

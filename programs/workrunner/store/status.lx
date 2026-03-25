@@ -14,8 +14,8 @@ use std/fs
     exists = fs.exists path
     not exists ? () : {
       data = fs.read path ^ | json.parse ^
-      self.results <- data.results ?? []
-      self.completed <- data.completed ?? []
+      self.results <- data.results
+      self.completed <- data.completed
     }
   }
 
