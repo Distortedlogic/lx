@@ -1,22 +1,23 @@
 use workgen/schema/audit
+use workgen/schema/audit {item_count summaries get_item}
 
 audit = audit_parser.load "workgen/tests/fixtures/tiny_audit.md"
 
 assert (audit.path == "workgen/tests/fixtures/tiny_audit.md") "path set"
 assert (audit.name | len > 0) "name derived"
 assert (audit.raw | len > 0) "raw content loaded"
-assert (audit.item_count () == 2) "2 audit items"
+assert (item_count audit == 2) "2 audit items"
 
-summaries = audit.summaries ()
+summaries = summaries audit
 assert (summaries | len == 2) "2 summaries"
 
-t1 = (audit.get_item 1) ?? {title: ""}
+t1 = (get_item audit 1) ?? {title: ""}
 assert (t1.title | contains? "TODO") "item 1 about TODO"
 
-t2 = (audit.get_item 2) ?? {title: ""}
+t2 = (get_item audit 2) ?? {title: ""}
 assert (t2.title | contains? "unused") "item 2 about unused"
 
-missing = (audit.get_item 99) ?? None
+missing = (get_item audit 99) ?? None
 assert (missing == None) "item 99 missing"
 
 log.info "workgen_audit_parser: all passed"

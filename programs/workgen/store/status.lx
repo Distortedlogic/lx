@@ -2,10 +2,8 @@
 
 use std/fs
 
-Class +RunStatus = {
+Store +RunStatus = {
   runner_dir: ".lx/workgen"
-  results: []
-  completed: []
 
   status_file = () { "{self.runner_dir}/status.json" }
 
@@ -14,30 +12,35 @@ Class +RunStatus = {
     exists = fs.exists path
     not exists ? () : {
       data = fs.read path ^ | json.parse ^
-      self.results <- data.results ?? []
-      self.completed <- data.completed ?? []
+      results = data.results ?? []
+      completed = data.completed ?? []
+      results | each (r) { self.entries.set "result_{self.len ()}" r }
+      completed | each (c) { self.entries.set "completed_{c}" c }
     }
   }
 
   save = () {
     $^mkdir -p {self.runner_dir}
-    data = {results: self.results  completed: self.completed}
+    results = self.query (r) { (to_str r) | contains? "status" }
+    completed = self.keys () | filter (k) { k | starts_with? "completed_" } | map (k) { k | replace "completed_" "" }
+    data = {results: results; completed: completed}
     fs.write (self.status_file ()) (json.encode_pretty data) ^
   }
 
   is_completed = (name) {
-    self.completed | any? (c) c == name
+    self.has "completed_{name}"
   }
 
   record_result = (result) {
-    self.results <- [..self.results result]
+    self.entries.set "result_{self.len ()}" result
     is_pass = result.status == "pass"
-    new_completed = is_pass ? [..self.completed result.name] : self.completed
-    self.completed <- new_completed
+    is_pass ? { self.entries.set "completed_{result.name}" result.name }
     self.save ()
   }
 
-  completed_count = () { self.completed | len }
+  completed_count = () {
+    self.keys () | filter (k) { k | starts_with? "completed_" } | len
+  }
 }
 
 +save_debug = (runner_dir slug label content) {

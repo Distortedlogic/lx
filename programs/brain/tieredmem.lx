@@ -4,7 +4,7 @@
 
 use ./memory {MemoryStore}
 use ./store/knowledge {KnowledgeBase}
-use ./store/profile
+use ./profile
 use std/time
 use std/fs
 

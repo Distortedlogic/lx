@@ -1,4 +1,5 @@
 -- Orchestrator for workgen — runs the audit pipeline: investigate, compose, grade, revise.
+use workgen/schema/audit {item_count summaries}
 
 use std/fs
 use std/md
@@ -24,9 +25,9 @@ check_sections_impl = (draft) {
   slug = audit.name | lower
   wg_log.log ""
   wg_log.log "=== workgen: {audit.name} ==="
-  wg_log.log "  audit: {audit.path} ({audit.item_count ()} items)"
+  wg_log.log "  audit: {audit.path} ({item_count audit} items)"
   wg_log.log "  root: {root}"
-  audit.summaries () | each (s) wg_log.log "    {s}"
+  summaries audit | each (s) wg_log.log "    {s}"
 
   wg_log.log "  PHASE: investigate"
   findings = agents.investigate audit.raw root runner_dir slug

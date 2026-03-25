@@ -1,29 +1,26 @@
--- Audit parser — reads an audit checklist markdown and extracts structured items.
+-- Audit schema + parser — reads audit checklist markdown into structured items.
 
 use std/fs
 use std/md
 
-Class +AuditItem = {
-  num: 0
-  title: ""
-  description: ""
-  full_text: ""
-
-  summary = () { "Item {self.num}: {self.title}" }
+Schema +AuditItem = {
+  num: Int = "item number in the checklist"
+  title: Str = "section heading"
+  description: Str = "section content"
+  full_text: Str = "raw section text"
 }
 
-Class +AuditChecklist = {
-  path: ""
-  name: ""
-  raw: ""
-  items: []
-
-  item_count = () { self.items | len }
-
-  get_item = (n) { self.items | find (i) { i.num == n } }
-
-  summaries = () { self.items | map (i) { i.summary () } }
+Schema +AuditChecklist = {
+  path: Str = "filesystem path to the audit file"
+  name: Str = "derived name from filename"
+  raw: Str = "full raw markdown text"
+  items: List = "list of AuditItem records"
 }
+
++item_summary = (item) { "Item {item.num}: {item.title}" }
++item_count = (audit) { audit.items | len }
++get_item = (audit n) { audit.items | find (i) { i.num == n } }
++summaries = (audit) { audit.items | map (i) item_summary i }
 
 +load = (path) {
   raw = fs.read path ^
@@ -32,11 +29,12 @@ Class +AuditChecklist = {
 
   item_sections = sections | filter (s) { s.level >= 2 }
   items = item_sections | enumerate | map (pair) {
-    (idx sec) = pair
+    idx = pair.0
+    sec = pair.1
     AuditItem {num: idx + 1  title: sec.title  description: sec.content  full_text: sec.content}
   }
 
-  items | len == 0 ? assert false "audit_parser.load: no items found in {path}"
+  items | len == 0 ? assert false "audit.load: no items found in {path}"
 
   raw_name = path | split "/" | last
   name_parts = raw_name ?? path

@@ -1,11 +1,12 @@
 use workrunner/schema/work_item
+use workrunner/schema/work_item {task_count get_task task_context context_for_implement context_for_investigate task_summaries task_summary}
 use workrunner/log
 use workrunner/workflow/orchestrator
 use workrunner/grader {Grader}
 use workrunner/context
 
 wi = work_item.load "workrunner/tests/fixtures/tiny_work_item.md"
-assert (wi.task_count () == 1) "tiny has 1 task"
+assert (task_count wi == 1) "tiny has 1 task"
 assert (wi.slug | len > 0) "slug set"
 
 log.log "orchestrator test: parsing OK"

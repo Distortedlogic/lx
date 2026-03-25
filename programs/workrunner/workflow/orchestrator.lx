@@ -1,4 +1,5 @@
 -- Orchestrator — runs tasks within a work item, grades, fixes.
+use workrunner/schema/work_item {task_count task_summaries}
 -- Pure logic: takes dependencies as arguments, no globals.
 
 use workrunner/log
@@ -7,7 +8,7 @@ use workrunner/agent/agents
 use workrunner/schema/work_item
 
 run_task_impl = (wi task bootstrap_ctx max_rounds runner_dir) {
-  log.log "  --- task {task.num}/{wi.task_count ()}: {task.subject} ---"
+  log.log "  --- task {task.num}/{task_count wi}: {task.subject} ---"
   agents.implement wi task bootstrap_ctx runner_dir
 
   clean = agents.diagnose task runner_dir wi.slug
@@ -40,11 +41,11 @@ grade_and_log_impl = (wi grader_inst report runner_dir) {
   log.log "=== [{idx + 1}/{total}] {path} ==="
 
   wi = work_item.load path
-  log.log "  parsed: {wi.task_count ()} tasks"
-  wi.task_summaries () | each (s) log.log "    {s}"
+  log.log "  parsed: {task_count wi} tasks"
+  task_summaries wi | each (s) log.log "    {s}"
 
   wi.tasks | each (task) {
-    log.log "  --- task {task.num}/{wi.task_count ()}: {task.subject} ---"
+    log.log "  --- task {task.num}/{task_count wi}: {task.subject} ---"
     agents.implement wi task bootstrap_ctx runner_dir
 
     clean = agents.diagnose task runner_dir wi.slug

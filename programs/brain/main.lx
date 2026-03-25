@@ -9,7 +9,7 @@ use pkg/agent/perception {Perception}
 use pkg/agent/reasoning {ReasoningChain}
 use ./agents/monitor {CognitiveState}
 use pkg/agent/reflect {FeedbackSignal}
-use ./schema/contracts {Response PerceptionEvent ReasoningEvent}
+use ./contracts {Response PerceptionEvent ReasoningEvent}
 use pkg/agent/perception : perceive_mod
 use pkg/agent/reasoning : reason_mod
 use ./tieredmem : mem

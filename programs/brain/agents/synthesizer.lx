@@ -3,8 +3,8 @@
 
 use std/md
 use pkg/agent/reasoning {ReasoningChain}
-use ../schema/capability {advertise}
-use ../schema/contracts {Response Identity}
+use ../capability {advertise}
+use ../contracts {Response Identity}
 use ../traits {Synthesizer}
 
 Prompt SynthesisPrompt = {

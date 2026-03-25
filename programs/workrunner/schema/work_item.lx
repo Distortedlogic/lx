@@ -1,56 +1,46 @@
--- WorkItem + Task classes -- Structured representation of work item markdown.
--- Parses the standard work item format: Goal, Why, What Changes, Files Affected, Task List.
--- Each Task has subject, description, active_form. WorkItem holds the collection.
+-- WorkItem + Task — structured representation of work item markdown.
 
 use std/fs
 use std/md
 
-Class +Task = {
-  num: 0
-  subject: ""
-  description: ""
-  active_form: ""
-  full_text: ""
-
-  context_for_agent = () {
-    "Task {self.num}: {self.subject}\n\n{self.description}"
-  }
-
-  summary = () {
-    "Task {self.num}: {self.subject}"
-  }
+Schema +Task = {
+  num: Int = "task number in the work item"
+  subject: Str = "short task title"
+  description: Str = "full task description"
+  active_form: Str = "active voice form of the task"
+  full_text: Str = "raw section text"
 }
 
-Class +WorkItem = {
-  path: ""
-  slug: ""
-  goal: ""
-  why: ""
-  what_changes: ""
-  files_affected: ""
-  raw: ""
-  tasks: []
-
-  task_count = () {
-    self.tasks | len
-  }
-
-  get_task = (n) {
-    self.tasks | find (t) t.num == n
-  }
-
-  context_for_implement = () {
-    "# Goal\n{self.goal}\n\n# What Changes\n{self.what_changes}\n\n# Files Affected\n{self.files_affected}"
-  }
-
-  context_for_investigate = () {
-    self.raw
-  }
-
-  task_summaries = () {
-    self.tasks | map (t) t.summary ()
-  }
+Schema +WorkItem = {
+  path: Str = "filesystem path to the work item markdown"
+  slug: Str = "url-safe identifier derived from path"
+  goal: Str = "the Goal section content"
+  why: Str = "the Why section content"
+  what_changes: Str = "the What Changes section content"
+  files_affected: Str = "the Files Affected section content"
+  raw: Str = "full raw markdown text"
+  tasks: List = "list of Task records"
 }
+
++task_context = (task) {
+  "Task {task.num}: {task.subject}\n\n{task.description}"
+}
+
++task_summary = (task) {
+  "Task {task.num}: {task.subject}"
+}
+
++task_count = (wi) { wi.tasks | len }
+
++get_task = (wi n) { wi.tasks | find (t) t.num == n }
+
++context_for_implement = (wi) {
+  "# Goal\n{wi.goal}\n\n# What Changes\n{wi.what_changes}\n\n# Files Affected\n{wi.files_affected}"
+}
+
++context_for_investigate = (wi) { wi.raw }
+
++task_summaries = (wi) { wi.tasks | map (t) task_summary t }
 
 parse_task_section = (sec num) {
   title = sec.title
@@ -96,7 +86,8 @@ extract_until_next_heading = (parts) {
   task_sections = sections | filter (s) s.level == 3 && (s.title | starts? "Task")
   task_sections | len == 0 ? assert false "work_item.load: no tasks found in {path}"
   tasks = task_sections | enumerate | map (pair) {
-    (idx sec) = pair
+    idx = pair.0
+    sec = pair.1
     parse_task_section sec (idx + 1)
   }
 

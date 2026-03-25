@@ -2,8 +2,8 @@
 -- Source: each step has a do/undo pair — undo actually reverses side effects
 
 use pkg/store/trace {TraceStore}
-use ./schema/handoff {as_context}
-use ../schema/contracts {Response}
+use ./handoff {as_context}
+use ../contracts {Response}
 use pkg/agent/perception : perceive
 use pkg/agent/reasoning : reason
 use ./tieredmem : mem

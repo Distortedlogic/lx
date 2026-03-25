@@ -11,7 +11,7 @@ use std/diag
 use std/time
 
 use ./agents/monitor {CognitiveState}
-use ./schema/contracts {Response PerceptionEvent ReasoningEvent ResponseEvent}
+use ./contracts {Response PerceptionEvent ReasoningEvent ResponseEvent}
 use pkg/agent/perception : perceive
 use pkg/agent/reasoning : reason
 use ./tieredmem : mem

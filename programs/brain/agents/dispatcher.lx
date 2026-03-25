@@ -3,7 +3,7 @@
 -- Architecture: agents spawned as subprocesses, communicate via ~>?, pub/sub for events
 
 use ../intercept {intercept}
-use ../schema/capability {capabilities}
+use ../capability {capabilities}
 use ../reconcile {reconcile}
 use ../negotiate {negotiate}
 use pkg/store/trace {TraceStore}

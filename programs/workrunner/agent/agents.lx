@@ -1,4 +1,5 @@
 -- AI agent calls — implement, fix, investigate, diagnose.
+use workrunner/schema/work_item {task_context context_for_implement context_for_investigate}
 
 use workrunner/prompt/agents {ImplementPrompt FixPrompt InvestigatePrompt FixWiPrompt}
 use workrunner/store/status {save_debug}
@@ -6,11 +7,11 @@ use workrunner/log
 
 +implement = (wi task bootstrap_ctx runner_dir) {
   log.log "    > claude: implement task {task.num} (max 25 turns)..."
-  ctx = task.context_for_agent ()
+  ctx = task_context task
 
   p = ImplementPrompt {}
   p.add_section "Context Bootstrap" bootstrap_ctx
-  p.add_section "Work Item Context" (wi.context_for_implement ())
+  p.add_section "Work Item Context" (context_for_implement wi)
   p.add_section "Current Task" ctx
   p.add_instruction "Run `just diagnose` after implementation to verify compilation."
   p.add_constraint "Do not add code comments or doc strings"
@@ -40,7 +41,7 @@ use workrunner/log
 
 +fix = (wi task bootstrap_ctx feedback runner_dir) {
   log.log "    > claude: fix task {task.num}..."
-  ctx = task.context_for_agent ()
+  ctx = task_context task
 
   p = FixPrompt {}
   p.add_section "Context Bootstrap" bootstrap_ctx
@@ -63,7 +64,7 @@ use workrunner/log
 +investigate = (wi bootstrap_ctx runner_dir) {
   log.log "  > claude: investigate full work item..."
   p = InvestigatePrompt {}
-  p.add_section "Work Item" (wi.context_for_investigate ())
+  p.add_section "Work Item" (context_for_investigate wi)
   p.add_instruction "Check each file in Files Affected exists (use Glob)"
   p.add_instruction "Check mod.rs registrations if applicable (use Grep)"
   p.add_instruction "Run `just diagnose` — report ONLY errors/warnings"
@@ -87,7 +88,7 @@ use workrunner/log
   log.log "  > claude: fix work item..."
   p = FixWiPrompt {}
   p.add_section "Context Bootstrap" bootstrap_ctx
-  p.add_section "Work Item" (wi.context_for_investigate ())
+  p.add_section "Work Item" (context_for_investigate wi)
   p.add_section "Grader Feedback" feedback
   p.add_section "Failed" failed_text
   p.add_instruction "Fix failed categories. Run `just diagnose` and `just test`."
