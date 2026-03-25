@@ -20,7 +20,7 @@ Store +RunStatus = {
   }
 
   save = () {
-    $^mkdir -p {self.runner_dir}
+    fs.mkdir self.runner_dir ^
     results = self.query (r) { (to_str r) | contains? "status" }
     completed = self.keys () | filter (k) { k | starts_with? "completed_" } | map (k) { k | replace "completed_" "" }
     data = {results: results; completed: completed}
@@ -45,6 +45,6 @@ Store +RunStatus = {
 
 +save_debug = (runner_dir slug label content) {
   dir = "{runner_dir}/logs/{slug}"
-  $^mkdir -p {dir}
+  fs.mkdir dir ^
   fs.write "{dir}/{label}" content ^
 }

@@ -32,7 +32,7 @@ Class +Profile = {
     }
     false -> {
       now = time.now () | time.format "%Y-%m-%dT%H:%M:%S"
-      $^mkdir -p .lx/profiles
+      fs.mkdir ".lx/profiles" ^
       Profile {name: name  path: path  created: now  updated: now}
     }
   }
@@ -48,7 +48,7 @@ Class +Profile = {
     knowledge: profile.knowledge.to_record ()
     preferences: profile.preferences.to_record ()
   }
-  $^mkdir -p .lx/profiles
+  fs.mkdir ".lx/profiles" ^
   fs.write profile.path (json.encode_pretty data) ^
 }
 
