@@ -21,7 +21,7 @@ Units 1-5 implement keywords in isolation. This unit catches composition issues:
 **Description:** Create `tests/keyword_equivalence.lx`. For each of the 8 simple keywords, instantiate both the keyword version and the manual version, then assert identical behavior.
 
 ```lx
-use pkg/core/guard {Guard}
+use std/guard {Guard}
 
 -- Manual
 Class ManualGuard : [Guard] = { max_turns: 5 }
@@ -42,7 +42,7 @@ assert (m.is_tripped ()) == (k.is_tripped ())
 assert (m.check () | ok?) == (k.check () | ok?)
 
 -- Agent equivalence
-use pkg/agent {Agent}
+use std/agent {Agent}
 
 Class ManualAgent : [Agent] = {
   perceive = (msg) { {parsed: msg} }
@@ -59,7 +59,7 @@ assert (ma.perceive "hi").parsed == (ka.perceive "hi").parsed
 assert (methods_of ma | sort) == (methods_of ka | sort)
 
 -- Store equivalence
-use pkg/core/collection {Collection}
+use std/collection {Collection}
 
 Class ManualStore : [Collection] = { entries: Store () }
 
@@ -75,7 +75,7 @@ assert (ms.get "a") == (ks.get "a")
 assert (ms.len ()) == (ks.len ())
 
 -- Tool equivalence
-use pkg/core/tool {Tool}
+use std/tool {Tool}
 
 Class ManualTool : [Tool] = {
   description: "test"
@@ -161,9 +161,9 @@ Run `just test`.
 -- GradeResult as Schema (if Schema keyword works)
 -- If Schema tests are passing from Unit 3:
 Schema GradeResult = {
-  score: Int
-  passed: Bool
-  feedback: Str
+  score: Int = "0-100 weighted score"
+  passed: Bool = "true if score >= threshold"
+  feedback: Str = "human-readable summary"
 }
 
 result = GradeResult {score: 95, passed: true, feedback: "all good"}

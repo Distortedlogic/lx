@@ -56,7 +56,7 @@ Note: `trait_body()` does NOT parse the enclosing `{ }` braces — the caller (`
 
 In `desugar_keyword`, add the Schema branch. Convert `KeywordDeclData` into `TraitDeclData`:
 
-1. Create `Stmt::Use` for `pkg/core/schema {Schema}`.
+1. Create `Stmt::Use` for `std/schema {Schema}`.
 2. Convert `data.trait_entries` into the TraitDecl's `entries` field.
 3. Generate `schema()` default method: builds a record literal from the trait's field names and type names. For each `TraitEntry::Field(FieldDecl { name, type_name, .. })`, generate a record field `name: type_name_string`. The result is an expression like `{score: "Int", passed: "Bool", feedback: "Str"}`.
 4. Generate `validate(data)` default method: checks that `data` is a Record and has all required field names. For each field in entries, check `data | keys | any? (== field_name)`. Return `Ok data` or `Err {missing: [...]}`.

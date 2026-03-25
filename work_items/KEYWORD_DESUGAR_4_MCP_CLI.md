@@ -27,7 +27,7 @@ tools = () {
 ```
 
 Auto-injected fields: `session: None` (if not provided by user).
-Auto-injected imports: `use pkg/core/connector {Connector}`, `use std/mcp`.
+Auto-injected imports: `use std/connector {Connector}`, `use std/mcp`.
 
 **CLI** (from `pkg/connectors/cli.lx` CliConnector):
 
@@ -59,7 +59,7 @@ build_cli_args = (tool_def args) {
 ```
 
 Auto-injected fields: `tool_defs: []`, `env: {}` (if not provided).
-Auto-injected imports: `use pkg/core/connector {Connector}`.
+Auto-injected imports: `use std/connector {Connector}`.
 
 # What Changes
 
@@ -173,7 +173,7 @@ Check user overrides: collect `data.methods` names into a set. Only inject gener
 
 Inject `session: None` field if user didn't provide it.
 
-Emit `Stmt::Use` for `pkg/core/connector {Connector}` and `std/mcp` (UseKind::Whole).
+Emit `Stmt::Use` for `std/connector {Connector}` and `std/mcp` (UseKind::Whole).
 
 Emit `Stmt::ClassDecl` with `traits: [intern("Connector")]`.
 
@@ -197,7 +197,7 @@ For `tools()`: return `self.tool_defs`.
 
 Inject `tool_defs: []` field if not present (default is empty list literal). Inject `env: {}` field if not present (default is empty record literal).
 
-Emit `Stmt::Use` for `pkg/core/connector {Connector}`.
+Emit `Stmt::Use` for `std/connector {Connector}`.
 
 **ActiveForm:** Implementing CLI desugaring
 

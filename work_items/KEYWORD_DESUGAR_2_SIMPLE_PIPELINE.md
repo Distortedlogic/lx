@@ -4,7 +4,7 @@ Add 12 keyword tokens to the lexer, a `KeywordDecl` AST node, a unified keyword 
 
 # Why
 
-This is the core compiler pipeline. After this unit, `Agent MyAgent = { ... }` produces identical runtime behavior to writing `use pkg/agent {Agent}` then `Class MyAgent : [Agent] = { ... }`.
+This is the core compiler pipeline. After this unit, `Agent MyAgent = { ... }` produces identical runtime behavior to writing `use std/agent {Agent}` then `Class MyAgent : [Agent] = { ... }`.
 
 # What Changes
 
@@ -294,14 +294,14 @@ Then implement `desugar_keyword`:
 ```rust
 fn desugar_keyword(data: KeywordDeclData, span: SourceSpan, arena: &mut AstArena) -> Vec<StmtId> {
     let (import_path, trait_name) = match data.keyword {
-        KeywordKind::Agent => (vec!["pkg", "agent"], "Agent"),
-        KeywordKind::Tool => (vec!["pkg", "core", "tool"], "Tool"),
-        KeywordKind::Prompt => (vec!["pkg", "core", "prompt_trait"], "Prompt"),
-        KeywordKind::Connector => (vec!["pkg", "core", "connector"], "Connector"),
-        KeywordKind::Store => (vec!["pkg", "core", "collection"], "Collection"),
-        KeywordKind::Session => (vec!["pkg", "core", "session"], "Session"),
-        KeywordKind::Guard => (vec!["pkg", "core", "guard"], "Guard"),
-        KeywordKind::Workflow => (vec!["pkg", "core", "workflow"], "Workflow"),
+        KeywordKind::Agent => (vec!["std", "agent"], "Agent"),
+        KeywordKind::Tool => (vec!["std", "tool"], "Tool"),
+        KeywordKind::Prompt => (vec!["std", "prompt"], "Prompt"),
+        KeywordKind::Connector => (vec!["std", "connector"], "Connector"),
+        KeywordKind::Store => (vec!["std", "collection"], "Collection"),
+        KeywordKind::Session => (vec!["std", "session"], "Session"),
+        KeywordKind::Guard => (vec!["std", "guard"], "Guard"),
+        KeywordKind::Workflow => (vec!["std", "workflow"], "Workflow"),
         // Schema, Mcp, Cli, Http handled by later units — pass through
         _ => return vec![arena.alloc_stmt(Stmt::KeywordDecl(data), span)],
     };
@@ -315,19 +315,13 @@ fn desugar_keyword(data: KeywordDeclData, span: SourceSpan, arena: &mut AstArena
         span,
     );
 
-    let mut fields = data.fields;
+    let fields = data.fields;
     let methods = data.methods;
 
-    // Store keyword: inject `entries: Store()` if not present
-    if data.keyword == KeywordKind::Store {
-        let has_entries = fields.iter().any(|f| f.name == intern("entries"));
-        if !has_entries {
-            let store_ident = arena.alloc_expr(Expr::Ident(intern("Store")), span);
-            let unit = arena.alloc_expr(Expr::Literal(Literal::Unit), span);
-            let store_call = arena.alloc_expr(Expr::Apply(ExprApply { func: store_ident, arg: unit }), span);
-            fields.insert(0, ClassField { name: intern("entries"), default: store_call });
-        }
-    }
+    // No field injection needed here. Trait field defaults are inherited by
+    // classes at runtime (fixed in Unit 1, Task 1: exec_stmt.rs ClassDecl
+    // evaluation now copies trait field defaults into class defaults_map).
+    // The keyword desugaring only needs to inject the trait name.
 
     // Generate: Class Name : [Trait] = { fields, methods }
     let class_stmt = arena.alloc_stmt(
@@ -346,7 +340,7 @@ fn desugar_keyword(data: KeywordDeclData, span: SourceSpan, arena: &mut AstArena
 }
 ```
 
-Add required imports at top of file: `UseStmt`, `UseKind`, `ClassDeclData`, `ClassField`, `KeywordKind`, `KeywordDeclData`, `ExprApply`, `Literal`, `intern`.
+Add required imports at top of file: `UseStmt`, `UseKind`, `ClassDeclData`, `ClassField`, `KeywordKind`, `KeywordDeclData`, `intern`.
 
 **ActiveForm:** Implementing keyword desugaring
 
@@ -412,6 +406,8 @@ assert (s.len ()) == 2
 assert (s.has "a")
 assert (s.get "a") == 1
 ```
+
+Note: The `entries: Store()` field is inherited from the Collection trait's field defaults (fixed by Unit 1 Task 1 interpreter change). The Store keyword desugars to `Class Items : [Collection] = {}`, and Collection's `entries` field default transfers automatically.
 
 `tests/keyword_guard.lx`:
 ```lx

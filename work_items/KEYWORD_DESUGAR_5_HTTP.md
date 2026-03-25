@@ -67,7 +67,7 @@ tools = () self.endpoints
 ```
 
 Inject default fields: `base_url: ""`, `headers: {}`, `endpoints: []`.
-Inject imports: `use pkg/core/connector {Connector}`, `use std/http`.
+Inject imports: `use std/connector {Connector}`, `use std/http`.
 
 **Validate — `crates/lx/src/folder/validate_core.rs`:**
 
@@ -168,7 +168,7 @@ Inject default fields if not present:
 - `headers: {}` (empty record)
 - `endpoints: []` (empty list)
 
-Emit imports: `use pkg/core/connector {Connector}`, `use std/http` (UseKind::Whole).
+Emit imports: `use std/connector {Connector}`, `use std/http` (UseKind::Whole).
 
 **ActiveForm:** Implementing HTTP desugaring
 
