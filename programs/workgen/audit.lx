@@ -1,19 +1,13 @@
 -- Interactive audit chooser.
--- Lists audit files from RULES_DIR, presents them via user.choose,
+-- Lists audit files from the program's rules/ directory,
 -- then runs workgen with the selected audit.
---
--- Env vars (set by justfile):
---   RULES_DIR        — path to rules directory
---   WORK_ITEM_RULES  — path to work-item.md rules file
 
 use std/fs
 use std/user
-use std/env
 use ./main : workgen
 
 +main = () {
-  rules_dir = env.get "RULES_DIR" ^
-  work_item_rules = env.get "WORK_ITEM_RULES" ^
+  rules_dir = "{source_dir ()}/rules"
 
   files = fs.ls rules_dir ^
   audits = files
@@ -29,7 +23,7 @@ use ./main : workgen
       labels = audits | map (f) { replace ".md" "" f }
       chosen = user.choose "Select audit:" labels
       path = "{rules_dir}/{chosen}.md"
-      workgen.run path work_item_rules "."
+      workgen.run path
     }
   }
 }

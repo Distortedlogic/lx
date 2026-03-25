@@ -3,10 +3,9 @@
 -- Pipeline: parse audit → investigate codebase → compose draft → grade → revise loop.
 -- Persists status + debug logs to .lx/workgen/.
 --
--- Usage: AUDIT_FILE=rules/foo.md RULES_FILE=rules/work-item.md lx run workgen
--- Interactive: lx run workgen/audit.lx
+-- Usage: lx run workgen
+-- With specific audit: AUDIT_FILE=path/to/audit.md lx run workgen
 
-use std/env
 use std/fs
 use std/time
 use std/cron
@@ -18,6 +17,7 @@ use workgen/lib/orchestrator
 
 max_rounds = 3
 runner_dir = ".lx/workgen"
+rules_dir = "{source_dir ()}/rules"
 
 wi_grader = Grader {
   threshold: 75
@@ -29,29 +29,33 @@ wi_grader = Grader {
   ]
 }
 
+rules_content = fs.read "{rules_dir}/work-item.md" ^
+
 +main = () {
-  audit_path = env.get "AUDIT_FILE" ?? ""
-  rules_path = env.get "RULES_FILE" ?? ""
-  root = env.get "ROOT" ?? "."
-
-  audit_path == "" ? assert false "AUDIT_FILE env var not set"
-  rules_path == "" ? assert false "RULES_FILE env var not set"
-
-  run audit_path rules_path root
+  audit_path = std/env.get "AUDIT_FILE" ?? ""
+  audit_path == "" ? (run_interactive ()) : (run audit_path)
 }
 
-run = (audit_path rules_path root) {
+run_interactive = () {
+  files = fs.ls rules_dir ^
+  audits = files | filter (f) { f | contains? "audit" && (f | ends? ".md") } | sort
+  (audits | len) == 0 ? assert false "no audit files in {rules_dir}"
+  audits | each (f) { emit f }
+  emit "set AUDIT_FILE to run a specific audit"
+}
+
++run = (audit_path) {
   wg_log.log "=== Work Item Generator ==="
 
   audit = audit_parser.load audit_path
-  rules_content = fs.read rules_path ^
-
   status = RunStatus {runner_dir: runner_dir}
   status.load ()
 
   already_done = status.is_completed audit.name
-  already_done ? wg_log.log "{audit.name} already completed — skipping"
-  already_done ? assert false "already completed"
+  already_done ? {
+    wg_log.log "{audit.name} already completed — skipping"
+    assert false "already completed"
+  }
 
   start = time.now ()
   start_ms = start.ms
@@ -63,7 +67,7 @@ run = (audit_path rules_path root) {
     emit "[{ts}] heartbeat — {mins}m elapsed"
   }
 
-  result = orchestrator.run_audit audit rules_content root wi_grader max_rounds runner_dir
+  result = orchestrator.run_audit audit rules_content "." wi_grader max_rounds runner_dir
   status.record_result result
 
   elapsed = (time.now().ms - start_ms) // 1000
@@ -74,6 +78,5 @@ run = (audit_path rules_path root) {
   result.status == "pass" ? wg_log.log "  output: {result.path}"
   result.status != "pass" ? wg_log.log "  feedback: {result.feedback}"
 }
-+run = run
 
 main ()

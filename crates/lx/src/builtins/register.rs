@@ -156,6 +156,15 @@ pub fn register(env: &Env) {
   ctx_fields.insert(crate::sym::intern("current"), mk("context.current", 1, bi_global_context_current));
   ctx_fields.insert(crate::sym::intern("get"), mk("context.get", 1, bi_global_context_get));
   env.bind_str("context", LxVal::record(ctx_fields));
+  env.bind_str("source_dir", mk("source_dir", 0, bi_source_dir));
+}
+
+fn bi_source_dir(_args: &[LxVal], _span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+  let dir = ctx.source_dir.lock().clone();
+  match dir {
+    Some(p) => Ok(LxVal::str(p.to_string_lossy())),
+    None => Ok(LxVal::str(".")),
+  }
 }
 
 fn bi_agent_spawn_stub(_args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {

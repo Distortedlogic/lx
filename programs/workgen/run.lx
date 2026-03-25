@@ -1,3 +1,0 @@
--- Entry point for workgen. Import and call main.
-use ./main : workgen
-workgen.main ()

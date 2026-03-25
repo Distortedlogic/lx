@@ -1,96 +1,33 @@
 flowchart TD
     subgraph sg_main ["main"]
         main["main"]
-        match_10{"audit_path == str?"}
-        match_11{"rules_path == str?"}
-        match_12{"missing?"}
-    end
-    subgraph sg_check_sections ["check_sections"]
-        agent_6["check_sections"]
-        match_24{"expr?"}
-    end
-    subgraph sg_investigate ["investigate"]
-        agent_3["investigate"]
-        tool_20(["ai.prompt_with"])
-    end
-    subgraph sg_compose ["compose"]
-        agent_4["compose"]
-        tool_21(["ai.prompt_with"])
-    end
-    subgraph sg_gather_tree ["gather_tree"]
-        agent_2["gather_tree"]
-        io_17>"shell"]
-        match_18{"git_files != str?"}
-        io_19>"shell"]
+        cond_2{"audit_path == str?"}
+        cond_3{"rules_path == str?"}
     end
     subgraph sg_run ["run"]
         agent_1["run"]
-        io_13>"fs.read"]
-        io_14>"fs.read"]
-        resource_15[("trace")]
-        io_16>"fs.write"]
+        tool_4(["audit_parser.load"])
+        io_5>"fs.read"]
+        cond_6{"already_done?"}
+        cond_7{"already_done?"}
+        loop_8{{"cron"}}
+        tool_9(["orchestrator.run_audit"])
+        cond_10{"result.status == pass?"}
+        cond_11{"result.status == pass?"}
+        cond_12{"result.status != pass?"}
     end
-    subgraph sg_write_draft ["write_draft"]
-        agent_5["write_draft"]
-        io_22>"fs.mkdir"]
-        io_23>"fs.write"]
-    end
-    subgraph sg_grade_draft ["grade_draft"]
-        agent_7["grade_draft"]
-        tool_25(["grader.grade"])
-    end
-    subgraph sg_verify_and_revise ["verify_and_revise"]
-        agent_9["verify_and_revise"]
-        match_27{"structural.passed?"}
-        loop_28{{"loop"}}
-        cond_29{"grade_result.passed?"}
-        match_30{"should_stop?"}
-        io_31>"fs.write"]
-        tool_32(["auditor.audit"])
-        match_33{"final_check.passed?"}
-    end
-    subgraph sg_revise_draft ["revise_draft"]
-        agent_8["revise_draft"]
-        tool_26(["ai.prompt_with"])
-    end
-    main --> match_10
-    main --> match_11
-    main --> match_12
-    match_12 --> agent_1
-    agent_1 --> io_13
-    agent_1 --> io_14
-    agent_1 -->|"create"| resource_15
-    agent_1 --> agent_3
-    agent_1 -.->|"record"| resource_15
-    agent_1 --> agent_4
-    agent_1 -.->|"record"| resource_15
-    agent_1 --> agent_5
-    agent_1 --> agent_9
-    agent_1 --> io_16
-    agent_1 -.->|"record"| resource_15
-    agent_2 --> io_17
-    agent_2 --> match_18
-    match_18 --> io_19
-    agent_3 --> agent_2
-    agent_3 --> tool_20
-    agent_4 --> tool_21
-    agent_5 --> io_22
-    agent_5 --> io_23
-    agent_6 --> match_24
-    agent_7 --> tool_25
-    agent_8 --> tool_26
-    agent_9 --> match_27
-    agent_9 --> agent_6
-    agent_9 --> loop_28
-    loop_28 --> agent_7
-    loop_28 -.->|"record"| resource_15
-    loop_28 --> cond_29
-    loop_28 -.->|"should_stop"| resource_15
-    loop_28 --> match_30
-    match_30 --> agent_8
-    match_30 --> io_31
-    agent_9 --> tool_32
-    agent_9 --> match_33
+    main --> cond_2
+    main --> cond_3
+    main --> agent_1
+    agent_1 --> tool_4
+    agent_1 --> io_5
+    agent_1 --> cond_6
+    agent_1 --> cond_7
+    agent_1 --> loop_8
+    agent_1 --> tool_9
+    agent_1 --> cond_10
+    agent_1 --> cond_11
+    agent_1 --> cond_12
     classDef agent fill:#e1f5fe,stroke:#0288d1
     classDef tool fill:#f3e5f5,stroke:#7b1fa2
     classDef decision fill:#fff3e0,stroke:#ef6c00
@@ -101,35 +38,14 @@ flowchart TD
     classDef type fill:#f5f5f5,stroke:#616161
     class main agent
     class agent_1 agent
-    class agent_2 agent
-    class agent_3 agent
-    class agent_4 agent
-    class agent_5 agent
-    class agent_6 agent
-    class agent_7 agent
-    class agent_8 agent
-    class agent_9 agent
-    class match_10 decision
-    class match_11 decision
-    class match_12 decision
-    class io_13 io
-    class io_14 io
-    class resource_15 resource
-    class io_16 io
-    class io_17 io
-    class match_18 decision
-    class io_19 io
-    class tool_20 tool
-    class tool_21 tool
-    class io_22 io
-    class io_23 io
-    class match_24 decision
-    class tool_25 tool
-    class tool_26 tool
-    class match_27 decision
-    class loop_28 loop
-    class cond_29 decision
-    class match_30 decision
-    class io_31 io
-    class tool_32 tool
-    class match_33 decision
+    class cond_2 decision
+    class cond_3 decision
+    class tool_4 tool
+    class io_5 io
+    class cond_6 decision
+    class cond_7 decision
+    class loop_8 loop
+    class tool_9 tool
+    class cond_10 decision
+    class cond_11 decision
+    class cond_12 decision
