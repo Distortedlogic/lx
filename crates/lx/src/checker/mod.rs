@@ -27,7 +27,8 @@ use std::sync::Arc;
 
 use la_arena::ArenaMap;
 
-use crate::ast::{AstArena, Core, ExprId, Program, TypeExpr, TypeExprId};
+use crate::ast::{AstArena, Core, ExprId, Program, Stmt, StmtId, TypeExpr, TypeExprId};
+use crate::visitor::{AstVisitor, VisitAction};
 use diagnostics::{DiagnosticKind, Fix};
 use miette::SourceSpan;
 use module_graph::ModuleSignature;
@@ -223,9 +224,18 @@ impl<'a> Checker<'a> {
   }
 
   fn check_program(&mut self, program: &Program<Core>) {
-    for &sid in &program.stmts {
-      self.check_stmt(sid, &program.arena);
-    }
+    let _ = crate::visitor::walk_program(self, program);
+  }
+}
+
+impl AstVisitor for Checker<'_> {
+  fn visit_stmt(&mut self, _id: StmtId, _stmt: &Stmt, _span: SourceSpan) -> VisitAction {
+    VisitAction::Skip
+  }
+
+  fn leave_stmt(&mut self, id: StmtId, _stmt: &Stmt, _span: SourceSpan) {
+    let arena = self.arena;
+    self.check_stmt(id, arena);
   }
 }
 
