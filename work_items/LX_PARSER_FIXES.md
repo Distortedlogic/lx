@@ -1,102 +1,162 @@
 # Goal
 
-Fix four parser bugs that force workarounds in every lx program: pipe-after-block-lambda, trait body name conflict, assert message parsing, and tuple destructuring in trait bodies.
+Fix three parser bugs that force workarounds in every lx program: lambda body greedily consuming pipes, assert message parsing, and trait body name conflict.
 
 # Why
 
-- `filter (e) { e > 1 } | len` parses `| len` inside the lambda body instead of piping the filter result. Every program splits filter+len into two lines as a workaround.
-- `{name: value}` record literals inside trait/class method bodies are misinterpreted as trait field declarations. Every program uses semicolons between record fields or avoids record literals in methods.
+- `filter (e) { e > 1 } | len` parses `| len` inside the lambda body. Every program splits filter+len into two lines.
 - `assert (condition) "message"` parses as applying the Bool result to the String. Every test omits assert messages.
-- `(a b) = pair` tuple destructuring fails inside trait bodies due to the same `ident =` ambiguity. Programs use `pair.0` and `pair.1` instead.
+- `{name: value}` record literals inside trait method bodies are misinterpreted as trait field declarations. Programs use semicolons or avoid record literals in methods.
 
-# What Changes
+# Root Causes (verified by reading source)
 
-**Pipe after block lambda — `crates/lx/src/parser/expr_pratt.rs`:**
+**Lambda body is greedy (pipe-after-block AND assert message — same root cause):**
 
-The Pratt parser handles function application as a postfix operator at precedence 31. When parsing `filter (e) { e > 1 } | len`, application consumes `(e)` then `{ e > 1 } | len` as the next argument because the block expression doesn't terminate the application chain.
+`crates/lx/src/parser/expr_compound.rs` line 104-113: the `func_def` parser matches `(params) [type_params] [-> ret_type] [& guard] body` where `body` is `expr.clone()` (line 110) — the FULL expression parser including pipes. So `(x) { x > 2 } | len` — the func_def matches `(x)` as params, then `{ x > 2 } | len` as the body. The `{ x > 2 }` block is parsed, then `| len` is consumed as a pipe on the block result inside the lambda body.
 
-Fix: when parsing a postfix application argument, if the argument is a `{ }` block expression, stop the application chain. The `|` after the block starts a new pipe at the outer level. Concretely: in the postfix application parsing loop in `expr_pratt.rs`, after parsing an atom that is a Block, do not continue consuming further arguments at the application precedence level. Return the application and let the Pratt loop handle `|` at pipe precedence (19).
+Same root cause for assert: line 138-143 in `expr.rs`, assert uses `.ignore_then(expr.clone()).then(expr.clone().or_not())`. The first `expr.clone()` greedily consumes `(cond) "msg"` as an Apply expression (Bool applied to String).
 
-To verify: `filter (e) { e > 1 } | len` on `[1; 2; 3]` should return `2`. `map (x) { x | to_str }` should still work (pipe inside lambda body is fine — it's consumed during block parsing, not during the postfix application loop).
+**Trait body name conflict:**
 
-**Trait body name conflict — `crates/lx/src/parser/stmt.rs` `trait_body()`:**
-
-The trait body parser at line 228 tries `field_entry` first, which matches `ident : TypeName`. When a method body contains `{name: value}` record literals, the `name:` is greedily matched as a trait field.
-
-Fix: the `field_entry` parser should require that the token after `ident :` is a TypeName (capitalized identifier or keyword-as-type). If followed by a lowercase ident, string literal, number, or other expression, it's NOT a trait field — fall through to `default_method` parsing. Add lookahead: `ident().then_ignore(just(TokenKind::Colon)).then(type_name())` already does this because `type_name()` only matches capitalized identifiers. But the issue is that `type_name()` now also matches keyword tokens via `keyword_as_type_name()`. Verify that the parser correctly rejects `name: "some string"` and `name: some_var` as field entries.
-
-If the issue is that `field_entry` matches `name: rub.name` (where `rub` is lowercase), then the fix is correct — `type_name()` should NOT match lowercase identifiers. Verify the `type_name()` function in `expr.rs` only matches `TokenKind::TypeName` and keyword tokens, not `TokenKind::Ident`.
-
-To verify: `+Trait T = { method = () { {name: value; other: value2} } }` should parse without errors. The record literal inside the method body should not be mistaken for trait fields.
-
-**Assert message — `crates/lx/src/parser/expr.rs` or `expr_compound.rs`:**
-
-Assert is parsed as `just(TokenKind::Assert).ignore_then(expr)` which parses the entire `(condition) "message"` as a single expression. The `(condition) "message"` is function application: Bool applied to String.
-
-Fix: change the assert parser to parse the condition expression, then optionally consume a string literal as the message. The assert AST node `ExprAssert { expr, msg }` already supports an optional message. The parser should be:
-
-```
-just(TokenKind::Assert)
-  .ignore_then(expr.clone())
-  .then(string_literal.or_not())
-  .map(|(expr, msg)| ExprAssert { expr, msg })
-```
-
-Where `string_literal` matches a `StrStart ... StrEnd` token sequence (a string literal expression). If the next token after the condition is a string start, consume it as the message. Otherwise, `msg` is None.
-
-Read the current assert parser to find the exact location and current implementation before making changes.
-
-To verify: `assert (x == 1) "x should be 1"` should pass with message. `assert (x == 1)` should pass without message. `assert false "expected failure"` should produce an error with "expected failure" as the help text.
-
-**Tuple destructuring in trait body — same fix as trait body name conflict:**
-
-`(a b) = pair` fails because after `(a b)`, the `=` is interpreted as starting a default method (`name = expr`). But `(a b)` is not an identifier — it's a parenthesized expression. The `default_method` parser expects `ident = expr`. Since `(a b)` doesn't match `ident`, it falls through to other alternatives and fails.
-
-This is fixed by the trait body lookahead fix above — if the trait body parser correctly distinguishes field declarations from nested expressions, tuple destructuring patterns won't be misinterpreted. Verify by testing `+Trait T = { method = () { (a b) = pair; a } }`.
+`crates/lx/src/parser/stmt.rs` `trait_body()` at line 228: `field_entry` matches `ident : type_name`. The `type_name()` parser only matches capitalized identifiers and keyword tokens — NOT lowercase identifiers. So `name: rub.name` should NOT match as a field entry because `rub` is lowercase. If it does match, the issue is that chumsky's `choice` doesn't backtrack after `ident :` partially succeeds with `field_entry` but then `type_name()` fails on the lowercase token. The parser error cascades instead of falling through to `default_method`.
 
 # Files Affected
 
-- `crates/lx/src/parser/expr_pratt.rs` — Fix application termination after block argument
-- `crates/lx/src/parser/stmt.rs` — Verify trait_body field_entry lookahead
-- `crates/lx/src/parser/expr.rs` or `expr_compound.rs` — Fix assert message parsing
+- `crates/lx/src/parser/expr_compound.rs` — Fix func_def body parsing (line 110)
+- `crates/lx/src/parser/expr.rs` — Fix assert parsing (line 138-143)
+- `crates/lx/src/parser/stmt.rs` — Verify/fix trait_body backtracking
 
 # Task List
 
-### Task 1: Fix pipe after block lambda
+### Task 1: Fix lambda body — block body stops at `}`
 
-**Subject:** Stop application chain after { } block argument in Pratt parser
+**Subject:** Lambda with `{ }` body should not consume pipe after closing brace
 
-**Description:** Read `crates/lx/src/parser/expr_pratt.rs`. Find the postfix application parsing — the section that handles implicit function application (when an expression is followed by another expression at application precedence).
+**Description:** Edit `crates/lx/src/parser/expr_compound.rs`. The `func_def` parser at line 104-113 has `.then(expr.clone())` at line 110 for the body. This consumes the full expression including pipes.
 
-The current behavior: `filter (e) { e > 1 } | len` — after parsing `filter`, the application loop consumes `(e)` as arg1, then `{ e > 1 } | len` as arg2 (because `{ e > 1 }` is a block expression and `| len` is parsed inside it or as continuation).
+Fix: when the body starts with `{`, parse only the block (stops at `}`). Otherwise parse the full expression (for bare bodies like `(x) x + 1`).
 
-The fix: after consuming a `{ }` block as a function argument, break out of the application loop. The block is a complete argument. The next token (`|`) should be handled at the outer Pratt precedence level.
-
-Write a test: create `tests/parser_pipe_after_block.lx`:
-```lx
-result = [1; 2; 3] | filter (e) { e > 1 } | len
-assert (result == 2)
-inner = [1; 2; 3] | map (x) { x | to_str }
-assert (inner | len == 3)
+Change line 110 from:
+```rust
+.then(expr.clone())
+```
+to:
+```rust
+.then(
+    just(TokenKind::LBrace)
+        .ignore_then(super::expr::stmts_block(expr.clone(), a_body.clone()))
+        .then_ignore(just(TokenKind::RBrace))
+        .map_with(move |stmts, e| a_body.borrow_mut().alloc_expr(Expr::Block(ExprBlock { stmts }), ss(e.span())))
+        .or(expr.clone())
+)
 ```
 
-**ActiveForm:** Fixing pipe-after-block-lambda parsing
+You'll need an additional ArenaRef clone (`a_body`) for the block body parser. Import `ExprBlock` from `crate::ast`.
+
+The block alternative is tried first (because `or` tries left then right in chumsky). If `{` is the next token, it parses the block and stops at `}`. If not, falls through to the full expression parser.
+
+Write test `tests/parser_lambda_pipe.lx`:
+```lx
+items = [1; 2; 3; 4; 5]
+
+result = items | filter (x) { x > 2 } | len
+assert (result == 3)
+
+mapped = items | map (x) { x * 2 } | filter (x) { x > 4 } | len
+assert (mapped == 3)
+
+inner_pipe = items | map (x) { x | to_str }
+assert (inner_pipe | len == 5)
+
+bare_body = items | map (x) x * 2
+assert (bare_body | len == 5)
+```
+
+**ActiveForm:** Fixing lambda block body parsing
 
 ---
 
-### Task 2: Verify and fix trait body field lookahead
+### Task 2: Fix assert message parsing
 
-**Subject:** Ensure trait body parser doesn't match record fields as trait fields
+**Subject:** Assert condition should not consume the message string as an argument
 
-**Description:** Read `crates/lx/src/parser/stmt.rs` around line 228 where `trait_body()` is defined. Read the `field_entry` parser.
+**Description:** Edit `crates/lx/src/parser/expr.rs` lines 138-143. Current assert parser:
 
-The `field_entry` parser matches `ident : type_name`. Check whether `type_name()` in `expr.rs` matches ONLY capitalized identifiers (TypeName tokens) and keyword-as-type tokens. It should NOT match lowercase identifiers. If a method body contains `{name: rub.name}`, the `rub` after `:` is lowercase — `type_name()` should reject it, and `field_entry` should fail, letting `default_method` parse the method body.
+```rust
+just(TokenKind::Assert)
+    .ignore_then(expr.clone())
+    .then(expr.clone().or_not())
+```
 
-Test by running: `echo '+Trait T = { m = () { {name: "hello"; age: 42} } }' > /tmp/test_trait.lx && cargo run -p lx-cli -- run /tmp/test_trait.lx`. If it parses, the lookahead already works. If it fails, the `field_entry` parser needs fixing.
+The first `expr.clone()` greedily consumes `(cond) "msg"` as Apply(cond, msg). The `.then(expr.clone().or_not())` gets nothing because everything was consumed.
 
-If the lookahead IS already correct but fails in practice, the issue is that chumsky's `choice` combinator doesn't backtrack properly after `field_entry` partially matches. In that case, wrap `field_entry` in `try()` or `attempt()` to enable backtracking on partial match failure.
+Fix: the assert condition should be parsed at a restricted precedence that stops before function application of a string literal. The simplest fix — post-parse: after parsing the full expression, check if it's an `Apply` where the argument is a string literal. If so, split: the function part is the condition, the string argument is the message.
 
-Write a test: create `tests/parser_trait_record.lx`:
+```rust
+let assert_expr = {
+    let al = arena.clone();
+    let al2 = arena.clone();
+    just(TokenKind::Assert)
+        .ignore_then(expr.clone())
+        .map_with(move |ex, e| {
+            let arena_ref = al.borrow();
+            // Check if expr is Apply(cond, Literal::Str(...))
+            if let Expr::Apply(app) = arena_ref.expr(ex) {
+                if let Expr::Literal(Literal::Str(_)) = arena_ref.expr(app.arg) {
+                    let cond = app.func;
+                    let msg = Some(app.arg);
+                    return al2.borrow_mut().alloc_expr(
+                        Expr::Assert(ExprAssert { expr: cond, msg }),
+                        ss(e.span()),
+                    );
+                }
+            }
+            drop(arena_ref);
+            al2.borrow_mut().alloc_expr(
+                Expr::Assert(ExprAssert { expr: ex, msg: None }),
+                ss(e.span()),
+            )
+        })
+};
+```
+
+This checks the parsed expression: if it's `Apply(cond, string_literal)`, split into assert with condition and message. Otherwise, it's a plain assert with no message. No parser restructuring needed — just a post-parse fixup.
+
+Note: this requires borrowing the arena to inspect the expression, then dropping the borrow before mutably borrowing to allocate. Handle the borrow carefully.
+
+Write test `tests/parser_assert_message.lx`:
+```lx
+assert (1 == 1) "one equals one"
+assert (2 > 1) "two greater than one"
+assert (true)
+x = 5
+assert (x > 0) "x must be positive"
+```
+
+All should pass. For a failing assert with message, verify the message appears in the error output.
+
+**ActiveForm:** Fixing assert message parsing
+
+---
+
+### Task 3: Fix trait body backtracking
+
+**Subject:** Ensure trait body parser falls through to default_method when field_entry partially fails
+
+**Description:** Read `crates/lx/src/parser/stmt.rs` `trait_body()` around line 228. The `field_entry` parser matches `ident : type_name`. The `type_name()` in `expr.rs` only matches `TokenKind::TypeName` and keyword tokens — NOT lowercase `TokenKind::Ident`. So `name: rub.name` should fail at `type_name()` because `rub` is lowercase.
+
+Test whether the current parser already handles this correctly:
+
+```
+echo '+Trait T = { m = () { {name: "hello"} } }' > /tmp/test_trait_record.lx
+cargo run -p lx-cli -- run /tmp/test_trait_record.lx
+```
+
+If it parses, trait body backtracking already works — task is done (just add a regression test).
+
+If it fails, the issue is that chumsky's `choice` in `trait_body` partially consumes `ident :` before `type_name()` fails, and doesn't backtrack. Fix by wrapping `field_entry` in `.try_map()` or restructuring so `ident :` is not consumed until `type_name()` succeeds. In chumsky, use `.then(type_name()).rewind()` or an explicit `.try()` to enable backtracking.
+
+Write test `tests/parser_trait_record.lx`:
 ```lx
 +Trait HasMethod = {
   describe = () {
@@ -111,33 +171,7 @@ assert (result.name == "test")
 assert (result.value == 42)
 ```
 
-**ActiveForm:** Verifying trait body field lookahead
-
----
-
-### Task 3: Fix assert message parsing
-
-**Subject:** Assert consumes optional string message after condition
-
-**Description:** Read the assert expression parser. Search for `Assert` in `crates/lx/src/parser/expr.rs` or `expr_compound.rs` — find where `ExprAssert` is constructed.
-
-Currently: `assert` parses one expression as the condition, and optionally a second expression as the message. The issue is `assert (cond) "msg"` — `(cond) "msg"` is parsed as a single expression where the Bool result of `(cond)` is applied to `"msg"` as a function call.
-
-Fix: parse assert as `assert <expr>` where the expr is the condition, then check if the NEXT token is a string literal start (`StrStart`). If so, parse the string as the message separately — not as part of the condition expression.
-
-The key change: the condition expression should be parsed at a precedence that STOPS before function application of a string. One approach: parse the condition using a restricted expression parser that doesn't include bare string literals as continuations. Another approach: after parsing the condition, check if it's a function application where the last arg is a string — extract the string as the message.
-
-The simplest approach: after parsing `assert expr`, check if `expr` is an `Apply` where the `arg` is a `Literal::Str`. If so, split it: the `func` part becomes the condition, the `arg` becomes the message. This is a post-parse fixup, not a parser change.
-
-Write a test: create `tests/parser_assert_message.lx`:
-```lx
-assert (1 == 1) "one equals one"
-assert (true)
-x = 5
-assert (x > 0) "x must be positive"
-```
-
-**ActiveForm:** Fixing assert message parsing
+**ActiveForm:** Fixing trait body backtracking
 
 ---
 
