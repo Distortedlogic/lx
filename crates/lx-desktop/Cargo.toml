@@ -21,6 +21,7 @@ workspace = true
 common-pane-tree = { path = "../../../dioxus-common/crates/common-pane-tree" }
 common-pty = { path = "../../../dioxus-common/crates/common-pty" }
 dioxus-widget-bridge = { path = "../../../dioxus-common/crates/dioxus-widget-bridge" }
+dioxus-storage = { path = "../../../dioxus-common/crates/dioxus-storage" }
 common-audio = { path = "../../../dioxus-common/crates/common-audio" }
 common-whisper = { path = "../../../dioxus-common/crates/common-whisper" }
 common-kokoro = { path = "../../../dioxus-common/crates/common-kokoro" }

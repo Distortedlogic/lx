@@ -4,10 +4,12 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use miette::SourceSpan;
 
 use crate::ast::{
-  AstArena, BindTarget, Binding, ClassDeclData, Core, Expr, ExprApply, ExprBinary, ExprBlock, ExprFieldAccess, ExprFunc, ExprId, ExprMatch, ExprWith,
-  FieldKind, KeywordDeclData, KeywordKind, Literal, MatchArm, Param, Pattern, PatternConstructor, Program, Section, Stmt, StmtId, StrPart, Surface, UseKind,
-  UseStmt, WithKind,
+  AstArena, BinOp, BindTarget, Binding, ClassDeclData, ClassField, Core, Expr, ExprApply,
+  ExprBinary, ExprBlock, ExprFieldAccess, ExprFunc, ExprId, ExprMatch, ExprTernary, ExprWith,
+  FieldKind, KeywordDeclData, KeywordKind, Literal, MatchArm, Param, Pattern, PatternConstructor,
+  Program, Section, Stmt, StmtId, StrPart, Surface, UseKind, UseStmt, WithKind,
 };
+use crate::folder::gen_ast::*;
 use crate::sym::{Sym, intern};
 use crate::visitor::transformer::AstTransformer;
 
@@ -180,6 +182,12 @@ fn desugar_keyword(data: KeywordDeclData, span: SourceSpan, arena: &mut AstArena
   if data.keyword == KeywordKind::Schema {
     return super::desugar_schema::desugar_schema(data, span, arena);
   }
+  if data.keyword == KeywordKind::Mcp {
+    return desugar_mcp(data, span, arena);
+  }
+  if data.keyword == KeywordKind::Cli {
+    return desugar_cli(data, span, arena);
+  }
 
   let (import_path, trait_name) = match data.keyword {
     KeywordKind::Agent => (vec!["std", "agent"], "Agent"),
@@ -196,17 +204,161 @@ fn desugar_keyword(data: KeywordDeclData, span: SourceSpan, arena: &mut AstArena
   let trait_sym = intern(trait_name);
   let path: Vec<Sym> = import_path.iter().map(|s| intern(s)).collect();
 
-  let use_stmt = arena.alloc_stmt(Stmt::Use(UseStmt { path, kind: UseKind::Selective(vec![trait_sym]) }), span);
+  let use_stmt = arena.alloc_stmt(
+    Stmt::Use(UseStmt { path, kind: UseKind::Selective(vec![trait_sym]) }),
+    span,
+  );
 
   let fields = data.fields;
   let methods = data.methods;
 
   let class_stmt = arena.alloc_stmt(
-    Stmt::ClassDecl(ClassDeclData { name: data.name, type_params: data.type_params, traits: vec![trait_sym], fields, methods, exported: data.exported }),
+    Stmt::ClassDecl(ClassDeclData {
+      name: data.name,
+      type_params: data.type_params,
+      traits: vec![trait_sym],
+      fields,
+      methods,
+      exported: data.exported,
+    }),
     span,
   );
 
   vec![use_stmt, class_stmt]
+}
+
+fn has_user_method(methods: &[crate::ast::AgentMethod], name: &str) -> bool {
+  let sym = intern(name);
+  methods.iter().any(|m| m.name == sym)
+}
+
+fn has_user_field(fields: &[ClassField], name: &str) -> bool {
+  let sym = intern(name);
+  fields.iter().any(|f| f.name == sym)
+}
+
+fn desugar_mcp(data: KeywordDeclData, span: SourceSpan, arena: &mut AstArena) -> Vec<StmtId> {
+  let connector_sym = intern("Connector");
+  let connector_path: Vec<Sym> = vec![intern("std"), intern("connector")];
+  let use_connector = arena.alloc_stmt(
+    Stmt::Use(UseStmt { path: connector_path, kind: UseKind::Selective(vec![connector_sym]) }),
+    span,
+  );
+
+  let mcp_path: Vec<Sym> = vec![intern("std"), intern("mcp")];
+  let use_mcp = arena.alloc_stmt(Stmt::Use(UseStmt { path: mcp_path, kind: UseKind::Whole }), span);
+
+  let mut fields = data.fields;
+  let mut methods = data.methods;
+
+  if !has_user_field(&fields, "session") {
+    let none_val = gen_none(span, arena);
+    fields.push(ClassField { name: intern("session"), default: none_val });
+  }
+
+  if !has_user_method(&methods, "connect") {
+    methods.push(gen_method("connect", build_mcp_connect(span, arena)));
+  }
+  if !has_user_method(&methods, "disconnect") {
+    methods.push(gen_method("disconnect", build_mcp_disconnect(span, arena)));
+  }
+  if !has_user_method(&methods, "call") {
+    methods.push(gen_method("call", build_mcp_call(span, arena)));
+  }
+  if !has_user_method(&methods, "tools") {
+    methods.push(gen_method("tools", build_mcp_tools(span, arena)));
+  }
+
+  let class_stmt = arena.alloc_stmt(
+    Stmt::ClassDecl(ClassDeclData {
+      name: data.name,
+      type_params: data.type_params,
+      traits: vec![connector_sym],
+      fields,
+      methods,
+      exported: data.exported,
+    }),
+    span,
+  );
+
+  vec![use_connector, use_mcp, class_stmt]
+}
+
+fn build_mcp_connect(span: SourceSpan, arena: &mut AstArena) -> ExprId {
+  let self_cmd = gen_self_field("command", span, arena);
+  let self_args = gen_self_field("args", span, arena);
+  let config = gen_record(
+    vec![(intern("command"), self_cmd), (intern("args"), self_args)],
+    span,
+    arena,
+  );
+  let mcp_connect = gen_field_call("mcp", "connect", &[config], span, arena);
+  let propagated = gen_propagate(mcp_connect, span, arena);
+  let assign = gen_field_update("self", "session", propagated, span, arena);
+  let ok = gen_ok_unit(span, arena);
+  let ok_stmt = arena.alloc_stmt(Stmt::Expr(ok), span);
+  let body = gen_block(vec![assign, ok_stmt], span, arena);
+  gen_func(&[], body, span, arena)
+}
+
+fn build_mcp_disconnect(span: SourceSpan, arena: &mut AstArena) -> ExprId {
+  let self_session = gen_self_field("session", span, arena);
+  let none = gen_none(span, arena);
+  let cond = arena.alloc_expr(
+    Expr::Binary(ExprBinary { op: BinOp::Eq, left: self_session, right: none }),
+    span,
+  );
+  let ok_branch = gen_ok_unit(span, arena);
+  let self_session2 = gen_self_field("session", span, arena);
+  let mcp_close = gen_field_call("mcp", "close", &[self_session2], span, arena);
+  let close_stmt = arena.alloc_stmt(Stmt::Expr(mcp_close), span);
+  let ok2 = gen_ok_unit(span, arena);
+  let ok2_stmt = arena.alloc_stmt(Stmt::Expr(ok2), span);
+  let else_body = gen_block(vec![close_stmt, ok2_stmt], span, arena);
+  let ternary = arena.alloc_expr(
+    Expr::Ternary(ExprTernary { cond, then_: ok_branch, else_: Some(else_body) }),
+    span,
+  );
+  gen_func(&[], ternary, span, arena)
+}
+
+fn build_mcp_call(span: SourceSpan, arena: &mut AstArena) -> ExprId {
+  let self_session = gen_self_field("session", span, arena);
+  let req_tool = {
+    let req = gen_ident("req", span, arena);
+    arena.alloc_expr(
+      Expr::FieldAccess(ExprFieldAccess { expr: req, field: FieldKind::Named(intern("tool")) }),
+      span,
+    )
+  };
+  let req_args = {
+    let req = gen_ident("req", span, arena);
+    arena.alloc_expr(
+      Expr::FieldAccess(ExprFieldAccess { expr: req, field: FieldKind::Named(intern("args")) }),
+      span,
+    )
+  };
+  let mcp_call = gen_field_call("mcp", "call", &[self_session, req_tool, req_args], span, arena);
+  let propagated = gen_propagate(mcp_call, span, arena);
+  gen_func(&["req"], propagated, span, arena)
+}
+
+fn build_mcp_tools(span: SourceSpan, arena: &mut AstArena) -> ExprId {
+  let self_session = gen_self_field("session", span, arena);
+  let none = gen_none(span, arena);
+  let cond = arena.alloc_expr(
+    Expr::Binary(ExprBinary { op: BinOp::Eq, left: self_session, right: none }),
+    span,
+  );
+  let empty_list = gen_list(vec![], span, arena);
+  let self_session2 = gen_self_field("session", span, arena);
+  let list_tools = gen_field_call("mcp", "list_tools", &[self_session2], span, arena);
+  let propagated = gen_propagate(list_tools, span, arena);
+  let ternary = arena.alloc_expr(
+    Expr::Ternary(ExprTernary { cond, then_: empty_list, else_: Some(propagated) }),
+    span,
+  );
+  gen_func(&[], ternary, span, arena)
 }
 
 pub fn desugar(program: Program<Surface>) -> Program<Core> {
