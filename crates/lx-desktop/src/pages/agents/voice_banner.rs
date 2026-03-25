@@ -211,9 +211,9 @@ async fn run_pipeline(
   let session_id = &*crate::voice_backend::SESSION_ID;
   let session_created = crate::voice_backend::SESSION_CREATED.load(std::sync::atomic::Ordering::Relaxed);
   let cmd = if session_created {
-    format!("claude -p {escaped} --output-format text --system-prompt {system_escaped} --resume {session_id}")
+    format!("echo YOU: {escaped} && claude -p {escaped} --output-format text --system-prompt {system_escaped} --resume {session_id}")
   } else {
-    format!("claude -p {escaped} --output-format text --system-prompt {system_escaped} --session-id {session_id}")
+    format!("echo YOU: {escaped} && claude -p {escaped} --output-format text --system-prompt {system_escaped} --session-id {session_id}")
   };
 
   let terminal_id = uuid::Uuid::new_v4().to_string();
@@ -239,7 +239,8 @@ async fn run_pipeline(
 
   crate::voice_backend::SESSION_CREATED.store(true, std::sync::atomic::Ordering::Relaxed);
 
-  let response = String::from_utf8_lossy(&accumulated).trim().to_owned();
+  let full_output = String::from_utf8_lossy(&accumulated);
+  let response = full_output.find('\n').map(|i| full_output[i + 1..].trim()).unwrap_or("").to_owned();
   if response.is_empty() {
     ctx.pipeline_stage.set(PipelineStage::Idle);
     return Ok(());
