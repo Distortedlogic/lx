@@ -36,25 +36,25 @@ impl LintRule for RedundantPropagate {
   }
 
   fn check_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan, _arena: &AstArena, model: &SemanticModel) {
-    if let Expr::Propagate(ExprPropagate { inner: inner_id }) = expr {
-      if let Some(type_id) = model.type_of_expr(*inner_id) {
-        let ty = model.type_arena.get(type_id);
-        match ty {
-          Type::Result { .. } | Type::Maybe(_) => {},
-          _ => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagLevel::Warning,
-              kind: DiagnosticKind::LintWarning {
-                rule_name: "redundant-propagate".into(),
-                message: format!("propagate (^) on non-Result/Maybe type `{}`", model.type_arena.display(type_id)),
-              },
-              code: "L003",
-              span,
-              secondary: Vec::new(),
-              fix: None,
-            });
-          },
-        }
+    if let Expr::Propagate(ExprPropagate { inner: inner_id }) = expr
+      && let Some(type_id) = model.type_of_expr(*inner_id)
+    {
+      let ty = model.type_arena.get(type_id);
+      match ty {
+        Type::Result { .. } | Type::Maybe(_) => {},
+        _ => {
+          self.diagnostics.push(Diagnostic {
+            level: DiagLevel::Warning,
+            kind: DiagnosticKind::LintWarning {
+              rule_name: "redundant-propagate".into(),
+              message: format!("propagate (^) on non-Result/Maybe type `{}`", model.type_arena.display(type_id)),
+            },
+            code: "L003",
+            span,
+            secondary: Vec::new(),
+            fix: None,
+          });
+        },
       }
     }
   }

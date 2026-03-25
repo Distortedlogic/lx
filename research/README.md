@@ -103,7 +103,7 @@ Comprehensive survey of how programming languages are designed and implemented �
 - [debugger/landscape.md](debugger/landscape.md) — DAP specification, Python/Lua/Erlang debugger internals, trace hooks, breakpoints, flamegraphs, profilers
 
 #### Anthropic/Claude Rust SDKs
-- [tooling/anthropic-rust-sdks.md](tooling/anthropic-rust-sdks.md) — 18 Rust crates for Claude API and Claude Code CLI; tokio/streaming support, API coverage, maintenance status, recommendations for lx
+- [tooling/anthropic-rust-sdks.md](tooling/anthropic-rust-sdks.md) — 30+ Rust crates: 11 direct API clients + 20+ Claude Code CLI wrappers; tokio/streaming, hooks, MCP, adoption metrics, ecosystem fragmentation analysis
 
 #### Agent Harness Design
 - [harness/agent_harness_design.md](harness/agent_harness_design.md) — What harnesses are, context management, tool design, context rot, Anthropic's long-running agent pattern

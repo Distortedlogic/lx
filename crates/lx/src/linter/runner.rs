@@ -42,7 +42,7 @@ pub fn lint(program: &Program<Core>, model: &SemanticModel, registry: &mut RuleR
   }
 
   let mut walker = LintWalker { rules: registry.rules_mut(), arena: &program.arena, model };
-  walk_program(&mut walker, program);
+  let _ = walk_program(&mut walker, program);
 
   for rule in registry.rules_mut() {
     all_diags.extend(rule.take_diagnostics());

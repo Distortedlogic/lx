@@ -39006,7 +39006,10 @@ registerProcessor('capture', Capture);
 				source.connect(ctx.destination);
 				source.onended = () => this.playNext();
 				source.start();
-			}, () => this.playNext());
+			}, (err) => {
+				console.error("[audio-playback] decodeAudioData failed:", err);
+				this.playNext();
+			});
 		}
 		playAlertTone(frequency = 440, duration = .2, volume = .3) {
 			const ctx = this.ensureContext();
