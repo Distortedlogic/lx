@@ -102,6 +102,23 @@ Comprehensive survey of how programming languages are designed and implemented �
 #### Debugger & Profiler
 - [debugger/landscape.md](debugger/landscape.md) — DAP specification, Python/Lua/Erlang debugger internals, trace hooks, breakpoints, flamegraphs, profilers
 
+#### Anthropic/Claude Rust SDKs
+- [tooling/anthropic-rust-sdks.md](tooling/anthropic-rust-sdks.md) — 18 Rust crates for Claude API and Claude Code CLI; tokio/streaming support, API coverage, maintenance status, recommendations for lx
+
+#### Agent Harness Design
+- [harness/agent_harness_design.md](harness/agent_harness_design.md) — What harnesses are, context management, tool design, context rot, Anthropic's long-running agent pattern
+- [harness/agent_tool_orchestration.md](harness/agent_tool_orchestration.md) — Tool consolidation, CodeAct, PTC, response optimization, naming, sandboxing, parallel execution
+- [harness/agent_session_and_state_management.md](harness/agent_session_and_state_management.md) — Session persistence, state bridging, checkpoint/recovery
+- [harness/agent_observability_and_feedback_loops.md](harness/agent_observability_and_feedback_loops.md) — Observability patterns, feedback loops, debugging agent behavior
+- [harness/agent_configuration_as_code.md](harness/agent_configuration_as_code.md) — Configuration patterns, CLAUDE.md, project instructions, context files
+- [harness/context_engineering_deep_dive.md](harness/context_engineering_deep_dive.md) — Context window engineering, compaction, summarization, sub-agent compression
+- [harness/domain_specific_harness_patterns.md](harness/domain_specific_harness_patterns.md) — Domain-specific harness patterns for coding, research, data analysis
+- [harness/multi_agent_coordination_harness.md](harness/multi_agent_coordination_harness.md) — Multi-agent coordination, delegation, fan-out/fan-in
+- [harness/opencode_harness_analysis.md](harness/opencode_harness_analysis.md) — OpenCode (SST): client-server architecture, Plan/Build modes, Hashline editing, 75+ providers, LSP-as-context
+- [harness/pi_harness_analysis.md](harness/pi_harness_analysis.md) — Pi (badlogic): minimal 4-tool harness, <1K token system prompt, anti-MCP, tree-structured sessions, extensibility
+- [harness/REF_anthropic_effective_harnesses.md](harness/REF_anthropic_effective_harnesses.md) — Anthropic's two-agent long-running pattern, JSON feature tracking, session initialization protocol
+- [harness/REF_openai_harness_engineering.md](harness/REF_openai_harness_engineering.md) — OpenAI's harness engineering guidance
+
 ### Runtime & Security
 
 #### Backend Architecture

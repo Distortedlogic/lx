@@ -101,9 +101,14 @@ pub fn walk_stmt<V: AstVisitor + ?Sized>(v: &mut V, id: StmtId, arena: &AstArena
       let action = v.visit_binding(id, binding, span);
       match action {
         VisitAction::Stop => return ControlFlow::Break(()),
-        VisitAction::Skip => {},
+        VisitAction::Skip => {
+          v.leave_binding(id, binding, span);
+        },
         VisitAction::Descend => {
           walk_binding(v, id, binding, span, arena)?;
+          let Stmt::Binding(binding) = arena.stmt(id) else { unreachable!() };
+          let span = arena.stmt_span(id);
+          v.leave_binding(id, binding, span);
         },
       }
     },
@@ -135,7 +140,7 @@ pub fn walk_stmt<V: AstVisitor + ?Sized>(v: &mut V, id: StmtId, arena: &AstArena
   ControlFlow::Continue(())
 }
 
-pub fn walk_binding<V: AstVisitor + ?Sized>(v: &mut V, id: StmtId, binding: &Binding, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
+pub fn walk_binding<V: AstVisitor + ?Sized>(v: &mut V, _id: StmtId, binding: &Binding, _span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
   if let Some(ty_id) = binding.type_ann {
     walk_type_expr_dispatch(v, ty_id, arena)?;
   }
@@ -143,7 +148,6 @@ pub fn walk_binding<V: AstVisitor + ?Sized>(v: &mut V, id: StmtId, binding: &Bin
     walk_pattern_dispatch(v, *pid, arena)?;
   }
   dispatch_expr(v, binding.value, arena)?;
-  v.leave_binding(id, binding, span);
   ControlFlow::Continue(())
 }
 
