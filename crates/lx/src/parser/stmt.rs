@@ -225,7 +225,7 @@ where
   trait_union.or(trait_decl)
 }
 
-fn trait_body<'a, I>(
+pub(super) fn trait_body<'a, I>(
   expr: impl Parser<'a, I, ExprId, extra::Err<Rich<'a, TokenKind, Span>>> + Clone,
 ) -> impl Parser<'a, I, (Vec<TraitEntry>, Vec<AgentMethod>), extra::Err<Rich<'a, TokenKind, Span>>> + Clone
 where

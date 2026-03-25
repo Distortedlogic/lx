@@ -2,6 +2,7 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as B64;
 use common_pane_tree::TabsState;
 use common_pane_tree::{NotificationLevel, PaneNotification};
+use common_voice::AgentBackend as _;
 use dioxus::logger::tracing::error;
 use dioxus::prelude::*;
 use dioxus_widget_bridge::use_ts_widget;
@@ -90,47 +91,108 @@ pub fn TerminalView(terminal_id: String, working_dir: String, command: Option<St
 
 #[component]
 pub fn EditorView(editor_id: String, file_path: String, language: Option<String>) -> Element {
-  let lang = language.unwrap_or_else(|| "plaintext".into());
-  let content = if file_path.is_empty() { String::new() } else { std::fs::read_to_string(&file_path).unwrap_or_default() };
-  let (element_id, _widget) = use_ts_widget(
-    "editor",
-    serde_json::json!({
-        "content": content,
-        "language": lang,
-        "filePath": file_path,
-    }),
-  );
-
-  rsx! {
-    div {
-      id: "{element_id}",
-      class: "w-full h-full bg-[var(--surface-container-lowest)]",
+  let fp = file_path.clone();
+  let content = use_resource(move || {
+    let fp = fp.clone();
+    async move {
+      if fp.is_empty() {
+        String::new()
+      } else {
+        tokio::fs::read_to_string(&fp).await.unwrap_or_default()
+      }
     }
-  }
+  });
+
+  let (element_id, widget) = use_ts_widget("editor", serde_json::json!({}));
+
+  use_effect(move || {
+    if let Some(text) = content.value().read().as_ref() {
+      widget.send_update(serde_json::json!({ "content": text }));
+    }
+  });
+
+  use_future(move || async move {
+    loop {
+      let Ok(msg) = widget.recv::<serde_json::Value>().await else { break };
+      match msg["type"].as_str() {
+        Some("cursor") => {
+          let line = msg["line"].as_u64().unwrap_or(1) as u32;
+          let col = msg["col"].as_u64().unwrap_or(1) as u32;
+          let ctx = use_context::<crate::contexts::status_bar::StatusBarState>();
+          ctx.update_cursor(line, col);
+        }
+        Some("save") => {
+          if let Some(text) = msg["content"].as_str() {
+            let fp = file_path.clone();
+            if !fp.is_empty() {
+              let text = text.to_owned();
+              let _ = tokio::fs::write(&fp, &text).await;
+            }
+          }
+        }
+        _ => {}
+      }
+    }
+  });
+
+  rsx! { div { id: "{element_id}", class: "w-full h-full bg-[var(--surface-container-lowest)]" } }
 }
 
 #[component]
 pub fn AgentView(agent_id: String, session_id: String, model: String) -> Element {
-  let (element_id, _widget) = use_ts_widget("agent", serde_json::json!({}));
+  let (element_id, widget) = use_ts_widget(
+    "agent",
+    serde_json::json!({ "sessionId": session_id, "model": model }),
+  );
 
-  rsx! {
-    div {
-      id: "{element_id}",
-      class: "w-full h-full bg-[var(--surface-container)]",
+  use_future(move || async move {
+    loop {
+      let Ok(msg) = widget.recv::<serde_json::Value>().await else { break };
+      match msg["type"].as_str() {
+        Some("user_message") => {
+          let content = msg["content"].as_str().unwrap_or("").to_owned();
+          if content.is_empty() { continue; }
+          match crate::voice_backend::ClaudeCliBackend.query(&content).await {
+            Ok(response) => {
+              widget.send_update(serde_json::json!({
+                "type": "assistant_chunk",
+                "text": response,
+              }));
+              widget.send_update(serde_json::json!({ "type": "assistant_done" }));
+            }
+            Err(e) => {
+              widget.send_update(serde_json::json!({
+                "type": "error",
+                "message": format!("{e:#}"),
+              }));
+            }
+          }
+        }
+        Some("tool_decision") => {}
+        _ => {}
+      }
     }
-  }
+  });
+
+  rsx! { div { id: "{element_id}", class: "w-full h-full bg-[var(--surface-container)]" } }
 }
 
 #[component]
 pub fn CanvasView(canvas_id: String, widget_type: String, config: Value) -> Element {
-  let (element_id, _widget) = use_ts_widget(&widget_type, &config);
+  let (element_id, widget) = use_ts_widget(&widget_type, &config);
 
-  rsx! {
-    div {
-      id: "{element_id}",
-      class: "w-full h-full bg-[var(--surface-container)]",
+  use_future(move || async move {
+    loop {
+      let Ok(msg) = widget.recv::<serde_json::Value>().await else { break };
+      match msg["type"].as_str() {
+        Some("content_update") => {}
+        Some("interaction") => {}
+        _ => {}
+      }
     }
-  }
+  });
+
+  rsx! { div { id: "{element_id}", class: "w-full h-full bg-[var(--surface-container)]" } }
 }
 
 #[component]

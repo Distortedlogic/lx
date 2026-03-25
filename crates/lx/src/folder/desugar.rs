@@ -110,7 +110,7 @@ fn desugar_section(s: Section, span: SourceSpan, arena: &mut AstArena) -> Expr {
   }
 }
 
-fn desugar_ternary(cond: ExprId, then_: ExprId, else_: Option<ExprId>, span: SourceSpan, arena: &mut AstArena) -> Expr {
+pub(super) fn desugar_ternary(cond: ExprId, then_: ExprId, else_: Option<ExprId>, span: SourceSpan, arena: &mut AstArena) -> Expr {
   let else_body = else_.unwrap_or_else(|| arena.alloc_expr(Expr::Literal(Literal::Unit), span));
   let true_pat = arena.alloc_pattern(Pattern::Literal(Literal::Bool(true)), span);
   let false_pat = arena.alloc_pattern(Pattern::Literal(Literal::Bool(false)), span);
@@ -177,6 +177,10 @@ fn desugar_interp(parts: Vec<StrPart>, span: SourceSpan, arena: &mut AstArena) -
 }
 
 fn desugar_keyword(data: KeywordDeclData, span: SourceSpan, arena: &mut AstArena) -> Vec<StmtId> {
+  if data.keyword == KeywordKind::Schema {
+    return super::desugar_schema::desugar_schema(data, span, arena);
+  }
+
   let (import_path, trait_name) = match data.keyword {
     KeywordKind::Agent => (vec!["std", "agent"], "Agent"),
     KeywordKind::Tool => (vec!["std", "tool"], "Tool"),
