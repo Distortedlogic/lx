@@ -69,6 +69,7 @@ Comprehensive survey of how programming languages are designed and implemented �
 - [workflow-dsls/julep_deep_dive.md](workflow-dsls/julep_deep_dive.md) — Julep: 18 YAML step types as feature checklist, expression sandbox, Temporal-backed durable execution, why YAML fails as substrate, hosted shutdown postmortem
 - [workflow-dsls/slang_deep_dive.md](workflow-dsls/slang_deep_dive.md) — SLANG: three primitives (stake/await/commit), non-Turing-complete by design, dual-mode execution (LLM-as-runtime vs CLI), static deadlock detection, converge model
 - [workflow-dsls/autoresearch_deep_dive.md](workflow-dsls/autoresearch_deep_dive.md) — Karpathy's autoresearch: markdown-as-agent-program, single-file mutation surface, 5-min wall-clock budget, git-as-experiment-tracker, greedy metric-gated optimization loop
+- [workflow-dsls/agent_memory_systems_deep_dive.md](workflow-dsls/agent_memory_systems_deep_dive.md) — Mem0 (vector+graph, 49% LongMemEval), Zep/Graphiti (temporal knowledge graph, bi-temporal model), Hindsight (4-way retrieval, 91.4% SOTA), memory primitive taxonomy for DSLs
 
 #### AI/LLM Integration
 - [ai-llm-integration/landscape.md](ai-llm-integration/landscape.md) — DSPy, BAML, Guidance, LMQL, SGLang, Outlines, Instructor; structured output, constrained decoding
@@ -78,6 +79,9 @@ Comprehensive survey of how programming languages are designed and implemented �
 #### Refine Loops (Iterative AI Improvement)
 - [refine-loops/landscape.md](refine-loops/landscape.md) — Self-Refine, Reflexion, CRITIC, LLM-as-Judge, convergence theory, evaluation frameworks
 - [refine-loops/design-patterns.md](refine-loops/design-patterns.md) — Generate-critique-revise, grading rubrics, termination strategies, lx refine construct analysis
+
+#### Agent Benchmarks & Evaluation
+- [training-and-eval/agent_benchmarks_deep_dive.md](training-and-eval/agent_benchmarks_deep_dive.md) — SWE-bench, Terminal-Bench 2.0, GAIA, CORE, Tau-bench, WebArena; harness > model finding, reliability cliff (90%/step → 35% at 10 steps), context as central constraint
 
 ### Tooling
 
