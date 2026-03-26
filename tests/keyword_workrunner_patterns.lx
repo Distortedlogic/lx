@@ -29,9 +29,9 @@ Store RunStatus = {}
 status = RunStatus {}
 status.entries.set "task1" {status: "pass", score: 95}
 status.entries.set "task2" {status: "fail", score: 60}
-assert (status.len ()) == 2
+assert (status.len () == 2)
 passed = status.values () | filter (r) { r.status == "pass" }
-assert (passed | len) == 1
+assert (passed | len == 1)
 
 -- Guard for work item processing
 Guard WorkGuard = { max_turns: 50, max_time_ms: 600000 }

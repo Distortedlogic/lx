@@ -1,10 +1,9 @@
-use ../prompt/agents {ComposePrompt}
-use ../store/status {save_debug}
-use ../log : wg_log
+use ../prompt/compose {ComposePrompt}
+use pkg/log
 
 +Agent Composer = {
   act = (msg) {
-    wg_log.log "  > claude: compose work item document..."
+    log.log "  > claude: compose work item document..."
 
     p = ComposePrompt {}
     p.add_section "Audit Checklist" msg.audit_content
@@ -21,8 +20,8 @@ use ../log : wg_log
     } ^
 
     draft = result.text
-    save_debug msg.runner_dir msg.slug "compose.md" draft
-    wg_log.log "  < compose done ({draft | lines | len} lines)"
+    log.save_debug msg.runner_dir msg.slug "compose.md" draft
+    log.log "  < compose done ({draft | lines | len} lines)"
     draft
   }
 }

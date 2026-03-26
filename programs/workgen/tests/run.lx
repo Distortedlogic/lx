@@ -3,9 +3,9 @@
 
 use std/env
 use std/fs
-use ../log : wg_log
+use pkg/log
 use ../schema/audit {load}
-use ../grader {Grader}
+use ../agent/grader {Grader}
 use ../workflow/orchestrator
 use ./spec
 
@@ -14,7 +14,7 @@ rules_dir = "{source_dir ()}/../../rules"
 rules_content = fs.read "{rules_dir}/work-item.md" ^
 
 run_scenario_impl = (scenario) {
-  wg_log.log "  --- {scenario.name} ---"
+  log.log "  --- {scenario.name} ---"
   audit = load scenario.audit
   result = orchestrator.run_audit audit rules_content scenario.root wi_grader 3 ".lx/workgen_test"
   {name: scenario.name; passed: result.status == "pass"; score: result.score}
@@ -24,22 +24,22 @@ run_scenario_impl = (scenario) {
   tag_filter = env.get "TEST_TAG" ?? ""
   scenarios = tag_filter == "" ? spec.scenarios : (spec.scenarios | filter (s) { s.tags | contains? tag_filter })
 
-  wg_log.log "=== workgen satisfaction tests ==="
-  wg_log.log "scenarios: {scenarios | len}"
-  wg_log.log "threshold: {spec.threshold}"
+  log.log "=== workgen satisfaction tests ==="
+  log.log "scenarios: {scenarios | len}"
+  log.log "threshold: {spec.threshold}"
 
   results = scenarios | map run_scenario_impl
 
   passed_count = results | filter (r) { r.passed == true } | len
   total = results | len
 
-  wg_log.log ""
-  wg_log.log "=== {spec.name} ==="
+  log.log ""
+  log.log "=== {spec.name} ==="
   results | each (r) {
     status = r.passed ? "PASS" : "FAIL"
-    wg_log.log "  {r.name}: {r.score} {status}"
+    log.log "  {r.name}: {r.score} {status}"
   }
-  wg_log.log "Overall: {passed_count}/{total} passed (threshold: {spec.threshold})"
+  log.log "Overall: {passed_count}/{total} passed (threshold: {spec.threshold})"
 
   passed_count == total ? (Ok results) : (Err "some scenarios failed")
 }

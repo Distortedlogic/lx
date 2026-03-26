@@ -1,0 +1,3 @@
++Prompt RevisePrompt = {
+  system: "You are revising a work item document. Fix every feedback item. Output the complete revised document."
+}

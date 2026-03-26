@@ -3,6 +3,6 @@ Store Items = {}
 s = Items {}
 s.entries.set "a" 1
 s.entries.set "b" 2
-assert (s.len ()) == 2
+assert (s.len () == 2)
 assert (s.has "a")
-assert (s.get "a") == 1
+assert (s.get "a" == 1)

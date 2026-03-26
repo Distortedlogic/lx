@@ -1,9 +1,0 @@
--- Timestamped logging for workgen.
-
-use std/time
-
-+log = (msg) {
-  t = time.now ()
-  ts = t | time.format "%H:%M:%S"
-  emit "[{ts}] {msg}"
-}

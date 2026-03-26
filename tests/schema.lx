@@ -50,12 +50,12 @@ assert is_err5b
 s6 = schema.define "S6" {a: true, b: true}
 r6 = schema.validate_all s6 {:}
 errs6 = r6 ? { Err e -> e; Ok _ -> [] }
-assert (len errs6) == 2
+assert (len errs6 == 2)
 
 -- 7. schema.check returns Bool
 s7 = schema.define "S7" {x: true}
-assert (schema.check s7 {x: 1}) == true
-assert (schema.check s7 {:}) == false
+assert (schema.check s7 {x: 1} == true)
+assert (schema.check s7 {:} == false)
 
 -- 8. extra fields preserved
 s8 = schema.define "S8" {a: true}

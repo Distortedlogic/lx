@@ -36797,6 +36797,8 @@ var WidgetBridge = (function(exports) {
 				textarea,
 				currentBubble: null,
 				currentText: "",
+				pendingText: "",
+				typeTimer: null,
 				userScrolled: false,
 				dx
 			};
@@ -36834,12 +36836,32 @@ var WidgetBridge = (function(exports) {
 					if (!state.currentBubble) {
 						state.currentBubble = createBubble(state.messagesDiv, "assistant");
 						state.currentText = "";
+						state.pendingText = "";
 					}
-					state.currentText += msg.text ?? "";
-					state.currentBubble.textContent = state.currentText;
-					autoScroll(state);
+					state.pendingText += msg.text ?? "";
+					if (!state.typeTimer) state.typeTimer = setInterval(() => {
+						if (state.pendingText.length > 0) {
+							const batch = state.pendingText.slice(0, 3);
+							state.pendingText = state.pendingText.slice(3);
+							state.currentText += batch;
+							if (state.currentBubble) state.currentBubble.textContent = state.currentText;
+							autoScroll(state);
+						} else {
+							clearInterval(state.typeTimer);
+							state.typeTimer = null;
+						}
+					}, 16);
 					break;
 				case "assistant_done":
+					if (state.typeTimer) {
+						clearInterval(state.typeTimer);
+						state.typeTimer = null;
+					}
+					if (state.pendingText && state.currentBubble) {
+						state.currentText += state.pendingText;
+						state.currentBubble.textContent = state.currentText;
+						state.pendingText = "";
+					}
 					state.currentBubble = null;
 					state.currentText = "";
 					break;

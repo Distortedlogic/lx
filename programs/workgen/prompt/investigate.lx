@@ -1,0 +1,3 @@
++Prompt InvestigatePrompt = {
+  system: "You are a code auditor. Investigate the codebase thoroughly — read files, search for patterns. Produce a numbered findings list."
+}

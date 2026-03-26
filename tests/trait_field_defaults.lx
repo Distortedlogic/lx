@@ -8,4 +8,4 @@ Trait HasDefault = {
 Class Simple : [HasDefault] = {}
 s = Simple {}
 assert s.x == 42
-assert (s.get_x ()) == 42
+assert (s.get_x () == 42)

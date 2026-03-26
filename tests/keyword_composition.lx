@@ -24,9 +24,9 @@ w = Worker {}
 
 result = w.act {id: 1, name: "test task"}
 assert (result | ok?)
-assert (w.task_log.len ()) == 1
+assert (w.task_log.len () == 1)
 assert w.guard.turns == 1
 
 w.act {id: 2, name: "task 2"}
-assert (w.task_log.len ()) == 2
+assert (w.task_log.len () == 2)
 assert w.guard.turns == 2

@@ -5,8 +5,8 @@ CLI TestCli = {
 
 c = TestCli {}
 assert c.command == "echo"
-assert (c.tool_defs | len) == 1
+assert (c.tool_defs | len == 1)
 assert (methods_of c | any? (== "connect"))
 assert (methods_of c | any? (== "tools"))
 result = c.tools ()
-assert (result | len) == 1
+assert (result | len == 1)

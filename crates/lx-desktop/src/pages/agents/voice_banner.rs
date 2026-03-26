@@ -205,6 +205,7 @@ async fn run_pipeline(
 
   ctx.pipeline_stage.set(PipelineStage::SynthesizingSpeech);
   let wav_bytes = tts(&response).await?;
+  tokio::time::sleep(std::time::Duration::from_millis(150)).await;
   ctx.pending.write().insert("r0".to_string(), response);
   voice_widget.send_update(serde_json::json!({
       "type": "audio_response",

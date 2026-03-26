@@ -11,6 +11,6 @@ assert (methods_of api | any? (== "connect"))
 assert (methods_of api | any? (== "call"))
 assert (methods_of api | any? (== "tools"))
 result = api.tools ()
-assert (result | len) == 1
+assert (result | len == 1)
 connect_result = api.connect ()
 assert (connect_result | ok?)

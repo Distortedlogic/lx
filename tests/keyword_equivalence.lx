@@ -15,8 +15,8 @@ m.tick ()
 k.tick ()
 
 assert m.turns == k.turns
-assert (m.is_tripped ()) == (k.is_tripped ())
-assert (m.check () | ok?) == (k.check () | ok?)
+assert (m.is_tripped () == (k.is_tripped ()))
+assert (m.check () | ok? == (k.check () | ok?))
 
 -- Agent equivalence
 use std/agent {Agent}
@@ -33,7 +33,7 @@ ma = ManualAgent {}
 ka = KeywordAgent {}
 
 assert (ma.perceive "hi").parsed == (ka.perceive "hi").parsed
-assert (methods_of ma | sort) == (methods_of ka | sort)
+assert (methods_of ma | sort == (methods_of ka | sort))
 
 -- Store equivalence
 use std/collection {Collection}
@@ -48,8 +48,8 @@ ks = KeywordStore {}
 ms.entries.set "a" 1
 ks.entries.set "a" 1
 
-assert (ms.get "a") == (ks.get "a")
-assert (ms.len ()) == (ks.len ())
+assert (ms.get "a" == (ks.get "a"))
+assert (ms.len () == (ks.len ()))
 
 -- Tool equivalence
 use std/tool {Tool}
@@ -69,5 +69,5 @@ Tool KeywordTool = {
 mt = ManualTool {}
 kt = KeywordTool {}
 
-assert (mt.run {x: 42}) == (kt.run {x: 42})
-assert (mt.schema ()) == (kt.schema ())
+assert (mt.run {x: 42} == (kt.run {x: 42}))
+assert (mt.schema () == (kt.schema ()))

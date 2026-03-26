@@ -9,7 +9,7 @@ Class Echo : [Tool] = {
 t = Echo {}
 assert t.description == "echoes input"
 s = t.schema ()
-assert (s | keys | len) == 1
+assert (s | keys | len == 1)
 assert s.text == "Str"
 result = t.run {text: "hello"}
 assert result == Ok "hello"

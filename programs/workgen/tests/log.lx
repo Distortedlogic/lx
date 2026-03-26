@@ -1,4 +1,4 @@
-use ../log : wg_log
+use pkg/log
 
-wg_log.log "test message from workgen log"
-assert ((type_of wg_log.log) == "Func")
+log.log "test message from workgen log"
+assert ((type_of log.log == "Func"))

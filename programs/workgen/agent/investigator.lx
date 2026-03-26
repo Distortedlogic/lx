@@ -1,10 +1,9 @@
-use ../prompt/agents {InvestigatePrompt}
-use ../store/status {save_debug}
-use ../log : wg_log
+use ../prompt/investigate {InvestigatePrompt}
+use pkg/log
 
 +Agent Investigator = {
   act = (msg) {
-    wg_log.log "  > claude: investigate codebase (max 30 turns)..."
+    log.log "  > claude: investigate codebase (max 30 turns)..."
 
     p = InvestigatePrompt {}
     p.add_section "Audit Checklist" msg.audit_content
@@ -21,8 +20,8 @@ use ../log : wg_log
     } ^
 
     findings = result.text
-    save_debug msg.runner_dir msg.slug "investigate.md" findings
-    wg_log.log "  < investigate done ({findings | lines | len} lines, {result.turns ?? 0} turns)"
+    log.save_debug msg.runner_dir msg.slug "investigate.md" findings
+    log.log "  < investigate done ({findings | lines | len} lines, {result.turns ?? 0} turns)"
     findings
   }
 }

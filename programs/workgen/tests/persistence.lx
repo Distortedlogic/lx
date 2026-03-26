@@ -7,16 +7,16 @@ runner_dir = "/tmp/lx_test_workgen_{now.ms}"
 st = RunStatus {runner_dir: runner_dir}
 st.load ()
 
-assert (st.completed_count () == 0)
+assert (st.completed_count ( == 0))
 
 st.record_result {status: "pass"; score: 80; name: "RUST_AUDIT"; path: "work_items/RUST_AUDIT.md"; feedback: "ok"}
-assert (st.completed_count () == 1)
+assert (st.completed_count ( == 1))
 done = st.is_completed "RUST_AUDIT"
 assert (done == true)
 
 st.record_result {status: "fail"; score: 40; name: "PYTHON_AUDIT"; path: "work_items/PYTHON_AUDIT.md"; feedback: "bad"}
-assert (st.completed_count () == 1)
+assert (st.completed_count ( == 1))
 
 st2 = RunStatus {runner_dir: runner_dir}
 st2.load ()
-assert (st2.completed_count () == 1)
+assert (st2.completed_count ( == 1))

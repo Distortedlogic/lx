@@ -1,6 +1,7 @@
 -- Work Item Generator — generates work items from audit checklists.
 --
--- Pipeline: parse audit → investigate codebase → compose draft → grade → revise loop.
+-- Pipeline: parse audit → investigate → validate → compose → grade → revise loop.
+-- Validate step ensures approach is best practice before generating.
 -- Persists status + debug logs to .lx/workgen/.
 --
 -- Usage: lx run workgen
@@ -9,10 +10,10 @@
 use std/fs
 use std/time
 use std/cron
-use ./log : wg_log
+use pkg/log
 use ./store/status {RunStatus}
 use ./schema/audit
-use ./grader {Grader}
+use ./agent/grader {Grader}
 use ./workflow/orchestrator
 
 max_rounds = 3
@@ -22,10 +23,11 @@ rules_dir = "{source_dir ()}/rules"
 wi_grader = Grader {
   threshold: 75
   rubric: [
-    {name: "coverage"; description: "every audit item has a finding and task"; weight: 25}
-    {name: "task_quality"; description: "tasks are unambiguous, correctly ordered, with exact files and changes"; weight: 25}
-    {name: "compliance"; description: "follows work-item.md format: required sections, CRITICAL REMINDERS footer"; weight: 25}
-    {name: "correctness"; description: "proposed fixes are correct for the codebase"; weight: 25}
+    {name: "coverage"; description: "every audit item has a finding and task"; weight: 20}
+    {name: "task_quality"; description: "tasks are unambiguous, correctly ordered, with exact files and changes"; weight: 20}
+    {name: "compliance"; description: "follows work-item.md format: required sections, CRITICAL REMINDERS footer"; weight: 20}
+    {name: "correctness"; description: "proposed fixes are correct for the codebase"; weight: 20}
+    {name: "self_sufficiency"; description: "no deferred work, no vagueness, no deferral language, executable by separate agent with zero additional context"; weight: 20}
   ]
 }
 
@@ -45,15 +47,15 @@ run_interactive = () {
 }
 
 +run = (audit_path) {
-  wg_log.log "=== Work Item Generator ==="
+  log.log "=== Work Item Generator ==="
 
   audit = audit_parser.load audit_path
   status = RunStatus {runner_dir: runner_dir}
-  status.load ()
+  status.init ()
 
   already_done = status.is_completed audit.name
   already_done ? {
-    wg_log.log "{audit.name} already completed — skipping"
+    log.log "{audit.name} already completed — skipping"
     assert false "already completed"
   }
 
@@ -71,12 +73,12 @@ run_interactive = () {
   status.record_result result
 
   elapsed = (time.now().ms - start_ms) // 1000
-  wg_log.log ""
-  wg_log.log "=== DONE ==="
+  log.log ""
+  log.log "=== DONE ==="
   icon = result.status == "pass" ? "OK" : "FAIL"
-  wg_log.log "  [{icon}] {result.name} — {result.score}/100 ({result.rounds} rounds, {elapsed}s)"
-  result.status == "pass" ? wg_log.log "; output: {result.path}"
-  result.status != "pass" ? wg_log.log "; feedback: {result.feedback}"
+  log.log "  [{icon}] {result.name} — {result.score}/100 ({result.rounds} rounds, {elapsed}s)"
+  result.status == "pass" ? log.log "; output: {result.path}"
+  result.status != "pass" ? log.log "; feedback: {result.feedback}"
 }
 
 main ()

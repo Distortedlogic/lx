@@ -1,0 +1,33 @@
+-- Validator — checks if proposed approach is best practice before generating work items.
+-- Returns validated findings or rejection with alternatives.
+
+use ../prompt/validate {ValidatePrompt}
+use pkg/log
+
++Agent Validator = {
+  act = (msg) {
+    log.log "  > claude: validate approach (max 20 turns)..."
+
+    p = ValidatePrompt {}
+    p.add_section "Audit Findings" msg.findings
+    p.add_section "Codebase Root" msg.root
+    p.add_instruction "For each proposed change, evaluate: performant? optimal? elegant? simple and concise? minimally knotted?"
+    p.add_instruction "Is this the best practice, highly standard, most idiomatic long-term solution?"
+    p.add_instruction "If validated: return the findings unchanged with a VALIDATED header"
+    p.add_instruction "If rejected: explain why and propose concrete alternatives"
+    p.add_constraint "Do not accept workarounds, hacks, or non-standard approaches"
+    p.add_constraint "Prefer established patterns over clever solutions"
+
+    result = self.think_with {
+      prompt: (p.render ())
+      tools: ["Read"; "Glob"; "Grep"; "Bash"]
+      max_turns: 20
+    } ^
+
+    report = result.text
+    log.save_debug msg.runner_dir msg.slug "validate.md" report
+    validated = report | contains? "VALIDATED"
+    log.log "  < validate done — {validated ? "accepted" : "rejected"}"
+    {validated: validated; report: report}
+  }
+}

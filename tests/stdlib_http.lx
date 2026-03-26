@@ -1,6 +1,6 @@
 use std/http
 
-assert (type_of http.get) != "Unit"
-assert (type_of http.post) != "Unit"
-assert (type_of http.request) != "Unit"
+assert (type_of http.get != "Unit")
+assert (type_of http.post != "Unit")
+assert (type_of http.request != "Unit")
 log.info "stdlib_http: all functions exist"

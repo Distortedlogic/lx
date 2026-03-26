@@ -1,8 +1,8 @@
 use miette::SourceSpan;
 
 use crate::ast::{
-  AgentMethod, AstArena, BinOp, BindTarget, Binding, Expr, ExprApply, ExprBinary, ExprBlock, ExprFunc, ExprId, ExprUnary, KeywordDeclData, ListElem, Literal,
-  Param, RecordField, Stmt, StmtId, StrPart, TraitDeclData, TraitEntry, UseKind, UseStmt,
+  AgentMethod, AstArena, BinOp, BindTarget, Binding, ClassDeclData, ClassField, Expr, ExprApply, ExprBinary, ExprBlock, ExprFunc, ExprId, ExprUnary,
+  KeywordDeclData, ListElem, Literal, Param, RecordField, Stmt, StmtId, StrPart, TraitEntry, UseKind, UseStmt,
 };
 use crate::sym::intern;
 
@@ -54,6 +54,17 @@ fn lx_type_to_json_type(type_name: &str) -> &'static str {
   }
 }
 
+fn default_for_type(type_name: &str, span: SourceSpan, arena: &mut AstArena) -> ExprId {
+  match type_name {
+    "Int" => arena.alloc_expr(Expr::Literal(Literal::Int(0.into())), span),
+    "Float" => arena.alloc_expr(Expr::Literal(Literal::Float(0.0)), span),
+    "Str" => arena.alloc_expr(Expr::Literal(Literal::Str(vec![StrPart::Text(String::new())])), span),
+    "Bool" => arena.alloc_expr(Expr::Literal(Literal::Bool(false)), span),
+    "List" => arena.alloc_expr(Expr::List(vec![]), span),
+    _ => arena.alloc_expr(Expr::Literal(Literal::Unit), span),
+  }
+}
+
 pub(super) fn desugar_schema(data: KeywordDeclData, span: SourceSpan, arena: &mut AstArena) -> Vec<StmtId> {
   let use_path = vec![intern("std"), intern("schema_trait")];
   let schema_sym = intern("Schema");
@@ -70,19 +81,23 @@ pub(super) fn desugar_schema(data: KeywordDeclData, span: SourceSpan, arena: &mu
     }
   }
 
-  let trait_decl = TraitDeclData {
-    name: data.name,
-    type_params: data.type_params,
-    entries,
-    methods: vec![],
-    defaults: vec![schema_method, validate_method],
-    requires: vec![],
-    description: None,
-    tags: vec![],
-    exported: data.exported,
-  };
+  let fields: Vec<ClassField> = entries
+    .iter()
+    .filter_map(|e| {
+      if let TraitEntry::Field(f) = e {
+        let default = f.default.unwrap_or_else(|| default_for_type(f.type_name.as_str(), span, arena));
+        Some(ClassField { name: f.name, default })
+      } else {
+        None
+      }
+    })
+    .collect();
 
-  vec![use_stmt, arena.alloc_stmt(Stmt::TraitDecl(trait_decl), span)]
+  let methods = vec![schema_method, validate_method];
+
+  let class_decl = ClassDeclData { name: data.name, type_params: data.type_params, traits: vec![], fields, methods, exported: data.exported };
+
+  vec![use_stmt, arena.alloc_stmt(Stmt::ClassDecl(class_decl), span)]
 }
 
 fn build_schema_method(entries: &[TraitEntry], span: SourceSpan, arena: &mut AstArena) -> AgentMethod {

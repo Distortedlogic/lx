@@ -1,10 +1,9 @@
-use ../prompt/agents {RevisePrompt}
-use ../store/status {save_debug}
-use ../log : wg_log
+use ../prompt/revise {RevisePrompt}
+use pkg/log
 
 +Agent Reviser = {
   act = (msg) {
-    wg_log.log "  > claude: revise draft (round {msg.round_num})..."
+    log.log "  > claude: revise draft (round {msg.round_num})..."
 
     p = RevisePrompt {}
     p.add_section "Current Document" msg.draft
@@ -19,8 +18,8 @@ use ../log : wg_log
     } ^
 
     revised = result.text
-    save_debug msg.runner_dir msg.slug "revise_round_{msg.round_num}.md" revised
-    wg_log.log "  < revise done ({revised | lines | len} lines)"
+    log.save_debug msg.runner_dir msg.slug "revise_round_{msg.round_num}.md" revised
+    log.log "  < revise done ({revised | lines | len} lines)"
     revised
   }
 }
