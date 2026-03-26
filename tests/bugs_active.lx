@@ -1,5 +1,5 @@
 -- active bug probes from agent/BUGS.md
--- BUG-FIXED asserts pass when resolved, fail when regressed
+-- parse-error and type-error bugs are in crates/lx-cli/tests/bug_probes.rs
 
 use std/agent {Agent}
 
@@ -30,12 +30,5 @@ ba = BareAgent {}
 assert (methods_of ba | any? (== "think") == true) "BUG-FIXED: Agent think injected"
 assert (methods_of ba | any? (== "handle") == true) "BUG-FIXED: Agent handle injected"
 assert (methods_of ba | any? (== "think_with") == true) "BUG-FIXED: Agent think_with injected"
-
--- tuple destructuring in HOF chains
-probe_destr = try (() {
-  [("x"; 10); ("y"; 20)] | map (name val) { "{name}:{val}" }
-}) ()
-destr_works = probe_destr ? { Err _ -> false; _ -> probe_destr == ["x:10"; "y:20"] }
-assert (destr_works == true) "BUG-FIXED: tuple destructuring in HOF map"
 
 emit "bugs_active: all checks passed"

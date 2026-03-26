@@ -19,19 +19,11 @@ The structured output path works as follows: `llm.prompt_structured` in `crates/
 
 The fix has two parts. First, pass `json_schema` from `LlmOpts` through to `parse_response`. Second, when `json_schema` is present, after extracting the text from Claude's response, apply SAP-style recovery transformations on the text before attempting `serde_json::from_str`: strip markdown code fences, find the first `{` or `[` and trim before it, remove trailing commas before `}` or `]`, remove single-line comments. If JSON parsing succeeds, return the parsed value as a Record/List LxVal. If it fails, return the raw text as before (no behavior change for non-structured calls).
 
-**3. Type checking for `~>?` ask expressions in the desugarer**
-
-`Expr::Ask` is desugared to `agent.ask(target, msg)` in `crates/lx/src/folder/desugar.rs` at line 61 BEFORE the type checker runs. The type checker marks `Expr::Ask` as `unreachable!()` in both `check_expr.rs` line 47 and `type_ops.rs` line 46. Therefore type checking cannot happen in the checker — it must happen in the desugarer, before the Ask is lowered to an `agent.ask` call.
-
-The fix adds a pre-desugar validation pass: before converting `Expr::Ask` to `agent.ask`, if the target expression resolves to a known Agent/Class type in the current scope that has a `handle` method with a typed parameter, emit a warning diagnostic if the message expression's apparent type does not match. Since the desugarer does not have full type information (it operates on the Surface AST before type inference), this check is best-effort: it can catch cases where the target is a locally-bound identifier with a known Class type and the message is a record literal with known fields. Skip the check for any non-trivial expression. This is a lightweight static check, not a full type-level verification.
-
 # How It Works
 
 **ToolSearch** is a pure lx Tool. It reads `registry.list_tools ()` (or a passed-in tools list) at initialization, builds an in-memory index of name + description strings, and on each `run` call scores the query against each tool's description using keyword overlap (split query into words, count how many appear in the tool description, normalize by query word count). No vector embeddings, no external dependencies. This matches the "BM25-lite" approach the Anthropic Agent SDK uses for its regex-based tool search variant.
 
-**SAP recovery** is a Rust function that preprocesses the raw response string before `serde_json::from_str`. It is applied inside the existing `llm.prompt_structured` implementation, after the LLM response is received and before JSON parsing. The function is pure (no side effects, no LLM calls) and fast (string operations only). If recovery succeeds, the parsed value goes through the existing schema validation path. If it fails, the existing error/retry path is unchanged.
-
-**Type checking for `~>?`** extends the existing expression type synthesis. The type checker already resolves identifier types and function signatures. For an `Ask` expression `target ~>? msg`, if `target` resolves to a type that includes a `handle` method with a known parameter type, unify `msg`'s type with that parameter type. This is analogous to how the checker already validates function application types.
+**SAP recovery** is a pure Rust function (`recover_json`) in `crates/lx-cli/src/llm_backend.rs` that preprocesses the raw response text before `serde_json::from_str`. It is called inside `parse_response` only when `json_schema` is `Some`. The function is pure (no side effects, no LLM calls) and fast (string operations only). If JSON parsing succeeds after recovery, the parsed value is converted to an `LxVal` and returned as `Ok(LxVal::ok(parsed))`. If parsing fails after recovery, the raw text is returned exactly as before — no behavior change for existing callers. The `json_schema` string itself is not used for validation (it was already sent to the LLM as a prompt instruction) — it only serves as a flag indicating that structured output was requested and JSON parsing should be attempted.
 
 # Files Affected
 
@@ -39,7 +31,6 @@ The fix adds a pre-desugar validation pass: before converting `Expr::Ask` to `ag
 |------|--------|
 | `pkg/connectors/tool_search.lx` | New file — ToolSearch Tool (~50 lines) |
 | `crates/lx-cli/src/llm_backend.rs` | Pass `json_schema` to `parse_response`; add `recover_json` helper; parse structured output as JSON with SAP recovery |
-| `crates/lx/src/folder/desugar.rs` | Add pre-desugar type validation for `Expr::Ask` message shapes before lowering to `agent.ask` |
 
 ---
 
@@ -81,7 +72,7 @@ Edit `crates/lx-cli/src/llm_backend.rs`. Add a `recover_json` function above `pa
 4. Remove single-line comments: for each line, if it contains `//` that is not inside a quoted string, truncate the line at that position. A simple heuristic: split by lines, for each line find `//` and if the count of `"` characters before it is even, truncate there.
 5. Return the cleaned string.
 
-Then modify `parse_response`: after extracting the `text` variable (currently line 63 `raw.to_string()` fallback or the extracted `result`/`text` field), add a new block. If `json_schema` is `Some(_)`, call `recover_json(&text)` to get a cleaned string, then attempt `serde_json::from_str::<serde_json::Value>(&cleaned)`. If that succeeds, convert the `serde_json::Value` to an `LxVal` using the existing `LxVal::from_json` or equivalent conversion (check if `LxVal` has a `from` impl for `serde_json::Value` — if not, build a simple recursive converter: null to `LxVal::None`, bool to `LxVal::Bool`, number to `LxVal::Float` or `LxVal::Int`, string to `LxVal::str`, array to `LxVal::list`, object to `LxVal::record`). Wrap the result in `Ok(LxVal::ok(parsed_value))`. If JSON parsing fails after recovery, fall through to the existing behavior of returning the raw text wrapped in a record.
+Then modify `parse_response`: after extracting the `text` variable (currently line 63 `raw.to_string()` fallback or the extracted `result`/`text` field), add a new block. If `json_schema` is `Some(_)`, call `recover_json(&text)` to get a cleaned string, then attempt `serde_json::from_str::<serde_json::Value>(&cleaned)`. If that succeeds, convert the `serde_json::Value` to an `LxVal` using the existing `impl From<serde_json::Value> for LxVal` at `crates/lx/src/value/serde_impl.rs` line 73 — call `LxVal::from(json_value)`. Wrap the result in `Ok(LxVal::ok(parsed_value))`. If JSON parsing fails after recovery, fall through to the existing behavior of returning the raw text wrapped in a record.
 
 ### Task 8: Format and commit
 

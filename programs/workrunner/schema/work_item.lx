@@ -47,10 +47,7 @@ section_content = (sections name) {
   (found ?? {content: ""}).content | trim
 }
 
-parse_task_section = (sec num) {
-  title = sec.title
-  body = sec.content
-
+parse_task_section = (title body num) {
   subject_line = (body | lines | find (l) { l | starts? "Subject:" }) ?? ""
   subject = subject_line | len > 0 ? (subject_line | replace "Subject:" "" | trim) : title
 
@@ -65,21 +62,17 @@ parse_task_section = (sec num) {
   Task {num: num; subject: subject; description: description; active_form: active_form; full_text: body}
 }
 
-parse_tasks_from_raw = (raw) {
-  task_section = raw | split "\n# Task List\n"
-  has_tasks = task_section | len >= 2
-  has_tasks == false ? [] : {
-    task_text = (task_section | drop 1 | first) ?? ""
-    next_h1 = task_text | lines | find (l) { l | starts? "# " }
-    cut_text = next_h1 != None ? {
-      idx = task_text | lines | enumerate | find (p) { p.1 | starts? "# " }
-      before = task_text | lines | take ((idx ?? (0; "")).0)
-      before | join "\n"
-    } : task_text
-    task_md = "# Tasks\n{cut_text}"
-    parsed = md.parse task_md
-    secs = md.sections parsed
-    secs | filter (s) { s.title | starts? "Task" }
+extract_tasks = (raw) {
+  all_lines = raw | lines
+  task_indices = all_lines | enumerate | filter (p) { p.1 | starts? "### Task" }
+  task_indices | enumerate | map (outer) {
+    num = outer.0 + 1
+    start_pair = outer.1
+    start_idx = start_pair.0
+    title = start_pair.1 | replace "### " "" | trim
+    body_lines = all_lines | drop (start_idx + 1) | take_while (l) { not (l | starts? "### ") && not (l | starts? "## ") }
+    body = body_lines | join "\n" | trim
+    parse_task_section title body num
   }
 }
 
@@ -93,13 +86,8 @@ parse_tasks_from_raw = (raw) {
   what_changes = section_content sections "What Changes"
   files_affected = section_content sections "Files Affected"
 
-  task_sections = parse_tasks_from_raw raw
-  task_sections | len == 0 ? assert false "work_item.load: no tasks found in {path}"
-  tasks = task_sections | enumerate | map (pair) {
-    idx = pair.0
-    sec = pair.1
-    parse_task_section sec (idx + 1)
-  }
+  tasks = extract_tasks raw
+  (tasks | len) == 0 ? assert (false) "work_item.load: no tasks found in {path}"
 
   slug = path | replace "work_items/" "" | replace ".md" "" | lower
 

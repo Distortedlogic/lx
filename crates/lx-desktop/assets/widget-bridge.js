@@ -38974,87 +38974,6 @@ registerProcessor('capture', Capture);
 		}
 	};
 	//#endregion
-	//#region ../audio-playback/src/playback.ts
-	var AudioPlayback = class {
-		constructor() {
-			this.queue = [];
-			this.playing = false;
-			this.currentAudio = null;
-			this.onComplete = null;
-			this.onItemStart = null;
-		}
-		get isPlaying() {
-			return this.playing;
-		}
-		get queueLength() {
-			return this.queue.length;
-		}
-		enqueue(base64Wav, id = "") {
-			this.queue.push({
-				data: base64Wav,
-				id
-			});
-			if (!this.playing) this.playNext();
-		}
-		playNext() {
-			if (this.queue.length === 0) {
-				this.playing = false;
-				this.onComplete?.();
-				return;
-			}
-			this.playing = true;
-			const item = this.queue.shift();
-			const binary = atob(item.data);
-			const bytes = new Uint8Array(binary.length);
-			for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-			const blob = new Blob([bytes], { type: "audio/wav" });
-			const url = URL.createObjectURL(blob);
-			const audio = new Audio(url);
-			this.currentAudio = audio;
-			this.onItemStart?.(item.id);
-			audio.onended = () => {
-				URL.revokeObjectURL(url);
-				this.currentAudio = null;
-				this.playNext();
-			};
-			audio.onerror = () => {
-				URL.revokeObjectURL(url);
-				this.currentAudio = null;
-				this.playNext();
-			};
-			audio.oncanplaythrough = () => {
-				audio.play().catch(() => {
-					URL.revokeObjectURL(url);
-					this.currentAudio = null;
-					this.playNext();
-				});
-			};
-			audio.load();
-		}
-		playAlertTone(frequency = 440, duration = .2, volume = .3) {
-			const ctx = new AudioContext();
-			const osc = ctx.createOscillator();
-			const gain = ctx.createGain();
-			osc.frequency.value = frequency;
-			gain.gain.value = volume;
-			osc.connect(gain);
-			gain.connect(ctx.destination);
-			osc.start();
-			osc.stop(ctx.currentTime + duration);
-		}
-		stop() {
-			this.queue.length = 0;
-			this.playing = false;
-			if (this.currentAudio) {
-				this.currentAudio.pause();
-				this.currentAudio = null;
-			}
-		}
-		dispose() {
-			this.stop();
-		}
-	};
-	//#endregion
 	//#region widgets/voice.ts
 	var states = /* @__PURE__ */ new Map();
 	function transition(state, status) {
@@ -39067,10 +38986,8 @@ registerProcessor('capture', Capture);
 	registerWidget("voice", {
 		mount(elementId, _config, dx) {
 			const capture = new AudioCapture({ sampleRate: 16e3 });
-			const playback = new AudioPlayback();
 			const state = {
 				capture,
-				playback,
 				status: "idle",
 				dx
 			};
@@ -39095,22 +39012,11 @@ registerProcessor('capture', Capture);
 					level: rms
 				});
 			};
-			playback.onComplete = () => {
-				transition(state, "idle");
-				dx.send({ type: "playback_complete" });
-			};
-			playback.onItemStart = (id) => {
-				dx.send({
-					type: "audio_playing",
-					id
-				});
-			};
 		},
 		update(elementId, data) {
 			const state = states.get(elementId);
 			if (!state) return;
-			const msg = data;
-			switch (msg.type) {
+			switch (data.type) {
 				case "start_capture":
 					if (state.status !== "idle") return;
 					state.capture.start().then(() => {
@@ -39120,13 +39026,8 @@ registerProcessor('capture', Capture);
 					break;
 				case "stop_capture":
 					state.capture.stop();
-					state.playback.stop();
 					transition(state, "idle");
 					state.dx.send({ type: "cancel" });
-					break;
-				case "audio_response":
-					transition(state, "speaking");
-					if (msg.data) state.playback.enqueue(msg.data, msg.id ?? "");
 					break;
 			}
 		},
@@ -39135,7 +39036,6 @@ registerProcessor('capture', Capture);
 			const state = states.get(elementId);
 			if (state) {
 				state.capture.dispose();
-				state.playback.dispose();
 				states.delete(elementId);
 			}
 		}

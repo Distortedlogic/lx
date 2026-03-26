@@ -1,55 +1,23 @@
 -- gotcha probes: runtime traps from agent/GOTCHAS.md
+-- type-error gotchas are in crates/lx-cli/tests/bug_probes.rs
 
 use std/time
 use std/cron
 use std/agent {Agent}
 
--- ?? binds looser than | — probe without parens
-entry = {field: None}
-probe_prec = try (() { entry.field ?? "HELLO" | lower }) ()
-prec_fixed = probe_prec ? { Err _ -> false; _ -> probe_prec == "hello" }
-assert (prec_fixed == true) "BUG-FIXED: ?? binds tighter than |"
+-- tuple destructuring in HOF lambdas (this one works via lx run)
+result = ["x"; "y"] | enumerate | map (i s) { "{i}:{s}" }
+assert (result == ["0:x"; "1:y"]) "BUG-FIXED: tuple destructuring in HOF lambdas"
 
--- | binds looser than +
-probe_pipe = try (() { [1; 2; 3] | len + [4; 5] | len }) ()
-pipe_fixed = probe_pipe ? { Err _ -> false; _ -> probe_pipe == 5 }
-assert (pipe_fixed == true) "BUG-FIXED: | binds tighter than +"
-
--- tuple destructuring in HOF lambdas
-probe_tuple = try (() {
-  ["x"; "y"] | enumerate | map (i s) { "{i}:{s}" }
-}) ()
-tuple_fixed = probe_tuple ? { Err _ -> false; _ -> probe_tuple == ["0:x"; "1:y"] }
-assert (tuple_fixed == true) "BUG-FIXED: tuple destructuring in HOF lambdas"
-
--- not is a function not an operator
-not_result = not true
-assert (type_of not_result == "Bool") "BUG-FIXED: not returns Bool"
-
--- find/first/last return Some not the value
+-- find no match returns None
 list = [1; 2; 3; 4; 5]
-found = list | find (x) { x > 3 }
-assert (found == 4) "BUG-FIXED: find returns value directly"
-
-first_val = list | first
-assert (first_val == 1) "BUG-FIXED: first returns value directly"
-
-last_val = list | last
-assert (last_val == 5) "BUG-FIXED: last returns value directly"
-
 no_match = list | find (x) { x > 100 }
 assert (no_match == None) "find no match returns None"
 
--- computed tuple negative indexing
-t_neg = (10; 20; 30)
-neg_probe = try (() { t_neg.[-1] }) ()
-neg_works = neg_probe ? { Err _ -> false; _ -> neg_probe == 30 }
-assert (neg_works == true) "BUG-FIXED: tuple negative indexing"
-
--- cron.every exists and takes milliseconds
+-- cron.every exists
 assert (type_of cron.every == "Func") "cron.every exists"
 
--- agent default tools is empty list
+-- agent default tools/max_turns
 Agent NoToolAgent = {
   role = () { "tester" }
   goal = () { "test" }

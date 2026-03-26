@@ -1,17 +1,10 @@
 -- gotcha probes: parser traps from agent/GOTCHAS.md
--- parse-error gotchas are tested in crates/lx-cli/tests/bug_probes.rs
--- this file tests runtime-detectable parser gotchas
+-- parse-error and type-error gotchas are in crates/lx-cli/tests/bug_probes.rs
 
 -- multi-arg calls before ? — probe whether ? binds to call or last arg
 add = (a b) a + b
 probe1 = add 2 3 ? { 5 -> "call"; _ -> "misbind" }
 assert (probe1 == "call") "BUG-FIXED: multi-arg call ? binds to full call"
-
--- f arg () { body } — probe whether closure is passed correctly
-with_fn = (x fn) { fn x }
-probe2 = try (() { with_fn 1 () { 99 } }) ()
-fn_works = probe2 ? { Err _ -> false; _ -> probe2 == 99 }
-assert (fn_works == true) "BUG-FIXED: f arg () { body } passes closure"
 
 -- {} is Unit not empty Record
 assert (type_of {} == "Unit") "{} is Unit"
@@ -20,12 +13,5 @@ assert (type_of {:} == "Record") "{:} is Record"
 -- string interpolation parses {key: val} as lx code
 schema_str = `{score: Int, issues: [Str]}`
 assert (schema_str | contains? "score") "backtick avoids interpolation"
-
--- {..spread shorthand} — runtime detection
-entry = {name: "a"; value: 1}
-score = 100
-probe3 = try (() { {..entry  score} }) ()
-spread_works = probe3 ? { Err _ -> false; _ -> probe3.score == 100 }
-assert (spread_works == true) "BUG-FIXED: {..spread shorthand} works"
 
 emit "gotchas_parser: all checks passed"

@@ -22,19 +22,25 @@ use std/md
 +get_item = (audit n) { audit.items | find (i) { i.num == n } }
 +summaries = (audit) { audit.items | map (i) item_summary i }
 
+extract_items = (raw) {
+  all_lines = raw | lines
+  heading_indices = all_lines | enumerate | filter (p) { p.1 | starts? "## " }
+  heading_indices | enumerate | map (outer) {
+    num = outer.0 + 1
+    start_pair = outer.1
+    start_idx = start_pair.0
+    title = start_pair.1 | replace "## " "" | trim
+    body_lines = all_lines | drop (start_idx + 1) | take_while (l) { not (l | starts? "## ") && not (l | starts? "# ") }
+    body = body_lines | join "\n" | trim
+    AuditItem {num: num; title: title; description: body; full_text: body}
+  }
+}
+
 +load = (path) {
   raw = fs.read path ^
-  parsed = md.parse raw
-  sections = md.sections parsed
 
-  item_sections = sections | filter (s) { s.level >= 2 }
-  items = item_sections | enumerate | map (pair) {
-    idx = pair.0
-    sec = pair.1
-    AuditItem {num: idx + 1; title: sec.title; description: sec.content; full_text: sec.content}
-  }
-
-  items | len == 0 ? assert false "audit.load: no items found in {path}"
+  items = extract_items raw
+  (items | len) == 0 ? assert (false) "audit.load: no items found in {path}"
 
   raw_name = path | split "/" | last
   name_parts = raw_name ?? path
