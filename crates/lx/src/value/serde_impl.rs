@@ -57,6 +57,7 @@ impl Serialize for LxVal {
       },
       LxVal::Store { id } => marker_map!(serializer, ("__store", id)),
       LxVal::Stream { id } => marker_map!(serializer, ("__stream", id)),
+      LxVal::Type(s) => serializer.serialize_str(s.as_str()),
       LxVal::Object(o) => marker_map!(serializer, ("__object", &o.id), ("__class", &o.class_name.as_str())),
       _ => serializer.serialize_str(&format!("<{}>", self.type_name())),
     }

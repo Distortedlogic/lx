@@ -62,6 +62,9 @@ impl LxVal {
       (LxVal::Trait(a), LxVal::Trait(b)) => a.name == b.name,
       (LxVal::Class(a), LxVal::Class(b)) => a.name == b.name,
       (LxVal::Object(a), LxVal::Object(b)) => a.id == b.id,
+      (LxVal::Type(a), LxVal::Type(b)) => a == b,
+      (LxVal::Type(a), LxVal::Str(b)) => a.as_str() == b.as_ref(),
+      (LxVal::Str(a), LxVal::Type(b)) => a.as_ref() == b.as_str(),
       (LxVal::Store { id: i1 }, LxVal::Store { id: i2 }) => i1 == i2,
       (LxVal::Stream { id: i1 }, LxVal::Stream { id: i2 }) => i1 == i2,
       (LxVal::Func(_), _) | (_, LxVal::Func(_)) => false,
@@ -120,6 +123,7 @@ impl LxVal {
       LxVal::Object(o) => o.id.hash(state),
       LxVal::Store { id } => id.hash(state),
       LxVal::Stream { id } => id.hash(state),
+      LxVal::Type(s) => s.hash(state),
       LxVal::Func(_) | LxVal::MultiFunc(_) | LxVal::BuiltinFunc(_) | LxVal::TaggedCtor { .. } => {},
     }
   }

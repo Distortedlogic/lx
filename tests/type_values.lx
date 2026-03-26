@@ -1,0 +1,9 @@
+assert (type_of 42 == Int)
+assert (type_of "hello" == Str)
+assert (type_of 42 == "Int")
+assert (Str 42 == "42")
+assert (Int "42" == 42)
+assert (Float 42 == 42.0)
+r = {name: Str; age: Int}
+assert (r.name == Str)
+assert (r.age == Int)

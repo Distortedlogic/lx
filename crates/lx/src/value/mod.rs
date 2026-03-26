@@ -104,6 +104,8 @@ pub enum LxVal {
   Trait(Box<LxTrait>),
   Class(Box<LxClass>),
   Object(Box<LxObject>),
+  #[strum(serialize = "Type")]
+  Type(Sym),
   Store {
     id: u64,
   },
@@ -174,6 +176,9 @@ impl LxVal {
   }
   pub fn err_str(s: impl AsRef<str>) -> Self {
     LxVal::Err(Box::new(LxVal::str(s)))
+  }
+  pub fn typ(name: &str) -> Self {
+    LxVal::Type(crate::sym::intern(name))
   }
 
   pub fn as_int(&self) -> Option<&BigInt> {

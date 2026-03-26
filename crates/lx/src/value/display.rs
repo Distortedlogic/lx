@@ -76,6 +76,7 @@ impl fmt::Display for LxVal {
       },
       LxVal::Class(c) => write!(f, "<Class {}>", c.name),
       LxVal::Object(o) => write!(f, "<{}#{}>", o.class_name, o.id),
+      LxVal::Type(s) => write!(f, "{s}"),
       LxVal::Store { id } => write!(f, "<Store#{id}>"),
       LxVal::Stream { id } => write!(f, "<Stream#{id}>"),
     }

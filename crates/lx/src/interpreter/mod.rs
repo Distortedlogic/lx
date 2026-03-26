@@ -130,7 +130,16 @@ impl Interpreter {
         };
         LxError::runtime(msg, span)
       })?),
-      Expr::TypeConstructor(name) => Ok(self.env.get(name).ok_or_else(|| LxError::runtime(format!("undefined constructor '{name}'"), span))?),
+      Expr::TypeConstructor(name) => {
+        if let Some(val) = self.env.get(name) {
+          Ok(val)
+        } else {
+          match name.as_str() {
+            "Str" | "Int" | "Float" | "Bool" | "List" | "Record" | "Map" | "Tuple" => Ok(LxVal::Type(name)),
+            _ => Err(LxError::runtime(format!("undefined constructor '{name}'"), span).into()),
+          }
+        }
+      },
       Expr::Binary(ExprBinary { op, left, right }) => self.eval_binary(&op, left, right, span).await,
       Expr::Unary(ExprUnary { op, operand }) => self.eval_unary(&op, operand, span).await,
       Expr::Pipe(_) | Expr::Tell(_) | Expr::Ask(_) => unreachable!(),

@@ -1,8 +1,12 @@
 use std::sync::Arc;
 
+use num_bigint::BigInt;
+use num_traits::ToPrimitive;
+
 use crate::ast::{AstArena, ExprId, Param};
 use crate::env::Env;
 use crate::error::{EvalResult, EvalSignal, LxError};
+use crate::sym::Sym;
 use crate::value::{BuiltinKind, LxFunc, LxVal};
 use miette::SourceSpan;
 
@@ -98,7 +102,35 @@ impl Interpreter {
         let id = crate::stdlib::object_insert(fields);
         Ok(LxVal::Object(Box::new(crate::value::LxObject { class_name: c.name, id, traits: c.traits, methods: c.methods })))
       },
+      LxVal::Type(name) => self.apply_type_constructor(name, arg, span),
       other => Err(LxError::type_err(format!("cannot call {}, not a function", other.type_name()), span, None).into()),
+    }
+  }
+
+  fn apply_type_constructor(&self, name: Sym, arg: LxVal, span: SourceSpan) -> EvalResult<LxVal> {
+    match name.as_str() {
+      "Str" => Ok(LxVal::str(arg.to_string())),
+      "Int" => match &arg {
+        LxVal::Int(_) => Ok(arg),
+        LxVal::Float(f) => Ok(LxVal::int(*f as i64)),
+        LxVal::Str(s) => s.parse::<BigInt>().map(LxVal::Int).map_err(|e| LxError::runtime(format!("Int: cannot parse '{s}': {e}"), span).into()),
+        LxVal::Bool(b) => Ok(LxVal::Int(if *b { 1.into() } else { 0.into() })),
+        _ => Err(LxError::type_err(format!("cannot construct Int from {}", arg.type_name()), span, None).into()),
+      },
+      "Float" => match &arg {
+        LxVal::Float(_) => Ok(arg),
+        LxVal::Int(n) => n.to_f64().map(LxVal::Float).ok_or_else(|| LxError::runtime("Float: int too large", span).into()),
+        LxVal::Str(s) => s.parse::<f64>().map(LxVal::Float).map_err(|e| LxError::runtime(format!("Float: cannot parse '{s}': {e}"), span).into()),
+        _ => Err(LxError::type_err(format!("cannot construct Float from {}", arg.type_name()), span, None).into()),
+      },
+      "Bool" => match &arg {
+        LxVal::Bool(_) => Ok(arg),
+        LxVal::Int(n) => Ok(LxVal::Bool(n != &BigInt::from(0))),
+        LxVal::Str(s) => Ok(LxVal::Bool(!s.is_empty())),
+        LxVal::None | LxVal::Unit => Ok(LxVal::Bool(false)),
+        _ => Ok(LxVal::Bool(true)),
+      },
+      _ => Err(LxError::runtime(format!("cannot construct {name} from value"), span).into()),
     }
   }
 

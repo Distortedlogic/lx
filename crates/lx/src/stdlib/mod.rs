@@ -81,17 +81,6 @@ pub(crate) fn lx_std_module_source(name: &str) -> Option<&'static str> {
   }
 }
 
-pub(crate) const DEFAULT_TOOL_MODULES: &[(&str, &str)] = &[
-  ("tools/bash", "Bash"),
-  ("tools/read", "Read"),
-  ("tools/write", "Write"),
-  ("tools/edit", "Edit"),
-  ("tools/glob", "Glob"),
-  ("tools/grep", "Grep"),
-  ("tools/web_search", "WebSearch"),
-  ("tools/web_fetch", "WebFetch"),
-];
-
 pub(crate) fn std_module_exists(path: &[&str]) -> bool {
   if path.len() < 2 || path[0] != "std" {
     return false;

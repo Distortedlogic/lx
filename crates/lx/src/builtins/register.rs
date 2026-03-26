@@ -107,7 +107,7 @@ fn bi_type_of(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resu
     LxVal::MultiFunc(_) => "Func",
     other => other.type_name(),
   };
-  Ok(LxVal::str(name))
+  Ok(LxVal::typ(name))
 }
 
 fn bi_print(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
@@ -119,6 +119,15 @@ pub fn register(env: &Env) {
   env.bind_str("true", LxVal::Bool(true));
   env.bind_str("false", LxVal::Bool(false));
   env.bind_str("None", LxVal::None);
+
+  env.bind_str("Str", LxVal::typ("Str"));
+  env.bind_str("Int", LxVal::typ("Int"));
+  env.bind_str("Float", LxVal::typ("Float"));
+  env.bind_str("Bool", LxVal::typ("Bool"));
+  env.bind_str("List", LxVal::typ("List"));
+  env.bind_str("Record", LxVal::typ("Record"));
+  env.bind_str("Map", LxVal::typ("Map"));
+  env.bind_str("Tuple", LxVal::typ("Tuple"));
   env.bind_str("Ok", mk("Ok", 1, |a, _, _ctx| Ok(LxVal::ok(a[0].clone()))));
   env.bind_str("Err", mk("Err", 1, |a, _, _ctx| Ok(LxVal::err(a[0].clone()))));
   env.bind_str("Some", mk("Some", 1, |a, _, _ctx| Ok(LxVal::some(a[0].clone()))));

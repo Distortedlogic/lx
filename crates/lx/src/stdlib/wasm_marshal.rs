@@ -62,6 +62,7 @@ fn lxval_to_json_value(val: &LxVal) -> Result<serde_json::Value, LxError> {
       map.insert("values".to_string(), serde_json::Value::Array(arr?));
       Ok(serde_json::Value::Object(map))
     },
+    LxVal::Type(s) => Ok(serde_json::Value::String(s.as_str().to_string())),
     other => Err(LxError::runtime(format!("cannot serialize {} to JSON for wasm plugin call", other.type_name()), (0, 0).into())),
   }
 }
