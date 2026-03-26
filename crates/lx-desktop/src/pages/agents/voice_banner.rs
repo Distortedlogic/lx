@@ -169,7 +169,40 @@ pub fn VoiceBanner() -> Element {
 
 async fn tts(text: &str) -> anyhow::Result<Vec<u8>> {
   let req = SpeechRequest { text: text.to_owned(), voice: "am_michael".into(), lang_code: "a".into(), speed: 1.2 };
-  common_kokoro::KOKORO.infer(&req).await
+  let wav = common_kokoro::KOKORO.infer(&req).await?;
+  Ok(prepend_silence(&wav, 50))
+}
+
+fn prepend_silence(wav: &[u8], ms: u32) -> Vec<u8> {
+  if wav.len() < 44 || &wav[0..4] != b"RIFF" || &wav[8..12] != b"WAVE" {
+    return wav.to_vec();
+  }
+  let sample_rate = u32::from_le_bytes([wav[24], wav[25], wav[26], wav[27]]);
+  let channels = u16::from_le_bytes([wav[22], wav[23]]);
+  let bits_per_sample = u16::from_le_bytes([wav[34], wav[35]]);
+  let bytes_per_sample = (bits_per_sample / 8) as u32;
+  let silence_samples = sample_rate * ms / 1000;
+  let silence_bytes = silence_samples * u32::from(channels) * bytes_per_sample;
+  let mut offset = 12;
+  while offset + 8 <= wav.len() {
+    if &wav[offset..offset + 4] == b"data" {
+      let old_data_size = u32::from_le_bytes([wav[offset + 4], wav[offset + 5], wav[offset + 6], wav[offset + 7]]);
+      let new_data_size = old_data_size + silence_bytes;
+      let new_chunk_size = 36 + new_data_size;
+      let pcm = &wav[offset + 8..];
+      let mut out = Vec::with_capacity(44 + new_data_size as usize);
+      out.extend_from_slice(&wav[0..4]);
+      out.extend_from_slice(&new_chunk_size.to_le_bytes());
+      out.extend_from_slice(&wav[8..offset + 4]);
+      out.extend_from_slice(&new_data_size.to_le_bytes());
+      out.extend(std::iter::repeat_n(0u8, silence_bytes as usize));
+      out.extend_from_slice(pcm);
+      return out;
+    }
+    let chunk_size = u32::from_le_bytes([wav[offset + 4], wav[offset + 5], wav[offset + 6], wav[offset + 7]]) as usize;
+    offset += 8 + chunk_size;
+  }
+  wav.to_vec()
 }
 
 async fn run_pipeline(
