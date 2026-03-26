@@ -108,7 +108,7 @@ where
     .then(super::type_ann::generic_params())
     .then(just(TokenKind::Arrow).ignore_then(super::type_ann::type_parser(arena.clone())).or_not())
     .then(just(TokenKind::Amp).ignore_then(expr.clone().delimited_by(just(TokenKind::LParen), just(TokenKind::RParen))).or_not())
-    .then(super::expr_helpers::block_or_record_parser(expr.clone(), a_body.clone()).or(expr.clone()))
+    .then(super::expr_helpers::func_body_parser(expr.clone(), a_body.clone()).or(expr.clone()))
     .map_with(move |((((params, type_params), ret_type), guard), body), e| {
       a7.borrow_mut().alloc_expr(Expr::Func(ExprFunc { params, type_params, ret_type, guard, body }), ss(e.span()))
     });

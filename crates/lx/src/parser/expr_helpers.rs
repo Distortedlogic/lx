@@ -76,6 +76,23 @@ where
   skip_semis().ignore_then(field.separated_by(skip_semis()).at_least(1).allow_trailing().collect::<Vec<_>>()).then_ignore(skip_semis())
 }
 
+pub(super) fn func_body_parser<'a, I>(
+  expr: impl Parser<'a, I, ExprId, extra::Err<Rich<'a, TokenKind, Span>>> + Clone,
+  arena: ArenaRef,
+) -> impl Parser<'a, I, ExprId, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
+where
+  I: ValueInput<'a, Token = TokenKind, Span = Span>,
+{
+  let a1 = arena.clone();
+  let a2 = arena.clone();
+  let a3 = arena;
+
+  let record_inner = record_fields(expr.clone(), a1).then_ignore(just(TokenKind::RBrace)).map(Expr::Record);
+  let block_inner = super::expr::stmts_block(expr, a2).then_ignore(just(TokenKind::RBrace)).map(|stmts| Expr::Block(ExprBlock { stmts }));
+
+  just(TokenKind::LBrace).ignore_then(block_inner.or(record_inner)).map_with(move |node, e| a3.borrow_mut().alloc_expr(node, ss(e.span())))
+}
+
 pub(super) fn map_parser<'a, I>(
   expr: impl Parser<'a, I, ExprId, extra::Err<Rich<'a, TokenKind, Span>>> + Clone,
   arena: ArenaRef,

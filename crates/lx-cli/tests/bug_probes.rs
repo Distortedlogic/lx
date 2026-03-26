@@ -9,7 +9,7 @@ fn run_lx(code: &str) -> (bool, String, String) {
     .spawn()
     .and_then(|mut child| {
       use std::io::Write;
-      child.stdin.take().unwrap().write_all(code.as_bytes()).unwrap();
+      child.stdin.take().expect("stdin handle").write_all(code.as_bytes()).expect("write to stdin");
       child.wait_with_output()
     })
     .expect("failed to run lx");
