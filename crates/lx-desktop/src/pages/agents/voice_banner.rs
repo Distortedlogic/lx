@@ -168,7 +168,7 @@ pub fn VoiceBanner() -> Element {
 }
 
 async fn tts(text: &str) -> anyhow::Result<Vec<u8>> {
-  let req = SpeechRequest { text: text.to_owned(), voice: "am_michael".into(), lang_code: "a".into(), speed: 1.0 };
+  let req = SpeechRequest { text: text.to_owned(), voice: "am_michael".into(), lang_code: "a".into(), speed: 1.4 };
   common_kokoro::KOKORO.infer(&req).await
 }
 
