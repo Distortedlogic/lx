@@ -1,46 +1,13 @@
--- Memory: extension architecture spec. Two extension mechanisms: Tools and WASM plugins.
+-- Memory: extension architecture spec. Tools + WASM plugins.
 -- Implements the "thin core" principle: lx core is orchestration only, all capabilities are extensions.
 
 # Extension Architecture
 
-lx has two extension mechanisms for two different purposes:
-
-- **Tools** — I/O and side effects (LLM, HTTP, filesystem, shell, databases). The Tool trait is the universal interface. Multiple backing implementations: CLI (subprocess), MCP (protocol), HTTP (REST), native Rust, or pure lx. Different scenarios call for different backings — an agent reaches for CLI first, MCP when richer integration is needed.
-- **WASM plugins** — fast pure compute (JSON parsing, regex, schema validation, hashing). Compiled to WebAssembly, loaded by the lx runtime. Sandboxed by default.
-
 Design principle: **lx core knows how to orchestrate. Extensions know how to do things.**
 
-## What Moves Out of Core
+## The Tool Interface
 
-### Becomes a Tool
-
-| Current | Tool Name | Why |
-|---------|-----------|-----|
-| `llm.prompt` / `llm.prompt_with` | `Claude` (or any LLM) | Side effect: API call to external service |
-| `std/http` | `Http` | Side effect: network I/O |
-| `std/fs` | `Fs` | Side effect: filesystem I/O |
-| `$cmd` / `$^cmd` / `${}` | `Bash` | Side effect: subprocess execution |
-| `std/git` | `Git` | Side effect: subprocess + filesystem |
-
-### Becomes a WASM Plugin
-
-| Current | Plugin Name | Why |
-|---------|-------------|-----|
-| `std/json` (json.parse, json.encode) | `json` | Pure compute: parsing/serialization |
-| `std/re` | `regex` | Pure compute: pattern matching |
-| `std/schema` | `schema` | Pure compute: validation |
-| `std/md` | `markdown` | Pure compute: parsing |
-| `std/math` (extended) | `math` | Pure compute: trigonometry, etc. |
-
-### Stays in Core
-
-Arithmetic, collections, control flow, pattern matching, pipes, closures, type system, agent spawn/messaging/channels, `par`/`sel`/`timeout`/`refine`/`meta`, `Store`, `with`/`emit`/`yield`/`assert`, module loading, the extension loading mechanisms themselves.
-
-## Part 1: Tools
-
-### Connector → Tool Rename
-
-The current `Connector` trait is renamed to `Tool`. The current `Tool` trait (which only defines schema/validate) merges into it. One abstraction: "thing an agent can call."
+From the lx program's perspective, every capability is a Tool. One interface:
 
 ```lx
 Trait Tool = {
@@ -57,14 +24,72 @@ Trait Tool = {
 }
 ```
 
-### Tool Backings
-
-`Tool` is the interface. How it runs is a detail. The `MCP`, `CLI`, `HTTP` keywords each provide a different default `run` implementation:
+Every tool call looks the same:
 
 ```lx
--- CLI tool: backed by std::process::Command
--- Simplest. Agent writes a command, gets stdout/stderr/code back.
--- This is the default reach — agents write CLI tools first.
+result <- Read.run {path: "src/main.rs"} ^
+result <- Bash.run {command: "cargo test"} ^
+result <- Claude.run {prompt: "analyze this"} ^
+result <- WebSearch.run {query: "rust wasm plugins"} ^
+result <- Grep.run {pattern: "TODO"  path: "src/"} ^
+```
+
+The lx program doesn't know or care how the tool is implemented. It calls `run`, gets a `Result` back.
+
+### Tool Protocol Guarantees
+
+All tools return `Result`:
+- `Ok value` on success (value shape depends on tool)
+- `Err {code: Int, message: Str}` on failure
+
+Tools are **never** uncatchable. `^` propagation and `??` coalescing work on all tool results.
+
+### Agent Wiring
+
+Agents declare tools via `uses`:
+
+```lx
+Agent Worker = {
+  uses Bash
+  uses Claude
+  uses Read
+  uses WebFetch
+
+  act = (task) {
+    code <- Read.run {path: task.file} ^
+    page <- WebFetch.run {url: task.reference} ^
+    analysis <- Claude.run {prompt: "Review {code} against {page}"} ^
+    analysis
+  }
+}
+```
+
+`uses` auto-connects the tool at agent initialization. Tool schemas are collected and passed to the LLM when the agent calls `self.think_with`.
+
+### Tool Testing
+
+Any tool can be mocked by providing a Tool with the same name:
+
+```lx
+MockBash = Tool {
+  name: "bash"
+  run = (args) { Ok {stdout: "mocked"  stderr: ""  code: 0} }
+}
+
+Agent TestWorker = {
+  uses MockBash : Bash
+}
+```
+
+## Tool Backings
+
+The consumer sees one interface. The tool author picks an implementation. Four backing types:
+
+### 1. CLI (subprocess)
+
+Tool backed by `std::process::Command`. The simplest way to wrap any command-line program.
+
+```lx
 CLI Bash = {
   command: "bash"
   name: "bash"
@@ -78,33 +103,45 @@ CLI Ripgrep = {
   description: "Search files with ripgrep"
   params: {pattern: Str  path: Str}
 }
+```
 
--- HTTP tool: backed by generic HTTP requests (reqwest)
--- For any URL. Agent specifies base_url, headers, tool builds requests.
--- This is plain HTTP, not MCP-over-HTTP.
-HTTP GitHubAPI = {
-  base_url: "https://api.github.com"
-  headers: {accept: "application/vnd.github.v3+json"}
-  name: "github"
-  description: "GitHub REST API"
-  params: {method: Str = "GET"  path: Str  body: Record = {:}}
-}
+The `CLI` keyword auto-generates a `run` that spawns the subprocess, captures output, and returns `Ok {stdout: Str, stderr: Str, code: Int}`. Non-zero exit codes are values, not exceptions — the lx program decides what to do.
 
--- MCP tool: backed by MCP server over stdio
--- Richer integration: tool discovery, structured I/O, server lifecycle.
--- Used when a tool server already exists or needs bidirectional state.
+**When to use:** Wrapping existing command-line tools. The lowest-friction option for agent-written tools. Agents reach for this first.
+
+### 2. MCP (server protocol)
+
+Tool backed by an MCP server over stdio. Richer than CLI: structured I/O, tool discovery, server lifecycle management.
+
+```lx
 MCP Weather = {
   server: "weather-server"
   name: "get_forecast"
   description: "Get weather forecast"
   params: {location: Str  days: Int}
 }
+```
 
--- Pure lx tool: backed by lx code
--- For composed/virtual tools that combine other tools.
+The `MCP` keyword auto-generates a `run` that connects to the MCP server (spawning it if needed), calls `tools/call`, and returns the structured result.
+
+**When to use:** When a tool server already exists. When the tool needs bidirectional state or rich structured I/O. When CLI isn't enough.
+
+### 3. WASM
+
+Tool backed by a WebAssembly function. Fast, sandboxed, in-process. See Part 2 for details on the WASM plugin system.
+
+A WASM plugin can expose both functions (called via module syntax `json.parse(...)`) and tools (called via `Tool.run(...)`). The plugin manifest declares which is which.
+
+**When to use:** Pure compute that needs to be fast. Sandboxed third-party code.
+
+### 4. Pure lx
+
+Tool implemented in lx code. For composition, glue, and virtual tools that combine other tools.
+
+```lx
 Tool Analyzer = {
   name: "analyze"
-  description: "Run ripgrep then summarize"
+  description: "Search then summarize"
   params: {pattern: Str  path: Str}
   run = (args) {
     matches <- Ripgrep.run args ^
@@ -113,123 +150,73 @@ Tool Analyzer = {
 }
 ```
 
-Each backing has a Rust implementation that provides the default `run`:
+**When to use:** Combining other tools into higher-level capabilities. Domain-specific workflows exposed as a single tool.
 
-| Keyword | Backing | Default `run` | Returns |
-|---------|---------|---------------|---------|
-| `CLI` | `std::process::Command` | Spawns subprocess, captures output | `{stdout: Str, stderr: Str, code: Int}` |
-| `HTTP` | `reqwest` | Generic HTTP request to any URL | `{status: Int, body: Str, headers: Record}` |
-| `MCP` | MCP client (JSON-RPC over stdio) | Calls MCP server's `tools/call` | Tool-defined structured output |
-| `Tool` | lx code | User-defined `run` method | Whatever `run` returns |
+### Backing Comparison
 
-An agent writing lx code picks the backing that fits:
-- **CLI** for anything that has a command-line interface (most things)
-- **HTTP** for REST APIs
-- **MCP** when a tool server exists with rich capabilities
-- **Tool** (pure lx) for composition and glue
+| Backing | Implemented in | Runs | Typical latency | Sandbox |
+|---------|---------------|------|-----------------|---------|
+| CLI | Shell command (any language) | Subprocess | 10-100ms | OS-level |
+| MCP | MCP server (any language) | Separate process | 10-100ms | Process isolation |
+| WASM | Rust/C/Go/etc → .wasm | In-process (wasmtime) | 1-10ms | WASM sandbox |
+| lx | lx code | In-process | Depends on body | lx runtime |
 
-### Tool Discovery and Wiring
+From the consumer: **all identical.** `Tool.run(args) -> Result`.
 
-Agents declare tools via `uses`:
+WASM is the Rust extension story. Developer writes Rust, compiles to `wasm32-unknown-unknown`, lx loads it via Extism. That's how you extend lx with Rust — not by editing the lx source and recompiling.
 
-```lx
-Agent Worker = {
-  uses Bash
-  uses Claude
-  uses Weather
+## Default Tools
 
-  act = (task) {
-    files <- Bash.run {command: "ls src/"} ^
-    forecast <- Weather.run {location: "SF"  days: 3} ^
-    analysis <- Claude.run {prompt: "Analyze: {files.stdout}"} ^
-    analysis
-  }
-}
-```
+lx ships with built-in tools that mirror what LLM coding agents expect:
 
-`uses` auto-connects the tool at agent initialization and makes it available as a bound name in the agent's scope. Tool schemas are collected and passed to the LLM when the agent calls `self.think_with`.
+| Tool | Description |
+|------|-------------|
+| `Bash` | Execute shell commands |
+| `Read` | Read file contents |
+| `Write` | Write file contents |
+| `Edit` | Edit file (string replacement) |
+| `Glob` | Find files by pattern |
+| `Grep` | Search file contents |
+| `WebSearch` | Search the web |
+| `WebFetch` | Fetch URL → agent-friendly markdown |
 
-### Rust Backing Implementations
+How these are implemented internally (Rust compiled into the binary) is not the user's concern. They're tools. They have `run`. Additional tools (Claude, Git, database, etc.) are added per-project via `uses` declarations.
 
-Each keyword gets a Rust-backed default `run`. These live in `crates/lx/src/stdlib/tools/`:
+## What Moves Out of Core
 
-**CLI** (`tools/cli.rs`):
-```rust
-fn bi_cli_run(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-    let command = args[0].require_str("command", span)?;
-    let tool_args = args[1]; // Record of named args
-    let output = Command::new("bash")
-        .arg("-c")
-        .arg(command)
-        .output()
-        .map_err(|e| LxError::runtime(format!("CLI failed: {e}"), span))?;
-    Ok(LxVal::ok(LxVal::record(indexmap! {
-        sym!("stdout") => LxVal::str(String::from_utf8_lossy(&output.stdout)),
-        sym!("stderr") => LxVal::str(String::from_utf8_lossy(&output.stderr)),
-        sym!("code")   => LxVal::int(output.status.code().unwrap_or(-1)),
-    })))
-}
-```
+### Becomes a Tool
 
-**HTTP** (`tools/http.rs`): generic HTTP via `reqwest`. Builds request from `base_url` + `path` + `method` + `headers` + `body`. Returns `{status, body, headers}`. Not MCP — plain HTTP to any URL.
+| Current | Tool | Why |
+|---------|------|-----|
+| `llm.prompt` / `llm.prompt_with` | `Claude` (or any LLM tool) | Side effect: API call |
+| `std/http` | `WebFetch` / custom HTTP tools | Side effect: network I/O |
+| `std/fs` | `Read` / `Write` | Side effect: filesystem I/O |
+| `$cmd` / `$^cmd` / `${}` | `Bash` | Side effect: subprocess |
+| `std/git` | `Git` | Side effect: subprocess + filesystem |
 
-**MCP** (`tools/mcp.rs`): JSON-RPC client over stdio. Handles server lifecycle (spawn, connect, call, close) and connection pooling.
+### Becomes a WASM Plugin
 
-### LLM as a Tool
+| Current | Plugin | Why |
+|---------|--------|-----|
+| `std/json` | `json` | Pure compute: parsing/serialization |
+| `std/re` | `regex` | Pure compute: pattern matching |
+| `std/schema` | `schema` | Pure compute: validation |
+| `std/md` | `markdown` | Pure compute: parsing |
+| `std/math` (extended) | `math` | Pure compute: trigonometry, etc. |
 
-`llm.prompt` is no longer a global builtin — it's a tool that agents explicitly `uses`. The backing can be CLI (calling `claude` CLI), HTTP (calling the API directly), or MCP (connecting to a model server):
+### Stays in Core
 
-```lx
--- Simplest: CLI backing, calls the claude CLI
-CLI Claude = {
-  command: "claude"
-  name: "prompt"
-  description: "Send prompt to Claude"
-  params: {prompt: Str  json_schema: Str = ""  max_turns: Int = 1}
-}
-
--- Or: HTTP backing, calls the API directly
-HTTP Claude = {
-  base_url: "https://api.anthropic.com"
-  name: "prompt"
-  description: "Send prompt to Claude"
-  params: {prompt: Str  model: Str = "claude-sonnet-4-20250514"}
-}
-
-Agent Analyst = {
-  uses Claude
-
-  think = (prompt) {
-    Claude.run {prompt: prompt} ^
-  }
-}
-```
-
-### Tool Protocol Guarantees
-
-All tools return `Result`:
-- `Ok value` on success (value shape depends on tool and backing)
-- `Err {code: Int, message: Str}` on failure
-
-Tools are **never** uncatchable. `^` propagation and `??` coalescing work on all tool results. This fixes the `$^` bug by design — there is no `$^`, there's `Bash.run` which returns a Result.
-
-### Tool Testing
-
-Tools can be mocked for testing:
-
-```lx
-MockBash = Tool {
-  name: "bash"
-  run = (args) { Ok {stdout: "mocked output"  stderr: ""  code: 0} }
-}
-
-Agent TestWorker = {
-  uses MockBash : Bash    -- alias mock as Bash
-  -- rest of agent code unchanged
-}
-```
+Arithmetic, collections, control flow, pattern matching, pipes, closures, type system, agent spawn/messaging/channels, `par`/`sel`/`timeout`/`refine`/`meta`, `Store`, `with`/`emit`/`yield`/`assert`, module loading, the extension loading mechanisms themselves.
 
 ## Part 2: WASM Plugins
+
+WASM plugins serve a different purpose than tools. Tools are capabilities agents invoke (`Tool.run`). WASM plugins are **compute modules** that expose functions (`module.func(args)`).
+
+The distinction:
+- `json.parse(text)` — a function call in an expression. WASM plugin.
+- `Read.run({path: "file"})` — a capability invocation. Tool.
+
+A WASM plugin CAN also register tools (declaring them in plugin.toml), but its primary interface is functions via `use`.
 
 ### Architecture: Extism
 
@@ -307,9 +294,14 @@ version = "0.1.0"
 description = "JSON parsing and encoding"
 wasm = "target/wasm32-unknown-unknown/release/my_plugin.wasm"
 
+# Functions exposed as module members (use wasm/json → json.parse, json.encode)
 [exports]
 parse = { params = { text = "Str" }, returns = "Record" }
 encode = { params = { value = "Any" }, returns = "Str" }
+
+# Optional: also register as a Tool (Tool.run interface)
+# [tools]
+# json_validator = { description = "Validate JSON against schema", params = { text = "Str", schema = "Str" } }
 ```
 
 ### Plugin Loading
@@ -332,8 +324,8 @@ Plugins live in `~/.lx/plugins/` or project-local `.lx/plugins/`:
 Loaded via `use`:
 
 ```lx
-use wasm/json              -- loads ~/.lx/plugins/json/
-use wasm/regex             -- loads ~/.lx/plugins/regex/
+use wasm/json
+use wasm/regex
 
 data = json.parse `{"key": "value"}`
 matches = regex.find_all `\d+` "abc 123 def 456"
@@ -356,7 +348,8 @@ if str_path.starts_with("wasm/") {
 2. Read `plugin.toml` manifest
 3. Load `.wasm` file via Extism
 4. Create `ModuleExports` with one `BuiltinFunc` per exported function
-5. Cache the loaded plugin (don't reload on subsequent `use`)
+5. If `[tools]` section exists, also register tools in the tool registry
+6. Cache the loaded plugin (don't reload on subsequent `use`)
 
 ### Host-Side Plugin Manager
 
@@ -374,7 +367,6 @@ pub fn load_plugin(name: &str, wasm_path: &Path) -> Result<ModuleExports, LxErro
     let plugin = Plugin::new(&manifest, [], false)
         .map_err(|e| LxError::runtime(format!("WASM load failed: {e}"), span))?;
 
-    // Discover exports from plugin.toml
     let manifest_toml = read_plugin_manifest(name)?;
     let mut bindings = IndexMap::new();
 
@@ -383,7 +375,6 @@ pub fn load_plugin(name: &str, wasm_path: &Path) -> Result<ModuleExports, LxErro
         let fn_name_owned = fn_name.to_string();
         let arity = fn_meta.params.len();
 
-        // Create a builtin that calls into the WASM plugin
         let builtin = mk_async(&fn_name, arity, move |args, span, _ctx| {
             let pname = plugin_name.clone();
             let fname = fn_name_owned.clone();
@@ -430,7 +421,6 @@ JSON serialization adds ~1-5μs per call. Acceptable for compute plugins called 
 Plugins can call back into the lx runtime via Extism host functions:
 
 ```rust
-// Host-side: register callbacks available to all WASM plugins
 host_fn!(plugin_log(level: u32, msg: String) {
     match level {
         0 => log::debug!("{msg}"),
@@ -447,15 +437,6 @@ host_fn!(plugin_get_config(key: String) -> String {
 });
 ```
 
-Plugin-side:
-```rust
-#[host_fn("extism:host/user")]
-extern "ExtismHost" {
-    fn plugin_log(level: u32, msg: String);
-    fn plugin_get_config(key: String) -> String;
-}
-```
-
 ### Sandboxing
 
 WASM plugins are sandboxed by default:
@@ -464,7 +445,7 @@ WASM plugins are sandboxed by default:
 - **Fuel limits** — configurable max instructions per call (prevents infinite loops)
 - **Memory limits** — configurable max WASM linear memory
 
-Plugins that need I/O should be Tools (CLI/HTTP/MCP), not WASM plugins. WASM is for pure compute.
+Plugins that need I/O should be Tools, not WASM plugins. WASM is for pure compute.
 
 ### Plugin Installation
 
@@ -474,8 +455,6 @@ lx plugin install ./my-plugin       # from local path
 lx plugin list                      # show installed
 lx plugin remove json               # uninstall
 ```
-
-Or manually: copy the plugin directory to `~/.lx/plugins/`.
 
 ### Hot Reload
 
@@ -487,74 +466,92 @@ WASM makes hot reload trivial:
 
 No ABI concerns — WASM is a stable binary format.
 
-## Part 3: Integration — How Tools and WASM Work Together
+## Part 3: Unified Extension Model
 
-### Agent Using Both
-
-```lx
-use wasm/json
-use wasm/schema
-
-Agent Analyst : [Agent] = {
-  uses Claude
-  uses Bash
-  uses Http
-
-  act = (task) {
-    -- WASM: pure compute (fast, in-process)
-    input = json.parse (task.data)
-    valid = schema.validate task_schema input
-
-    valid ? {
-      Err e -> Err "Invalid input: {e}"
-      Ok _ -> {
-        -- Tool: I/O (MCP/CLI, out-of-process)
-        raw <- Http.run {url: task.source  method: "GET"} ^
-        code <- Bash.run {command: "wc -l src/*.rs"} ^
-        analysis <- Claude.run {
-          prompt: "Analyze {raw.body} against {code.stdout}"
-        } ^
-
-        -- WASM: pure compute on the result
-        json.encode {result: analysis  input: input}
-      }
-    }
-  }
-}
-```
-
-### The Clean Split
+### How It All Fits Together
 
 ```
-┌──────────────────────────────────────────────────┐
-│                   lx program                      │
-│  agents, pipes, pattern matching, control flow    │
-│  par/sel/timeout/refine/meta, channels, stores    │
-├────────────────────┬─────────────────────────────┤
-│   WASM plugins     │         Tools                │
-│   (in-process)     │     (out-of-process)         │
-│                    │                               │
-│   json.parse       │   CLI: Bash.run (shell)      │
-│   regex.match      │   CLI: Git.run (vcs)         │
-│   schema.validate  │   HTTP: Claude.run (LLM)     │
-│   md.parse         │   HTTP: Api.run (REST)       │
-│   math.sin         │   MCP: Weather.run (server)  │
-│                    │   lx: Composed.run (glue)    │
-│   Pure compute     │   Side effects               │
-│   <1ms per call    │   10ms-10s per call          │
-│   Sandboxed        │   Capability-controlled      │
-└────────────────────┴─────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                      lx program                           │
+│  Agent Worker = {                                         │
+│    uses Bash                                              │
+│    uses Claude                                            │
+│    uses Read                                              │
+│    act = (task) {                                         │
+│      code <- Read.run {path: task.file} ^                │
+│      json.parse code | schema.validate spec ^            │
+│      Claude.run {prompt: "review {code}"} ^              │
+│    }                                                      │
+│  }                                                        │
+├──────────────────────────────────────────────────────────┤
+│           Uniform Interface Layer                         │
+│  Tool.run(args) -> Result    module.func(args) -> value  │
+├──────────────┬──────────────┬────────────────────────────┤
+│ CLI          │ MCP          │ WASM                        │
+│ subprocess   │ server       │ wasmtime (Extism)           │
+│              │              │                              │
+│ Bash         │ Weather      │ json.parse                  │
+│ Ripgrep      │ Database     │ regex.match                 │
+│ curl         │ Langfuse     │ schema.validate             │
+│ git          │              │ md.parse                    │
+│              │              │                              │
+│ 10-100ms     │ 10-100ms     │ 1-10ms                     │
+│ Subprocess   │ Ext process  │ In-process, sandboxed       │
+└──────────────┴──────────────┴────────────────────────────┘
+
+Built-in tools (Read, Write, Grep, WebFetch, etc.) sit above
+this layer — they're compiled into lx, not user-extensible.
+```
+
+The consumer never sees the bottom row. They see `Tool.run` and `module.func`.
+
+### Extension Discovery
+
+All extensions (regardless of backing) are found through a unified path:
+
+1. **Built-in** — native Rust tools and stdlib modules compiled into `lx`
+2. **Project-local** — `.lx/plugins/` and `.lx/tools/` in the project directory
+3. **User-global** — `~/.lx/plugins/` and `~/.lx/tools/`
+4. **Registry** — `lx plugin install` / `lx tool install` (future)
+
+### Extension Manifest
+
+Both tools and plugins use `plugin.toml`:
+
+```toml
+[plugin]
+name = "my-extension"
+version = "0.1.0"
+description = "Does something useful"
+
+# WASM plugin: expose functions as a module
+[exports]
+parse = { params = { text = "Str" }, returns = "Record" }
+
+# Tool: expose capabilities via Tool.run
+[tools.my_tool]
+description = "Does the thing"
+params = { input = "Str", count = "Int" }
+backing = "wasm"  # or "cli", "mcp", "lx"
+
+# CLI tool config (only if backing = "cli")
+[tools.my_tool.cli]
+command = "my-command"
+
+# MCP tool config (only if backing = "mcp")
+[tools.my_tool.mcp]
+server = "my-server"
 ```
 
 ### Migration Path
 
-Phase 1: **Tool infrastructure** (CLI/HTTP/MCP backings + Tool trait rename)
-- Implement CLI tool backing via `std::process::Command`
-- Implement HTTP tool backing via existing `ReqwestHttpBackend`
-- Implement MCP tool backing (JSON-RPC client over stdio)
-- Rename `Connector` → `Tool`, merge traits
-- Create `Bash`, `Http`, `Fs` as built-in CLI Tools
-- Move `llm.*` from global builtins to a Tool (CLI or HTTP backing)
+Phase 1: **Tool trait + native backings**
+- Rename `Connector` → `Tool`, merge with existing `Tool` trait
+- Implement native Rust backing for built-in tools (Read, Write, Grep, Bash, WebFetch)
+- CLI keyword desugars to Tool with subprocess `run`
+- MCP keyword desugars to Tool with JSON-RPC `run`
+- Move `llm.*` from global builtins to a Tool
+- All tools return `Result` — no uncatchable errors
 
 Phase 2: **WASM plugin infrastructure**
 - Add Extism dependency
@@ -568,6 +565,6 @@ Phase 3: **Migrate stdlib**
 - Remove `$cmd` / `$^cmd` / `${}` shell syntax from parser (Bash tool replaces it)
 
 Phase 4: **Ecosystem**
-- Plugin registry (like crates.io but for lx plugins)
-- Plugin template (`lx plugin new my-plugin`)
+- Plugin registry
+- Plugin/tool templates (`lx plugin new`, `lx tool new`)
 - Documentation generation from plugin.toml
