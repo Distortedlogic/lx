@@ -13,7 +13,6 @@ use ../prompt/grade {GradingPrompt}
     schema_str = self.grading_schema ()
     result = self.think_with {
       prompt: rendered
-      disable_tools: true
       json_schema: schema_str
     } ^
 

@@ -191,6 +191,7 @@ impl Interpreter {
         let v = self.eval(value).await?;
         Ok(self.ctx.yield_.yield_value(v, span)?)
       },
+      Expr::Grouped(inner) => self.eval(inner).await,
       Expr::With(ExprWith { ref kind, ref body }) => match kind.clone() {
         WithKind::Binding { .. } => unreachable!(),
         WithKind::Resources { resources } => {

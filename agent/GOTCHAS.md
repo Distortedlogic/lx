@@ -121,12 +121,11 @@
 - **`cron.every` takes milliseconds, not seconds.** `cron.every 60 fn` fires every 60ms (16 times/second), not every minute. **Fix:** `cron.every 60000 fn` for once per minute.
 - **Cron closures capture scope at definition time.** `cron.every 1000 () { x }` where `x` is defined AFTER the cron call → "undefined variable" error on the background thread. **Fix:** define all variables the closure needs before the `cron.every` call.
 
-## grader.grade / AiBackend Traps
+## grader / AiBackend Traps
 
-- **`grader.grade` used `max_turns: 1` which caused empty responses.** Claude Code uses tools by default. With `max_turns: 1`, it uses a tool on turn 1, hits the limit on turn 2, and returns empty `result` text. **Fixed:** grader now uses `disable_tools: true` and `json_schema` for guaranteed structured output.
-- **`--tools ""` disables all tools in Claude CLI.** Passing `--allowedTools ""` (empty string) does NOT disable tools — it passes an empty allowlist which confuses the CLI. Use `--tools ""` instead.
+- **`grader` used `max_turns: 1` which caused empty responses.** Claude Code uses tools by default. With `max_turns: 1`, it uses a tool on turn 1, hits the limit on turn 2, and returns empty `result` text. **Fixed:** grader Agent now declares empty `tools = () { [] }` (the trait default) and uses `json_schema` for structured output.
+- **Agents with no tools leave `tools` at the default empty list.** The Agent trait default `tools = () { [] }` means no tools. The backend sees an empty tools vec and doesn't pass `--allowedTools`.
 - **`--json-schema` puts output in `structured_output`, not `result`.** When `--json-schema` is used, the `result` field in Claude CLI JSON output is empty string. The structured data is in `structured_output` field. `parse_ai_response` must check `structured_output` first.
-- **`AiOpts` supports `disable_tools: bool` and `json_schema: Option<String>`.** These map to `--tools ""` and `--json-schema <schema>` on the Claude CLI. Use for any LLM call that should just answer without tool use.
 
 ## md.sections Limitations
 

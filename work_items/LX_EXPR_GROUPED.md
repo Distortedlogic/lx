@@ -86,29 +86,14 @@ The check: Apply where func is Grouped AND arg is Str → split into condition +
 - `assert (s.has "a")` → Grouped(Apply(s.has, "a")) → not Apply at top level → no split ✓
 - `assert s.has "a"` → Apply(FieldAccess, Str) → func is NOT Grouped → no split ✓
 
-**Visitor trait — `crates/lx/src/visitor/visitor_trait.rs`:**
+**Visitor walk — `crates/lx/src/visitor/walk/mod.rs`:**
 
-Add visit/leave hooks:
-```rust
-fn visit_grouped(&mut self, _id: ExprId, _inner: ExprId, _span: SourceSpan) -> VisitAction { VisitAction::Descend }
-fn leave_grouped(&mut self, _id: ExprId, _inner: ExprId, _span: SourceSpan) {}
-```
-
-**walk/generated.rs:**
-
-Add dispatch:
-```rust
-define_walk_and_dispatch!(walk_grouped_dispatch, walk_grouped, visit_grouped, leave_grouped, ExprId, ExprId);
-```
-
-Wait — `define_walk_and_dispatch!` expects a struct type, not ExprId. Grouped is just `Expr::Grouped(ExprId)` — a single ExprId, not a struct. The walk for Grouped should dispatch into the inner expression:
-
-In `walk/mod.rs` `walk_expr`, add:
+Grouped is transparent — no visitor hooks, no separate walk/dispatch function. Just dispatch into the inner expression in `walk_expr`:
 ```rust
 Expr::Grouped(inner) => dispatch_expr(v, *inner, arena)?,
 ```
 
-No separate walk/dispatch function needed. The visitor hooks are optional — Grouped is transparent for most visitors.
+No changes needed in `visitor_trait.rs` or `walk/generated.rs`.
 
 # Files Affected
 
@@ -120,8 +105,9 @@ No separate walk/dispatch function needed. The visitor hooks are optional — Gr
 - `crates/lx/src/checker/check_expr.rs` — Check inner
 - `crates/lx/src/checker/type_ops.rs` — Synth inner
 - `crates/lx/src/visitor/walk/mod.rs` — Dispatch inner
-- `crates/lx/src/folder/desugar.rs` — Pass through
-- `crates/lx/src/stdlib/diag/diag_helpers.rs` — Recurse inner
+- `crates/lx/src/folder/desugar.rs` — Pass through (no explicit arm needed, falls through to `other => other`)
+- `crates/lx/src/folder/desugar_schema.rs` — stringify_expr recurse inner
+- `crates/lx/src/stdlib/diag/diag_helpers.rs` — Recurse inner in unwrap_propagate and expr_label
 
 # Task List
 
@@ -165,13 +151,15 @@ let grouped = just(TokenKind::LParen).ignore_then(expr).then_ignore(just(TokenKi
 
 1. `crates/lx/src/formatter/emit_expr.rs` — `Expr::Grouped(inner) => { self.write("("); self.emit_expr(*inner); self.write(")"); }`
 2. `crates/lx/src/interpreter/mod.rs` — `Expr::Grouped(inner) => self.eval(*inner).await`
-3. `crates/lx/src/checker/check_expr.rs` — Add Grouped to the catch-all arm that calls `self.synth_expr` (or handle explicitly by checking inner with expected type)
+3. `crates/lx/src/checker/check_expr.rs` — `Expr::Grouped(inner) => self.check_expr(*inner, expected)` — add as explicit arm before the catch-all, passing through expected type to inner expression
 4. `crates/lx/src/checker/type_ops.rs` — `Expr::Grouped(inner) => self.synth_expr(*inner)`
 5. `crates/lx/src/visitor/walk/mod.rs` — `Expr::Grouped(inner) => dispatch_expr(v, *inner, arena)?`
 6. `crates/lx/src/folder/desugar.rs` — Falls through to `other => other` (Grouped is not desugared)
 7. `crates/lx/src/stdlib/diag/diag_helpers.rs` unwrap_propagate — `Expr::Grouped(inner) => unwrap_propagate(arena.expr(*inner), arena)`
 
 Also update `expr_label` in `diag_helpers.rs` — `Expr::Grouped(inner) => expr_label(arena.expr(*inner), arena)`
+
+Also update `stringify_expr` in `folder/desugar_schema.rs` — `Expr::Grouped(inner) => stringify_expr(*inner, arena)` (recurse into inner for constraint display)
 
 **ActiveForm:** Updating exhaustive match sites
 
@@ -216,28 +204,27 @@ x = 5
 assert (x > 0) "x must be positive"
 assert (x == 5)
 list = [1; 2; 3]
-assert (list | len == 3)
-has = (s.has "a") ?? false
+assert (list | len == 3) "list has 3 elements"
+assert (list | len > 0)
 ```
 
 **ActiveForm:** Implementing assert messages with Grouped
 
 ---
 
-### Task 5: Run full test suite
+### Task 5: Run full test suite and fix regressions
 
-**Subject:** Verify no regressions from Grouped addition
+**Subject:** Verify no regressions from Grouped addition, fix any that appear
 
-**Description:** Run ALL tests:
-- `just rust-diagnose`
-- `cargo test -p lx --test formatter_roundtrip`
-- All tests/*.lx files
-- All programs/workgen/tests/*.lx files
-- All programs/workrunner/tests/*.lx files
+**Description:** Run ALL tests and fix failures:
 
-The Grouped wrapper is transparent at runtime (evaluator just evals inner) so existing behavior should be preserved. The formatter now emits explicit parens for Grouped nodes, which may affect formatter roundtrip — verify and fix.
+1. Run `just rust-diagnose` — fix any compile errors or clippy warnings.
+2. Run `just test` — run all .lx suite tests. Fix any failures.
+3. Run `cargo test -p lx --test formatter_roundtrip` — this is the most likely source of regressions.
 
-**ActiveForm:** Full regression testing
+**Formatter roundtrip details:** The formatter emits `(inner)` for Grouped nodes. Previously, `(x + 1)` parsed to a bare `Binary` node (parens discarded), so the formatter emitted `x + 1`. Now it parses to `Grouped(Binary)`, so the formatter emits `(x + 1)`. On re-parse, `(x + 1)` → `Grouped(Binary)` again → formats to `(x + 1)` — the roundtrip is stable. BUT: the first format output changes compared to the original source for expressions that had no parens but now get Grouped wrappers. The formatter roundtrip test compares format(format(source)) == format(source), which should still hold. If the test compares format(source) == source, that will break for any test file containing parenthesized expressions. Investigate the test to understand what it compares and fix accordingly.
+
+**ActiveForm:** Full regression testing and fixes
 
 ---
 

@@ -1,4 +1,5 @@
 mod agent_cmd;
+mod ai_backend;
 mod check;
 mod fmt;
 mod init;
@@ -203,7 +204,7 @@ fn apply_manifest_backends(ctx: &mut RuntimeCtx) {
   }
   if let Some(ref name) = backends.ai {
     match name.as_str() {
-      "claude-code" => {},
+      "claude-code" => ctx.ai = Arc::new(ai_backend::ClaudeCodeAiBackend),
       other => eprintln!("warning: unknown ai backend '{other}'"),
     }
   }

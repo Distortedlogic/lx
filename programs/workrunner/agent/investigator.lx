@@ -3,6 +3,9 @@ use ../schema/work_item {context_for_investigate}
 use pkg/log
 
 +Agent Investigator = {
+  tools = () { ["Read"; "Glob"; "Grep"; "Bash"] }
+  max_turns = () { 20 }
+
   act = (msg) {
     log.log "  > claude: investigate full work item..."
     p = InvestigatePrompt {}
@@ -18,11 +21,7 @@ use pkg/log
     p.add_constraint "For each task: did the code do what was asked? Anything not asked? Anything incomplete?"
     p.add_constraint "Keep under 2000 chars. No file contents."
 
-    result = self.think_with {
-      prompt: (p.render ())
-      tools: ["Read"; "Glob"; "Grep"; "Bash"]
-      max_turns: 20
-    } ^
+    result = self.think_with { prompt: (p.render ()) } ^
 
     report = result.text
     log.save_debug msg.runner_dir msg.wi.slug "investigate.md" report

@@ -105,6 +105,8 @@ pub enum Expr {
   Emit(ExprEmit),
   Yield(ExprYield),
   With(ExprWith),
+
+  Grouped(ExprId),
 }
 
 #[derive(Debug, Clone, PartialEq)]

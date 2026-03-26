@@ -81,7 +81,6 @@ count_matches = (text phrases) {
 
     result = ai.prompt_with {
       prompt: p.render ()
-      disable_tools: true
       json_schema: `{"type":"object","properties":{"score":{"type":"integer"},"passed":{"type":"boolean"},"feedback":{"type":"string"},"categories":{"type":"array","items":{"type":"object","properties":{"name":{"type":"string"},"score":{"type":"integer"},"feedback":{"type":"string"}}}}}}`
     } ^
 

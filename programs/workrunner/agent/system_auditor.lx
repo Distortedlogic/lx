@@ -6,6 +6,9 @@ use ../prompt/system_audit {SystemAuditPrompt}
 use pkg/log
 
 +Agent SystemAuditor = {
+  tools = () { ["Read"; "Glob"; "Grep"; "Bash"] }
+  max_turns = () { 30 }
+
   act = (msg) {
     log.log "> claude: system audit (phase 1: quality, phase 2: compliance)..."
     paths_text = msg.completed_paths | join "\n"
@@ -27,11 +30,7 @@ use pkg/log
     p.add_constraint "Return a numbered findings list. Report ONLY problems."
     p.add_constraint "Keep under 3000 chars."
 
-    result = self.think_with {
-      prompt: (p.render ())
-      tools: ["Read"; "Glob"; "Grep"; "Bash"]
-      max_turns: 30
-    } ^
+    result = self.think_with { prompt: (p.render ()) } ^
 
     report = result.text
     log.save_debug msg.runner_dir "system" "system_audit.md" report

@@ -14,10 +14,7 @@ use pkg/log
     p.add_constraint "Output ONLY the raw markdown — no preamble, no commentary"
     p.add_constraint "Start with '# Goal' — nothing before it"
 
-    result = self.think_with {
-      prompt: p.render ()
-      disable_tools: true
-    } ^
+    result = self.think_with { prompt: (p.render ()) } ^
 
     draft = result.text
     log.save_debug msg.runner_dir msg.slug "compose.md" draft

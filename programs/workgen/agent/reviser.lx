@@ -12,10 +12,7 @@ use pkg/log
     p.add_constraint "Do not remove content to avoid checks — fix issues properly"
     p.add_constraint "Start with '# Goal' — nothing before it"
 
-    result = self.think_with {
-      prompt: p.render ()
-      disable_tools: true
-    } ^
+    result = self.think_with { prompt: (p.render ()) } ^
 
     revised = result.text
     log.save_debug msg.runner_dir msg.slug "revise_round_{msg.round_num}.md" revised

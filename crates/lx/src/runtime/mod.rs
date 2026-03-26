@@ -74,7 +74,6 @@ pub struct AiOpts {
   pub prompt: String,
   pub tools: Vec<String>,
   pub max_turns: Option<u32>,
-  pub disable_tools: bool,
   pub json_schema: Option<String>,
 }
 

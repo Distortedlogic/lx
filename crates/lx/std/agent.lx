@@ -23,12 +23,23 @@
     }
   }
 
+  tools = () { [] }
+  max_turns = () { 25 }
+
   think = (prompt) { ai.prompt prompt }
-  think_with = (config) { ai.prompt_with config }
+
+  think_with = (config) {
+    has_tools = config.tools != None
+    has_turns = config.max_turns != None
+    agent_tools = self.tools ()
+    merged_tools = has_tools ? config.tools : agent_tools
+    merged_turns = has_turns ? config.max_turns : (self.max_turns ())
+    ai.prompt_with {..config; tools: merged_tools; max_turns: merged_turns}
+  }
+
   think_structured = (schema_def prompt) { ai.prompt_structured schema_def prompt }
 
   use_tool = (name input) { Err "no tools configured" }
-  tools = () { [] }
 
   describe = () {
     n = to_str self

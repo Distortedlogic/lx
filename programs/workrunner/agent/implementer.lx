@@ -3,6 +3,8 @@ use ../schema/work_item {task_context context_for_implement}
 use pkg/log
 
 +Agent Implementer = {
+  tools = () { ["Read"; "Edit"; "Write"; "Bash"; "Glob"; "Grep"] }
+
   act = (msg) {
     log.log "    > claude: implement task {msg.task.num} (max 25 turns)..."
     ctx = task_context msg.task
@@ -15,11 +17,7 @@ use pkg/log
     p.add_constraint "Do not add code comments or doc strings"
     p.add_constraint "No #[allow()] macros"
 
-    result = self.think_with {
-      prompt: (p.render ())
-      tools: ["Read"; "Edit"; "Write"; "Bash"; "Glob"; "Grep"]
-      max_turns: 25
-    } ^
+    result = self.think_with { prompt: (p.render ()) } ^
 
     log.save_debug msg.runner_dir msg.wi.slug "task_{msg.task.num}_implement.md" result.text
     log.log "    < done ({result.turns ?? 0} turns)"

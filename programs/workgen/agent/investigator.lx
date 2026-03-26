@@ -2,8 +2,11 @@ use ../prompt/investigate {InvestigatePrompt}
 use pkg/log
 
 +Agent Investigator = {
+  tools = () { ["Read"; "Glob"; "Grep"; "Bash"] }
+  max_turns = () { 30 }
+
   act = (msg) {
-    log.log "  > claude: investigate codebase (max 30 turns)..."
+    log.log "  > claude: investigate codebase..."
 
     p = InvestigatePrompt {}
     p.add_section "Audit Checklist" msg.audit_content
@@ -13,11 +16,7 @@ use pkg/log
     p.add_constraint "Report ONLY problems — do not list things that are correct"
     p.add_constraint "One fix per finding, verbal only, no code snippets"
 
-    result = self.think_with {
-      prompt: p.render ()
-      tools: ["Read"; "Glob"; "Grep"; "Bash"]
-      max_turns: 30
-    } ^
+    result = self.think_with { prompt: (p.render ()) } ^
 
     findings = result.text
     log.save_debug msg.runner_dir msg.slug "investigate.md" findings

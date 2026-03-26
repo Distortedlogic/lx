@@ -24,10 +24,9 @@ pub fn bi_prompt_with(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -
     list.iter().filter_map(|v| v.as_str().map(String::from)).collect()
   }).unwrap_or_default();
   let max_turns = rec.get(&intern("max_turns")).and_then(|v| v.as_int()).and_then(|n| u32::try_from(n).ok());
-  let disable_tools = rec.get(&intern("disable_tools")).and_then(|v| v.as_bool()).unwrap_or(false);
   let json_schema = rec.get(&intern("json_schema")).and_then(|v| v.as_str()).map(String::from);
 
-  let opts = AiOpts { prompt, tools, max_turns, disable_tools, json_schema };
+  let opts = AiOpts { prompt, tools, max_turns, json_schema };
   ctx.ai.prompt_with(&opts, span)
 }
 
