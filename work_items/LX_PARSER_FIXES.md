@@ -1,30 +1,27 @@
 # Goal
 
-Fix three parser bugs that force workarounds in every lx program: lambda body greedily consuming pipes, assert message parsing, and trait body name conflict.
+Fix two parser bugs: lambda body greedily consuming pipes, and assert message parsing.
 
-# Why
+Note: "trait body name conflict" was investigated and is NOT a separate bug. Record literals inside trait bodies work when fields are on separate lines (lexer brace depth fix) or separated by semicolons. Multi-field records on ONE line always need semicolons — this is universal lx behavior, not trait-body-specific. Verified: `Trait T = { m = () { {name: "hello"} } }` parses fine. `{name: "hello"  age: 42}` fails everywhere (not just traits) because space-separated fields on one line need semicolons.
 
-- `filter (e) { e > 1 } | len` parses `| len` inside the lambda body. Every program splits filter+len into two lines.
-- `assert (condition) "message"` parses as applying the Bool result to the String. Every test omits assert messages.
-- `{name: value}` record literals inside trait method bodies are misinterpreted as trait field declarations. Programs use semicolons or avoid record literals in methods.
+# Root Causes (verified by reading source and testing)
 
-# Root Causes (verified by reading source)
+**Lambda body is greedy (pipe-after-block):**
 
-**Lambda body is greedy (pipe-after-block AND assert message — same root cause):**
+`crates/lx/src/parser/expr_compound.rs` line 110: `func_def` parser's body is `expr.clone()` — the FULL expression parser. `(x) { x > 2 } | len` — func_def matches `(x)` as params, then `{ x > 2 } | len` as body. Verified: `filter ((x) { x > 2 }) | len` works (explicit parens force the lambda to be one atom), `filter (x) { x > 2 } | len` doesn't.
 
-`crates/lx/src/parser/expr_compound.rs` line 104-113: the `func_def` parser matches `(params) [type_params] [-> ret_type] [& guard] body` where `body` is `expr.clone()` (line 110) — the FULL expression parser including pipes. So `(x) { x > 2 } | len` — the func_def matches `(x)` as params, then `{ x > 2 } | len` as the body. The `{ x > 2 }` block is parsed, then `| len` is consumed as a pipe on the block result inside the lambda body.
+Fix: use `block_or_record_parser` (already exists in `expr_helpers.rs` as `pub(super)`) when `{` follows params. It parses `{ }` blocks and records, stopping at `}`. Falls back to `expr.clone()` for bare bodies. `block_or_record_parser` handles: empty records `{:}`, records `{name: val}` (via `looks_like_record` lookahead), and blocks `{stmts; expr}`.
 
-Same root cause for assert: line 138-143 in `expr.rs`, assert uses `.ignore_then(expr.clone()).then(expr.clone().or_not())`. The first `expr.clone()` greedily consumes `(cond) "msg"` as an Apply expression (Bool applied to String).
+**Assert message consumed by greedy expr:**
 
-**Trait body name conflict:**
+`crates/lx/src/parser/expr.rs` lines 138-143: `just(Assert).ignore_then(expr.clone()).then(expr.clone().or_not())`. First `expr.clone()` consumes `(cond) "msg"` as `Apply(cond, msg)`.
 
-`crates/lx/src/parser/stmt.rs` `trait_body()` at line 228: `field_entry` matches `ident : type_name`. The `type_name()` parser only matches capitalized identifiers and keyword tokens — NOT lowercase identifiers. So `name: rub.name` should NOT match as a field entry because `rub` is lowercase. If it does match, the issue is that chumsky's `choice` doesn't backtrack after `ident :` partially succeeds with `field_entry` but then `type_name()` fails on the lowercase token. The parser error cascades instead of falling through to `default_method`.
+Fix: post-parse fixup — after parsing, if result is `Apply(cond, Literal::Str(...))`, split into assert condition + message. Must scope the immutable arena borrow in a block, drop it, then do the mutable alloc.
 
 # Files Affected
 
-- `crates/lx/src/parser/expr_compound.rs` — Fix func_def body parsing (line 110)
-- `crates/lx/src/parser/expr.rs` — Fix assert parsing (line 138-143)
-- `crates/lx/src/parser/stmt.rs` — Verify/fix trait_body backtracking
+- `crates/lx/src/parser/expr_compound.rs` — Fix func_def body (line 110)
+- `crates/lx/src/parser/expr.rs` — Fix assert (lines 138-143)
 
 # Task List
 
@@ -32,28 +29,19 @@ Same root cause for assert: line 138-143 in `expr.rs`, assert uses `.ignore_then
 
 **Subject:** Lambda with `{ }` body should not consume pipe after closing brace
 
-**Description:** Edit `crates/lx/src/parser/expr_compound.rs`. The `func_def` parser at line 104-113 has `.then(expr.clone())` at line 110 for the body. This consumes the full expression including pipes.
+**Description:** Edit `crates/lx/src/parser/expr_compound.rs`. At line 110, the func_def body is `.then(expr.clone())`.
 
-Fix: when the body starts with `{`, parse only the block (stops at `}`). Otherwise parse the full expression (for bare bodies like `(x) x + 1`).
-
-Change line 110 from:
-```rust
-.then(expr.clone())
-```
-to:
+Change to:
 ```rust
 .then(
-    just(TokenKind::LBrace)
-        .ignore_then(super::expr::stmts_block(expr.clone(), a_body.clone()))
-        .then_ignore(just(TokenKind::RBrace))
-        .map_with(move |stmts, e| a_body.borrow_mut().alloc_expr(Expr::Block(ExprBlock { stmts }), ss(e.span())))
+    super::expr_helpers::block_or_record_parser(expr.clone(), a_body.clone())
         .or(expr.clone())
 )
 ```
 
-You'll need an additional ArenaRef clone (`a_body`) for the block body parser. Import `ExprBlock` from `crate::ast`.
+Add `let a_body = arena.clone();` alongside the existing arena clones at lines 61-68.
 
-The block alternative is tried first (because `or` tries left then right in chumsky). If `{` is the next token, it parses the block and stops at `}`. If not, falls through to the full expression parser.
+`block_or_record_parser` is already `pub(super)` in `expr_helpers.rs`. chumsky `.or()` tries left first — if `{` is next, `block_or_record_parser` matches (stops at `}`). If not, falls through to `expr.clone()` for bare bodies like `(x) x + 1`.
 
 Write test `tests/parser_lambda_pipe.lx`:
 ```lx
@@ -70,6 +58,9 @@ assert (inner_pipe | len == 5)
 
 bare_body = items | map (x) x * 2
 assert (bare_body | len == 5)
+
+record_body = items | map (x) {value: x}
+assert (record_body | len == 5)
 ```
 
 **ActiveForm:** Fixing lambda block body parsing
@@ -78,51 +69,38 @@ assert (bare_body | len == 5)
 
 ### Task 2: Fix assert message parsing
 
-**Subject:** Assert condition should not consume the message string as an argument
+**Subject:** Assert condition should not consume the message string
 
-**Description:** Edit `crates/lx/src/parser/expr.rs` lines 138-143. Current assert parser:
-
-```rust
-just(TokenKind::Assert)
-    .ignore_then(expr.clone())
-    .then(expr.clone().or_not())
-```
-
-The first `expr.clone()` greedily consumes `(cond) "msg"` as Apply(cond, msg). The `.then(expr.clone().or_not())` gets nothing because everything was consumed.
-
-Fix: the assert condition should be parsed at a restricted precedence that stops before function application of a string literal. The simplest fix — post-parse: after parsing the full expression, check if it's an `Apply` where the argument is a string literal. If so, split: the function part is the condition, the string argument is the message.
+**Description:** Edit `crates/lx/src/parser/expr.rs` lines 138-143. Replace the assert parser with:
 
 ```rust
 let assert_expr = {
     let al = arena.clone();
-    let al2 = arena.clone();
     just(TokenKind::Assert)
         .ignore_then(expr.clone())
         .map_with(move |ex, e| {
-            let arena_ref = al.borrow();
-            // Check if expr is Apply(cond, Literal::Str(...))
-            if let Expr::Apply(app) = arena_ref.expr(ex) {
-                if let Expr::Literal(Literal::Str(_)) = arena_ref.expr(app.arg) {
-                    let cond = app.func;
-                    let msg = Some(app.arg);
-                    return al2.borrow_mut().alloc_expr(
-                        Expr::Assert(ExprAssert { expr: cond, msg }),
-                        ss(e.span()),
-                    );
+            let (cond, msg) = {
+                let ar = al.borrow();
+                if let Expr::Apply(app) = ar.expr(ex) {
+                    if let Expr::Literal(Literal::Str(_)) = ar.expr(app.arg) {
+                        (app.func, Some(app.arg))
+                    } else {
+                        (ex, None)
+                    }
+                } else {
+                    (ex, None)
                 }
-            }
-            drop(arena_ref);
-            al2.borrow_mut().alloc_expr(
-                Expr::Assert(ExprAssert { expr: ex, msg: None }),
-                ss(e.span()),
-            )
+            };
+            al.borrow_mut().alloc_expr(Expr::Assert(ExprAssert { expr: cond, msg }), ss(e.span()))
         })
 };
 ```
 
-This checks the parsed expression: if it's `Apply(cond, string_literal)`, split into assert with condition and message. Otherwise, it's a plain assert with no message. No parser restructuring needed — just a post-parse fixup.
+The immutable borrow `al.borrow()` is scoped in a block that returns `(cond, msg)`. After the block ends, the borrow is dropped. Then `al.borrow_mut()` allocates. This avoids the simultaneous immutable+mutable borrow panic.
 
-Note: this requires borrowing the arena to inspect the expression, then dropping the borrow before mutably borrowing to allocate. Handle the borrow carefully.
+Remove the `.then(expr.clone().or_not())` from the current parser — it's replaced by the post-parse splitting.
+
+Add `Expr::Apply` and `ExprApply` to the imports at the top of `expr.rs` if not already present. Check the existing `use crate::ast::{ ... }` statement.
 
 Write test `tests/parser_assert_message.lx`:
 ```lx
@@ -133,45 +111,7 @@ x = 5
 assert (x > 0) "x must be positive"
 ```
 
-All should pass. For a failing assert with message, verify the message appears in the error output.
-
 **ActiveForm:** Fixing assert message parsing
-
----
-
-### Task 3: Fix trait body backtracking
-
-**Subject:** Ensure trait body parser falls through to default_method when field_entry partially fails
-
-**Description:** Read `crates/lx/src/parser/stmt.rs` `trait_body()` around line 228. The `field_entry` parser matches `ident : type_name`. The `type_name()` in `expr.rs` only matches `TokenKind::TypeName` and keyword tokens — NOT lowercase `TokenKind::Ident`. So `name: rub.name` should fail at `type_name()` because `rub` is lowercase.
-
-Test whether the current parser already handles this correctly:
-
-```
-echo '+Trait T = { m = () { {name: "hello"} } }' > /tmp/test_trait_record.lx
-cargo run -p lx-cli -- run /tmp/test_trait_record.lx
-```
-
-If it parses, trait body backtracking already works — task is done (just add a regression test).
-
-If it fails, the issue is that chumsky's `choice` in `trait_body` partially consumes `ident :` before `type_name()` fails, and doesn't backtrack. Fix by wrapping `field_entry` in `.try_map()` or restructuring so `ident :` is not consumed until `type_name()` succeeds. In chumsky, use `.then(type_name()).rewind()` or an explicit `.try()` to enable backtracking.
-
-Write test `tests/parser_trait_record.lx`:
-```lx
-+Trait HasMethod = {
-  describe = () {
-    n = "test"
-    {name: n; value: 42}
-  }
-}
-Class Impl : [HasMethod] = {}
-obj = Impl {}
-result = obj.describe ()
-assert (result.name == "test")
-assert (result.value == 42)
-```
-
-**ActiveForm:** Fixing trait body backtracking
 
 ---
 
