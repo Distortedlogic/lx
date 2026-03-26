@@ -8,7 +8,7 @@ use std/cron
 use ./log
 use ./context
 use ./store/status {RunStatus}
-use ./grader {Grader}
+use ./agent/grader {Grader}
 use ./workflow/orchestrator
 
 target_grade = 93

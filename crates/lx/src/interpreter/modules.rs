@@ -107,11 +107,13 @@ impl Interpreter {
     let result = crate::parser::parse(tokens, crate::source::FileId::new(0), comments, source);
     let surface = result.program.ok_or_else(|| LxError::runtime(format!("std/{name}: parse error"), span))?;
     let program = desugar(surface);
+    let saved_source_dir = self.ctx.source_dir.lock().clone();
     let mut mod_interp = Interpreter::new(source, None, Arc::clone(&self.ctx));
     mod_interp.module_cache = Arc::clone(&self.module_cache);
     mod_interp.loading = Arc::clone(&self.loading);
     mod_interp.exec(&program).await.map_err(|e| LxError::runtime(format!("std/{name}: {e}"), span))?;
     let exports = collect_exports(&program, &mod_interp);
+    *self.ctx.source_dir.lock() = saved_source_dir;
     self.module_cache.lock().insert(cache_key, exports.clone());
     Ok(exports)
   }
@@ -143,11 +145,13 @@ impl Interpreter {
     }
     let program = desugar(surface);
     let module_dir = file_path.parent().map(|p| p.to_path_buf());
+    let saved_source_dir = self.ctx.source_dir.lock().clone();
     let mut mod_interp = Interpreter::new(&source, module_dir, Arc::clone(&self.ctx));
     mod_interp.module_cache = Arc::clone(&self.module_cache);
     mod_interp.loading = Arc::clone(&self.loading);
     mod_interp.exec(&program).await.map_err(|e| LxError::runtime(format!("module '{}': {e}", file_path.display()), span))?;
     let exports = collect_exports(&program, &mod_interp);
+    *self.ctx.source_dir.lock() = saved_source_dir;
     self.module_cache.lock().insert(canonical.clone(), exports.clone());
     self.loading.lock().remove(&canonical);
     Ok(exports)

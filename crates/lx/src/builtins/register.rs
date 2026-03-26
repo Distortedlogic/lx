@@ -102,7 +102,12 @@ fn bi_odd(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<Lx
 }
 
 fn bi_type_of(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  Ok(LxVal::str(args[0].type_name()))
+  let name = match &args[0] {
+    LxVal::BuiltinFunc(_) => "Func",
+    LxVal::MultiFunc(_) => "Func",
+    other => other.type_name(),
+  };
+  Ok(LxVal::str(name))
 }
 
 fn bi_print(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
