@@ -75,21 +75,20 @@ pub fn VoiceBanner() -> Element {
   use_future(move || async move {
     loop {
       let Ok(msg) = agent_widget.recv::<serde_json::Value>().await else { break };
-      match msg["type"].as_str() {
-        Some("user_message") => {
-          let content = msg["content"].as_str().unwrap_or("").to_owned();
-          if content.is_empty() { continue; }
-          match crate::voice_backend::ClaudeCliBackend.query(&content).await {
-            Ok(response) => {
-              agent_widget.send_update(serde_json::json!({ "type": "assistant_chunk", "text": response }));
-              agent_widget.send_update(serde_json::json!({ "type": "assistant_done" }));
-            }
-            Err(e) => {
-              agent_widget.send_update(serde_json::json!({ "type": "error", "message": format!("{e:#}") }));
-            }
-          }
+      if let Some("user_message") = msg["type"].as_str() {
+        let content = msg["content"].as_str().unwrap_or("").to_owned();
+        if content.is_empty() {
+          continue;
         }
-        _ => {}
+        match crate::voice_backend::ClaudeCliBackend.query(&content).await {
+          Ok(response) => {
+            agent_widget.send_update(serde_json::json!({ "type": "assistant_chunk", "text": response }));
+            agent_widget.send_update(serde_json::json!({ "type": "assistant_done" }));
+          },
+          Err(e) => {
+            agent_widget.send_update(serde_json::json!({ "type": "error", "message": format!("{e:#}") }));
+          },
+        }
       }
     }
   });
@@ -109,33 +108,58 @@ pub fn VoiceBanner() -> Element {
     div { class: "flex flex-col h-full",
       div { class: "bg-[var(--surface-container)] px-4 py-2 flex items-center gap-3 shrink-0 {bar_glow}",
         span { class: "text-[var(--primary)] text-sm", "{icon}" }
-        span { class: "text-sm font-semibold uppercase tracking-wider text-[var(--on-surface)]", "{status_text}" }
+        span { class: "text-sm font-semibold uppercase tracking-wider text-[var(--on-surface)]",
+          "{status_text}"
+        }
         if is_active {
           div { class: "flex items-end gap-[2px] h-4 ml-1",
-            span { class: "w-1 bg-[var(--primary)] rounded-sm transition-all duration-75", style: "height: {(volume * 40.0).max(2.0)}%;" }
-            span { class: "w-1 bg-[var(--primary)] rounded-sm transition-all duration-75", style: "height: {(volume * 70.0).max(2.0)}%;" }
-            span { class: "w-1 bg-[var(--primary)] rounded-sm transition-all duration-75", style: "height: {(volume * 100.0).max(2.0)}%;" }
-            span { class: "w-1 bg-[var(--primary)] rounded-sm transition-all duration-75", style: "height: {(volume * 60.0).max(2.0)}%;" }
+            span {
+              class: "w-1 bg-[var(--primary)] rounded-sm transition-all duration-75",
+              style: "height: {(volume * 40.0).max(2.0)}%;",
+            }
+            span {
+              class: "w-1 bg-[var(--primary)] rounded-sm transition-all duration-75",
+              style: "height: {(volume * 70.0).max(2.0)}%;",
+            }
+            span {
+              class: "w-1 bg-[var(--primary)] rounded-sm transition-all duration-75",
+              style: "height: {(volume * 100.0).max(2.0)}%;",
+            }
+            span {
+              class: "w-1 bg-[var(--primary)] rounded-sm transition-all duration-75",
+              style: "height: {(volume * 60.0).max(2.0)}%;",
+            }
           }
-          span { class: "text-[10px] text-[var(--outline)] uppercase tracking-wider", "{stage}" }
-          span { class: "text-[10px] text-[var(--outline)] uppercase tracking-wider", "TURNS: {turn_count}" }
+          span { class: "text-[10px] text-[var(--outline)] uppercase tracking-wider",
+            "{stage}"
+          }
+          span { class: "text-[10px] text-[var(--outline)] uppercase tracking-wider",
+            "TURNS: {turn_count}"
+          }
         }
         div { class: "flex-1" }
         if is_active {
           button {
             class: "border border-[var(--outline)] text-[var(--on-surface)] rounded px-4 py-1.5 text-sm uppercase hover:bg-[var(--surface-container-high)] transition-colors duration-150 font-semibold",
-            onclick: move |_| { voice_widget.send_update(serde_json::json!({ "type": "stop_capture" })); },
+            onclick: move |_| {
+                voice_widget.send_update(serde_json::json!({ "type" : "stop_capture" }));
+            },
             "STOP"
           }
         } else {
           button {
             class: "border border-[var(--primary)] text-[var(--primary)] rounded px-4 py-1.5 text-sm uppercase hover:bg-[var(--primary)]/10 transition-colors duration-150 font-semibold",
-            onclick: move |_| { voice_widget.send_update(serde_json::json!({ "type": "start_capture" })); },
+            onclick: move |_| {
+                voice_widget.send_update(serde_json::json!({ "type" : "start_capture" }));
+            },
             "PUSH TO TALK"
           }
         }
       }
-      div { id: "{agent_element_id}", class: "flex-1 min-h-0 overflow-hidden" }
+      div {
+        id: "{agent_element_id}",
+        class: "flex-1 min-h-0 overflow-hidden",
+      }
       div { id: "{voice_element_id}", class: "hidden" }
     }
   }
