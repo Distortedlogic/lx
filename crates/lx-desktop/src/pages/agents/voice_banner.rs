@@ -3,7 +3,6 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as B64;
 use common_inference::InferenceClient as _;
 use common_kokoro::SpeechRequest;
-use common_voice::AgentBackend as _;
 use common_whisper::TranscribeRequest;
 use dioxus::prelude::*;
 use dioxus_widget_bridge::use_ts_widget;
@@ -80,9 +79,12 @@ pub fn VoiceBanner() -> Element {
         if content.is_empty() {
           continue;
         }
-        match crate::voice_backend::ClaudeCliBackend.query(&content).await {
-          Ok(response) => {
-            agent_widget.send_update(serde_json::json!({ "type": "assistant_chunk", "text": response }));
+        match crate::voice_backend::query_streaming(&content, |chunk| {
+          agent_widget.send_update(serde_json::json!({ "type": "assistant_chunk", "text": chunk }));
+        })
+        .await
+        {
+          Ok(_) => {
             agent_widget.send_update(serde_json::json!({ "type": "assistant_done" }));
           },
           Err(e) => {
@@ -190,9 +192,10 @@ async fn run_pipeline(
   agent_widget.send_update(serde_json::json!({ "type": "user_display", "text": text }));
 
   ctx.pipeline_stage.set(PipelineStage::QueryingLlm);
-  let response = crate::voice_backend::ClaudeCliBackend.query(&text).await?;
-
-  agent_widget.send_update(serde_json::json!({ "type": "assistant_chunk", "text": response }));
+  let response = crate::voice_backend::query_streaming(&text, |chunk| {
+    agent_widget.send_update(serde_json::json!({ "type": "assistant_chunk", "text": chunk }));
+  })
+  .await?;
   agent_widget.send_update(serde_json::json!({ "type": "assistant_done" }));
 
   if response.is_empty() {
