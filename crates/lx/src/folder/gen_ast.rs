@@ -42,12 +42,6 @@ pub fn gen_func(params: &[&str], body: ExprId, span: SourceSpan, arena: &mut Ast
   arena.alloc_expr(Expr::Func(ExprFunc { params, type_params: vec![], ret_type: None, guard: None, body }), span)
 }
 
-pub fn gen_ok_unit(span: SourceSpan, arena: &mut AstArena) -> ExprId {
-  let ok = arena.alloc_expr(Expr::TypeConstructor(intern("Ok")), span);
-  let unit = arena.alloc_expr(Expr::Literal(Literal::Unit), span);
-  arena.alloc_expr(Expr::Apply(ExprApply { func: ok, arg: unit }), span)
-}
-
 pub fn gen_propagate(inner: ExprId, span: SourceSpan, arena: &mut AstArena) -> ExprId {
   arena.alloc_expr(Expr::Propagate(ExprPropagate { inner }), span)
 }

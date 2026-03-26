@@ -64,9 +64,7 @@ CLI TestCli = {
 c = TestCli {}
 assert c.command == "echo"
 assert (c.tool_defs | len == 1)
-assert (methods_of c | any? (== "connect"))
-assert (methods_of c | any? (== "tools"))
-assert (c.tools () | len == 1)
+assert (methods_of c | any? (== "run"))
 
 -- HTTP
 HTTP TestApi = {
@@ -76,10 +74,7 @@ HTTP TestApi = {
 }
 api = TestApi {}
 assert api.base_url == "https://httpbin.org"
-assert (methods_of api | any? (== "connect"))
-assert (methods_of api | any? (== "call"))
-assert (api.tools () | len == 1)
-assert (api.connect () | ok?)
+assert (methods_of api | any? (== "run"))
 
 -- MCP
 MCP TestServer = {
@@ -89,8 +84,7 @@ MCP TestServer = {
 srv = TestServer {}
 assert srv.command == "echo"
 assert srv.args == ["test"]
-assert (methods_of srv | any? (== "connect"))
-assert (methods_of srv | any? (== "call"))
+assert (methods_of srv | any? (== "run"))
 
 -- Export prefix (+ before and after keyword)
 +Schema BeforeKeyword = { x: Int = "test" }

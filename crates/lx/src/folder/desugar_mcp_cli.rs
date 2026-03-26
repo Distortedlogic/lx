@@ -5,7 +5,8 @@ use crate::ast::{
   Pattern, Stmt, StmtId, UseKind, UseStmt,
 };
 use crate::folder::gen_ast::{
-  gen_apply, gen_block, gen_field_call, gen_field_update, gen_func, gen_ident, gen_literal_str, gen_method, gen_none, gen_propagate, gen_record, gen_self_field,
+  gen_apply, gen_block, gen_field_call, gen_field_update, gen_func, gen_ident, gen_list, gen_literal_str, gen_method, gen_none, gen_propagate, gen_record,
+  gen_self_field,
 };
 use crate::sym::{Sym, intern};
 
@@ -134,5 +135,3 @@ fn build_cli_run(span: SourceSpan, arena: &mut AstArena) -> ExprId {
   let propagated = gen_propagate(bash_call, span, arena);
   gen_func(&["args"], propagated, span, arena)
 }
-
-use crate::folder::gen_ast::gen_list;
