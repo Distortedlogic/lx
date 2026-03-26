@@ -8,6 +8,7 @@ mod listing;
 mod llm_backend;
 mod lockfile;
 mod manifest;
+mod plugin;
 mod run;
 mod testing;
 
@@ -79,6 +80,18 @@ enum Command {
     #[arg()]
     package: Option<String>,
   },
+  Plugin {
+    #[command(subcommand)]
+    action: PluginAction,
+  },
+}
+
+#[derive(Subcommand)]
+enum PluginAction {
+  Install { path: std::path::PathBuf },
+  List,
+  Remove { name: String },
+  New { name: String },
 }
 
 fn main() -> ExitCode {
@@ -115,6 +128,12 @@ fn main() -> ExitCode {
     Command::Init { name, flow } => init::run_init(name.as_deref(), flow),
     Command::Install { package } => install::run_install(package.as_deref()),
     Command::Update { package } => install::run_update(package.as_deref()),
+    Command::Plugin { action } => match action {
+      PluginAction::Install { path } => plugin::install(&path),
+      PluginAction::List => plugin::list(),
+      PluginAction::Remove { name } => plugin::remove(&name),
+      PluginAction::New { name } => plugin::new_plugin(&name),
+    },
   }
 }
 
