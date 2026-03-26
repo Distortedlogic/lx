@@ -168,7 +168,7 @@ pub fn VoiceBanner() -> Element {
 }
 
 async fn tts(text: &str) -> anyhow::Result<Vec<u8>> {
-  let req = SpeechRequest { text: text.to_owned(), voice: "am_michael".into(), lang_code: "a".into(), speed: 1.4 };
+  let req = SpeechRequest { text: text.to_owned(), voice: "am_michael".into(), lang_code: "a".into(), speed: 1.2 };
   common_kokoro::KOKORO.infer(&req).await
 }
 
@@ -205,7 +205,7 @@ async fn run_pipeline(
 
   ctx.pipeline_stage.set(PipelineStage::SynthesizingSpeech);
   let wav_bytes = tts(&response).await?;
-  tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+  tokio::time::sleep(std::time::Duration::from_millis(300)).await;
   ctx.pending.write().insert("r0".to_string(), response);
   voice_widget.send_update(serde_json::json!({
       "type": "audio_response",
