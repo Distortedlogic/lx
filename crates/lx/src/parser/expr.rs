@@ -137,10 +137,20 @@ where
 
     let assert_expr = {
       let al = arena.clone();
-      just(TokenKind::Assert)
-        .ignore_then(expr.clone())
-        .then(expr.clone().or_not())
-        .map_with(move |(ex, msg), e| al.borrow_mut().alloc_expr(Expr::Assert(ExprAssert { expr: ex, msg }), ss(e.span())))
+      just(TokenKind::Assert).ignore_then(expr.clone()).map_with(move |ex, e| {
+        let (cond, msg) = {
+          let ar = al.borrow();
+          if let Expr::Apply(app) = ar.expr(ex)
+            && let Expr::Grouped(_) = ar.expr(app.func)
+            && let Expr::Literal(Literal::Str(_)) = ar.expr(app.arg)
+          {
+            (app.func, Some(app.arg))
+          } else {
+            (ex, None)
+          }
+        };
+        al.borrow_mut().alloc_expr(Expr::Assert(ExprAssert { expr: cond, msg }), ss(e.span()))
+      })
     };
 
     let emit_expr = {

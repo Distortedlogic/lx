@@ -160,9 +160,9 @@ pub fn register(env: &Env) {
   env.bind_str("agent", LxVal::record(agent_fields));
 
   let mut ai_fields = IndexMap::new();
-  ai_fields.insert(intern("prompt"), mk("ai.prompt", 1, super::ai::bi_prompt));
-  ai_fields.insert(intern("prompt_with"), mk("ai.prompt_with", 1, super::ai::bi_prompt_with));
-  ai_fields.insert(intern("prompt_structured"), mk("ai.prompt_structured", 2, super::ai::bi_prompt_structured));
+  ai_fields.insert(crate::sym::intern("prompt"), mk("ai.prompt", 1, super::ai::bi_prompt));
+  ai_fields.insert(crate::sym::intern("prompt_with"), mk("ai.prompt_with", 1, super::ai::bi_prompt_with));
+  ai_fields.insert(crate::sym::intern("prompt_structured"), mk("ai.prompt_structured", 2, super::ai::bi_prompt_structured));
   env.bind_str("ai", LxVal::record(ai_fields));
 
   let mut ctx_fields = IndexMap::new();

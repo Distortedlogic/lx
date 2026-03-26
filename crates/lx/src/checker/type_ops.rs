@@ -135,6 +135,7 @@ impl Checker<'_> {
         let with = with.clone();
         self.synth_with_type(&with.kind, &with.body)
       },
+      Expr::Grouped(inner) => self.synth_expr(*inner),
     }
   }
 

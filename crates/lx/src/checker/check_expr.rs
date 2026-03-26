@@ -43,6 +43,7 @@ impl Checker<'_> {
       },
       Expr::Match(m) => self.check_match(m.scrutinee, &m.arms, expected),
       Expr::Block(ExprBlock { stmts }) => self.check_block(stmts, expected),
+      Expr::Grouped(inner) => self.check_expr(*inner, expected),
       Expr::Literal(_)
       | Expr::Ident(_)
       | Expr::TypeConstructor(_)

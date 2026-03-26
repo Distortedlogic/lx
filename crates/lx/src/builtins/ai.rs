@@ -15,14 +15,10 @@ pub fn bi_prompt_with(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -
   let LxVal::Record(rec) = &args[0] else {
     return Err(LxError::type_err("ai.prompt_with: expected Record", span, None));
   };
-  let prompt = rec
-    .get(&intern("prompt"))
-    .and_then(|v| v.as_str())
-    .ok_or_else(|| LxError::type_err("ai.prompt_with: 'prompt' field required", span, None))?
-    .to_string();
-  let tools = rec.get(&intern("tools")).and_then(|v| v.as_list()).map(|list| {
-    list.iter().filter_map(|v| v.as_str().map(String::from)).collect()
-  }).unwrap_or_default();
+  let prompt =
+    rec.get(&intern("prompt")).and_then(|v| v.as_str()).ok_or_else(|| LxError::type_err("ai.prompt_with: 'prompt' field required", span, None))?.to_string();
+  let tools =
+    rec.get(&intern("tools")).and_then(|v| v.as_list()).map(|list| list.iter().filter_map(|v| v.as_str().map(String::from)).collect()).unwrap_or_default();
   let max_turns = rec.get(&intern("max_turns")).and_then(|v| v.as_int()).and_then(|n| u32::try_from(n).ok());
   let json_schema = rec.get(&intern("json_schema")).and_then(|v| v.as_str()).map(String::from);
 

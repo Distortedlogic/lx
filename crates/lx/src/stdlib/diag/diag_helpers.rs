@@ -13,6 +13,7 @@ pub(super) fn extract_field_call_parts<'a>(expr: &'a Expr, arena: &'a AstArena) 
 pub(super) fn unwrap_propagate<'a>(expr: &'a Expr, arena: &'a AstArena) -> &'a Expr {
   match expr {
     Expr::Propagate(ExprPropagate { inner }) => unwrap_propagate(arena.expr(*inner), arena),
+    Expr::Grouped(inner) => unwrap_propagate(arena.expr(*inner), arena),
     other => other,
   }
 }
@@ -42,6 +43,7 @@ pub(super) fn expr_label(expr: &Expr, arena: &AstArena) -> String {
     Expr::Literal(Literal::Int(n)) => n.to_string(),
     Expr::Literal(Literal::Bool(b)) => b.to_string(),
     Expr::Literal(Literal::Str(_)) => extract_str_literal(expr).unwrap_or_else(|| "str".into()),
+    Expr::Grouped(inner) => expr_label(arena.expr(*inner), arena),
     _ => "expr".into(),
   }
 }

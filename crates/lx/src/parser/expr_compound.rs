@@ -118,9 +118,10 @@ where
     .then_ignore(just(TokenKind::RParen))
     .map_with(move |elems, e| a8.borrow_mut().alloc_expr(Expr::Tuple(ExprTuple { elems }), ss(e.span())));
 
-  let grouped = just(TokenKind::LParen).ignore_then(expr).then_ignore(just(TokenKind::RParen)).map_with(move |inner, e| {
-    arena.borrow_mut().alloc_expr(Expr::Grouped(inner), ss(e.span()))
-  });
+  let grouped = just(TokenKind::LParen)
+    .ignore_then(expr)
+    .then_ignore(just(TokenKind::RParen))
+    .map_with(move |inner, e| arena.borrow_mut().alloc_expr(Expr::Grouped(inner), ss(e.span())));
 
   choice((field_section, index_section, binop_section, right_section, func_def, unit, left_section, tuple, grouped))
 }

@@ -39,6 +39,7 @@ fn stringify_expr(id: ExprId, arena: &AstArena) -> String {
     Expr::Apply(ExprApply { func, arg }) => {
       format!("{} {}", stringify_expr(*func, arena), stringify_expr(*arg, arena))
     },
+    Expr::Grouped(inner) => stringify_expr(*inner, arena),
     _ => "<constraint>".to_string(),
   }
 }
