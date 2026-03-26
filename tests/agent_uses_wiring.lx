@@ -15,4 +15,4 @@
 
 a = TestAgent {}
 assert (a.tools () | len > 0)
-assert (a.tools () | any? (== "test_tool"))
+assert (a.tools () | find (t) { t == "test_tool" } | (!= None))
