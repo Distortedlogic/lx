@@ -102,4 +102,4 @@ assert (d.tools == ["Read"]) "describe includes tools"
 Agent EscAgent = {}
 esc = EscAgent {}
 esc_result = esc.escalate "need human"
-assert (err? esc_result) "escalate returns Err"
+assert (esc_result | err?) "escalate returns Err"
