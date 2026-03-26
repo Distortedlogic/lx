@@ -83,3 +83,19 @@ topo_sort = (steps) {
   }
   Ok sorted
 }
+
++refine = (initial opts) {
+  grade_fn = opts.grade
+  revise_fn = opts.revise
+  threshold = opts.threshold ?? 80
+  max_r = opts.max_rounds ?? 3
+  work := initial
+  round := 0
+  loop {
+    round <- round + 1
+    result = grade_fn work
+    result.score >= threshold ? break Ok {work: work; rounds: round; score: result.score}
+    round >= max_r ? break Err {work: work; rounds: round; score: result.score}
+    work <- revise_fn work result.feedback
+  }
+}
