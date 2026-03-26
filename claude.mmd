@@ -1,0 +1,95 @@
+graph TD
+    start(["0.0.0 Session Start"]):::teal
+    start --> init["0.0.1 Initialize\n——————\nload system prompt\nload CLAUDE.md chain\nload MEMORY.md + memories\ncapture git status snapshot\nload settings + permissions\nresolve tools + MCP servers\nload hooks config"]:::cyan
+    init --> wait["0.0.2 Await User Input"]:::teal
+
+    wait --> parse{{"0.1.0 input type?"}}:::purple
+    parse -- "text / question" --> assemble
+    parse -- "/slash command" --> skill["0.0.3 Expand Skill\n——————\nskill name → full prompt\ninjected into conversation"]:::cyan
+    parse -- "! shell" --> passthru["0.0.4 Pass-through Shell\n——————\nexecute in user session\noutput lands in conversation"]:::cyan
+    skill --> assemble
+    passthru --> wait
+
+    assemble["`**1.0.0 Assemble Context**
+———
+system prompt
+CLAUDE.md chain (root → nested)
+memory files (user, feedback, project, reference)
+conversation history
+git status snapshot
+tool schemas (built-in + MCP)
+hook feedback from prior turns`"]:::orange
+
+    assemble --> generate["`**2.0.0 Generate**
+———
+extended thinking (hidden from user)
+→ analyze request
+→ plan approach
+→ identify needed tools
+———
+produces in single response:
+→ text output (shown to user)
+→ tool calls (0 or more)
+———
+independent calls emitted in parallel
+dependent calls emitted sequentially`"]:::yellow
+
+    generate --> has_tools{{"2.1.0 tool calls\nin response?"}}:::teal
+    has_tools -- "no" --> display["2.0.1 Display Text\n——————\nmarkdown rendered\nto terminal"]:::cyan
+    display --> compress_check
+
+    has_tools -- "yes" --> tool_loop["3.0.0 For each tool call"]:::purple
+    tool_loop --> perm{{"3.1.0 permission\nmode?"}}:::teal
+
+    perm -- "auto-allow\n(allowlist match)" --> exec
+    perm -- "needs approval" --> ask{{"3.2.0 user\napproves?"}}:::yellow
+    ask -- "yes" --> exec
+    ask -- "no" --> denied["3.0.1 Denied\n——————\ndo not re-attempt same call\nadjust approach"]:::red
+    denied --> generate
+
+    exec["`**4.0.0 Execute Tool**
+———
+⟳ pre-hooks fire (if configured)
+———
+dispatch to tool handler:
+→ Read — file contents
+→ Edit — string replacement in file
+→ Write — create or overwrite file
+→ Bash — shell command execution
+→ Grep — ripgrep content search
+→ Glob — file pattern matching
+→ Agent — spawn subagent
+→ Skill — expand slash command
+→ MCP — call MCP server tool
+→ WebFetch / WebSearch
+→ LSP — language server queries
+———
+⟳ post-hooks fire (if configured)
+———
+collect result or error`"]:::orange
+
+    exec --> is_agent{{"4.1.0 agent\nspawn?"}}:::teal
+
+    is_agent -- "yes" --> agent["`**5.0.0 Spawn Subagent**
+———
+fresh isolated context window
+typed: Explore, Plan, general-purpose, etc.
+own tool permissions
+own generate → tool → feedback loop
+———
+foreground: parent blocks until done
+background: parent continues,
+  notified on completion
+worktree: isolated git copy`"]:::yellow
+    agent --> agent_done["5.0.1 Collect Result\n——————\nresult returned to parent\nsubagent context discarded"]:::cyan
+    agent_done --> more
+
+    is_agent -- "no" --> more{{"4.2.0 more tool\ncalls in batch?"}}:::purple
+    more -- "yes" --> tool_loop
+    more -- "no" --> feedback["4.0.1 Feed Results\n——————\ntool results appended\nto conversation context"]:::cyan
+    feedback --> generate
+
+    compress_check{{"6.0.0 context\nnearing limit?"}}:::teal
+    compress_check -- "yes" --> compress["6.0.1 Compress\n——————\nsummarize earlier messages\npreserve key information\nconversation continues"]:::cyan
+    compress --> wait
+    compress_check -- "no" --> wait

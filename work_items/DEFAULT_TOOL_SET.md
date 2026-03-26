@@ -23,7 +23,7 @@ CLI Bash = {
   command: "bash"
   name: "bash"
   description: "Execute shell commands"
-  params: {command: Str}
+  params: {command: "Str"}
 }
 ```
 

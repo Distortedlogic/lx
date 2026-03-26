@@ -13,6 +13,16 @@ every task in the work item
 → do not combine with other tasks
 → do not add work not in the task
 → do not substitute a different approach
+→ do not touch files outside the task scope
+→ do not add infrastructure not in the spec
+}
+———
+⟳ if your change creates a new problem {
+→ fix the root cause in this task
+→ do not restructure other code to avoid it
+}
+⟳ if you must deviate from the spec {
+→ stop · document why · before proceeding
 }`"]:::orange
     implement --> audit["`**2.0.0 Audit (Spawn Subagent)**
 ——— read ———
@@ -31,8 +41,18 @@ functions returning placeholders
 match arms discarding with _ => {}
 new struct/trait/enum with no users
 TODO/FIXME/unimplemented left behind
+unused imports · dead functions · orphaned consts
+pub items nothing outside the module uses
 code compiles with 0 warnings
 all tests pass
+——— check for failure modes ———
+workarounds: restructured code to dodge a bug?
+regressions: new ambiguities or edge cases?
+scope creep: files outside the work item touched?
+deviations: spec vs actual — justified?
+——— grade 0 if ———
+any pre-existing test regresses
+implementer worked around own bug
 ——— returns ———
 grade 0–100
 list of {file, issue, severity}`"]:::yellow
@@ -52,6 +72,10 @@ findings list from auditor
 ⟳ for each finding {
 → open the flagged file
 → fix exactly the issue described
+→ fix root causes, not symptoms
+→ if finding is a workaround, fix the
+  underlying problem
+→ do not introduce new workarounds
 → do not add features
 → do not refactor nearby code
 → do not touch files not in findings
@@ -87,11 +111,21 @@ all tests pass
 →→ did it add anything not in the task?
   }
 }
+——— phase 3: cross-item integrity ———
+⟳ for each pair of work items {
+→ did a later item work around a problem
+  introduced by an earlier item?
+→ if so: fix at the source, not downstream
+}
+⟳ for each behavioral change {
+→ is it tested?
+→ undocumented edge cases = finding
+}
 ——— returns ———
 grade 0–100
 list of {file, issue, severity}
-(includes both code quality
-and spec compliance findings)`"]:::cyan
+(includes code quality, spec compliance,
+and cross-item findings)`"]:::cyan
     sys_audit --> sys_check{{"4.1.0 grade >= 93?"}}:::teal
 
     sys_check -- "no" --> sys_stuck{{"4.2.0 stuck?\n——————\n3+ attempts ·\ngrade not improving ·\nsame findings repeating"}}:::red
@@ -105,6 +139,10 @@ findings list from auditor
 ⟳ for each finding {
 → open the flagged file
 → fix exactly the issue described
+→ fix root causes, not symptoms
+→ if finding is a workaround, fix the
+  underlying problem
+→ do not introduce new workarounds
 → do not add features
 → do not refactor nearby code
 → do not touch files not in findings
