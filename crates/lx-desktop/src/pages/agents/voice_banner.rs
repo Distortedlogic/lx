@@ -197,16 +197,23 @@ async fn run_pipeline(
   ctx.status.set(VoiceStatus::Speaking);
 
   let transcript_entry = response.clone();
+  let wav_len = wav_bytes.len();
+  eprintln!("[voice] TTS returned {} bytes of WAV data", wav_len);
   tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
     use std::sync::LazyLock;
     static AUDIO_SINK: LazyLock<rodio::MixerDeviceSink> = LazyLock::new(|| {
+      eprintln!("[voice] Opening default audio sink...");
       let mut sink = rodio::DeviceSinkBuilder::open_default_sink().expect("no audio device");
       sink.log_on_drop(false);
+      eprintln!("[voice] Audio sink opened successfully");
       sink
     });
+    eprintln!("[voice] Decoding and playing {} bytes", wav_len);
     let cursor = std::io::Cursor::new(wav_bytes);
     let player = rodio::play(AUDIO_SINK.mixer(), cursor)?;
+    eprintln!("[voice] Waiting for playback to finish...");
     player.sleep_until_end();
+    eprintln!("[voice] Playback complete");
     Ok(())
   })
   .await??;

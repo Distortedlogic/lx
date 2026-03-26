@@ -1,55 +1,75 @@
 # Goal
 
-Wire the Agent trait's `run` loop to automatically compose existing guardrail packages (budget, circuit breaker, quality grading, stop conditions) so agents get harness-level reliability by declaring fields instead of manually calling guard functions. Implement the missing `refine` function in `std/workflow.lx`. Add composable stop conditions as a new `pkg/guard/conditions.lx` module. Update the Agent trait's `run` method to check declared guardrails before/after each turn. Update brain programs to use the new declarative fields instead of manual wiring, validating the design and shrinking the brain code.
+Implement the missing `refine` function in `std/workflow.lx` that `pkg/agent/quality.lx` already calls. Add composable stop conditions as a new `pkg/guard/conditions.lx` module. Create an agent harness runner in `pkg/agents/harness.lx` that composes budget tracking, stop conditions, and quality gating around any Agent's run loop — living in pkg/ where it can import other pkg/ modules, not in std/ where it cannot.
 
 # Why
 
-- The benchmarks research found harness design drives agent scores more than model choice (CORE-Bench: 36-point gain from switching scaffolds with same model). The harness IS budget tracking + quality gates + circuit breaking + termination conditions. lx already has all these packages but they require manual wiring in every program.
-- `pkg/agent/quality.lx` line 72 calls `refine` but the function does not exist anywhere in the codebase — not as a Rust builtin, not as an exported lx function. Every `refine_work`, `refine_response`, and `refine_code` call is broken.
-- Brain's `main.lx` (203 lines) and `orchestrator.lx` manually call `monitor.guard()`, `budget.spend()`, `quality.grade()`, `circuit.check()` at every step. This boilerplate is repeated across brain agents and any future lx agent program.
-- The CircuitBreaker in `pkg/guard/circuit.lx` checks max_turns/max_actions/max_time/repetition as a config blob, but conditions cannot be composed algebraically. AutoGen's composable termination with `|`/`&` operators was identified as one of its best design patterns.
+- `pkg/agent/quality.lx` line 72 calls `refine` but the function does not exist anywhere in the codebase — not as a Rust builtin, not as an exported lx function. The `refine_work`, `refine_response`, and `refine_code` functions are all broken because they depend on this missing function.
+- The CircuitBreaker in `pkg/guard/circuit.lx` checks max_turns/max_actions/max_time/repetition as a config blob, but conditions cannot be composed algebraically. You cannot write "stop after 25 turns OR 60 seconds OR budget exhaustion" as a single composable value.
+- Brain's `main.lx` and `orchestrator.lx` manually call `monitor.guard()`, `budget.spend()`, `quality.grade()` at every step. This boilerplate pattern would be repeated by any future agent program. A reusable harness runner in pkg/ eliminates this.
+
+# Why Not Wire Into std/agent.lx
+
+The Agent trait lives in `crates/lx/std/agent.lx`, which is embedded in the Rust binary via `include_str!()` in `crates/lx/src/stdlib/mod.rs`. Stdlib files go through a different module resolution path than normal .lx files — they cannot import pkg/ modules. Adding `use pkg/agent/budget` or `use pkg/guard/conditions` to `std/agent.lx` would fail at runtime because the stdlib loader does not resolve pkg/ paths.
+
+The correct architecture: the Agent trait in std/ stays minimal and dependency-free. The harness composition layer lives in pkg/ where it can freely import budget, conditions, quality, and any other pkg/ module. Simple agents use the harness; complex agents (like brain/) continue to wire their own monitoring.
 
 # What Changes
 
 **1. Implement `refine` in `std/workflow.lx`**
 
-Add an exported `refine` function after the existing `topo_sort` function. It takes an initial value and an options record with `grade` (function returning `{score: Int; feedback: Str}`), `revise` (function taking current work and feedback string, returning revised work), `threshold` (Int, default 80), and `max_rounds` (Int, default 3). The function loops: call grade on current work, if score meets threshold return `Ok {work: work; rounds: round; score: result.score}`, if max rounds reached return `Err {work: work; rounds: round; score: result.score}`, otherwise call revise with current work and feedback, set work to the result, and continue.
+Add an exported `refine` function after the existing `topo_sort` function at line 85. It takes two arguments: `initial` (the starting work value) and `opts` (a record with fields `grade`, `revise`, `threshold`, `max_rounds`). The function loops: call grade on current work, if score meets threshold return Ok, if max rounds reached return Err, otherwise call revise with current work and feedback and continue.
+
+The return value matches the existing call site in `pkg/agent/quality.lx` line 94: `result ? { Ok r -> r.work; Err r -> r.work }`. Both Ok and Err carry `{work: ...; rounds: ...; score: ...}`.
 
 **2. Add composable stop conditions in `pkg/guard/conditions.lx`**
 
-Create a new file exporting condition constructor functions. Each constructor returns a record with a `check` field that takes a state record and returns Bool. The state record has fields: `turns` (Int), `elapsed_ms` (Int), `budget_pct` (Float), `last_score` (Float), `action_count` (Int). Constructor functions: `max_turns` (takes Int n, checks `state.turns >= n`), `timeout_ms` (takes Int ms, checks `state.elapsed_ms >= ms`), `budget_at` (takes Float pct, checks `state.budget_pct >= pct`), `score_above` (takes Float n, checks `state.last_score >= n`), `max_actions` (takes Int n, checks `state.action_count >= n`). Combinator functions: `any_of` (takes list of conditions, returns true if any condition's check returns true), `all_of` (takes list of conditions, returns true if all conditions' check returns true).
+New file exporting constructor functions. Each constructor returns a record with a `check` field — a closure taking a state record and returning Bool. The state record has fields: `turns`, `elapsed_ms`, `budget_pct`, `last_score`, `action_count`. Constructors: `max_turns`, `timeout_ms`, `budget_at`, `score_above`, `max_actions`. Combinators: `any_of` (any condition true → true), `all_of` (all conditions true → true).
 
-**3. Add optional guardrail fields to the Agent trait in `std/agent.lx`**
+**3. Create agent harness runner in `pkg/agents/harness.lx`**
 
-Add three optional fields after the existing `max_turns` method: `budget` (default None — when set to a record like `{tokens: 100000; cost_usd: 0.50}`, the run loop creates a budget via `budget.create` and calls `budget.spend` after each `think`/`think_with` call), `stop_when` (default None — when set to a condition record from `pkg/guard/conditions.lx`, the run loop calls `condition.check` after each turn and breaks if true), `quality_gate` (default None — when set to a record like `{grader: fn; threshold: 80}`, the run loop calls the grader on the result of each `handle` call and if below threshold, calls `refine` with the work).
+New file exporting a `run_with` function that wraps any Agent with guardrail checking. Takes an agent handle (spawned subprocess) and an opts record with optional fields: `budget` (record passed to `budget.create`), `stop_when` (condition record from conditions.lx), `quality_gate` (record with `grader` function and `threshold`). The function runs the yield/handle/yield loop with automatic checks: before each turn, check budget status; after each turn, check stop conditions; optionally grade results. Returns when a stop condition fires, budget exhausts, or the agent breaks naturally.
 
-Modify the existing `run` method to check these fields. Before the yield/handle/yield loop body: if `self.budget` is not None, check budget status and break with `Err BudgetExhausted` if exceeded. After handle returns: if `self.stop_when` is not None, build the state record from current turn count, elapsed time, budget percentage, and last score, call `self.stop_when.check state`, and break if true. If `self.quality_gate` is not None, call the grader on the result; if below threshold, call refine.
+This does NOT modify `std/agent.lx`. The harness is a wrapper that coordinates with the agent via the existing `~>?` ask protocol. An lx program uses it like:
 
-Add `use pkg/agent/budget : budget_mod` and `use pkg/guard/conditions` and `use std/time` as imports at the top of `std/agent.lx`, after the existing `use std/prompt {Prompt}` on line 1. The file already imports `std/prompt` — add the new imports on separate lines below it.
+```
+use pkg/agents/harness
+use pkg/guard/conditions {any_of max_turns timeout_ms}
 
-**4. Update brain programs to use declarative Agent fields**
-
-In `programs/brain/main.lx`: remove manual `monitor.guard`, `budget.spend`, and `quality.grade` calls where they duplicate the new Agent trait guardrails. The brain agent can set `budget`, `stop_when`, and `quality_gate` fields and let the trait's `run` loop handle them.
-
-In `programs/brain/orchestrator.lx`: same pattern — declare guardrails on the orchestrator's agent setup rather than manually calling guard functions at each step.
+handle = agent.spawn {command: "lx" args: ["agent" "worker.lx"]}
+result = harness.run_with handle {
+  budget: {tokens: 100000; cost_usd: 0.50}
+  stop_when: any_of [max_turns 25; timeout_ms 60000]
+}
+```
 
 # How It Works
 
-The `refine` function is a standalone loop — no trait required. It receives work, grades it, optionally revises, and returns the best version. `quality.refine_work` already has the call site at line 72 expecting this signature. The function's Ok/Err return matches the existing `result ? { Ok r -> r.work; Err r -> r.work }` pattern at line 94.
+The `refine` function is a standalone loop — no trait required. It receives work, grades it, optionally revises, and returns the best version. `quality.refine_work` at line 72 already expects this: it calls `refine initial { grade: ...; revise: ...; threshold; max_rounds: 3 }` and handles the result at line 94 with `result ? { Ok r -> r.work; Err r -> r.work }`.
 
-The stop conditions module is purely functional — each constructor returns a record with a `check` closure. Combining with `any_of`/`all_of` wraps the list in a new closure that iterates. No new types, no Rust changes. An agent declares `stop_when: any_of [max_turns 25; timeout_ms 60000; budget_at 100.0]` and the run loop calls `self.stop_when.check state` each turn.
+The stop conditions module is purely functional — each constructor returns a record with a `check` closure. Combining with `any_of`/`all_of` wraps the list in a new closure that iterates. No new types, no Rust changes.
 
-The Agent trait changes are backward-compatible. All new fields default to None. Existing agents that do not set `budget`, `stop_when`, or `quality_gate` get the current behavior unchanged. The `run` method checks `self.budget != None` before engaging budget logic, etc.
+The harness runner manages the conversation loop externally. It spawns an agent, sends messages via `~>?`, receives results, and checks guardrails between turns. It builds the stop condition state record from tracked turn count, elapsed time (via `time.now`), budget percentage (via `budget.used_pct`), and last quality score. When any stop condition fires, it kills the agent and returns the last result.
+
+The harness does NOT change how agents are written. Agents still implement the Agent trait with perceive/reason/act/reflect. The harness wraps the outer communication loop that drives the agent, adding resource checks between turns.
+
+Brain programs do NOT use the harness — they have custom orchestration flows (saga-based pipeline, specialist agent dispatch, multi-tier memory) that are domain-specific and would not benefit from a generic wrapper. The harness is for simpler agents that follow the standard yield/handle/yield pattern.
+
+# Gotchas
+
+- **`std/workflow.lx` is embedded via `include_str!`.** The `refine` function is added to this file, which is fine — it has no imports beyond what workflow.lx already uses. The function is pure lx with no pkg/ dependencies.
+- **`quality.refine_work` calls `refine` as a bare name (line 72).** This means `refine` must be in scope when `quality.lx` executes. Since `std/workflow` is auto-loaded as part of stdlib, its exports are available globally. The `+refine` export prefix makes it accessible.
+- **The harness `run_with` function communicates with agents via `~>?` (ask).** This is the existing agent subprocess protocol — JSON-lines over stdin/stdout. The harness sends a message, waits for a response, checks guardrails, and repeats. It does not need access to the agent's internal state.
+- **`budget.create` takes a record where numeric fields become dimensions.** Example: `{tokens: 100000; cost_usd: 0.50; tight_at: 50.0; critical_at: 80.0}`. Non-numeric fields (`tight_at`, `critical_at`) are threshold config, not dimensions. The harness passes `opts.budget` directly to `budget.create`.
+- **`budget.used_pct` returns a record of dimension percentages**, e.g., `{tokens: 45.2; cost_usd: 30.0}`. To get a single number for the stop condition state, the harness takes the max value: `budget.used_pct b | values | fold 0.0 (acc v) { v > acc ? v : acc }`.
 
 # Files Affected
 
 | File | Change |
 |------|--------|
-| `crates/lx/std/workflow.lx` | Add `+refine` function (~25 lines) |
-| `pkg/guard/conditions.lx` | New file — stop condition constructors and combinators (~60 lines) |
-| `crates/lx/std/agent.lx` | Add `budget`, `stop_when`, `quality_gate` fields; modify `run` loop; add imports |
-| `programs/brain/main.lx` | Remove manual guard/budget/quality calls, declare fields instead |
-| `programs/brain/orchestrator.lx` | Remove manual guard/budget calls, declare fields instead |
+| `crates/lx/std/workflow.lx` | Add `+refine` function (~25 lines) after `topo_sort` |
+| `pkg/guard/conditions.lx` | New file — stop condition constructors and combinators (~40 lines) |
+| `pkg/agents/harness.lx` | New file — `run_with` function wrapping agent with guardrails (~60 lines) |
 
 ---
 
@@ -57,7 +77,7 @@ The Agent trait changes are backward-compatible. All new fields default to None.
 
 ### Task 1: Implement the refine function in std/workflow.lx
 
-Add an exported `+refine` function at the bottom of `crates/lx/std/workflow.lx`, after the `topo_sort` function. The function takes two arguments: `initial` (the starting work value) and `opts` (a record). Extract from opts: `grade_fn` as `opts.grade`, `revise_fn` as `opts.revise`, `threshold` as `opts.threshold ?? 80`, `max_r` as `opts.max_rounds ?? 3`. Create mutable bindings `work := initial` and `round := 0`. Enter a loop: increment round, call `result = grade_fn work`, check `result.score >= threshold` and if so break with `Ok {work: work; rounds: round; score: result.score}`, check `round >= max_r` and if so break with `Err {work: work; rounds: round; score: result.score}`, otherwise call `work <- revise_fn work result.feedback` and continue the loop.
+Add an exported `+refine` function at the bottom of `crates/lx/std/workflow.lx`, after the `topo_sort` function (which ends at line 85). The function takes two arguments: `initial` (the starting work value) and `opts` (a record). Extract from opts: `grade_fn` as `opts.grade`, `revise_fn` as `opts.revise`, `threshold` as `opts.threshold ?? 80`, `max_r` as `opts.max_rounds ?? 3`. Create mutable bindings `work := initial` and `round := 0`. Enter a loop: increment round with `round <- round + 1`, call `result = grade_fn work`, check `result.score >= threshold` and if so break with `Ok {work: work; rounds: round; score: result.score}`, check `round >= max_r` and if so break with `Err {work: work; rounds: round; score: result.score}`, otherwise call `work <- revise_fn work result.feedback` and continue the loop. The function has no imports — it uses only core language features.
 
 ### Task 2: Format and commit
 
@@ -69,18 +89,22 @@ Run the following command verbatim, exactly as written, with no modifications: `
 
 ### Task 4: Create composable stop conditions module
 
-Create a new file `pkg/guard/conditions.lx`. Add a header comment: `-- Composable stop conditions — combinable termination predicates for agent loops.` Add `use std/time`. Export the following constructor functions, each returning a record with a `check` field that takes a `state` record argument and returns Bool:
+Create a new file `pkg/guard/conditions.lx`. Add a header comment: `-- Composable stop conditions — combinable termination predicates for agent loops.`
 
-- `+max_turns = (n) { {check: (state) { (state.turns ?? 0) >= n }} }`
-- `+timeout_ms = (ms) { {check: (state) { (state.elapsed_ms ?? 0) >= ms }} }`
-- `+budget_at = (pct) { {check: (state) { (state.budget_pct ?? 0.0) >= pct }} }`
-- `+score_above = (n) { {check: (state) { (state.last_score ?? 0.0) >= n }} }`
-- `+max_actions = (n) { {check: (state) { (state.action_count ?? 0) >= n }} }`
+Export the following constructor functions. Each returns a record with a `check` field that takes a `state` record argument and returns Bool. Use the `??` operator to default missing state fields to zero:
+
+`+max_turns = (n) { {check: (state) { (state.turns ?? 0) >= n }} }`
+`+timeout_ms = (ms) { {check: (state) { (state.elapsed_ms ?? 0) >= ms }} }`
+`+budget_at = (pct) { {check: (state) { (state.budget_pct ?? 0.0) >= pct }} }`
+`+score_above = (n) { {check: (state) { (state.last_score ?? 0.0) >= n }} }`
+`+max_actions = (n) { {check: (state) { (state.action_count ?? 0) >= n }} }`
 
 Export two combinator functions:
 
-- `+any_of = (conditions) { {check: (state) { conditions | any? (c) { c.check state } }} }`
-- `+all_of = (conditions) { {check: (state) { conditions | all? (c) { c.check state } }} }`
+`+any_of = (conditions) { {check: (state) { conditions | any? (c) { c.check state } }} }`
+`+all_of = (conditions) { {check: (state) { conditions | all? (c) { c.check state } }} }`
+
+No imports needed — these are pure closures.
 
 ### Task 5: Format and commit
 
@@ -90,72 +114,50 @@ Run the following command verbatim, exactly as written, with no modifications: `
 
 Run the following command verbatim, exactly as written, with no modifications: `git add -A && git commit -m "feat: add composable stop conditions module in pkg/guard/conditions.lx"`. Do NOT pipe, redirect, append shell operators (`| tail`, `| head`, `2>&1`, `> /dev/null`, `| grep`, etc.), or otherwise modify this command in any way. CRITICAL: Do NOT use `$()`, heredocs, `cat <<EOF`, or any subshell substitution. Do NOT append `--trailer`, `Co-authored-by`, `Signed-off-by`, or any other trailer/metadata.
 
-### Task 7: Add guardrail fields and imports to the Agent trait
+### Task 7: Create agent harness runner
 
-Edit `crates/lx/std/agent.lx`. The file currently starts with `use std/prompt {Prompt}` on line 1, followed by a blank line, then `+Trait Agent = {` on line 3. Add three new import lines between line 1 and the blank line: `use pkg/agent/budget : budget_mod`, `use pkg/guard/conditions`, `use std/time`. The file should then start with four `use` lines, blank line, then the trait.
+Create a new file `pkg/agents/harness.lx`. Add a header comment: `-- Agent harness — wraps agent communication with automatic budget, stop condition, and quality checks.`
 
-Inside the `+Trait Agent = {` block, after the existing `max_turns = () { 25 }` line (currently line 52), add three new fields on separate lines:
+Add imports: `use std/time`, `use pkg/agent/budget : budget_mod`.
 
-- `budget = None`
-- `stop_when = None`
-- `quality_gate = None`
+Export a `+run_with` function taking two arguments: `handle` (an agent handle from `agent.spawn`) and `opts` (a record). The function:
 
-### Task 8: Modify the Agent trait run loop to check guardrails
+1. Extract from opts: `budget_opts` as `opts.budget` (default None), `stop_cond` as `opts.stop_when` (default None), `quality_opts` as `opts.quality_gate` (default None).
+2. Create mutable bindings: `turn_count := 0`, `start = time.now ()`, `active_budget := None`, `last_score := 0.0`, `last_result := None`.
+3. If `budget_opts != None`, set `active_budget <- budget_mod.create budget_opts`.
+4. Enter a loop:
+   a. Increment `turn_count <- turn_count + 1`.
+   b. If `active_budget != None`: call `status = budget_mod.status active_budget`. If `status == "exceeded"`, break with `Err {type: "BudgetExhausted"; turns: turn_count; last_result: last_result}`.
+   c. Send message to agent: `result = handle ~>? {action: "handle"; turn: turn_count} ^`. Set `last_result <- result`.
+   d. If `quality_opts != None`: call `grade = quality_opts.grader result`. Set `last_score <- grade.score`. If `grade.score < (quality_opts.threshold ?? 80)`, the result is below quality — log but continue (the agent's own refine loop handles revision).
+   e. If `stop_cond != None`: build state record `check_state = {turns: turn_count; elapsed_ms: (time.now ()).ms - start.ms; budget_pct: active_budget != None ? (budget_mod.used_pct active_budget | values | fold 0.0 (acc v) { v > acc ? v : acc }) : 0.0; last_score: last_score; action_count: turn_count}`. Call `stop_cond.check check_state`. If true, break with `Ok {result: last_result; turns: turn_count; reason: "stop_condition"}`.
+5. After loop breaks, return the break value.
 
-Edit `crates/lx/std/agent.lx`. The current `run` method is at lines 36-43 and looks like this:
-
-```
-  run = () {
-    self.init ()
-    loop {
-      msg = yield {status: "ready"}
-      result = self.handle msg
-      yield result
-    }
-  }
-```
-
-Replace it with a version that tracks turn state and checks guardrails. The new `run` method should: call `self.init ()`, create mutable bindings `turn_count := 0` and `start = time.now ()` and `active_budget := None`, check `self.budget != None` and if so set `active_budget <- budget_mod.create self.budget`, then enter the loop. In the loop: increment `turn_count`, if `active_budget != None` call `budget_mod.status active_budget` and if the result is `"exceeded"` then break with `Err {type: "BudgetExhausted"}`. Then yield `{status: "ready"}` to get msg. Call `result = self.handle msg`. If `self.stop_when != None`, build a state record with `turns: turn_count`, `elapsed_ms: (time.now ()).ms - start.ms`, `budget_pct: active_budget != None ? (budget_mod.used_pct active_budget | values | first ?? 0.0) : 0.0`, `last_score: 0.0`, `action_count: turn_count` — then call `self.stop_when.check state` and if true break with result. Yield result and continue the loop.
-
-Do NOT change or remove any existing methods other than `run`. The following methods must remain exactly as they are: `role`, `goal`, `system_prompt`, `bootstrap_context`, `examples`, `max_context_tokens`, `init`, `perceive`, `reason`, `act`, `reflect`, `handle`, `build_prompt`, `on_turn_start`, `on_turn_end`, `on_error`, `tools`, `max_turns`, `think`, `think_with`, `think_structured`, `use_tool`, `delegate`, `escalate`, `describe`, `health`, `ask`, `tell`.
-
-### Task 9: Format and commit
+### Task 8: Format and commit
 
 Run the following command verbatim, exactly as written, with no modifications: `just fmt`. Do NOT pipe, redirect, append shell operators (`| tail`, `| head`, `2>&1`, `> /dev/null`, `| grep`, etc.), or otherwise modify this command in any way.
 
-### Task 10: Commit Agent trait guardrails
+### Task 9: Commit harness runner
 
-Run the following command verbatim, exactly as written, with no modifications: `git add -A && git commit -m "feat: add budget, stop_when, quality_gate guardrail fields to Agent trait"`. Do NOT pipe, redirect, append shell operators (`| tail`, `| head`, `2>&1`, `> /dev/null`, `| grep`, etc.), or otherwise modify this command in any way. CRITICAL: Do NOT use `$()`, heredocs, `cat <<EOF`, or any subshell substitution. Do NOT append `--trailer`, `Co-authored-by`, `Signed-off-by`, or any other trailer/metadata.
+Run the following command verbatim, exactly as written, with no modifications: `git add -A && git commit -m "feat: add agent harness runner with budget, stop conditions, and quality checks"`. Do NOT pipe, redirect, append shell operators (`| tail`, `| head`, `2>&1`, `> /dev/null`, `| grep`, etc.), or otherwise modify this command in any way. CRITICAL: Do NOT use `$()`, heredocs, `cat <<EOF`, or any subshell substitution. Do NOT append `--trailer`, `Co-authored-by`, `Signed-off-by`, or any other trailer/metadata.
 
-### Task 11: Update brain/main.lx to use declarative guardrails
-
-Edit `programs/brain/main.lx`. In the `think` function, remove the manual `mon.guard state "reasoning" ^` call at line 92 and the manual `ensure_quality` function call pattern (lines 152-162) where it manually grades and refines. Instead, where the brain creates its cognitive agent configuration, add `budget: {tokens: 100000; cost_usd: 1.00}` and `stop_when: any_of [max_turns 50; timeout_ms 120000]` declarations. Add `use pkg/guard/conditions {any_of max_turns timeout_ms}` to the imports. Keep all other logic unchanged — the brain's custom perception/reasoning/tool execution flow remains manual since it is domain-specific, not generic guardrail logic.
-
-### Task 12: Format and commit
-
-Run the following command verbatim, exactly as written, with no modifications: `just fmt`. Do NOT pipe, redirect, append shell operators (`| tail`, `| head`, `2>&1`, `> /dev/null`, `| grep`, etc.), or otherwise modify this command in any way.
-
-### Task 13: Commit brain update
-
-Run the following command verbatim, exactly as written, with no modifications: `git add -A && git commit -m "refactor: use declarative guardrails in brain/main.lx"`. Do NOT pipe, redirect, append shell operators (`| tail`, `| head`, `2>&1`, `> /dev/null`, `| grep`, etc.), or otherwise modify this command in any way. CRITICAL: Do NOT use `$()`, heredocs, `cat <<EOF`, or any subshell substitution. Do NOT append `--trailer`, `Co-authored-by`, `Signed-off-by`, or any other trailer/metadata.
-
-### Task 14: Run tests
+### Task 10: Run tests
 
 Run the following command verbatim, exactly as written, with no modifications: `just test`. Do NOT pipe, redirect, or append shell operators. If any tests fail, fix all failures and re-run until all tests pass.
 
-### Task 15: Run diagnostics
+### Task 11: Run diagnostics
 
 Run the following command verbatim, exactly as written, with no modifications: `just diagnose`. Do NOT pipe, redirect, or append shell operators. Fix ALL reported errors AND warnings. Re-run `just diagnose` until the output is completely clean with zero errors and zero warnings.
 
-### Task 16: Final format
+### Task 12: Final format
 
 Run the following command verbatim, exactly as written, with no modifications: `just fmt`. Do NOT pipe, redirect, or append shell operators.
 
-### Task 17: Final commit
+### Task 13: Final commit
 
 Run the following command verbatim, exactly as written, with no modifications: `git add -A && git commit -m "fix: final verification cleanup"`. Do NOT pipe, redirect, or append shell operators. CRITICAL: Do NOT use `$()`, heredocs, `cat <<EOF`, or any subshell substitution — just a plain `-m "message"` flag. Do NOT append `--trailer`, `Co-authored-by`, `Signed-off-by`, or any other trailer/metadata.
 
-### Task 18: Remove work item file
+### Task 14: Remove work item file
 
 Run the following command verbatim, exactly as written, with no modifications: `rm work_items/AGENT_LIFECYCLE_GUARDRAILS.md && git add -A && git commit -m "chore: remove completed work item"`. Do NOT pipe, redirect, or append shell operators. Do NOT append `--trailer`, `Co-authored-by`, `Signed-off-by`, or any other trailer/metadata.
 
