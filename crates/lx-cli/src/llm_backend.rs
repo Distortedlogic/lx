@@ -166,6 +166,7 @@ fn parse_ndjson(raw: &str, structured: bool, _span: SourceSpan) -> Result<LxVal,
     return Ok(LxVal::err_str(&response_text));
   }
 
+  let mut parse_failed = false;
   if structured {
     if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&response_text) {
       return Ok(LxVal::ok(LxVal::from(json_val)));
@@ -174,6 +175,7 @@ fn parse_ndjson(raw: &str, structured: bool, _span: SourceSpan) -> Result<LxVal,
     if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&recovered) {
       return Ok(LxVal::ok(LxVal::from(json_val)));
     }
+    parse_failed = true;
   }
 
   Ok(LxVal::ok(record! {
@@ -182,6 +184,7 @@ fn parse_ndjson(raw: &str, structured: bool, _span: SourceSpan) -> Result<LxVal,
     "turns" => LxVal::int(turns),
     "input_tokens" => LxVal::int(input_tokens),
     "output_tokens" => LxVal::int(output_tokens),
-    "session_id" => session_id.map(LxVal::str).unwrap_or(LxVal::None)
+    "session_id" => session_id.map(LxVal::str).unwrap_or(LxVal::None),
+    "parse_failed" => LxVal::Bool(parse_failed)
   }))
 }
