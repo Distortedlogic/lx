@@ -5,7 +5,6 @@ use miette::SourceSpan;
 use super::diagnostics::DiagnosticKind;
 use super::semantic::{DefKind, ScopeKind};
 use super::type_arena::TypeId;
-use super::type_error::TypeContext;
 use super::types::Type;
 use super::{Checker, DiagLevel};
 
@@ -48,44 +47,6 @@ impl Checker<'_> {
         self.sem.pop_scope();
         result
       },
-    }
-  }
-
-  pub(super) fn synth_ternary_type(&mut self, cond: ExprId, then_: ExprId, else_: Option<ExprId>) -> TypeId {
-    let ct = self.synth_expr(cond);
-    let cond_span = self.arena.expr_span(cond);
-    let resolved = self.table.resolve(ct, &self.type_arena);
-    let bool_id = self.type_arena.bool();
-    let unknown_id = self.type_arena.unknown();
-    let todo_id = self.type_arena.todo();
-    let error_id = self.type_arena.error();
-    if resolved != bool_id && resolved != unknown_id && resolved != todo_id && resolved != error_id {
-      self.emit(DiagLevel::Error, DiagnosticKind::TernaryCondNotBool, cond_span);
-    }
-    let branch_info = super::narrowing::analyze_condition(cond, self.arena, &self.type_arena);
-    self.narrowing.push();
-    for (name, ty) in &branch_info.then_narrowings {
-      self.narrowing.narrow(*name, *ty);
-    }
-    let tt = self.synth_expr(then_);
-    self.narrowing.pop();
-    if let Some(e) = else_ {
-      self.narrowing.push();
-      for (name, ty) in &branch_info.else_narrowings {
-        self.narrowing.narrow(*name, *ty);
-      }
-      let else_span = self.arena.expr_span(e);
-      let et = self.synth_expr(e);
-      self.narrowing.pop();
-      match self.table.unify_with_context(tt, et, TypeContext::General, &mut self.type_arena) {
-        Ok(t) => t,
-        Err(te) => {
-          self.emit_type_error(&te, else_span);
-          self.type_arena.error()
-        },
-      }
-    } else {
-      tt
     }
   }
 

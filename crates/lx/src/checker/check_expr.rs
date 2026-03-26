@@ -44,23 +44,18 @@ impl Checker<'_> {
       Expr::Match(m) => self.check_match(m.scrutinee, &m.arms, expected),
       Expr::Block(ExprBlock { stmts }) => self.check_block(stmts, expected),
       Expr::Grouped(inner) => self.check_expr(*inner, expected),
+      Expr::Pipe(_) | Expr::Tell(_) | Expr::Ask(_) | Expr::Section(_) | Expr::Ternary(_) | Expr::Coalesce(_) => unreachable!(),
       Expr::Literal(_)
       | Expr::Ident(_)
       | Expr::TypeConstructor(_)
       | Expr::Binary(_)
       | Expr::Unary(_)
-      | Expr::Pipe(_)
-      | Expr::Tell(_)
-      | Expr::Ask(_)
       | Expr::Apply(_)
-      | Expr::Section(_)
       | Expr::FieldAccess(_)
       | Expr::Tuple(_)
       | Expr::Record(_)
       | Expr::Map(_)
-      | Expr::Ternary(_)
       | Expr::Propagate(_)
-      | Expr::Coalesce(_)
       | Expr::Slice(_)
       | Expr::NamedArg(_)
       | Expr::Loop(_)

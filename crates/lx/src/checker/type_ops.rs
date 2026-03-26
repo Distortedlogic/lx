@@ -43,9 +43,9 @@ impl Checker<'_> {
         self.synth_binary_type(&binary.op, lt, rt, span)
       },
       Expr::Unary(unary) => self.synth_unary(unary.op, unary.operand, span),
-      Expr::Pipe(_) | Expr::Tell(_) | Expr::Ask(_) => self.type_arena.todo(),
+      Expr::Pipe(_) | Expr::Tell(_) | Expr::Ask(_) => unreachable!(),
       Expr::Apply(apply) => self.synth_apply_type(apply.func, apply.arg),
-      Expr::Section(_) => self.type_arena.todo(),
+      Expr::Section(_) => unreachable!(),
       Expr::FieldAccess(fa) => {
         let fa = fa.clone();
         self.synth_expr(fa.expr);
@@ -83,9 +83,9 @@ impl Checker<'_> {
         let m = m.clone();
         self.synth_match_type(m.scrutinee, &m.arms, span)
       },
-      Expr::Ternary(ternary) => self.synth_ternary_type(ternary.cond, ternary.then_, ternary.else_),
+      Expr::Ternary(_) => unreachable!(),
       Expr::Propagate(ExprPropagate { inner }) => self.synth_propagate(*inner, span),
-      Expr::Coalesce(_) => self.type_arena.todo(),
+      Expr::Coalesce(_) => unreachable!(),
       Expr::Slice(slice) => {
         if let Some(s) = slice.start {
           self.synth_expr(s);
