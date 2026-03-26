@@ -1,0 +1,22 @@
+-- formatter emits shorthand; verify records with shorthand work end-to-end
+
+a = 1
+b = 2
+r1 = {a; b}
+assert (r1.a == 1)
+assert (r1.b == 2)
+
+x = 10
+r2 = {x; y: 20}
+assert (r2.x == 10)
+assert (r2.y == 20)
+
+name = "alice"
+r3 = {user: name}
+assert (r3.user == "alice")
+
+base = {a: 1}
+extra = 2
+r4 = {..base; extra}
+assert (r4.a == 1)
+assert (r4.extra == 2)

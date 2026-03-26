@@ -27,3 +27,20 @@ fn formatter_roundtrips_test_files() {
     }
   }
 }
+
+#[test]
+fn formatter_emits_record_shorthand() {
+  let cases = vec![
+    ("x = 1\nr = {x: x; y: 2}\n", "{ x; y: 2 }"),
+    ("a = 1\nb = 2\nr = {a: a; b: b}\n", "{ a; b }"),
+    ("r = {name: \"alice\"}\n", "{ name: \"alice\" }"),
+    ("a = 1\nr = {a: a}\n", "{ a }"),
+  ];
+  for (input, expected_fragment) in cases {
+    let (tokens, comments) = lex(input).expect("lex failed");
+    let result = parse(tokens, FileId::new(0), comments, input);
+    let program = result.program.expect("parse failed");
+    let formatted = format(&program);
+    assert!(formatted.contains(expected_fragment), "Expected formatted output to contain {expected_fragment:?}, got:\n{formatted}");
+  }
+}

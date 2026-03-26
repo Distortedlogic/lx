@@ -150,9 +150,12 @@ impl Formatter<'_> {
       }
       match f {
         RecordField::Named { name, value } => {
+          let is_shorthand = matches!(self.arena.expr(*value), Expr::Ident(sym) if *sym == *name);
           self.write(name.as_str());
-          self.write(": ");
-          self.emit_expr(*value);
+          if !is_shorthand {
+            self.write(": ");
+            self.emit_expr(*value);
+          }
         },
         RecordField::Spread(eid) => {
           self.write("..");
