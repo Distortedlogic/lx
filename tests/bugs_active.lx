@@ -1,0 +1,44 @@
+-- active bug detection tests from agent/BUGS.md
+
+-- named-arg parser consumes ternary : separator
+id = (x) x
+parenthesized = (id 42 == 42) ? "yes" : "no"
+assert (parenthesized == "yes") "named-arg ternary workaround"
+
+-- assert parsing greedy with callable expressions
+assert (true == true) "assert greedy workaround"
+val = 42
+assert (val == 42) "assert with callable-looking expr"
+
+-- closures inside + functions drop non-exported module bindings
+helper_mul = (x) x * 3
++exported_map = (items) {
+  items | map (x) { helper_mul x }
+}
+closure_result = exported_map [1; 2; 3]
+assert (closure_result == [3; 6; 9]) "BUG-FIXED: closure capture in + function"
+
+helper_add = (x) x + 10
+acc := []
++exported_each = (items) {
+  items | each (x) {
+    v = helper_add x
+    acc <- acc ++ [v]
+  }
+}
+exported_each [1; 2]
+assert (acc == [11; 12]) "BUG-FIXED: each closure capture in + function"
+
+-- Agent Trait defaults not injected into Class : [Agent]
+use std/agent {Agent}
+Class BareAgent : [Agent] = {
+  role = () { "test" }
+  goal = () { "test" }
+}
+ba = BareAgent {}
+has_think = methods_of ba | any? (== "think")
+assert (has_think == true) "BUG-FIXED: Agent trait defaults injected into Class : [Agent]"
+has_handle = methods_of ba | any? (== "handle")
+assert (has_handle == true) "BUG-FIXED: Agent handle method injected"
+
+emit "bugs_active: all checks passed"

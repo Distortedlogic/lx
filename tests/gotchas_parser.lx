@@ -1,0 +1,70 @@
+-- gotcha detection: parser traps from agent/GOTCHAS.md
+
+-- multi-arg calls before ? silently misbind
+add = (a b) a + b
+result1 = (add 2 3) ? { 5 -> "five"; _ -> "other" }
+assert (result1 == "five") "multi-arg call before ? workaround"
+
+-- () before (param) { body } breaks argument parsing
+apply = (name fn) { fn name }
+my_fn = (x) { "got: {x}" }
+result2 = apply "test" my_fn
+assert (result2 == "got: test") "() before closure workaround"
+
+-- f arg () { body } passes Unit then separate block
+with_fn = (x fn) { fn x }
+cb = () { 99 }
+result3 = with_fn 1 cb
+assert (result3 == 99) "f arg () body workaround"
+
+-- multi-line ternary chains don't parse
+x = 2
+result4 = x == 1 ? "one" : (x == 2 ? "two" : "other")
+assert (result4 == "two") "multi-line ternary workaround"
+
+-- shorthand fields before spread/keyed misparse
+steps = [1; 2; 3]
+task = "do it"
+r1 = {steps: steps; task: task; step_count: steps | len}
+assert (r1.steps == [1; 2; 3]) "shorthand field workaround steps"
+assert (r1.task == "do it") "shorthand field workaround task"
+assert (r1.step_count == 3) "shorthand field workaround count"
+
+-- {..spread shorthand} misparses
+entry = {name: "a"; value: 1}
+score = 100
+r3 = {..entry; score: score}
+assert (r3.name == "a") "spread+explicit key name"
+assert (r3.value == 1) "spread+explicit key value"
+assert (r3.score == 100) "spread+explicit key score"
+
+-- assert parses greedily
+done = true
+assert (done == true) "assert greedy workaround"
+count = 5
+assert (count > 0) "assert greedy with comparison"
+
+-- no SCREAMING_CASE constants
+target_grade = 93
+assert (target_grade == 93) "lowercase constant workaround"
+
+-- uppercase keyword field names can't be used
+r4 = {agent: 1; tool: 2}
+assert (r4.agent == 1) "lowercase keyword field"
+assert (r4.tool == 2) "lowercase keyword field tool"
+
+-- parens are not blocks
+blk_val = true ? { a = 10; b = 20; a + b } : 0
+assert (blk_val == 30) "block not parens workaround"
+
+-- string interpolation parses {key: val} as lx code
+schema_str = `{score: Int, issues: [Str]}`
+assert (schema_str | contains? "score") "backtick raw string workaround"
+
+-- {} is Unit not empty Record
+empty_rec = {:}
+assert (type_of empty_rec == "Record") "{:} is empty Record"
+unit_val = {}
+assert (type_of unit_val == "Unit") "{} is Unit"
+
+emit "gotchas_parser: all checks passed"
