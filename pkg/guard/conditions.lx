@@ -1,0 +1,10 @@
+-- Composable stop conditions — combinable termination predicates for agent loops.
+
++max_turns = (n) { {check: (state) { (state.turns ?? 0) >= n }} }
++timeout_ms = (ms) { {check: (state) { (state.elapsed_ms ?? 0) >= ms }} }
++budget_at = (pct) { {check: (state) { (state.budget_pct ?? 0.0) >= pct }} }
++score_above = (n) { {check: (state) { (state.last_score ?? 0.0) >= n }} }
++max_actions = (n) { {check: (state) { (state.action_count ?? 0) >= n }} }
+
++any_of = (conditions) { {check: (state) { conditions | any? (c) { c.check state } }} }
++all_of = (conditions) { {check: (state) { conditions | all? (c) { c.check state } }} }
