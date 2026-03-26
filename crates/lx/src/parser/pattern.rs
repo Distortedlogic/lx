@@ -40,7 +40,7 @@ where
 
     let tuple_pat = pat
       .clone()
-      .separated_by(just(TokenKind::Semi).or_not())
+      .separated_by(just(TokenKind::Semi).or(just(TokenKind::Comma)).or_not())
       .collect::<Vec<_>>()
       .delimited_by(just(TokenKind::LParen), just(TokenKind::RParen))
       .map_with(move |pats, e| a9.borrow_mut().alloc_pattern(Pattern::Tuple(pats), ss(e.span())));
@@ -76,10 +76,10 @@ where
   let field = ident().then(just(TokenKind::Colon).ignore_then(pat).or_not()).map(|(name, pattern)| FieldPattern { name, pattern });
 
   just(TokenKind::LBrace)
-    .ignore_then(super::expr::skip_semis())
-    .ignore_then(field.separated_by(super::expr::skip_semis()).collect::<Vec<_>>())
-    .then(super::expr::skip_semis().ignore_then(rest).or_not())
-    .then_ignore(super::expr::skip_semis())
+    .ignore_then(super::expr::skip_item_sep())
+    .ignore_then(field.separated_by(super::expr::skip_item_sep()).collect::<Vec<_>>())
+    .then(super::expr::skip_item_sep().ignore_then(rest).or_not())
+    .then_ignore(super::expr::skip_item_sep())
     .then_ignore(just(TokenKind::RBrace))
     .map_with(move |(fields, rest), e| arena.borrow_mut().alloc_pattern(Pattern::Record(PatternRecord { fields, rest: rest.flatten() }), ss(e.span())))
 }
@@ -94,7 +94,7 @@ where
   let rest = just(TokenKind::DotDot).ignore_then(ident().or(just(TokenKind::Underscore).to(intern("_"))).or_not());
 
   just(TokenKind::LBracket)
-    .ignore_then(pat.separated_by(just(TokenKind::Semi).or_not()).collect::<Vec<_>>())
+    .ignore_then(pat.separated_by(just(TokenKind::Semi).or(just(TokenKind::Comma)).or_not()).collect::<Vec<_>>())
     .then(rest.or_not())
     .then_ignore(just(TokenKind::RBracket))
     .map_with(move |(elems, rest), e| arena.borrow_mut().alloc_pattern(Pattern::List(PatternList { elems, rest: rest.flatten() }), ss(e.span())))

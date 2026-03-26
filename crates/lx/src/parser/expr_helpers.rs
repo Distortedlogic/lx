@@ -1,7 +1,7 @@
 use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 
-use super::expr::{ident, ident_or_keyword, skip_semis};
+use super::expr::{ident, ident_or_keyword, item_sep, skip_item_sep, skip_semis};
 use super::{ArenaRef, ExprId, Span, ss};
 use crate::ast::{Expr, ExprBlock, ListElem, MapEntry, Param, RecordField};
 use crate::lexer::token::TokenKind;
@@ -20,9 +20,9 @@ where
 
   let al = arena;
   just(TokenKind::LBracket)
-    .ignore_then(super::expr::skip_semis())
-    .ignore_then(elem.separated_by(super::expr::semi_sep()).allow_trailing().collect::<Vec<_>>())
-    .then_ignore(super::expr::skip_semis())
+    .ignore_then(super::expr::skip_item_sep())
+    .ignore_then(elem.separated_by(super::expr::item_sep()).allow_trailing().collect::<Vec<_>>())
+    .then_ignore(super::expr::skip_item_sep())
     .then_ignore(just(TokenKind::RBracket))
     .map_with(move |elems, e| al.borrow_mut().alloc_expr(Expr::List(elems), ss(e.span())))
 }
@@ -73,7 +73,7 @@ where
 
   let field = spread_field.or(named_field);
 
-  skip_semis().ignore_then(field.separated_by(skip_semis()).at_least(1).allow_trailing().collect::<Vec<_>>()).then_ignore(skip_semis())
+  skip_item_sep().ignore_then(field.separated_by(item_sep()).at_least(1).allow_trailing().collect::<Vec<_>>()).then_ignore(skip_item_sep())
 }
 
 pub(super) fn func_body_parser<'a, I>(
@@ -106,7 +106,7 @@ where
 
   let al = arena;
   entry
-    .separated_by(just(TokenKind::Semi).or_not())
+    .separated_by(just(TokenKind::Semi).or(just(TokenKind::Comma)).or_not())
     .allow_trailing()
     .collect::<Vec<_>>()
     .delimited_by(just(TokenKind::PercentLBrace), just(TokenKind::RBrace))

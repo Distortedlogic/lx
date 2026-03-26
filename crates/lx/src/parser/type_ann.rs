@@ -81,9 +81,10 @@ where
   let record_field = ident().then_ignore(just(TokenKind::Colon)).then(ty.clone()).map(|(name, ty)| TypeField { name, ty });
 
   let record_ty = just(TokenKind::Semi)
+    .or(just(TokenKind::Comma))
     .repeated()
-    .ignore_then(record_field.separated_by(just(TokenKind::Semi).repeated().at_least(1)).allow_trailing().collect::<Vec<_>>())
-    .then_ignore(just(TokenKind::Semi).repeated())
+    .ignore_then(record_field.separated_by(just(TokenKind::Semi).or(just(TokenKind::Comma)).repeated().at_least(1)).allow_trailing().collect::<Vec<_>>())
+    .then_ignore(just(TokenKind::Semi).or(just(TokenKind::Comma)).repeated())
     .delimited_by(just(TokenKind::LBrace), just(TokenKind::RBrace))
     .map_with(move |fields, e| a4.borrow_mut().alloc_type_expr(TypeExpr::Record(fields), ss(e.span())));
 
@@ -118,7 +119,7 @@ where
   I: ValueInput<'a, Token = TokenKind, Span = Span>,
 {
   ident()
-    .separated_by(just(TokenKind::Semi))
+    .separated_by(just(TokenKind::Semi).or(just(TokenKind::Comma)))
     .allow_trailing()
     .collect::<Vec<_>>()
     .delimited_by(just(TokenKind::LBracket), just(TokenKind::RBracket))

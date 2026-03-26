@@ -9,7 +9,7 @@ fn roundtrip_check(path: &str) {
   let source = fs::read_to_string(path).expect("failed to read test file");
   let (tokens, comments) = lex(&source).expect("lex failed");
   let result = parse(tokens, FileId::new(0), comments, &source);
-  let program = result.program.expect("parse failed");
+  let program = result.program.unwrap_or_else(|| panic!("parse failed for {path}"));
   let formatted = format(&program);
 
   let (tokens2, comments2) = lex(&formatted).expect("re-lex failed");

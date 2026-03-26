@@ -99,6 +99,7 @@ pub enum TokenKind {
 
   Export,
   Semi,
+  Comma,
   Eof,
 
   Error,

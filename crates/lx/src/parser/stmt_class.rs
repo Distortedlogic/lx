@@ -24,9 +24,9 @@ where
   let member = uses_member.or(class_field).or(class_method);
 
   just(TokenKind::LBrace)
-    .ignore_then(super::expr::skip_semis())
-    .ignore_then(member.separated_by(super::expr::skip_semis()).collect::<Vec<_>>())
-    .then_ignore(super::expr::skip_semis())
+    .ignore_then(super::expr::skip_item_sep())
+    .ignore_then(member.separated_by(super::expr::skip_item_sep()).collect::<Vec<_>>())
+    .then_ignore(super::expr::skip_item_sep())
     .then_ignore(just(TokenKind::RBrace))
     .map(|members| {
       let mut uses = Vec::new();
@@ -51,7 +51,7 @@ where
 {
   let trait_list = just(TokenKind::Colon).ignore_then(
     name_or_type()
-      .separated_by(super::expr::skip_semis())
+      .separated_by(super::expr::skip_item_sep())
       .collect::<Vec<_>>()
       .delimited_by(just(TokenKind::LBracket), just(TokenKind::RBracket))
       .or(name_or_type().map(|n| vec![n])),

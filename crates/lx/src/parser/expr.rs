@@ -81,6 +81,20 @@ where
   just(TokenKind::Semi).repeated().at_least(1).ignored()
 }
 
+pub(super) fn item_sep<'a, I>() -> impl Parser<'a, I, (), extra::Err<Rich<'a, TokenKind, Span>>> + Clone
+where
+  I: ValueInput<'a, Token = TokenKind, Span = Span>,
+{
+  just(TokenKind::Semi).or(just(TokenKind::Comma)).repeated().at_least(1).ignored()
+}
+
+pub(super) fn skip_item_sep<'a, I>() -> impl Parser<'a, I, (), extra::Err<Rich<'a, TokenKind, Span>>> + Clone
+where
+  I: ValueInput<'a, Token = TokenKind, Span = Span>,
+{
+  just(TokenKind::Semi).or(just(TokenKind::Comma)).repeated().ignored()
+}
+
 pub(super) fn expr_parser<'a, I>(arena: ArenaRef) -> impl Parser<'a, I, ExprId, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
 where
   I: ValueInput<'a, Token = TokenKind, Span = Span>,

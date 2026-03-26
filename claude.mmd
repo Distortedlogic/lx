@@ -1,95 +1,211 @@
 graph TD
     start(["0.0.0 Session Start"]):::teal
-    start --> init["0.0.1 Initialize\n——————\nload system prompt\nload CLAUDE.md chain\nload MEMORY.md + memories\ncapture git status snapshot\nload settings + permissions\nresolve tools + MCP servers\nload hooks config"]:::cyan
-    init --> wait["0.0.2 Await User Input"]:::teal
+    start --> init["`**0.0.1 Initialize**
+———
+system prompt loaded
+CLAUDE.md chain resolved (root → nested dirs)
+MEMORY.md index → individual memory files
+git status captured (branch, modified, recent commits)
+settings chain merged (project → user → global)
+→ permission allowlists and denylists
+→ environment variables · model preferences
+hooks registered
+→ PreToolUse · PostToolUse
+→ UserPromptSubmit · Stop
+tool inventory resolved:
+→ built-in (Read, Edit, Write, Bash, Grep,
+  Glob, Agent, Skill, ToolSearch, LSP)
+→ deferred (name only — schema on demand)
+→ MCP (connect to configured servers)
+keybindings loaded`"]:::cyan
 
-    wait --> parse{{"0.1.0 input type?"}}:::purple
-    parse -- "text / question" --> assemble
-    parse -- "/slash command" --> skill["0.0.3 Expand Skill\n——————\nskill name → full prompt\ninjected into conversation"]:::cyan
-    parse -- "! shell" --> passthru["0.0.4 Pass-through Shell\n——————\nexecute in user session\noutput lands in conversation"]:::cyan
-    skill --> assemble
+    init --> wait["1.0.0 Await User Input"]:::teal
+    wait -- "user exits\n(Ctrl+C · /exit · close)" --> done(["9.0.2 Session End"]):::teal
+
+    wait --> parse{{"1.1.0 input type?"}}:::purple
+    parse -- "free text · image\nPDF · notebook path" --> hooks
+    parse -- "/command" --> slash{{"1.2.0 built-in\nor skill?"}}:::teal
+    slash -- "built-in\n(/help · /clear · /compact\n/model · /fast · /cost)" --> cli["1.0.1 CLI Command\n——————\nprocessed locally\nno model invocation"]:::cyan
+    cli --> wait
+    slash -- "skill\n(/commit · /review-pr\n/simplify · /loop · etc.)" --> skill["1.0.2 Expand Skill\n——————\nskill name → full prompt\ninjected as user message"]:::cyan
+    skill --> hooks
+    parse -- "! shell-command" --> passthru["1.0.3 Shell Pass-through\n——————\nexecute in user's session\nstdout + stderr land\nin conversation context"]:::cyan
     passthru --> wait
 
-    assemble["`**1.0.0 Assemble Context**
+    hooks["`**2.0.0 Prompt Submit Hooks**
+———
+UserPromptSubmit hooks fire
+before message reaches model
+———
+hooks can:
+→ modify message content
+→ block submission entirely
+→ inject additional context
+———
+hook feedback treated as from user`"]:::orange
+    hooks --> hook_block{{"2.1.0 hook\nblocked?"}}:::teal
+    hook_block -- "yes" --> submit_blocked["2.0.1 Blocked\n——————\nmessage does not proceed\nuser checks hook config"]:::red
+    submit_blocked --> wait
+    hook_block -- "no" --> assemble
+
+    assemble["`**3.0.0 Assemble Context**
 ———
 system prompt
-CLAUDE.md chain (root → nested)
-memory files (user, feedback, project, reference)
-conversation history
-git status snapshot
-tool schemas (built-in + MCP)
-hook feedback from prior turns`"]:::orange
+→ role · safety rules · tool instructions
+→ output efficiency · risk guidelines
+CLAUDE.md chain
+→ project rules (root → each nested dir)
+→ overrides default behavior
+memory (loaded from files)
+→ user: role, preferences, knowledge
+→ feedback: corrections + confirmed approaches
+→ project: ongoing work, decisions, deadlines
+→ reference: external system pointers
+system reminders (injected metadata)
+→ deferred tool names available
+→ skill list available
+→ current date
+conversation history (all prior turns)
+git status snapshot (from session start)
+tool schemas
+→ built-in: full JSONSchema
+→ deferred: names only until ToolSearch
+→ MCP: full schemas from servers
+multimodal content
+→ images: rendered visually
+→ PDFs: parsed text (max 20 pages per read)
+→ notebooks: cells with outputs`"]:::orange
 
-    assemble --> generate["`**2.0.0 Generate**
+    assemble --> generate["`**4.0.0 Generate**
 ———
 extended thinking (hidden from user)
-→ analyze request
-→ plan approach
-→ identify needed tools
+→ analyze request against full context
+→ recall relevant memory
+  (user prefs, past feedback, project state)
+→ assess risk and reversibility
+→ plan approach (simplest first)
+→ select tools
+→ consider permission implications
 ———
-produces in single response:
-→ text output (shown to user)
+produces single response:
+→ text (markdown, rendered to terminal)
 → tool calls (0 or more)
 ———
-independent calls emitted in parallel
-dependent calls emitted sequentially`"]:::yellow
+parallel: independent calls in one batch
+sequential: dependent calls across batches
+———
+state modifiers (if active):
+→ plan mode: restricted to read-only tools
+→ worktree: isolated git environment`"]:::yellow
 
-    generate --> has_tools{{"2.1.0 tool calls\nin response?"}}:::teal
-    has_tools -- "no" --> display["2.0.1 Display Text\n——————\nmarkdown rendered\nto terminal"]:::cyan
-    display --> compress_check
+    generate --> has_tools{{"4.1.0 tool calls\nin response?"}}:::teal
+    has_tools -- "no" --> display["4.0.1 Display Text\n——————\nmarkdown rendered\ncode blocks highlighted"]:::cyan
+    display --> stop_hooks
 
-    has_tools -- "yes" --> tool_loop["3.0.0 For each tool call"]:::purple
-    tool_loop --> perm{{"3.1.0 permission\nmode?"}}:::teal
+    has_tools -- "yes" --> batch["5.0.0 For each tool call in batch"]:::purple
+    batch --> deferred{{"5.1.0 deferred tool?\n(schema unknown)"}}:::teal
+    deferred -- "yes" --> toolsearch["5.0.1 ToolSearch\n——————\nquery matches deferred list\nreturns full JSONSchema\ntool becomes callable"]:::cyan
+    toolsearch --> perm
+    deferred -- "no" --> perm
 
-    perm -- "auto-allow\n(allowlist match)" --> exec
-    perm -- "needs approval" --> ask{{"3.2.0 user\napproves?"}}:::yellow
-    ask -- "yes" --> exec
-    ask -- "no" --> denied["3.0.1 Denied\n——————\ndo not re-attempt same call\nadjust approach"]:::red
+    perm{{"5.2.0 permission\ncheck"}}:::teal
+    perm -- "auto-allow\n(allowlist match)" --> pre_hooks
+    perm -- "needs approval" --> approve{{"5.3.0 user\napproves?"}}:::yellow
+    approve -- "yes" --> pre_hooks
+    approve -- "no" --> denied["5.0.2 Denied\n——————\ndo not re-attempt same call\nadjust approach or ask user"]:::red
     denied --> generate
 
-    exec["`**4.0.0 Execute Tool**
-———
-⟳ pre-hooks fire (if configured)
-———
-dispatch to tool handler:
-→ Read — file contents
-→ Edit — string replacement in file
-→ Write — create or overwrite file
-→ Bash — shell command execution
-→ Grep — ripgrep content search
-→ Glob — file pattern matching
-→ Agent — spawn subagent
-→ Skill — expand slash command
-→ MCP — call MCP server tool
-→ WebFetch / WebSearch
-→ LSP — language server queries
-———
-⟳ post-hooks fire (if configured)
-———
-collect result or error`"]:::orange
+    pre_hooks{{"6.1.0 PreToolUse\nhook fires"}}:::teal
+    pre_hooks -- "hook blocks" --> hook_deny["6.0.1 Hook Blocked\n——————\ntreated as user denial\nmodel adjusts approach"]:::red
+    hook_deny --> generate
+    pre_hooks -- "allows or\nno hooks" --> exec
 
-    exec --> is_agent{{"4.1.0 agent\nspawn?"}}:::teal
-
-    is_agent -- "yes" --> agent["`**5.0.0 Spawn Subagent**
+    exec["`**7.0.0 Execute Tool**
 ———
-fresh isolated context window
-typed: Explore, Plan, general-purpose, etc.
-own tool permissions
-own generate → tool → feedback loop
+⟳ filesystem
+→ Read (file · image · PDF · notebook)
+→ Edit (string replacement; must Read first)
+→ Write (create or overwrite; must Read first)
+→ Glob (pattern-match file paths)
+→ Grep (ripgrep content search)
 ———
-foreground: parent blocks until done
-background: parent continues,
-  notified on completion
-worktree: isolated git copy`"]:::yellow
-    agent --> agent_done["5.0.1 Collect Result\n——————\nresult returned to parent\nsubagent context discarded"]:::cyan
-    agent_done --> more
+⟳ execution
+→ Bash (shell command, foreground or background)
+→ LSP (language server protocol query)
+———
+⟳ agent orchestration
+→ Agent (spawn subagent — see 8.0.0)
+→ SendMessage (continue existing subagent)
+→ Skill (expand + execute skill prompt)
+———
+⟳ external
+→ MCP tools (call MCP server endpoints)
+→ WebFetch (HTTP request)
+→ WebSearch (web search query)
+→ ToolSearch (resolve deferred tool schema)
+→ ReadMcpResource (read MCP resources)
+———
+⟳ state transitions
+→ EnterPlanMode (restrict to read-only tools)
+→ ExitPlanMode (restore full tool set)
+→ EnterWorktree (isolated git copy)
+→ ExitWorktree (return to main working dir)
+→ NotebookEdit (modify notebook cells)
+———
+⟳ scheduled
+→ CronCreate · CronList · CronDelete
+→ RemoteTrigger (invoke remote agent)`"]:::orange
 
-    is_agent -- "no" --> more{{"4.2.0 more tool\ncalls in batch?"}}:::purple
-    more -- "yes" --> tool_loop
-    more -- "no" --> feedback["4.0.1 Feed Results\n——————\ntool results appended\nto conversation context"]:::cyan
+    exec --> post_hooks["7.0.1 PostToolUse Hooks Fire\n——————\nhook sees tool name + result\ncan log · validate · alert"]:::cyan
+    post_hooks --> result{{"7.1.0 result?"}}:::teal
+
+    result -- "error" --> error["7.0.2 Error Captured\n——————\nerror in result payload\nmodel sees on next generation\nadjusts approach — no blind retry\ndiagnoses root cause first"]:::red
+    error --> more
+
+    result -- "success" --> is_agent{{"7.2.0 agent\nspawn?"}}:::teal
+
+    is_agent -- "yes" --> agent["`**8.0.0 Spawn Subagent**
+———
+creates isolated child:
+→ fresh context window
+→ typed specialization:
+  · Explore (fast codebase search, no writes)
+  · Plan (architecture, no writes)
+  · general-purpose (full capabilities)
+  · custom (user-defined agents)
+→ own system prompt + tool restrictions
+→ inherits or overrides parent model
+———
+execution modes:
+→ foreground: parent blocks until done
+→ background: parent continues,
+  notified asynchronously on completion
+———
+isolation modes:
+→ shared: same working directory
+→ worktree: temporary git branch + copy
+  changes stay on separate branch
+  worktree path returned if modified
+———
+subagent lifecycle:
+→ runs own 4.0.0 → 7.x.x loop
+  (full generate → route → execute → feedback)
+→ can be continued via SendMessage
+  (preserves full subagent context)
+→ on completion: single result to parent
+→ subagent context then discarded`"]:::yellow
+    agent --> collect["8.0.1 Collect Result\n——————\nresult message returned\nto parent context"]:::cyan
+    collect --> more
+
+    is_agent -- "no" --> more{{"7.3.0 more calls\nin batch?"}}:::purple
+    more -- "yes" --> batch
+    more -- "no" --> feedback["7.0.3 Feed Results\n——————\nall batch results appended\nas tool-result turn\nsystem reminders injected\n(deferred tools · skills · memory)"]:::cyan
     feedback --> generate
 
-    compress_check{{"6.0.0 context\nnearing limit?"}}:::teal
-    compress_check -- "yes" --> compress["6.0.1 Compress\n——————\nsummarize earlier messages\npreserve key information\nconversation continues"]:::cyan
-    compress --> wait
-    compress_check -- "no" --> wait
+    stop_hooks["9.0.0 Stop Hooks Fire\n——————\nmodel turn complete\n(no more tool calls)\nhooks can log · alert ·\nor inject feedback"]:::cyan
+    stop_hooks --> stop_fb{{"9.1.0 hook injected\nfeedback?"}}:::teal
+    stop_fb -- "yes\n(re-enter generation)" --> assemble
+    stop_fb -- "no" --> compress{{"9.2.0 context\nnearing limit?"}}:::teal
+    compress -- "yes" --> do_compress["9.0.1 Compress\n——————\nsummarize earlier messages\npreserve key information\n(tool results · decisions · code)\nconversation continues seamlessly"]:::cyan
+    do_compress --> wait
+    compress -- "no" --> wait

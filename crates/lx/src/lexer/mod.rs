@@ -140,7 +140,8 @@ impl<'src> Lexer<'src> {
         self.paren_bracket_depth = 1;
         self.emit(Token::new(TokenKind::PercentLBrace, span));
       },
-      RawToken::Semi | RawToken::Comma => self.emit(Token::new(TokenKind::Semi, span)),
+      RawToken::Semi => self.emit(Token::new(TokenKind::Semi, span)),
+      RawToken::Comma => self.emit(Token::new(TokenKind::Comma, span)),
       RawToken::Hash => return Err(LxError::parse("unexpected character: #", span, None)),
       RawToken::Quote => {
         self.read_string(start)?;

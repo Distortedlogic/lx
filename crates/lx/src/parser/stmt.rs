@@ -103,7 +103,7 @@ where
   let alias = just(TokenKind::Colon).ignore_then(ident()).map(UseKind::Alias);
 
   let selective = name_or_type()
-    .separated_by(just(TokenKind::Semi).or_not())
+    .separated_by(just(TokenKind::Semi).or(just(TokenKind::Comma)).or_not())
     .collect::<Vec<_>>()
     .delimited_by(just(TokenKind::LBrace), just(TokenKind::RBrace))
     .map(UseKind::Selective);
@@ -168,7 +168,7 @@ where
 {
   let variant = just(TokenKind::Pipe).ignore_then(type_name()).then(
     any()
-      .filter(|k: &TokenKind| !matches!(k, TokenKind::Pipe | TokenKind::Semi | TokenKind::Eof | TokenKind::RBrace))
+      .filter(|k: &TokenKind| !matches!(k, TokenKind::Pipe | TokenKind::Semi | TokenKind::Comma | TokenKind::Eof | TokenKind::RBrace))
       .repeated()
       .collect::<Vec<_>>()
       .map(|toks| toks.len()),

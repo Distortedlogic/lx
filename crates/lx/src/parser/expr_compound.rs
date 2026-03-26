@@ -42,7 +42,7 @@ where
   let resource = expr.clone().then_ignore(just(TokenKind::As)).then(ident());
 
   let with_resource = just(TokenKind::With)
-    .ignore_then(resource.separated_by(just(TokenKind::Semi)).at_least(1).collect::<Vec<_>>())
+    .ignore_then(resource.separated_by(just(TokenKind::Semi).or(just(TokenKind::Comma))).at_least(1).collect::<Vec<_>>())
     .then_ignore(just(TokenKind::LBrace))
     .then(super::expr::stmts_block(expr, arena))
     .then_ignore(just(TokenKind::RBrace))
@@ -114,7 +114,7 @@ where
     });
 
   let tuple = just(TokenKind::LParen)
-    .ignore_then(expr.clone().separated_by(just(TokenKind::Semi).or_not()).at_least(2).collect::<Vec<_>>())
+    .ignore_then(expr.clone().separated_by(just(TokenKind::Semi).or(just(TokenKind::Comma)).or_not()).at_least(2).collect::<Vec<_>>())
     .then_ignore(just(TokenKind::RParen))
     .map_with(move |elems, e| a8.borrow_mut().alloc_expr(Expr::Tuple(ExprTuple { elems }), ss(e.span())));
 
