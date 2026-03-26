@@ -1,0 +1,31 @@
+-- md.sections fix tests
+-- verifies bullet lists, code blocks, sub-heading nesting, same-level split
+
+use std/md
+
+raw1 = "# Title\n\n- item1\n- item2"
+secs1 = md.parse raw1 | md.sections
+assert (len secs1 == 1)
+assert (secs1.0.content | contains? "item1")
+
+tick = "`"
+raw2 = "# Code\n\n" ++ tick ++ tick ++ tick ++ "rust\nfn main() {}\n" ++ tick ++ tick ++ tick
+secs2 = md.parse raw2 | md.sections
+assert (len secs2 == 1)
+assert (secs2.0.content | contains? "fn main")
+
+raw3 = "# Parent\n\ntext\n\n### Child\n\nchild text"
+secs3 = md.parse raw3 | md.sections
+assert (len secs3 == 1)
+assert (secs3.0.title == "Parent")
+assert (secs3.0.content | contains? "text")
+assert (secs3.0.content | contains? "Child")
+assert (secs3.0.content | contains? "child text")
+
+raw4 = "# A\n\ntext a\n\n# B\n\ntext b"
+secs4 = md.parse raw4 | md.sections
+assert (len secs4 == 2)
+
+raw5 = "# Simple\n\nhello world"
+secs5 = md.parse raw5 | md.sections
+assert (secs5.0.content == "hello world")
