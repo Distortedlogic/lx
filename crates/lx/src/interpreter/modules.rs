@@ -4,14 +4,45 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 
 use crate::ast::{BindTarget, Core, Program, Stmt, StmtTypeDef, UseKind, UseStmt};
+use crate::env::Env;
 use crate::error::LxError;
 use crate::folder::desugar;
+use crate::sym::intern;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
 use super::{Interpreter, ModuleExports};
 
+const DEFAULT_TOOLS_SENTINEL: &str = "__default_tools_loaded";
+
 impl Interpreter {
+  pub(crate) async fn load_default_tools(&mut self) -> Result<(), LxError> {
+    let sentinel = PathBuf::from(DEFAULT_TOOLS_SENTINEL);
+    {
+      let cache = self.module_cache.lock();
+      if cache.contains_key(&sentinel) {
+        return Ok(());
+      }
+    }
+    self.module_cache.lock().insert(
+      sentinel,
+      ModuleExports { bindings: IndexMap::new(), variant_ctors: Vec::new() },
+    );
+    let span = SourceSpan::from(0..0);
+    let env = self.env.child();
+    for &(module_name, export_name) in crate::stdlib::DEFAULT_TOOL_MODULES {
+      let source = crate::stdlib::lx_std_module_source(module_name)
+        .ok_or_else(|| LxError::runtime(format!("missing default tool module: {module_name}"), span))?;
+      let exports = self.load_module_from_source(module_name, source, span).await?;
+      let sym = intern(export_name);
+      if let Some(val) = exports.bindings.get(&sym) {
+        env.bind(sym, val.clone());
+      }
+    }
+    self.env = Arc::new(env);
+    Ok(())
+  }
+
   pub(super) async fn eval_use(&mut self, use_stmt: &UseStmt, span: SourceSpan) -> Result<(), LxError> {
     let str_path: Vec<&str> = use_stmt.path.iter().map(|s| s.as_str()).collect();
     let str_joined = str_path.join("/");

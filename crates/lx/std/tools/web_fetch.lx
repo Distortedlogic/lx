@@ -1,0 +1,14 @@
+-- default tool: fetch a URL and return its content via Bash + curl
+
+Tool WebFetch = {
+  name: "web_fetch"
+  description: "Fetch a URL and return its content"
+  params: {url: Str}
+  run = (args) {
+    result = Bash.run {command: "curl -sL '{args.url}'"} ^
+    result ? {
+      Ok r -> r.code == 0 ? (Ok r.stdout) : (Err "fetch failed: HTTP error")
+      Err e -> Err e
+    }
+  }
+}

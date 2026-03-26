@@ -1,0 +1,8 @@
+-- default tool: execute shell commands via CLI keyword desugaring
+
+CLI Bash = {
+  command: "bash"
+  name: "bash"
+  description: "Execute shell commands"
+  params: {command: Str}
+}

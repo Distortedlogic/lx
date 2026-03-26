@@ -69,9 +69,28 @@ pub(crate) fn lx_std_module_source(name: &str) -> Option<&'static str> {
     "guard" => Some(include_str!("../../std/guard.lx")),
     "workflow" => Some(include_str!("../../std/workflow.lx")),
     "schema_trait" => Some(include_str!("../../std/schema_trait.lx")),
+    "tools/bash" => Some(include_str!("../../std/tools/bash.lx")),
+    "tools/read" => Some(include_str!("../../std/tools/read.lx")),
+    "tools/write" => Some(include_str!("../../std/tools/write.lx")),
+    "tools/edit" => Some(include_str!("../../std/tools/edit.lx")),
+    "tools/glob" => Some(include_str!("../../std/tools/glob.lx")),
+    "tools/grep" => Some(include_str!("../../std/tools/grep.lx")),
+    "tools/web_search" => Some(include_str!("../../std/tools/web_search.lx")),
+    "tools/web_fetch" => Some(include_str!("../../std/tools/web_fetch.lx")),
     _ => None,
   }
 }
+
+pub(crate) const DEFAULT_TOOL_MODULES: &[(&str, &str)] = &[
+  ("tools/bash", "Bash"),
+  ("tools/read", "Read"),
+  ("tools/write", "Write"),
+  ("tools/edit", "Edit"),
+  ("tools/glob", "Glob"),
+  ("tools/grep", "Grep"),
+  ("tools/web_search", "WebSearch"),
+  ("tools/web_fetch", "WebFetch"),
+];
 
 pub(crate) fn std_module_exists(path: &[&str]) -> bool {
   if path.len() < 2 || path[0] != "std" {
