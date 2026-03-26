@@ -66,6 +66,7 @@ where
   let a6 = arena.clone();
   let a7 = arena.clone();
   let a8 = arena.clone();
+  let a_body = arena.clone();
 
   let unit = just(TokenKind::LParen).then(just(TokenKind::RParen)).map_with(move |_, e| a1.borrow_mut().alloc_expr(Expr::Literal(Literal::Unit), ss(e.span())));
 
@@ -107,7 +108,7 @@ where
     .then(super::type_ann::generic_params())
     .then(just(TokenKind::Arrow).ignore_then(super::type_ann::type_parser(arena.clone())).or_not())
     .then(just(TokenKind::Amp).ignore_then(expr.clone().delimited_by(just(TokenKind::LParen), just(TokenKind::RParen))).or_not())
-    .then(expr.clone())
+    .then(super::expr_helpers::block_or_record_parser(expr.clone(), a_body.clone()).or(expr.clone()))
     .map_with(move |((((params, type_params), ret_type), guard), body), e| {
       a7.borrow_mut().alloc_expr(Expr::Func(ExprFunc { params, type_params, ret_type, guard, body }), ss(e.span()))
     });
