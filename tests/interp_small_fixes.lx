@@ -1,0 +1,25 @@
+-- interp_small_fixes
+-- tests for adjacent string interpolation and tuple computed index
+
+a = "hello"
+b = "world"
+assert ("{a}{b}" == "helloworld") "adjacent interp"
+
+x = "a"
+y = "b"
+z = "c"
+assert ("{x}{y}{z}" == "abc") "three adjacent"
+
+name = "lx"
+assert ("hello {name}!" == "hello lx!") "mixed interp"
+
+t = (10; 20; 30)
+assert (t.[0] == 10) "tuple idx 0"
+assert (t.[2] == 30) "tuple idx 2"
+
+i = 1
+t2 = ("a"; "b"; "c")
+assert (t2.[i] == "b") "tuple var idx"
+
+t3 = (1; 2)
+assert (t3.0 == 1) "positional"
