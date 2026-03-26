@@ -1,0 +1,41 @@
+-- System auditor — final cross-codebase audit after all work items pass.
+-- Phase 1: code quality across all touched files.
+-- Phase 2: spec compliance — did each work item's diff match its spec?
+
+use ../prompt/system_audit {SystemAuditPrompt}
+use pkg/log
+
++Agent SystemAuditor = {
+  act = (msg) {
+    log.log "> claude: system audit (phase 1: quality, phase 2: compliance)..."
+    paths_text = msg.completed_paths | join "\n"
+
+    p = SystemAuditPrompt {}
+    p.add_section "Completed Work Items" paths_text
+
+    p.add_instruction "PHASE 1 — code quality: scan all files in the codebase"
+    p.add_constraint "Flag: empty function bodies, functions returning placeholders"
+    p.add_constraint "Flag: match arms discarding with _ => {}, pub items with no external users"
+    p.add_constraint "Flag: TODO/FIXME/unimplemented left behind"
+    p.add_instruction "Run `just diagnose` — must be 0 errors 0 warnings"
+    p.add_instruction "Run `just test` — all tests must pass"
+
+    p.add_instruction "PHASE 2 — spec compliance: for each completed work item"
+    p.add_instruction "Read the work item spec, read the committed code"
+    p.add_instruction "For each task: did code do what was asked? Anything missing? Anything extra?"
+
+    p.add_constraint "Return a numbered findings list. Report ONLY problems."
+    p.add_constraint "Keep under 3000 chars."
+
+    result = self.think_with {
+      prompt: (p.render ())
+      tools: ["Read"; "Glob"; "Grep"; "Bash"]
+      max_turns: 30
+    } ^
+
+    report = result.text
+    log.save_debug msg.runner_dir "system" "system_audit.md" report
+    log.log "< system audit done ({report | len} chars)"
+    report
+  }
+}

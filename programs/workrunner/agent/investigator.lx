@@ -12,7 +12,11 @@ use pkg/log
     p.add_instruction "Run `just diagnose` — report ONLY errors/warnings"
     p.add_instruction "Run `just test` — report ONLY failures"
     p.add_instruction "For each task: DONE or MISSING with one line"
-    p.add_instruction "Keep under 2000 chars. No file contents."
+    p.add_instruction "Scan all touched files for code quality issues"
+    p.add_constraint "Flag: empty function bodies, placeholder returns, match arms discarding with _ => {}"
+    p.add_constraint "Flag: new struct/trait/enum with no users, TODO/FIXME/unimplemented left behind"
+    p.add_constraint "For each task: did the code do what was asked? Anything not asked? Anything incomplete?"
+    p.add_constraint "Keep under 2000 chars. No file contents."
 
     result = self.think_with {
       prompt: (p.render ())

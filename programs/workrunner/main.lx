@@ -1,5 +1,8 @@
 -- Agentic Work Runner -- entrypoint. Composition only.
 --
+-- Pipeline per work item: implement → diagnose → fix loop → investigate → grade → fix WI loop
+-- After all items: system audit (code quality + spec compliance)
+--
 -- Usage: lx run workrunner
 -- Reset: rm -rf .lx/work_runner/
 
@@ -9,6 +12,7 @@ use pkg/log
 use ./prompt/context {BootstrapContext}
 use ./store/status {RunStatus}
 use ./agent/grader {Grader}
+use ./agent/system_auditor {SystemAuditor}
 use ./workflow/orchestrator
 
 target_grade = 93
@@ -44,6 +48,10 @@ grader = Grader {
   ]
 }
 
+system_auditor = SystemAuditor {}
+
+$git add -A && git commit --allow-empty -m "baseline"
+
 bootstrap_prompt = BootstrapContext {}
 bootstrap_prompt.load ()
 
@@ -70,6 +78,7 @@ run_one = (idx path) {
   result = orchestrator.run_work_item path idx total grader bootstrap_prompt max_fix_rounds runner_dir
   icon = result.status == "pass" ? "PASS" : "FAIL"
   log.log "  >>> {icon} {path} — {result.score}/100"
+  result.status == "pass" ? $just fmt && git add -A && git commit -m "implement {path}"
   status.record_result result
   log.log "  status saved ({status.completed_count ()} completed)"
 }
@@ -104,4 +113,15 @@ has_failures ? log.log "Failed items:"
 fail_list | each (r) {
   log.log "  {r.path}: {r.status} at {r.score}"
   log.log "    {r.feedback}"
+}
+
+has_passes = pass_list | len > 0
+has_passes ? {
+  log.log ""
+  log.log "=== SYSTEM AUDIT ==="
+  completed_paths = pass_list | map (r) r.path
+  report = system_auditor.act {completed_paths: completed_paths; runner_dir: runner_dir}
+  sys_grade = grader.act {work: report; task: "System-wide code quality and spec compliance audit"}
+  log.log "System audit: {sys_grade.score}/100 | {sys_grade.feedback}"
+  sys_grade.passed ? $just fmt && git add -A && git commit -m "system audit clean"
 }

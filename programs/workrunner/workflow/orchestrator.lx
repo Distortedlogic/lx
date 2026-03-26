@@ -1,4 +1,5 @@
 -- Orchestrator — runs tasks within a work item, grades, fixes.
+-- Stuck detection: bail if 3+ rounds with grade not improving.
 use ../schema/work_item {task_count task_summaries load}
 use pkg/log
 use ./agents {diagnose}
@@ -21,6 +22,16 @@ grade_and_log_impl = (wi grader_inst report runner_dir) {
     log.log "    [{icon}] {cat.name}: {cat.score}/100 — {cat.feedback}"
   }
   grade
+}
+
+is_stuck = (round scores) {
+  round < 3 ? false : {
+    recent = scores | drop ((scores | len) - 3)
+    best = recent | fold 0 (a b) { a > b ? a : b }
+    worst = recent | fold 100 (a b) { a < b ? a : b }
+    improving = best - worst > 2
+    not improving
+  }
 }
 
 +run_work_item = (path idx total grader_inst bootstrap_prompt max_rounds runner_dir) {
@@ -52,12 +63,19 @@ grade_and_log_impl = (wi grader_inst report runner_dir) {
 
   score := grade.score
   passed := grade.passed
+  scores := [grade.score]
 
   round := 0
   loop {
     passed ? break ()
     round <- round + 1
     round > max_rounds ? break ()
+
+    stuck = is_stuck round scores
+    stuck ? {
+      log.log "  STUCK: 3+ rounds, grade not improving ({scores | map to_str | join " → "})"
+      break ()
+    }
 
     failed_list = grade.failed
     has_failed = failed_list | len > 0
@@ -70,6 +88,7 @@ grade_and_log_impl = (wi grader_inst report runner_dir) {
     grade = grade_and_log_impl wi grader_inst report runner_dir
     score <- grade.score
     passed <- grade.passed
+    scores <- [..scores; grade.score]
   }
 
   status_str = passed ? "pass" : "fail"
