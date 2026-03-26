@@ -199,9 +199,11 @@ async fn run_pipeline(
   let transcript_entry = response.clone();
   tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
     let cursor = std::io::Cursor::new(wav_bytes);
-    let sink = rodio::DeviceSinkBuilder::open_default_sink()?;
+    let mut sink = rodio::DeviceSinkBuilder::open_default_sink()?;
+    sink.log_on_drop(false);
     let player = rodio::play(sink.mixer(), cursor)?;
     player.sleep_until_end();
+    std::thread::sleep(std::time::Duration::from_secs(1));
     Ok(())
   })
   .await??;
