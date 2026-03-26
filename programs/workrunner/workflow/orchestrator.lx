@@ -14,7 +14,7 @@ investigator = Investigator {}
 
 grade_and_log_impl = (wi grader_inst report runner_dir) {
   log.log "  > grader: full work item..."
-  grade = grader_inst.grade report "Verify full implementation of {wi.path}"
+  grade = grader_inst.act {work: report; task: "Verify full implementation of {wi.path}"}
   save_debug runner_dir wi.slug "grade_final.json" (json.encode_pretty grade)
   log.log "  GRADE: {grade.score}/100 | passed: {grade.passed} | {grade.feedback}"
   grade.categories | each (cat) {

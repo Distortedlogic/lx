@@ -118,11 +118,12 @@ impl<'src> Lexer<'src> {
         self.emit(Token::new(TokenKind::RParen, span));
       },
       RawToken::LBracket => {
-        self.paren_bracket_depth += 1;
+        self.brace_stack.push(self.paren_bracket_depth);
+        self.paren_bracket_depth = 0;
         self.emit(Token::new(TokenKind::LBracket, span));
       },
       RawToken::RBracket => {
-        self.paren_bracket_depth -= 1;
+        self.paren_bracket_depth = self.brace_stack.pop().unwrap_or(0);
         self.emit(Token::new(TokenKind::RBracket, span));
       },
       RawToken::LBrace => {

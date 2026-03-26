@@ -14,7 +14,7 @@ pub fn Agents() -> Element {
 
   rsx! {
     div { class: "flex flex-col h-full",
-      div { class: "shrink-0 border-b border-[var(--outline-variant)]/15", VoiceBanner {} }
+      div { class: "flex-1 min-h-0 border-b border-[var(--outline-variant)]/15", VoiceBanner {} }
       div { class: "flex-1 min-h-0", PaneArea {} }
     }
   }

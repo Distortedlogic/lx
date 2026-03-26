@@ -19,11 +19,16 @@ where
   let elem = spread.or(single);
 
   let al = arena;
-  elem
-    .separated_by(just(TokenKind::Semi).or_not())
-    .allow_trailing()
-    .collect::<Vec<_>>()
-    .delimited_by(just(TokenKind::LBracket), just(TokenKind::RBracket))
+  just(TokenKind::LBracket)
+    .ignore_then(super::expr::skip_semis())
+    .ignore_then(
+      elem
+        .separated_by(super::expr::semi_sep())
+        .allow_trailing()
+        .collect::<Vec<_>>(),
+    )
+    .then_ignore(super::expr::skip_semis())
+    .then_ignore(just(TokenKind::RBracket))
     .map_with(move |elems, e| al.borrow_mut().alloc_expr(Expr::List(elems), ss(e.span())))
 }
 

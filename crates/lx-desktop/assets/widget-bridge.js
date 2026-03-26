@@ -36843,6 +36843,12 @@ var WidgetBridge = (function(exports) {
 					state.currentBubble = null;
 					state.currentText = "";
 					break;
+				case "user_display": {
+					const bubble = createBubble(state.messagesDiv, "user");
+					bubble.textContent = msg.text ?? "";
+					autoScroll(state);
+					break;
+				}
 				case "tool_call": {
 					const bubble = createBubble(state.messagesDiv, "tool");
 					const title = document.createElement("div");

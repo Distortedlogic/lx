@@ -8,7 +8,7 @@ g = Grader {
   ]
 }
 
-result = g.grade "Task 1: DONE. Task 2: DONE. All files exist. Tests pass. 0 errors." "Verify implementation"
+result = g.act {work: "Task 1: DONE. Task 2: DONE. All files exist. Tests pass. 0 errors."; task: "Verify implementation"}
 emit "score: {result.score}"
 emit "passed: {result.passed}"
 emit "feedback: {result.feedback}"

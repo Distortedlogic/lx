@@ -1,17 +1,17 @@
--- Work Item Grader — scores work against a rubric.
+-- Work Item Grader — scores work against a rubric via LLM evaluation.
 
 use ./schema/grade {GradeResult CategoryScore}
 use ./prompt/agents {GradePrompt}
 
-+Class Grader = {
++Agent Grader = {
   rubric: []
   threshold: 93
 
-  grade = (work task) {
-    p = self.build_prompt work task
+  act = (msg) {
+    p = self.build_prompt msg.work msg.task
     rendered = p.render ()
-    schema_str = self.schema ()
-    result = ai.prompt_with {
+    schema_str = self.grading_schema ()
+    result = self.think_with {
       prompt: rendered
       disable_tools: true
       json_schema: schema_str
@@ -35,7 +35,7 @@ use ./prompt/agents {GradePrompt}
     p
   }
 
-  schema = () {
+  grading_schema = () {
     `{"type":"object","properties":{"categories":{"type":"array","items":{"type":"object","properties":{"name":{"type":"string"},"score":{"type":"integer","minimum":0,"maximum":100},"feedback":{"type":"string"}},"required":["name","score","feedback"]}}},"required":["categories"]}`
   }
 
