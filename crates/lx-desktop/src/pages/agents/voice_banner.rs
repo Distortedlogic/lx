@@ -198,12 +198,15 @@ async fn run_pipeline(
 
   let transcript_entry = response.clone();
   tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+    use std::sync::LazyLock;
+    static AUDIO_SINK: LazyLock<rodio::MixerDeviceSink> = LazyLock::new(|| {
+      let mut sink = rodio::DeviceSinkBuilder::open_default_sink().expect("no audio device");
+      sink.log_on_drop(false);
+      sink
+    });
     let cursor = std::io::Cursor::new(wav_bytes);
-    let mut sink = rodio::DeviceSinkBuilder::open_default_sink()?;
-    sink.log_on_drop(false);
-    let player = rodio::play(sink.mixer(), cursor)?;
+    let player = rodio::play(AUDIO_SINK.mixer(), cursor)?;
     player.sleep_until_end();
-    std::thread::sleep(std::time::Duration::from_secs(1));
     Ok(())
   })
   .await??;
