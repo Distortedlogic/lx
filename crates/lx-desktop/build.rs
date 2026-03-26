@@ -9,7 +9,28 @@ fn main() {
 
   let widget_bridge_dir = dioxus_common.join("ts/widget-bridge");
   for dir in &["src", "widgets"] {
-    println!("cargo:rerun-if-changed={}", widget_bridge_dir.join(dir).display());
+    let d = widget_bridge_dir.join(dir);
+    if d.exists()
+      && let Ok(entries) = std::fs::read_dir(&d)
+    {
+      for entry in entries.flatten() {
+        if entry.path().extension().is_some_and(|e| e == "ts") {
+          println!("cargo:rerun-if-changed={}", entry.path().display());
+        }
+      }
+    }
+  }
+  for pkg in &["audio-playback", "audio-capture"] {
+    let pkg_src = dioxus_common.join(format!("ts/{pkg}/src"));
+    if pkg_src.exists()
+      && let Ok(entries) = std::fs::read_dir(&pkg_src)
+    {
+      for entry in entries.flatten() {
+        if entry.path().extension().is_some_and(|e| e == "ts") {
+          println!("cargo:rerun-if-changed={}", entry.path().display());
+        }
+      }
+    }
   }
   if widget_bridge_dir.join("package.json").exists() {
     let status = Command::new("pnpm").arg("build").current_dir(&widget_bridge_dir).status();

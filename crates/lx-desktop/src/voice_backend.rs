@@ -2,7 +2,6 @@ use common_voice::AgentBackend;
 use std::process::Stdio;
 use std::sync::LazyLock;
 use std::sync::atomic::{AtomicBool, Ordering};
-use tokio::io::AsyncReadExt;
 
 const SYSTEM_PROMPT: &str = "\
 Your final response to the user will be spoken aloud via text-to-speech. \
@@ -14,8 +13,18 @@ Write abbreviations, acronyms, and numbers as spoken words. Avoid parenthetical 
 static SESSION_ID: LazyLock<String> = LazyLock::new(|| uuid::Uuid::new_v4().to_string());
 static SESSION_CREATED: AtomicBool = AtomicBool::new(false);
 
-fn build_args(text: &str) -> Vec<&str> {
+fn build_args_text(text: &str) -> Vec<&str> {
   let mut args = vec!["-p", text, "--output-format", "text", "--system-prompt", SYSTEM_PROMPT];
+  if SESSION_CREATED.load(Ordering::Relaxed) {
+    args.extend(["--resume", &SESSION_ID]);
+  } else {
+    args.extend(["--session-id", &SESSION_ID]);
+  }
+  args
+}
+
+fn build_args_stream(text: &str) -> Vec<&str> {
+  let mut args = vec!["-p", text, "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--system-prompt", SYSTEM_PROMPT];
   if SESSION_CREATED.load(Ordering::Relaxed) {
     args.extend(["--resume", &SESSION_ID]);
   } else {
@@ -29,7 +38,7 @@ pub struct ClaudeCliBackend;
 #[async_trait::async_trait]
 impl AgentBackend for ClaudeCliBackend {
   async fn query(&self, text: &str) -> anyhow::Result<String> {
-    let args = build_args(text);
+    let args = build_args_text(text);
     let output = tokio::process::Command::new("claude").args(&args).output().await?;
     if !output.status.success() {
       let stderr = String::from_utf8_lossy(&output.stderr);
@@ -42,24 +51,35 @@ impl AgentBackend for ClaudeCliBackend {
 }
 
 pub async fn query_streaming(text: &str, mut on_chunk: impl FnMut(&str)) -> anyhow::Result<String> {
-  let args = build_args(text);
+  use tokio::io::AsyncBufReadExt;
+  let args = build_args_stream(text);
   let mut child = tokio::process::Command::new("claude").args(&args).stdout(Stdio::piped()).stderr(Stdio::null()).spawn()?;
-  let mut stdout = child.stdout.take().ok_or_else(|| anyhow::anyhow!("no stdout"))?;
-  let mut full = Vec::new();
-  let mut buf = [0u8; 256];
-  loop {
-    let n = stdout.read(&mut buf).await?;
-    if n == 0 {
-      break;
+  let stdout = child.stdout.take().ok_or_else(|| anyhow::anyhow!("no stdout"))?;
+  let mut lines = tokio::io::BufReader::new(stdout).lines();
+  let mut result_text = String::new();
+  while let Some(line) = lines.next_line().await? {
+    let Ok(event) = serde_json::from_str::<serde_json::Value>(&line) else { continue };
+    match event["type"].as_str() {
+      Some("stream_event") => {
+        if event["event"]["type"].as_str() == Some("content_block_delta")
+          && event["event"]["delta"]["type"].as_str() == Some("text_delta")
+          && let Some(text) = event["event"]["delta"]["text"].as_str()
+        {
+          on_chunk(text);
+        }
+      },
+      Some("result") => {
+        if let Some(text) = event["result"].as_str() {
+          result_text = text.trim().to_owned();
+        }
+      },
+      _ => {},
     }
-    full.extend_from_slice(&buf[..n]);
-    let chunk = String::from_utf8_lossy(&buf[..n]);
-    on_chunk(&chunk);
   }
   let status = child.wait().await?;
-  if !status.success() {
+  if !status.success() && result_text.is_empty() {
     anyhow::bail!("claude cli failed");
   }
   SESSION_CREATED.store(true, Ordering::Relaxed);
-  Ok(String::from_utf8(full)?.trim().to_owned())
+  Ok(result_text)
 }
