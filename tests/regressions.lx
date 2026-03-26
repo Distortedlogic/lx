@@ -1,0 +1,80 @@
+-- regression tests
+-- verifies fixes for specific bugs that were found and fixed
+
+-- Coalesce passes through plain values (not just Maybe/Result)
+list = [1; 2; 3]
+assert (len (list ?? []) == 3)
+assert (("hello" ?? "default") == "hello")
+assert ((42 ?? 0) == 42)
+assert ((None ?? "fallback") == "fallback")
+assert ((Ok 10 ?? 0) == 10)
+assert ((Err "bad" ?? 99) == 99)
+assert ((Some "yes" ?? "no") == "yes")
+
+-- Newlines in brackets work as list separators
+items = [
+  1
+  2
+  3
+]
+assert (len items == 3)
+records = [
+  {name: "a"; value: 1}
+  {name: "b"; value: 2}
+]
+assert (len records == 2)
+nested = [
+  [1; 2]
+  [3; 4]
+]
+assert (len nested == 2)
+strings = [
+  "hello"
+  "world"
+]
+assert (len strings == 2)
+
+-- Pipe after block lambda
+pipe_items = [1; 2; 3; 4; 5]
+result_filter = pipe_items | filter (x) { x > 2 } | len
+assert (result_filter == 3)
+result_chain = pipe_items | map (x) { x * 2 } | filter (x) { x > 4 } | len
+assert (result_chain == 3)
+result_inner = pipe_items | map (x) { x | to_str } | len
+assert (result_inner == 5)
+result_bare = pipe_items | map (x) { x * 2 } | len
+assert (result_bare == 5)
+result_rec = pipe_items | map (x) { {value: x} } | len
+assert (result_rec == 5)
+
+-- Assert with messages via Expr::Grouped
+assert (1 == 1) "one equals one"
+assert (2 > 1) "two is greater"
+assert (true)
+x = 5
+assert (x > 0) "x must be positive"
+assert (x == 5)
+assert (len [1; 2; 3] == 3) "list has 3 elements"
+
+-- type_of returns "Func" for all function types
+assert (type_of (x) { x + 1 } == "Func")
+assert (type_of len == "Func")
+assert (type_of to_str == "Func")
+assert (type_of map == "Func")
+
+-- source_dir stable across module loads
+use std/time
+sd1 = source_dir ()
+now = time.now ()
+sd2 = source_dir ()
+assert (sd1 == sd2)
+
+-- stdlib http functions exist
+use std/http
+assert (type_of http.get != "Unit")
+assert (type_of http.post != "Unit")
+assert (type_of http.request != "Unit")
+
+-- agent builtins exist
+assert (type_of agent.spawn == "Func")
+assert (type_of agent.kill == "Func")

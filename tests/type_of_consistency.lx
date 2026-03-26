@@ -1,5 +1,0 @@
-f = (x) { x + 1 }
-assert (type_of f == "Func")
-assert (type_of len == "Func")
-assert (type_of to_str == "Func")
-assert (type_of map == "Func")

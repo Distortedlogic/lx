@@ -1,4 +1,0 @@
--- This test requires a simple echo agent script
--- For now, just verify the builtins exist and are callable
-assert (type_of agent.spawn == "Func")
-assert (type_of agent.kill == "Func")

@@ -73,7 +73,7 @@ run_fn = (steps executor on_step) {
     cycle_err = Err "plan: cycle or unmet dependencies in remaining steps"
     err_result <- (has_ready == false) ? cycle_err : err_result
     (has_ready == false) ? break ()
-    step = ready ? { Some s -> s; _ -> ready }
+    step = ready ?? ready
     sid = si step
     remaining <- remaining | filter (s) { (si s) != sid }
     ctx = {completed: completed}

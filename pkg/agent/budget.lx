@@ -65,7 +65,7 @@ spend_fn = (b amounts) {
   }
   has_exceeded = (exceeded | len) > 0
   first_exceeded = exceeded | first
-  resource = first_exceeded ? { Some s -> s; _ -> "unknown" }
+  resource = first_exceeded ?? "unknown"
   spent_val = (used_store.get resource) ?? 0.0
   limit_val = (initial.get resource) ?? 0.0
   err_rec = BudgetExhausted {used: spent_val; limit: limit_val; resource: resource}

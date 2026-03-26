@@ -120,7 +120,7 @@ use std/time
 +adapt_strategy = (profile domain result) {
   key = "strategy:{domain}:{result.strategy ?? "default"}"
   existing = profile.knowledge.get key
-  prev_score = existing ? { Some e -> e.score ?? 0; _ -> 0 }
+  prev_score = (existing ?? {score: 0}).score ?? 0
   new_score = (prev_score + (result.score ?? 0)) // 2
   profile.knowledge.set key {strategy: result.strategy ?? "default"; score: new_score; timestamp: (time.now ()).ms}
 }

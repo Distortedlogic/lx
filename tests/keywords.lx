@@ -1,0 +1,190 @@
+-- keyword desugaring tests
+-- verifies Agent, Tool, Store, Guard, CLI, HTTP, MCP, export prefix, composition, equivalence
+
+-- Agent
+Agent TestAgent = {
+  perceive = (msg) { {intent: msg} }
+}
+a = TestAgent {}
+assert (a.perceive "hello").intent == "hello"
+assert (methods_of a | any? (== "think"))
+assert (methods_of a | any? (== "handle"))
+
+-- Tool
+Tool Echo = {
+  description: "echoes"
+  params: {text: "Str"}
+  run = (args) { Ok args.text }
+}
+t = Echo {}
+assert t.description == "echoes"
+assert (t.run {text: "hi"} == Ok "hi")
+assert (t.validate {text: "hello"} | ok?)
+assert (t.validate {wrong: 1} | err?)
+
+-- Store
+Store Items = {}
+s = Items {}
+s.entries.set "a" 1
+s.entries.set "b" 2
+assert (s.len () == 2)
+assert (s.has "a")
+assert (s.get "a" == 1)
+
+-- Guard
+Guard TurnLimit = { max_turns: 4 }
+g = TurnLimit {}
+g.tick ()
+g.tick ()
+g.tick ()
+assert (g.check () | ok?)
+g.tick ()
+assert (g.is_tripped ())
+
+-- CLI
+CLI TestCli = {
+  command: "echo"
+  tool_defs: [{name: "hello", subcommand: "hello"}]
+}
+c = TestCli {}
+assert c.command == "echo"
+assert (c.tool_defs | len == 1)
+assert (methods_of c | any? (== "connect"))
+assert (methods_of c | any? (== "tools"))
+assert (c.tools () | len == 1)
+
+-- HTTP
+HTTP TestApi = {
+  base_url: "https://httpbin.org"
+  headers: {accept: "application/json"}
+  endpoints: [{name: "/get", method: "GET"}]
+}
+api = TestApi {}
+assert api.base_url == "https://httpbin.org"
+assert (methods_of api | any? (== "connect"))
+assert (methods_of api | any? (== "call"))
+assert (api.tools () | len == 1)
+assert (api.connect () | ok?)
+
+-- MCP
+MCP TestServer = {
+  command: "echo"
+  args: ["test"]
+}
+srv = TestServer {}
+assert srv.command == "echo"
+assert srv.args == ["test"]
+assert (methods_of srv | any? (== "connect"))
+assert (methods_of srv | any? (== "call"))
+
+-- Export prefix (+ before and after keyword)
++Schema BeforeKeyword = { x: Int = "test" }
+Schema +AfterKeyword = { y: Int = "test" }
+ex_a = BeforeKeyword {x: 1}
+ex_b = AfterKeyword {y: 2}
+assert (ex_a.x == 1)
+assert (ex_b.y == 2)
+
+-- Keyword equivalence: keyword and manual Class produce the same thing
+use std/guard {Guard}
+Class ManualGuard : [Guard] = { max_turns: 5 }
+Guard KeywordGuard = { max_turns: 5 }
+mg = ManualGuard {}
+kg = KeywordGuard {}
+mg.tick ()
+kg.tick ()
+mg.tick ()
+kg.tick ()
+assert mg.turns == kg.turns
+assert (mg.is_tripped () == (kg.is_tripped ()))
+
+use std/agent {Agent}
+Class ManualAgent : [Agent] = { perceive = (msg) { {parsed: msg} } }
+Agent KeywordAgent = { perceive = (msg) { {parsed: msg} } }
+ma = ManualAgent {}
+ka = KeywordAgent {}
+assert (ma.perceive "hi").parsed == (ka.perceive "hi").parsed
+assert (methods_of ma | sort == (methods_of ka | sort))
+
+use std/collection {Collection}
+Class ManualStore : [Collection] = { entries: Store () }
+Store KeywordStore = {}
+ms = ManualStore {}
+ks = KeywordStore {}
+ms.entries.set "a" 1
+ks.entries.set "a" 1
+assert (ms.get "a" == (ks.get "a"))
+assert (ms.len () == (ks.len ()))
+
+use std/tool {Tool}
+Class ManualTool : [Tool] = {
+  description: "test"
+  params: {x: "Int"}
+  run = (args) { Ok args.x }
+}
+Tool KeywordTool = {
+  description: "test"
+  params: {x: "Int"}
+  run = (args) { Ok args.x }
+}
+mt = ManualTool {}
+kt = KeywordTool {}
+assert (mt.run {x: 42} == (kt.run {x: 42}))
+assert (mt.schema () == (kt.schema ()))
+
+-- Composition: multiple keywords working together
+Tool Logger = {
+  description: "logs"
+  params: {msg: "Str"}
+  run = (args) { log.info args.msg; Ok () }
+}
+Guard Safety = { max_turns: 10 }
+Store TaskLog = {}
+Agent Worker = {
+  guard: Safety {}
+  task_log: TaskLog {}
+  act = (plan) {
+    self.guard.tick () ^
+    self.guard.check () ^
+    self.task_log.entries.set (to_str plan.id) plan
+    Ok plan
+  }
+}
+w = Worker {}
+result = w.act {id: 1, name: "test task"}
+assert (result | ok?)
+assert (w.task_log.len () == 1)
+assert w.guard.turns == 1
+w.act {id: 2, name: "task 2"}
+assert (w.task_log.len () == 2)
+assert w.guard.turns == 2
+
+-- Workrunner-style patterns
+Schema GradeResult = {
+  score: Int = "0-100 weighted score"
+  passed: Bool = "true if score >= threshold"
+  feedback: Str = "human-readable summary"
+}
+gr = GradeResult {score: 95, passed: true, feedback: "all good"}
+assert gr.score == 95
+assert gr.passed
+
+Tool ScoreChecker = {
+  description: "checks if score meets threshold"
+  params: {score: "Int", threshold: "Int"}
+  run = (args) { args.score >= args.threshold ? Ok {passed: true} : Ok {passed: false} }
+}
+checker = ScoreChecker {}
+assert (checker.run {score: 90, threshold: 80} | ok?)
+
+Store RunStatus = {}
+status = RunStatus {}
+status.entries.set "task1" {status: "pass", score: 95}
+status.entries.set "task2" {status: "fail", score: 60}
+assert (status.len () == 2)
+assert (status.values () | filter (r) { r.status == "pass" } | len == 1)
+
+Guard WorkGuard = { max_turns: 50, max_time_ms: 600000 }
+wg = WorkGuard {}
+wg.tick ()
+assert (wg.check () | ok?)

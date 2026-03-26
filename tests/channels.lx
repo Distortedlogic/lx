@@ -31,8 +31,7 @@ assert (r2a == Ok "x")
 r2b = channel.recv rx2
 assert (r2b == Ok "y")
 r2c = channel.recv rx2
-is_err2 = r2c ? { Err _ -> true; Ok _ -> false }
-assert is_err2
+assert (err? r2c)
 
 -- 3. Par producer/consumer
 ch3 = channel.create 10
@@ -57,8 +56,7 @@ recv_list = result3.1
 assert (recv_list.0 == Ok 10)
 assert (recv_list.1 == Ok 20)
 assert (recv_list.2 == Ok 30)
-r3closed = recv_list.3 ? { Err _ -> true; Ok _ -> false }
-assert r3closed
+assert (err? recv_list.3)
 
 -- 4. try_recv: None on empty, Some after send
 ch4 = channel.create 10

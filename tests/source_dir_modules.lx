@@ -1,6 +1,0 @@
-use std/time
-
-sd1 = source_dir ()
-now = time.now ()
-sd2 = source_dir ()
-assert (sd1 == sd2)

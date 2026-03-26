@@ -6,8 +6,7 @@ check1 = result1 == Ok 42
 assert check1
 
 result2 = timeout 1 (loop {})
-is_err = result2 ? { Err _ -> true; Ok _ -> false }
-assert is_err
+assert (err? result2)
 
 err_val = result2 ? { Err e -> e; Ok _ -> {kind: "none", ms: 0} }
 has_kind = err_val.kind == ":timeout"

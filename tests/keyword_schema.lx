@@ -1,9 +1,0 @@
-Schema UserProfile = {
-  name: Str = "the user's full name"
-  age: Int = "age in years"
-  email: Str = "contact email"
-}
-
-user = UserProfile {name: "Alice"; age: 30; email: "a@b.com"}
-assert user.name == "Alice"
-assert user.age == 30

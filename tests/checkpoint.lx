@@ -22,7 +22,7 @@ fs.write counter_path "0"
 
 inc_counter = () {
   prev = fs.read counter_path
-  old = prev ? { Ok v -> v; Err _ -> "0" }
+  old = prev ?? "0"
   n = to_int old
   fs.write counter_path (to_str (n + 1))
   n + 1
@@ -37,12 +37,12 @@ run_scope = () {
 
 run_scope ()
 c1 = fs.read counter_path
-c1v = c1 ? { Ok v -> v; Err _ -> "0" }
+c1v = c1 ?? "0"
 assert (c1v == "1")
 
 run_scope ()
 c2 = fs.read counter_path
-c2v = c2 ? { Ok v -> v; Err _ -> "0" }
+c2v = c2 ?? "0"
 assert (c2v == "1")
 
 checkpoint.clear "test_replay"
@@ -55,7 +55,7 @@ fs.write counter_path3 "0"
 
 inc_counter3 = () {
   prev = fs.read counter_path3
-  old = prev ? { Ok v -> v; Err _ -> "0" }
+  old = prev ?? "0"
   n = to_int old
   fs.write counter_path3 (to_str (n + 1))
   n + 1
@@ -69,13 +69,13 @@ run_scope3 = () {
 
 run_scope3 ()
 v3a = fs.read counter_path3
-v3a_s = v3a ? { Ok v -> v; Err _ -> "0" }
+v3a_s = v3a ?? "0"
 assert (v3a_s == "1")
 
 checkpoint.clear "test_clear"
 run_scope3 ()
 v3b = fs.read counter_path3
-v3b_s = v3b ? { Ok v -> v; Err _ -> "0" }
+v3b_s = v3b ?? "0"
 assert (v3b_s == "2")
 
 checkpoint.clear "test_clear"
@@ -87,6 +87,5 @@ make_fn = () { (x) x + 1 }
 func_result = checkpoint.scope "test_func_err" {:} (step) {
   step "bad" make_fn
 }
-is_err4 = func_result ? { Err _ -> true; _ -> false }
-assert is_err4
+assert (err? func_result)
 checkpoint.clear "test_func_err"

@@ -1,9 +1,0 @@
-assert (1 == 1) "one equals one"
-assert (2 > 1) "two is greater"
-assert (true)
-x = 5
-assert (x > 0) "x must be positive"
-assert (x == 5)
-list = [1; 2; 3]
-assert (list | len == 3) "list has 3 elements"
-assert (list | len > 0)

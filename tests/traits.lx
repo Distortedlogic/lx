@@ -1,0 +1,95 @@
+-- trait tests
+-- verifies trait field defaults, method inheritance, and all std traits
+
+-- Field default inheritance
+Trait HasDefault = {
+  x: Int = 42
+  get_x = () { self.x }
+}
+Class SimpleDefault : [HasDefault] = {}
+sd = SimpleDefault {}
+assert sd.x == 42
+assert (sd.get_x () == 42)
+
+-- Class overrides trait default
++Trait Greeter = {
+  greeting: Str = "hello"
+  greet = (name) { self.greeting ++ " " ++ name }
+}
++Class MyGreeter : [Greeter] = { greeting: "hi" }
+g1 = MyGreeter ()
+assert (g1.greet "world" == "hi world")
++Class DefaultGreeter : [Greeter] = { greeting: "hey" }
+g2 = DefaultGreeter ()
+assert (g2.greet "there" == "hey there")
+
+-- Guard trait
+use std/guard {Guard}
+Class TurnLimit : [Guard] = { max_turns: 4 }
+gl = TurnLimit {}
+gl.tick ()
+gl.tick ()
+gl.tick ()
+assert (gl.check () | ok?)
+gl.tick ()
+assert (gl.is_tripped ())
+assert (gl.check () | err?)
+gl.reset ()
+assert (not (gl.is_tripped ()))
+assert (gl.check () | ok?)
+
+-- Prompt trait
+use std/prompt {Prompt}
+Class GreeterPrompt : [Prompt] = { system: "You greet people" }
+p = GreeterPrompt {}
+p.add_section "Name" "Alice"
+rendered = p.render ()
+assert (rendered | contains? "You greet people")
+assert (rendered | contains? "Alice")
+
+-- Tool trait
+use std/tool {Tool}
+Class EchoTool : [Tool] = {
+  description: "echoes input"
+  params: {text: "Str"}
+  run = (args) { Ok args.text }
+}
+tt = EchoTool {}
+assert tt.description == "echoes input"
+assert (tt.schema () | keys | len == 1)
+assert (tt.run {text: "hello"} == Ok "hello")
+assert (tt.validate {text: "hi"} | ok?)
+assert (tt.validate {wrong: 1} | err?)
+
+-- Schema trait
+use std/schema_trait {Schema}
+Class UserValidator : [Schema] = {
+  validate = (data) {
+    (type_of data) != "Record" ? (Err "not a record") : {
+      missing = ["name"; "age"] | filter (k) { not (data | keys | any? (== k)) }
+      (missing | len) == 0 ? Ok data : Err {missing: missing}
+    }
+  }
+}
+v = UserValidator {}
+assert (v.validate {name: "Alice", age: 30} | ok?)
+assert (v.validate {name: "Bob"} | err?)
+
+-- Session trait
+use std/session {Session}
+Class Chat : [Session] = { max_tokens: 1000 }
+ss = Chat {}
+ss.messages.set "0" {role: "user"; content: "hello"}
+ss.messages.set "1" {role: "assistant"; content: "hi there"}
+assert (ss.messages.keys () | len == 2)
+
+-- Workflow trait
+use std/workflow {Workflow}
+Class TwoStep : [Workflow] = {
+  steps: [
+    {id: "a"; run: (ctx) { Ok 1 }; depends: []; undo: None};
+    {id: "b"; run: (ctx) { Ok 2 }; depends: ["a"]; undo: None}
+  ]
+}
+ws = TwoStep {}
+assert (ws.run {} | ok?)

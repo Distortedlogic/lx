@@ -1,9 +1,0 @@
-Guard TurnLimit = { max_turns: 4 }
-
-g = TurnLimit {}
-g.tick ()
-g.tick ()
-g.tick ()
-assert (g.check () | ok?)
-g.tick ()
-assert (g.is_tripped ())
