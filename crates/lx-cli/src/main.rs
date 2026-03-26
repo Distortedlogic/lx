@@ -1,11 +1,11 @@
 mod agent_cmd;
-mod ai_backend;
 mod check;
 mod fmt;
 mod init;
 mod install;
 mod install_ops;
 mod listing;
+mod llm_backend;
 mod lockfile;
 mod manifest;
 mod run;
@@ -202,10 +202,10 @@ fn apply_manifest_backends(ctx: &mut RuntimeCtx) {
       other => eprintln!("warning: unknown log backend '{other}'"),
     }
   }
-  if let Some(ref name) = backends.ai {
+  if let Some(ref name) = backends.llm {
     match name.as_str() {
-      "claude-code" => ctx.ai = Arc::new(ai_backend::ClaudeCodeAiBackend),
-      other => eprintln!("warning: unknown ai backend '{other}'"),
+      "claude-code" => ctx.llm = Arc::new(llm_backend::ClaudeCodeLlmBackend),
+      other => eprintln!("warning: unknown llm backend '{other}'"),
     }
   }
   if let Some(ref name) = backends.http {

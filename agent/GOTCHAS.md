@@ -13,12 +13,6 @@
 - **`$^{cmd}` throws `LxError::propagate` on non-zero exit, NOT `Value::Err`.** `($^{cmd}) ?? ""` does NOT catch the error because `??` only catches `Value::Err` and `Value::None`, not `LxError`. rg exits 1 on no matches, so `$^rg ...` throws uncatchably when there are no results. **Fix:** use `$sh -c "{cmd}"` (returns `Ok({out, err, code})` regardless of exit code), then check `.code` or just use `.out`.
 - **`${cmd}` is multi-line shell block syntax, NOT `$` with variable interpolation.** `${cmd}` opens a multi-line shell block (like `${ cd /tmp; ls }`), it does not run the value of `cmd` as a shell command. **Fix:** use `$sh -c "{cmd}"` to run a dynamically constructed command string.
 
-## Fixed Parser Traps (Session 64)
-
-- **`(expr) {record}` in application context no longer misparses.** Previously, `(to_str counter) {name: name}` was parsed as a 2-param function literal instead of a parenthesized expression + record. Fixed via `application_depth` tracking in the parser. In application context with 2+ bare-ident params and no strong signals, the parser rejects func-def when body is a record literal or an identifier not matching any param name.
-
-- **Lambda body with `==`/`!=` in pipe chains breaks.** `list | keep (x) x.name == val | sort_by (.id)` — the lambda body extends through `| sort_by (.id)`, so `sort_by` receives `val` from the inner pipe, not the filtered list. **Fix:** use block syntax: `list | keep (x) { x.name == val } | sort_by (.id)`. Or break into two statements: `matched = list | keep (x) { x.name == val }` then `matched | sort_by (.id)`.
-
 ## Ternary + Record Ambiguity
 
 - **`? {record}` is parsed as match, not ternary returning a record.** `expr ? {field: val  field2: val2} : other` — the `? {` triggers match-arm parsing, so `field:` is expected to be `pattern ->`. **Fix:** bind the record first: `result = {field: val  field2: val2}` then `expr ? result : other`.
@@ -71,10 +65,6 @@
 
 - **`( )` is grouping, not a block scope.** `cond ? ( x = compute; use x )` fails with "expected RParen, found Assign" — parens don't create blocks, only `{ }` does. But `? { }` triggers match parsing (see above). **Fix:** restructure to avoid multi-statement branches. Use pipe chains: `cond ? (compute | use)`. Or bind before the ternary: `val = compute; cond ? val : other`. Or use sequential single-arm guards: `cond ? break val`.
 
-## Sections Limitation
-
-- **Sections don't support `==` or `!=`.** `filter (.status == "pass")` fails — the section parser can't handle comparison operators. **Fix:** use a lambda: `filter (r) r.status == "pass"`.
-
 ## find/first/last Return Some, Not the Value
 
 - **`find`, `first`, and `last` return `Some(val)` or `None`, not the value directly.** `list | find pred | (.field)` fails — `.field` is called on `Some(record)`. `list | last | trim` fails — `trim` is called on `Some(str)`. **Fix:** unwrap with `??`: `(list | find pred) ?? default`. Parenthesize the expression before `??` because `??` binds looser than `|`.
@@ -102,11 +92,7 @@
 
 ## pkg/ Import Paths
 
-- **pkg/ uses subdirectory paths.** Packages are organized into `pkg/core/`, `pkg/ai/`, `pkg/data/`, `pkg/agents/`, `pkg/infra/`, `pkg/connectors/`, `pkg/kit/`. Import as `use pkg/core/prompt`, not `use pkg/prompt`. The old flat paths no longer resolve.
-
-## Lambda Body Extent in Records
-
-- **Lambda body extends through `| pipe` in record field values.** `{x: items | filter (f) f.severity == "critical" | len}` — the `| len` becomes part of the filter lambda body, not a pipe after filter. **Fix:** use block syntax: `{x: items | filter (f) { f.severity == "critical" } | len}`.
+- **pkg/ uses subdirectory paths.** Current layout: `pkg/agent/`, `pkg/git/`, `pkg/guard/`, `pkg/schema/`, `pkg/store/`, `pkg/workflow/`, plus `pkg/log.lx` at root. Import as `use pkg/agent/auditor`, `use pkg/log`, etc.
 
 ## Regex in String Pattern Lists
 
@@ -132,11 +118,15 @@
 - **`md.sections` drops bullet list and code block content.** Sections with only `- item` bullets or fenced code return empty `content`. Only plain text paragraphs between headings are captured. **Fix:** use raw string splitting (`split "\n# Title\n"` + `take_while`) instead of `md.sections` for sections that contain bullet lists.
 - **`md.sections` splits sub-headings into separate sections.** `# Parent` with `### Child` inside — the child becomes its own section, not content of the parent. `Parent` section has empty content. **Fix:** use `md.sections` for the sub-headings directly: `sections | filter (s) s.level == 3`.
 
-## Agent vs Class Field Syntax
-
-- **`Agent` keyword does not support field declarations with `:`.** `Agent Foo = { x: 0 }` fails — the parser expects `=` (method assignment) for everything except `uses`, `init`, `on`. Only `Class` supports `field: default` syntax. **Fix:** use `Class Foo : [Agent] = { x: 0 }` instead.
-- **`Class : [Agent]` does NOT inject Agent Trait defaults.** `Class Foo : [Agent] = { ... }` — `self.think`, `self.think_with` etc. are `None`, not the defaults from `pkg/agent.lx`. This may be a bug in trait injection for the Agent Trait specifically. **Workaround:** call `ai.prompt_with` directly instead of `self.think_with`.
-
 ## Incomplete Wiring
 
 - **`uses` bindings are dropped.** The `Agent` keyword parses `uses` declarations but they are not stored on the Class value. MCP servers must be connected manually in method bodies or `init`.
+
+## Fixed (kept for reference)
+
+- **`(expr) {record}` in application context no longer misparses.** Fixed via `application_depth` tracking in the parser.
+- **Lambda body with `==`/`!=` in pipe chains** — use block syntax `{ }` for lambda bodies in pipe chains. Block lambdas now correctly stop at `}` (commit 1b1f823).
+- **Lambda body extends through `| pipe` in record field values** — block syntax `{ }` now terminates correctly (commit 1b1f823).
+- **Sections now support `==`, `!=`, `<`, `>`, `<=`, `>=`.** `filter (.status == "pass")` works. `section_op` in `expr_pratt.rs` includes all comparison operators.
+- **`Agent` keyword now supports field declarations with `:`.** `Agent Foo = { x: 0 }` works — the keyword parser uses `class_body()` which handles both `:` fields and `=` methods.
+- **`Agent` keyword injects trait defaults.** `self.think`, `self.think_with` etc. are available on any `+Agent` declaration via trait desugaring.

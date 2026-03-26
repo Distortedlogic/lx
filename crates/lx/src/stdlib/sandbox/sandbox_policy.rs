@@ -9,9 +9,9 @@ use super::sandbox::Policy;
 
 pub(super) fn make_preset(name: &str) -> Policy {
   match name {
-    "pure" => Policy { fs_read: vec![], fs_write: vec![], net_allow: vec![], agent: false, mcp: false, ai: false, embed: false, pane: false, max_time_ms: 0 },
+    "pure" => Policy { fs_read: vec![], fs_write: vec![], net_allow: vec![], agent: false, mcp: false, llm: false, embed: false, pane: false, max_time_ms: 0 },
     "readonly" => {
-      Policy { fs_read: vec![".".into()], fs_write: vec![], net_allow: vec![], agent: false, mcp: false, ai: false, embed: false, pane: false, max_time_ms: 0 }
+      Policy { fs_read: vec![".".into()], fs_write: vec![], net_allow: vec![], agent: false, mcp: false, llm: false, embed: false, pane: false, max_time_ms: 0 }
     },
     "local" => Policy {
       fs_read: vec![".".into()],
@@ -19,7 +19,7 @@ pub(super) fn make_preset(name: &str) -> Policy {
       net_allow: vec![],
       agent: false,
       mcp: false,
-      ai: false,
+      llm: false,
       embed: false,
       pane: false,
       max_time_ms: 0,
@@ -30,7 +30,7 @@ pub(super) fn make_preset(name: &str) -> Policy {
       net_allow: vec!["*".into()],
       agent: false,
       mcp: false,
-      ai: true,
+      llm: true,
       embed: false,
       pane: false,
       max_time_ms: 0,
@@ -41,7 +41,7 @@ pub(super) fn make_preset(name: &str) -> Policy {
       net_allow: vec!["*".into()],
       agent: true,
       mcp: true,
-      ai: true,
+      llm: true,
       embed: true,
       pane: true,
       max_time_ms: 0,
@@ -87,8 +87,8 @@ pub(super) fn parse_policy(config: &IndexMap<crate::sym::Sym, LxVal>, span: Sour
   if let Some(LxVal::Bool(b)) = config.get(&crate::sym::intern("mcp")) {
     p.mcp = *b;
   }
-  if let Some(LxVal::Bool(b)) = config.get(&crate::sym::intern("ai")) {
-    p.ai = *b;
+  if let Some(LxVal::Bool(b)) = config.get(&crate::sym::intern("llm")) {
+    p.llm = *b;
   }
   if let Some(LxVal::Bool(b)) = config.get(&crate::sym::intern("embed")) {
     p.embed = *b;
@@ -115,7 +115,7 @@ pub(super) fn intersect_policies(policies: &[Policy]) -> Policy {
     result.net_allow = intersect_paths(&result.net_allow, &p.net_allow);
     result.agent = result.agent && p.agent;
     result.mcp = result.mcp && p.mcp;
-    result.ai = result.ai && p.ai;
+    result.llm = result.llm && p.llm;
     result.embed = result.embed && p.embed;
     result.pane = result.pane && p.pane;
     if p.max_time_ms > 0 && (result.max_time_ms == 0 || p.max_time_ms < result.max_time_ms) {
@@ -143,7 +143,7 @@ pub(super) fn policy_to_describe(p: &Policy) -> LxVal {
       "net" => to_list(&p.net_allow),
       "agent" => LxVal::Bool(p.agent),
       "mcp" => LxVal::Bool(p.mcp),
-      "ai" => LxVal::Bool(p.ai),
+      "llm" => LxVal::Bool(p.llm),
       "embed" => LxVal::Bool(p.embed),
       "pane" => LxVal::Bool(p.pane),
   }
@@ -154,7 +154,7 @@ pub(super) fn permits_check(p: &Policy, capability: &str, target: &str) -> bool 
     "fs_read" => path_matches(&p.fs_read, target),
     "fs_write" => path_matches(&p.fs_write, target),
     "net" => path_matches(&p.net_allow, target),
-    "ai" => p.ai,
+    "llm" => p.llm,
     "agent" => p.agent,
     "mcp" => p.mcp,
     "embed" => p.embed,

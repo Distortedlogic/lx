@@ -27,8 +27,8 @@ pub struct RuntimeCtx {
   pub yield_: Arc<dyn YieldBackend>,
   #[default(Arc::new(StderrLogBackend))]
   pub log: Arc<dyn LogBackend>,
-  #[default(Arc::new(NoopAiBackend))]
-  pub ai: Arc<dyn AiBackend>,
+  #[default(Arc::new(NoopLlmBackend))]
+  pub llm: Arc<dyn LlmBackend>,
   pub source_dir: parking_lot::Mutex<Option<PathBuf>>,
   pub workspace_members: HashMap<String, PathBuf>,
   pub dep_dirs: HashMap<String, PathBuf>,
@@ -70,16 +70,16 @@ pub trait LogBackend: Send + Sync {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct AiOpts {
+pub struct LlmOpts {
   pub prompt: String,
   pub tools: Vec<String>,
   pub max_turns: Option<u32>,
   pub json_schema: Option<String>,
 }
 
-pub trait AiBackend: Send + Sync {
+pub trait LlmBackend: Send + Sync {
   fn prompt(&self, text: &str, span: SourceSpan) -> Result<LxVal, LxError>;
-  fn prompt_with(&self, opts: &AiOpts, span: SourceSpan) -> Result<LxVal, LxError>;
+  fn prompt_with(&self, opts: &LlmOpts, span: SourceSpan) -> Result<LxVal, LxError>;
 }
 
 pub trait UserBackend: Send + Sync {

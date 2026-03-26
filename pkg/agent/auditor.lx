@@ -79,7 +79,7 @@ count_matches = (text phrases) {
     p.add_section "Rubric" (rubric | map (r) "- {r.name}: {r.description}" | join "\n")
     p.add_instruction `Score each rubric category 0-100. Return JSON with: score (int), passed (bool), feedback (str), categories (list of {name, score, feedback}).`
 
-    result = ai.prompt_with {
+    result = llm.prompt_with {
       prompt: p.render ()
       json_schema: `{"type":"object","properties":{"score":{"type":"integer"},"passed":{"type":"boolean"},"feedback":{"type":"string"},"categories":{"type":"array","items":{"type":"object","properties":{"name":{"type":"string"},"score":{"type":"integer"},"feedback":{"type":"string"}}}}}}`
     } ^

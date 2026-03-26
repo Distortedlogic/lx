@@ -1,5 +1,4 @@
 pub(crate) mod agent;
-pub(crate) mod ai;
 mod call;
 pub(crate) mod coll;
 mod coll_transform;
@@ -7,6 +6,7 @@ mod convert;
 mod hof;
 mod hof_extra;
 mod hof_parallel;
+pub(crate) mod llm;
 mod register;
 mod str;
 

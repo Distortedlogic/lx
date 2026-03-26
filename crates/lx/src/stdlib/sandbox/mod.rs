@@ -21,7 +21,7 @@ pub(super) struct Policy {
   pub net_allow: Vec<String>,
   pub agent: bool,
   pub mcp: bool,
-  pub ai: bool,
+  pub llm: bool,
   pub embed: bool,
   pub pane: bool,
   pub max_time_ms: u64,

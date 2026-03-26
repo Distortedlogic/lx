@@ -71,13 +71,13 @@
 
   ask = (fallback) {
     rendered = self.render ()
-    resp = ai.prompt rendered ?? prompt_text_record fallback
+    resp = llm.prompt rendered ?? prompt_text_record fallback
     resp.text
   }
 
   ask_with = (opts fallback) {
     rendered = self.render ()
-    resp = ai.prompt_with {..opts; prompt: rendered} ?? prompt_text_record fallback
+    resp = llm.prompt_with {..opts; prompt: rendered} ?? prompt_text_record fallback
     resp.text
   }
 }

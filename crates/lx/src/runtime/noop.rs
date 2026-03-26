@@ -2,7 +2,7 @@ use crate::error::LxError;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
-use super::{AiBackend, AiOpts, EmitBackend, LogBackend, LogLevel};
+use super::{EmitBackend, LlmBackend, LlmOpts, LogBackend, LogLevel};
 
 pub struct NoopEmitBackend;
 
@@ -18,14 +18,14 @@ impl LogBackend for NoopLogBackend {
   fn log(&self, _level: LogLevel, _msg: &str) {}
 }
 
-pub struct NoopAiBackend;
+pub struct NoopLlmBackend;
 
-impl AiBackend for NoopAiBackend {
+impl LlmBackend for NoopLlmBackend {
   fn prompt(&self, _text: &str, _span: SourceSpan) -> Result<LxVal, LxError> {
-    Ok(LxVal::err_str("ai backend not configured"))
+    Ok(LxVal::err_str("llm backend not configured"))
   }
 
-  fn prompt_with(&self, _opts: &AiOpts, _span: SourceSpan) -> Result<LxVal, LxError> {
-    Ok(LxVal::err_str("ai backend not configured"))
+  fn prompt_with(&self, _opts: &LlmOpts, _span: SourceSpan) -> Result<LxVal, LxError> {
+    Ok(LxVal::err_str("llm backend not configured"))
   }
 }

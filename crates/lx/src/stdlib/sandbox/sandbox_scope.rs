@@ -21,7 +21,7 @@ fn build_restricted_ctx(base: &Arc<RuntimeCtx>, policy: &Policy) -> Arc<RuntimeC
     http,
     yield_: base.yield_.clone(),
     log: base.log.clone(),
-    ai: base.ai.clone(),
+    llm: base.llm.clone(),
     source_dir: parking_lot::Mutex::new(base.source_dir.lock().clone()),
     workspace_members: base.workspace_members.clone(),
     dep_dirs: base.dep_dirs.clone(),

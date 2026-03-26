@@ -159,11 +159,11 @@ pub fn register(env: &Env) {
   agent_fields.insert(crate::sym::intern("implements"), mk("agent.implements", 2, bi_agent_implements));
   env.bind_str("agent", LxVal::record(agent_fields));
 
-  let mut ai_fields = IndexMap::new();
-  ai_fields.insert(crate::sym::intern("prompt"), mk("ai.prompt", 1, super::ai::bi_prompt));
-  ai_fields.insert(crate::sym::intern("prompt_with"), mk("ai.prompt_with", 1, super::ai::bi_prompt_with));
-  ai_fields.insert(crate::sym::intern("prompt_structured"), mk("ai.prompt_structured", 2, super::ai::bi_prompt_structured));
-  env.bind_str("ai", LxVal::record(ai_fields));
+  let mut llm_fields = IndexMap::new();
+  llm_fields.insert(crate::sym::intern("prompt"), mk("llm.prompt", 1, super::llm::bi_prompt));
+  llm_fields.insert(crate::sym::intern("prompt_with"), mk("llm.prompt_with", 1, super::llm::bi_prompt_with));
+  llm_fields.insert(crate::sym::intern("prompt_structured"), mk("llm.prompt_structured", 2, super::llm::bi_prompt_structured));
+  env.bind_str("llm", LxVal::record(llm_fields));
 
   let mut ctx_fields = IndexMap::new();
   ctx_fields.insert(crate::sym::intern("current"), mk("context.current", 1, bi_global_context_current));

@@ -37,7 +37,7 @@ Agent InnerCritic: Critic = {
     p.add_instruction "Find: 1) Factual errors 2) Logical gaps 3) Missing edge cases 4) Security risks"
     p.add_constraint "If the content is actually good, say so briefly. Don't manufacture issues."
 
-    resp = ai.prompt (p.render ()) ^
+    resp = llm.prompt (p.render ()) ^
     issues = resp.text | lines | filter (starts? "- ") | map (drop 2)
 
     flaws = issues | filter (contains? "error")
@@ -58,7 +58,7 @@ Agent InnerCritic: Critic = {
     p.add_section "Context" msg.context
     p.add_instruction "1) State the assumption. 2) Find counterexamples. 3) Where does it break?"
 
-    resp = ai.prompt (p.render ()) ^
+    resp = llm.prompt (p.render ()) ^
     counterexamples = resp.text | lines | filter (starts? "- ") | map (drop 2)
     {holds: counterexamples | empty?; counterexamples: counterexamples}
   }
@@ -78,7 +78,7 @@ check_correctness = (code: Str; task: Str) -> {ok: Bool; issues: [Str]} {
   p.add_section "Task" task
   p.add_instruction "Does this code correctly accomplish the task? List any bugs."
 
-  resp = ai.prompt (p.render ()) ^
+  resp = llm.prompt (p.render ()) ^
   bugs = resp.text | lines | filter (starts? "- ") | map (drop 2)
   {ok: bugs | empty?; issues: bugs}
 }
