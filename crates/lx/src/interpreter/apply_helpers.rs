@@ -58,6 +58,11 @@ impl Interpreter {
             let i = if i < 0 { items.len() as i64 + i } else { i } as usize;
             Ok(items.get(i).cloned().ok_or_else(|| LxError::runtime(format!("index {i} out of bounds (list length {})", items.len()), span))?)
           },
+          (LxVal::Tuple(items), LxVal::Int(n)) => {
+            let i = n.to_i64().ok_or_else(|| LxError::runtime(format!("index {n} too large for i64"), span))?;
+            let i = if i < 0 { items.len() as i64 + i } else { i } as usize;
+            Ok(items.get(i).cloned().ok_or_else(|| LxError::runtime(format!("index {i} out of bounds (tuple length {})", items.len()), span))?)
+          },
           _ => Err(LxError::type_err(format!("computed field access: unsupported types {} / {}", val.type_name(), key.type_name()), span, None).into()),
         }
       },
