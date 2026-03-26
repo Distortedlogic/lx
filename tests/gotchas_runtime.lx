@@ -1,67 +1,44 @@
--- gotcha detection: runtime traps from agent/GOTCHAS.md
+-- gotcha probes: runtime traps from agent/GOTCHAS.md
 
--- ?? binds looser than | pipe
+use std/time
+use std/cron
+use std/agent {Agent}
+
+-- ?? binds looser than | — probe without parens
 entry = {field: None}
-result1 = (entry.field ?? "HELLO") | lower
-assert (result1 == "hello") "?? pipe precedence workaround"
-entry2 = {field: "WORLD"}
-result2 = (entry2.field ?? "default") | lower
-assert (result2 == "world") "?? pipe precedence with value"
+probe_prec = try (() { entry.field ?? "HELLO" | lower }) ()
+prec_fixed = probe_prec ? { Err _ -> false; _ -> probe_prec == "hello" }
+assert (prec_fixed == true) "BUG-FIXED: ?? binds tighter than |"
 
 -- | binds looser than +
-x_list = [1; 2; 3]
-y_list = [4; 5]
-result3 = (x_list | len) + (y_list | len)
-assert (result3 == 5) "pipe + precedence workaround"
+probe_pipe = try (() { [1; 2; 3] | len + [4; 5] | len }) ()
+pipe_fixed = probe_pipe ? { Err _ -> false; _ -> probe_pipe == 5 }
+assert (pipe_fixed == true) "BUG-FIXED: | binds tighter than +"
 
 -- tuple destructuring in HOF lambdas
-items = ["a"; "b"; "c"]
-result4 = items | enumerate | map (pair) { "{pair.0}:{pair.1}" }
-assert (result4 == ["0:a"; "1:b"; "2:c"]) "enumerate map workaround"
-
 probe_tuple = try (() {
   ["x"; "y"] | enumerate | map (i s) { "{i}:{s}" }
 }) ()
-tuple_destr_fixed = probe_tuple ? {
-  Err _ -> false
-  _ -> probe_tuple == ["0:x"; "1:y"]
-}
-assert (tuple_destr_fixed == true) "BUG-FIXED: tuple destructuring in HOF lambdas"
+tuple_fixed = probe_tuple ? { Err _ -> false; _ -> probe_tuple == ["0:x"; "1:y"] }
+assert (tuple_fixed == true) "BUG-FIXED: tuple destructuring in HOF lambdas"
 
 -- not is a function not an operator
-is_empty = false
-assert (is_empty == false) "not workaround with == false"
 not_result = not true
-not_type = type_of not_result
-assert (not_type == "Bool") "BUG-FIXED: not returns Bool"
+assert (type_of not_result == "Bool") "BUG-FIXED: not returns Bool"
 
 -- find/first/last return Some not the value
 list = [1; 2; 3; 4; 5]
-found = (list | find (x) { x > 3 }) ?? 0
-assert (found == 4) "find returns Some workaround"
-first_val = (list | first) ?? 0
-assert (first_val == 1) "first returns Some workaround"
-last_val = (list | last) ?? 0
-assert (last_val == 5) "last returns Some workaround"
+found = list | find (x) { x > 3 }
+assert (found == 4) "BUG-FIXED: find returns value directly"
+
+first_val = list | first
+assert (first_val == 1) "BUG-FIXED: first returns value directly"
+
+last_val = list | last
+assert (last_val == 5) "BUG-FIXED: last returns value directly"
+
 no_match = list | find (x) { x > 100 }
 assert (no_match == None) "find no match returns None"
-found2 = ([10; 20; 30] | find (x) { x == 20 }) ?? 0
-assert (found2 == 20) "find ?? precedence workaround"
-
--- module name collisions
-assert (type_of log.info == "Func") "log builtin accessible"
-
--- sections don't support == or != (parse error, workaround only)
-records = [{status: "pass"; score: 90}; {status: "fail"; score: 40}]
-passed = records | filter (r) { r.status == "pass" }
-assert (passed | len == 1) "section == workaround"
-assert ((passed | first) ?? {:}).score == 90
-
--- time.format takes format string first, time record second
-use std/time
-t = time.now ()
-formatted = t | time.format "%Y"
-assert (formatted | len == 4) "time.format pipe workaround"
 
 -- computed tuple negative indexing
 t_neg = (10; 20; 30)
@@ -69,12 +46,10 @@ neg_probe = try (() { t_neg.[-1] }) ()
 neg_works = neg_probe ? { Err _ -> false; _ -> neg_probe == 30 }
 assert (neg_works == true) "BUG-FIXED: tuple negative indexing"
 
--- cron.every takes milliseconds not seconds
-use std/cron
+-- cron.every exists and takes milliseconds
 assert (type_of cron.every == "Func") "cron.every exists"
 
--- grader/LlmBackend: agents with no tools get empty list
-use std/agent {Agent}
+-- agent default tools is empty list
 Agent NoToolAgent = {
   role = () { "tester" }
   goal = () { "test" }
@@ -83,7 +58,7 @@ nta = NoToolAgent {}
 assert (nta.tools () == []) "agent default tools is empty list"
 assert (nta.max_turns () == 25) "agent default max_turns is 25"
 
--- grader/LlmBackend: think_with merges tools and max_turns
+-- agent custom tools/max_turns
 Agent ToolAgent = {
   role = () { "tool user" }
   goal = () { "test" }

@@ -1,12 +1,11 @@
 # Goal
 
-Improve the reliability of what comes back from LLM calls and agent communication through three independent changes: add a ToolSearch tool that indexes available tools and returns matches on demand (avoiding the 75k token cost of eager tool loading), improve `llm.prompt_structured` to use SAP-style edit-distance recovery before falling back to retry (recovering malformed JSON in under 10ms instead of re-prompting), and extend the type checker to verify that `~>?` ask messages conform to the target agent's declared input type.
+Improve the reliability of what comes back from LLM calls through two changes: add a ToolSearch tool that indexes available tools and returns matches on demand (avoiding the 75k token cost of eager tool loading), and fix `llm.prompt_structured` to actually parse structured output as JSON with SAP-style edit-distance recovery (recovering malformed JSON in microseconds instead of re-prompting). Currently `llm.prompt_structured` ignores the `json_schema` field entirely — the `ClaudeCodeLlmBackend` never passes it to the claude CLI or to its response parser.
 
 # Why
 
 - The MCP token cost problem is real: 10 MCP servers x 15 tools x 500 tokens = 75,000 tokens of tool definitions before any user input. Cursor enforces a hard limit of 40 tools due to output degradation. Claude Code's tool search achieves 85% token reduction. A ToolSearch tool that indexes descriptions and returns matches on demand is the standard pattern — it is just a Tool, not a runtime feature.
 - BAML's Schema-Aligned Parsing benchmarks show 92-94% structured output accuracy vs 57-87% for native function calling. SAP applies edit-distance recovery (strip markdown fences, fix trailing commas, coerce types, find JSON in chain-of-thought text) in under 10ms. Every `llm.prompt_structured` call benefits. The research consistently shows structured output reliability is a multiplier on agent success.
-- Agents communicate via `~>?` ask with record messages, but the type checker does not verify message shapes against the target agent's declared `handle` signature or trait input type. DSPy and BAML both emphasize compile-time type safety for LLM I/O as a differentiator. Catching message type mismatches before runtime prevents a class of agent communication bugs.
 
 # What Changes
 

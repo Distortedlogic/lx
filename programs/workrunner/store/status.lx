@@ -20,10 +20,7 @@ use std/fs
 
   is_completed = (path) {
     entry = self.entries.get path
-    entry ? {
-      None -> false
-      Some e -> e.status == "pass"
-    }
+    entry == None ? false : entry.status == "pass"
   }
 
   completed_count = () {
