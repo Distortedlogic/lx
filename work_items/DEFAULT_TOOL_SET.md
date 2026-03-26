@@ -9,35 +9,21 @@ An agent running an lx program needs basic capabilities without the user install
 # Depends On
 
 - `TOOL_TRAIT_UNIFICATION.md` — the merged Tool trait must exist first
+- `KEYWORD_DESUGAR_4_MCP_CLI.md` — the CLI keyword desugarer must work (generates the subprocess `run` method for CLI-backed tools)
 
 # Default Tools
 
-All defined as lx files in `crates/lx/std/tools/` using the `Tool` keyword. Each has a fixed `run` implementation — no "TBD" backings.
+All defined as lx files in `crates/lx/std/tools/`. No new Rust builtins — tools use the existing extension mechanisms (CLI keyword desugaring provides subprocess execution via the already-implemented `std::process::Command` code in `desugar_mcp_cli.rs`, `std/fs` provides file I/O).
 
 ### Bash
-CLI-backed. `run` calls `std::process::Command` with `bash -c`.
+CLI-backed via the `CLI` keyword. The desugarer auto-generates `run` that calls `std::process::Command`.
 
 ```lx
-Tool Bash = {
+CLI Bash = {
+  command: "bash"
   name: "bash"
   description: "Execute shell commands"
   params: {command: Str}
-  run = (args) { bash_exec (args.command) }
-}
-```
-
-`bash_exec` is a new Rust builtin in `stdlib/tools/cli.rs`:
-```rust
-fn bi_bash_exec(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-    let cmd = args[0].require_str("bash_exec", span)?;
-    let output = std::process::Command::new("bash")
-        .arg("-c").arg(cmd).output()
-        .map_err(|e| LxError::runtime(format!("bash: {e}"), span))?;
-    Ok(LxVal::ok(LxVal::record(indexmap! {
-        sym!("stdout") => LxVal::str(String::from_utf8_lossy(&output.stdout)),
-        sym!("stderr") => LxVal::str(String::from_utf8_lossy(&output.stderr)),
-        sym!("code") => LxVal::int(output.status.code().unwrap_or(-1)),
-    })))
 }
 ```
 
@@ -98,7 +84,7 @@ Tool Edit = {
 ```
 
 ### Glob
-CLI-backed via `find`. Returns list of matching paths.
+Uses Bash tool to call `find`. Pure lx composition.
 
 ```lx
 Tool Glob = {
@@ -106,8 +92,8 @@ Tool Glob = {
   description: "Find files matching a pattern"
   params: {pattern: Str  path: Str = "."}
   run = (args) {
-    result = bash_exec "find {args.path} -name '{args.pattern}' -type f 2>/dev/null"
-    result ^ ? {
+    result = Bash.run {command: "find {args.path} -name '{args.pattern}' -type f 2>/dev/null"} ^
+    result ? {
       Ok r -> Ok (r.stdout | trim | split "\n" | filter (s) { (s | len) > 0 })
       Err e -> Err e
     }
@@ -116,7 +102,7 @@ Tool Glob = {
 ```
 
 ### Grep
-CLI-backed via `grep -rn`. Returns matching lines with file paths.
+Uses Bash tool to call `grep -rn`. Pure lx composition.
 
 ```lx
 Tool Grep = {
@@ -124,8 +110,8 @@ Tool Grep = {
   description: "Search file contents for a pattern"
   params: {pattern: Str  path: Str = "."}
   run = (args) {
-    result = bash_exec "grep -rn '{args.pattern}' {args.path} 2>/dev/null"
-    result ^ ? {
+    result = Bash.run {command: "grep -rn '{args.pattern}' {args.path} 2>/dev/null"} ^
+    result ? {
       Ok r -> r.code == 0 ? (Ok r.stdout) : (Ok "")
       Err e -> Err e
     }
@@ -133,10 +119,10 @@ Tool Grep = {
 }
 ```
 
-Note: `grep` returns exit code 1 for no matches — this is handled as `Ok ""`, not an error.
+Note: `grep` returns exit code 1 for no matches — handled as `Ok ""`, not an error.
 
 ### WebSearch
-CLI-backed. Calls a search tool. Initial implementation uses `curl` + DuckDuckGo lite HTML endpoint, parses results. This is functional but basic — can be upgraded later to a proper search API or MCP server.
+Uses Bash tool to call `curl` + DuckDuckGo lite. Pure lx composition. Returns raw HTML — parsing into structured results is a future WASM plugin.
 
 ```lx
 Tool WebSearch = {
@@ -145,8 +131,8 @@ Tool WebSearch = {
   params: {query: Str}
   run = (args) {
     encoded = args.query | replace " " "+"
-    result = bash_exec "curl -sL 'https://lite.duckduckgo.com/lite?q={encoded}'"
-    result ^ ? {
+    result = Bash.run {command: "curl -sL 'https://lite.duckduckgo.com/lite?q={encoded}'"} ^
+    result ? {
       Ok r -> Ok r.stdout
       Err e -> Err e
     }
@@ -155,7 +141,7 @@ Tool WebSearch = {
 ```
 
 ### WebFetch
-CLI-backed. Fetches URL and returns content. Uses `curl` for the fetch. Markdown conversion is not included in v1 — returns raw HTML. Markdown conversion can be added as a WASM plugin (`html_to_md`) or upgraded to use a readability tool later.
+Uses Bash tool to call `curl`. Pure lx composition. Returns raw HTML — markdown conversion is a future WASM plugin.
 
 ```lx
 Tool WebFetch = {
@@ -163,8 +149,8 @@ Tool WebFetch = {
   description: "Fetch a URL and return its content"
   params: {url: Str}
   run = (args) {
-    result = bash_exec "curl -sL '{args.url}'"
-    result ^ ? {
+    result = Bash.run {command: "curl -sL '{args.url}'"} ^
+    result ? {
       Ok r -> r.code == 0 ? (Ok r.stdout) : (Err "fetch failed: HTTP error")
       Err e -> Err e
     }
@@ -182,33 +168,25 @@ In `crates/lx/src/interpreter/mod.rs`, after `builtins::register(&env)`:
 
 When an agent declares `uses Bash`, the `uses` wiring (from AGENT_USES_WIRING work item) resolves `Bash` from the environment.
 
-# New Rust Builtins
-
-One new builtin needed: `bash_exec` — registered globally in `builtins/register.rs`. This is the backing function for CLI tools. It takes a command string and returns `Ok {stdout, stderr, code}`.
-
-No other Rust builtins needed — Read, Write, Edit, Glob, Grep, WebSearch, WebFetch are all pure lx wrapping either `bash_exec` or `std/fs`.
-
 # Gotchas
 
-- **`bash_exec` vs existing `$^` syntax:** `bash_exec` returns `Ok {stdout, stderr, code}` always. `$^` throws uncatchable `LxError`. They coexist until `$^` is removed (Phase 3 of EXTENSIONS.md migration).
 - **Glob uses `find`:** On macOS, `find` has different flag semantics than GNU find. The `-name` + `-type f` flags are POSIX-compatible and work on both.
-- **Grep exit code 1:** `grep` returns 1 for "no matches" — this is normal, not an error. The tool handles this by checking `.code`.
-- **WebSearch returns raw HTML:** Parsing search results into structured data is left for a future WASM plugin or MCP tool. The v1 is functional but crude.
-- **WebFetch returns raw HTML:** Same — markdown conversion is a future enhancement. Raw content is still useful for agents.
-- **String interpolation in `bash_exec` calls:** Commands built with string interpolation (`"find {args.path}"`) are vulnerable to injection if args contain shell metacharacters. For v1 this matches how `$^` works today. Proper escaping is a future enhancement (tracked in STD_SANDBOX.md).
+- **Grep exit code 1:** `grep` returns 1 for "no matches" — normal, not an error. The tool handles this by checking `.code`.
+- **WebSearch returns raw HTML:** Parsing search results into structured data is left for a future WASM plugin. The v1 is functional but crude.
+- **WebFetch returns raw HTML:** Same — markdown conversion is a future WASM plugin.
+- **Shell injection:** Commands built with string interpolation (`"find {args.path}"`) are vulnerable to injection if args contain shell metacharacters. Proper escaping is tracked in STD_SANDBOX.md.
+- **Bash tool must be loaded before Glob/Grep/WebSearch/WebFetch:** These tools call `Bash.run` — Bash must be in scope. Load order in registration matters.
+- **CLI keyword desugarer generates `call` not `run`:** The current desugarer in `desugar_mcp_cli.rs` generates `connect`/`disconnect`/`call`/`tools` methods for the Connector trait. After TOOL_TRAIT_UNIFICATION, it generates `run`. This work item depends on that change being done first.
 
 # Task List
 
-### Task 1: Add `bash_exec` builtin
-Create `crates/lx/src/stdlib/tools/cli.rs` with `bi_bash_exec`. Register in `builtins/register.rs` as `bash_exec`. Add `pub mod tools;` to `stdlib/mod.rs` with `pub mod cli;` inside.
-
-### Task 2: Create tool definition files
+### Task 1: Create tool definition files
 Create `crates/lx/std/tools/bash.lx`, `read.lx`, `write.lx`, `edit.lx`, `glob.lx`, `grep.lx`, `web_search.lx`, `web_fetch.lx` with the exact definitions above.
 
-### Task 3: Register default tools in interpreter
-Update `lx_std_module_source()` to serve `tools/*` files. Update interpreter initialization to bind default tool names in the global environment.
+### Task 2: Register default tools in interpreter
+Update `lx_std_module_source()` to serve `tools/*` files. Update interpreter initialization to load and bind default tool names in the global environment. Ensure Bash loads first (Glob/Grep/WebSearch/WebFetch depend on it).
 
-### Task 4: Write tests
+### Task 3: Write tests
 Create `tests/default_tools.lx`. Test Bash (echo), Read/Write (create temp file, read it back), Edit (replace string), Glob (find test files), Grep (search for known pattern). WebSearch and WebFetch are not tested in CI (require network) — test manually.
 
 ---
