@@ -24,7 +24,7 @@ pub async fn transcribe(pcm: &[u8]) -> anyhow::Result<String> {
 pub fn match_trigger(text: &str, triggers: &[String]) -> Option<String> {
   let text_words: Vec<&str> = text.split_whitespace().collect();
   let mut sorted: Vec<&String> = triggers.iter().collect();
-  sorted.sort_by(|a, b| b.len().cmp(&a.len()));
+  sorted.sort_by_key(|b| std::cmp::Reverse(b.len()));
   for trigger in sorted {
     let trigger_words: Vec<&str> = trigger.split_whitespace().collect();
     let n = trigger_words.len();

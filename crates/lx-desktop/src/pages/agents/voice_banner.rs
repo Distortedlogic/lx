@@ -134,77 +134,82 @@ pub fn VoiceBanner() -> Element {
   let always_listen = (ctx.always_listen)();
 
   rsx! {
-      div { class: "flex flex-col h-full",
-          div { class: "bg-[var(--surface-container)] px-4 py-2 flex items-center gap-3 shrink-0 {bar_glow}",
-              span { class: "text-[var(--primary)] text-sm", "{icon}" }
-              span { class: "text-sm font-semibold uppercase tracking-wider text-[var(--on-surface)]",
-                  "{status_text}"
-              }
-              if is_active {
-                  div { class: "flex items-end gap-[2px] h-4 ml-1",
-                      span {
-                          class: "w-1 bg-[var(--primary)] rounded-sm transition-all duration-75",
-                          style: "height: {(volume * 40.0).max(2.0)}%;",
-                      }
-                      span {
-                          class: "w-1 bg-[var(--primary)] rounded-sm transition-all duration-75",
-                          style: "height: {(volume * 70.0).max(2.0)}%;",
-                      }
-                      span {
-                          class: "w-1 bg-[var(--primary)] rounded-sm transition-all duration-75",
-                          style: "height: {(volume * 100.0).max(2.0)}%;",
-                      }
-                      span {
-                          class: "w-1 bg-[var(--primary)] rounded-sm transition-all duration-75",
-                          style: "height: {(volume * 60.0).max(2.0)}%;",
-                      }
-                  }
-                  span { class: "text-[10px] text-[var(--outline)] uppercase tracking-wider",
-                      "{stage}"
-                  }
-                  span { class: "text-[10px] text-[var(--outline)] uppercase tracking-wider",
-                      "TURNS: {turn_count}"
-                  }
-              }
-              div { class: "flex-1" }
-              button {
-                  class: "border border-[var(--outline-variant)] text-[var(--on-surface-variant)] rounded px-3 py-1.5 text-xs uppercase hover:bg-[var(--surface-container-high)] transition-colors duration-150 font-semibold",
-                  onclick: move |_| {
-                      if always_listen {
-                          ctx.always_listen.set(false);
-                          voice_widget.send_update(serde_json::json!({ "type": "stop_capture" }));
-                      } else {
-                          ctx.always_listen.set(true);
-                          voice_widget.send_update(serde_json::json!({ "type": "start_standby_listen" }));
-                      }
-                  },
-                  if always_listen { "ALWAYS LISTEN: ON" } else { "ALWAYS LISTEN: OFF" }
-              }
-              if is_active {
-                  button {
-                      class: "border border-[var(--outline)] text-[var(--on-surface)] rounded px-4 py-1.5 text-sm uppercase hover:bg-[var(--surface-container-high)] transition-colors duration-150 font-semibold",
-                      onclick: move |_| {
-                          ctx.always_listen.set(false);
-                          voice_widget.send_update(serde_json::json!({ "type": "stop_capture" }));
-                      },
-                      "STOP"
-                  }
+    div { class: "flex flex-col h-full",
+      div { class: "bg-[var(--surface-container)] px-4 py-2 flex items-center gap-3 shrink-0 {bar_glow}",
+        span { class: "text-[var(--primary)] text-sm", "{icon}" }
+        span { class: "text-sm font-semibold uppercase tracking-wider text-[var(--on-surface)]",
+          "{status_text}"
+        }
+        if is_active {
+          div { class: "flex items-end gap-[2px] h-4 ml-1",
+            span {
+              class: "w-1 bg-[var(--primary)] rounded-sm transition-all duration-75",
+              style: "height: {(volume * 40.0).max(2.0)}%;",
+            }
+            span {
+              class: "w-1 bg-[var(--primary)] rounded-sm transition-all duration-75",
+              style: "height: {(volume * 70.0).max(2.0)}%;",
+            }
+            span {
+              class: "w-1 bg-[var(--primary)] rounded-sm transition-all duration-75",
+              style: "height: {(volume * 100.0).max(2.0)}%;",
+            }
+            span {
+              class: "w-1 bg-[var(--primary)] rounded-sm transition-all duration-75",
+              style: "height: {(volume * 60.0).max(2.0)}%;",
+            }
+          }
+          span { class: "text-[10px] text-[var(--outline)] uppercase tracking-wider",
+            "{stage}"
+          }
+          span { class: "text-[10px] text-[var(--outline)] uppercase tracking-wider",
+            "TURNS: {turn_count}"
+          }
+        }
+        div { class: "flex-1" }
+        button {
+          class: "border border-[var(--outline-variant)] text-[var(--on-surface-variant)] rounded px-3 py-1.5 text-xs uppercase hover:bg-[var(--surface-container-high)] transition-colors duration-150 font-semibold",
+          onclick: move |_| {
+              if always_listen {
+                  ctx.always_listen.set(false);
+                  voice_widget.send_update(serde_json::json!({ "type" : "stop_capture" }));
               } else {
-                  button {
-                      class: "border border-[var(--primary)] text-[var(--primary)] rounded px-4 py-1.5 text-sm uppercase hover:bg-[var(--primary)]/10 transition-colors duration-150 font-semibold",
-                      onclick: move |_| {
-                          voice_widget.send_update(serde_json::json!({ "type": "start_capture" }));
-                      },
-                      "PUSH TO TALK"
-                  }
+                  ctx.always_listen.set(true);
+                  voice_widget
+                      .send_update(serde_json::json!({ "type" : "start_standby_listen" }));
               }
+          },
+          if always_listen {
+            "ALWAYS LISTEN: ON"
+          } else {
+            "ALWAYS LISTEN: OFF"
           }
-          div {
-              id: "{agent_element_id}",
-              class: "flex-1 min-h-0 overflow-hidden",
+        }
+        if is_active {
+          button {
+            class: "border border-[var(--outline)] text-[var(--on-surface)] rounded px-4 py-1.5 text-sm uppercase hover:bg-[var(--surface-container-high)] transition-colors duration-150 font-semibold",
+            onclick: move |_| {
+                ctx.always_listen.set(false);
+                voice_widget.send_update(serde_json::json!({ "type" : "stop_capture" }));
+            },
+            "STOP"
           }
-          div { id: "{voice_element_id}", class: "hidden" }
+        } else {
+          button {
+            class: "border border-[var(--primary)] text-[var(--primary)] rounded px-4 py-1.5 text-sm uppercase hover:bg-[var(--primary)]/10 transition-colors duration-150 font-semibold",
+            onclick: move |_| {
+                voice_widget.send_update(serde_json::json!({ "type" : "start_capture" }));
+            },
+            "PUSH TO TALK"
+          }
+        }
       }
+      div {
+        id: "{agent_element_id}",
+        class: "flex-1 min-h-0 overflow-hidden",
+      }
+      div { id: "{voice_element_id}", class: "hidden" }
+    }
   }
 }
 
