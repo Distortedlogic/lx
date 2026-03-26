@@ -80,6 +80,7 @@ impl<'src> Lexer<'src> {
         if matches!(raw, RawToken::RBrace) {
           brace_depth -= 1;
           if brace_depth == 0 {
+            self.push(TokenKind::RBrace, start, end);
             return Ok(());
           }
         }
