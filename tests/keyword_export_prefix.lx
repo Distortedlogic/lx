@@ -1,0 +1,7 @@
++Schema BeforeKeyword = { x: Int = "test" }
+Schema +AfterKeyword = { y: Int = "test" }
+
+a = BeforeKeyword {x: 1}
+b = AfterKeyword {y: 2}
+assert (a.x == 1)
+assert (b.y == 2)

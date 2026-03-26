@@ -1,0 +1,11 @@
+use std/fs
+
+fs.mkdir "/tmp/lx_test_rm" ^
+fs.write "/tmp/lx_test_rm/file.txt" "hello" ^
+assert (fs.exists "/tmp/lx_test_rm/file.txt")
+
+fs.rm "/tmp/lx_test_rm/file.txt" ^
+assert (not (fs.exists "/tmp/lx_test_rm/file.txt"))
+
+fs.rmdir "/tmp/lx_test_rm" ^
+assert (not (fs.exists "/tmp/lx_test_rm"))

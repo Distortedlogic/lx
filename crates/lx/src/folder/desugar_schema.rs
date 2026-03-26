@@ -1,13 +1,44 @@
 use miette::SourceSpan;
 
 use crate::ast::{
-  AgentMethod, AstArena, BinOp, BindTarget, Binding, Expr, ExprApply, ExprBinary, ExprBlock, ExprFunc, ExprId, KeywordDeclData, ListElem, Literal, Param,
-  RecordField, Stmt, StmtId, StrPart, TraitDeclData, TraitEntry, UseKind, UseStmt,
+  AgentMethod, AstArena, BinOp, BindTarget, Binding, Expr, ExprApply, ExprBinary, ExprBlock, ExprFunc, ExprId, ExprUnary, KeywordDeclData, ListElem, Literal,
+  Param, RecordField, Stmt, StmtId, StrPart, TraitDeclData, TraitEntry, UnaryOp, UseKind, UseStmt,
 };
 use crate::sym::intern;
 
 fn gen_str(s: &str, span: SourceSpan, arena: &mut AstArena) -> ExprId {
   arena.alloc_expr(Expr::Literal(Literal::Str(vec![StrPart::Text(s.to_string())])), span)
+}
+
+fn stringify_expr(id: ExprId, arena: &AstArena) -> String {
+  match arena.expr(id) {
+    Expr::Ident(sym) => sym.as_str().to_string(),
+    Expr::Literal(lit) => match lit {
+      Literal::Int(n) => n.to_string(),
+      Literal::Float(f) => f.to_string(),
+      Literal::Str(parts) => {
+        let text: String = parts
+          .iter()
+          .map(|p| match p {
+            StrPart::Text(t) => t.clone(),
+            StrPart::Expr(_) => "...".to_string(),
+          })
+          .collect();
+        format!("\"{text}\"")
+      },
+      Literal::Bool(b) => b.to_string(),
+    },
+    Expr::Binary(ExprBinary { op, left, right }) => {
+      format!("{} {op} {}", stringify_expr(*left, arena), stringify_expr(*right, arena))
+    },
+    Expr::Unary(ExprUnary { op, operand }) => {
+      format!("{op}{}", stringify_expr(*operand, arena))
+    },
+    Expr::Apply(ExprApply { func, arg }) => {
+      format!("{} {}", stringify_expr(*func, arena), stringify_expr(*arg, arena))
+    },
+    _ => "<constraint>".to_string(),
+  }
 }
 
 fn lx_type_to_json_type(type_name: &str) -> &'static str {
@@ -66,6 +97,10 @@ fn build_schema_method(entries: &[TraitEntry], span: SourceSpan, arena: &mut Ast
       {
         let desc_text = desc_text.clone();
         prop_fields.push(RecordField::Named { name: intern("description"), value: gen_str(&desc_text, span, arena) });
+      }
+      if let Some(constraint_id) = f.constraint {
+        let constraint_str = stringify_expr(constraint_id, arena);
+        prop_fields.push(RecordField::Named { name: intern("constraint"), value: gen_str(&constraint_str, span, arena) });
       }
       let prop_record = arena.alloc_expr(Expr::Record(prop_fields), span);
       Some(RecordField::Named { name: f.name, value: prop_record })

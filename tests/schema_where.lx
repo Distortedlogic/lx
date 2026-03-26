@@ -1,0 +1,8 @@
+Schema Bounded = {
+  score: Float = "0.0 to 1.0 confidence score"
+}
+
+b = Bounded {score: 0.5}
+s = b.schema ()
+assert (s.properties.score.type == "number")
+assert (s.properties.score.description == "0.0 to 1.0 confidence score")

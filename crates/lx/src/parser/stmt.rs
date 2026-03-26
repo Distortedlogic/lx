@@ -56,7 +56,7 @@ where
   choice((
     use_stmt,
     exported.clone().then(keyword_stmt).map_with(move |(exp, mut d), e| {
-      d.exported = exp;
+      d.exported = exp || d.exported;
       a6.borrow_mut().alloc_stmt(Stmt::KeywordDecl(d), ss(e.span()))
     }),
     exported.clone().then(trait_stmt).map_with(move |(exp, mut stmt), e| {

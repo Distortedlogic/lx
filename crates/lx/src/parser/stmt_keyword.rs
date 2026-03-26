@@ -37,23 +37,25 @@ where
   ));
 
   let schema_branch = schema_kw
+    .then(just(TokenKind::Export).or_not())
     .then(type_name())
     .then_ignore(just(TokenKind::Assign))
     .then_ignore(just(TokenKind::LBrace))
     .then(trait_body(expr.clone()))
     .then_ignore(just(TokenKind::RBrace))
-    .map(|((kw, name), (entries, defaults))| (kw, name, KeywordBody::Trait(entries, defaults)));
+    .map(|(((kw, inner_export), name), (entries, defaults))| (kw, inner_export.is_some(), name, KeywordBody::Trait(entries, defaults)));
 
   let other_branch = other_kw
+    .then(just(TokenKind::Export).or_not())
     .then(type_name())
     .then_ignore(just(TokenKind::Assign))
     .then(class_body(expr))
-    .map(|((kw, name), (fields, methods))| (kw, name, KeywordBody::Class(fields, methods)));
+    .map(|(((kw, inner_export), name), (fields, methods))| (kw, inner_export.is_some(), name, KeywordBody::Class(fields, methods)));
 
-  choice((schema_branch, other_branch)).map(|(kw, name, body)| match body {
-    KeywordBody::Class(fields, methods) => KeywordDeclData { keyword: kw, name, type_params: vec![], fields, methods, trait_entries: None, exported: false },
+  choice((schema_branch, other_branch)).map(|(kw, exported, name, body)| match body {
+    KeywordBody::Class(fields, methods) => KeywordDeclData { keyword: kw, name, type_params: vec![], fields, methods, trait_entries: None, exported },
     KeywordBody::Trait(entries, defaults) => {
-      KeywordDeclData { keyword: kw, name, type_params: vec![], fields: vec![], methods: defaults, trait_entries: Some(entries), exported: false }
+      KeywordDeclData { keyword: kw, name, type_params: vec![], fields: vec![], methods: defaults, trait_entries: Some(entries), exported }
     },
   })
 }

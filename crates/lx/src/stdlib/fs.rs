@@ -17,6 +17,8 @@ pub fn build() -> IndexMap<crate::sym::Sym, LxVal> {
     "append" => "fs.append", 2, bi_append;
     "exists" => "fs.exists", 1, bi_exists;
     "remove" => "fs.remove", 1, bi_remove;
+    "rm"     => "fs.rm",     1, bi_rm;
+    "rmdir"  => "fs.rmdir",  1, bi_rmdir;
     "mkdir"  => "fs.mkdir",  1, bi_mkdir;
     "ls"     => "fs.ls",     1, bi_ls;
     "stat"   => "fs.stat",   1, bi_stat
@@ -52,6 +54,24 @@ fn bi_remove(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result
   let path = std::path::Path::new(path_str);
   let result = if path.is_dir() { std::fs::remove_dir_all(path) } else { std::fs::remove_file(path) };
   Ok(wrap_io(result.map(|()| LxVal::Unit)))
+}
+
+fn bi_rm(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+  let path_str = args[0].require_str("fs.rm", span)?;
+  let path = std::path::Path::new(path_str);
+  if !path.exists() {
+    return Ok(LxVal::ok(LxVal::Unit));
+  }
+  Ok(wrap_io(std::fs::remove_file(path).map(|()| LxVal::Unit)))
+}
+
+fn bi_rmdir(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+  let path_str = args[0].require_str("fs.rmdir", span)?;
+  let path = std::path::Path::new(path_str);
+  if !path.exists() {
+    return Ok(LxVal::ok(LxVal::Unit));
+  }
+  Ok(wrap_io(std::fs::remove_dir_all(path).map(|()| LxVal::Unit)))
 }
 
 fn bi_mkdir(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
