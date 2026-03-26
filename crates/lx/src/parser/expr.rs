@@ -14,6 +14,26 @@ where
   select! { TokenKind::Ident(n) => n }
 }
 
+pub(super) fn ident_or_keyword<'a, I>() -> impl Parser<'a, I, Sym, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
+where
+  I: ValueInput<'a, Token = TokenKind, Span = Span>,
+{
+  select! {
+      TokenKind::Ident(n) => n,
+      TokenKind::Use => intern("use"),
+      TokenKind::Loop => intern("loop"),
+      TokenKind::Break => intern("break"),
+      TokenKind::Par => intern("par"),
+      TokenKind::Sel => intern("sel"),
+      TokenKind::Assert => intern("assert"),
+      TokenKind::Emit => intern("emit"),
+      TokenKind::Yield => intern("yield"),
+      TokenKind::With => intern("with"),
+      TokenKind::Timeout => intern("timeout"),
+      TokenKind::As => intern("as"),
+  }
+}
+
 fn keyword_as_type_name<'a, I>() -> impl Parser<'a, I, Sym, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
 where
   I: ValueInput<'a, Token = TokenKind, Span = Span>,
