@@ -2,7 +2,7 @@ use chumsky::input::ValueInput;
 use chumsky::pratt::{Operator, infix, left, postfix, prefix};
 use chumsky::prelude::*;
 
-use super::expr::{ident, semi_sep, skip_semis, type_name};
+use super::expr::{semi_sep, skip_semis, type_name};
 use super::{ArenaRef, ExprId, Span, ss};
 use crate::ast::{
   BinOp, Expr, ExprApply, ExprBinary, ExprCoalesce, ExprFieldAccess, ExprMatch, ExprPipe, ExprPropagate, ExprTernary, ExprUnary, FieldKind, Literal, MatchArm,
@@ -65,7 +65,7 @@ fn dot_rhs<'a, I>(
 where
   I: ValueInput<'a, Token = TokenKind, Span = Span>,
 {
-  let named = ident().map(FieldKind::Named);
+  let named = super::expr::ident_or_keyword().map(FieldKind::Named);
   let type_field = type_name().map(FieldKind::Named);
   let indexed = select! { TokenKind::Int(n) => n }.map(|n| {
     let idx: i64 = n.try_into().unwrap_or(0);

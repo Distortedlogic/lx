@@ -87,10 +87,7 @@ fn use_parser<'a, I>(arena: ArenaRef) -> impl Parser<'a, I, StmtId, extra::Err<R
 where
   I: ValueInput<'a, Token = TokenKind, Span = Span>,
 {
-  let path_seg = select! {
-      TokenKind::Ident(n) => n,
-      TokenKind::Yield => intern("yield"),
-  };
+  let path_seg = super::expr::ident_or_keyword();
 
   let dotdot_prefix = just(TokenKind::DotDot).then_ignore(just(TokenKind::Slash)).to(intern(".."));
   let dot_prefix = just(TokenKind::Dot).then_ignore(just(TokenKind::Slash)).to(intern("."));

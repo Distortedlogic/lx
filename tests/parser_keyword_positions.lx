@@ -1,0 +1,14 @@
+-- keyword positions: record fields, dot-access, use paths
+
+r = {par: 1; sel: 2; loop: 3; emit: 4}
+assert r.par == 1
+assert r.sel == 2
+assert r.loop == 3
+assert r.emit == 4
+
+data = {yield: "hello"}
+assert data.yield == "hello"
+
+normal = {name: "test"; count: 5}
+assert normal.name == "test"
+assert normal.count == 5
