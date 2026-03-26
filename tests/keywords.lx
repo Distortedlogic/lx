@@ -193,7 +193,10 @@ status.entries.set "task2" {status: "fail", score: 60}
 assert (status.len () == 2)
 assert (status.values () | filter (r) { r.status == "pass" } | len == 1)
 
-Guard WorkGuard = { max_turns: 50, max_time_ms: 600000 }
+Guard WorkGuard = {
+  max_turns: 50
+  max_time_ms: 600000
+}
 wg = WorkGuard {}
 wg.tick ()
 assert (wg.check () | ok?)

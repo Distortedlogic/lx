@@ -1,0 +1,27 @@
+r1 = {a: 1, b: 2}
+assert (r1.a == 1)
+assert (r1.b == 2)
+
+r2 = {a: "hello", b: 42, c: true}
+assert (r2.a == "hello")
+assert (r2.b == 42)
+assert (r2.c == true)
+
+l1 = [1, 2, 3]
+assert (l1 | len == 3)
+assert (l1.0 == 1)
+assert (l1.1 == 2)
+assert (l1.2 == 3)
+
+t1 = (1, 2, 3)
+assert (t1.0 == 1)
+assert (t1.1 == 2)
+assert (t1.2 == 3)
+
+m1 = %{"a": 1, "b": 2}
+assert (m1 | len == 2)
+
+r3 = {a: Str, b: Int, c: Bool}
+assert (r3.a == Str)
+assert (r3.b == Int)
+assert (r3.c == Bool)
