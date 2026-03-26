@@ -36841,8 +36841,8 @@ var WidgetBridge = (function(exports) {
 					state.pendingText += msg.text ?? "";
 					if (!state.typeTimer) state.typeTimer = setInterval(() => {
 						if (state.pendingText.length > 0) {
-							const batch = state.pendingText.slice(0, 3);
-							state.pendingText = state.pendingText.slice(3);
+							const batch = state.pendingText.slice(0, 1);
+							state.pendingText = state.pendingText.slice(1);
 							state.currentText += batch;
 							if (state.currentBubble) state.currentBubble.textContent = state.currentText;
 							autoScroll(state);
@@ -39044,11 +39044,14 @@ registerProcessor('capture', Capture);
 				this.currentAudio = null;
 				this.playNext();
 			};
-			audio.play().catch(() => {
-				URL.revokeObjectURL(url);
-				this.currentAudio = null;
-				this.playNext();
-			});
+			audio.oncanplaythrough = () => {
+				audio.play().catch(() => {
+					URL.revokeObjectURL(url);
+					this.currentAudio = null;
+					this.playNext();
+				});
+			};
+			audio.load();
 		}
 		playAlertTone(frequency = 440, duration = .2, volume = .3) {
 			const ctx = new AudioContext();
