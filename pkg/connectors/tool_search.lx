@@ -1,0 +1,21 @@
+-- Tool search — indexes available tools and returns matches on demand to avoid eager loading.
+
+Tool +ToolSearch = {
+  description: "Search available tools by capability. Returns top matches with name and description."
+  params: {query: "Str", tools: "List"}
+  run = (args) {
+    words = args.query | split " " | map lower
+    scored = args.tools | map (tool) {
+      tool_name_lower = tool.name | lower
+      desc_words = tool.description | split " " | map lower
+      hits = words | filter (w) {
+        tool_name_lower | contains? w || desc_words | any? (dw) { dw | contains? w }
+      } | len
+      relevance = (hits + 0.0) / (len words + 0.0)
+      {name: tool.name, description: tool.description, relevance: relevance}
+    }
+    matched = scored | filter (t) { t.relevance > 0.0 }
+    sorted = matched | sort_by (t) { 0.0 - t.relevance }
+    sorted | take 5
+  }
+}
