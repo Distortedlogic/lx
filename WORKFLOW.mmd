@@ -50,6 +50,10 @@ workarounds: restructured code to dodge a bug?
 regressions: new ambiguities or edge cases?
 scope creep: files outside the work item touched?
 deviations: spec vs actual — justified?
+——— scope ———
+grade ONLY current file state on disk
+do not grade commit history or staging
+the commit step happens AFTER audit passes
 ——— grade 0 if ———
 any pre-existing test regresses
 implementer worked around own bug
