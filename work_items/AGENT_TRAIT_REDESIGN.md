@@ -11,14 +11,14 @@ Every workgen/workrunner agent repeats the same 10-15 line pattern: create Promp
 **Agent trait full method set after redesign:**
 
 ```lx
-use std/prompt {Prompt}
+use std/prompt {new_prompt}
 
 +Trait Agent = {
   role = () { "" }
   goal = () { "" }
   system_prompt = () { "" }
 
-  bootstrap_context = (msg) { {} }
+  bootstrap_context = (msg) { {:} }
   examples = () { [] }
   max_context_tokens = () { 100000 }
 
@@ -31,7 +31,7 @@ use std/prompt {Prompt}
   reflect = (result) { result }
   handle = (msg) { ... enriched via bootstrap_context, wrapped in try/on_error ... }
 
-  build_prompt = (msg) { Prompt { system: self.system_prompt () } with examples merged }
+  build_prompt = (msg) { new_prompt (self.system_prompt ()) with examples merged }
 
   on_turn_start = (msg) { }
   on_turn_end = (msg result) { }
@@ -58,9 +58,9 @@ use std/prompt {Prompt}
 
 # Technical Details
 
-### `use std/prompt {Prompt}` required in agent.lx
+### `use std/prompt {new_prompt}` required in agent.lx
 
-The `build_prompt` default creates `Prompt { system: self.system_prompt () }`. Without the import, `Prompt` is not in scope. No circular dependency — prompt.lx does not import agent.lx.
+`Prompt { system: "..." }` creates a plain Record, not a Prompt Object with methods (render, add_section, etc.). The `new_prompt(system_text)` constructor in std/prompt creates a proper Prompt Object via `Class BasePrompt : [Prompt]`. All agents use `new_prompt` not `Prompt { ... }`. Agent.lx imports `{new_prompt}`. `try` returns raw value on success (not `Ok(value)`), so `handle` match uses `Err e -> ...; r -> ...` (catch-all for success, not `Ok r`). `bootstrap_context` returns `{:}` (empty record literal) not `{}` (which is a block evaluating to Unit).
 
 ### `try` is a 2-arg builtin: `try func arg`
 
@@ -183,7 +183,7 @@ The `~>` and `~>?` operators are implemented (TELL_ASK_OPERATORS work item). `di
 
 **Description:** Rewrite `crates/lx/std/agent.lx`.
 
-Add `use std/prompt {Prompt}` at the top of the file.
+Add `use std/prompt {new_prompt}` at the top of the file.
 
 New methods to add with their defaults:
 - `role = () { "" }`
@@ -192,7 +192,7 @@ New methods to add with their defaults:
 - `bootstrap_context = (msg) { {} }`
 - `examples = () { [] }`
 - `max_context_tokens = () { 100000 }`
-- `build_prompt = (msg) { p = Prompt { system: self.system_prompt () }; exs = self.examples (); (exs | len) > 0 ? { p.examples <- exs }; p }`
+- `build_prompt = (msg) { p = new_prompt (self.system_prompt ()); exs = self.examples (); (exs | len) > 0 ? { p.examples <- exs }; p }`
 - `on_turn_start = (msg) { }`
 - `on_turn_end = (msg result) { }`
 - `on_error = (err) { err }`
@@ -241,9 +241,9 @@ Keep ALL existing methods unchanged: init, run, perceive, reason, act, reflect, 
 
 Transformation pattern for each agent:
 1. Remove the `use ../prompt/... {SomePrompt}` import
-2. Add `use std/prompt {Prompt}` (needed by build_prompt)
+2. Add `use std/prompt {new_prompt}` (needed by build_prompt)
 3. Add `system_prompt = () { "the system string from the deleted prompt file" }`
-4. Add `build_prompt = (msg) { p = Prompt { system: self.system_prompt () }; p.add_section ...; p.add_instruction ...; p.add_constraint ...; p }` — move section/instruction/constraint additions from act into build_prompt
+4. Add `build_prompt = (msg) { p = new_prompt (self.system_prompt ()); p.add_section ...; p.add_instruction ...; p.add_constraint ...; p }` — move section/instruction/constraint additions from act into build_prompt
 5. Add `on_turn_start = (msg) { log.log "  > claude: ..." }` with the agent's current pre-work log message
 6. Add `on_turn_end = (msg result) { log.save_debug ...; log.log "  < done ..." }` with the agent's current post-work log/save_debug calls
 7. Simplify `act` to: `p = self.build_prompt msg; result = self.think_with {prompt: (p.render ())} ^; result.text` (or whatever the agent returns)
@@ -321,9 +321,9 @@ Keep all specialist methods (plan, replan, estimate_cost) unchanged. Keep in-fil
 
 **synthesizer.lx (ResponseSynth)** — Add role = `"response synthesis specialist"`, goal = `"combine reasoning, results, and identity into coherent output"`, system_prompt: `"You synthesize responses."`. Keep synthesize/format/compose_parts.
 
-**monitor.lx** — Add role = `"self-monitoring specialist"`, goal = `"track health, detect stuck loops, manage budgets"`. Add `health = () { check_health state }` wired to the existing `check_health` function in the file.
+**monitor.lx** — NOT APPLICABLE. This file has no Agent declaration — it is a standalone function module exporting `check_health`, `tick`, etc. Cannot add Agent trait overrides to a non-Agent. Skip.
 
-**dispatcher.lx** — Add role = `"multi-agent coordinator"`, goal = `"spawn, route, and supervise specialist agents"`. Replace `agent.ask` calls in `dispatch_task` with `self.delegate`. The `~>?` operator calls in the file now work (implemented in TELL_ASK_OPERATORS), leave them as-is.
+**dispatcher.lx** — NOT APPLICABLE. This file has no Agent declaration — it is a standalone function module exporting `dispatch_task`, `fan_out`, etc. The `~>?` operator calls work correctly. Cannot add Agent trait overrides to a non-Agent. Skip.
 
 Do NOT delete any in-file Prompt/Schema declarations in brain agents.
 
@@ -379,7 +379,7 @@ The existing Agent section starts at the `-- Agent` comment and ends before `-- 
 3. Run `cargo test -p lx --test formatter_roundtrip` — verify formatter roundtrip.
 
 Likely failure sources:
-- Missing `use std/prompt {Prompt}` in agent files that create Prompt instances in build_prompt
+- Missing `use std/prompt {new_prompt}` in agent files that create Prompt instances in build_prompt
 - `on_turn_end` signature: agents must pass 2 args, callers in handle pass `enriched` and `r`
 - `handle`'s try pattern: `try ooda enriched` — ooda must be a function accepting one arg
 - Deleted prompt file imports not removed from agent files
@@ -401,7 +401,7 @@ Likely failure sources:
 8. **`on_turn_end` takes 2 args: `(msg result)`.** Handle passes `self.on_turn_end enriched r`.
 9. **DO NOT delete `workrunner/prompt/context.lx`** — has load method, imported by main.lx.
 10. **`act` default stays as `(plan) { plan }`.** Do not change it.
-11. **`use std/prompt {Prompt}` must be added** to agent.lx and to each agent file that creates Prompt in build_prompt.
+11. **`use std/prompt {new_prompt}` must be added** to agent.lx and to each agent file that creates Prompt in build_prompt.
 12. **Brain agent in-file Prompt declarations** (PlanningPrompt, AnalysisPrompt, etc.) must NOT be deleted.
 13. **`~>?` in dispatcher.lx now works** — the operators are implemented. Do not replace them.
 
