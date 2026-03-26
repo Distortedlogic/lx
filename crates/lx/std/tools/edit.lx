@@ -5,11 +5,7 @@ use std/fs
 Tool Edit = {
   name: "edit"
   description: "Replace text in a file"
-  params: {
-    path: Str
-    old: Str
-    new: Str
-  }
+  params: {path: Str, old: Str, new: Str}
   run = (args) {
     content = fs.read (args.path) ^
     (content | contains? (args.old)) ? {

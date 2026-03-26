@@ -3,10 +3,7 @@
 Tool Grep = {
   name: "grep"
   description: "Search file contents for a pattern"
-  params: {
-    pattern: Str
-    path: Str
-  }
+  params: {pattern: Str, path: Str}
   run = (args) {
     r = Bash.run {command: "grep -rn '{args.pattern}' {args.path} 2>/dev/null"} ^
     r.code == 0 ? (Ok r.stdout) : (Ok "")

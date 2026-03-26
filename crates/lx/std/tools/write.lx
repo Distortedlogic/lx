@@ -5,9 +5,6 @@ use std/fs
 Tool Write = {
   name: "write"
   description: "Write content to file"
-  params: {
-    path: Str
-    content: Str
-  }
+  params: {path: Str, content: Str}
   run = (args) { fs.write (args.path) (args.content) }
 }
