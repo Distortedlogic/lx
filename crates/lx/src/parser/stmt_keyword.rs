@@ -53,9 +53,11 @@ where
     .map(|(((kw, inner_export), name), (fields, methods))| (kw, inner_export.is_some(), name, KeywordBody::Class(fields, methods)));
 
   choice((schema_branch, other_branch)).map(|(kw, exported, name, body)| match body {
-    KeywordBody::Class(fields, methods) => KeywordDeclData { keyword: kw, name, type_params: vec![], fields, methods, trait_entries: None, exported },
+    KeywordBody::Class(fields, methods) => {
+      KeywordDeclData { keyword: kw, name, type_params: vec![], fields, methods, trait_entries: None, exported, uses: vec![] }
+    },
     KeywordBody::Trait(entries, defaults) => {
-      KeywordDeclData { keyword: kw, name, type_params: vec![], fields: vec![], methods: defaults, trait_entries: Some(entries), exported }
+      KeywordDeclData { keyword: kw, name, type_params: vec![], fields: vec![], methods: defaults, trait_entries: Some(entries), exported, uses: vec![] }
     },
   })
 }

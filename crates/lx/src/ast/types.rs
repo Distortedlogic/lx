@@ -121,6 +121,7 @@ pub struct KeywordDeclData {
   pub methods: Vec<AgentMethod>,
   pub trait_entries: Option<Vec<TraitEntry>>,
   pub exported: bool,
+  pub uses: Vec<Sym>,
 }
 
 #[derive(Debug, Clone, PartialEq, AstWalk)]
