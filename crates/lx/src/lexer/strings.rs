@@ -46,7 +46,9 @@ impl<'src> Lexer<'src> {
         },
         Some('{') => {
           self.flush_buf(&mut buf, chunk_start, TokenKind::StrChunk);
+          let brace_start = self.pos;
           self.advance();
+          self.push(TokenKind::LBrace, brace_start, brace_start + 1);
           self.lex_interpolation(start)?;
           chunk_start = self.pos;
         },
