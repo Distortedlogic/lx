@@ -84,10 +84,10 @@ fn recover_json(raw: &str) -> String {
     (None, Some(b)) => Some(b),
     (None, None) => None,
   };
-  if let (Some(start_idx), Some(end_idx)) = (start, end) {
-    if start_idx <= end_idx {
-      s = s[start_idx..=end_idx].to_string();
-    }
+  if let (Some(start_idx), Some(end_idx)) = (start, end)
+    && start_idx <= end_idx
+  {
+    s = s[start_idx..=end_idx].to_string();
   }
 
   loop {
@@ -134,10 +134,10 @@ fn parse_ndjson(raw: &str, structured: bool, _span: SourceSpan) -> Result<LxVal,
       Some("assistant") => {
         if let Some(content) = json.get("message").and_then(|m| m.get("content")).and_then(|c| c.as_array()) {
           for item in content {
-            if item.get("type").and_then(|t| t.as_str()) == Some("text") {
-              if let Some(text) = item.get("text").and_then(|t| t.as_str()) {
-                full_text.push(text.to_string());
-              }
+            if item.get("type").and_then(|t| t.as_str()) == Some("text")
+              && let Some(text) = item.get("text").and_then(|t| t.as_str())
+            {
+              full_text.push(text.to_string());
             }
           }
         }
@@ -182,6 +182,6 @@ fn parse_ndjson(raw: &str, structured: bool, _span: SourceSpan) -> Result<LxVal,
     "turns" => LxVal::int(turns),
     "input_tokens" => LxVal::int(input_tokens),
     "output_tokens" => LxVal::int(output_tokens),
-    "session_id" => session_id.map(|s| LxVal::str(s)).unwrap_or(LxVal::None)
+    "session_id" => session_id.map(LxVal::str).unwrap_or(LxVal::None)
   }))
 }
