@@ -36,7 +36,8 @@ where
 {
   let a1 = arena.clone();
   let a2 = arena.clone();
-  let a3 = arena;
+  let a3 = arena.clone();
+  let a4 = arena;
 
   let empty_record = just(TokenKind::LBrace)
     .then(skip_semis())
@@ -44,26 +45,13 @@ where
     .then(just(TokenKind::RBrace))
     .map_with(move |_, e| a1.borrow_mut().alloc_expr(Expr::Record(vec![]), ss(e.span())));
 
-  let record = just(TokenKind::LBrace)
-    .then(skip_semis())
-    .then(looks_like_record().rewind())
-    .ignore_then(record_fields(expr.clone(), a2.clone()))
-    .then_ignore(just(TokenKind::RBrace))
-    .map_with(move |fields, e| a2.borrow_mut().alloc_expr(Expr::Record(fields), ss(e.span())));
+  let record_inner = record_fields(expr.clone(), a2).then_ignore(just(TokenKind::RBrace)).map(Expr::Record);
 
-  let block = just(TokenKind::LBrace)
-    .ignore_then(super::expr::stmts_block(expr, a3.clone()))
-    .then_ignore(just(TokenKind::RBrace))
-    .map_with(move |stmts, e| a3.borrow_mut().alloc_expr(Expr::Block(ExprBlock { stmts }), ss(e.span())));
+  let block_inner = super::expr::stmts_block(expr, a3).then_ignore(just(TokenKind::RBrace)).map(|stmts| Expr::Block(ExprBlock { stmts }));
 
-  choice((empty_record, record, block))
-}
+  let brace_expr = just(TokenKind::LBrace).ignore_then(record_inner.or(block_inner)).map_with(move |node, e| a4.borrow_mut().alloc_expr(node, ss(e.span())));
 
-fn looks_like_record<'a, I>() -> impl Parser<'a, I, (), extra::Err<Rich<'a, TokenKind, Span>>> + Clone
-where
-  I: ValueInput<'a, Token = TokenKind, Span = Span>,
-{
-  choice((ident_or_keyword().then_ignore(just(TokenKind::Colon)).ignored(), just(TokenKind::DotDot).ignored()))
+  choice((empty_record, brace_expr))
 }
 
 fn record_fields<'a, I>(
@@ -85,7 +73,7 @@ where
 
   let field = spread_field.or(named_field);
 
-  skip_semis().ignore_then(field.separated_by(skip_semis()).allow_trailing().collect::<Vec<_>>()).then_ignore(skip_semis())
+  skip_semis().ignore_then(field.separated_by(skip_semis()).at_least(1).allow_trailing().collect::<Vec<_>>()).then_ignore(skip_semis())
 }
 
 pub(super) fn map_parser<'a, I>(

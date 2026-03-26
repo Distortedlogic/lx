@@ -1,0 +1,81 @@
+-- record shorthand: {ident} and {ident; ident} parse as records
+-- blocks fall back when content has bindings or expressions
+
+-- all-shorthand records
+a = 1
+b = 2
+c = 3
+r = {a; b; c}
+assert (r.a == 1)
+assert (r.b == 2)
+assert (r.c == 3)
+
+-- single shorthand field
+name = "alice"
+r2 = {name}
+assert (r2.name == "alice")
+
+-- mixed shorthand and explicit
+x = 10
+r3 = {x; y: 20; z: 30}
+assert (r3.x == 10)
+assert (r3.y == 20)
+assert (r3.z == 30)
+
+-- shorthand first, explicit after
+val = "hello"
+r4 = {val; len: 5}
+assert (r4.val == "hello")
+assert (r4.len == 5)
+
+-- spread still works with shorthand
+base = {a: 1; b: 2}
+extra = 3
+r5 = {..base; extra}
+assert (r5.a == 1)
+assert (r5.b == 2)
+assert (r5.extra == 3)
+
+-- empty braces is block returning unit
+r6 = {}
+assert (r6 == ())
+
+-- empty record still uses {:}
+r7 = {:}
+assert (r7 == {:})
+
+-- blocks with bindings still work
+r8 = {
+  x = 10
+  y = 20
+  x + y
+}
+assert (r8 == 30)
+
+-- block with function application
+items = [1; 2; 3]
+r9 = {
+  items | len
+}
+assert (r9 == 3)
+
+-- constructor call with shorthand fields
++Trait Pt = {x: Int; y: Int}
+px = 5
+py = 10
+p1 = Pt {x: px; y: py}
+assert (p1.x == 5)
+assert (p1.y == 10)
+
+-- constructor call with variable names matching field names
+x = 100
+y = 200
+p2 = Pt {x; y}
+assert (p2.x == 100)
+assert (p2.y == 200)
+
+-- nested records with shorthand
+inner = "nested"
+outer = {inner; tag: "wrapper"}
+assert (outer.inner == "nested")
+assert (outer.tag == "wrapper")
