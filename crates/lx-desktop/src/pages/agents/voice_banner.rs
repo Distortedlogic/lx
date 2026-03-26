@@ -41,17 +41,6 @@ pub fn VoiceBanner() -> Element {
             }
           });
         },
-        Some("audio_playing") => {
-          if let Some(id) = msg["id"].as_str()
-            && let Some(text) = ctx.pending.write().remove(id)
-          {
-            let mut t = ctx.transcript.write();
-            match t.last_mut() {
-              Some(entry) if !entry.is_user => entry.text.push_str(&format!(" {text}")),
-              _ => t.push(TranscriptEntry { is_user: false, text }),
-            }
-          }
-        },
         Some("rms") => {
           if let Some(level) = msg["level"].as_f64() {
             ctx.rms.set(level as f32);
@@ -65,7 +54,6 @@ pub fn VoiceBanner() -> Element {
           _ => {},
         },
         Some("start_standby") | Some("cancel") => ctx.pcm_buffer.write().clear(),
-        Some("playback_complete") => {},
         _ => {},
       }
     }
@@ -169,40 +157,7 @@ pub fn VoiceBanner() -> Element {
 
 async fn tts(text: &str) -> anyhow::Result<Vec<u8>> {
   let req = SpeechRequest { text: text.to_owned(), voice: "am_michael".into(), lang_code: "a".into(), speed: 1.2 };
-  let wav = common_kokoro::KOKORO.infer(&req).await?;
-  Ok(prepend_silence(&wav, 50))
-}
-
-fn prepend_silence(wav: &[u8], ms: u32) -> Vec<u8> {
-  if wav.len() < 44 || &wav[0..4] != b"RIFF" || &wav[8..12] != b"WAVE" {
-    return wav.to_vec();
-  }
-  let sample_rate = u32::from_le_bytes([wav[24], wav[25], wav[26], wav[27]]);
-  let channels = u16::from_le_bytes([wav[22], wav[23]]);
-  let bits_per_sample = u16::from_le_bytes([wav[34], wav[35]]);
-  let bytes_per_sample = (bits_per_sample / 8) as u32;
-  let silence_samples = sample_rate * ms / 1000;
-  let silence_bytes = silence_samples * u32::from(channels) * bytes_per_sample;
-  let mut offset = 12;
-  while offset + 8 <= wav.len() {
-    if &wav[offset..offset + 4] == b"data" {
-      let old_data_size = u32::from_le_bytes([wav[offset + 4], wav[offset + 5], wav[offset + 6], wav[offset + 7]]);
-      let new_data_size = old_data_size + silence_bytes;
-      let new_chunk_size = 36 + new_data_size;
-      let pcm = &wav[offset + 8..];
-      let mut out = Vec::with_capacity(44 + new_data_size as usize);
-      out.extend_from_slice(&wav[0..4]);
-      out.extend_from_slice(&new_chunk_size.to_le_bytes());
-      out.extend_from_slice(&wav[8..offset + 4]);
-      out.extend_from_slice(&new_data_size.to_le_bytes());
-      out.extend(std::iter::repeat_n(0u8, silence_bytes as usize));
-      out.extend_from_slice(pcm);
-      return out;
-    }
-    let chunk_size = u32::from_le_bytes([wav[offset + 4], wav[offset + 5], wav[offset + 6], wav[offset + 7]]) as usize;
-    offset += 8 + chunk_size;
-  }
-  wav.to_vec()
+  common_kokoro::KOKORO.infer(&req).await
 }
 
 async fn run_pipeline(
@@ -238,12 +193,26 @@ async fn run_pipeline(
 
   ctx.pipeline_stage.set(PipelineStage::SynthesizingSpeech);
   let wav_bytes = tts(&response).await?;
-  ctx.pending.write().insert("r0".to_string(), response);
-  voice_widget.send_update(serde_json::json!({
-      "type": "audio_response",
-      "data": B64.encode(&wav_bytes),
-      "id": "r0",
-  }));
+
+  ctx.status.set(VoiceStatus::Speaking);
+
+  let transcript_entry = response.clone();
+  tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+    let cursor = std::io::Cursor::new(wav_bytes);
+    let sink = rodio::DeviceSinkBuilder::open_default_sink()?;
+    let player = rodio::play(sink.mixer(), cursor)?;
+    player.sleep_until_end();
+    Ok(())
+  })
+  .await??;
+
+  let mut t = ctx.transcript.write();
+  match t.last_mut() {
+    Some(entry) if !entry.is_user => entry.text.push_str(&format!(" {transcript_entry}")),
+    _ => t.push(TranscriptEntry { is_user: false, text: transcript_entry }),
+  }
+
+  voice_widget.send_update(serde_json::json!({ "type": "stop_capture" }));
   ctx.pipeline_stage.set(PipelineStage::Idle);
   Ok(())
 }

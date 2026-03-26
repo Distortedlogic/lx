@@ -32,6 +32,7 @@ common-inference = { path = "../../../dioxus-common/crates/common-inference" }
 anyhow = "1"
 async-trait = "0.1"
 base64 = "0.22"
+rodio = { version = "0.22", default-features = false, features = ["playback", "symphonia-wav"] }
 dioxus = { version = "0.7", features = ["fullstack", "router"] }
 futures = "0.3"
 serde = { workspace = true }

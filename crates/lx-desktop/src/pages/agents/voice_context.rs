@@ -1,5 +1,4 @@
 use dioxus::prelude::*;
-use std::collections::HashMap;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum VoiceStatus {
@@ -49,7 +48,6 @@ pub struct TranscriptEntry {
 pub struct VoiceContext {
   pub status: Signal<VoiceStatus>,
   pub transcript: Signal<Vec<TranscriptEntry>>,
-  pub pending: Signal<HashMap<String, String>>,
   pub pcm_buffer: Signal<Vec<u8>>,
   pub rms: Signal<f32>,
   pub pipeline_stage: Signal<PipelineStage>,
@@ -61,7 +59,6 @@ impl VoiceContext {
     let ctx = Self {
       status: Signal::new(VoiceStatus::Idle),
       transcript: Signal::new(Vec::new()),
-      pending: Signal::new(HashMap::new()),
       pcm_buffer: Signal::new(Vec::new()),
       rms: Signal::new(0.0),
       pipeline_stage: Signal::new(PipelineStage::Idle),
