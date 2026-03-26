@@ -1,0 +1,18 @@
+-- agent uses wiring tests
+-- verifies that `use` declarations auto-connect connectors during init
+
++Connector TestConn = {
+  connect = () { Ok () }
+  disconnect = () { Ok () }
+  call = (req) { Ok "done" }
+  tools = () { ["test_tool"] }
+}
+
++Agent TestAgent = {
+  use TestConn
+  act = (msg) { "done" }
+}
+
+a = TestAgent {}
+assert (a.tools () | len > 0)
+assert (a.tools () | any? (== "test_tool"))

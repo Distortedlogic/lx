@@ -1,7 +1,7 @@
 use miette::SourceSpan;
 
-use crate::ast::{AgentMethod, AstArena, ClassField, Expr, ExprBlock, ExprFieldAccess, FieldKind, ListElem, Literal, Stmt, StmtFieldUpdate, StmtId};
-use crate::folder::gen_ast::{gen_apply, gen_block, gen_func, gen_method, gen_none, gen_self_field};
+use crate::ast::{AgentMethod, AstArena, ClassField, Expr, ExprBlock, ExprFieldAccess, FieldKind, ListElem, Literal, Stmt, StmtId};
+use crate::folder::gen_ast::{gen_apply, gen_block, gen_func, gen_method, gen_self_field};
 use crate::sym::{Sym, intern};
 
 fn conn_field_name(type_name: Sym) -> Sym {
@@ -15,14 +15,10 @@ pub(super) fn generate_uses_wiring(uses: &[Sym], fields: &mut Vec<ClassField>, m
   for &type_sym in uses {
     let field_name = conn_field_name(type_sym);
 
-    let none_val = gen_none(span, arena);
-    fields.push(ClassField { name: field_name, default: none_val });
-
     let ctor = arena.alloc_expr(Expr::TypeConstructor(type_sym), span);
     let empty_record = arena.alloc_expr(Expr::Record(vec![]), span);
     let instance = gen_apply(ctor, empty_record, span, arena);
-    let assign_instance = arena.alloc_stmt(Stmt::FieldUpdate(StmtFieldUpdate { name: intern("self"), fields: vec![field_name], value: instance }), span);
-    init_stmts.push(assign_instance);
+    fields.push(ClassField { name: field_name, default: instance });
 
     let self_conn = gen_self_field(field_name.as_str(), span, arena);
     let connect_access = arena.alloc_expr(Expr::FieldAccess(ExprFieldAccess { expr: self_conn, field: FieldKind::Named(intern("connect")) }), span);
