@@ -239,8 +239,9 @@ where
   let field_entry = ident()
     .then_ignore(just(TokenKind::Colon))
     .then(type_name())
-    .then(just(TokenKind::Assign).ignore_then(expr).or_not())
-    .map(|((name, typ), default)| TraitBodyItem::Field(FieldDecl { name, type_name: typ, default, constraint: None }));
+    .then(just(TokenKind::Assign).ignore_then(expr.clone()).or_not())
+    .then(just(TokenKind::Ident(intern("where"))).ignore_then(expr).or_not())
+    .map(|(((name, typ), default), constraint)| TraitBodyItem::Field(FieldDecl { name, type_name: typ, default, constraint }));
 
   let item = spread_entry.map(TraitBodyItem::Entry).or(default_method).or(field_entry);
 

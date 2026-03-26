@@ -1,3 +1,6 @@
+-- Schema instances are plain records without methods.
+-- schema()/validate() live on the Trait value, not on instances.
+-- Once Schema generates a companion Class, instance method calls can be tested here.
 Schema Bounded = {
   score: Float = "0.0 to 1.0 confidence score"
 }
