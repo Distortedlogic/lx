@@ -1,7 +1,8 @@
-use ../prompt/agents {FixPrompt FixWiPrompt}
+use ../prompt/fix {FixPrompt}
+use ../prompt/fix_wi {FixWiPrompt}
 use ../schema/work_item {task_context context_for_investigate}
 use ../store/status {save_debug}
-use ../log
+use pkg/log
 
 +Agent TaskFixer = {
   act = (msg) {
@@ -9,7 +10,7 @@ use ../log
     ctx = task_context msg.task
 
     p = FixPrompt {}
-    p.add_section "Context Bootstrap" msg.bootstrap_ctx
+    p.compose msg.bootstrap_prompt
     p.add_section "Task" ctx
     p.add_section "Grader Feedback" msg.feedback
     p.add_instruction "Fix the issues. Run `just diagnose` after."
@@ -31,7 +32,7 @@ use ../log
   act = (msg) {
     log.log "  > claude: fix work item..."
     p = FixWiPrompt {}
-    p.add_section "Context Bootstrap" msg.bootstrap_ctx
+    p.compose msg.bootstrap_prompt
     p.add_section "Work Item" (context_for_investigate msg.wi)
     p.add_section "Grader Feedback" msg.feedback
     p.add_section "Failed" msg.failed_text

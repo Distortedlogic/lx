@@ -1,6 +1,6 @@
 -- Orchestrator — runs tasks within a work item, grades, fixes.
 use ../schema/work_item {task_count task_summaries load}
-use ../log
+use pkg/log
 use ../store/status {save_debug}
 use ./agents {diagnose}
 use ../agent/implementer {Implementer}
@@ -24,7 +24,7 @@ grade_and_log_impl = (wi grader_inst report runner_dir) {
   grade
 }
 
-+run_work_item = (path idx total grader_inst bootstrap_ctx max_rounds runner_dir) {
++run_work_item = (path idx total grader_inst bootstrap_prompt max_rounds runner_dir) {
   log.log ""
   log.log "=== [{idx + 1}/{total}] {path} ==="
 
@@ -34,7 +34,7 @@ grade_and_log_impl = (wi grader_inst report runner_dir) {
 
   wi.tasks | each (task) {
     log.log "  --- task {task.num}/{task_count wi}: {task.subject} ---"
-    implementer.act {wi: wi; task: task; bootstrap_ctx: bootstrap_ctx; runner_dir: runner_dir}
+    implementer.act {wi: wi; task: task; bootstrap_prompt: bootstrap_prompt; runner_dir: runner_dir}
 
     clean = diagnose task runner_dir wi.slug
     fix_round := 0
@@ -42,7 +42,7 @@ grade_and_log_impl = (wi grader_inst report runner_dir) {
       clean ? break ()
       fix_round <- fix_round + 1
       fix_round >= max_rounds ? break ()
-      task_fixer.act {wi: wi; task: task; bootstrap_ctx: bootstrap_ctx; feedback: "just diagnose has errors or warnings — fix compilation issues"; runner_dir: runner_dir}
+      task_fixer.act {wi: wi; task: task; bootstrap_prompt: bootstrap_prompt; feedback: "just diagnose has errors or warnings — fix compilation issues"; runner_dir: runner_dir}
       clean = diagnose task runner_dir wi.slug
     }
   }
@@ -65,7 +65,7 @@ grade_and_log_impl = (wi grader_inst report runner_dir) {
     not has_failed ? break ()
 
     failed_text = failed_list | map to_str | join "\n- "
-    wi_fixer.act {wi: wi; bootstrap_ctx: bootstrap_ctx; feedback: grade.feedback; failed_text: failed_text; runner_dir: runner_dir}
+    wi_fixer.act {wi: wi; bootstrap_prompt: bootstrap_prompt; feedback: grade.feedback; failed_text: failed_text; runner_dir: runner_dir}
 
     report = investigator.act {wi: wi; runner_dir: runner_dir}
     grade = grade_and_log_impl wi grader_inst report runner_dir

@@ -61,6 +61,9 @@ Comprehensive survey of how programming languages are designed and implemented �
 #### Workflow DSLs & Agent Frameworks
 - [workflow-dsls/landscape.md](workflow-dsls/landscape.md) — Temporal, Restate, Prefect, Airflow, Step Functions; LangGraph, CrewAI, AutoGen, DSPy, Mastra
 - [workflow-dsls/design-patterns.md](workflow-dsls/design-patterns.md) — Van der Aalst's 43 workflow patterns, saga, durable execution, human-in-the-loop
+- [workflow-dsls/crewai_deep_dive.md](workflow-dsls/crewai_deep_dive.md) — CrewAI: Flows/Crews dual-layer, broken hierarchical mode, guardrails, memory scoring, enterprise deployments
+- [workflow-dsls/autogen_deep_dive.md](workflow-dsls/autogen_deep_dive.md) — AutoGen: 0.2→0.4 actor-model rewrite, conversation patterns, composable termination, AG2 fork, maintenance mode
+- [workflow-dsls/agent_framework_landscape_2026.md](workflow-dsls/agent_framework_landscape_2026.md) — 12 frameworks ranked by lx relevance: DSPy, Letta, Julep, SLANG, OpenAI Agents SDK, smolagents, Semantic Kernel, Pydantic AI, LangGraph, Mastra, Agency Swarm
 
 #### AI/LLM Integration
 - [ai-llm-integration/landscape.md](ai-llm-integration/landscape.md) — DSPy, BAML, Guidance, LMQL, SGLang, Outlines, Instructor; structured output, constrained decoding

@@ -1,7 +1,7 @@
-use ../prompt/agents {ImplementPrompt}
+use ../prompt/implement {ImplementPrompt}
 use ../schema/work_item {task_context context_for_implement}
 use ../store/status {save_debug}
-use ../log
+use pkg/log
 
 +Agent Implementer = {
   act = (msg) {
@@ -9,7 +9,7 @@ use ../log
     ctx = task_context msg.task
 
     p = ImplementPrompt {}
-    p.add_section "Context Bootstrap" msg.bootstrap_ctx
+    p.compose msg.bootstrap_prompt
     p.add_section "Work Item Context" (context_for_implement msg.wi)
     p.add_section "Current Task" ctx
     p.add_instruction "Run `just diagnose` after implementation to verify compilation."

@@ -2,7 +2,7 @@ use miette::SourceSpan;
 
 use crate::ast::{
   AgentMethod, AstArena, BinOp, BindTarget, Binding, Expr, ExprApply, ExprBinary, ExprBlock, ExprFunc, ExprId, ExprUnary, KeywordDeclData, ListElem, Literal,
-  Param, RecordField, Stmt, StmtId, StrPart, TraitDeclData, TraitEntry, UnaryOp, UseKind, UseStmt,
+  Param, RecordField, Stmt, StmtId, StrPart, TraitDeclData, TraitEntry, UseKind, UseStmt,
 };
 use crate::sym::intern;
 
@@ -21,12 +21,14 @@ fn stringify_expr(id: ExprId, arena: &AstArena) -> String {
           .iter()
           .map(|p| match p {
             StrPart::Text(t) => t.clone(),
-            StrPart::Expr(_) => "...".to_string(),
+            StrPart::Interp(_) => "...".to_string(),
           })
           .collect();
         format!("\"{text}\"")
       },
       Literal::Bool(b) => b.to_string(),
+      Literal::RawStr(s) => format!("\"{s}\""),
+      Literal::Unit => "()".to_string(),
     },
     Expr::Binary(ExprBinary { op, left, right }) => {
       format!("{} {op} {}", stringify_expr(*left, arena), stringify_expr(*right, arena))

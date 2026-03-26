@@ -37,7 +37,7 @@ where
   ));
 
   let schema_branch = schema_kw
-    .then(just(TokenKind::Export).or_not())
+    .then(just(TokenKind::Export).or(just(TokenKind::Plus)).or_not())
     .then(type_name())
     .then_ignore(just(TokenKind::Assign))
     .then_ignore(just(TokenKind::LBrace))
@@ -46,7 +46,7 @@ where
     .map(|(((kw, inner_export), name), (entries, defaults))| (kw, inner_export.is_some(), name, KeywordBody::Trait(entries, defaults)));
 
   let other_branch = other_kw
-    .then(just(TokenKind::Export).or_not())
+    .then(just(TokenKind::Export).or(just(TokenKind::Plus)).or_not())
     .then(type_name())
     .then_ignore(just(TokenKind::Assign))
     .then(class_body(expr))

@@ -152,8 +152,10 @@ pub fn register(env: &Env) {
   env.bind_str("json", LxVal::record(json_fields));
 
   let mut agent_fields = IndexMap::new();
-  agent_fields.insert(crate::sym::intern("spawn"), mk("agent.spawn", 1, bi_agent_spawn_stub));
-  agent_fields.insert(crate::sym::intern("kill"), mk("agent.kill", 1, bi_agent_kill_stub));
+  agent_fields.insert(crate::sym::intern("spawn"), mk("agent.spawn", 1, super::agent::bi_agent_spawn));
+  agent_fields.insert(crate::sym::intern("kill"), mk("agent.kill", 1, super::agent::bi_agent_kill));
+  agent_fields.insert(crate::sym::intern("ask"), mk("agent.ask", 2, super::agent::bi_agent_ask));
+  agent_fields.insert(crate::sym::intern("tell"), mk("agent.tell", 2, super::agent::bi_agent_tell));
   agent_fields.insert(crate::sym::intern("implements"), mk("agent.implements", 2, bi_agent_implements));
   env.bind_str("agent", LxVal::record(agent_fields));
 
@@ -172,13 +174,6 @@ fn bi_source_dir(_args: &[LxVal], _span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> R
   }
 }
 
-fn bi_agent_spawn_stub(_args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  Err(LxError::runtime("agent.spawn: subprocess agents not yet available in this build", span))
-}
-
-fn bi_agent_kill_stub(_args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  Err(LxError::runtime("agent.kill: subprocess agents not yet available in this build", span))
-}
 
 fn bi_agent_implements(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let target_trait = match &args[1] {

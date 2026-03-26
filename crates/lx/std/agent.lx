@@ -37,6 +37,6 @@
     {name: n; actions: a; tools: t}
   }
 
-  ask = (agent msg) { Err "agent.ask not yet implemented" }
-  tell = (agent msg) { Err "agent.tell not yet implemented" }
+  ask = (agent_handle msg) { agent.ask agent_handle msg }
+  tell = (agent_handle msg) { agent.tell agent_handle msg }
 }

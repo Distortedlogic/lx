@@ -5,8 +5,8 @@
 
 use std/time
 use std/cron
-use ./log
-use ./context
+use pkg/log
+use ./prompt/context {BootstrapContext}
 use ./store/status {RunStatus}
 use ./agent/grader {Grader}
 use ./workflow/orchestrator
@@ -44,7 +44,8 @@ grader = Grader {
   ]
 }
 
-bootstrap_ctx = context.load_bootstrap ()
+bootstrap_prompt = BootstrapContext {}
+bootstrap_prompt.load ()
 
 status = RunStatus {runner_dir: runner_dir}
 status.load ()
@@ -66,7 +67,7 @@ heartbeat = cron.every 60000 () {
 }
 
 run_one = (idx path) {
-  result = orchestrator.run_work_item path idx total grader bootstrap_ctx max_fix_rounds runner_dir
+  result = orchestrator.run_work_item path idx total grader bootstrap_prompt max_fix_rounds runner_dir
   icon = result.status == "pass" ? "PASS" : "FAIL"
   log.log "  >>> {icon} {path} — {result.score}/100"
   status.record_result result

@@ -1,6 +1,6 @@
 -- Non-agent workflow utilities (no AI calls)
 use ../store/status {save_debug}
-use ../log
+use pkg/log
 
 +diagnose = (task runner_dir slug) {
   log.log "    > diagnose after task {task.num}..."

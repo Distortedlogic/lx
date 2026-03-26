@@ -1,10 +1,13 @@
-use ../context
+use ../prompt/context {BootstrapContext}
 
-ctx = context.load_bootstrap ()
-assert (ctx | len > 0)
-assert (ctx | contains? "Context Bootstrap")
-assert (ctx | contains? "Inventory")
-assert (ctx | contains? "Reference")
-assert (ctx | contains? "Stdlib")
+p = BootstrapContext {}
+p.load ()
+rendered = p.render ()
+assert (rendered | len > 0)
+assert (rendered | contains? "Context Bootstrap")
+assert (rendered | contains? "Inventory")
+assert (rendered | contains? "Reference")
+assert (rendered | contains? "Stdlib")
+assert (p.sections | len == 4)
 
 log.info "context: all passed"

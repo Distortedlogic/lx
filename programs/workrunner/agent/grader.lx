@@ -1,7 +1,7 @@
 -- Work Item Grader — scores work against a rubric via LLM evaluation.
 
 use ../schema/grade {GradeResult CategoryScore}
-use ../prompt/agents {GradePrompt}
+use ../prompt/grade {GradePrompt}
 
 +Agent Grader = {
   rubric: []

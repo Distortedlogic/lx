@@ -1,4 +1,4 @@
--- Timestamped logging utility for the work runner.
+-- Timestamped logging — future runtime stream backend hook point.
 
 use std/time
 

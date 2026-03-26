@@ -1,0 +1,3 @@
++Prompt ImplementPrompt = {
+  system: "You are implementing one task from a work item. Follow the task description exactly. Use justfile recipes. No code comments. 300 line file limit."
+}

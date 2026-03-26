@@ -1,7 +1,7 @@
-use ../prompt/agents {InvestigatePrompt}
+use ../prompt/investigate {InvestigatePrompt}
 use ../schema/work_item {context_for_investigate}
 use ../store/status {save_debug}
-use ../log
+use pkg/log
 
 +Agent Investigator = {
   act = (msg) {

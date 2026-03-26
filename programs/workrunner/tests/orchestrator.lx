@@ -1,9 +1,9 @@
 use ../schema/work_item
 use ../schema/work_item {task_count get_task task_context context_for_implement context_for_investigate task_summaries task_summary}
-use ../log
+use pkg/log
 use ../workflow/orchestrator
 use ../agent/grader {Grader}
-use ../context
+use ../prompt/context {BootstrapContext}
 
 wi = work_item.load "programs/workrunner/tests/fixtures/tiny_work_item.md"
 assert (task_count wi == 1)
@@ -11,8 +11,9 @@ assert (wi.slug | len > 0)
 
 log.log "orchestrator test: parsing OK"
 
-bootstrap_ctx = context.load_bootstrap ()
-assert (bootstrap_ctx | len > 0)
+bootstrap_prompt = BootstrapContext {}
+bootstrap_prompt.load ()
+assert (bootstrap_prompt.sections | len > 0)
 
 grader_inst = Grader {
   threshold: 50
@@ -22,7 +23,7 @@ grader_inst = Grader {
 }
 
 log.log "orchestrator test: running work item..."
-result = orchestrator.run_work_item wi.path 0 1 grader_inst bootstrap_ctx 2 ".lx/work_runner_test"
+result = orchestrator.run_work_item wi.path 0 1 grader_inst bootstrap_prompt 2 ".lx/work_runner_test"
 
 log.log "result status: {result.status}"
 log.log "result score: {result.score}"

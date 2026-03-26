@@ -1,0 +1,23 @@
+-- Bootstrap context prompt — loads agent/ context files as structured sections.
+
+use std/fs
+use pkg/log
+
++Prompt BootstrapContext = {
+  system: ""
+
+  load = () {
+    log.log "loading context files..."
+    tick = fs.read "agent/TICK.md" ^
+    inventory = fs.read "agent/INVENTORY.md" ^
+    reference = fs.read "agent/REFERENCE.md" ^
+    stdlib = fs.read "agent/STDLIB.md" ^
+    self.add_section "Context Bootstrap" tick
+    self.add_section "Inventory" inventory
+    self.add_section "Reference" reference
+    self.add_section "Stdlib" stdlib
+    total = (tick | len) + (inventory | len) + (reference | len) + (stdlib | len)
+    log.log "context loaded ({total} chars)"
+    self
+  }
+}
