@@ -7,10 +7,11 @@ use super::stmt::trait_body;
 use super::stmt_class::class_body;
 use crate::ast::{AgentMethod, ClassField, ExprId, KeywordDeclData, KeywordKind, TraitEntry};
 use crate::lexer::token::TokenKind;
+use crate::sym::Sym;
 
 #[derive(Clone)]
 enum KeywordBody {
-  Class(Vec<ClassField>, Vec<AgentMethod>),
+  Class(Vec<Sym>, Vec<ClassField>, Vec<AgentMethod>),
   Trait(Vec<TraitEntry>, Vec<AgentMethod>),
 }
 
@@ -50,11 +51,11 @@ where
     .then(type_name())
     .then_ignore(just(TokenKind::Assign))
     .then(class_body(expr))
-    .map(|(((kw, inner_export), name), (fields, methods))| (kw, inner_export.is_some(), name, KeywordBody::Class(fields, methods)));
+    .map(|(((kw, inner_export), name), (uses, fields, methods))| (kw, inner_export.is_some(), name, KeywordBody::Class(uses, fields, methods)));
 
   choice((schema_branch, other_branch)).map(|(kw, exported, name, body)| match body {
-    KeywordBody::Class(fields, methods) => {
-      KeywordDeclData { keyword: kw, name, type_params: vec![], fields, methods, trait_entries: None, exported, uses: vec![] }
+    KeywordBody::Class(uses, fields, methods) => {
+      KeywordDeclData { keyword: kw, name, type_params: vec![], fields, methods, trait_entries: None, exported, uses }
     },
     KeywordBody::Trait(entries, defaults) => {
       KeywordDeclData { keyword: kw, name, type_params: vec![], fields: vec![], methods: defaults, trait_entries: Some(entries), exported, uses: vec![] }

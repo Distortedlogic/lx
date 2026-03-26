@@ -64,7 +64,7 @@ where
     .then(trait_list.or_not().map(|t| t.unwrap_or_default()))
     .then_ignore(just(TokenKind::Assign))
     .then(class_body(expr))
-    .map(|(((name, type_params), traits), (fields, methods))| ClassDeclData { name, type_params, traits, fields, methods, exported: false })
+    .map(|(((name, type_params), traits), (_, fields, methods))| ClassDeclData { name, type_params, traits, fields, methods, exported: false })
 }
 
 #[derive(Clone)]
