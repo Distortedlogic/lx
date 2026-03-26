@@ -1,3 +1,0 @@
-+Prompt FixWiPrompt = {
-  system: "Fix issues found in work item grading. Fix ONLY what failed."
-}

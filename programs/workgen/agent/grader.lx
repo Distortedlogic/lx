@@ -1,11 +1,13 @@
 -- Work Item Grader — scores generated work items against a rubric via LLM.
 
+use std/prompt {Prompt}
 use ../schema/grade {GradeResult CategoryScore}
-use ../prompt/grade {GradingPrompt}
 
 +Agent Grader = {
   rubric: []
   threshold: 75
+
+  system_prompt = () { "You are a grader scoring work against a rubric. For each category, assign a score 0-100 and brief feedback. A category passes at score >= 70." }
 
   act = (msg) {
     p = self.build_prompt msg.work msg.task
@@ -27,7 +29,7 @@ use ../prompt/grade {GradingPrompt}
       "{idx + 1}. {cat.name} (weight {cat.weight}) — {cat.description}"
     } | join "\n"
 
-    p = GradingPrompt {}
+    p = Prompt { system: self.system_prompt () }
     p.add_section "Task" task
     p.add_section "Work to Grade" work
     p.add_section "Rubric Categories" category_lines

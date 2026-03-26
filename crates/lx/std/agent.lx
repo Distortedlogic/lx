@@ -1,4 +1,14 @@
+use std/prompt {Prompt}
+
 +Trait Agent = {
+  role = () { "" }
+  goal = () { "" }
+  system_prompt = () { "" }
+
+  bootstrap_context = (msg) { {} }
+  examples = () { [] }
+  max_context_tokens = () { 100000 }
+
   init = () { }
 
   perceive = (msg) { msg }
@@ -7,10 +17,19 @@
   reflect = (result) { result }
 
   handle = (msg) {
-    action = msg.action
-    method = action != None ? (method_of self action) : None
-    method != None ? (method msg) : {
-      self.reflect (self.act (self.reason (self.perceive msg)))
+    enriched = {..msg; ..(self.bootstrap_context msg)}
+    self.on_turn_start enriched
+    ooda = (m) {
+      action = m.action
+      method = action != None ? (method_of self action) : None
+      method != None ? (method m) : {
+        self.reflect (self.act (self.reason (self.perceive m)))
+      }
+    }
+    result = try ooda enriched
+    result ? {
+      Ok r -> { self.on_turn_end enriched r; r }
+      Err e -> self.on_error e
     }
   }
 
@@ -22,6 +41,12 @@
       yield result
     }
   }
+
+  build_prompt = (msg) { p = Prompt { system: self.system_prompt () }; exs = self.examples (); (exs | len) > 0 ? { p.examples <- exs }; p }
+
+  on_turn_start = (msg) { }
+  on_turn_end = (msg result) { }
+  on_error = (err) { err }
 
   tools = () { [] }
   max_turns = () { 25 }
@@ -41,12 +66,14 @@
 
   use_tool = (name input) { Err "no tools configured" }
 
+  delegate = (agent_handle task) { agent.ask agent_handle task }
+  escalate = (reason) { Err {type: "escalation"; reason: reason} }
+
   describe = () {
-    n = to_str self
-    a = methods_of self
-    t = self.tools ()
-    {name: n; actions: a; tools: t}
+    {name: to_str self; role: self.role (); goal: self.goal (); actions: methods_of self; tools: self.tools ()}
   }
+
+  health = () { {ok: true} }
 
   ask = (agent_handle msg) { agent.ask agent_handle msg }
   tell = (agent_handle msg) { agent.tell agent_handle msg }

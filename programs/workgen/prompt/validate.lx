@@ -1,3 +1,0 @@
-+Prompt ValidatePrompt = {
-  system: "You are validating a proposed approach before work item generation. Evaluate whether the solution is best practice, idiomatic, and sound."
-}

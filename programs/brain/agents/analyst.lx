@@ -25,6 +25,10 @@ Schema AnalysisResult = {
 }
 
 Agent DeepAnalyst: Analyst = {
+  role = () { "analytical specialist" }
+  goal = () { "find what others miss" }
+  system_prompt = () { "You are an analytical specialist. You find what others miss." }
+
   analyze = (msg) {
     depth_instruction = msg.depth ? {
       "shallow" -> "Give a brief, high-level analysis in 2-3 sentences."

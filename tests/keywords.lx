@@ -3,12 +3,27 @@
 
 -- Agent
 Agent TestAgent = {
+  role = () { "test agent" }
+  goal = () { "verify trait methods" }
+  system_prompt = () { "You are a test." }
   perceive = (msg) { {intent: msg} }
 }
+
 a = TestAgent {}
 assert (a.perceive "hello").intent == "hello"
 assert (methods_of a | any? (== "think"))
 assert (methods_of a | any? (== "handle"))
+assert (methods_of a | any? (== "build_prompt"))
+assert (methods_of a | any? (== "health"))
+assert (methods_of a | any? (== "role"))
+assert (methods_of a | any? (== "delegate"))
+assert (methods_of a | any? (== "escalate"))
+assert (methods_of a | any? (== "on_turn_start"))
+assert (methods_of a | any? (== "on_error"))
+assert (methods_of a | any? (== "bootstrap_context"))
+assert (a.role () == "test agent")
+assert (a.goal () == "verify trait methods")
+assert ((a.health ()).ok == true)
 
 -- Tool
 Tool Echo = {

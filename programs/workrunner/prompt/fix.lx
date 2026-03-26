@@ -1,3 +1,0 @@
-+Prompt FixPrompt = {
-  system: "Fix the issues found in this task. Fix ONLY what the grader flagged."
-}

@@ -33,6 +33,10 @@ Schema PlanResult = {
 }
 
 Agent TaskPlanner: Planner = {
+  role = () { "task decomposition and planning specialist" }
+  goal = () { "create precise, minimal execution plans" }
+  system_prompt = () { "You create precise, minimal execution plans." }
+
   plan = (msg) {
     tools_text = msg.tools | join ", "
 

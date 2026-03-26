@@ -1,26 +1,34 @@
-use ../prompt/implement {ImplementPrompt}
+use std/prompt {Prompt}
 use ../schema/work_item {task_context context_for_implement}
 use pkg/log
 
 +Agent Implementer = {
   tools = () { ["Read"; "Edit"; "Write"; "Bash"; "Glob"; "Grep"] }
 
-  act = (msg) {
-    log.log "    > claude: implement task {msg.task.num} (max 25 turns)..."
-    ctx = task_context msg.task
+  system_prompt = () { "You are implementing one task from a work item. Follow the task description exactly. Use justfile recipes. No code comments. 300 line file limit." }
 
-    p = ImplementPrompt {}
+  build_prompt = (msg) {
+    ctx = task_context msg.task
+    p = Prompt { system: self.system_prompt () }
     p.compose msg.bootstrap_prompt
     p.add_section "Work Item Context" (context_for_implement msg.wi)
     p.add_section "Current Task" ctx
     p.add_instruction "Run `just diagnose` after implementation to verify compilation."
     p.add_constraint "Do not add code comments or doc strings"
     p.add_constraint "No #[allow()] macros"
+    p
+  }
 
-    result = self.think_with { prompt: (p.render ()) } ^
+  on_turn_start = (msg) { log.log "    > claude: implement task {msg.task.num} (max 25 turns)..." }
 
+  on_turn_end = (msg result) {
     log.save_debug msg.runner_dir msg.wi.slug "task_{msg.task.num}_implement.md" result.text
     log.log "    < done ({result.turns ?? 0} turns)"
+  }
+
+  act = (msg) {
+    p = self.build_prompt msg
+    result = self.think_with { prompt: (p.render ()) } ^
     result
   }
 }

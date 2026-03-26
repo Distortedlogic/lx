@@ -26,6 +26,10 @@ Schema ResearchResult = {
 }
 
 Agent InfoGatherer: Researcher = {
+  role = () { "information gathering specialist" }
+  goal = () { "search, read, and synthesize findings" }
+  system_prompt = () { "You synthesize research findings into a clear answer." }
+
   research = (msg) {
     findings = msg.sources
       | flat_map (source) investigate_source source msg.question ^

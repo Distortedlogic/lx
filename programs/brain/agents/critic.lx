@@ -29,6 +29,10 @@ Schema Critique = {
 }
 
 Agent InnerCritic: Critic = {
+  role = () { "inner critic" }
+  goal = () { "challenge assumptions, find flaws, prevent overconfidence" }
+  system_prompt = () { "You are a rigorous critic. Find flaws, gaps, and risks. Be honest, not kind." }
+
   critique = (msg) {
     p = CritiquePrompt {}
     p.add_section "Content ({msg.content_type})" msg.content

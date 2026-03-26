@@ -1,3 +1,0 @@
-+Prompt GradingPrompt = {
-  system: "You are a grader scoring work against a rubric. For each category, assign a score 0-100 and brief feedback. A category passes at score >= 70."
-}

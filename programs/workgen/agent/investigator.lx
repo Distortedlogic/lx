@@ -1,26 +1,33 @@
-use ../prompt/investigate {InvestigatePrompt}
+use std/prompt {Prompt}
 use pkg/log
 
 +Agent Investigator = {
   tools = () { ["Read"; "Glob"; "Grep"; "Bash"] }
   max_turns = () { 30 }
 
-  act = (msg) {
-    log.log "  > claude: investigate codebase..."
+  system_prompt = () { "You are a code auditor. Investigate the codebase thoroughly — read files, search for patterns. Produce a numbered findings list." }
 
-    p = InvestigatePrompt {}
+  build_prompt = (msg) {
+    p = Prompt { system: self.system_prompt () }
     p.add_section "Audit Checklist" msg.audit_content
     p.add_instruction "For each audit item, search the codebase under '{msg.root}/' to determine if it is violated"
     p.add_instruction "Read every relevant file — do not guess from filenames alone"
     p.add_instruction "Return a numbered list of findings: concrete problem, root cause, single best fix, affected files"
     p.add_constraint "Report ONLY problems — do not list things that are correct"
     p.add_constraint "One fix per finding, verbal only, no code snippets"
+    p
+  }
 
+  on_turn_start = (msg) { log.log "  > claude: investigate codebase..." }
+
+  on_turn_end = (msg result) {
+    log.save_debug msg.runner_dir msg.slug "investigate.md" result
+    log.log "  < investigate done ({result | lines | len} lines)"
+  }
+
+  act = (msg) {
+    p = self.build_prompt msg
     result = self.think_with { prompt: (p.render ()) } ^
-
-    findings = result.text
-    log.save_debug msg.runner_dir msg.slug "investigate.md" findings
-    log.log "  < investigate done ({findings | lines | len} lines, {result.turns ?? 0} turns)"
-    findings
+    result.text
   }
 }

@@ -1,3 +1,0 @@
-+Prompt SystemAuditPrompt = {
-  system: "You are running a final system-wide audit after all work items have been implemented. Check code quality across the full codebase and verify spec compliance for every executed work item."
-}

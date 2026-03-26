@@ -1,3 +1,0 @@
-+Prompt ComposePrompt = {
-  system: "You are a markdown document generator. Output the document directly. Start with '# Goal'. No conversation."
-}

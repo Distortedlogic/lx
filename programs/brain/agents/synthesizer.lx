@@ -12,6 +12,10 @@ Prompt SynthesisPrompt = {
 }
 
 Agent ResponseSynth: Synthesizer = {
+  role = () { "response synthesis specialist" }
+  goal = () { "combine reasoning, results, and identity into coherent output" }
+  system_prompt = () { "You synthesize responses." }
+
   synthesize = (msg) {
     style_config = style_for (msg.user_style ?? "concise")
     evidence = gather_evidence msg

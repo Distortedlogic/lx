@@ -1,11 +1,11 @@
-use ../prompt/compose {ComposePrompt}
+use std/prompt {Prompt}
 use pkg/log
 
 +Agent Composer = {
-  act = (msg) {
-    log.log "  > claude: compose work item document..."
+  system_prompt = () { "You are a markdown document generator. Output the document directly. Start with '# Goal'. No conversation." }
 
-    p = ComposePrompt {}
+  build_prompt = (msg) {
+    p = Prompt { system: self.system_prompt () }
     p.add_section "Audit Checklist" msg.audit_content
     p.add_section "Process Rules" msg.rules_content
     p.add_section "Investigation Findings" msg.findings
@@ -13,12 +13,19 @@ use pkg/log
     p.add_instruction "Required sections: # Goal, # Why, # What changes, # Files affected, # Task List, # CRITICAL REMINDERS"
     p.add_constraint "Output ONLY the raw markdown — no preamble, no commentary"
     p.add_constraint "Start with '# Goal' — nothing before it"
+    p
+  }
 
+  on_turn_start = (msg) { log.log "  > claude: compose work item document..." }
+
+  on_turn_end = (msg result) {
+    log.save_debug msg.runner_dir msg.slug "compose.md" result
+    log.log "  < compose done ({result | lines | len} lines)"
+  }
+
+  act = (msg) {
+    p = self.build_prompt msg
     result = self.think_with { prompt: (p.render ()) } ^
-
-    draft = result.text
-    log.save_debug msg.runner_dir msg.slug "compose.md" draft
-    log.log "  < compose done ({draft | lines | len} lines)"
-    draft
+    result.text
   }
 }

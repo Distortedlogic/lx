@@ -1,4 +1,4 @@
-use ../prompt/investigate {InvestigatePrompt}
+use std/prompt {Prompt}
 use ../schema/work_item {context_for_investigate}
 use pkg/log
 
@@ -6,9 +6,10 @@ use pkg/log
   tools = () { ["Read"; "Glob"; "Grep"; "Bash"] }
   max_turns = () { 20 }
 
-  act = (msg) {
-    log.log "  > claude: investigate full work item..."
-    p = InvestigatePrompt {}
+  system_prompt = () { "Investigate whether a work item is fully implemented. Check code quality and spec compliance. Be terse — under 2000 chars." }
+
+  build_prompt = (msg) {
+    p = Prompt { system: self.system_prompt () }
     p.add_section "Work Item" (context_for_investigate msg.wi)
     p.add_instruction "Check each file in Files Affected exists (use Glob)"
     p.add_instruction "Check mod.rs registrations if applicable (use Grep)"
@@ -20,12 +21,19 @@ use pkg/log
     p.add_constraint "Flag: new struct/trait/enum with no users, TODO/FIXME/unimplemented left behind"
     p.add_constraint "For each task: did the code do what was asked? Anything not asked? Anything incomplete?"
     p.add_constraint "Keep under 2000 chars. No file contents."
+    p
+  }
 
+  on_turn_start = (msg) { log.log "  > claude: investigate full work item..." }
+
+  on_turn_end = (msg result) {
+    log.save_debug msg.runner_dir msg.wi.slug "investigate.md" result
+    log.log "  < investigate done ({result | len} chars)"
+  }
+
+  act = (msg) {
+    p = self.build_prompt msg
     result = self.think_with { prompt: (p.render ()) } ^
-
-    report = result.text
-    log.save_debug msg.runner_dir msg.wi.slug "investigate.md" report
-    log.log "  < investigate done ({report | len} chars)"
-    report
+    result.text
   }
 }

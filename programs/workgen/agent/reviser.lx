@@ -1,22 +1,29 @@
-use ../prompt/revise {RevisePrompt}
+use std/prompt {Prompt}
 use pkg/log
 
 +Agent Reviser = {
-  act = (msg) {
-    log.log "  > claude: revise draft (round {msg.round_num})..."
+  system_prompt = () { "You are revising a work item document. Fix every feedback item. Output the complete revised document." }
 
-    p = RevisePrompt {}
+  build_prompt = (msg) {
+    p = Prompt { system: self.system_prompt () }
     p.add_section "Current Document" msg.draft
     p.add_section "Feedback to Fix" msg.feedback
     p.add_instruction "Fix ALL feedback items. Return the complete revised markdown document."
     p.add_constraint "Do not remove content to avoid checks — fix issues properly"
     p.add_constraint "Start with '# Goal' — nothing before it"
+    p
+  }
 
+  on_turn_start = (msg) { log.log "  > claude: revise draft (round {msg.round_num})..." }
+
+  on_turn_end = (msg result) {
+    log.save_debug msg.runner_dir msg.slug "revise_round_{msg.round_num}.md" result
+    log.log "  < revise done ({result | lines | len} lines)"
+  }
+
+  act = (msg) {
+    p = self.build_prompt msg
     result = self.think_with { prompt: (p.render ()) } ^
-
-    revised = result.text
-    log.save_debug msg.runner_dir msg.slug "revise_round_{msg.round_num}.md" revised
-    log.log "  < revise done ({revised | lines | len} lines)"
-    revised
+    result.text
   }
 }
