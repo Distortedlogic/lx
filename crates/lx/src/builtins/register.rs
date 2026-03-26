@@ -174,7 +174,6 @@ fn bi_source_dir(_args: &[LxVal], _span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> R
   }
 }
 
-
 fn bi_agent_implements(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let target_trait = match &args[1] {
     LxVal::Str(s) => s.to_string(),

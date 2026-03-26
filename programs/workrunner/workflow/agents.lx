@@ -1,5 +1,4 @@
 -- Non-agent workflow utilities (no AI calls)
-use ../store/status {save_debug}
 use pkg/log
 
 +diagnose = (task runner_dir slug) {
@@ -8,7 +7,7 @@ use pkg/log
   diag_out = diag ?? {out: ""; err: "command failed"; code: 1}
   output = diag_out.out ?? diag_out.err ?? ""
   clean = output | contains? "0 errors" && (output | contains? "0 warnings")
-  save_debug runner_dir slug "task_{task.num}_diagnose.txt" output
+  log.save_debug runner_dir slug "task_{task.num}_diagnose.txt" output
   clean ? log.log "    TASK {task.num}: compiles clean" : log.log "    TASK {task.num}: compilation issues"
   clean
 }

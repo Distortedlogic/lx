@@ -5,7 +5,7 @@ now = time.now ()
 runner_dir = "/tmp/lx_test_persistence_{now.ms}"
 
 st = RunStatus {runner_dir: runner_dir}
-st.load ()
+st.init ()
 
 assert (st.completed_count () == 0)
 
@@ -18,7 +18,7 @@ st.record_result {status: "fail"; score: 40; path: "bar.md"; feedback: "bad"}
 assert (st.completed_count () == 1)
 
 st2 = RunStatus {runner_dir: runner_dir}
-st2.load ()
+st2.init ()
 assert (st2.completed_count () == 1)
 foo_reloaded = st2.is_completed "foo.md"
 assert (foo_reloaded == true)

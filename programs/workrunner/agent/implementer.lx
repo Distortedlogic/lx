@@ -1,6 +1,5 @@
 use ../prompt/implement {ImplementPrompt}
 use ../schema/work_item {task_context context_for_implement}
-use ../store/status {save_debug}
 use pkg/log
 
 +Agent Implementer = {
@@ -22,7 +21,7 @@ use pkg/log
       max_turns: 25
     } ^
 
-    save_debug msg.runner_dir msg.wi.slug "task_{msg.task.num}_implement.md" result.text
+    log.save_debug msg.runner_dir msg.wi.slug "task_{msg.task.num}_implement.md" result.text
     log.log "    < done ({result.turns ?? 0} turns)"
     result
   }

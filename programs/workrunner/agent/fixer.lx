@@ -1,7 +1,6 @@
 use ../prompt/fix {FixPrompt}
 use ../prompt/fix_wi {FixWiPrompt}
 use ../schema/work_item {task_context context_for_investigate}
-use ../store/status {save_debug}
 use pkg/log
 
 +Agent TaskFixer = {
@@ -22,7 +21,7 @@ use pkg/log
       max_turns: 15
     } ^
 
-    save_debug msg.runner_dir msg.wi.slug "task_{msg.task.num}_fix.md" result.text
+    log.save_debug msg.runner_dir msg.wi.slug "task_{msg.task.num}_fix.md" result.text
     log.log "    < fix done ({result.turns ?? 0} turns)"
     result
   }
@@ -44,7 +43,7 @@ use pkg/log
       max_turns: 25
     } ^
 
-    save_debug msg.runner_dir msg.wi.slug "fix_wi.md" result.text
+    log.save_debug msg.runner_dir msg.wi.slug "fix_wi.md" result.text
     log.log "  < fix done ({result.turns ?? 0} turns)"
     result
   }

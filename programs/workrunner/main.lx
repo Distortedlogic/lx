@@ -48,7 +48,7 @@ bootstrap_prompt = BootstrapContext {}
 bootstrap_prompt.load ()
 
 status = RunStatus {runner_dir: runner_dir}
-status.load ()
+status.init ()
 
 total = work_item_paths | len
 log.log "Agentic Work Runner — {total} work items ({status.completed_count ()} already completed)"

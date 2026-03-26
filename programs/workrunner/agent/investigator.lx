@@ -1,6 +1,5 @@
 use ../prompt/investigate {InvestigatePrompt}
 use ../schema/work_item {context_for_investigate}
-use ../store/status {save_debug}
 use pkg/log
 
 +Agent Investigator = {
@@ -22,7 +21,7 @@ use pkg/log
     } ^
 
     report = result.text
-    save_debug msg.runner_dir msg.wi.slug "investigate.md" report
+    log.save_debug msg.runner_dir msg.wi.slug "investigate.md" report
     log.log "  < investigate done ({report | len} chars)"
     report
   }

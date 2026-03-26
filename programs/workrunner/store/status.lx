@@ -1,4 +1,4 @@
--- Status persistence + debug log storage for the work runner.
+-- Status persistence for the work runner.
 
 use std/fs
 
@@ -7,20 +7,15 @@ use std/fs
 
   status_file = () { "{self.runner_dir}/status.json" }
 
-  load = () {
+  init = () {
     path = self.status_file ()
-    exists = fs.exists path
-    not exists ? () : {
-      data = fs.read path ^ | json.parse ^
-      entries_list = data.entries
-      entries_list | each (e) { self.entries.set e.path e }
-    }
+    (fs.exists path) ? self.load path
   }
 
-  save = () {
+  record_result = (result) {
     fs.mkdir self.runner_dir ^
-    data = {entries: self.entries.values ()}
-    fs.write (self.status_file ()) (json.encode_pretty data) ^
+    self.entries.set result.path result
+    self.save (self.status_file ())
   }
 
   is_completed = (path) {
@@ -31,19 +26,7 @@ use std/fs
     }
   }
 
-  record_result = (result) {
-    self.entries.set result.path result
-    self.save ()
-  }
-
   completed_count = () {
-    passed = self.entries.values () | filter (e) { e.status == "pass" }
-    passed | len
+    self.entries.values () | filter (e) { e.status == "pass" } | len
   }
-}
-
-+save_debug = (runner_dir slug label content) {
-  dir = "{runner_dir}/logs/{slug}"
-  fs.mkdir dir ^
-  fs.write "{dir}/{label}" content ^
 }

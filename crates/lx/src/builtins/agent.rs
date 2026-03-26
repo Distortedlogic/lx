@@ -29,20 +29,11 @@ pub fn bi_agent_spawn(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) 
 
   let script_path = config
     .get(&crate::sym::intern("script"))
-    .or_else(|| {
-      config.get(&crate::sym::intern("args")).and_then(|a| {
-        if let LxVal::List(l) = a {
-          l.last()
-        } else {
-          None
-        }
-      })
-    })
+    .or_else(|| config.get(&crate::sym::intern("args")).and_then(|a| if let LxVal::List(l) = a { l.last() } else { None }))
     .and_then(|v| v.as_str().map(|s| s.to_string()))
     .ok_or_else(|| LxError::type_err("agent.spawn: config needs 'script' or 'args' with script path", span, None))?;
 
-  let source = std::fs::read_to_string(&script_path)
-    .map_err(|e| LxError::runtime(format!("agent.spawn: cannot read {script_path}: {e}"), span))?;
+  let source = std::fs::read_to_string(&script_path).map_err(|e| LxError::runtime(format!("agent.spawn: cannot read {script_path}: {e}"), span))?;
 
   let (tokens, comments) = crate::lexer::lex(&source).map_err(|e| LxError::runtime(format!("agent.spawn: lex error: {e}"), span))?;
   let result = crate::parser::parse(tokens, crate::source::FileId::new(0), comments, &source);
@@ -61,12 +52,8 @@ pub fn bi_agent_spawn(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) 
   tokio::task::spawn_blocking(move || {
     let rt = tokio::runtime::Runtime::new().expect("agent runtime");
     let yield_backend: Arc<dyn crate::runtime::YieldBackend> = Arc::new(ChannelYieldBackend { rx: yield_rx, tx: yield_tx });
-    let ctx = Arc::new(RuntimeCtx {
-      source_dir: parking_lot::Mutex::new(source_dir),
-      yield_: yield_backend,
-      tokio_runtime: Arc::new(rt),
-      ..RuntimeCtx::default()
-    });
+    let ctx =
+      Arc::new(RuntimeCtx { source_dir: parking_lot::Mutex::new(source_dir), yield_: yield_backend, tokio_runtime: Arc::new(rt), ..RuntimeCtx::default() });
     let source_clone = source.clone();
     ctx.tokio_runtime.clone().block_on(async {
       let mut interp = crate::interpreter::Interpreter::new(&source_clone, None, ctx);
@@ -74,10 +61,7 @@ pub fn bi_agent_spawn(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) 
     });
   });
 
-  AGENTS.insert(id, AgentEntry {
-    to_agent: Some(Arc::new(to_agent_tx)),
-    from_agent: Arc::new(std::sync::Mutex::new(from_agent_rx)),
-  });
+  AGENTS.insert(id, AgentEntry { to_agent: Some(Arc::new(to_agent_tx)), from_agent: Arc::new(std::sync::Mutex::new(from_agent_rx)) });
 
   Ok(record! {
     "__agent_id" => LxVal::int(id),
