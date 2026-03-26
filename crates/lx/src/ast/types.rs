@@ -101,7 +101,6 @@ pub enum KeywordKind {
   Agent,
   Tool,
   Prompt,
-  Connector,
   Store,
   Session,
   Guard,

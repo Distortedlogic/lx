@@ -88,7 +88,6 @@ pub enum TokenKind {
   AgentKw,
   ToolKw,
   PromptKw,
-  ConnectorKw,
   StoreKw,
   SessionKw,
   GuardKw,

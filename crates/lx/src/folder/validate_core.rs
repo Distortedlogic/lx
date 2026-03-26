@@ -10,7 +10,6 @@ impl AstVisitor for CoreValidator {
         KeywordKind::Agent
         | KeywordKind::Tool
         | KeywordKind::Prompt
-        | KeywordKind::Connector
         | KeywordKind::Store
         | KeywordKind::Session
         | KeywordKind::Guard

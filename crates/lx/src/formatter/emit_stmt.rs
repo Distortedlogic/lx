@@ -188,7 +188,6 @@ impl Formatter<'_> {
       KeywordKind::Agent => "Agent",
       KeywordKind::Tool => "Tool",
       KeywordKind::Prompt => "Prompt",
-      KeywordKind::Connector => "Connector",
       KeywordKind::Store => "Store",
       KeywordKind::Session => "Session",
       KeywordKind::Guard => "Guard",

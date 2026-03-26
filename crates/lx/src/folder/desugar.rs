@@ -210,7 +210,6 @@ fn desugar_keyword(data: KeywordDeclData, span: SourceSpan, arena: &mut AstArena
     KeywordKind::Agent => (vec!["std", "agent"], "Agent"),
     KeywordKind::Tool => (vec!["std", "tool"], "Tool"),
     KeywordKind::Prompt => (vec!["std", "prompt"], "Prompt"),
-    KeywordKind::Connector => (vec!["std", "connector"], "Connector"),
     KeywordKind::Store => (vec!["std", "collection"], "Collection"),
     KeywordKind::Session => (vec!["std", "session"], "Session"),
     KeywordKind::Guard => (vec!["std", "guard"], "Guard"),

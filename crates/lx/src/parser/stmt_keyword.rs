@@ -27,7 +27,6 @@ where
     just(TokenKind::AgentKw).to(KeywordKind::Agent),
     just(TokenKind::ToolKw).to(KeywordKind::Tool),
     just(TokenKind::PromptKw).to(KeywordKind::Prompt),
-    just(TokenKind::ConnectorKw).to(KeywordKind::Connector),
     just(TokenKind::StoreKw).to(KeywordKind::Store),
     just(TokenKind::SessionKw).to(KeywordKind::Session),
     just(TokenKind::GuardKw).to(KeywordKind::Guard),

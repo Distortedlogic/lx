@@ -42,7 +42,6 @@ where
       TokenKind::AgentKw => intern("Agent"),
       TokenKind::ToolKw => intern("Tool"),
       TokenKind::PromptKw => intern("Prompt"),
-      TokenKind::ConnectorKw => intern("Connector"),
       TokenKind::StoreKw => intern("Store"),
       TokenKind::SessionKw => intern("Session"),
       TokenKind::GuardKw => intern("Guard"),

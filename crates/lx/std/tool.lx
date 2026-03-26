@@ -1,4 +1,5 @@
 +Trait Tool = {
+  name: Str = ""
   description: Str = ""
   params: Record = {}
 

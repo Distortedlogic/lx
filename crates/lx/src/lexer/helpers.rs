@@ -39,7 +39,6 @@ pub(super) fn type_name_or_keyword(text: &str) -> TokenKind {
     "Agent" => TokenKind::AgentKw,
     "Tool" => TokenKind::ToolKw,
     "Prompt" => TokenKind::PromptKw,
-    "Connector" => TokenKind::ConnectorKw,
     "Store" => TokenKind::StoreKw,
     "Session" => TokenKind::SessionKw,
     "Guard" => TokenKind::GuardKw,
