@@ -40,6 +40,7 @@ pub(crate) async fn call_value(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Ar
       match bf.kind {
         BuiltinKind::Sync(f) => f(&bf.applied, span, ctx),
         BuiltinKind::Async(f) => f(bf.applied, span, Arc::clone(ctx)).await,
+        BuiltinKind::DynAsync(ref f) => f(bf.applied.clone(), span, Arc::clone(ctx)).await,
       }
     },
     LxVal::MultiFunc(clauses) => {

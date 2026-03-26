@@ -3,7 +3,7 @@ mod func;
 mod impls;
 mod serde_impl;
 
-pub use func::{AsyncBuiltinFn, BuiltinFunc, BuiltinKind, LxFunc, SyncBuiltinFn};
+pub use func::{AsyncBuiltinFn, BuiltinFunc, BuiltinKind, DynAsyncBuiltinFn, LxFunc, SyncBuiltinFn, mk_dyn_async};
 
 use std::sync::Arc;
 

@@ -1,0 +1,5 @@
+use wasm/test_upper
+
+assert (test_upper.upper "hello") == "HELLO"
+assert (test_upper.upper "world") == "WORLD"
+assert (test_upper.upper "lx wasm plugins") == "LX WASM PLUGINS"

@@ -37,6 +37,7 @@ clap = { version = "4", features = ["derive"] }
 cron = { version = "0.15.0" }
 dashmap = { version = "6.1.0" }
 ena = { version = "0.14" }
+extism = { version = "1.20.0" }
 derive_more = { version = "2.1.1", features = ["deref", "display", "from", "try_from"] }
 fastrand = { version = "2" }
 futures = { version = "0.3.32" }

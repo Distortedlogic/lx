@@ -1,3 +1,4 @@
+use std::pin::Pin;
 use std::sync::Arc;
 
 use crate::ast::{AstArena, ExprId};
@@ -23,12 +24,17 @@ pub struct LxFunc {
 pub type SyncBuiltinFn = fn(&[LxVal], miette::SourceSpan, &Arc<crate::runtime::RuntimeCtx>) -> Result<LxVal, LxError>;
 
 pub type AsyncBuiltinFn =
-  fn(Vec<LxVal>, miette::SourceSpan, Arc<crate::runtime::RuntimeCtx>) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<LxVal, LxError>>>>;
+  fn(Vec<LxVal>, miette::SourceSpan, Arc<crate::runtime::RuntimeCtx>) -> Pin<Box<dyn std::future::Future<Output = Result<LxVal, LxError>>>>;
 
-#[derive(Clone, Copy)]
+pub type DynAsyncBuiltinFn = Arc<
+  dyn Fn(Vec<LxVal>, miette::SourceSpan, Arc<crate::runtime::RuntimeCtx>) -> Pin<Box<dyn std::future::Future<Output = Result<LxVal, LxError>>>> + Send + Sync,
+>;
+
+#[derive(Clone)]
 pub enum BuiltinKind {
   Sync(SyncBuiltinFn),
   Async(AsyncBuiltinFn),
+  DynAsync(DynAsyncBuiltinFn),
 }
 
 #[derive(Clone)]
@@ -37,4 +43,8 @@ pub struct BuiltinFunc {
   pub arity: usize,
   pub kind: BuiltinKind,
   pub applied: Vec<LxVal>,
+}
+
+pub fn mk_dyn_async(name: &'static str, arity: usize, func: DynAsyncBuiltinFn) -> LxVal {
+  LxVal::BuiltinFunc(BuiltinFunc { name, arity, kind: BuiltinKind::DynAsync(func), applied: Vec::new() })
 }

@@ -69,6 +69,7 @@ impl Interpreter {
         match bf.kind {
           BuiltinKind::Sync(f) => Ok(f(&bf.applied, span, &self.ctx)?),
           BuiltinKind::Async(f) => Ok(f(bf.applied, span, Arc::clone(&self.ctx)).await?),
+          BuiltinKind::DynAsync(ref f) => Ok(f(bf.applied.clone(), span, Arc::clone(&self.ctx)).await?),
         }
       },
       LxVal::TaggedCtor { tag, arity, mut applied } => {

@@ -1,0 +1,8 @@
+[plugin]
+name = "test_upper"
+version = "0.1.0"
+description = "Uppercase string plugin for testing"
+wasm = "test_upper.wasm"
+
+[exports]
+upper = { arity = 1 }

@@ -14,6 +14,7 @@ use super::{Interpreter, ModuleExports};
 impl Interpreter {
   pub(super) async fn eval_use(&mut self, use_stmt: &UseStmt, span: SourceSpan) -> Result<(), LxError> {
     let str_path: Vec<&str> = use_stmt.path.iter().map(|s| s.as_str()).collect();
+    let str_joined = str_path.join("/");
     let exports = if crate::stdlib::std_module_exists(&str_path) {
       if let Some(rust_exports) = crate::stdlib::get_std_module(&str_path) {
         rust_exports
@@ -22,6 +23,8 @@ impl Interpreter {
       } else {
         return Err(LxError::runtime(format!("unknown stdlib module: {}", str_path.join("/")), span));
       }
+    } else if let Some(plugin_name) = str_joined.strip_prefix("wasm/") {
+      self.load_wasm_plugin(plugin_name, span)?
     } else if let Some(file_path) = self.resolve_workspace_module(&str_path) {
       self.load_module(&file_path, span).await?
     } else if let Some(file_path) = self.resolve_dep_module(&str_path) {
@@ -56,6 +59,37 @@ impl Interpreter {
     }
     self.env = Arc::new(env);
     Ok(())
+  }
+
+  fn load_wasm_plugin(&self, name: &str, span: SourceSpan) -> Result<ModuleExports, LxError> {
+    let cache_key = PathBuf::from(format!("__wasm_{name}"));
+    {
+      let cache = self.module_cache.lock();
+      if let Some(exports) = cache.get(&cache_key) {
+        return Ok(exports.clone());
+      }
+    }
+    let plugin_dir = self.find_plugin_dir(name);
+    let dir = plugin_dir.ok_or_else(|| LxError::runtime(format!("wasm plugin '{name}' not found"), span))?;
+    let exports = crate::stdlib::wasm::load_plugin(name, &dir, span)?;
+    self.module_cache.lock().insert(cache_key, exports.clone());
+    Ok(exports)
+  }
+
+  fn find_plugin_dir(&self, name: &str) -> Option<PathBuf> {
+    if let Some(ref source_dir) = self.source_dir {
+      let local = source_dir.join(".lx").join("plugins").join(name);
+      if local.join("plugin.toml").exists() {
+        return Some(local);
+      }
+    }
+    if let Some(home) = std::env::var_os("HOME") {
+      let global = PathBuf::from(home).join(".lx").join("plugins").join(name);
+      if global.join("plugin.toml").exists() {
+        return Some(global);
+      }
+    }
+    None
   }
 
   fn resolve_workspace_module(&self, path: &[&str]) -> Option<PathBuf> {
