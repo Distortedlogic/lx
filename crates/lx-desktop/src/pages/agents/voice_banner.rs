@@ -6,11 +6,12 @@ use base64::engine::general_purpose::STANDARD as B64;
 use common_inference::InferenceClient as _;
 use common_kokoro::SpeechRequest;
 use common_whisper::TranscribeRequest;
+use dioxus::logger::tracing::error;
 use dioxus::prelude::*;
 use dioxus_widget_bridge::use_ts_widget;
 
 static AUDIO_SINK: LazyLock<rodio::MixerDeviceSink> = LazyLock::new(|| {
-  let mut sink = rodio::DeviceSinkBuilder::open_default_sink().expect("no audio device");
+  let mut sink = rodio::DeviceSinkBuilder::open_default_sink().unwrap_or_else(|e| panic!("audio device: {e}"));
   sink.log_on_drop(false);
   sink
 });
@@ -206,14 +207,24 @@ async fn run_pipeline(
 
   let transcript_entry = response.clone();
   let wav_len = wav_bytes.len();
-  eprintln!("[voice] TTS returned {wav_len} bytes of WAV data");
-  tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+  error!("voice: TTS returned {wav_len} bytes, starting playback");
+  let play_result = tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
     let cursor = std::io::Cursor::new(wav_bytes);
-    let player = rodio::play(AUDIO_SINK.mixer(), cursor)?;
+    let player = rodio::play(AUDIO_SINK.mixer(), cursor).map_err(|e| {
+      error!("voice: rodio::play failed: {e}");
+      e
+    })?;
     player.sleep_until_end();
+    error!("voice: playback finished");
     Ok(())
   })
-  .await??;
+  .await;
+  match &play_result {
+    Ok(Ok(())) => {},
+    Ok(Err(e)) => error!("voice: playback error: {e}"),
+    Err(e) => error!("voice: spawn_blocking panicked: {e}"),
+  }
+  play_result??;
 
   let mut t = ctx.transcript.write();
   match t.last_mut() {
