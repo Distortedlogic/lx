@@ -137,12 +137,10 @@ where
 
     let assert_expr = {
       let al = arena.clone();
-      let assert_cond = just(TokenKind::LParen).ignore_then(expr.clone()).then_ignore(just(TokenKind::RParen));
-      let assert_msg = super::expr_pratt::string_parser(expr.clone(), arena.clone());
       just(TokenKind::Assert)
-        .ignore_then(assert_cond)
-        .then(assert_msg.or_not())
-        .map_with(move |(cond, msg), e| al.borrow_mut().alloc_expr(Expr::Assert(ExprAssert { expr: cond, msg }), ss(e.span())))
+        .ignore_then(expr.clone())
+        .then(expr.clone().or_not())
+        .map_with(move |(ex, msg), e| al.borrow_mut().alloc_expr(Expr::Assert(ExprAssert { expr: ex, msg }), ss(e.span())))
     };
 
     let emit_expr = {
