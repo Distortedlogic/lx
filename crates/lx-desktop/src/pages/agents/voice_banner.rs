@@ -165,26 +165,6 @@ pub fn VoiceBanner() -> Element {
   }
 }
 
-fn split_sentences(text: &str) -> Vec<String> {
-  let mut sentences = Vec::new();
-  let mut current = String::new();
-  for ch in text.chars() {
-    current.push(ch);
-    if matches!(ch, '.' | '!' | '?') {
-      let trimmed = current.trim().to_owned();
-      if !trimmed.is_empty() {
-        sentences.push(trimmed);
-      }
-      current.clear();
-    }
-  }
-  let trimmed = current.trim().to_owned();
-  if !trimmed.is_empty() {
-    sentences.push(trimmed);
-  }
-  sentences
-}
-
 async fn tts(text: &str) -> anyhow::Result<Vec<u8>> {
   let req = SpeechRequest { text: text.to_owned(), voice: "am_michael".into(), lang_code: "a".into(), speed: 1.0 };
   common_kokoro::KOKORO.infer(&req).await
@@ -220,35 +200,14 @@ async fn run_pipeline(
     return Ok(());
   }
 
-  let sentences = split_sentences(&response);
-  if sentences.is_empty() {
-    ctx.pipeline_stage.set(PipelineStage::Idle);
-    return Ok(());
-  }
-
   ctx.pipeline_stage.set(PipelineStage::SynthesizingSpeech);
-  let mut next_tts: Option<tokio::task::JoinHandle<anyhow::Result<Vec<u8>>>> = {
-    let s = sentences[0].clone();
-    Some(tokio::spawn(async move { tts(&s).await }))
-  };
-
-  for (i, sentence) in sentences.iter().enumerate() {
-    let Some(handle) = next_tts.take() else { break };
-    let wav_bytes = handle.await??;
-
-    if i + 1 < sentences.len() {
-      let s = sentences[i + 1].clone();
-      next_tts = Some(tokio::spawn(async move { tts(&s).await }));
-    }
-
-    let id = format!("s{i}");
-    ctx.pending.write().insert(id.clone(), sentence.clone());
-    voice_widget.send_update(serde_json::json!({
-        "type": "audio_response",
-        "data": B64.encode(&wav_bytes),
-        "id": id,
-    }));
-  }
+  let wav_bytes = tts(&response).await?;
+  ctx.pending.write().insert("r0".to_string(), response);
+  voice_widget.send_update(serde_json::json!({
+      "type": "audio_response",
+      "data": B64.encode(&wav_bytes),
+      "id": "r0",
+  }));
   ctx.pipeline_stage.set(PipelineStage::Idle);
   Ok(())
 }
