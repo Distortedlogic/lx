@@ -39049,8 +39049,14 @@ registerProcessor('capture', Capture);
 					break;
 				case "resume_standby":
 					state.hasSpeech = false;
-					state.capture.resetVad();
-					transition(state, "standby");
+					if (!state.capture.isRunning) state.capture.start().then(() => {
+						state.capture.resetVad();
+						transition(state, "standby");
+					});
+					else {
+						state.capture.resetVad();
+						transition(state, "standby");
+					}
 					break;
 				case "awaiting_query":
 					state.hasSpeech = false;

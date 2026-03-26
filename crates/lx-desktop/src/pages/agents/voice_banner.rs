@@ -229,7 +229,7 @@ async fn handle_utterance(
   }
 
   if is_awaiting {
-    voice_pipeline::run_pipeline(&text, voice_widget, agent_widget, ctx).await?;
+    voice_pipeline::run_pipeline(&text, agent_widget, ctx).await?;
     return Ok(true);
   }
 
@@ -256,12 +256,12 @@ async fn handle_utterance(
         return Ok(false);
       },
       Some(query) => {
-        voice_pipeline::run_pipeline(&query, voice_widget, agent_widget, ctx).await?;
+        voice_pipeline::run_pipeline(&query, agent_widget, ctx).await?;
       },
     }
     return Ok(true);
   }
 
-  voice_pipeline::run_pipeline(&text, voice_widget, agent_widget, ctx).await?;
+  voice_pipeline::run_pipeline(&text, agent_widget, ctx).await?;
   Ok(true)
 }

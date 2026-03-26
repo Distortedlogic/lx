@@ -9,7 +9,7 @@ use common_whisper::TranscribeRequest;
 use dioxus::logger::tracing::{error, info};
 use dioxus::prelude::*;
 
-pub static AUDIO_SINK: LazyLock<rodio::MixerDeviceSink> = LazyLock::new(|| {
+static AUDIO_SINK: LazyLock<rodio::MixerDeviceSink> = LazyLock::new(|| {
   let mut sink = rodio::DeviceSinkBuilder::open_default_sink().unwrap_or_else(|e| panic!("audio device: {e}"));
   sink.log_on_drop(false);
   sink
@@ -79,12 +79,7 @@ async fn tts(text: &str) -> anyhow::Result<Vec<u8>> {
   common_kokoro::KOKORO.infer(&req).await
 }
 
-pub async fn run_pipeline(
-  text: &str,
-  _voice_widget: dioxus_widget_bridge::TsWidgetHandle,
-  agent_widget: dioxus_widget_bridge::TsWidgetHandle,
-  mut ctx: VoiceContext,
-) -> anyhow::Result<()> {
+pub async fn run_pipeline(text: &str, agent_widget: dioxus_widget_bridge::TsWidgetHandle, mut ctx: VoiceContext) -> anyhow::Result<()> {
   ctx.transcript.write().push(TranscriptEntry { is_user: true, text: text.to_owned() });
 
   agent_widget.send_update(serde_json::json!({ "type": "user_display", "text": text }));
