@@ -1,4 +1,5 @@
 pub(crate) mod agent;
+pub(crate) mod ai;
 mod call;
 pub(crate) mod coll;
 mod coll_transform;
