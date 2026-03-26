@@ -1,0 +1,23 @@
+list = [1; 2; 3]
+result = list ?? []
+assert (result | len == 3)
+
+text = "hello"
+result2 = text ?? "default"
+assert (result2 == "hello")
+
+num = 42
+result3 = num ?? 0
+assert (result3 == 42)
+
+none_val = None ?? "fallback"
+assert (none_val == "fallback")
+
+ok_val = Ok 10 ?? 0
+assert (ok_val == 10)
+
+err_val = Err "bad" ?? 99
+assert (err_val == 99)
+
+some_val = Some "yes" ?? "no"
+assert (some_val == "yes")

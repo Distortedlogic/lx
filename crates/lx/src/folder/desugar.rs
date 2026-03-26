@@ -136,14 +136,19 @@ pub(super) fn desugar_coalesce(expr: ExprId, default: ExprId, span: SourceSpan, 
   let ok_pat = ctor_pat("Ok", vec![ok_bind], arena);
   let ok_body = v_ref(arena);
   let none_pat = ctor_pat("None", vec![], arena);
-  let wildcard = arena.alloc_pattern(Pattern::Wildcard, span);
+  let err_wildcard = arena.alloc_pattern(Pattern::Wildcard, span);
+  let err_pat = ctor_pat("Err", vec![err_wildcard], arena);
+  let coalesce_val = gensym("coalesce");
+  let bind_pat = arena.alloc_pattern(Pattern::Bind(coalesce_val), span);
+  let bind_body = arena.alloc_expr(Expr::Ident(coalesce_val), span);
   Expr::Match(ExprMatch {
     scrutinee: expr,
     arms: vec![
       MatchArm { pattern: some_pat, guard: None, body: some_body },
       MatchArm { pattern: ok_pat, guard: None, body: ok_body },
       MatchArm { pattern: none_pat, guard: None, body: default },
-      MatchArm { pattern: wildcard, guard: None, body: default },
+      MatchArm { pattern: err_pat, guard: None, body: default },
+      MatchArm { pattern: bind_pat, guard: None, body: bind_body },
     ],
   })
 }
