@@ -15,20 +15,46 @@ pub(super) fn bi_sections(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCt
   let mut cur: Option<(i64, String, String)> = None;
   for node in nodes {
     if let LxVal::Record(r) = node {
-      if field_str(r, "type").as_deref() == Some("heading") {
-        if let Some((lv, title, content)) = cur.take() {
-          sections.push(node_rec("section", vec![("level", LxVal::int(lv)), ("title", LxVal::str(title)), ("content", LxVal::str(content.trim()))]));
-        }
+      let type_name = field_str(r, "type");
+      if type_name.as_deref() == Some("heading") {
         let lv: i64 = r.get(&crate::sym::intern("level")).and_then(|v| v.as_int()).and_then(|n| n.try_into().ok()).unwrap_or(1);
-        let title = field_str(r, "text").unwrap_or_default();
-        cur = Some((lv, title, String::new()));
-      } else if let Some((_, _, ref mut content)) = cur
-        && let Some(t) = field_str(r, "text")
-      {
-        if !content.is_empty() {
-          content.push_str("\n\n");
+        let heading_text = field_str(r, "text").unwrap_or_default();
+        match cur.as_mut() {
+          Some((cur_lv, _, content)) if lv > *cur_lv => {
+            if !content.is_empty() {
+              content.push_str("\n\n");
+            }
+            content.push_str(&"#".repeat(lv as usize));
+            content.push(' ');
+            content.push_str(&heading_text);
+          },
+          Some(_) => {
+            let (old_lv, old_title, old_content) = cur.take().expect("checked Some");
+            sections
+              .push(node_rec("section", vec![("level", LxVal::int(old_lv)), ("title", LxVal::str(old_title)), ("content", LxVal::str(old_content.trim()))]));
+            cur = Some((lv, heading_text, String::new()));
+          },
+          None => {
+            cur = Some((lv, heading_text, String::new()));
+          },
         }
-        content.push_str(&t);
+      } else if let Some((_, _, ref mut content)) = cur {
+        let extracted = match type_name.as_deref() {
+          Some("para") | Some("blockquote") => field_str(r, "text"),
+          Some("code") => field_str(r, "code"),
+          Some("list") | Some("ordered") => r
+            .get(&crate::sym::intern("items"))
+            .and_then(|v| v.as_list())
+            .map(|items| items.iter().map(|item| format!("- {item}")).collect::<Vec<_>>().join("\n")),
+          Some("hr") => Some("---".to_string()),
+          _ => field_str(r, "text"),
+        };
+        if let Some(text) = extracted {
+          if !content.is_empty() {
+            content.push_str("\n\n");
+          }
+          content.push_str(&text);
+        }
       }
     }
   }
