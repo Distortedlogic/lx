@@ -1,0 +1,50 @@
+-- Agent harness — wraps agent communication with automatic budget, stop condition, and quality checks.
+
+use std/time
+use pkg/agent/budget : budget_mod
+
++run_with = (handle opts) {
+  budget_opts = opts.budget ?? None
+  stop_cond = opts.stop_when ?? None
+  quality_opts = opts.quality_gate ?? None
+
+  turn_count := 0
+  start = time.now ()
+  active_budget := None
+  last_score := 0.0
+  last_result := None
+
+  budget_opts != None ? (active_budget <- budget_mod.create budget_opts)
+
+  loop {
+    turn_count <- turn_count + 1
+
+    active_budget != None ? {
+      status = budget_mod.status active_budget
+      status == "exceeded" ? break Err {type: "BudgetExhausted"; turns: turn_count; last_result: last_result}
+    }
+
+    result = handle ~>? {action: "handle"; turn: turn_count} ^
+    last_result <- result
+
+    quality_opts != None ? {
+      grade = quality_opts.grader result
+      last_score <- grade.score
+    }
+
+    stop_cond != None ? {
+      now = time.now ()
+      max_budget_pct = active_budget != None
+        ? (budget_mod.used_pct active_budget | values | fold 0.0 (acc v) { v > acc ? v : acc })
+        : 0.0
+      check_state = {
+        turns: turn_count
+        elapsed_ms: now.ms - start.ms
+        budget_pct: max_budget_pct
+        last_score: last_score
+        action_count: turn_count
+      }
+      stop_cond.check check_state ? break Ok {result: last_result; turns: turn_count; reason: "stop_condition"}
+    }
+  }
+}
