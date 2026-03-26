@@ -50,6 +50,8 @@ impl Checker<'_> {
       | Expr::Binary(_)
       | Expr::Unary(_)
       | Expr::Pipe(_)
+      | Expr::Tell(_)
+      | Expr::Ask(_)
       | Expr::Apply(_)
       | Expr::Section(_)
       | Expr::FieldAccess(_)

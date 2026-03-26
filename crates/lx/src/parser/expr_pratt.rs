@@ -5,8 +5,8 @@ use chumsky::prelude::*;
 use super::expr::{semi_sep, skip_semis, type_name};
 use super::{ArenaRef, ExprId, Span, ss};
 use crate::ast::{
-  BinOp, Expr, ExprApply, ExprBinary, ExprCoalesce, ExprFieldAccess, ExprMatch, ExprPipe, ExprPropagate, ExprTernary, ExprUnary, FieldKind, Literal, MatchArm,
-  StrPart, UnaryOp,
+  BinOp, Expr, ExprApply, ExprAsk, ExprBinary, ExprCoalesce, ExprFieldAccess, ExprMatch, ExprPipe, ExprPropagate, ExprTell, ExprTernary, ExprUnary, FieldKind,
+  Literal, MatchArm, StrPart, UnaryOp,
 };
 use crate::lexer::token::TokenKind;
 
@@ -97,6 +97,8 @@ where
   let a6 = arena.clone();
   let a7 = arena.clone();
   let a8 = arena.clone();
+  let a9 = arena.clone();
+  let a10 = arena.clone();
 
   let match_arms = skip_semis()
     .ignore_then(
@@ -154,6 +156,14 @@ where
     binop!(left(21), TokenKind::PlusPlus, BinOp::Concat),
     infix(left(19), just(TokenKind::Pipe), move |l: ExprId, _, r: ExprId, e| {
       a6.borrow_mut().alloc_expr(Expr::Pipe(ExprPipe { left: l, right: r }), ss(e.span()))
+    })
+    .boxed(),
+    infix(left(18), just(TokenKind::TildeArrow), move |l: ExprId, _, r: ExprId, e| {
+      a9.borrow_mut().alloc_expr(Expr::Tell(ExprTell { target: l, msg: r }), ss(e.span()))
+    })
+    .boxed(),
+    infix(left(18), just(TokenKind::TildeArrowQ), move |l: ExprId, _, r: ExprId, e| {
+      a10.borrow_mut().alloc_expr(Expr::Ask(ExprAsk { target: l, msg: r }), ss(e.span()))
     })
     .boxed(),
     binop!(left(17), TokenKind::Eq, BinOp::Eq),

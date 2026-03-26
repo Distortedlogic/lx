@@ -192,6 +192,8 @@ pub fn walk_expr<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, arena: &AstArena
     Expr::Binary(binary) => walk_binary_dispatch(v, id, binary, span, arena)?,
     Expr::Unary(unary) => walk_unary_dispatch(v, id, unary, span, arena)?,
     Expr::Pipe(pipe) => walk_pipe_dispatch(v, id, pipe, span, arena)?,
+    Expr::Tell(tell) => walk_tell_dispatch(v, id, tell, span, arena)?,
+    Expr::Ask(ask) => walk_ask_dispatch(v, id, ask, span, arena)?,
     Expr::Apply(apply) => walk_apply_dispatch(v, id, apply, span, arena)?,
     Expr::Section(section) => walk_section_dispatch(v, id, section, span, arena)?,
     Expr::FieldAccess(fa) => walk_field_access_dispatch(v, id, fa, span, arena)?,

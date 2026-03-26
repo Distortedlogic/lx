@@ -51,6 +51,8 @@ pub enum TokenKind {
   Arrow,
   Question,
   Bang,
+  TildeArrow,
+  TildeArrowQ,
   Dot,
   DotDot,
   DotDotEq,

@@ -4,11 +4,11 @@ Redesign the Agent trait to include identity, context assembly, prompt building,
 
 # Why
 
-Every workgen/workrunner agent repeats the same 10-15 line pattern: create Prompt, add sections, render, call think_with, log before, log after, save debug output. 11 of 12 prompt files in workgen/workrunner are single-line system prompt strings (the exception is `workrunner/prompt/context.lx` which has a `load` method). The brain agents scatter identity, health checking, and context management across separate modules. The new trait centralizes these patterns so agents declare what's unique (their system prompt, their sections, their tools) and the trait handles the rest.
+Every workgen/workrunner agent repeats the same 10-15 line pattern: create Prompt, add sections, render, call think_with, log before, log after, save debug output. 11 of 12 prompt files in workgen/workrunner are single-line system prompt strings (the exception is `workrunner/prompt/context.lx` which has a `load` method that reads files from disk — it is imported by `workrunner/main.lx` and must NOT be deleted). The brain agents scatter identity, health checking, and context management across separate modules. The new trait centralizes these patterns so agents declare what's unique and the trait handles the rest.
 
 # What Changes
 
-**Agent trait (`crates/lx/std/agent.lx`)** — new default methods:
+**Agent trait full method set after redesign:**
 
 ```lx
 use std/prompt {Prompt}
@@ -23,23 +23,23 @@ use std/prompt {Prompt}
   max_context_tokens = () { 100000 }
 
   init = () { }
-  run = () { ... }
+  run = () { ... yield loop ... }
 
   perceive = (msg) { msg }
   reason = (perception) { perception }
   act = (plan) { plan }
   reflect = (result) { result }
-  handle = (msg) { ... }
+  handle = (msg) { ... enriched via bootstrap_context, wrapped in try/on_error ... }
 
-  build_prompt = (msg) { ... }
+  build_prompt = (msg) { Prompt { system: self.system_prompt () } with examples merged }
 
   on_turn_start = (msg) { }
   on_turn_end = (msg result) { }
   on_error = (err) { err }
 
-  think = (prompt) { ... }
-  think_with = (config) { ... }
-  think_structured = (schema_def prompt) { ... }
+  think = (prompt) { llm.prompt prompt }
+  think_with = (config) { ... merges tools/max_turns ... }
+  think_structured = (schema_def prompt) { llm.prompt_structured schema_def prompt }
 
   tools = () { [] }
   max_turns = () { 25 }
@@ -48,25 +48,25 @@ use std/prompt {Prompt}
   delegate = (agent_handle task) { agent.ask agent_handle task }
   escalate = (reason) { Err {type: "escalation"; reason: reason} }
 
-  describe = () { ... }
+  describe = () { {name, role, goal, actions, tools} }
   health = () { {ok: true} }
 
-  ask = (agent_handle msg) { ... }
-  tell = (agent_handle msg) { ... }
+  ask = (agent_handle msg) { agent.ask agent_handle msg }
+  tell = (agent_handle msg) { agent.tell agent_handle msg }
 }
 ```
 
 # Technical Details
 
-### `use std/prompt` required
+### `use std/prompt {Prompt}` required in agent.lx
 
-`agent.lx` must add `use std/prompt {Prompt}` at the top. The `build_prompt` default creates `Prompt { system: self.system_prompt () }`. Without the import, `Prompt` is not in scope. No circular dependency — prompt.lx does not import agent.lx.
+The `build_prompt` default creates `Prompt { system: self.system_prompt () }`. Without the import, `Prompt` is not in scope. No circular dependency — prompt.lx does not import agent.lx.
 
 ### `try` is a 2-arg builtin: `try func arg`
 
-`try` takes a function and an argument. It catches `^` (propagate) errors and wraps them as `Err(value)`. It does NOT catch runtime errors (those still crash). Usage: `result = try my_func my_arg`. NOT `try { block }`.
+`try` takes a function and an argument. It catches `^` (propagate) errors and wraps them as `Err(value)`. It does NOT catch runtime errors. Usage: `try my_func my_arg`. NOT `try { block }`.
 
-The `handle` method must extract the OODA chain into a function to use try:
+The `handle` method extracts the OODA chain into a function to use try:
 
 ```lx
 handle = (msg) {
@@ -89,9 +89,7 @@ handle = (msg) {
 
 ### `on_turn_end` takes TWO args: `(msg result)`
 
-The logging pattern in workgen/workrunner agents needs both msg (for `msg.runner_dir`, `msg.slug`) and result (for `result.text`, `result.turns`). Signature must be `on_turn_end = (msg result) { }`, not `(result)`.
-
-Example override:
+Logging needs both msg (for `msg.runner_dir`, `msg.slug`) and result (for `result.text`, `result.turns`). Override example:
 ```lx
 on_turn_end = (msg result) {
   log.save_debug msg.runner_dir msg.slug "investigate.md" result.text
@@ -101,47 +99,52 @@ on_turn_end = (msg result) {
 
 ### `bootstrap_context` is forward-looking
 
-Current workgen agents don't use it — they read msg fields directly in build_prompt. Current workrunner agents receive `msg.bootstrap_prompt` from the orchestrator and compose it in build_prompt via `p.compose msg.bootstrap_prompt`.
+Current workgen agents don't use it — they read msg fields directly in build_prompt. Current workrunner agents receive `msg.bootstrap_prompt` from the orchestrator and compose it in build_prompt via `p.compose msg.bootstrap_prompt`. The method exists for future agents that need to dynamically fetch context before prompt construction. Current agents leave the default `(msg) { {} }`.
 
-The method exists for future agents that need to dynamically fetch context (read files, query stores, check git state) before prompt construction. Current agents can leave the default `(msg) { {} }`.
+### `act` default stays as pass-through `(plan) { plan }`
 
-### `act` default stays as pass-through
-
-Do NOT change act's default to call build_prompt+think_with. Agents override act and call `self.build_prompt msg` inside their override. The trait provides build_prompt as a helper, not as an automatic pipeline step.
+Do NOT change act's default. Agents override act and call `self.build_prompt msg` inside their override. The trait provides build_prompt as a helper, not an automatic pipeline step.
 
 ### `workrunner/prompt/context.lx` must NOT be deleted
 
-This file has a `load` method that reads agent context files from disk (`agent/TICK.md`, `agent/INVENTORY.md`, etc.). It is imported by `workrunner/main.lx`. It is NOT a simple system string. Keep it.
+This file has a `load` method that reads agent context files from disk (`agent/TICK.md`, `agent/INVENTORY.md`, `agent/REFERENCE.md`, `agent/STDLIB.md`). It is imported by `workrunner/main.lx` at line 12: `use ./prompt/context {BootstrapContext}`. Keep it.
 
-The 11 files that ARE simple system strings and CAN be deleted:
-- `workgen/prompt/investigate.lx` — `system: "You are a code auditor..."`
-- `workgen/prompt/compose.lx` — `system: "You are a markdown document generator..."`
-- `workgen/prompt/revise.lx` — `system: "You are revising a work item document..."`
-- `workgen/prompt/validate.lx` — `system: "You are validating a proposed approach..."`
-- `workgen/prompt/grade.lx` — `system: "You are a grader scoring work against a rubric..."`
-- `workrunner/prompt/implement.lx` — `system: "You are implementing one task..."`
-- `workrunner/prompt/fix.lx` — `system: "Fix the issues found in this task..."`
-- `workrunner/prompt/fix_wi.lx` — `system: "Fix issues found in work item grading..."`
-- `workrunner/prompt/investigate.lx` — `system: "Investigate whether a work item is fully implemented..."`
-- `workrunner/prompt/system_audit.lx` — `system: "You are running a final system-wide audit..."`
-- `workrunner/prompt/grade.lx` — `system: "You are a grader scoring work against a rubric..."`
+### Prompt files that ARE simple system strings (deletable)
 
-### brain dispatcher `~>?` syntax does not work
+All verified to contain only `+Prompt Name = { system: "..." }` with no other methods:
 
-The `~>?` and `~>` operators were never added to the lexer. `~` lexes as `Tilde→Bang`. Lines in `dispatcher.lx` using `~>?` are non-functional dead code. Replace with `self.delegate agent_handle msg` or `agent.ask agent_handle msg`.
+- `workgen/prompt/investigate.lx` → `"You are a code auditor. Investigate the codebase thoroughly — read files, search for patterns. Produce a numbered findings list."`
+- `workgen/prompt/compose.lx` → `"You are a markdown document generator. Output the document directly. Start with '# Goal'. No conversation."`
+- `workgen/prompt/revise.lx` → `"You are revising a work item document. Fix every feedback item. Output the complete revised document."`
+- `workgen/prompt/validate.lx` → `"You are validating a proposed approach before work item generation. Evaluate whether the solution is best practice, idiomatic, and sound."`
+- `workgen/prompt/grade.lx` → `"You are a grader scoring work against a rubric. For each category, assign a score 0-100 and brief feedback. A category passes at score >= 70."`
+- `workrunner/prompt/implement.lx` → `"You are implementing one task from a work item. Follow the task description exactly. Use justfile recipes. No code comments. 300 line file limit."`
+- `workrunner/prompt/fix.lx` → `"Fix the issues found in this task. Fix ONLY what the grader flagged."`
+- `workrunner/prompt/fix_wi.lx` → `"Fix issues found in work item grading. Fix ONLY what failed."`
+- `workrunner/prompt/investigate.lx` → `"Investigate whether a work item is fully implemented. Check code quality and spec compliance. Be terse — under 2000 chars."`
+- `workrunner/prompt/system_audit.lx` → `"You are running a final system-wide audit after all work items have been implemented. Check code quality across the full codebase and verify spec compliance for every executed work item."`
+- `workrunner/prompt/grade.lx` → `"You are a grader scoring work against a rubric. For each category, assign a score 0-100 and brief feedback. A category passes at score >= 70."`
 
 ### Grader agents already have `build_prompt`
 
-Both workgen and workrunner Grader agents define their own `build_prompt` method. The Agent trait adds a default `build_prompt` — the grader's existing method overrides it. No name collision; lx class method overrides work correctly.
+Both workgen and workrunner Grader agents define their own `build_prompt` method. The Agent trait's default `build_prompt` gets overridden. No name collision.
 
 ### Messages are always Records
 
-All orchestrator call sites pass Records to `.act`: `investigator.act {audit_content: ...; root: ...}`, `implementer.act {wi: ...; task: ...}`, etc. The `{..msg; ..(self.bootstrap_context msg)}` spread merge is safe because msg is always a Record.
+All orchestrator call sites pass Records: `investigator.act {audit_content: ...; root: ...}`, `implementer.act {wi: ...; task: ...}`, etc. The `{..msg; ..(self.bootstrap_context msg)}` spread merge is safe.
+
+### brain agents have in-file Prompt declarations
+
+Brain agents define `Prompt PlanningPrompt = { ... }`, `Prompt AnalysisPrompt = { ... }` etc. in the same file as the agent. These are used by specialist methods that build custom prompts. Do NOT delete them — they're in-file declarations, not separate prompt files.
+
+### brain dispatcher `~>?` syntax now works
+
+The `~>` and `~>?` operators are implemented (TELL_ASK_OPERATORS work item). `dispatcher.lx` uses `~>?` which now lexes and desugars correctly to `agent.ask`. No changes needed to dispatcher for operator syntax.
 
 # Files Affected
 
 - `crates/lx/std/agent.lx` — Rewrite trait with new methods + `use std/prompt`
-- `programs/workgen/agent/investigator.lx` — Move system prompt inline, override build_prompt/on_turn_start/on_turn_end, simplify act
+- `programs/workgen/agent/investigator.lx` — Move system prompt inline, override build_prompt/hooks, simplify act
 - `programs/workgen/agent/composer.lx` — Same
 - `programs/workgen/agent/reviser.lx` — Same
 - `programs/workgen/agent/validator.lx` — Same
@@ -157,7 +160,7 @@ All orchestrator call sites pass Records to `.act`: `investigator.act {audit_con
 - `programs/brain/agents/critic.lx` — Same
 - `programs/brain/agents/synthesizer.lx` — Same
 - `programs/brain/agents/monitor.lx` — Wire health() to existing check_health
-- `programs/brain/agents/dispatcher.lx` — Replace `~>?` dead code with delegate/agent.ask
+- `programs/brain/agents/dispatcher.lx` — Add role/goal/system_prompt, use delegate()
 - `programs/workgen/prompt/investigate.lx` — DELETE
 - `programs/workgen/prompt/compose.lx` — DELETE
 - `programs/workgen/prompt/revise.lx` — DELETE
@@ -169,7 +172,7 @@ All orchestrator call sites pass Records to `.act`: `investigator.act {audit_con
 - `programs/workrunner/prompt/investigate.lx` — DELETE
 - `programs/workrunner/prompt/system_audit.lx` — DELETE
 - `programs/workrunner/prompt/grade.lx` — DELETE
-- `programs/workrunner/prompt/context.lx` — KEEP (has load method, imported by main.lx)
+- `programs/workrunner/prompt/context.lx` — KEEP
 - `tests/keywords.lx` — Update Agent test to verify new methods
 
 # Task List
@@ -197,7 +200,7 @@ New methods to add with their defaults:
 - `escalate = (reason) { Err {type: "escalation"; reason: reason} }`
 - `health = () { {ok: true} }`
 
-Update `handle` — extract OODA into a function for `try`:
+Update `handle`:
 ```lx
 handle = (msg) {
   enriched = {..msg; ..(self.bootstrap_context msg)}
@@ -224,7 +227,7 @@ describe = () {
 }
 ```
 
-Keep ALL existing methods unchanged: init, run, perceive, reason, act, reflect, think, think_with, think_structured, tools, max_turns, use_tool, ask, tell. Do NOT change act's default — it stays as `(plan) { plan }`.
+Keep ALL existing methods unchanged: init, run, perceive, reason, act, reflect, think, think_with, think_structured, tools, max_turns, use_tool, ask, tell. Do NOT change act's default.
 
 **ActiveForm:** Rewriting Agent trait
 
@@ -234,21 +237,26 @@ Keep ALL existing methods unchanged: init, run, perceive, reason, act, reflect, 
 
 **Subject:** Simplify 5 workgen agents, delete 5 prompt files
 
-**Description:** For each agent in `programs/workgen/agent/`, apply this transformation:
+**Description:** For each agent in `programs/workgen/agent/`:
 
+Transformation pattern for each agent:
 1. Remove the `use ../prompt/... {SomePrompt}` import
-2. Add `system_prompt = () { "the system string from the deleted prompt file" }`
-3. Move prompt section/instruction/constraint additions from `act` into `build_prompt = (msg) { p = Prompt { system: self.system_prompt () }; p.add_section ...; p }`
-4. Add `on_turn_start = (msg) { log.log "  > claude: doing thing..." }` with the agent's current log message
-5. Add `on_turn_end = (msg result) { log.save_debug msg.runner_dir msg.slug "filename.md" result.text; log.log "  < done ..." }` with the agent's current log/save_debug calls
-6. Simplify `act` to: build prompt, call think_with, extract text/result
+2. Add `use std/prompt {Prompt}` (needed by build_prompt)
+3. Add `system_prompt = () { "the system string from the deleted prompt file" }`
+4. Add `build_prompt = (msg) { p = Prompt { system: self.system_prompt () }; p.add_section ...; p.add_instruction ...; p.add_constraint ...; p }` — move section/instruction/constraint additions from act into build_prompt
+5. Add `on_turn_start = (msg) { log.log "  > claude: ..." }` with the agent's current pre-work log message
+6. Add `on_turn_end = (msg result) { log.save_debug ...; log.log "  < done ..." }` with the agent's current post-work log/save_debug calls
+7. Simplify `act` to: `p = self.build_prompt msg; result = self.think_with {prompt: (p.render ())} ^; result.text` (or whatever the agent returns)
 
-Specific system prompt strings to inline (copy exactly from the prompt files):
-- **investigator.lx**: `"You are a code auditor. Investigate the codebase thoroughly — read files, search for patterns. Produce a numbered findings list."`
-- **composer.lx**: `"You are a markdown document generator. Output the document directly. Start with '# Goal'. No conversation."`
-- **reviser.lx**: `"You are revising a work item document. Fix every feedback item. Output the complete revised document."`
-- **validator.lx**: `"You are validating a proposed approach before work item generation. Evaluate whether the solution is best practice, idiomatic, and sound."`
-- **grader.lx**: `"You are a grader scoring work against a rubric. For each category, assign a score 0-100 and brief feedback. A category passes at score >= 70."` — grader already has its own `build_prompt` method, just add `system_prompt` and keep everything else.
+**investigator.lx**: system_prompt = `"You are a code auditor. Investigate the codebase thoroughly — read files, search for patterns. Produce a numbered findings list."`. build_prompt adds "Audit Checklist" section + 4 instructions + 2 constraints from msg. on_turn_end saves to "investigate.md".
+
+**composer.lx**: system_prompt = `"You are a markdown document generator. Output the document directly. Start with '# Goal'. No conversation."`. build_prompt adds "Audit Checklist", "Process Rules", "Investigation Findings" sections + 2 instructions + 2 constraints. on_turn_end saves to "compose.md".
+
+**reviser.lx**: system_prompt = `"You are revising a work item document. Fix every feedback item. Output the complete revised document."`. build_prompt adds "Current Document", "Feedback to Fix" sections + 1 instruction + 2 constraints. on_turn_end saves to "revise_round_{msg.round_num}.md".
+
+**validator.lx**: system_prompt = `"You are validating a proposed approach before work item generation. Evaluate whether the solution is best practice, idiomatic, and sound."`. build_prompt adds "Audit Findings", "Codebase Root" sections + 4 instructions + 2 constraints. on_turn_end saves to "validate.md".
+
+**grader.lx**: system_prompt = `"You are a grader scoring work against a rubric. For each category, assign a score 0-100 and brief feedback. A category passes at score >= 70."`. Keep existing build_prompt/grading_schema/parse_response/assemble/empty_result. Grader has no logging to move.
 
 After updating all agents, delete these 5 files:
 - `programs/workgen/prompt/investigate.lx`
@@ -256,8 +264,6 @@ After updating all agents, delete these 5 files:
 - `programs/workgen/prompt/revise.lx`
 - `programs/workgen/prompt/validate.lx`
 - `programs/workgen/prompt/grade.lx`
-
-Add `use std/prompt {Prompt}` to each agent file that creates Prompt instances in build_prompt (previously the Prompt came from the prompt file import).
 
 **ActiveForm:** Simplifying workgen agents
 
@@ -269,15 +275,17 @@ Add `use std/prompt {Prompt}` to each agent file that creates Prompt instances i
 
 **Description:** Same transformation as Task 2 for `programs/workrunner/agent/`.
 
-System prompt strings to inline:
-- **implementer.lx**: `"You are implementing one task from a work item. Follow the task description exactly. Use justfile recipes. No code comments. 300 line file limit."`
-- **fixer.lx (TaskFixer)**: `"Fix the issues found in this task. Fix ONLY what the grader flagged."`
-- **fixer.lx (WorkItemFixer)**: `"Fix issues found in work item grading. Fix ONLY what failed."`
-- **investigator.lx**: `"Investigate whether a work item is fully implemented. Check code quality and spec compliance. Be terse — under 2000 chars."`
-- **system_auditor.lx**: `"You are running a final system-wide audit after all work items have been implemented. Check code quality across the full codebase and verify spec compliance for every executed work item."`
-- **grader.lx**: `"You are a grader scoring work against a rubric. For each category, assign a score 0-100 and brief feedback. A category passes at score >= 70."` — same as workgen grader, just add system_prompt.
+**implementer.lx**: system_prompt = `"You are implementing one task from a work item. Follow the task description exactly. Use justfile recipes. No code comments. 300 line file limit."`. build_prompt does `p.compose msg.bootstrap_prompt` then adds "Work Item Context" (from `context_for_implement msg.wi`), "Current Task" (from `task_context msg.task`) sections + 1 instruction + 2 constraints. Keep `use ../schema/work_item {task_context context_for_implement}` import. on_turn_end saves to "task_{msg.task.num}_implement.md".
 
-For implementer.lx and fixer.lx: the current code does `p.compose msg.bootstrap_prompt`. In the new version, this goes inside `build_prompt`: `p = Prompt { system: self.system_prompt () }; p.compose msg.bootstrap_prompt; p.add_section ...`.
+**fixer.lx (TaskFixer)**: system_prompt = `"Fix the issues found in this task. Fix ONLY what the grader flagged."`. build_prompt does `p.compose msg.bootstrap_prompt` then adds "Task" (from `task_context msg.task`), "Grader Feedback" sections + 1 instruction + 1 constraint. on_turn_end saves to "task_{msg.task.num}_fix.md".
+
+**fixer.lx (WorkItemFixer)**: system_prompt = `"Fix issues found in work item grading. Fix ONLY what failed."`. build_prompt does `p.compose msg.bootstrap_prompt` then adds "Work Item" (from `context_for_investigate msg.wi`), "Grader Feedback", "Failed" sections + 1 instruction. on_turn_end saves to "fix_wi.md".
+
+**investigator.lx**: system_prompt = `"Investigate whether a work item is fully implemented. Check code quality and spec compliance. Be terse — under 2000 chars."`. build_prompt adds "Work Item" section + 6 instructions + 4 constraints. on_turn_end saves to "investigate.md".
+
+**system_auditor.lx**: system_prompt = `"You are running a final system-wide audit after all work items have been implemented. Check code quality across the full codebase and verify spec compliance for every executed work item."`. build_prompt adds "Completed Work Items" section + 5 instructions + 2 constraints. on_turn_end saves to "system_audit.md".
+
+**grader.lx**: system_prompt = `"You are a grader scoring work against a rubric. For each category, assign a score 0-100 and brief feedback. A category passes at score >= 70."`. Keep existing build_prompt/grading_schema/parse_response/assemble/empty_result. No logging to move.
 
 After updating agents, delete these 6 files:
 - `programs/workrunner/prompt/implement.lx`
@@ -287,9 +295,7 @@ After updating agents, delete these 6 files:
 - `programs/workrunner/prompt/system_audit.lx`
 - `programs/workrunner/prompt/grade.lx`
 
-DO NOT delete `programs/workrunner/prompt/context.lx` — it has a `load` method that reads files from disk and is imported by `workrunner/main.lx`.
-
-Add `use std/prompt {Prompt}` to each agent file that creates Prompt instances.
+DO NOT delete `programs/workrunner/prompt/context.lx`.
 
 **ActiveForm:** Simplifying workrunner agents
 
@@ -297,31 +303,29 @@ Add `use std/prompt {Prompt}` to each agent file that creates Prompt instances.
 
 ### Task 4: Update brain agents
 
-**Subject:** Add role/goal/system_prompt to brain agents, fix dispatcher dead code
+**Subject:** Add role/goal/system_prompt to brain agents, wire health and delegate
 
 **Description:** For each agent in `programs/brain/agents/`:
 
 **planner.lx (TaskPlanner)** — Add:
-```lx
-role = () { "task decomposition and planning specialist" }
-goal = () { "create precise, minimal execution plans" }
-system_prompt = () { "You create precise, minimal execution plans." }
-```
-Keep all specialist methods (plan, replan, estimate_cost) unchanged.
+- `role = () { "task decomposition and planning specialist" }`
+- `goal = () { "create precise, minimal execution plans" }`
+- `system_prompt = () { "You create precise, minimal execution plans." }`
+Keep all specialist methods (plan, replan, estimate_cost) unchanged. Keep in-file PlanningPrompt/ReplanPrompt declarations.
 
-**analyst.lx (DeepAnalyst)** — Add role/goal/system_prompt from existing AnalysisPrompt system string. Keep analyze/compare/investigate.
+**analyst.lx (DeepAnalyst)** — Add role/goal/system_prompt from AnalysisPrompt system string: `"You are an analytical specialist. You find what others miss."`. Keep analyze/compare/investigate. Keep in-file Prompt declarations.
 
-**researcher.lx (InfoGatherer)** — Add role/goal/system_prompt. Keep research/search.
+**researcher.lx (InfoGatherer)** — Add role = `"information gathering specialist"`, goal = `"search, read, and synthesize findings"`, system_prompt from SynthesisPrompt: `"You synthesize research findings into a clear answer."`. Keep research/search.
 
-**critic.lx (InnerCritic)** — Add role/goal/system_prompt from CritiquePrompt system string. Keep critique/challenge/verify_code.
+**critic.lx (InnerCritic)** — Add role = `"inner critic"`, goal = `"challenge assumptions, find flaws, prevent overconfidence"`, system_prompt from CritiquePrompt: `"You are a rigorous critic. Find flaws, gaps, and risks. Be honest, not kind."`. Keep critique/challenge/verify_code.
 
-**synthesizer.lx (ResponseSynth)** — Add role/goal/system_prompt. Keep synthesize/format/compose_parts.
+**synthesizer.lx (ResponseSynth)** — Add role = `"response synthesis specialist"`, goal = `"combine reasoning, results, and identity into coherent output"`, system_prompt: `"You synthesize responses."`. Keep synthesize/format/compose_parts.
 
-**monitor.lx** — Add `health = () { check_health state }` wired to existing check_health function. Add role/goal.
+**monitor.lx** — Add role = `"self-monitoring specialist"`, goal = `"track health, detect stuck loops, manage budgets"`. Add `health = () { check_health state }` wired to the existing `check_health` function in the file.
 
-**dispatcher.lx** — The file uses `~>?` syntax (lines 52, 64, 109, 110) which does NOT work — `~` lexes as Tilde→Bang, the operator was never implemented. Replace all `worker ~>?` and `workforce.analyst ~>?` calls with `agent.ask worker` or `self.delegate worker`. This is fixing dead code, not refactoring working code.
+**dispatcher.lx** — Add role = `"multi-agent coordinator"`, goal = `"spawn, route, and supervise specialist agents"`. Replace `agent.ask` calls in `dispatch_task` with `self.delegate`. The `~>?` operator calls in the file now work (implemented in TELL_ASK_OPERATORS), leave them as-is.
 
-Brain agents have separate Prompt declarations (PlanningPrompt, AnalysisPrompt, etc.) defined in the same file. These are used by specialist methods that build custom prompts. Do NOT delete them — they're in-file declarations, not separate prompt files.
+Do NOT delete any in-file Prompt/Schema declarations in brain agents.
 
 **ActiveForm:** Updating brain agents
 
@@ -331,7 +335,7 @@ Brain agents have separate Prompt declarations (PlanningPrompt, AnalysisPrompt, 
 
 **Subject:** Verify new Agent methods exist in keyword test
 
-**Description:** In `tests/keywords.lx`, update the Agent section:
+**Description:** In `tests/keywords.lx`, replace the existing Agent section with:
 
 ```lx
 Agent TestAgent = {
@@ -358,6 +362,8 @@ assert (a.goal () == "verify trait methods")
 assert (a.health ().ok == true)
 ```
 
+The existing Agent section starts at the `-- Agent` comment and ends before `-- Tool`. Replace only that section.
+
 **ActiveForm:** Updating keyword test
 
 ---
@@ -367,16 +373,17 @@ assert (a.health ().ok == true)
 **Subject:** Verify no regressions, fix any failures
 
 **Description:**
+
 1. Run `just rust-diagnose` — fix any compile errors.
 2. Run `just test` — fix any test failures.
-3. Check that `tests/keywords.lx` passes with the updated Agent test.
-4. Check that workgen/workrunner tests pass (if they exist in programs/workgen/tests/ and programs/workrunner/tests/).
+3. Run `cargo test -p lx --test formatter_roundtrip` — verify formatter roundtrip.
 
 Likely failure sources:
-- Missing `use std/prompt {Prompt}` in agent files that now create Prompt instances
-- `on_turn_end` signature mismatch if any agent passes wrong number of args
-- `handle`'s try/ooda pattern: if `try` doesn't see a function+arg it will error. Verify `try ooda enriched` works (ooda is a function, enriched is its argument).
-- Deleted prompt file imports that weren't removed from agent files
+- Missing `use std/prompt {Prompt}` in agent files that create Prompt instances in build_prompt
+- `on_turn_end` signature: agents must pass 2 args, callers in handle pass `enriched` and `r`
+- `handle`'s try pattern: `try ooda enriched` — ooda must be a function accepting one arg
+- Deleted prompt file imports not removed from agent files
+- `try` only catches `^` errors — if an agent's act method throws a runtime error (not `^`), it won't be caught by on_error. This is by design — runtime errors are bugs, not expected failures.
 
 **ActiveForm:** Full regression testing
 
@@ -390,12 +397,13 @@ Likely failure sources:
 4. **Tasks are implementation-only.**
 5. **Do not add code comments or doc strings** (exception: `--` header comments on .lx program files).
 6. **Use `just rust-diagnose` not raw cargo commands.**
-7. **`try` takes 2 args: `try func arg`.** NOT `try { block }`. Extract the OODA chain into `ooda = (m) { ... }` then call `try ooda enriched`.
-8. **`on_turn_end` takes 2 args: `(msg result)`.** Logging needs both msg (runner_dir, slug) and result (text, turns).
-9. **DO NOT delete `workrunner/prompt/context.lx`** — it has a load method and is imported by main.lx.
-10. **`~>?` in brain/dispatcher.lx is dead code** — the operator was never implemented. Replace with agent.ask/self.delegate.
-11. **`act` default stays as `(plan) { plan }` pass-through.** Do not change it to auto-call build_prompt.
-12. **`use std/prompt {Prompt}` must be added to agent.lx** and to any agent file that creates Prompt instances in build_prompt.
+7. **`try` takes 2 args: `try func arg`.** Extract OODA into `ooda = (m) { ... }` then call `try ooda enriched`.
+8. **`on_turn_end` takes 2 args: `(msg result)`.** Handle passes `self.on_turn_end enriched r`.
+9. **DO NOT delete `workrunner/prompt/context.lx`** — has load method, imported by main.lx.
+10. **`act` default stays as `(plan) { plan }`.** Do not change it.
+11. **`use std/prompt {Prompt}` must be added** to agent.lx and to each agent file that creates Prompt in build_prompt.
+12. **Brain agent in-file Prompt declarations** (PlanningPrompt, AnalysisPrompt, etc.) must NOT be deleted.
+13. **`~>?` in dispatcher.lx now works** — the operators are implemented. Do not replace them.
 
 ---
 

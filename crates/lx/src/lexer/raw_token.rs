@@ -23,6 +23,10 @@ pub(super) enum RawToken {
   Comma,
   #[token("^")]
   Caret,
+  #[token("~>?")]
+  TildeArrowQ,
+  #[token("~>")]
+  TildeArrow,
   #[token("~")]
   Tilde,
   #[token("??")]

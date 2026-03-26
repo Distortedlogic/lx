@@ -71,6 +71,8 @@ pub enum Expr {
   Binary(ExprBinary),
   Unary(ExprUnary),
   Pipe(ExprPipe),
+  Tell(ExprTell),
+  Ask(ExprAsk),
 
   Apply(ExprApply),
   Section(Section),

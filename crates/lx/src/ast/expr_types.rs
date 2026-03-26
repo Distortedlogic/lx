@@ -122,6 +122,18 @@ pub struct ExprPipe {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, AstWalk)]
+pub struct ExprTell {
+  pub target: ExprId,
+  pub msg: ExprId,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, AstWalk)]
+pub struct ExprAsk {
+  pub target: ExprId,
+  pub msg: ExprId,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, AstWalk)]
 pub struct ExprApply {
   pub func: ExprId,
   pub arg: ExprId,

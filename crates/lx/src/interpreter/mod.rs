@@ -133,7 +133,7 @@ impl Interpreter {
       Expr::TypeConstructor(name) => Ok(self.env.get(name).ok_or_else(|| LxError::runtime(format!("undefined constructor '{name}'"), span))?),
       Expr::Binary(ExprBinary { op, left, right }) => self.eval_binary(&op, left, right, span).await,
       Expr::Unary(ExprUnary { op, operand }) => self.eval_unary(&op, operand, span).await,
-      Expr::Pipe(_) => unreachable!(),
+      Expr::Pipe(_) | Expr::Tell(_) | Expr::Ask(_) => unreachable!(),
       Expr::Apply(ExprApply { func, arg }) => {
         let f = self.eval(func).await?;
         if let Expr::NamedArg(ExprNamedArg { name, value }) = self.arena.expr(arg) {

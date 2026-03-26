@@ -70,6 +70,16 @@ impl Formatter<'_> {
         self.emit_expr(y.value);
       },
       Expr::With(w) => self.emit_with(w),
+      Expr::Tell(t) => {
+        self.emit_expr(t.target);
+        self.write(" ~> ");
+        self.emit_expr(t.msg);
+      },
+      Expr::Ask(a) => {
+        self.emit_expr(a.target);
+        self.write(" ~>? ");
+        self.emit_expr(a.msg);
+      },
       Expr::Grouped(inner) => {
         self.write("(");
         self.emit_expr(*inner);

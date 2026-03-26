@@ -43,7 +43,7 @@ impl Checker<'_> {
         self.synth_binary_type(&binary.op, lt, rt, span)
       },
       Expr::Unary(unary) => self.synth_unary(unary.op, unary.operand, span),
-      Expr::Pipe(_) => self.type_arena.todo(),
+      Expr::Pipe(_) | Expr::Tell(_) | Expr::Ask(_) => self.type_arena.todo(),
       Expr::Apply(apply) => self.synth_apply_type(apply.func, apply.arg),
       Expr::Section(_) => self.type_arena.todo(),
       Expr::FieldAccess(fa) => {

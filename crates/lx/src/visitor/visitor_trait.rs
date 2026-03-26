@@ -1,8 +1,8 @@
 use crate::ast::{
-  Binding, ClassDeclData, Expr, ExprApply, ExprAssert, ExprBinary, ExprBlock, ExprBreak, ExprCoalesce, ExprEmit, ExprFieldAccess, ExprFunc, ExprId, ExprLoop,
-  ExprMatch, ExprNamedArg, ExprPar, ExprPipe, ExprPropagate, ExprSlice, ExprTernary, ExprTimeout, ExprTuple, ExprUnary, ExprWith, ExprYield, FieldPattern,
-  ListElem, Literal, MapEntry, Pattern, PatternId, Program, RecordField, Section, SelArm, Stmt, StmtFieldUpdate, StmtId, StmtTypeDef, TraitDeclData,
-  TraitUnionDef, TypeExpr, TypeExprId, TypeField, UseStmt,
+  Binding, ClassDeclData, Expr, ExprApply, ExprAsk, ExprAssert, ExprBinary, ExprBlock, ExprBreak, ExprCoalesce, ExprEmit, ExprFieldAccess, ExprFunc, ExprId,
+  ExprLoop, ExprMatch, ExprNamedArg, ExprPar, ExprPipe, ExprPropagate, ExprSlice, ExprTell, ExprTernary, ExprTimeout, ExprTuple, ExprUnary, ExprWith,
+  ExprYield, FieldPattern, ListElem, Literal, MapEntry, Pattern, PatternId, Program, RecordField, Section, SelArm, Stmt, StmtFieldUpdate, StmtId, StmtTypeDef,
+  TraitDeclData, TraitUnionDef, TypeExpr, TypeExprId, TypeField, UseStmt,
 };
 use crate::sym::Sym;
 use miette::SourceSpan;
@@ -69,6 +69,14 @@ pub trait AstVisitor {
     VisitAction::Descend
   }
   fn leave_pipe(&mut self, _id: ExprId, _pipe: &ExprPipe, _span: SourceSpan) {}
+  fn visit_tell(&mut self, _id: ExprId, _tell: &ExprTell, _span: SourceSpan) -> VisitAction {
+    VisitAction::Descend
+  }
+  fn leave_tell(&mut self, _id: ExprId, _tell: &ExprTell, _span: SourceSpan) {}
+  fn visit_ask(&mut self, _id: ExprId, _ask: &ExprAsk, _span: SourceSpan) -> VisitAction {
+    VisitAction::Descend
+  }
+  fn leave_ask(&mut self, _id: ExprId, _ask: &ExprAsk, _span: SourceSpan) {}
   fn visit_apply(&mut self, _id: ExprId, _apply: &ExprApply, _span: SourceSpan) -> VisitAction {
     VisitAction::Descend
   }

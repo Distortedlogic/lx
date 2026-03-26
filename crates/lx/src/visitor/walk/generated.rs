@@ -1,9 +1,9 @@
 use std::ops::ControlFlow;
 
 use crate::ast::{
-  AstArena, ExprApply, ExprAssert, ExprBinary, ExprBlock, ExprBreak, ExprCoalesce, ExprEmit, ExprFieldAccess, ExprFunc, ExprId, ExprLoop, ExprMatch,
-  ExprNamedArg, ExprPar, ExprPipe, ExprPropagate, ExprSlice, ExprTernary, ExprTimeout, ExprTuple, ExprUnary, ExprWith, ExprYield, ListElem, Literal, MapEntry,
-  RecordField, Section, SelArm,
+  AstArena, ExprApply, ExprAsk, ExprAssert, ExprBinary, ExprBlock, ExprBreak, ExprCoalesce, ExprEmit, ExprFieldAccess, ExprFunc, ExprId, ExprLoop, ExprMatch,
+  ExprNamedArg, ExprPar, ExprPipe, ExprPropagate, ExprSlice, ExprTell, ExprTernary, ExprTimeout, ExprTuple, ExprUnary, ExprWith, ExprYield, ListElem, Literal,
+  MapEntry, RecordField, Section, SelArm,
 };
 use miette::SourceSpan;
 
@@ -13,6 +13,8 @@ define_walk_and_dispatch!(walk_literal_dispatch, walk_literal, visit_literal, le
 define_walk_and_dispatch!(walk_binary_dispatch, walk_binary, visit_binary, leave_binary, ExprBinary, ExprId);
 define_walk_and_dispatch!(walk_unary_dispatch, walk_unary, visit_unary, leave_unary, ExprUnary, ExprId);
 define_walk_and_dispatch!(walk_pipe_dispatch, walk_pipe, visit_pipe, leave_pipe, ExprPipe, ExprId);
+define_walk_and_dispatch!(walk_tell_dispatch, walk_tell, visit_tell, leave_tell, ExprTell, ExprId);
+define_walk_and_dispatch!(walk_ask_dispatch, walk_ask, visit_ask, leave_ask, ExprAsk, ExprId);
 define_walk_and_dispatch!(walk_apply_dispatch, walk_apply, visit_apply, leave_apply, ExprApply, ExprId);
 define_walk_and_dispatch!(walk_section_dispatch, walk_section, visit_section, leave_section, Section, ExprId);
 define_walk_and_dispatch!(walk_field_access_dispatch, walk_field_access, visit_field_access, leave_field_access, ExprFieldAccess, ExprId);

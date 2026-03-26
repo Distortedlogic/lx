@@ -184,6 +184,8 @@ impl<'src> Lexer<'src> {
         let v: BigInt = Self::strip_underscores(slice).parse().map_err(|_| LxError::parse("invalid integer literal", span, None))?;
         self.emit(Token::new(TokenKind::Int(v), span));
       },
+      RawToken::TildeArrow => self.emit(Token::new(TokenKind::TildeArrow, span)),
+      RawToken::TildeArrowQ => self.emit(Token::new(TokenKind::TildeArrowQ, span)),
       RawToken::Tilde | RawToken::BangExcl => self.emit(Token::new(TokenKind::Bang, span)),
       RawToken::Caret => self.emit(Token::new(TokenKind::Caret, span)),
       RawToken::QQ => self.emit(Token::new(TokenKind::QQ, span)),
