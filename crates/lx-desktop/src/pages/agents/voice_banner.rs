@@ -6,7 +6,7 @@ use base64::engine::general_purpose::STANDARD as B64;
 use common_inference::InferenceClient as _;
 use common_kokoro::SpeechRequest;
 use common_whisper::TranscribeRequest;
-use dioxus::logger::tracing::error;
+use dioxus::logger::tracing::{error, info};
 use dioxus::prelude::*;
 use dioxus_widget_bridge::use_ts_widget;
 
@@ -207,7 +207,7 @@ async fn run_pipeline(
 
   let transcript_entry = response.clone();
   let wav_len = wav_bytes.len();
-  error!("voice: TTS returned {wav_len} bytes, starting playback");
+  info!("voice: TTS returned {wav_len} bytes, starting playback");
   let play_result = tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
     let cursor = std::io::Cursor::new(wav_bytes);
     let player = rodio::play(AUDIO_SINK.mixer(), cursor).map_err(|e| {
@@ -215,7 +215,7 @@ async fn run_pipeline(
       e
     })?;
     player.sleep_until_end();
-    error!("voice: playback finished");
+    info!("voice: playback finished");
     Ok(())
   })
   .await;

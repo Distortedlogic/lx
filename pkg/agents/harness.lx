@@ -30,6 +30,7 @@ use pkg/agent/budget : budget_mod
     quality_opts != None ? {
       grade = quality_opts.grader result
       last_score <- grade.score
+      grade.score < (quality_opts.threshold ?? 80) ? log.info "quality below threshold ({grade.score})"
     }
 
     stop_cond != None ? {

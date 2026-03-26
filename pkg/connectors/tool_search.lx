@@ -12,7 +12,7 @@ Tool +ToolSearch = {
         tool_name_lower | contains? w || desc_words | any? (dw) { dw | contains? w }
       } | len
       relevance = (hits + 0.0) / (len words + 0.0)
-      {name: tool.name, description: tool.description, relevance: relevance}
+      {name: tool.name; description: tool.description; relevance: relevance}
     }
     matched = scored | filter (t) { t.relevance > 0.0 }
     sorted = matched | sort_by (t) { 0.0 - t.relevance }
