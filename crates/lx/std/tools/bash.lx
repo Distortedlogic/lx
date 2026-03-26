@@ -1,8 +1,8 @@
--- default tool: execute shell commands via CLI keyword desugaring
+-- default tool: execute shell commands via bash builtin
 
-CLI Bash = {
-  command: "bash"
+Tool Bash = {
   name: "bash"
   description: "Execute shell commands"
   params: {command: Str}
+  run = (args) { bash args.command }
 }

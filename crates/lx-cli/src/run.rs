@@ -18,6 +18,7 @@ pub fn run(source: &str, filename: &str, ctx: &Arc<RuntimeCtx>) -> Result<(), Ve
   let source_dir = Path::new(filename).parent().map(|p| p.to_path_buf());
   let mut interp = lx::interpreter::Interpreter::new(source, source_dir, Arc::clone(ctx));
   ctx.tokio_runtime.block_on(async {
+    interp.load_default_tools().await.map_err(|e| vec![e])?;
     match interp.exec(&program).await {
       Ok(val) => {
         if !matches!(val, lx::value::LxVal::Unit) {

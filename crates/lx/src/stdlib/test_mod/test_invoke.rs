@@ -27,6 +27,7 @@ pub(super) fn invoke_flow(flow_path: &str, input: &LxVal, ctx: &Arc<RuntimeCtx>,
   let mut interp = crate::interpreter::Interpreter::new(&source, module_dir, Arc::clone(ctx));
   tokio::task::block_in_place(|| {
     tokio::runtime::Handle::current().block_on(async {
+      interp.load_default_tools().await.map_err(|e| LxError::runtime(format!("test.run: tool init error in '{flow_path}': {e}"), span))?;
       interp.exec(&program).await.map_err(|e| LxError::runtime(format!("test.run: exec error in '{flow_path}': {e}"), span))?;
 
       let entry_name =

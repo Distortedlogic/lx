@@ -8,6 +8,7 @@ mod hof_extra;
 mod hof_parallel;
 pub(crate) mod llm;
 mod register;
+mod shell;
 mod str;
 
 use std::pin::Pin;

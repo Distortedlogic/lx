@@ -3,6 +3,7 @@ pub(crate) mod ambient;
 mod apply;
 mod apply_helpers;
 mod collections;
+mod default_tools;
 mod eval;
 mod eval_ops;
 mod exec_stmt;

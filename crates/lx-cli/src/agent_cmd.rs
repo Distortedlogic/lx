@@ -37,6 +37,10 @@ pub fn run_agent(script_path: &str) -> ExitCode {
   let source_dir = Path::new(script_path).parent().map(|p| p.to_path_buf());
   let ctx = Arc::new(lx::runtime::RuntimeCtx::default());
   let mut interp = lx::interpreter::Interpreter::new(&source, source_dir, Arc::clone(&ctx));
+  if let Err(e) = ctx.tokio_runtime.block_on(interp.load_default_tools()) {
+    eprintln!("agent error: {e}");
+    return ExitCode::from(1);
+  }
   let handler = match ctx.tokio_runtime.block_on(interp.exec(&program)) {
     Ok(val) => val,
     Err(e) => {

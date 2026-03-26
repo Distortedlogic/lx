@@ -1,0 +1,63 @@
+-- default tool tests
+-- verifies Bash, Read, Write, Edit, Glob, Grep tools loaded in global scope
+
+use std/fs
+
+-- Bash: run echo and check output
+b = Bash {}
+result = b.run {command: "echo hello"}
+assert (result | ok?)
+inner = result ^
+assert (inner.stdout | trim) == "hello"
+assert inner.code == 0
+
+-- Bash: non-zero exit code is a value, not an error
+result2 = b.run {command: "exit 42"}
+assert (result2 | ok?)
+inner2 = result2 ^
+assert inner2.code == 42
+
+-- Write + Read: create temp file, read it back
+w = Write {}
+r = Read {}
+fs.mkdir "/tmp/lx_test_default_tools" ^
+w.run {path: "/tmp/lx_test_default_tools/test.txt", content: "hello world"} ^
+read_result = r.run {path: "/tmp/lx_test_default_tools/test.txt"}
+assert (read_result | ok?)
+content = read_result ^
+assert content == "hello world"
+
+-- Edit: replace text in file
+e = Edit {}
+edit_result = e.run {path: "/tmp/lx_test_default_tools/test.txt", old: "hello", new: "goodbye"}
+assert (edit_result | ok?)
+after_edit = r.run {path: "/tmp/lx_test_default_tools/test.txt"} ^
+assert after_edit == "goodbye world"
+
+-- Edit: old string not found returns Err
+bad_edit = e.run {path: "/tmp/lx_test_default_tools/test.txt", old: "nonexistent", new: "x"}
+assert (bad_edit | err?)
+
+-- Glob: find test files
+gl = Glob {}
+glob_result = gl.run {pattern: "test.txt", path: "/tmp/lx_test_default_tools"}
+assert (glob_result | ok?)
+
+-- Grep: search for known pattern
+gr = Grep {}
+grep_result = gr.run {pattern: "goodbye", path: "/tmp/lx_test_default_tools"}
+assert (grep_result | ok?)
+grep_content = grep_result ^
+assert ((grep_content | len) > 0)
+
+-- Grep: no match returns Ok ""
+grep_miss = gr.run {pattern: "zzz_no_match_zzz", path: "/tmp/lx_test_default_tools"}
+assert (grep_miss | ok?)
+
+-- Cleanup
+fs.rmdir "/tmp/lx_test_default_tools" ^
+
+-- Tool trait methods are present
+assert (methods_of b | any? (== "run"))
+assert (methods_of b | any? (== "validate"))
+assert (methods_of b | any? (== "schema"))

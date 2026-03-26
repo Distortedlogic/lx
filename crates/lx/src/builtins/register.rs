@@ -148,6 +148,7 @@ pub fn register(env: &Env) {
   log_fields.insert(crate::sym::intern("debug"), make_log_builtin("log.debug", LogLevel::Debug));
   env.bind_str("log", LxVal::record(log_fields));
   super::hof::register(env);
+  super::shell::register(env);
   env.bind_str("Store", crate::stdlib::build_constructor());
   super::register_builtins!(env, {
     "method_of"/2 => bi_method_of, "methods_of"/1 => bi_methods_of,
