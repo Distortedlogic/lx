@@ -1,11 +1,11 @@
-use std/prompt {Prompt}
+use std/prompt {new_prompt}
 
 +Trait Agent = {
   role = () { "" }
   goal = () { "" }
   system_prompt = () { "" }
 
-  bootstrap_context = (msg) { {} }
+  bootstrap_context = (msg) { {:} }
   examples = () { [] }
   max_context_tokens = () { 100000 }
 
@@ -28,8 +28,8 @@ use std/prompt {Prompt}
     }
     result = try ooda enriched
     result ? {
-      Ok r -> { self.on_turn_end enriched r; r }
       Err e -> self.on_error e
+      r -> { self.on_turn_end enriched r; r }
     }
   }
 
@@ -42,7 +42,7 @@ use std/prompt {Prompt}
     }
   }
 
-  build_prompt = (msg) { p = Prompt { system: self.system_prompt () }; exs = self.examples (); (exs | len) > 0 ? { p.examples <- exs }; p }
+  build_prompt = (msg) { p := new_prompt (self.system_prompt ()); exs = self.examples (); (exs | len) > 0 ? { p.examples <- exs }; p }
 
   on_turn_start = (msg) { }
   on_turn_end = (msg result) { }

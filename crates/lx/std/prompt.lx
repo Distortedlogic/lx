@@ -82,6 +82,14 @@
   }
 }
 
+Class BasePrompt : [Prompt] = { system: "" }
+
++new_prompt = (system_text) {
+  p := BasePrompt {}
+  (system_text | len) > 0 ? { p.system <- system_text }
+  p
+}
+
 prompt_section = (n c) {
   to_record %{"name": n; "content": c}
 }

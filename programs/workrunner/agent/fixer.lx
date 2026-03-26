@@ -1,4 +1,4 @@
-use std/prompt {Prompt}
+use std/prompt {new_prompt}
 use ../schema/work_item {task_context context_for_investigate}
 use pkg/log
 
@@ -10,7 +10,7 @@ use pkg/log
 
   build_prompt = (msg) {
     ctx = task_context msg.task
-    p = Prompt { system: self.system_prompt () }
+    p = new_prompt (self.system_prompt ())
     p.compose msg.bootstrap_prompt
     p.add_section "Task" ctx
     p.add_section "Grader Feedback" msg.feedback
@@ -39,7 +39,7 @@ use pkg/log
   system_prompt = () { "Fix issues found in work item grading. Fix ONLY what failed." }
 
   build_prompt = (msg) {
-    p = Prompt { system: self.system_prompt () }
+    p = new_prompt (self.system_prompt ())
     p.compose msg.bootstrap_prompt
     p.add_section "Work Item" (context_for_investigate msg.wi)
     p.add_section "Grader Feedback" msg.feedback

@@ -1,4 +1,4 @@
-use std/prompt {Prompt}
+use std/prompt {new_prompt}
 use ../schema/work_item {task_context context_for_implement}
 use pkg/log
 
@@ -9,7 +9,7 @@ use pkg/log
 
   build_prompt = (msg) {
     ctx = task_context msg.task
-    p = Prompt { system: self.system_prompt () }
+    p = new_prompt (self.system_prompt ())
     p.compose msg.bootstrap_prompt
     p.add_section "Work Item Context" (context_for_implement msg.wi)
     p.add_section "Current Task" ctx

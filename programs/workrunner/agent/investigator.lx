@@ -1,4 +1,4 @@
-use std/prompt {Prompt}
+use std/prompt {new_prompt}
 use ../schema/work_item {context_for_investigate}
 use pkg/log
 
@@ -9,7 +9,7 @@ use pkg/log
   system_prompt = () { "Investigate whether a work item is fully implemented. Check code quality and spec compliance. Be terse — under 2000 chars." }
 
   build_prompt = (msg) {
-    p = Prompt { system: self.system_prompt () }
+    p = new_prompt (self.system_prompt ())
     p.add_section "Work Item" (context_for_investigate msg.wi)
     p.add_instruction "Check each file in Files Affected exists (use Glob)"
     p.add_instruction "Check mod.rs registrations if applicable (use Grep)"

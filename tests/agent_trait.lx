@@ -1,0 +1,105 @@
+-- agent trait tests
+-- verifies handle flow, bootstrap_context, hooks, build_prompt, health, delegate, escalate
+
+use std/prompt {new_prompt}
+
+-- Track hook calls via mutable state
+start_log := []
+end_log := []
+error_log := []
+
+Agent HookAgent = {
+  role = () { "hook tester" }
+  goal = () { "verify lifecycle hooks fire" }
+  system_prompt = () { "test system prompt" }
+
+  bootstrap_context = (msg) {
+    {enriched: true; original: msg.value}
+  }
+
+  on_turn_start = (msg) {
+    start_log <- [..start_log; msg]
+  }
+
+  on_turn_end = (msg result) {
+    end_log <- [..end_log; {msg: msg; result: result}]
+  }
+
+  perceive = (msg) { {perceived: msg.original; enriched: msg.enriched} }
+  reason = (perception) { {reasoned: perception.perceived * 2} }
+  act = (plan) { plan.reasoned }
+  reflect = (result) { result + 1 }
+}
+
+h = HookAgent {}
+
+-- handle triggers full OODA chain with bootstrap_context enrichment
+result = h.handle {value: 5}
+
+-- bootstrap_context merged: enriched=true, original=5
+assert (len start_log == 1) "on_turn_start fired"
+assert (start_log.0.enriched == true) "bootstrap_context merged into msg"
+assert (start_log.0.original == 5) "bootstrap_context preserved original"
+
+-- OODA chain: perceive(5) -> reason(10) -> act(10) -> reflect(11)
+assert (result == 11) "full OODA chain executed"
+
+-- on_turn_end received both msg and result
+assert (len end_log == 1) "on_turn_end fired"
+assert (end_log.0.result == 11) "on_turn_end got result"
+assert (end_log.0.msg.enriched == true) "on_turn_end got enriched msg"
+
+-- on_error fires when act propagates error
+Agent ErrorAgent = {
+  on_error = (err) { {caught: err} }
+  act = (plan) { (Err "boom") ^ }
+}
+
+ea = ErrorAgent {}
+err_result = ea.handle {action: None}
+assert (err_result.caught == "boom") "on_error caught propagated error"
+
+-- handle dispatches to named action methods
+Agent DispatchAgent = {
+  greet = (msg) { "hello {msg.name}" }
+}
+
+da = DispatchAgent {}
+greeted = da.handle {action: "greet"; name: "world"}
+assert (greeted == "hello world") "handle dispatched to greet method"
+
+-- build_prompt creates Prompt with system_prompt
+Agent PromptAgent = {
+  system_prompt = () { "you are helpful" }
+  examples = () { [{input: "hi"; output: "hello"}] }
+}
+
+pa = PromptAgent {}
+p = pa.build_prompt {:}
+rendered = p.render ()
+assert (rendered | contains? "you are helpful") "build_prompt uses system_prompt"
+assert (rendered | contains? "Example 1") "build_prompt merges examples"
+
+-- health default
+Agent HealthAgent = {}
+ha = HealthAgent {}
+assert ((ha.health ()).ok == true) "health default returns ok"
+
+-- describe includes role and goal
+Agent DescAgent = {
+  role = () { "describer" }
+  goal = () { "describe things" }
+  tools = () { ["Read"] }
+}
+
+desc_a = DescAgent {}
+d = desc_a.describe ()
+assert (d.role == "describer") "describe includes role"
+assert (d.goal == "describe things") "describe includes goal"
+assert (d.tools == ["Read"]) "describe includes tools"
+
+-- escalate returns Err with type and reason
+Agent EscAgent = {}
+esc = EscAgent {}
+esc_result = esc.escalate "need human"
+assert (err? esc_result) "escalate returns Err"

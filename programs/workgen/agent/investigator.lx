@@ -1,4 +1,4 @@
-use std/prompt {Prompt}
+use std/prompt {new_prompt}
 use pkg/log
 
 +Agent Investigator = {
@@ -8,7 +8,7 @@ use pkg/log
   system_prompt = () { "You are a code auditor. Investigate the codebase thoroughly — read files, search for patterns. Produce a numbered findings list." }
 
   build_prompt = (msg) {
-    p = Prompt { system: self.system_prompt () }
+    p = new_prompt (self.system_prompt ())
     p.add_section "Audit Checklist" msg.audit_content
     p.add_instruction "For each audit item, search the codebase under '{msg.root}/' to determine if it is violated"
     p.add_instruction "Read every relevant file — do not guess from filenames alone"

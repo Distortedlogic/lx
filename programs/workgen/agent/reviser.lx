@@ -1,11 +1,11 @@
-use std/prompt {Prompt}
+use std/prompt {new_prompt}
 use pkg/log
 
 +Agent Reviser = {
   system_prompt = () { "You are revising a work item document. Fix every feedback item. Output the complete revised document." }
 
   build_prompt = (msg) {
-    p = Prompt { system: self.system_prompt () }
+    p = new_prompt (self.system_prompt ())
     p.add_section "Current Document" msg.draft
     p.add_section "Feedback to Fix" msg.feedback
     p.add_instruction "Fix ALL feedback items. Return the complete revised markdown document."

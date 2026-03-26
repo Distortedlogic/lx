@@ -1,6 +1,6 @@
 -- Work Item Grader — scores work against a rubric via LLM evaluation.
 
-use std/prompt {Prompt}
+use std/prompt {new_prompt}
 use ../schema/grade {GradeResult CategoryScore}
 
 +Agent Grader = {
@@ -29,7 +29,7 @@ use ../schema/grade {GradeResult CategoryScore}
       "{idx + 1}. {cat.name} (weight {cat.weight}) — {cat.description}"
     } | join "\n"
 
-    p = Prompt { system: self.system_prompt () }
+    p = new_prompt (self.system_prompt ())
     p.add_section "Task" task
     p.add_section "Work to Grade" work
     p.add_section "Rubric Categories" category_lines

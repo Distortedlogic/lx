@@ -1,11 +1,11 @@
-use std/prompt {Prompt}
+use std/prompt {new_prompt}
 use pkg/log
 
 +Agent Composer = {
   system_prompt = () { "You are a markdown document generator. Output the document directly. Start with '# Goal'. No conversation." }
 
   build_prompt = (msg) {
-    p = Prompt { system: self.system_prompt () }
+    p = new_prompt (self.system_prompt ())
     p.add_section "Audit Checklist" msg.audit_content
     p.add_section "Process Rules" msg.rules_content
     p.add_section "Investigation Findings" msg.findings

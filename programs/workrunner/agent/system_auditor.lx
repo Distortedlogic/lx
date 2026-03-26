@@ -2,7 +2,7 @@
 -- Phase 1: code quality across all touched files.
 -- Phase 2: spec compliance — did each work item's diff match its spec?
 
-use std/prompt {Prompt}
+use std/prompt {new_prompt}
 use pkg/log
 
 +Agent SystemAuditor = {
@@ -13,7 +13,7 @@ use pkg/log
 
   build_prompt = (msg) {
     paths_text = msg.completed_paths | join "\n"
-    p = Prompt { system: self.system_prompt () }
+    p = new_prompt (self.system_prompt ())
     p.add_section "Completed Work Items" paths_text
     p.add_instruction "PHASE 1 — code quality: scan all files in the codebase"
     p.add_constraint "Flag: empty function bodies, functions returning placeholders"

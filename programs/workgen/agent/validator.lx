@@ -1,6 +1,6 @@
 -- Validator — checks if proposed approach is best practice before generating work items.
 
-use std/prompt {Prompt}
+use std/prompt {new_prompt}
 use pkg/log
 
 +Agent Validator = {
@@ -10,7 +10,7 @@ use pkg/log
   system_prompt = () { "You are validating a proposed approach before work item generation. Evaluate whether the solution is best practice, idiomatic, and sound." }
 
   build_prompt = (msg) {
-    p = Prompt { system: self.system_prompt () }
+    p = new_prompt (self.system_prompt ())
     p.add_section "Audit Findings" msg.findings
     p.add_section "Codebase Root" msg.root
     p.add_instruction "For each proposed change, evaluate: performant? optimal? elegant? simple and concise? minimally knotted?"
