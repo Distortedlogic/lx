@@ -3,6 +3,7 @@ use dioxus::prelude::*;
 #[derive(Clone, Copy, PartialEq)]
 pub enum VoiceStatus {
   Idle,
+  Standby,
   Listening,
   Processing,
   Speaking,
@@ -12,6 +13,7 @@ impl std::fmt::Display for VoiceStatus {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       Self::Idle => write!(f, "IDLE"),
+      Self::Standby => write!(f, "STANDBY"),
       Self::Listening => write!(f, "LISTENING"),
       Self::Processing => write!(f, "PROCESSING"),
       Self::Speaking => write!(f, "SPEAKING"),
@@ -25,6 +27,7 @@ pub enum PipelineStage {
   Transcribing,
   QueryingLlm,
   SynthesizingSpeech,
+  AwaitingQuery,
 }
 
 impl std::fmt::Display for PipelineStage {
@@ -34,6 +37,7 @@ impl std::fmt::Display for PipelineStage {
       Self::Transcribing => write!(f, "TRANSCRIBING"),
       Self::QueryingLlm => write!(f, "QUERYING_LLM"),
       Self::SynthesizingSpeech => write!(f, "SYNTHESIZING_SPEECH"),
+      Self::AwaitingQuery => write!(f, "AWAITING_QUERY"),
     }
   }
 }
@@ -52,6 +56,8 @@ pub struct VoiceContext {
   pub rms: Signal<f32>,
   pub pipeline_stage: Signal<PipelineStage>,
   pub widget: Signal<Option<dioxus_widget_bridge::TsWidgetHandle>>,
+  pub trigger_words: Signal<Vec<String>>,
+  pub always_listen: Signal<bool>,
 }
 
 impl VoiceContext {
@@ -63,6 +69,8 @@ impl VoiceContext {
       rms: Signal::new(0.0),
       pipeline_stage: Signal::new(PipelineStage::Idle),
       widget: Signal::new(None),
+      trigger_words: Signal::new(vec!["hey claude".into(), "ok claude".into(), "claude".into()]),
+      always_listen: Signal::new(false),
     };
     use_context_provider(|| ctx);
     ctx

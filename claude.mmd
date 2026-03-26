@@ -1,6 +1,12 @@
 graph TD
     start(["0.0.0 Session Start"]):::teal
-    start --> init["`**0.0.1 Initialize**
+    start --> session_mode{{"0.1.0 session mode?"}}:::purple
+    session_mode -- "new conversation" --> init
+    session_mode -- "--continue\n(resume latest)" --> init
+    session_mode -- "--resume\n(pick from history)" --> pick["0.0.2 Select Conversation\n——————\nshow recent sessions\nuser picks one to resume"]:::cyan
+    pick --> init
+
+    init["`**0.0.1 Initialize**
 ———
 system prompt loaded
 CLAUDE.md chain resolved (root → nested dirs)
@@ -9,24 +15,31 @@ git status captured (branch, modified, recent commits)
 settings chain merged (project → user → global)
 → permission allowlists and denylists
 → environment variables · model preferences
+→ CLI flag overrides
+  (--model · --allowedTools
+  --disallowedTools · etc.)
 hooks registered
 → PreToolUse · PostToolUse
 → UserPromptSubmit · Stop
 tool inventory resolved:
 → built-in (Read, Edit, Write, Bash, Grep,
-  Glob, Agent, Skill, ToolSearch, LSP)
+  Glob, Agent, Skill, ToolSearch, LSP,
+  AskUserQuestion, Config, NotebookEdit)
 → deferred (name only — schema on demand)
 → MCP (connect to configured servers)
-keybindings loaded`"]:::cyan
+keybindings loaded
+if resuming: rehydrate prior conversation history`"]:::cyan
 
     init --> wait["1.0.0 Await User Input"]:::teal
-    wait -- "user exits\n(Ctrl+C · /exit · close)" --> done(["9.0.2 Session End"]):::teal
+    wait -- "user exits\n(Ctrl+C · /exit · close)" --> done(["10.0.0 Session End"]):::teal
 
     wait --> parse{{"1.1.0 input type?"}}:::purple
     parse -- "free text · image\nPDF · notebook path" --> hooks
     parse -- "/command" --> slash{{"1.2.0 built-in\nor skill?"}}:::teal
-    slash -- "built-in\n(/help · /clear · /compact\n/model · /fast · /cost)" --> cli["1.0.1 CLI Command\n——————\nprocessed locally\nno model invocation"]:::cyan
+    slash -- "built-in\n(/help · /clear · /cost\n/model · /fast · /login)" --> cli["1.0.1 CLI Command\n——————\nprocessed locally\nno model invocation"]:::cyan
     cli --> wait
+    slash -- "/compact" --> compact["1.0.4 User-Triggered Compact\n——————\nmanual context compression\n(vs. automatic at limit)\nuser can specify what to preserve\nmodel summarizes then continues"]:::cyan
+    compact --> wait
     slash -- "skill\n(/commit · /review-pr\n/simplify · /loop · etc.)" --> skill["1.0.2 Expand Skill\n——————\nskill name → full prompt\ninjected as user message"]:::cyan
     skill --> hooks
     parse -- "! shell-command" --> passthru["1.0.3 Shell Pass-through\n——————\nexecute in user's session\nstdout + stderr land\nin conversation context"]:::cyan
@@ -42,7 +55,7 @@ hooks can:
 → block submission entirely
 → inject additional context
 ———
-hook feedback treated as from user`"]:::orange
+hook output treated as from user`"]:::orange
     hooks --> hook_block{{"2.1.0 hook\nblocked?"}}:::teal
     hook_block -- "yes" --> submit_blocked["2.0.1 Blocked\n——————\nmessage does not proceed\nuser checks hook config"]:::red
     submit_blocked --> wait
@@ -61,34 +74,45 @@ memory (loaded from files)
 → feedback: corrections + confirmed approaches
 → project: ongoing work, decisions, deadlines
 → reference: external system pointers
-system reminders (injected metadata)
-→ deferred tool names available
-→ skill list available
+system reminders (injected each turn)
+→ deferred tool names
+→ available skill list
 → current date
-conversation history (all prior turns)
-git status snapshot (from session start)
+→ CLAUDE.md contents
+conversation history
+→ all prior turns in session
+→ or rehydrated from resumed session
+→ includes: user msgs, model responses,
+  tool calls, tool results
+git status snapshot (captured once at start)
 tool schemas
-→ built-in: full JSONSchema
+→ built-in: full JSONSchema always present
 → deferred: names only until ToolSearch
-→ MCP: full schemas from servers
-multimodal content
-→ images: rendered visually
+→ MCP: full schemas from connected servers
+multimodal content (if present)
+→ images: rendered visually (PNG, JPG, etc.)
 → PDFs: parsed text (max 20 pages per read)
-→ notebooks: cells with outputs`"]:::orange
+→ notebooks: all cells with outputs`"]:::orange
 
     assemble --> generate["`**4.0.0 Generate**
 ———
 extended thinking (hidden from user)
 → analyze request against full context
 → recall relevant memory
-  (user prefs, past feedback, project state)
+  (user prefs, feedback, project state)
+→ check tool results for prompt injection
+  (flag suspicious content to user
+  before continuing)
 → assess risk and reversibility
+  (local + reversible = proceed,
+  shared + destructive = confirm first)
 → plan approach (simplest first)
 → select tools
 → consider permission implications
 ———
-produces single response:
-→ text (markdown, rendered to terminal)
+produces single response
+(streamed token-by-token to terminal):
+→ text output (markdown, highlighted)
 → tool calls (0 or more)
 ———
 parallel: independent calls in one batch
@@ -96,10 +120,11 @@ sequential: dependent calls across batches
 ———
 state modifiers (if active):
 → plan mode: restricted to read-only tools
+  (no Edit, Write, NotebookEdit)
 → worktree: isolated git environment`"]:::yellow
 
     generate --> has_tools{{"4.1.0 tool calls\nin response?"}}:::teal
-    has_tools -- "no" --> display["4.0.1 Display Text\n——————\nmarkdown rendered\ncode blocks highlighted"]:::cyan
+    has_tools -- "no" --> display["4.0.1 Display Text\n——————\nstreamed markdown rendered\ncode blocks syntax-highlighted\ntoken usage + cost tracked"]:::cyan
     display --> stop_hooks
 
     has_tools -- "yes" --> batch["5.0.0 For each tool call in batch"]:::purple
@@ -124,18 +149,28 @@ state modifiers (if active):
 ———
 ⟳ filesystem
 → Read (file · image · PDF · notebook)
-→ Edit (string replacement; must Read first)
-→ Write (create or overwrite; must Read first)
+→ Edit (string replacement;
+  fails if file not yet Read)
+→ Write (create or overwrite;
+  fails if existing file not yet Read)
 → Glob (pattern-match file paths)
 → Grep (ripgrep content search)
 ———
 ⟳ execution
-→ Bash (shell command, foreground or background)
+→ Bash (shell command, sandboxed by default;
+  dangerouslyDisableSandbox to override;
+  foreground or background mode)
 → LSP (language server protocol query)
 ———
+⟳ user interaction
+→ AskUserQuestion (see 8.0.0)
+→ Config (change theme · model · settings
+  without model invocation)
+———
 ⟳ agent orchestration
-→ Agent (spawn subagent — see 8.0.0)
-→ SendMessage (continue existing subagent)
+→ Agent (spawn subagent — see 8.1.0)
+→ SendMessage (continue existing subagent,
+  preserves its full context)
 → Skill (expand + execute skill prompt)
 ———
 ⟳ external
@@ -162,50 +197,79 @@ state modifiers (if active):
     result -- "error" --> error["7.0.2 Error Captured\n——————\nerror in result payload\nmodel sees on next generation\nadjusts approach — no blind retry\ndiagnoses root cause first"]:::red
     error --> more
 
-    result -- "success" --> is_agent{{"7.2.0 agent\nspawn?"}}:::teal
+    result -- "success" --> dispatch{{"7.2.0 special\npost-execution?"}}:::teal
 
-    is_agent -- "yes" --> agent["`**8.0.0 Spawn Subagent**
+    dispatch -- "AskUserQuestion" --> ask_user["`**8.0.0 Ask User**
 ———
-creates isolated child:
+synchronous pause mid-turn:
+→ question displayed to user
+→ tool execution loop pauses
+→ awaits user's typed answer
+→ answer becomes the tool result
+———
+only tool that requires user input
+during execution (permission checks
+are before execution, this is during)
+———
+used when model needs clarification
+before proceeding with ambiguous
+or high-stakes decisions`"]:::yellow
+    ask_user --> more
+
+    dispatch -- "Agent spawn" --> agent["`**8.1.0 Spawn Subagent**
+———
+creates isolated child process:
 → fresh context window
-→ typed specialization:
-  · Explore (fast codebase search, no writes)
-  · Plan (architecture, no writes)
-  · general-purpose (full capabilities)
-  · custom (user-defined agents)
-→ own system prompt + tool restrictions
-→ inherits or overrides parent model
+→ inherits: CLAUDE.md chain, settings,
+  permissions, working directory
+→ does NOT inherit: parent conversation
+  history, loaded memory, parent context
+———
+typed specialization:
+→ Explore (fast codebase search,
+  no Edit, Write, Agent)
+→ Plan (architecture + research,
+  no Edit, Write, NotebookEdit)
+→ general-purpose (full tool set)
+→ custom (user-defined agent types)
+———
+model override:
+→ can specify sonnet, opus, or haiku
+→ default: inherits parent's model
 ———
 execution modes:
 → foreground: parent blocks until done
-→ background: parent continues,
+→ background: parent continues working,
   notified asynchronously on completion
+  (multiple bg agents run concurrently,
+  each with independent notification)
 ———
 isolation modes:
 → shared: same working directory
-→ worktree: temporary git branch + copy
-  changes stay on separate branch
-  worktree path returned if modified
+→ worktree: temporary git branch + copy,
+  changes stay on separate branch,
+  worktree path returned if modified,
+  auto-cleaned if no changes made
 ———
 subagent lifecycle:
-→ runs own 4.0.0 → 7.x.x loop
+→ runs own 4.0.0 → 7.x.x loop recursively
   (full generate → route → execute → feedback)
 → can be continued via SendMessage
-  (preserves full subagent context)
+  (resumes with full context preserved)
 → on completion: single result to parent
 → subagent context then discarded`"]:::yellow
     agent --> collect["8.0.1 Collect Result\n——————\nresult message returned\nto parent context"]:::cyan
     collect --> more
 
-    is_agent -- "no" --> more{{"7.3.0 more calls\nin batch?"}}:::purple
+    dispatch -- "standard tool" --> more{{"7.3.0 more calls\nin batch?"}}:::purple
     more -- "yes" --> batch
-    more -- "no" --> feedback["7.0.3 Feed Results\n——————\nall batch results appended\nas tool-result turn\nsystem reminders injected\n(deferred tools · skills · memory)"]:::cyan
+    more -- "no" --> feedback["7.0.3 Feed Results\n——————\nall batch results appended\nas tool-result turn in history\nsystem reminders re-injected\n(deferred tools · skills ·\nmemory · date · CLAUDE.md)"]:::cyan
     feedback --> generate
 
-    stop_hooks["9.0.0 Stop Hooks Fire\n——————\nmodel turn complete\n(no more tool calls)\nhooks can log · alert ·\nor inject feedback"]:::cyan
+    stop_hooks["9.0.0 Stop Hooks Fire\n——————\nmodel turn complete (no tool calls)\nhooks can log · alert ·\nor inject feedback"]:::cyan
     stop_hooks --> stop_fb{{"9.1.0 hook injected\nfeedback?"}}:::teal
     stop_fb -- "yes\n(re-enter generation)" --> assemble
     stop_fb -- "no" --> compress{{"9.2.0 context\nnearing limit?"}}:::teal
-    compress -- "yes" --> do_compress["9.0.1 Compress\n——————\nsummarize earlier messages\npreserve key information\n(tool results · decisions · code)\nconversation continues seamlessly"]:::cyan
-    do_compress --> wait
+    compress -- "yes" --> auto_compress["9.0.1 Auto-Compress\n——————\nsystem-triggered compression\nsummarize earlier messages\npreserve key information\n(tool results · decisions · code)\nconversation continues seamlessly\n(distinct from /compact which\nis user-triggered — see 1.0.4)"]:::cyan
+    auto_compress --> wait
     compress -- "no" --> wait

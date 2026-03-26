@@ -1,6 +1,7 @@
 mod pane_area;
 mod voice_banner;
 mod voice_context;
+mod voice_pipeline;
 
 use dioxus::prelude::*;
 

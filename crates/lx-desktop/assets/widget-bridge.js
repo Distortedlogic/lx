@@ -38972,6 +38972,9 @@ registerProcessor('capture', Capture);
 				this.audioCtx = null;
 			}
 		}
+		resetVad() {
+			this.vad.reset();
+		}
 	};
 	//#endregion
 	//#region widgets/voice.ts
@@ -38989,18 +38992,31 @@ registerProcessor('capture', Capture);
 			const state = {
 				capture,
 				status: "idle",
-				dx
+				dx,
+				hasSpeech: false
 			};
 			states.set(elementId, state);
 			capture.onChunk = (b64pcm) => {
-				dx.send({
-					type: "audio_chunk",
-					data: b64pcm,
-					seq: capture.currentSeq
-				});
+				if (state.status === "listening" || state.status === "standby") {
+					state.hasSpeech = true;
+					dx.send({
+						type: "audio_chunk",
+						data: b64pcm,
+						seq: capture.currentSeq
+					});
+				}
 			};
 			capture.onSilence = () => {
-				if (state.status === "listening") {
+				if (state.status === "standby") {
+					if (!state.hasSpeech) {
+						capture.resetVad();
+						return;
+					}
+					state.hasSpeech = false;
+					transition(state, "processing");
+					dx.send({ type: "silence_detected" });
+				} else if (state.status === "listening") {
+					state.hasSpeech = false;
 					capture.stop();
 					transition(state, "processing");
 					dx.send({ type: "silence_detected" });
@@ -39023,6 +39039,23 @@ registerProcessor('capture', Capture);
 						transition(state, "listening");
 						state.dx.send({ type: "start_standby" });
 					});
+					break;
+				case "start_standby_listen":
+					if (state.status !== "idle") return;
+					state.hasSpeech = false;
+					state.capture.start().then(() => {
+						transition(state, "standby");
+					});
+					break;
+				case "resume_standby":
+					state.hasSpeech = false;
+					state.capture.resetVad();
+					transition(state, "standby");
+					break;
+				case "awaiting_query":
+					state.hasSpeech = false;
+					state.capture.resetVad();
+					transition(state, "listening");
 					break;
 				case "stop_capture":
 					state.capture.stop();
