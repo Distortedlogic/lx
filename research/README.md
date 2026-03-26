@@ -64,10 +64,16 @@ Comprehensive survey of how programming languages are designed and implemented �
 - [workflow-dsls/crewai_deep_dive.md](workflow-dsls/crewai_deep_dive.md) — CrewAI: Flows/Crews dual-layer, broken hierarchical mode, guardrails, memory scoring, enterprise deployments
 - [workflow-dsls/autogen_deep_dive.md](workflow-dsls/autogen_deep_dive.md) — AutoGen: 0.2→0.4 actor-model rewrite, conversation patterns, composable termination, AG2 fork, maintenance mode
 - [workflow-dsls/agent_framework_landscape_2026.md](workflow-dsls/agent_framework_landscape_2026.md) — 12 frameworks ranked by lx relevance: DSPy, Letta, Julep, SLANG, OpenAI Agents SDK, smolagents, Semantic Kernel, Pydantic AI, LangGraph, Mastra, Agency Swarm
+- [workflow-dsls/dspy_deep_dive.md](workflow-dsls/dspy_deep_dive.md) — DSPy: signatures as typed I/O specs, modules as composable strategies, optimizers as prompt compilers, MIPROv2/GEPA/SIMBA internals, the assertion→refinement evolution
+- [workflow-dsls/letta_deep_dive.md](workflow-dsls/letta_deep_dive.md) — Letta/MemGPT: three-tier memory (core/recall/archival), heartbeat continuation, tool-call-as-reasoning, sleep-time compute, V1 reasoning dilemma, agent persistence
+- [workflow-dsls/julep_deep_dive.md](workflow-dsls/julep_deep_dive.md) — Julep: 18 YAML step types as feature checklist, expression sandbox, Temporal-backed durable execution, why YAML fails as substrate, hosted shutdown postmortem
+- [workflow-dsls/slang_deep_dive.md](workflow-dsls/slang_deep_dive.md) — SLANG: three primitives (stake/await/commit), non-Turing-complete by design, dual-mode execution (LLM-as-runtime vs CLI), static deadlock detection, converge model
+- [workflow-dsls/autoresearch_deep_dive.md](workflow-dsls/autoresearch_deep_dive.md) — Karpathy's autoresearch: markdown-as-agent-program, single-file mutation surface, 5-min wall-clock budget, git-as-experiment-tracker, greedy metric-gated optimization loop
 
 #### AI/LLM Integration
 - [ai-llm-integration/landscape.md](ai-llm-integration/landscape.md) — DSPy, BAML, Guidance, LMQL, SGLang, Outlines, Instructor; structured output, constrained decoding
 - [ai-llm-integration/design-patterns.md](ai-llm-integration/design-patterns.md) — Structured output patterns, prompt composition, refine loops, RAG, embeddings, token budgeting
+- [ai-llm-integration/baml_deep_dive.md](ai-llm-integration/baml_deep_dive.md) — BAML: typed LLM functions DSL, Schema-Aligned Parsing (<10ms recovery), type-to-prompt compilation (4x fewer tokens), cross-language codegen, streaming partial types
 
 #### Refine Loops (Iterative AI Improvement)
 - [refine-loops/landscape.md](refine-loops/landscape.md) — Self-Refine, Reflexion, CRITIC, LLM-as-Judge, convergence theory, evaluation frameworks
@@ -121,6 +127,9 @@ Comprehensive survey of how programming languages are designed and implemented �
 - [harness/pi_harness_analysis.md](harness/pi_harness_analysis.md) — Pi (badlogic): minimal 4-tool harness, <1K token system prompt, anti-MCP, tree-structured sessions, extensibility
 - [harness/REF_anthropic_effective_harnesses.md](harness/REF_anthropic_effective_harnesses.md) — Anthropic's two-agent long-running pattern, JSON feature tracking, session initialization protocol
 - [harness/REF_openai_harness_engineering.md](harness/REF_openai_harness_engineering.md) — OpenAI's harness engineering guidance
+- [harness/swarma_experiment_loops.md](harness/swarma_experiment_loops.md) — Swarma: experiment-loop layer for agent swarms, LLM-as-judge scoring, verdict-driven strategy evolution, teams-as-config
+- [harness/a2a_mcp_protocol_analysis.md](harness/a2a_mcp_protocol_analysis.md) — A2A + MCP protocols: task lifecycle, token cost problem (75k tokens for 10 servers), progressive tool disclosure, security models
+- [harness/anthropic_agent_sdk_deep_dive.md](harness/anthropic_agent_sdk_deep_dive.md) — Anthropic Agent SDK: 5-layer architecture, tool search (85% token reduction), subagents, agent teams, 5-stage permission pipeline
 
 ### Runtime & Security
 
@@ -137,6 +146,23 @@ Comprehensive survey of how programming languages are designed and implemented �
 
 #### Sandboxing & Capabilities
 - [sandboxing/landscape.md](sandboxing/landscape.md) — Deno permissions, WASM/WASI, capability-based security, Lua sandboxing, container isolation
+
+### Desktop App & Voice Pipeline
+
+#### Claude Code CLI Streaming
+- [cli-toolchain/claude-code-stream-json.md](cli-toolchain/claude-code-stream-json.md) — `--output-format stream-json` requires `--verbose`, line-buffered through pipes, event types (system/assistant/user/result/stream_event), delta extraction with `--include-partial-messages`
+
+#### WebKit2GTK Audio
+- [webkit2gtk_audio_api.md](webkit2gtk_audio_api.md) — Web Audio API `decodeAudioData` unreliable on GStreamer backend, HTMLAudioElement blob URLs work, audio clipping caused by PipeWire suspend-on-idle (fix: WirePlumber config), WebKitGTK 2.50.6 may fix Web Audio
+
+#### Kokoro TTS Output
+- [kokoro_tts_audio_output.md](kokoro_tts_audio_output.md) — 24kHz 16-bit mono, peak-normalized to full int16 range, no zero-crossing guarantee, no fade-in option, proper WAV headers
+
+#### Linux Pipe Buffering
+- [pipes-composition/linux-pipe-buffering.md](pipes-composition/linux-pipe-buffering.md) — glibc full-buffers pipes (4096 bytes), Node.js (Claude CLI) bypasses stdio via libuv (flushes per write), Rust stdout is LineWriter, tokio read() returns immediately on any kernel buffer data
+
+#### Widget Bridge Build Pipeline
+- [tooling/widget-bridge-build-pipeline.md](tooling/widget-bridge-build-pipeline.md) — build.rs rerun-if-changed only watches widget-bridge/src and widgets/, audio-playback changes are invisible to Cargo, must touch build.rs to force rebuild
 
 ### Academic Research
 - [scripting-languages-academic.md](scripting-languages-academic.md) — 50+ papers on scripting language design, gradual typing, JIT, workflow patterns, actor model, agent DSLs

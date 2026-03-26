@@ -4,17 +4,16 @@
 use std/time
 use std/math
 
-compute_delay_fn = (opts attempt) {
++compute_delay = (opts attempt) {
   bo = opts.backoff ?? "exponential"
   base = opts.base_ms ?? 100
   max_d = opts.max_delay_ms ?? 30000
   raw = bo == "constant" ? base : (bo == "linear" ? base * attempt : base * (math.pow 2 attempt))
   raw > max_d ? max_d : raw
 }
-+compute_delay = compute_delay_fn
 
-retry_with = (opts f) {
-  cd = compute_delay_fn
++retry_with = (opts f) {
+  cd = compute_delay
   max = opts.max ?? 3
   now_start = time.now ()
   start_ms = now_start.ms
@@ -50,7 +49,6 @@ retry_with = (opts f) {
     time.sleep delay
   }
 }
-+retry_with = retry_with
 
 +retry = (f) {
   retry_with {max: 3; backoff: "exponential"; base_ms: 100; max_delay_ms: 30000; jitter: false} f

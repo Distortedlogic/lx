@@ -70,13 +70,16 @@
 
 ## lx Package Traps
 
-- **Self-recursive `+` exports need two-step pattern.** `+f = (n) { f (n-1) }` — `+` exports are excluded from forward declarations so builtins aren't shadowed. **Fix:** `f = (n) { f (n-1) }; +f = f`.
 - **String interpolation parses `{key: val}` as lx code.** `"Return JSON: {score: Int, issues: [Str]}"` — the `{score: Int}` is parsed as a record literal. **Fix:** use backtick raw strings: `` `Return JSON: {score: Int}` ``.
 - **`{}` is Unit, not empty Record.** Empty block `{}` evaluates to Unit. Empty record requires `{:}` syntax. **Fix:** use `()` explicitly for Unit.
 
 ## Module Paths
 
 - **pkg/ uses subdirectory paths.** Current layout: `pkg/agent/`, `pkg/git/`, `pkg/guard/`, `pkg/schema/`, `pkg/store/`, `pkg/workflow/`, plus `pkg/log.lx` at root. Import as `use pkg/agent/auditor`, `use pkg/log`, etc.
+
+## Sections Limitation
+
+- **Sections don't support `==` or `!=`.** `filter (.status == "pass")` fails with parse error — `section_op` in `expr_pratt.rs` lists comparison operators but the section expression builder doesn't handle them. **Fix:** use a lambda: `filter (r) { r.status == "pass" }`.
 
 ## Cron Traps
 
@@ -94,7 +97,6 @@
 - **`(expr) {record}` in application context no longer misparses.** Fixed via `application_depth` tracking in the parser.
 - **Lambda body with `==`/`!=` in pipe chains** — block lambdas now correctly stop at `}` (commit 1b1f823).
 - **Lambda body extends through `| pipe` in record field values** — block syntax `{ }` now terminates correctly (commit 1b1f823).
-- **Sections now support `==`, `!=`, `<`, `>`, `<=`, `>=`.** `section_op` in `expr_pratt.rs` includes all comparison operators.
 - **`Agent` keyword now supports field declarations with `:`.** The keyword parser uses `class_body()` which handles both `:` fields and `=` methods.
 - **`Agent` keyword injects trait defaults.** `self.think`, `self.think_with` etc. are available via trait desugaring.
 - **`grader` max_turns trap** — grader Agent now declares empty `tools = () { [] }` (trait default) and uses `json_schema` for structured output.
@@ -109,3 +111,4 @@
 - **Closures inside `+` functions capture sibling bindings.** `!b.exported` removed from forward declaration scan. Exported and non-exported function bindings both get pre-registered.
 - **`md.sections` accumulates all content types.** Bullet lists, code blocks, ordered lists, blockquotes, and HRs are now included. Sub-headings nest inside parent sections instead of splitting.
 - **`uses` declarations work in Agent keyword.** `Agent Foo = { uses MyConn; act = ... }` auto-connects the connector in init and collects its tools.
+- **Self-recursive `+` exports work directly.** `+f = (n) { f (n-1) }` works — `!b.exported` removed from forward declaration scan, so `+` bindings are pre-registered like non-exported ones. Two-step pattern no longer needed.

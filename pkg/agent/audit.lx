@@ -17,7 +17,7 @@ refusal_phrases = [
 
 +is_too_short = (s min_len) { (len s) < min_len }
 
-is_repetitive = (s) {
++is_repetitive = (s) {
   normalized = s | replace "\n" "."
   sentences = normalized | split "." | map (x) { x | trim | lower } | filter (x) { (len x) > 0 }
   total = sentences | len
@@ -30,21 +30,18 @@ is_repetitive = (s) {
     dupes * 2 >= total
   }
 }
-+is_repetitive = is_repetitive
 
-is_hedging = (s) {
++is_hedging = (s) {
   lo = s | lower
   hedging_phrases | any? (h) { lo | contains? h }
 }
-+is_hedging = is_hedging
 
-is_refusal = (s) {
++is_refusal = (s) {
   lo = s | lower
   refusal_phrases | any? (r) { lo | contains? r }
 }
-+is_refusal = is_refusal
 
-references_task = (output task) {
++references_task = (output task) {
   lo = output | lower
   words = task | split " " | filter (w) { (len w) > 3 } | map lower
   total = words | len
@@ -54,7 +51,6 @@ references_task = (output task) {
     hits * 3 >= total
   }
 }
-+references_task = references_task
 
 +files_exist = (paths) { paths | all? (p) { fs.exists p } }
 
@@ -64,7 +60,7 @@ references_task = (output task) {
 
 +rubric = (categories) { categories }
 
-evaluate = (categories data) {
++evaluate = (categories data) {
   threshold = data.threshold ?? 95
   results = categories | map (cat) {
     name = cat.name ?? "unknown"
@@ -79,18 +75,18 @@ evaluate = (categories data) {
   final_score = total_weight > 0 ? total_score // total_weight : 0
   cat_records = results | map (r) { {name: r.name; score: r.score; passed: r.passed} }
   failed_names = results | filter (r) { r.passed == false } | map (.name)
-  feedback_parts = results | filter (r) { r.passed == false } | map (r) { r.name ++ ": failed" }
+  feedback_parts = results | filter (r) { r.passed == false } | map (r) { "{r.name}: failed" }
   feedback = feedback_parts | join "; "
   passed = final_score >= threshold
   {score: final_score; passed: passed; categories: cat_records; feedback: feedback; failed: failed_names}
 }
-+evaluate = evaluate
 
 check_min_length = (output min_len) {
-  (len output) < min_len ? ["output too short (" ++ (to_str (len output)) ++ " < " ++ (to_str min_len) ++ ")"] : []
+  output_len = len output
+  (len output) < min_len ? ["output too short ({output_len} < {min_len})"] : []
 }
 
-quick_check = (opts) {
++quick_check = (opts) {
   output = opts.output ?? ""
   reasons = (output | trim | len == 0) ? ["output is empty"] : []
   ml = opts.min_length
@@ -105,4 +101,3 @@ quick_check = (opts) {
   passed = (len reasons) == 0
   {passed: passed; reasons: reasons}
 }
-+quick_check = quick_check

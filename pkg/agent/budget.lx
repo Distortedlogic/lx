@@ -6,7 +6,7 @@ use pkg/schema/errors {BudgetExhausted}
 
 budgets = Store ()
 
-create_fn = (opts) {
++create = (opts) {
   tight = (opts.tight_at ?? 50.0) + 0.0
   critical = (opts.critical_at ?? 80.0) + 0.0
   dims = opts | entries | filter (e) {
@@ -33,14 +33,13 @@ create_fn = (opts) {
   budgets.set id state
   {__budget_id: id}
 }
-+create = create_fn
 
 get_state = (b) {
   id = b.__budget_id
   budgets.get id
 }
 
-spend_fn = (b amounts) {
++spend = (b amounts) {
   gs = get_state
   state = gs b
   initial = state.get "initial"
@@ -54,7 +53,7 @@ spend_fn = (b amounts) {
   }
   parent = state.get "parent"
   has_parent = parent != None
-  has_parent ? spend_fn parent amounts
+  has_parent ? spend parent amounts
   exceeded := []
   initial.keys () | each (k) {
     limit = initial.get k
@@ -73,9 +72,8 @@ spend_fn = (b amounts) {
   ok_unit = Ok ()
   has_exceeded ? budget_err : ok_unit
 }
-+spend = spend_fn
 
-remaining_fn = (b) {
++remaining = (b) {
   gs = get_state
   state = gs b
   initial = state.get "initial"
@@ -88,17 +86,15 @@ remaining_fn = (b) {
   }
   result.to_record ()
 }
-+remaining = remaining_fn
 
-used_fn = (b) {
++used = (b) {
   gs = get_state
   state = gs b
   used_store = state.get "used"
   used_store.to_record ()
 }
-+used = used_fn
 
-used_pct_fn = (b) {
++used_pct = (b) {
   gs = get_state
   state = gs b
   initial = state.get "initial"
@@ -112,9 +108,8 @@ used_pct_fn = (b) {
   }
   result.to_record ()
 }
-+used_pct = used_pct_fn
 
-status_fn = (b) {
++status = (b) {
   gs = get_state
   state = gs b
   initial = state.get "initial"
@@ -130,9 +125,8 @@ status_fn = (b) {
   }
   max_pct > 100.0 ? "exceeded" : (max_pct >= critical ? "critical" : (max_pct >= tight ? "tight" : "comfortable"))
 }
-+status = status_fn
 
-project_fn = (b opts) {
++project = (b opts) {
   gs = get_state
   state = gs b
   initial = state.get "initial"
@@ -159,9 +153,8 @@ project_fn = (b opts) {
   head_rec = result_headroom.to_record ()
   {projected_total: proj_rec; headroom: head_rec; will_exceed: will_exceed}
 }
-+project = project_fn
 
-slice_fn = (parent limits) {
++slice = (parent limits) {
   gs = get_state
   parent_state = gs parent
   tight = parent_state.get "tight_at"
@@ -184,8 +177,7 @@ slice_fn = (parent limits) {
   child_state.set "critical_at" critical
   child_state.set "parent" parent
   now = time.now ()
-  id = to_str now.ms ++ "_child"
+  id = "{now.ms}_child"
   budgets.set id child_state
   {__budget_id: id}
 }
-+slice = slice_fn

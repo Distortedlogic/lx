@@ -5,7 +5,7 @@ Trait +Handoff = {result: Any = ""; tried: List = []; assumptions: List = []; un
 format_section = (title items) {
   is_empty = (items | len) == 0
   bullets = items | map (item) { "- {item}\n" } | join ""
-  section = "\n**{title}:**\n" ++ bullets
+  section = "\n**{title}:**\n{bullets}"
   is_empty ? "" : section
 }
 
@@ -18,5 +18,5 @@ format_section = (title items) {
   recommendations = fs "Recommendations" (handoff.recommendations ?? [])
   files = fs "Files examined" (handoff.files_read ?? [])
   tools = fs "Tools used" (handoff.tools_used ?? [])
-  header ++ tried ++ assumptions ++ uncertainties ++ recommendations ++ files ++ tools
+  "{header}{tried}{assumptions}{uncertainties}{recommendations}{files}{tools}"
 }
