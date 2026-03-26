@@ -167,31 +167,23 @@ do_merge_fields = (results config) {
   make_result rec (results | len) conflicts []
 }
 
-reconcile_fn = (results config) {
-  du = do_union
-  di = do_intersection
-  dv = do_vote
-  dhc = do_highest_confidence
-  dms = do_max_score
-  dmf = do_merge_fields
-  mr = make_result
++reconcile = (results config) {
   strategy = config.strategy ?? "union"
   is_fn = (type_of strategy) == "Func"
   is_fn ? {
     true -> {
       custom_val = strategy results
       src_count = results | len
-      mr custom_val src_count [] []
+      make_result custom_val src_count [] []
     }
     false -> strategy ? {
-      "union" -> du results config
-      "intersection" -> di results config
-      "vote" -> dv results config
-      "highest_confidence" -> dhc results config
-      "max_score" -> dms results config
-      "merge_fields" -> dmf results config
-      _ -> du results config
+      "union" -> do_union results config
+      "intersection" -> do_intersection results config
+      "vote" -> do_vote results config
+      "highest_confidence" -> do_highest_confidence results config
+      "max_score" -> do_max_score results config
+      "merge_fields" -> do_merge_fields results config
+      _ -> do_union results config
     }
   }
 }
-+reconcile = reconcile_fn

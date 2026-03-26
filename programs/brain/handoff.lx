@@ -1,5 +1,4 @@
 -- Handoff Trait + as_context formatter for structured agent-to-agent context transfer.
--- Replaces agent_handoff.rs.
 
 Trait +Handoff = {result: Any = ""; tried: List = []; assumptions: List = []; uncertainties: List = []; recommendations: List = []; files_read: List = []; tools_used: List = []; duration_ms: Int = 0}
 
@@ -10,7 +9,7 @@ format_section = (title items) {
   is_empty ? "" : section
 }
 
-as_context_fn = (handoff) {
++as_context = (handoff) {
   fs = format_section
   header = "## Previous Agent Handoff\n**Result:** {handoff.result}\n"
   tried = fs "Tried" (handoff.tried ?? [])
@@ -21,4 +20,3 @@ as_context_fn = (handoff) {
   tools = fs "Tools used" (handoff.tools_used ?? [])
   header ++ tried ++ assumptions ++ uncertainties ++ recommendations ++ files ++ tools
 }
-+as_context = as_context_fn

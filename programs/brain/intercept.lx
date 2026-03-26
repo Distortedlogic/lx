@@ -1,7 +1,6 @@
 -- Composable message middleware with short-circuit support.
--- Replaces agent_intercept.rs.
 
-intercept_fn = (agent middleware) {
++intercept = (agent middleware) {
   orig_handler = agent.handler
   next_fn = (msg) {
     resolved = resolve_handler agent
@@ -16,4 +15,3 @@ intercept_fn = (agent middleware) {
   }
   {..agent; handler: new_handler; __intercepted: true}
 }
-+intercept = intercept_fn

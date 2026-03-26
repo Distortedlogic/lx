@@ -1,15 +1,13 @@
 -- Dependency-aware step execution with revision actions.
 -- Replaces the Rust std/plan module with pure lx logic.
 
-step_id_fn = (step) { step.id ?? "unknown" }
-+step_id = step_id_fn
++step_id = (step) { step.id ?? "unknown" }
 
-step_deps_fn = (step) { step.depends ?? [] }
-+step_deps = step_deps_fn
++step_deps = (step) { step.depends ?? [] }
 
 next_ready_fn = (remaining completed_ids) {
   remaining | find (step) {
-    deps = step_deps_fn step
+    deps = step_deps step
     deps | all? (d) { completed_ids | contains? d }
   }
 }
@@ -56,9 +54,9 @@ apply_action = (act action remaining sid si sd) {
   }
 }
 
-run_fn = (steps executor on_step) {
-  si = step_id_fn
-  sd = step_deps_fn
++run = (steps executor on_step) {
+  si = step_id
+  sd = step_deps
   aa = apply_action
   completed := []
   completed_ids := []
@@ -92,4 +90,3 @@ run_fn = (steps executor on_step) {
   ok_val = Ok completed
   final_err ? err_result : ok_val
 }
-+run = run_fn

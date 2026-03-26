@@ -1,26 +1,20 @@
 -- Capabilities Trait + advertise/lookup for runtime capability discovery.
--- Replaces agent_capability.rs.
 
 Trait +Capabilities = {traits: List = []; tools: List = []; domains: List = []; budget_remaining: Int = -1; accepts: List = []; status: Str = "ready"}
 
 advertised = Store ()
 
-capabilities_fn = (agent) {
++capabilities = (agent) {
   msg = {type: "capabilities"}
   resp = agent ~>? msg
-  ok_val = Ok resp
-  ok_val
+  Ok resp
 }
-+capabilities = capabilities_fn
 
-advertise_fn = (name caps) {
++advertise = (name caps) {
   advertised.set name caps
-  ok_val = Ok ()
-  ok_val
+  Ok ()
 }
-+advertise = advertise_fn
 
-lookup_fn = (name) {
++lookup = (name) {
   advertised.get name
 }
-+lookup = lookup_fn

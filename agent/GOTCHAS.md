@@ -50,19 +50,19 @@
 
 ## Keyword Field Names
 
-- **`par` is a keyword — can't use as record field via dot access.** `dot_rhs` accepts `Ident` tokens; keywords are separate token types. Same applies to: `sel`, `match`, `if`, `use`, `emit`, `yield`, `refine`, `receive`, `Agent`, `Trait`, `MCP`.
+- **Uppercase keyword tokens can't be used as record field names.** `{Agent: 1}` fails because `AgentKw` is not in `ident_or_keyword()` or `looks_like_record()`. Dot-access works (`r.Agent`) because `dot_rhs` has a separate `type_name()` path. **Fix:** use lowercase field names.
 
 ## Parens Are Not Blocks
 
-- **`( )` is grouping, not a block scope.** `cond ? ( x = compute; use x )` fails — parens don't create blocks, only `{ }` does. But `? { }` triggers match parsing (see above). **Fix:** bind before the ternary: `val = compute; cond ? val : other`.
+- **`( )` is grouping, not a block scope.** `cond ? ( x = compute; use x )` fails — parens don't create blocks, only `{ }` does. **Fix:** use `{ }` for multi-statement branches: `cond ? { x = compute; x } : other`. Or bind before the ternary: `val = compute; cond ? val : other`.
 
 ## find/first/last Return Some, Not the Value
 
 - **`find`, `first`, and `last` return `Some(val)` or `None`, not the value directly.** `list | find pred | (.field)` fails — `.field` is called on `Some(record)`. **Fix:** unwrap with `??`: `(list | find pred) ?? default`. Parenthesize before `??` because `??` binds looser than `|`.
 
-## Computed Tuple Access
+## Computed Tuple Access (minor)
 
-- **`tuple.[0]` doesn't work.** Computed field access on tuples fails. **Fix:** use destructuring: `(a b) = tuple` then access `a` and `b` directly.
+- **`tuple.[-1]` negative indexing not tested.** Positional `t.0` and computed `t.[i]` both work. Negative indices may or may not work — use destructuring if needed.
 
 ## time.format Argument Order
 
@@ -71,16 +71,10 @@
 ## lx Package Traps
 
 - **Self-recursive `+` exports need two-step pattern.** `+f = (n) { f (n-1) }` — `+` exports are excluded from forward declarations so builtins aren't shadowed. **Fix:** `f = (n) { f (n-1) }; +f = f`.
-- **Closures inside `+` functions can't capture non-exported module bindings.** `helper = (x) x * 2` then `+main = () { list | each (x) { helper x } }` — `helper` is silently `None` inside the closure. **Fix:** use the two-step export: `helper = ...; +helper = helper`.
-- **Adjacent string interpolation blocks fail.** `"{head}{tail}"` — the first `{head}` evaluates to a Str, then `{tail}` tries to call the Str as a function. **Fix:** use `++` concatenation: `head ++ tail`.
 - **String interpolation parses `{key: val}` as lx code.** `"Return JSON: {score: Int, issues: [Str]}"` — the `{score: Int}` is parsed as a record literal. **Fix:** use backtick raw strings: `` `Return JSON: {score: Int}` ``.
 - **`{}` is Unit, not empty Record.** Empty block `{}` evaluates to Unit. Empty record requires `{:}` syntax. **Fix:** use `()` explicitly for Unit.
 
 ## Module Paths
-
-- **Only `yield` is accepted as keyword-named module path segment.** `use std/yield` works because `Yield` token is special-cased in `stmt_use.rs`. Other keywords are NOT accepted.
-
-## pkg/ Import Paths
 
 - **pkg/ uses subdirectory paths.** Current layout: `pkg/agent/`, `pkg/git/`, `pkg/guard/`, `pkg/schema/`, `pkg/store/`, `pkg/workflow/`, plus `pkg/log.lx` at root. Import as `use pkg/agent/auditor`, `use pkg/log`, etc.
 
@@ -94,14 +88,6 @@
 - **Agents with no tools leave `tools` at the default empty list.** The Agent trait default `tools = () { [] }` means no tools. The backend sees an empty tools vec and doesn't pass `--allowedTools`.
 - **`--json-schema` puts output in `structured_output`, not `result`.** When `--json-schema` is used, the `result` field in Claude CLI JSON output is empty string. The structured data is in `structured_output` field.
 
-## md.sections Limitations
-
-- **`md.sections` drops bullet list and code block content.** Only extracts the `"text"` field from each node. **Fix:** use raw string splitting (`split "\n# Title\n"` + `take_while`) for sections with bullet lists.
-- **`md.sections` splits sub-headings into separate sections.** Every heading starts a new section regardless of level. **Fix:** filter by level: `sections | filter (s) s.level == 3`.
-
-## Incomplete Wiring
-
-- **`uses` bindings are dropped.** `KeywordDeclData` has no `uses` field. The desugar ignores them. MCP servers must be connected manually.
 
 ## Fixed (kept for reference)
 
@@ -116,3 +102,10 @@
 - **`? {block}` works for ternary blocks.** Chumsky backtracks from match-arm parsing when no `->` is found. `true ? { x <- 5 }`, `true ? { a = 1; b = 2; a + b }`, and multi-branch `? { }` all work. Verified by testing.
 - **`? {record}` works inline.** `true ? {name: "hello"} : {name: "world"}` parses correctly — no need to bind records first.
 - **Trait errors are consistently catchable.** `apply_trait_fields` and `apply_trait_union` both return `Ok(LxVal::err_str(...))`. `try_match_variant` uses `LxError` internally but `apply_trait_union` catches it via `.is_ok()` at line 66 — no `LxError` escapes to user code.
+- **Lowercase keywords work as record field names and dot-access.** `{par: 1}`, `r.par`, `r.emit` all work. `ident_or_keyword()` accepts all lowercase keyword tokens. Uppercase keywords (`Agent`, `Tool`, etc.) work in dot-access via `type_name()` but NOT as record field names.
+- **All keywords work as module path segments.** `use std/match`, `use std/yield`, etc. `ident_or_keyword()` replaces the old special-cased `Yield`-only path.
+- **Adjacent string interpolation works.** `"{a}{b}"` correctly concatenates. Lexer now emits `LBrace`/`RBrace` around each interpolation block.
+- **Computed tuple access works.** `t.[i]` returns the element at index `i`. Tuple+Int arm added to computed field access handler.
+- **Closures inside `+` functions capture sibling bindings.** `!b.exported` removed from forward declaration scan. Exported and non-exported function bindings both get pre-registered.
+- **`md.sections` accumulates all content types.** Bullet lists, code blocks, ordered lists, blockquotes, and HRs are now included. Sub-headings nest inside parent sections instead of splitting.
+- **`uses` declarations work in Agent keyword.** `Agent Foo = { uses MyConn; act = ... }` auto-connects the connector in init and collects its tools.

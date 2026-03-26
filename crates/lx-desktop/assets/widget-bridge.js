@@ -39001,10 +39001,9 @@ registerProcessor('capture', Capture);
 		constructor() {
 			this.queue = [];
 			this.playing = false;
-			this.currentSource = null;
+			this.currentAudio = null;
 			this.onComplete = null;
 			this.onItemStart = null;
-			this.context = new AudioContext();
 		}
 		get isPlaying() {
 			return this.playing;
@@ -39013,64 +39012,68 @@ registerProcessor('capture', Capture);
 			return this.queue.length;
 		}
 		enqueue(base64Wav, id = "") {
-			const binary = atob(base64Wav);
-			const bytes = new Uint8Array(binary.length);
-			for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-			const buffer = this.context.decodeAudioData(bytes.buffer.slice(0));
 			this.queue.push({
-				buffer,
+				data: base64Wav,
 				id
 			});
 			if (!this.playing) this.playNext();
 		}
-		async playNext() {
+		playNext() {
 			if (this.queue.length === 0) {
 				this.playing = false;
 				this.onComplete?.();
 				return;
 			}
 			this.playing = true;
-			if (this.context.state === "suspended") await this.context.resume();
 			const item = this.queue.shift();
-			try {
-				const audioBuffer = await item.buffer;
-				const source = this.context.createBufferSource();
-				source.buffer = audioBuffer;
-				source.connect(this.context.destination);
-				this.currentSource = source;
-				this.onItemStart?.(item.id);
-				source.onended = () => {
-					this.currentSource = null;
-					this.playNext();
-				};
-				source.start();
-			} catch {
-				this.currentSource = null;
+			const binary = atob(item.data);
+			const bytes = new Uint8Array(binary.length);
+			for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+			const blob = new Blob([bytes], { type: "audio/wav" });
+			const url = URL.createObjectURL(blob);
+			const audio = new Audio(url);
+			this.currentAudio = audio;
+			this.onItemStart?.(item.id);
+			audio.onended = () => {
+				URL.revokeObjectURL(url);
+				this.currentAudio = null;
 				this.playNext();
-			}
+			};
+			audio.onerror = () => {
+				URL.revokeObjectURL(url);
+				this.currentAudio = null;
+				this.playNext();
+			};
+			audio.oncanplaythrough = () => {
+				audio.play().catch(() => {
+					URL.revokeObjectURL(url);
+					this.currentAudio = null;
+					this.playNext();
+				});
+			};
+			audio.load();
 		}
 		playAlertTone(frequency = 440, duration = .2, volume = .3) {
-			const osc = this.context.createOscillator();
-			const gain = this.context.createGain();
+			const ctx = new AudioContext();
+			const osc = ctx.createOscillator();
+			const gain = ctx.createGain();
 			osc.frequency.value = frequency;
 			gain.gain.value = volume;
 			osc.connect(gain);
-			gain.connect(this.context.destination);
+			gain.connect(ctx.destination);
 			osc.start();
-			osc.stop(this.context.currentTime + duration);
+			osc.stop(ctx.currentTime + duration);
 		}
 		stop() {
 			this.queue.length = 0;
 			this.playing = false;
-			if (this.currentSource) {
-				this.currentSource.stop();
-				this.currentSource.disconnect();
-				this.currentSource = null;
+			if (this.currentAudio) {
+				this.currentAudio.pause();
+				this.currentAudio = null;
 			}
 		}
 		dispose() {
 			this.stop();
-			this.context.close();
 		}
 	};
 	//#endregion

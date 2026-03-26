@@ -42,6 +42,11 @@ use std/md
 
 +task_summaries = (wi) { wi.tasks | map (t) task_summary t }
 
+section_content = (sections name) {
+  found = sections | find (s) { s.title == name }
+  (found ?? {content: ""}).content | trim
+}
+
 parse_task_section = (sec num) {
   title = sec.title
   body = sec.content
@@ -60,30 +65,17 @@ parse_task_section = (sec num) {
   Task {num: num; subject: subject; description: description; active_form: active_form; full_text: body}
 }
 
-extract_raw_section = (raw title) {
-  marker = "\n# {title}\n"
-  parts = raw | split marker
-  too_few = parts | len < 2
-  too_few ? "" : (extract_until_next_heading parts)
-}
-
-extract_until_next_heading = (parts) {
-  after = (parts | drop 1 | first) ?? ""
-  after_lines = after | lines
-  content_lines = after_lines | take_while (line) { not (line | starts? "# ") }
-  content_lines | join "\n" | trim
-}
-
 +load = (path) {
   raw = fs.read path ^
-  goal = extract_raw_section raw "Goal"
-  why = extract_raw_section raw "Why"
-  what_changes = extract_raw_section raw "What Changes"
-  files_affected = extract_raw_section raw "Files Affected"
-
   parsed = md.parse raw
   sections = md.sections parsed
-  task_sections = sections | filter (s) s.level == 3 && (s.title | starts? "Task")
+
+  goal = section_content sections "Goal"
+  why = section_content sections "Why"
+  what_changes = section_content sections "What Changes"
+  files_affected = section_content sections "Files Affected"
+
+  task_sections = sections | filter (s) { s.title | starts? "Task" }
   task_sections | len == 0 ? assert false "work_item.load: no tasks found in {path}"
   tasks = task_sections | enumerate | map (pair) {
     idx = pair.0

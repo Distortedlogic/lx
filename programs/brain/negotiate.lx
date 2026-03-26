@@ -1,7 +1,7 @@
 -- N-party iterative consensus — round-based negotiation with convergence function.
 -- Replaces agent_negotiate.rs.
 
-negotiate_fn = (agents config) {
++negotiate = (agents config) {
   proposal = config.proposal
   max_rounds = config.max_rounds ?? 3
   converge_fn = config.converge
@@ -33,4 +33,3 @@ negotiate_fn = (agents config) {
   has_result = result != None
   has_result ? result : Err {reason: "no_consensus"; rounds: max_rounds; positions: positions}
 }
-+negotiate = negotiate_fn

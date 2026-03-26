@@ -99,16 +99,13 @@ do_run = (steps initial_rec opts) {
   has_final_err ? err_out : ok_result
 }
 
-run_fn = (steps) { do_run steps {} {max_retries: 0} }
-+run = run_fn
++run = (steps) { do_run steps {} {max_retries: 0} }
 
-run_with_fn = (steps opts) { do_run steps {} opts }
-+run_with = run_with_fn
++run_with = (steps opts) { do_run steps {} opts }
 
 +define = (steps) { {__saga: true; steps: steps} }
 
-execute_fn = (definition initial) {
++execute = (definition initial) {
   steps = definition.steps ?? []
   do_run steps initial {max_retries: 0}
 }
-+execute = execute_fn

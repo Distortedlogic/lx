@@ -4,7 +4,7 @@
 # Section identical to scripts/clippy_wasm/clippy.toml:
 
 
-msrv = "1.93.0"
+msrv = "1.94.1"
 
 allow-unwrap-in-tests = true
 

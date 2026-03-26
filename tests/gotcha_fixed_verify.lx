@@ -1,0 +1,79 @@
+-- Verify all gotchas claimed as fixed actually work
+use std/md
+
+-- 1. Lowercase keywords as record field names
+r1 = {par: 1; sel: 2; emit: 3; loop: 4; yield: 5}
+assert (r1.par == 1) "keyword record field par"
+assert (r1.sel == 2) "keyword record field sel"
+assert (r1.emit == 3) "keyword record field emit"
+assert (r1.loop == 4) "keyword record field loop"
+assert (r1.yield == 5) "keyword record field yield"
+
+-- 2. Keyword dot-access
+data = {with: "hello"; timeout: 42}
+assert (data.with == "hello") "keyword dot-access with"
+assert (data.timeout == 42) "keyword dot-access timeout"
+
+-- 3. Adjacent string interpolation
+a = "hello"
+b = "world"
+assert ("{a}{b}" == "helloworld") "adjacent interp"
+x = "a"
+y = "b"
+z = "c"
+assert ("{x}{y}{z}" == "abc") "three adjacent interp"
+
+-- 4. Mixed text + interp still works
+name = "lx"
+assert ("hello {name}!" == "hello lx!") "mixed interp"
+
+-- 5. Computed tuple access
+t = (10; 20; 30)
+assert (t.[0] == 10) "tuple idx 0"
+assert (t.[2] == 30) "tuple idx 2"
+i = 1
+t2 = ("a"; "b"; "c")
+assert (t2.[i] == "b") "tuple var idx"
+
+-- 6. Positional tuple access still works
+t3 = (1; 2)
+assert (t3.0 == 1) "tuple positional"
+
+-- 7. Export closure capture
+double = (x) x * 2
++apply_double = (items) {
+  items | map (x) { double x }
+}
+result = apply_double [1; 2; 3]
+assert (result == [2; 4; 6]) "export closure capture"
+
+-- 8. md.sections with bullet list
+raw_list = "# Title\n\n- item1\n- item2"
+parsed_list = md.parse raw_list | md.sections
+assert (parsed_list | len == 1) "md sections count"
+content_list = (parsed_list | first) ?? {content: ""}
+assert (content_list.content | contains? "item1") "md sections bullet content"
+
+-- 9. md.sections sub-heading nesting
+raw_nest = "# Parent\n\nsome text\n\n### Child\n\nchild text"
+parsed_nest = md.parse raw_nest | md.sections
+assert (parsed_nest | len == 1) "md sub-heading nesting count"
+parent = (parsed_nest | first) ?? {content: ""; title: ""}
+assert (parent.title == "Parent") "md parent title"
+assert (parent.content | contains? "Child") "md nested child in parent"
+
+-- 10. md.sections same-level split
+raw_split = "# A\n\ntext a\n\n# B\n\ntext b"
+parsed_split = md.parse raw_split | md.sections
+assert (parsed_split | len == 2) "md same-level split"
+
+-- 11. Ternary with block (verify still works)
+xx := 0
+true ? { xx <- 5 }
+assert (xx == 5) "ternary block reassign"
+
+-- 12. Ternary with record inline
+rr = true ? {name: "yes"} : {name: "no"}
+assert (rr.name == "yes") "ternary inline record"
+
+emit "gotcha_fixed_verify: all passed"
