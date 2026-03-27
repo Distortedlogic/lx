@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -45,7 +46,7 @@ pub fn install_path(dest: &Path, source: &Path) -> Result<String, String> {
   }
   #[cfg(unix)]
   {
-    let canonical = std::fs::canonicalize(source).map_err(|e| format!("cannot resolve {}: {e}", source.display()))?;
+    let canonical = fs::canonicalize(source).map_err(|e| format!("cannot resolve {}: {e}", source.display()))?;
     std::os::unix::fs::symlink(&canonical, dest).map_err(|e| format!("symlink failed: {e}"))?;
   }
   #[cfg(not(unix))]
@@ -57,8 +58,8 @@ pub fn install_path(dest: &Path, source: &Path) -> Result<String, String> {
 
 #[cfg(not(unix))]
 fn copy_dir(src: &Path, dst: &Path) -> Result<(), String> {
-  std::fs::create_dir_all(dst).map_err(|e| format!("mkdir failed: {e}"))?;
-  let entries = std::fs::read_dir(src).map_err(|e| format!("readdir failed: {e}"))?;
+  fs::create_dir_all(dst).map_err(|e| format!("mkdir failed: {e}"))?;
+  let entries = fs::read_dir(src).map_err(|e| format!("readdir failed: {e}"))?;
   for entry in entries {
     let entry = entry.map_err(|e| format!("readdir entry failed: {e}"))?;
     let path = entry.path();
@@ -66,7 +67,7 @@ fn copy_dir(src: &Path, dst: &Path) -> Result<(), String> {
     if path.is_dir() {
       copy_dir(&path, &dest)?;
     } else {
-      std::fs::copy(&path, &dest).map_err(|e| format!("copy failed: {e}"))?;
+      fs::copy(&path, &dest).map_err(|e| format!("copy failed: {e}"))?;
     }
   }
   Ok(())
@@ -98,7 +99,7 @@ fn url_to_name(url: &str) -> String {
 
 fn write_dep_to_toml(root: &Path, name: &str, spec: &DepSpec) -> Result<(), String> {
   let manifest_path = root.join(lx::LX_MANIFEST);
-  let content = std::fs::read_to_string(&manifest_path).map_err(|e| format!("cannot read lx.toml: {e}"))?;
+  let content = fs::read_to_string(&manifest_path).map_err(|e| format!("cannot read lx.toml: {e}"))?;
   let dep_line = match spec {
     DepSpec::Git { git, branch, tag, rev } => {
       let mut parts = vec![format!("git = \"{git}\"")];
@@ -137,5 +138,5 @@ fn write_dep_to_toml(root: &Path, name: &str, spec: &DepSpec) -> Result<(), Stri
     result.push('\n');
     result
   };
-  std::fs::write(&manifest_path, new_content).map_err(|e| format!("cannot write lx.toml: {e}"))
+  fs::write(&manifest_path, new_content).map_err(|e| format!("cannot write lx.toml: {e}"))
 }

@@ -1,10 +1,12 @@
+use std::env;
+use std::fs;
 use std::path::Path;
 use std::process::ExitCode;
 
 use crate::manifest;
 
 pub fn list_workspace() -> ExitCode {
-  let cwd = match std::env::current_dir() {
+  let cwd = match env::current_dir() {
     Ok(d) => d,
     Err(e) => {
       eprintln!("error: cannot determine cwd: {e}");
@@ -50,7 +52,7 @@ fn count_lx_files(dir: &Path) -> usize {
 
 fn count_matching_files(dir: &str, pattern: &str) -> usize {
   let (prefix, suffix) = split_glob(pattern);
-  let Ok(read_dir) = std::fs::read_dir(dir) else {
+  let Ok(read_dir) = fs::read_dir(dir) else {
     return 0;
   };
   read_dir
@@ -63,7 +65,7 @@ fn count_matching_files(dir: &str, pattern: &str) -> usize {
 }
 
 fn walkdir(dir: &Path) -> usize {
-  let Ok(read_dir) = std::fs::read_dir(dir) else {
+  let Ok(read_dir) = fs::read_dir(dir) else {
     return 0;
   };
   let mut count = 0;

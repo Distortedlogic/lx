@@ -1,3 +1,5 @@
+use std::env;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -17,7 +19,7 @@ struct PluginMeta {
 }
 
 fn global_plugins_dir() -> Result<PathBuf, String> {
-  let home = std::env::var("HOME").map_err(|_| "HOME environment variable not set".to_string())?;
+  let home = env::var("HOME").map_err(|_| "HOME environment variable not set".to_string())?;
   Ok(PathBuf::from(home).join(".lx").join("plugins"))
 }
 
@@ -33,7 +35,7 @@ fn validate_plugin_name(name: &str) -> Result<(), String> {
 
 fn read_manifest(dir: &Path) -> Result<PluginManifest, String> {
   let manifest_path = dir.join(lx::PLUGIN_MANIFEST);
-  let content = std::fs::read_to_string(&manifest_path).map_err(|e| format!("cannot read {}: {e}", manifest_path.display()))?;
+  let content = fs::read_to_string(&manifest_path).map_err(|e| format!("cannot read {}: {e}", manifest_path.display()))?;
   let manifest: PluginManifest = toml::from_str(&content).map_err(|e| format!("invalid plugin.toml in {}: {e}", dir.display()))?;
   if manifest.plugin.name.is_empty() {
     return Err(format!("plugin.toml in {} missing [plugin].name", dir.display()));
@@ -48,26 +50,26 @@ fn read_manifest(dir: &Path) -> Result<PluginManifest, String> {
 }
 
 fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
-  std::fs::create_dir_all(dst).map_err(|e| format!("cannot create {}: {e}", dst.display()))?;
-  let entries = std::fs::read_dir(src).map_err(|e| format!("cannot read directory {}: {e}", src.display()))?;
+  fs::create_dir_all(dst).map_err(|e| format!("cannot create {}: {e}", dst.display()))?;
+  let entries = fs::read_dir(src).map_err(|e| format!("cannot read directory {}: {e}", src.display()))?;
   for entry in entries {
     let entry = entry.map_err(|e| format!("error reading entry in {}: {e}", src.display()))?;
     let src_path = entry.path();
-    let real_path = std::fs::canonicalize(&src_path).map_err(|e| format!("cannot resolve {}: {e}", src_path.display()))?;
+    let real_path = fs::canonicalize(&src_path).map_err(|e| format!("cannot resolve {}: {e}", src_path.display()))?;
     let file_name = entry.file_name();
     let dst_path = dst.join(&file_name);
-    let meta = std::fs::metadata(&real_path).map_err(|e| format!("cannot stat {}: {e}", real_path.display()))?;
+    let meta = fs::metadata(&real_path).map_err(|e| format!("cannot stat {}: {e}", real_path.display()))?;
     if meta.is_dir() {
       copy_dir_recursive(&real_path, &dst_path)?;
     } else {
-      std::fs::copy(&real_path, &dst_path).map_err(|e| format!("cannot copy {} -> {}: {e}", real_path.display(), dst_path.display()))?;
+      fs::copy(&real_path, &dst_path).map_err(|e| format!("cannot copy {} -> {}: {e}", real_path.display(), dst_path.display()))?;
     }
   }
   Ok(())
 }
 
 pub fn install(path: &Path) -> ExitCode {
-  let source = match std::fs::canonicalize(path) {
+  let source = match fs::canonicalize(path) {
     Ok(p) => p,
     Err(e) => {
       eprintln!("error: cannot resolve path {}: {e}", path.display());
@@ -93,7 +95,7 @@ pub fn install(path: &Path) -> ExitCode {
       return ExitCode::from(1);
     },
   };
-  if let Err(e) = std::fs::create_dir_all(&global_dir) {
+  if let Err(e) = fs::create_dir_all(&global_dir) {
     eprintln!("error: cannot create {}: {e}", global_dir.display());
     return ExitCode::from(1);
   }
@@ -102,7 +104,7 @@ pub fn install(path: &Path) -> ExitCode {
     if let Ok(old_manifest) = read_manifest(&target) {
       eprintln!("updating {} {} → {}", manifest.plugin.name, old_manifest.plugin.version, manifest.plugin.version);
     }
-    if let Err(e) = std::fs::remove_dir_all(&target) {
+    if let Err(e) = fs::remove_dir_all(&target) {
       eprintln!("error: cannot remove old plugin at {}: {e}", target.display());
       return ExitCode::from(1);
     }
@@ -120,7 +122,7 @@ pub fn list() -> ExitCode {
   if let Ok(global_dir) = global_plugins_dir() {
     scan_plugins_dir(&global_dir, "global", &mut entries);
   }
-  if let Ok(cwd) = std::env::current_dir() {
+  if let Ok(cwd) = env::current_dir() {
     let local_dir = cwd.join(".lx").join("plugins");
     scan_plugins_dir(&local_dir, "local", &mut entries);
   }
@@ -139,7 +141,7 @@ pub fn list() -> ExitCode {
 }
 
 fn scan_plugins_dir<'a>(dir: &Path, location: &'a str, out: &mut Vec<(String, String, &'a str, String)>) {
-  let Ok(rd) = std::fs::read_dir(dir) else {
+  let Ok(rd) = fs::read_dir(dir) else {
     return;
   };
   for entry in rd {
@@ -175,7 +177,7 @@ pub fn remove(name: &str) -> ExitCode {
     eprintln!("error: plugin '{name}' not found in ~/.lx/plugins/");
     return ExitCode::from(1);
   }
-  if let Err(e) = std::fs::remove_dir_all(&target) {
+  if let Err(e) = fs::remove_dir_all(&target) {
     eprintln!("error: cannot remove {}: {e}", target.display());
     return ExitCode::from(1);
   }
@@ -195,11 +197,11 @@ pub fn new_plugin(name: &str) -> ExitCode {
   }
   let src_dir = dir.join("src");
   let cargo_dir = dir.join(".cargo");
-  if let Err(e) = std::fs::create_dir_all(&src_dir) {
+  if let Err(e) = fs::create_dir_all(&src_dir) {
     eprintln!("error: cannot create {}: {e}", src_dir.display());
     return ExitCode::from(1);
   }
-  if let Err(e) = std::fs::create_dir_all(&cargo_dir) {
+  if let Err(e) = fs::create_dir_all(&cargo_dir) {
     eprintln!("error: cannot create {}: {e}", cargo_dir.display());
     return ExitCode::from(1);
   }
@@ -229,7 +231,7 @@ pub fn new_plugin(name: &str) -> ExitCode {
     (dir.join(".cargo").join("config.toml"), cargo_config),
   ];
   for (path, content) in writes {
-    if let Err(e) = std::fs::write(&path, content) {
+    if let Err(e) = fs::write(&path, content) {
       eprintln!("error: cannot write {}: {e}", path.display());
       return ExitCode::from(1);
     }

@@ -1,3 +1,5 @@
+use std::env;
+use std::fs;
 use std::path::Path;
 use std::process::ExitCode;
 
@@ -6,7 +8,7 @@ use crate::lockfile::LockFile;
 use crate::manifest::{self, DepSpec};
 
 pub fn run_install(package: Option<&str>) -> ExitCode {
-  let Ok(cwd) = std::env::current_dir() else {
+  let Ok(cwd) = env::current_dir() else {
     eprintln!("error: cannot determine cwd");
     return ExitCode::from(1);
   };
@@ -34,7 +36,7 @@ pub fn run_install(package: Option<&str>) -> ExitCode {
     return ExitCode::SUCCESS;
   }
   let deps_dir = manifest::deps_dir(&root);
-  if let Err(e) = std::fs::create_dir_all(&deps_dir) {
+  if let Err(e) = fs::create_dir_all(&deps_dir) {
     eprintln!("error: cannot create .lx/deps: {e}");
     return ExitCode::from(1);
   }
@@ -73,7 +75,7 @@ pub fn run_install(package: Option<&str>) -> ExitCode {
   if !dev_deps.is_empty() {
     let dev_marker = deps_dir.join(".dev-deps");
     let dev_names: Vec<&str> = dev_deps.keys().map(|k| k.as_str()).collect();
-    if let Err(e) = std::fs::write(&dev_marker, dev_names.join("\n")) {
+    if let Err(e) = fs::write(&dev_marker, dev_names.join("\n")) {
       eprintln!("error: cannot write .dev-deps marker: {e}");
       return ExitCode::from(1);
     }
@@ -86,7 +88,7 @@ pub fn run_install(package: Option<&str>) -> ExitCode {
 }
 
 pub fn run_update(package: Option<&str>) -> ExitCode {
-  let Ok(cwd) = std::env::current_dir() else {
+  let Ok(cwd) = env::current_dir() else {
     eprintln!("error: cannot determine cwd");
     return ExitCode::from(1);
   };
@@ -177,7 +179,7 @@ fn update_dep(deps_dir: &Path, name: &str, spec: &DepSpec) -> Result<(String, Op
     DepSpec::Git { git, branch, tag, rev } => {
       let dest = deps_dir.join(name);
       if dest.exists() {
-        std::fs::remove_dir_all(&dest).map_err(|e| format!("cannot remove {}: {e}", dest.display()))?;
+        fs::remove_dir_all(&dest).map_err(|e| format!("cannot remove {}: {e}", dest.display()))?;
       }
       let source = install_ops::install_git(&dest, git, branch.as_deref(), tag.as_deref(), rev.as_deref())?;
       let version = tag.as_deref().or(branch.as_deref()).or(rev.as_deref()).map(|v| v.to_string());

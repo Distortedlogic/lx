@@ -1,3 +1,6 @@
+use std::env;
+use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -15,7 +18,7 @@ use crate::{manifest, run};
 enum FixOutcome {
   Applied(Box<CheckResult>, String),
   NoFixes,
-  WriteFailed(std::io::Error),
+  WriteFailed(io::Error),
   RecheckFailed,
 }
 
@@ -28,7 +31,7 @@ pub fn check_file(path: &str, strict: bool, fix: bool) -> ExitCode {
   let result = check(&program, source_arc);
 
   if fix && let Some(fixed_source) = apply_fixes(&source, &result.diagnostics) {
-    if let Err(e) = std::fs::write(path, &fixed_source) {
+    if let Err(e) = fs::write(path, &fixed_source) {
       eprintln!("error: cannot write {path}: {e}");
       return ExitCode::from(1);
     }
@@ -37,7 +40,7 @@ pub fn check_file(path: &str, strict: bool, fix: bool) -> ExitCode {
       Ok(recheck_result) => return print_and_exit(&recheck_result, path, &fixed_source, strict),
       Err(detail) => {
         eprintln!("warning: fix produced invalid syntax in {path}, reverting ({detail})");
-        if let Err(e) = std::fs::write(path, &source) {
+        if let Err(e) = fs::write(path, &source) {
           eprintln!("error: cannot revert {path}: {e}");
         }
         return ExitCode::from(1);
@@ -74,7 +77,7 @@ fn try_apply_fixes(path: &str, source: &str, result: &CheckResult) -> FixOutcome
   let Some(fixed_source) = apply_fixes(source, &result.diagnostics) else {
     return FixOutcome::NoFixes;
   };
-  if let Err(e) = std::fs::write(path, &fixed_source) {
+  if let Err(e) = fs::write(path, &fixed_source) {
     return FixOutcome::WriteFailed(e);
   }
   eprintln!("applied fixes to {path}");
@@ -82,7 +85,7 @@ fn try_apply_fixes(path: &str, source: &str, result: &CheckResult) -> FixOutcome
     Ok(recheck_result) => FixOutcome::Applied(Box::new(recheck_result), fixed_source),
     Err(detail) => {
       eprintln!("warning: fix produced invalid syntax in {path}, reverting ({detail})");
-      if let Err(e) = std::fs::write(path, source) {
+      if let Err(e) = fs::write(path, source) {
         eprintln!("error: cannot revert {path}: {e}");
       }
       FixOutcome::RecheckFailed
@@ -95,7 +98,7 @@ fn count_errors(result: &CheckResult, strict: bool) -> u32 {
 }
 
 pub fn check_workspace(member_filter: Option<&str>, strict: bool, fix: bool) -> ExitCode {
-  let cwd = match std::env::current_dir() {
+  let cwd = match env::current_dir() {
     Ok(d) => d,
     Err(e) => {
       eprintln!("error: cannot determine cwd: {e}");
@@ -273,7 +276,7 @@ pub fn collect_lx_files(dir: &Path) -> Vec<PathBuf> {
 }
 
 fn collect_lx_files_rec(dir: &Path, files: &mut Vec<PathBuf>) {
-  let Ok(read_dir) = std::fs::read_dir(dir) else {
+  let Ok(read_dir) = fs::read_dir(dir) else {
     return;
   };
   for entry in read_dir.filter_map(|e| match e {

@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -32,7 +33,7 @@ pub fn run(source: &str, filename: &str, ctx: &Arc<RuntimeCtx>) -> Result<(), Ve
 }
 
 pub fn read_and_parse(path: &str) -> Result<(String, lx::ast::Program<lx::ast::Core>), ExitCode> {
-  let source = std::fs::read_to_string(path).map_err(|e| {
+  let source = fs::read_to_string(path).map_err(|e| {
     eprintln!("error: cannot read {path}: {e}");
     ExitCode::from(1)
   })?;

@@ -12,7 +12,10 @@ mod plugin;
 mod run;
 mod testing;
 
+use std::env;
+use std::fs;
 use std::io::IsTerminal;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::Arc;
 
@@ -88,7 +91,7 @@ enum Command {
 
 #[derive(Subcommand)]
 enum PluginAction {
-  Install { path: std::path::PathBuf },
+  Install { path: PathBuf },
   List,
   Remove { name: String },
   New { name: String },
@@ -138,11 +141,11 @@ fn main() -> ExitCode {
 }
 
 fn resolve_run_target(target: &str) -> String {
-  let path = std::path::Path::new(target);
+  let path = Path::new(target);
   if path.exists() && path.is_file() {
     return target.to_string();
   }
-  let Ok(cwd) = std::env::current_dir() else {
+  let Ok(cwd) = env::current_dir() else {
     return target.to_string();
   };
   let Some(root) = manifest::find_workspace_root(&cwd) else {
@@ -161,7 +164,7 @@ fn resolve_run_target(target: &str) -> String {
 }
 
 fn run_file(path: &str, _json: bool) -> ExitCode {
-  let source = match std::fs::read_to_string(path) {
+  let source = match fs::read_to_string(path) {
     Ok(s) => s,
     Err(e) => {
       eprintln!("error: cannot read {path}: {e}");
@@ -195,7 +198,7 @@ fn run_file(path: &str, _json: bool) -> ExitCode {
 }
 
 fn apply_manifest_backends(ctx: &mut RuntimeCtx, file_path: &str) {
-  let file_dir = std::path::Path::new(file_path).parent().unwrap_or(std::path::Path::new("."));
+  let file_dir = Path::new(file_path).parent().unwrap_or(Path::new("."));
   let Some(root) = manifest::find_manifest_root(file_dir) else {
     return;
   };
@@ -242,7 +245,7 @@ fn run_diagram(path: &str, output: Option<&str>) -> ExitCode {
   let mermaid = lx::stdlib::diag::extract_mermaid(&program);
   match output {
     Some(out_path) => {
-      if let Err(e) = std::fs::write(out_path, &mermaid) {
+      if let Err(e) = fs::write(out_path, &mermaid) {
         eprintln!("error: cannot write {out_path}: {e}");
         return ExitCode::from(1);
       }

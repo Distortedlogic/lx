@@ -1,10 +1,11 @@
+use std::fs;
 use std::io::{BufRead, Write};
 use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
 
 pub fn run_agent(script_path: &str) -> ExitCode {
-  let source = match std::fs::read_to_string(script_path) {
+  let source = match fs::read_to_string(script_path) {
     Ok(s) => s,
     Err(e) => {
       eprintln!("agent error: cannot read {script_path}: {e}");

@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::env;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -107,7 +109,7 @@ pub fn find_manifest_root(start: &Path) -> Option<PathBuf> {
 
 pub fn load_manifest(root: &Path) -> Result<RootManifest, String> {
   let manifest_path = root.join(lx::LX_MANIFEST);
-  let content = std::fs::read_to_string(&manifest_path).map_err(|e| format!("cannot read {}: {e}", manifest_path.display()))?;
+  let content = fs::read_to_string(&manifest_path).map_err(|e| format!("cannot read {}: {e}", manifest_path.display()))?;
   let manifest: RootManifest = toml::from_str(&content).map_err(|e| format!("invalid {}: {e}", manifest_path.display()))?;
   validate_manifest(&manifest, &manifest_path)?;
   Ok(manifest)
@@ -141,7 +143,7 @@ pub fn try_load_dep_dirs_no_dev() -> HashMap<String, PathBuf> {
 }
 
 fn load_dep_dirs_filtered(include_dev: bool) -> HashMap<String, PathBuf> {
-  let Ok(cwd) = std::env::current_dir() else {
+  let Ok(cwd) = env::current_dir() else {
     return HashMap::new();
   };
   let Some(root) = find_manifest_root(&cwd) else {
@@ -153,11 +155,11 @@ fn load_dep_dirs_filtered(include_dev: bool) -> HashMap<String, PathBuf> {
   }
   let dev_names: Vec<String> = if !include_dev {
     let marker = deps.join(".dev-deps");
-    std::fs::read_to_string(marker).unwrap_or_default().lines().filter(|l| !l.is_empty()).map(|l| l.to_string()).collect()
+    fs::read_to_string(marker).unwrap_or_default().lines().filter(|l| !l.is_empty()).map(|l| l.to_string()).collect()
   } else {
     Vec::new()
   };
-  let Ok(entries) = std::fs::read_dir(&deps) else {
+  let Ok(entries) = fs::read_dir(&deps) else {
     return HashMap::new();
   };
   let mut map = HashMap::new();
@@ -197,7 +199,7 @@ pub fn find_workspace_root(start: &Path) -> Option<PathBuf> {
   loop {
     let candidate = dir.join(lx::LX_MANIFEST);
     if candidate.exists() {
-      let content = std::fs::read_to_string(&candidate).ok()?;
+      let content = fs::read_to_string(&candidate).ok()?;
       let manifest: RootManifest = toml::from_str(&content).ok()?;
       if manifest.workspace.is_some() {
         return Some(dir);
@@ -211,7 +213,7 @@ pub fn find_workspace_root(start: &Path) -> Option<PathBuf> {
 
 pub fn load_workspace(root: &Path) -> Result<Workspace, String> {
   let manifest_path = root.join(lx::LX_MANIFEST);
-  let content = std::fs::read_to_string(&manifest_path).map_err(|e| format!("cannot read {}: {e}", manifest_path.display()))?;
+  let content = fs::read_to_string(&manifest_path).map_err(|e| format!("cannot read {}: {e}", manifest_path.display()))?;
   let manifest: RootManifest = toml::from_str(&content).map_err(|e| format!("invalid {}: {e}", manifest_path.display()))?;
   let ws = manifest.workspace.ok_or_else(|| format!("{} has no [workspace] section", manifest_path.display()))?;
 
@@ -222,7 +224,7 @@ pub fn load_workspace(root: &Path) -> Result<Workspace, String> {
     if !member_manifest_path.exists() {
       return Err(format!("member '{}' has no lx.toml at {}", member_path, member_manifest_path.display()));
     }
-    let member_content = std::fs::read_to_string(&member_manifest_path).map_err(|e| format!("cannot read {}: {e}", member_manifest_path.display()))?;
+    let member_content = fs::read_to_string(&member_manifest_path).map_err(|e| format!("cannot read {}: {e}", member_manifest_path.display()))?;
     let member_manifest: RootManifest = toml::from_str(&member_content).map_err(|e| format!("invalid {}: {e}", member_manifest_path.display()))?;
     validate_manifest(&member_manifest, &member_manifest_path)?;
     let pkg = member_manifest.package.ok_or_else(|| format!("{} has no [package] section", member_manifest_path.display()))?;
@@ -239,7 +241,7 @@ pub fn load_workspace(root: &Path) -> Result<Workspace, String> {
 }
 
 pub fn try_load_workspace_members() -> HashMap<String, PathBuf> {
-  let Ok(cwd) = std::env::current_dir() else {
+  let Ok(cwd) = env::current_dir() else {
     return HashMap::new();
   };
   let Some(root) = find_workspace_root(&cwd) else {

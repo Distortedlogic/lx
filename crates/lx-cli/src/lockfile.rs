@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
@@ -21,14 +22,14 @@ impl LockFile {
     if !path.exists() {
       return Ok(Self { package: Vec::new() });
     }
-    let content = std::fs::read_to_string(&path).map_err(|e| format!("cannot read lx.lock: {e}"))?;
+    let content = fs::read_to_string(&path).map_err(|e| format!("cannot read lx.lock: {e}"))?;
     toml::from_str(&content).map_err(|e| format!("invalid lx.lock: {e}"))
   }
 
   pub fn save(&self, root: &Path) -> Result<(), String> {
     let path = root.join("lx.lock");
     let content = toml::to_string_pretty(self).map_err(|e| format!("cannot serialize lx.lock: {e}"))?;
-    std::fs::write(&path, content).map_err(|e| format!("cannot write lx.lock: {e}"))
+    fs::write(&path, content).map_err(|e| format!("cannot write lx.lock: {e}"))
   }
 
   pub fn upsert(&mut self, name: &str, source: &str, version: Option<&str>) {

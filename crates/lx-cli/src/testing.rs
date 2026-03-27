@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::env;
+use std::fs;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -9,7 +11,7 @@ use crate::manifest::{self, Member};
 
 struct TestEntry {
   name: String,
-  path: std::path::PathBuf,
+  path: PathBuf,
 }
 
 pub fn run_tests_dir(dir: &str) -> ExitCode {
@@ -23,7 +25,7 @@ pub fn run_tests_dir(dir: &str) -> ExitCode {
 
 pub fn run_workspace_tests(member_filter: Option<&str>) -> ExitCode {
   let (threshold, runs) = load_test_config();
-  let cwd = match std::env::current_dir() {
+  let cwd = match env::current_dir() {
     Ok(d) => d,
     Err(e) => {
       eprintln!("error: cannot determine cwd: {e}");
@@ -92,7 +94,7 @@ fn discover_tests(dir: &str) -> Vec<TestEntry> {
 
 fn discover_tests_with_pattern(dir: &str, pattern: &str) -> Vec<TestEntry> {
   let mut entries: Vec<TestEntry> = Vec::new();
-  let read_dir = match std::fs::read_dir(dir) {
+  let read_dir = match fs::read_dir(dir) {
     Ok(d) => d,
     Err(e) => {
       eprintln!("error: cannot read directory {dir}: {e}");
@@ -131,7 +133,7 @@ fn execute_tests(entries: &[TestEntry], workspace_members: &HashMap<String, Path
   let mut failed = 0;
   let mut fail_details = Vec::new();
   for entry in entries {
-    let source = match std::fs::read_to_string(&entry.path) {
+    let source = match fs::read_to_string(&entry.path) {
       Ok(s) => s,
       Err(e) => {
         println!("SKIP {}: {e}", entry.name);
@@ -179,7 +181,7 @@ fn print_results(results: &TestResults) {
 }
 
 fn load_test_config() -> (Option<f64>, Option<u32>) {
-  let Ok(cwd) = std::env::current_dir() else {
+  let Ok(cwd) = env::current_dir() else {
     return (None, None);
   };
   let Some(root) = manifest::find_manifest_root(&cwd) else {
