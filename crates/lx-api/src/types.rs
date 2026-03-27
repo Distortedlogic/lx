@@ -5,7 +5,7 @@ pub struct ActivityEvent {
   pub message: String,
 }
 
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct RunStatus {
   pub status: String,
   pub source_path: Option<String>,
