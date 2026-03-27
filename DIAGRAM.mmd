@@ -54,25 +54,73 @@ sandbox enforcement`"]:::red
     guardrails --> interpreter["`**Interpreter**
 async tree-walk eval`"]:::purple
 
-    interpreter --> backends["`**Core Backends (swappable)**
-Ai
-Fs
-Store
-Channel
-Memory
-Sandbox
-Cron
-LSP`"]:::blue
+    interpreter --> resolve["`**Module Resolution**
+→ Rust stdlib (channel, fs, http, …)
+→ LX stdlib (agent, tool, prompt, …)
+→ WASM plugins (wasm/ prefix)
+→ workspace members
+→ dependency crates
+→ file-based imports`"]:::purple
+
+    interpreter --> api["`**Plugin API Contract**
+——— interpreter calls into plugins via ———
+tool: call(name, args) → result
+user: confirm · choose · ask · notify
+protocol: send · receive · adapt
+infra: init · teardown · checkpoint
+stream: subscribe(names, handler)
+——— data boundary ———
+JSON in · JSON out
+no shared memory · no direct Rust calls
+sandboxed: WASI · fuel limits`"]:::blue
+
     interpreter --> events
 
-    backends --> user["`**User Interaction**
-confirm · choose · ask
-progress · status
-table · notify
-approval gates
-escalation`"]:::bluelight
+    api --> wasm_ext
 
-    subgraph events ["Runtime Events"]
+    subgraph wasm_ext ["WASM Plugins — Extism — all capabilities are plugins"]
+        direction LR
+        bundled["`**Bundled Plugins (ship with lx)**
+all replaceable by name
+——— tools ———
+Bash · Read · Write · Edit
+Glob · Grep · WebSearch · WebFetch
+Git · Test · Lint · Browser
+RAG · Embed · Skill
+——— user interaction ———
+confirm · choose · ask
+progress · status · table · notify
+——— protocols ———
+MCP · A2A · AG-UI
+——— infra ———
+PlanMode · Worktree · ToolSearch
+Hooks · Permissions · Context Mgmt
+——— stream subscribers ———
+stdio · lx-desktop · agent-mode
+CI/CD · headless`"]:::blue
+        manifest["`**plugin.toml**
+same format for all plugins
+——————
+[exports] capability impls
+function name + arity
+——————
+[subscriptions] event streams
+stream names · handler export
+per-stream filters`"]:::blue
+        host_fns["`**Host Functions**
+plugin_log (leveled)
+plugin_get_config (env)
+stream_emit (derived events)
+control (kill · pause · resume)`"]:::blue
+        lifecycle["`**Plugin Lifecycle**
+lx plugin new · install
+lx plugin list · remove
+~/.lx/plugins/ (global)
+.lx/plugins/ (local)`"]:::blue
+        bundled ~~~ manifest ~~~ host_fns ~~~ lifecycle
+    end
+
+    subgraph events ["Event Streams — append-only · ordered · ring buffer"]
         direction LR
         evt_agent["`**Agent**
 spawned · msg
@@ -117,40 +165,21 @@ pruned`"]:::teal
         evt_trace ~~~ evt_security ~~~ evt_eval
     end
 
-    backends --> tools["`**Tools**
-Read · Write · Edit
-Glob · Grep
-WebSearch · WebFetch
-Browser · Git
-Test · Lint
-RAG · Embed`"]:::bluelight
-    backends --> clis["`**CLIs**
-Bash
-Skill`"]:::bluelight
-    backends --> infra["`**Infra**
-PlanMode
-Worktree
-ToolSearch · MCP
-Hooks · Permissions
-Context Management`"]:::bluelight
+    events --> dispatch["`**Stream Dispatcher**
+async task · off hot path
+fan-out to all subscribers
+bounded buffer per consumer
+drop policy: oldest · newest
+· backpressure`"]:::teal
 
-    backends --> protocols["`**Protocols**
-MCP — agent ↔ tool
-A2A — agent ↔ agent
-AG-UI — agent ↔ frontend`"]:::bluelight
+    dispatch --> wasm_ext
 
-    events --> subs["`**Subscribers**
-lx-desktop
-stdio
-agent-mode
-CI/CD
-headless`"]:::teal
-
-    subs --> control["`**Control Channel**
-kill
-pause · resume`"]:::teal
+    wasm_ext --> control["`**Control Channel**
+kill · pause · resume
+(host function back to interpreter)`"]:::teal
     control --> interpreter
 
     style desugars stroke:#ff6600,stroke-width:2px
     style guardrails stroke:#d16969,stroke-width:2px
     style events stroke:#4ec9b0,stroke-width:2px
+    style wasm_ext stroke:#0288d1,stroke-width:2px

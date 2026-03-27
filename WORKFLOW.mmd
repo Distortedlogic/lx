@@ -1,6 +1,6 @@
 graph TD
     start(["0.0.1 Start"]):::teal
-    start --> guardrail["0.0.2 Commit baseline\n——————\ngit add -A && git commit\n--allow-empty -m baseline"]:::cyan
+    start --> guardrail["0.0.2 Commit baseline\n——————\ngit add -A && git commit\n--allow-empty -m baseline\ngit push"]:::cyan
     guardrail --> loop_start["0.1.0 For each group"]:::purple
 
     loop_start --> implement["`**1.0.0 Implement (Spawn Subagent)**
@@ -65,7 +65,7 @@ list of {file, issue, severity}`"]:::yellow
     check -- "no" --> stuck{{"2.2.0 stuck?\n——————\n3+ attempts ·\ngrade not improving ·\nsame findings repeating"}}:::red
     check -- "yes" --> diagnose["2.0.1 just diagnose"]:::cyan
     diagnose --> diag_check{{"2.3.0 errors or\nwarnings?"}}:::teal
-    diag_check -- "no" --> fmtcommit["3.0.1 fmt + commit"]:::teal
+    diag_check -- "no" --> fmtcommit["3.0.1 fmt + commit + push"]:::teal
     diag_check -- "yes" --> fix
     fmtcommit --> more{{"3.1.0 more groups?"}}:::purple
 
@@ -133,7 +133,7 @@ and cross-item findings)`"]:::cyan
     sys_audit --> sys_check{{"4.1.0 grade >= 93?"}}:::teal
 
     sys_check -- "no" --> sys_stuck{{"4.2.0 stuck?\n——————\n3+ attempts ·\ngrade not improving ·\nsame findings repeating"}}:::red
-    sys_check -- "yes" --> sys_fmtcommit["4.0.1 fmt + commit"]:::teal
+    sys_check -- "yes" --> sys_fmtcommit["4.0.1 fmt + commit + push"]:::teal
     sys_fmtcommit --> done(["4.0.2 Done"]):::teal
 
     sys_stuck -- "no" --> sys_fix["`**4.3.0 Fix (Spawn Subagent)**
