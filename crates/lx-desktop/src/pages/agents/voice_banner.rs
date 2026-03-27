@@ -4,7 +4,7 @@ use super::voice_context::{PipelineStage, TranscriptEntry, VoiceContext, VoiceDa
 use super::{voice_pipeline, voice_porcupine};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as B64;
-use dioxus::logger::tracing::error;
+use dioxus::logger::tracing::{error, warn};
 use dioxus::prelude::*;
 use dioxus_widget_bridge::use_ts_widget;
 
@@ -233,7 +233,9 @@ fn handle_keyword_detected(voice_widget: dioxus_widget_bridge::TsWidgetHandle, c
   voice_porcupine::reset_buffer();
   voice_widget.send_update(serde_json::json!({ "type": "start_recording" }));
   spawn(async move {
-    let _ = voice_pipeline::play_wav(voice_pipeline::generate_ack_tone()).await;
+    if let Err(e) = voice_pipeline::play_wav(voice_pipeline::generate_ack_tone()).await {
+      warn!("audio playback failed: {e}");
+    }
   });
 }
 

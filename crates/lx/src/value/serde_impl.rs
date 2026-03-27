@@ -80,7 +80,7 @@ impl From<serde_json::Value> for LxVal {
         if let Some(i) = n.as_i64() {
           LxVal::Int(BigInt::from(i))
         } else {
-          LxVal::Float(n.as_f64().unwrap_or(0.0))
+          LxVal::Float(n.as_f64().or_else(|| n.as_u64().map(|u| u as f64)).unwrap_or(0.0))
         }
       },
       serde_json::Value::String(s) => LxVal::Str(Arc::from(s.as_str())),
@@ -98,6 +98,6 @@ impl From<serde_json::Value> for LxVal {
 
 impl From<&LxVal> for serde_json::Value {
   fn from(v: &LxVal) -> Self {
-    serde_json::to_value(v).unwrap_or(serde_json::Value::Null)
+    serde_json::to_value(v).expect("LxVal is always serializable")
   }
 }
