@@ -1,32 +1,46 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MODEL_NAME="sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01"
-MODEL_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/${MODEL_NAME}.tar.bz2"
-MODEL_DIR="${HOME}/.local/share/lx/kws-model"
+WAKEWORD_DIR="${HOME}/.local/share/lx/wakewords"
+WAKEWORD_FILE="${WAKEWORD_DIR}/hey_claude.rpw"
 
-if [ -d "${MODEL_DIR}" ] && [ -f "${MODEL_DIR}/tokens.txt" ]; then
-  echo "Model already exists at ${MODEL_DIR}"
-else
-  echo "Downloading ${MODEL_NAME}..."
-  mkdir -p "${MODEL_DIR}"
-  wget -q --show-progress "${MODEL_URL}" -O /tmp/kws-model.tar.bz2
-  tar xjf /tmp/kws-model.tar.bz2 -C /tmp/
-  cp /tmp/${MODEL_NAME}/*.onnx "${MODEL_DIR}/"
-  cp /tmp/${MODEL_NAME}/tokens.txt "${MODEL_DIR}/"
-  cp /tmp/${MODEL_NAME}/bpe.model "${MODEL_DIR}/"
-  rm -rf /tmp/${MODEL_NAME} /tmp/kws-model.tar.bz2
-  echo "Model extracted to ${MODEL_DIR}"
+if [ -f "${WAKEWORD_FILE}" ]; then
+  echo "Wakeword already exists at ${WAKEWORD_FILE}"
+  echo "export RUSTPOTTER_WAKEWORD_PATH=${WAKEWORD_FILE}"
+  exit 0
 fi
 
-KEYWORDS_FILE="${MODEL_DIR}/keywords.txt"
-cat > "${KEYWORDS_FILE}" << 'KEYWORDS'
-▁HE Y ▁C LA U DE
-▁HE LL O
-▁COMP U TER
-KEYWORDS
+if ! command -v rustpotter-cli &> /dev/null; then
+  echo "Installing rustpotter-cli..."
+  cargo install rustpotter-cli
+fi
 
-echo "Keywords written to ${KEYWORDS_FILE}"
+mkdir -p "${WAKEWORD_DIR}"
+SAMPLES_DIR=$(mktemp -d)
 echo ""
-echo "Setup complete. Add to your shell profile:"
-echo "  export SHERPA_KWS_MODEL_DIR=${MODEL_DIR}"
+echo "Record 3 samples of your wake word (e.g. 'Hey Claude')."
+echo "Press Enter to start each recording, then Ctrl+C to stop."
+echo ""
+
+for i in 1 2 3; do
+  read -p "Press Enter to record sample ${i}/3..."
+  rustpotter-cli record "${SAMPLES_DIR}/sample_${i}.wav"
+  echo "Saved sample ${i}"
+done
+
+echo ""
+echo "Building wakeword model..."
+rustpotter-cli build \
+  --model-name "hey claude" \
+  --model-path "${WAKEWORD_FILE}" \
+  "${SAMPLES_DIR}/sample_1.wav" \
+  "${SAMPLES_DIR}/sample_2.wav" \
+  "${SAMPLES_DIR}/sample_3.wav"
+
+rm -rf "${SAMPLES_DIR}"
+
+echo ""
+echo "Wakeword saved to ${WAKEWORD_FILE}"
+echo ""
+echo "Add to your shell profile:"
+echo "  export RUSTPOTTER_WAKEWORD_PATH=${WAKEWORD_FILE}"
