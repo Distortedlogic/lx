@@ -51,7 +51,7 @@ pub fn Events() -> Element {
         for f in FILTER_OPTIONS {
           button {
             class: "px-2 py-1 text-xs rounded",
-            class: if current_filter == *f { "bg-blue-600 text-white" } else { "bg-gray-700 text-gray-300" },
+            class: if current_filter == *f { "bg-[var(--primary)] text-[var(--on-primary)]" } else { "bg-[var(--surface-container-high)] text-[var(--on-surface-variant)]" },
             onclick: {
                 let f = f.to_string();
                 move |_| filter.set(f.clone())
@@ -65,7 +65,7 @@ pub fn Events() -> Element {
           {render_mobile_event(idx, event, &expanded)}
         }
         if visible.is_empty() {
-          p { class: "text-gray-500 text-sm", "No events yet" }
+          p { class: "text-[var(--outline)] text-sm", "No events yet" }
         }
       }
     }
@@ -96,7 +96,7 @@ fn render_mobile_event(idx: usize, event: &serde_json::Value, expanded: &Signal<
   let mut expanded = *expanded;
   rsx! {
     div {
-      class: "p-2 bg-gray-800 rounded text-xs cursor-pointer",
+      class: "p-2 bg-[var(--surface-container)] rounded text-xs cursor-pointer",
       onclick: move |_| {
           let mut set = expanded.write();
           if set.contains(&idx) {
@@ -106,11 +106,13 @@ fn render_mobile_event(idx: usize, event: &serde_json::Value, expanded: &Signal<
           }
       },
       div {
-        span { class: "text-gray-500", "[{agent}] " }
-        span { class: "text-gray-300", "{event_type}" }
+        span { class: "text-[var(--outline)]", "[{agent}] " }
+        span { class: "text-[var(--on-surface-variant)]", "{event_type}" }
       }
       if is_expanded {
-        pre { class: "mt-1 text-gray-400 whitespace-pre-wrap break-all", "{detail}" }
+        pre { class: "mt-1 text-[var(--outline)] whitespace-pre-wrap break-all",
+          "{detail}"
+        }
       }
     }
   }

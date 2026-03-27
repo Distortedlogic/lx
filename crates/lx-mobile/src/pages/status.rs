@@ -49,10 +49,10 @@ pub fn Status() -> Element {
     div { class: "flex flex-col items-center gap-6 pt-8",
       PulseIndicator { state: exec_state() }
       div { class: "text-center space-y-2",
-        p { class: "text-sm text-gray-300", "{source_path}" }
-        p { class: "text-xs text-gray-500", "elapsed: {elapsed}ms | cost: ${cost:.4}" }
+        p { class: "text-sm text-[var(--on-surface-variant)]", "{source_path}" }
+        p { class: "text-xs text-[var(--outline)]", "elapsed: {elapsed}ms | cost: ${cost:.4}" }
         if let Some(ref err) = *error_msg.read() {
-          p { class: "text-xs text-red-400", "{err}" }
+          p { class: "text-xs text-[var(--error)]", "{err}" }
         }
       }
     }

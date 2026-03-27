@@ -13,10 +13,10 @@ pub fn MobileShell() -> Element {
   let _client_ref = client.read();
 
   rsx! {
-    div { class: "min-h-screen bg-gray-900 text-gray-100 flex flex-col",
+    div { class: "min-h-screen bg-[var(--surface)] text-[var(--on-surface)] flex flex-col",
       main { class: "flex-1 overflow-auto p-4 pb-20",
         div { class: "flex items-center gap-2 mb-3",
-          span { class: "text-xs text-gray-400", "lx mobile" }
+          span { class: "text-xs text-[var(--outline)]", "lx mobile" }
         }
         Outlet::<Route> {}
       }

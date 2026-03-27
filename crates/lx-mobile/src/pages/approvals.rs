@@ -23,7 +23,7 @@ pub fn Approvals() -> Element {
     div { class: "space-y-4",
       h2 { class: "text-lg font-bold", "Approvals" }
       if prompts.read().is_empty() {
-        p { class: "text-gray-500 text-sm", "No pending approvals" }
+        p { class: "text-[var(--outline)] text-sm", "No pending approvals" }
       }
       for prompt in prompts.read().iter() {
         {render_prompt(prompt, client)}
@@ -58,16 +58,16 @@ fn render_prompt(prompt: &PendingPrompt, client: Signal<LxClient>) -> Element {
     PromptKind::Confirm { message } => {
       let pid = prompt.prompt_id;
       rsx! {
-        div { class: "p-3 bg-gray-800 rounded space-y-2",
+        div { class: "p-3 bg-[var(--surface-container)] rounded space-y-2",
           p { class: "text-sm", "{message}" }
           div { class: "flex gap-2",
             button {
-              class: "px-3 py-1 bg-green-600 rounded text-sm",
+              class: "px-3 py-1 bg-[var(--success)] rounded text-sm",
               onclick: move |_| send_response(client, pid, serde_json::json!(true)),
               "Yes"
             }
             button {
-              class: "px-3 py-1 bg-red-600 rounded text-sm",
+              class: "px-3 py-1 bg-[var(--error)] rounded text-sm",
               onclick: move |_| send_response(client, pid, serde_json::json!(false)),
               "No"
             }
@@ -78,11 +78,11 @@ fn render_prompt(prompt: &PendingPrompt, client: Signal<LxClient>) -> Element {
     PromptKind::Choose { message, options } => {
       let pid = prompt.prompt_id;
       rsx! {
-        div { class: "p-3 bg-gray-800 rounded space-y-2",
+        div { class: "p-3 bg-[var(--surface-container)] rounded space-y-2",
           p { class: "text-sm", "{message}" }
           for (i , opt) in options.iter().enumerate() {
             button {
-              class: "block w-full text-left px-3 py-1 bg-gray-700 rounded text-sm hover:bg-gray-600",
+              class: "block w-full text-left px-3 py-1 bg-[var(--surface-container-high)] rounded text-sm hover:bg-[var(--surface-bright)]",
               onclick: move |_| send_response(client, pid, serde_json::json!(i)),
               "{opt}"
             }
@@ -94,18 +94,18 @@ fn render_prompt(prompt: &PendingPrompt, client: Signal<LxClient>) -> Element {
       let pid = prompt.prompt_id;
       let mut input_text = use_signal(String::new);
       rsx! {
-        div { class: "p-3 bg-gray-800 rounded space-y-2",
+        div { class: "p-3 bg-[var(--surface-container)] rounded space-y-2",
           p { class: "text-sm", "{message}" }
           div { class: "flex gap-2",
             input {
               r#type: "text",
-              class: "flex-1 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-100",
+              class: "flex-1 bg-[var(--surface-container-high)] border border-[var(--outline)] rounded px-2 py-1 text-sm text-[var(--on-surface)]",
               placeholder: "Type your response...",
               value: "{input_text}",
               oninput: move |e| input_text.set(e.value()),
             }
             button {
-              class: "px-3 py-1 bg-blue-600 rounded text-sm",
+              class: "px-3 py-1 bg-[var(--primary)] rounded text-sm",
               disabled: input_text.read().is_empty(),
               onclick: move |_| {
                   let val = input_text.read().clone();

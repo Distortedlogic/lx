@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+@source "../src/**/*.rs";
+
+@theme {
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --radius-sm: 0rem;
+  --radius: 0rem;
+  --radius-md: 0rem;
+  --radius-lg: 0rem;
+  --radius-xl: 0rem;
+  --radius-2xl: 0rem;
+  --radius-3xl: 0rem;
+}
+
+:root {
+  --surface: #0e0e0e;
+  --surface-container-low: #131313;
+  --surface-container: #191919;
+  --surface-container-high: #1f1f1f;
+  --surface-container-highest: #262626;
+  --surface-container-lowest: #000000;
+  --surface-bright: #2c2c2c;
+
+  --primary: #9cff93;
+  --primary-container: #00fc40;
+  --on-primary: #006413;
+
+  --on-surface: #ffffff;
+  --on-surface-variant: #ababab;
+
+  --outline: #757575;
+  --outline-variant: #484848;
+
+  --tertiary: #81ecff;
+
+  --error: #ff7351;
+  --warning: #fcaf00;
+  --success: #9cff93;
+
+  --color-chart-axis: #3A3A4A;
+  --color-chart-split: #2A2A3A;
+  --color-chart-tooltip: #191919;
+}
+
+body {
+  background-color: var(--surface);
+  overflow: hidden;
+}
+
+.shadow-ambient {
+  box-shadow: 0 8px 32px rgba(30, 20, 10, 0.06);
+}
+
+.border-ghost {
+  border: 1px solid rgba(86, 67, 52, 0.15);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface-container-low);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--surface-container-highest);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--surface-bright);
+}
