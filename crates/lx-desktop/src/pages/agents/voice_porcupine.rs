@@ -1,5 +1,6 @@
 #![allow(unsafe_code)]
 
+use std::path::Path;
 use std::sync::{LazyLock, Mutex};
 
 use dioxus::logger::tracing::{info, warn};
@@ -12,29 +13,55 @@ struct KwsEngine {
 
 unsafe impl Send for KwsEngine {}
 
+fn find_onnx(dir: &Path, prefix: &str) -> Option<String> {
+  let int8 = std::fs::read_dir(dir)
+    .ok()?
+    .flatten()
+    .find(|e| {
+      let name = e.file_name();
+      let n = name.to_string_lossy();
+      n.starts_with(prefix) && n.ends_with(".int8.onnx")
+    })
+    .map(|e| e.path().to_string_lossy().into_owned());
+  if int8.is_some() {
+    return int8;
+  }
+  std::fs::read_dir(dir)
+    .ok()?
+    .flatten()
+    .find(|e| {
+      let name = e.file_name();
+      let n = name.to_string_lossy();
+      n.starts_with(prefix) && n.ends_with(".onnx")
+    })
+    .map(|e| e.path().to_string_lossy().into_owned())
+}
+
 static ENGINE: LazyLock<Option<Mutex<KwsEngine>>> = LazyLock::new(|| {
   let model_dir = std::env::var("SHERPA_KWS_MODEL_DIR").ok()?;
-  let dir = std::path::Path::new(&model_dir);
-  let encoder = dir.join("encoder.onnx");
-  let decoder = dir.join("decoder.onnx");
-  let joiner = dir.join("joiner.onnx");
+  let dir = Path::new(&model_dir);
+  if !dir.is_dir() {
+    warn!("kws: SHERPA_KWS_MODEL_DIR={model_dir} is not a directory");
+    return None;
+  }
+  let encoder = find_onnx(dir, "encoder")?;
+  let decoder = find_onnx(dir, "decoder")?;
+  let joiner = find_onnx(dir, "joiner")?;
   let tokens = dir.join("tokens.txt");
   let keywords = dir.join("keywords.txt");
-  for path in [&encoder, &decoder, &joiner, &tokens, &keywords] {
-    if !path.exists() {
-      warn!("kws: missing file {}", path.display());
-      return None;
-    }
+  if !tokens.exists() || !keywords.exists() {
+    warn!("kws: missing tokens.txt or keywords.txt in {model_dir}");
+    return None;
   }
   let mut config = KeywordSpotterConfig::default();
-  config.model_config.transducer.encoder = Some(encoder.to_string_lossy().into_owned());
-  config.model_config.transducer.decoder = Some(decoder.to_string_lossy().into_owned());
-  config.model_config.transducer.joiner = Some(joiner.to_string_lossy().into_owned());
+  config.model_config.transducer.encoder = Some(encoder);
+  config.model_config.transducer.decoder = Some(decoder);
+  config.model_config.transducer.joiner = Some(joiner);
   config.model_config.tokens = Some(tokens.to_string_lossy().into_owned());
   config.keywords_file = Some(keywords.to_string_lossy().into_owned());
   config.model_config.num_threads = 1;
   let Some(spotter) = KeywordSpotter::create(&config) else {
-    warn!("kws: failed to create keyword spotter");
+    warn!("kws: failed to create keyword spotter from {model_dir}");
     return None;
   };
   let stream = spotter.create_stream();
