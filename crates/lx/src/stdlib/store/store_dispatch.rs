@@ -5,7 +5,8 @@ use crate::builtins::{call_value_sync, mk};
 use crate::error::LxError;
 use crate::record;
 use crate::runtime::RuntimeCtx;
-use crate::value::{BuiltinFunc, BuiltinKind, LxVal};
+use crate::sym::{Sym, intern};
+use crate::value::{BuiltinFunc, BuiltinKind, LxVal, SyncBuiltinFn};
 use miette::SourceSpan;
 
 use super::store::{
@@ -14,7 +15,7 @@ use super::store::{
 };
 
 pub fn store_method(name: &str, store_val: &LxVal) -> Option<LxVal> {
-  let method: Option<(&'static str, usize, crate::value::SyncBuiltinFn)> = match name {
+  let method: Option<(&'static str, usize, SyncBuiltinFn)> = match name {
     "set" => Some(("store.set", 3, bi_set)),
     "get" => Some(("store.get", 2, bi_get)),
     "keys" => Some(("store.keys", 1, bi_keys)),
@@ -38,17 +39,17 @@ pub fn store_method(name: &str, store_val: &LxVal) -> Option<LxVal> {
   method.map(|(mname, arity, func)| LxVal::BuiltinFunc(BuiltinFunc { name: mname, arity, kind: BuiltinKind::Sync(func), applied: vec![store_val.clone()] }))
 }
 
-pub fn object_insert(fields: indexmap::IndexMap<crate::sym::Sym, crate::value::LxVal>) -> u64 {
+pub fn object_insert(fields: indexmap::IndexMap<Sym, LxVal>) -> u64 {
   let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
   STORES.insert(id, StoreState { data: fields, path: None });
   id
 }
 
-pub fn object_get_field(id: u64, field: &str) -> Option<crate::value::LxVal> {
-  STORES.get(&id).and_then(|s| s.data.get(&crate::sym::intern(field)).cloned())
+pub fn object_get_field(id: u64, field: &str) -> Option<LxVal> {
+  STORES.get(&id).and_then(|s| s.data.get(&intern(field)).cloned())
 }
 
-pub fn object_update_nested(id: u64, path: &[crate::sym::Sym], value: crate::value::LxVal) -> Result<(), String> {
+pub fn object_update_nested(id: u64, path: &[Sym], value: LxVal) -> Result<(), String> {
   let Some(mut s) = STORES.get_mut(&id) else {
     return Err("object not found".into());
   };
@@ -67,22 +68,22 @@ pub fn object_update_nested(id: u64, path: &[crate::sym::Sym], value: crate::val
   }
 }
 
-fn update_nested_record(val: &crate::value::LxVal, path: &[crate::sym::Sym], new_val: crate::value::LxVal) -> Result<crate::value::LxVal, String> {
-  let crate::value::LxVal::Record(rec) = val else {
+fn update_nested_record(val: &LxVal, path: &[Sym], new_val: LxVal) -> Result<LxVal, String> {
+  let LxVal::Record(rec) = val else {
     return Err(format!("field update requires Record, got {}", val.type_name()));
   };
   match path {
     [field] => {
       let mut new_rec = rec.as_ref().clone();
       new_rec.insert(*field, new_val);
-      Ok(crate::value::LxVal::record(new_rec))
+      Ok(LxVal::record(new_rec))
     },
     [field, rest @ ..] => {
       let inner = rec.get(field).ok_or_else(|| format!("field '{field}' not found"))?;
       let updated = update_nested_record(inner, rest, new_val)?;
       let mut new_rec = rec.as_ref().clone();
       new_rec.insert(*field, updated);
-      Ok(crate::value::LxVal::record(new_rec))
+      Ok(LxVal::record(new_rec))
     },
     [] => Err("empty field path".into()),
   }
@@ -120,7 +121,7 @@ fn bi_has(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<Lx
   let id = store_id(&args[0], span)?;
   let key = args[1].require_str("store.has", span)?;
   let s = get_store(id, span)?;
-  Ok(LxVal::Bool(s.data.contains_key(&crate::sym::intern(key))))
+  Ok(LxVal::Bool(s.data.contains_key(&intern(key))))
 }
 
 fn bi_save_to(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
@@ -151,7 +152,7 @@ fn bi_load_from(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Res
 
 fn bi_merge(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
-  let source_data: indexmap::IndexMap<crate::sym::Sym, LxVal> = match &args[1] {
+  let source_data: indexmap::IndexMap<Sym, LxVal> = match &args[1] {
     LxVal::Store { id: src_id } => {
       let src = get_store(*src_id, span)?;
       src.data.clone()

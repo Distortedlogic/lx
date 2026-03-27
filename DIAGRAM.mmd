@@ -1,13 +1,6 @@
 graph TD
-    source[".lx source"]
-    config["`**Config**
-CLAUDE.md · AGENTS.md
-Skills · Policies
-Permissions`"]
-    source --> lexer["Lexer"]:::orange
-    config --> lexer
-    lexer --> parser["Parser → Surface AST"]:::orange
-    parser --> desugars
+    parse[".lx source → Lexer → Parser → Surface AST"]:::orange
+    parse --> desugars
 
     subgraph desugars ["Desugar · Folder → Core AST"]
         direction LR
@@ -32,37 +25,18 @@ inference
 unification
 exhaustiveness
 diagnostics`"]:::yellow
-    checker --> guardrails
-
-    subgraph guardrails ["Guardrails"]
-        direction LR
-        gr_content["`**Content**
-relevance
-safety · PII
-moderation`"]:::red
-        gr_tool["`**Tool**
-risk rating
-input validation
-output validation`"]:::red
-        gr_policy["`**Policy**
-rules-based
-constitutional
-sandbox enforcement`"]:::red
-        gr_content ~~~ gr_tool ~~~ gr_policy
-    end
-
-    guardrails --> interpreter["`**Interpreter**
+    checker --> interpreter["`**Interpreter**
 async tree-walk eval`"]:::purple
 
     interpreter --> resolve["`**Module Resolution**
 → Rust stdlib (channel, fs, http, …)
 → LX stdlib (agent, tool, prompt, …)
-→ WASM plugins (wasm/ prefix)
+→ WASM components (wasm/ prefix)
 → workspace members
 → dependency crates
 → file-based imports`"]:::purple
 
-    interpreter --> api["`**Plugin API Contract (WIT-defined)**
+    resolve --> api["`**Plugin API Contract (WIT-defined)**
 ——— typed interfaces ———
 tool: call(name, args) → result
 user: confirm · choose · ask · notify
@@ -99,6 +73,10 @@ MCP · A2A · AG-UI
 ——— infra ———
 PlanMode · Worktree · ToolSearch
 Hooks · Permissions · Context Mgmt
+——— guardrails (wrap other components) ———
+content: relevance · safety · PII
+tool: risk rating · input/output validation
+policy: rules-based · constitutional
 ——— stream subscribers ———
 stdio · lx-desktop · agent-mode
 CI/CD · headless`"]:::blue
@@ -106,8 +84,13 @@ CI/CD · headless`"]:::blue
 define all plugin contracts
 ——————
 world lx-tool { … }
+world lx-guardrail { … }
 world lx-subscriber { … }
 world lx-protocol { … }
+——————
+guardrails = components that import
++ export the same interface (wrap)
+composed via Linker as middleware
 ——————
 resource types for stateful handles
 (connections · sessions · stores)
@@ -186,6 +169,5 @@ kill · pause · resume
     control --> interpreter
 
     style desugars stroke:#ff6600,stroke-width:2px
-    style guardrails stroke:#d16969,stroke-width:2px
     style events stroke:#4ec9b0,stroke-width:2px
     style wasm_ext stroke:#0288d1,stroke-width:2px

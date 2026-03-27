@@ -11,6 +11,8 @@ use tokio::sync::broadcast::error::RecvError;
 use uuid::Uuid;
 
 use super::use_tabs_state;
+use crate::contexts::activity_log::ActivityLog;
+use crate::contexts::status_bar::StatusBarState;
 use crate::panes::DesktopPane;
 
 pub use super::browser_view::{BrowserNavCtx, BrowserView};
@@ -19,7 +21,7 @@ pub use super::browser_view::{BrowserNavCtx, BrowserView};
 pub fn TerminalView(terminal_id: String, working_dir: String, command: Option<String>) -> Element {
   let (element_id, widget) = use_ts_widget("terminal", serde_json::json!({}));
   let mut tabs_state: Signal<TabsState<DesktopPane>> = use_tabs_state();
-  let activity_log = use_context::<crate::contexts::activity_log::ActivityLog>();
+  let activity_log = use_context::<ActivityLog>();
   let tid_notif = terminal_id.clone();
 
   let eid_rsx = element_id.clone();
@@ -129,7 +131,7 @@ pub fn EditorView(editor_id: String, file_path: String, language: Option<String>
           Some("cursor") => {
             let line = msg["line"].as_u64().unwrap_or(1) as u32;
             let col = msg["col"].as_u64().unwrap_or(1) as u32;
-            let ctx = use_context::<crate::contexts::status_bar::StatusBarState>();
+            let ctx = use_context::<StatusBarState>();
             ctx.update_cursor(line, col);
           },
           Some("save") => {

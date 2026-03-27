@@ -1,6 +1,6 @@
 use miette::SourceSpan;
 
-use crate::ast::{ExprId, PatternId, StmtId, TypeExprId};
+use crate::ast::{ExprId, NodeId, PatternId, StmtId, TypeExprId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FileId(u32);
@@ -114,15 +114,15 @@ pub struct AttachedComment {
   pub placement: CommentPlacement,
 }
 
-pub type CommentMap = std::collections::HashMap<crate::ast::NodeId, Vec<AttachedComment>>;
+pub type CommentMap = std::collections::HashMap<NodeId, Vec<AttachedComment>>;
 
-impl crate::ast::NodeId {
+impl NodeId {
   pub fn in_file(self, file: FileId) -> GlobalNodeId {
     match self {
-      crate::ast::NodeId::Expr(id) => GlobalNodeId::Expr(GlobalExprId::new(file, id)),
-      crate::ast::NodeId::Stmt(id) => GlobalNodeId::Stmt(GlobalStmtId::new(file, id)),
-      crate::ast::NodeId::Pattern(id) => GlobalNodeId::Pattern(GlobalPatternId::new(file, id)),
-      crate::ast::NodeId::TypeExpr(id) => GlobalNodeId::TypeExpr(GlobalTypeExprId::new(file, id)),
+      NodeId::Expr(id) => GlobalNodeId::Expr(GlobalExprId::new(file, id)),
+      NodeId::Stmt(id) => GlobalNodeId::Stmt(GlobalStmtId::new(file, id)),
+      NodeId::Pattern(id) => GlobalNodeId::Pattern(GlobalPatternId::new(file, id)),
+      NodeId::TypeExpr(id) => GlobalNodeId::TypeExpr(GlobalTypeExprId::new(file, id)),
     }
   }
 }

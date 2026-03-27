@@ -1,7 +1,14 @@
 use std::sync::Arc;
 
-use crate::error::LxError;
+use crate::ast::{BindTarget, Program, Stmt};
+use crate::error::{EvalSignal, LxError};
+use crate::folder::desugar;
+use crate::interpreter::Interpreter;
+use crate::lexer::lex;
+use crate::parser::parse;
 use crate::runtime::RuntimeCtx;
+use crate::source::FileId;
+use crate::sym::intern;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
@@ -12,8 +19,8 @@ pub(super) fn invoke_flow(flow_path: &str, input: &LxVal, ctx: &Arc<RuntimeCtx>,
     std::path::PathBuf::from(flow_path)
   };
   let source = std::fs::read_to_string(&path).map_err(|e| LxError::runtime(format!("test.run: cannot read flow '{flow_path}': {e}"), span))?;
-  let (tokens, comments) = crate::lexer::lex(&source).map_err(|e| LxError::runtime(format!("test.run: lex error in '{flow_path}': {e}"), span))?;
-  let result = crate::parser::parse(tokens, crate::source::FileId::new(0), comments, &source);
+  let (tokens, comments) = lex(&source).map_err(|e| LxError::runtime(format!("test.run: lex error in '{flow_path}': {e}"), span))?;
+  let result = parse(tokens, FileId::new(0), comments, &source);
   let surface = result.program.ok_or_else(|| {
     let msgs: Vec<String> = result.errors.iter().map(|e| format!("{e}")).collect();
     LxError::runtime(format!("test.run: parse errors in '{flow_path}': {}", msgs.join("; ")), span)
@@ -22,9 +29,9 @@ pub(super) fn invoke_flow(flow_path: &str, input: &LxVal, ctx: &Arc<RuntimeCtx>,
     let msgs: Vec<String> = result.errors.iter().map(|e| format!("{e}")).collect();
     eprintln!("test.run: parse warnings in '{flow_path}': {}", msgs.join("; "));
   }
-  let program = crate::folder::desugar(surface);
+  let program = desugar(surface);
   let module_dir = path.parent().map(|p| p.to_path_buf());
-  let mut interp = crate::interpreter::Interpreter::new(&source, module_dir, Arc::clone(ctx));
+  let mut interp = Interpreter::new(&source, module_dir, Arc::clone(ctx));
   tokio::task::block_in_place(|| {
     tokio::runtime::Handle::current().block_on(async {
       interp.load_default_tools().await.map_err(|e| LxError::runtime(format!("test.run: tool init error in '{flow_path}': {e}"), span))?;
@@ -34,18 +41,17 @@ pub(super) fn invoke_flow(flow_path: &str, input: &LxVal, ctx: &Arc<RuntimeCtx>,
         find_flow_entry_name(&program).ok_or_else(|| LxError::runtime(format!("test.run: flow '{flow_path}' must export +run or +main"), span))?;
       let entry = interp
         .env
-        .get(crate::sym::intern(&entry_name))
+        .get(intern(&entry_name))
         .ok_or_else(|| LxError::runtime(format!("test.run: flow '{flow_path}' exported +{entry_name} not found in env"), span))?;
       interp.apply_func(entry, input.clone(), span).await.map_err(|e| match e {
-        crate::error::EvalSignal::Error(e) => e,
-        crate::error::EvalSignal::Break(_) => LxError::runtime("break outside loop", span),
+        EvalSignal::Error(e) => e,
+        EvalSignal::Break(_) => LxError::runtime("break outside loop", span),
       })
     })
   })
 }
 
-fn find_flow_entry_name<P>(program: &crate::ast::Program<P>) -> Option<String> {
-  use crate::ast::{BindTarget, Stmt};
+fn find_flow_entry_name<P>(program: &Program<P>) -> Option<String> {
   let mut has_run = false;
   let mut has_main = false;
   for &sid in &program.stmts {

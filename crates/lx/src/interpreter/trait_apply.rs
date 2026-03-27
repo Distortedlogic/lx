@@ -8,7 +8,7 @@ use miette::SourceSpan;
 use super::Interpreter;
 
 impl Interpreter {
-  pub(super) async fn apply_trait_fields(&mut self, name: &str, fields: &Arc<Vec<FieldDef>>, arg: &LxVal, _span: SourceSpan) -> EvalResult<LxVal> {
+  pub(super) async fn apply_trait_fields(&mut self, name: &str, fields: &[FieldDef], arg: &LxVal, _span: SourceSpan) -> EvalResult<LxVal> {
     let LxVal::Record(rec) = arg else {
       return Ok(LxVal::err_str(format!("Trait {name}: expected Record, got {}", arg.type_name())));
     };
