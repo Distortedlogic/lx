@@ -65,7 +65,7 @@ pub fn TabBar(tabs_state: Signal<TabsState<DesktopPane>>, on_new_tab: EventHandl
                       s.set_active_and_focus(&tab_id_click);
                       s.clear_tab_notifications(&tab_id_click);
                   },
-                  span { class: "text-xs {icon_color}", "{tab_icon}" }
+                  span { class: "text-xs", class: "{icon_color}", "{tab_icon}" }
                   "{tab.title}"
                   if let Some(dc) = dot_class {
                     span { class: "{dc}" }

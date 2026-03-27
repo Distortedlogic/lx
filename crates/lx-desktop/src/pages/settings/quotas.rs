@@ -50,7 +50,11 @@ pub fn QuotasPanel() -> Element {
                     }
                   }
                   div { class: "h-2 bg-[var(--surface-container)] rounded-full overflow-hidden mb-2",
-                    div { class: "h-full {color} rounded-full", style: "{width}" }
+                    div {
+                      class: "h-full rounded-full",
+                      class: "{color}",
+                      style: "{width}",
+                    }
                   }
                   div { class: "flex justify-between text-[10px] text-[var(--outline)]",
                     span { "{quota.min_label}" }

@@ -137,7 +137,9 @@ pub fn VoiceBanner() -> Element {
 
   rsx! {
     div { class: "flex flex-col h-full",
-      div { class: "bg-[var(--surface-container)] px-4 py-2 flex items-center gap-3 shrink-0 {bar_glow}",
+      div {
+        class: "bg-[var(--surface-container)] px-4 py-2 flex items-center gap-3 shrink-0",
+        class: "{bar_glow}",
         span { class: "text-[var(--primary)] text-sm", "{icon}" }
         span { class: "text-sm font-semibold uppercase tracking-wider text-[var(--on-surface)]",
           "{status_text}"

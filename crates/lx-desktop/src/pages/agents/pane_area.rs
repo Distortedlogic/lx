@@ -157,7 +157,8 @@ fn PaneItem(mut tabs_state: Signal<TabsState<DesktopPane>>, pane: DesktopPane, r
   rsx! {
     div {
       key: "{pid}",
-      class: "group absolute flex flex-col border {border}",
+      class: "group absolute flex flex-col border",
+      class: "{border}",
       style: "left: {rect.left}%; top: {rect.top}%; width: {rect.width}%; height: {rect.height}%;",
       onclick: move |_| {
           tabs_state.write().focused_pane_id = Some(pid_focus.clone());
