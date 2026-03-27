@@ -1,9 +1,9 @@
 use std::sync::LazyLock;
 
-use super::voice_context::{PipelineStage, TranscriptEntry, VoiceContext, VoiceDataStoreExt as _, VoiceStatus};
-use base64::Engine as _;
+use super::voice_context::{PipelineStage, TranscriptEntry, VoiceContext, VoiceDataStoreExt, VoiceStatus};
+use base64::Engine;
 use base64::engine::general_purpose::STANDARD as B64;
-use common_inference::InferenceClient as _;
+use common_inference::InferenceClient;
 use common_kokoro::SpeechRequest;
 use common_whisper::TranscribeRequest;
 use dioxus::logger::tracing::{error, info};

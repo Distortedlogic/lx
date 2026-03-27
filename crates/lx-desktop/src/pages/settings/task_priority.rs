@@ -1,4 +1,4 @@
-use super::state::{SettingsDataStoreExt as _, SettingsState};
+use super::state::{SettingsDataStoreExt, SettingsState};
 use dioxus::prelude::*;
 
 #[component]

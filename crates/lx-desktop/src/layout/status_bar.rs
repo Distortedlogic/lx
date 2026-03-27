@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 
-use crate::contexts::status_bar::{StatusBarState, StatusBarStateStoreExt as _};
+use crate::contexts::status_bar::{StatusBarState, StatusBarStateStoreExt};
 
 #[component]
 pub fn StatusBar() -> Element {

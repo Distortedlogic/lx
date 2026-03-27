@@ -1,8 +1,8 @@
-use base64::Engine as _;
+use base64::Engine;
 use base64::engine::general_purpose::STANDARD as B64;
 use common_pane_tree::TabsState;
 use common_pane_tree::{NotificationLevel, PaneNotification};
-use common_voice::AgentBackend as _;
+use common_voice::AgentBackend;
 use dioxus::logger::tracing::error;
 use dioxus::prelude::*;
 use dioxus_widget_bridge::use_ts_widget;
@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 use super::use_tabs_state;
 use crate::contexts::activity_log::ActivityLog;
-use crate::contexts::status_bar::{StatusBarState, StatusBarStateStoreImplExt as _};
+use crate::contexts::status_bar::{StatusBarState, StatusBarStateStoreImplExt};
 use crate::panes::DesktopPane;
 
 pub use super::browser_view::{BrowserNavCtx, BrowserView};

@@ -1,4 +1,4 @@
-use super::state::{EnvEntry, SettingsDataStoreExt as _, SettingsState};
+use super::state::{EnvEntry, SettingsDataStoreExt, SettingsState};
 use dioxus::prelude::*;
 
 #[component]

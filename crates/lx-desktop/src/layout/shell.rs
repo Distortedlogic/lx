@@ -8,7 +8,7 @@ use super::menu_bar::MenuBar;
 use super::sidebar::Sidebar;
 use super::status_bar::StatusBar;
 use crate::contexts::activity_log::ActivityLog;
-use crate::contexts::status_bar::{StatusBarState, StatusBarStateStoreExt as _};
+use crate::contexts::status_bar::{StatusBarState, StatusBarStateStoreExt};
 use crate::panes::DesktopPane;
 use crate::routes::Route;
 use crate::terminal::{add_tab, use_provide_tabs};

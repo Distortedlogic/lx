@@ -1,6 +1,6 @@
-use super::voice_context::{PipelineStage, TranscriptEntry, VoiceContext, VoiceDataStoreExt as _, VoiceStatus};
+use super::voice_context::{PipelineStage, TranscriptEntry, VoiceContext, VoiceDataStoreExt, VoiceStatus};
 use super::{voice_pipeline, voice_porcupine};
-use base64::Engine as _;
+use base64::Engine;
 use base64::engine::general_purpose::STANDARD as B64;
 use dioxus::logger::tracing::error;
 use dioxus::prelude::*;
