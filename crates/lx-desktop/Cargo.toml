@@ -14,20 +14,8 @@ path = "src/main.rs"
 name = "lx_desktop"
 path = "src/lib.rs"
 
-[lints.rust]
-elided_lifetimes_in_paths = "warn"
-trivial_numeric_casts = "warn"
-unsafe_code = "allow"
-unused_extern_crates = "warn"
-unused_import_braces = "warn"
-unused_lifetimes = "warn"
-
-[lints.clippy]
-manual_let_else = "warn"
-needless_pass_by_value = "warn"
-uninlined_format_args = "warn"
-unwrap_used = "warn"
-wildcard_imports = "warn"
+[lints]
+workspace = true
 
 [dependencies]
 common-pane-tree = { path = "../../../dioxus-common/crates/common-pane-tree" }

@@ -1,3 +1,5 @@
+#![allow(unsafe_code)]
+
 use std::ffi::CString;
 use std::os::raw::c_char;
 use std::sync::{LazyLock, Mutex};
