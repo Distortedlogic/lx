@@ -14,7 +14,7 @@ pub struct RunStatus {
   pub error: Option<String>,
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PendingPrompt {
   pub prompt_id: u64,
   pub kind: String,

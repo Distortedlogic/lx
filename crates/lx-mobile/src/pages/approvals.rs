@@ -4,24 +4,16 @@ use lx_api::types::{PendingPrompt, PromptResponse};
 
 #[component]
 pub fn Approvals() -> Element {
-  let mut action = use_action(get_prompts);
+  let prompts = use_loader(get_prompts)?;
 
-  use_future(move || async move {
-    loop {
-      action.call();
-      tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-    }
-  });
-
-  let prompts: Vec<PendingPrompt> = action.value().and_then(|r| r.ok()).map(|s| s.read().clone()).unwrap_or_default();
-
+  let prompts_ref = prompts.read();
   rsx! {
     div { class: "space-y-4",
       h2 { class: "text-lg font-bold", "Approvals" }
-      if prompts.is_empty() {
+      if prompts_ref.is_empty() {
         p { class: "text-[var(--outline)] text-sm", "No pending approvals" }
       }
-      for prompt in prompts.iter() {
+      for prompt in prompts_ref.iter() {
         {render_prompt(prompt)}
       }
     }
