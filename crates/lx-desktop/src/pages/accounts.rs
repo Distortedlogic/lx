@@ -15,7 +15,7 @@ pub fn Accounts() -> Element {
   let mut new_key = use_signal(String::new);
   let reveal: Signal<Option<usize>> = use_signal(|| None);
 
-  let entries = creds.read().clone();
+  let entries = creds();
 
   rsx! {
     div { class: "flex flex-col h-full p-4 overflow-auto gap-4",

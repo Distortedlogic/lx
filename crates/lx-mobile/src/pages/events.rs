@@ -81,7 +81,7 @@ pub fn Events() -> Element {
     }
   });
 
-  let current_filter = filter.read().clone();
+  let current_filter = filter();
   let visible: Vec<_> = events.read().iter().filter(|e| current_filter.matches(&e.kind)).cloned().collect();
 
   let total = events.read().len();

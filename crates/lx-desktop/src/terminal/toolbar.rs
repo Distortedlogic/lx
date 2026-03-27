@@ -21,7 +21,7 @@ pub fn PaneToolbar(
   };
   let mut url_input = use_signal(|| initial_url);
   use_effect(move || {
-    let val = current_url.read().clone();
+    let val = current_url();
     if !val.is_empty() {
       url_input.set(val);
     }
