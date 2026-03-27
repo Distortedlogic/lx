@@ -14,7 +14,7 @@ keep = (pred list) filter pred list
 is_action = (a) a.type != "__marker" && a.type != "strategy_shift"
 
 pid_result = $^cat /proc/self/stat
-pid_val = pid_result | split " " | first ^ | to_int ?? 1
+pid_val = pid_result | split " " | first | to_int ?? 1
 
 +Class Inspector = {
   turns: 0

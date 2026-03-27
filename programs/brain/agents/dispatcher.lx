@@ -86,13 +86,13 @@ route_to_worker = (workforce: Any; specialist: Str) -> Any {
   }
 
   matched ? {
-    Some (cap worker) -> worker
     None -> specialist ? {
       "analyst" -> workforce.analyst
       "critic" -> workforce.critic
       "researcher" -> workforce.researcher
       _ -> workforce.analyst
     }
+    (cap worker) -> worker
   }
 }
 

@@ -70,7 +70,7 @@
       by_seq = (.seq)
       by_tokens_desc = (e) 0 - e.tokens
       by_priority = (e) self.priority_rank e.priority
-      target = strategy == "oldest" ? (evictable | sort_by by_seq | first ^) : (strategy == "largest" ? (evictable | sort_by by_tokens_desc | first ^) : (evictable | sort_by by_priority | first ^))
+      target = strategy == "oldest" ? (evictable | sort_by by_seq | first) : (strategy == "largest" ? (evictable | sort_by by_tokens_desc | first) : (evictable | sort_by by_priority | first))
       self.entries.remove target.key
       true
     }

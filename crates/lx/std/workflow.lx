@@ -37,8 +37,8 @@
     completed | each (step_id) {
       step = self.steps | find (s) s.id == step_id
       step ? {
-        Some s -> s.undo != None ? (s.undo (self.status.get step_id))
         None -> ()
+        s -> s.undo != None ? (s.undo (self.status.get step_id))
       }
     }
     Ok ()

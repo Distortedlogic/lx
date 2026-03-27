@@ -107,6 +107,8 @@ pub(super) enum RawToken {
   FloatExp,
   #[regex(r"[0-9][0-9_]*", priority = 5)]
   DecInt,
+  #[regex(r"[A-Z][A-Z0-9]*(_[A-Z0-9]+)+", priority = 15)]
+  ScreamingCase,
   #[regex(r"[A-Z][a-zA-Z0-9]*")]
   TypeName,
   #[regex(r"[a-z_][a-zA-Z0-9_']*\??")]

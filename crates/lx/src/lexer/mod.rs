@@ -154,6 +154,7 @@ impl<'src> Lexer<'src> {
       },
       RawToken::Ident if slice == "_" => self.emit(Token::new(TokenKind::Underscore, span)),
       RawToken::Ident => self.emit(Token::new(ident_or_keyword(slice), span)),
+      RawToken::ScreamingCase => self.emit(Token::new(TokenKind::Ident(crate::sym::intern(slice)), span)),
       RawToken::TypeName => self.emit(Token::new(type_name_or_keyword(slice), span)),
       RawToken::Plus => {
         let kind = if self.at_line_start(start) && self.source[end..].starts_with(|c: char| c.is_ascii_alphabetic() || c == '_') {

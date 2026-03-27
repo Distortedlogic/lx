@@ -33,7 +33,7 @@ compute_deltas = (scores window) {
   recent = drop (n - actual_window) scores
   indexed = recent | enumerate | keep not_first
   indexed | map (p) {
-    prev_score = (drop (p.0 - 1) recent) | first ^
+    prev_score = (drop (p.0 - 1) recent) | first
     p.1 - prev_score
   }
 }

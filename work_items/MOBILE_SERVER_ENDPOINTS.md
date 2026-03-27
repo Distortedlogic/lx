@@ -1,24 +1,36 @@
 # Goal
 
-Add server endpoints that lx-mobile needs. Refactor server state from `Arc<ServerState>` with `.with_state()` to `LazyLock<ServerState>` accessed directly. Use Dioxus `#[get]` for the WebSocket endpoint. Keep axum handlers for REST endpoints because the mobile app is an external HTTP client calling specific paths.
+Add server endpoints that lx-mobile needs and refactor all existing server endpoints from manual axum routes to Dioxus `#[get]`/`#[post]`/`#[put]` macros. Eliminate the axum Router entirely. Server state is a module-level `LazyLock<ServerState>`.
 
 # Why
 
-lx-mobile needs:
-- `GET /api/run/status` — execution state
-- `GET /api/run/prompts` — pending prompts
-- `POST /api/run/respond` — respond to a prompt
-- `WS /ws/events` — real-time event stream
+Dioxus provides `#[get("/path")]`, `#[post("/path")]`, `#[put("/path")]` macros that auto-register HTTP endpoints with full control over method, path, params, and return type. The existing server module manually builds an axum `Router` with `.route()` calls and `State` extractors. This is unnecessary — the Dioxus macros do the same thing with less code and automatic registration.
 
-The mobile app is a separate binary using `reqwest` to call REST endpoints at specific paths. `#[server]` functions auto-generate paths based on function names (e.g., `POST /api/get_run_status`) which don't match the mobile client's expected paths (`GET /api/run/status`). Axum handlers give full control over HTTP method and path. The WebSocket endpoint uses Dioxus `#[get]` which does allow a custom path.
+# Dioxus server endpoint patterns (from reference/dioxus/packages/fullstack/tests/compile-test.rs)
 
-Server state moves from `Arc<ServerState>` passed via `.with_state()` to `static STATE: LazyLock<ServerState>` — same pattern as `AUDIO_SINK`, `SESSION_ID`, `KOKORO`, `WHISPER`.
+```rust
+#[get("/api/items/{id}?amount&offset")]
+async fn get_item(id: i32, amount: Option<i32>, offset: Option<i32>) -> Result<Json<Item>> {
+    Ok(Json(Item { id, amount, offset }))
+}
 
-# Verified facts
+#[post("/api/items")]
+async fn create_item(data: Json<Item>) -> Result<()> {
+    Ok(())
+}
 
-- `tokio-tungstenite` 0.25+ changed `Message::Text` from `String` to `Utf8Bytes`. The mobile app's `ws_client.rs` pattern match needs `.to_string()`.
-- `reqwest` 0.12→0.13 is compatible for the mobile app's usage (`.get()`, `.post()`, `.json()`, `.send()`). The `query` feature is in the workspace.
-- `#[get("/path")]` WebSocket endpoints register automatically via Dioxus server infrastructure.
+#[get("/ws/stream")]
+async fn ws_stream(options: WebSocketOptions) -> Result<Websocket<String, String>> {
+    Ok(options.on_upgrade(|mut tx| async move { ... }))
+}
+```
+
+- `#[get]`, `#[post]`, `#[put]`, `#[patch]`, `#[delete]` — full HTTP method control
+- Path params: `/items/{id}`, query params: `?amount&offset`
+- Takes `Json<T>`, axum extractors, `WebSocketOptions`, `FileStream`
+- Returns `Result<T>` where T is `Json<T>`, `String`, `Bytes`, `Websocket`, or anything `IntoResponse`
+- Routes register automatically — no manual Router construction
+- Imported from `dioxus_fullstack` or `dioxus::fullstack`
 
 # Prerequisites
 
@@ -28,18 +40,18 @@ WU-1 (Mobile Crate Setup).
 
 | File | Change |
 |------|--------|
-| `src/server/mod.rs` | LazyLock state, new types, updated router |
-| `src/server/run_api.rs` | New — axum handlers for run status/prompts/respond |
-| `src/server/ws_events.rs` | New — #[get] WebSocket event stream |
-| `src/server/settings_api.rs` | Use LazyLock STATE instead of axum State extractor |
-| `src/server/activity_api.rs` | Use LazyLock STATE, add broadcast send |
-| `src/main.rs` | Update server launch |
+| `src/server/mod.rs` | LazyLock state, new types, remove Router |
+| `src/server/run_api.rs` | New — run status/prompts/respond |
+| `src/server/ws_events.rs` | New — WebSocket event stream |
+| `src/server/settings_api.rs` | Rewrite with #[get]/#[put] |
+| `src/server/activity_api.rs` | Rewrite with #[get]/#[post], add broadcast |
+| `src/main.rs` | Simplify server launch — no router merging |
 
 # Task List
 
-### Task 1: Rewrite ServerState as LazyLock and add new types
+### Task 1: Rewrite mod.rs — LazyLock state, new types, remove Router
 
-**Subject:** Replace Arc/with_state pattern with LazyLock, add run/prompt types
+**Subject:** Replace Arc/Router with LazyLock, add run/prompt types
 
 **Description:** Rewrite `crates/lx-desktop/src/server/mod.rs`:
 
@@ -52,8 +64,6 @@ mod ws_events;
 use std::collections::VecDeque;
 use std::sync::LazyLock;
 
-use axum::routing::get;
-use axum::Router;
 use tokio::sync::{RwLock, broadcast};
 
 use crate::contexts::activity_log::ActivityEvent;
@@ -112,27 +122,19 @@ fn dirs_or_default(app: &str, file: &str) -> String {
 fn load_settings(path: &str) -> SettingsData {
   std::fs::read_to_string(path).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
 }
-
-pub fn router() -> Router {
-  Router::new()
-    .merge(settings_api::routes())
-    .merge(activity_api::routes())
-    .merge(run_api::routes())
-    .merge(ws_events::routes())
-}
 ```
 
-The `router()` function returns a plain `Router` (no state parameter). All handlers access `STATE` directly. The `Default` impl, `ServerState::new()`, `health` handler, and `Arc` wrapping are removed. The health endpoint moves to `run_api.rs`.
+Removed entirely: `router()` function, `health` handler, `Default` impl, `ServerState::new()`, all axum imports (`Router`, `routing::get`, `extract::State`, `Json`, `Arc`). The module is now just types and a `LazyLock` static.
 
-**ActiveForm:** Rewriting ServerState as LazyLock
+**ActiveForm:** Rewriting mod.rs with LazyLock state
 
 ---
 
-### Task 2: Update main.rs server launch
+### Task 2: Simplify main.rs — remove router merging
 
-**Subject:** Merge the server router with the Dioxus router
+**Subject:** Server launch no longer needs manual router construction
 
-**Description:** Edit `crates/lx-desktop/src/main.rs`. Replace the current server main:
+**Description:** Edit `crates/lx-desktop/src/main.rs`. The current server main:
 
 ```rust
 #[cfg(feature = "server")]
@@ -145,149 +147,133 @@ fn main() {
 }
 ```
 
-With:
+Replace with:
 
 ```rust
 #[cfg(feature = "server")]
 fn main() {
   dioxus::serve(|| async {
-    let dioxus_router = dioxus::server::router(lx_desktop::app::App);
-    Ok(lx_desktop::server::router().merge(dioxus_router))
+    let cfg = dioxus::server::ServeConfig::builder();
+    Ok(axum::Router::new().serve_dioxus_application(cfg, lx_desktop::app::App))
   });
 }
 ```
 
-Same pattern, just uses the updated `router()` which no longer takes or returns state. The Dioxus router handles SSR. The server router handles API endpoints. Both are merged.
+The `#[get]`/`#[post]`/`#[put]` endpoints register automatically through Dioxus's distributed registration system. `serve_dioxus_application` sets up SSR and all registered server endpoints. No manual merging.
 
-**ActiveForm:** Updating main.rs server launch
+If `serve_dioxus_application` requires an import (it's an extension trait on `Router`), check `reference/dioxus/packages/playwright-tests/fullstack/src/main.rs` line 18 — it uses `axum::Router::new().serve_dioxus_application(cfg, app)` directly. The import comes from `dioxus::server` or `dioxus_fullstack`.
+
+**ActiveForm:** Simplifying server launch
 
 ---
 
-### Task 3: Create run API handlers
+### Task 3: Create run API endpoints
 
 **Subject:** Add run status, prompts, respond, and health endpoints
 
 **Description:** Create `crates/lx-desktop/src/server/run_api.rs`:
 
 ```rust
-use axum::routing::{get, post};
-use axum::{Json, Router};
+use axum::Json;
+use dioxus::prelude::*;
 
 use super::{PendingPrompt, RunStatus, STATE};
 
-async fn get_run_status() -> Json<RunStatus> {
-  Json(STATE.run_status.read().await.clone())
+#[get("/api/health")]
+pub async fn health() -> Result<Json<serde_json::Value>> {
+  let event_count = STATE.activity.read().await.len();
+  Ok(Json(serde_json::json!({ "status": "ok", "events": event_count })))
 }
 
-async fn get_prompts() -> Json<Vec<PendingPrompt>> {
-  Json(STATE.prompts.read().await.clone())
+#[get("/api/run/status")]
+pub async fn get_run_status() -> Result<Json<RunStatus>> {
+  Ok(Json(STATE.run_status.read().await.clone()))
+}
+
+#[get("/api/run/prompts")]
+pub async fn get_prompts() -> Result<Json<Vec<PendingPrompt>>> {
+  Ok(Json(STATE.prompts.read().await.clone()))
 }
 
 #[derive(serde::Deserialize)]
-struct PromptResponse {
-  prompt_id: u64,
+pub struct PromptResponse {
+  pub prompt_id: u64,
 }
 
-async fn post_respond(Json(body): Json<PromptResponse>) -> Json<serde_json::Value> {
-  STATE.prompts.write().await.retain(|p| p.prompt_id != body.prompt_id);
-  Json(serde_json::json!({ "status": "ok" }))
-}
-
-async fn health() -> Json<serde_json::Value> {
-  let event_count = STATE.activity.read().await.len();
-  Json(serde_json::json!({ "status": "ok", "events": event_count }))
-}
-
-pub fn routes() -> Router {
-  Router::new()
-    .route("/api/health", get(health))
-    .route("/api/run/status", get(get_run_status))
-    .route("/api/run/prompts", get(get_prompts))
-    .route("/api/run/respond", post(post_respond))
+#[post("/api/run/respond")]
+pub async fn post_respond(data: Json<PromptResponse>) -> Result<Json<serde_json::Value>> {
+  STATE.prompts.write().await.retain(|p| p.prompt_id != data.prompt_id);
+  Ok(Json(serde_json::json!({ "status": "ok" })))
 }
 ```
 
-Paths match exactly what `api_client.rs` in lx-mobile calls. No axum `State` extractor — handlers access `STATE` directly. The `PromptResponse` struct deserializes the request body. `post_respond` removes the prompt by ID.
+Paths match exactly what `api_client.rs` in lx-mobile calls: `GET /api/run/status`, `GET /api/run/prompts`, `POST /api/run/respond`. The `#[get]`/`#[post]` macros handle registration. `STATE` is accessed directly.
 
-**ActiveForm:** Creating run API handlers
+**ActiveForm:** Creating run API endpoints
 
 ---
 
-### Task 4: Rewrite settings and activity to use LazyLock STATE
+### Task 4: Rewrite settings and activity endpoints
 
-**Subject:** Remove axum State extractor from existing handlers
+**Subject:** Replace axum handlers with Dioxus endpoint macros
 
 **Description:** Rewrite `crates/lx-desktop/src/server/settings_api.rs`:
 
 ```rust
-use axum::routing::get;
-use axum::{Json, Router};
+use axum::Json;
+use dioxus::prelude::*;
 
 use crate::pages::settings::state::SettingsData;
 
 use super::STATE;
 
-async fn get_settings() -> Json<SettingsData> {
-  Json(STATE.settings.read().await.clone())
+#[get("/api/settings")]
+pub async fn get_settings() -> Result<Json<SettingsData>> {
+  Ok(Json(STATE.settings.read().await.clone()))
 }
 
-async fn put_settings(Json(new_settings): Json<SettingsData>) -> Json<serde_json::Value> {
+#[put("/api/settings")]
+pub async fn put_settings(new_settings: Json<SettingsData>) -> Result<Json<serde_json::Value>> {
   let mut settings = STATE.settings.write().await;
-  *settings = new_settings.clone();
+  *settings = new_settings.0.clone();
   drop(settings);
-  let result = tokio::fs::write(&STATE.settings_path, serde_json::to_string_pretty(&new_settings).unwrap_or_default()).await;
-  match result {
-    Ok(()) => Json(serde_json::json!({ "status": "saved" })),
-    Err(e) => Json(serde_json::json!({ "status": "error", "message": format!("{e}") })),
-  }
-}
-
-pub fn routes() -> Router {
-  Router::new().route("/api/settings", get(get_settings).put(put_settings))
+  let _ = tokio::fs::write(&STATE.settings_path, serde_json::to_string_pretty(&new_settings.0).unwrap_or_default()).await;
+  Ok(Json(serde_json::json!({ "status": "saved" })))
 }
 ```
 
 Rewrite `crates/lx-desktop/src/server/activity_api.rs`:
 
 ```rust
-use axum::extract::Query;
-use axum::routing::get;
-use axum::{Json, Router};
-use serde::Deserialize;
+use axum::Json;
+use dioxus::prelude::*;
 
 use crate::contexts::activity_log::ActivityEvent;
 
 use super::STATE;
 
-#[derive(Deserialize)]
-struct ActivityQuery {
-  limit: Option<usize>,
-}
-
-async fn get_activity(Query(query): Query<ActivityQuery>) -> Json<Vec<ActivityEvent>> {
+#[get("/api/activity?limit")]
+pub async fn get_activity(limit: Option<usize>) -> Result<Json<Vec<ActivityEvent>>> {
   let events = STATE.activity.read().await;
-  let limit = query.limit.unwrap_or(100).min(500);
-  Json(events.iter().take(limit).cloned().collect())
+  let limit = limit.unwrap_or(100).min(500);
+  Ok(Json(events.iter().take(limit).cloned().collect()))
 }
 
-async fn post_activity(Json(event): Json<ActivityEvent>) -> Json<serde_json::Value> {
-  let _ = STATE.event_tx.send(event.clone());
+#[post("/api/activity")]
+pub async fn post_activity(event: Json<ActivityEvent>) -> Result<Json<serde_json::Value>> {
+  let _ = STATE.event_tx.send(event.0.clone());
   let mut events = STATE.activity.write().await;
-  events.push_front(event);
+  events.push_front(event.0);
   if events.len() > 500 {
     events.pop_back();
   }
-  Json(serde_json::json!({ "status": "ok", "count": events.len() }))
-}
-
-pub fn routes() -> Router {
-  Router::new().route("/api/activity", get(get_activity).post(post_activity))
+  Ok(Json(serde_json::json!({ "status": "ok", "count": events.len() })))
 }
 ```
 
-Both files: removed `Arc<ServerState>` from handler signatures, removed `State` extractor import, changed `state.field` to `STATE.field`. `post_activity` now also broadcasts the event via `STATE.event_tx.send()` before adding to the deque.
+`get_activity` uses `?limit` in the path macro to extract the query parameter. `post_activity` broadcasts via `event_tx` before adding to the deque.
 
-**ActiveForm:** Rewriting settings and activity handlers
+**ActiveForm:** Rewriting settings and activity endpoints
 
 ---
 
@@ -298,38 +284,30 @@ Both files: removed `Arc<ServerState>` from handler signatures, removed `State` 
 **Description:** Create `crates/lx-desktop/src/server/ws_events.rs`:
 
 ```rust
-use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::response::IntoResponse;
-use axum::routing::get;
-use axum::Router;
+use dioxus::fullstack::{Websocket, WebSocketOptions};
+use dioxus::prelude::*;
 
 use super::STATE;
 
-async fn ws_handler(ws: WebSocketUpgrade) -> impl IntoResponse {
+#[get("/ws/events")]
+pub async fn ws_events(options: WebSocketOptions) -> Result<Websocket<String, ()>> {
   let rx = STATE.event_tx.subscribe();
-  ws.on_upgrade(move |socket| handle_socket(socket, rx))
-}
-
-async fn handle_socket(mut socket: WebSocket, mut rx: tokio::sync::broadcast::Receiver<crate::contexts::activity_log::ActivityEvent>) {
-  while let Ok(event) = rx.recv().await {
-    let json = match serde_json::to_string(&event) {
-      Ok(j) => j,
-      Err(_) => continue,
-    };
-    if socket.send(Message::Text(json.into())).await.is_err() {
-      break;
+  Ok(options.on_upgrade(move |mut tx| async move {
+    let mut rx = rx;
+    while let Ok(event) = rx.recv().await {
+      let json = match serde_json::to_string(&event) {
+        Ok(j) => j,
+        Err(_) => continue,
+      };
+      if tx.send(json).await.is_err() {
+        break;
+      }
     }
-  }
-}
-
-pub fn routes() -> Router {
-  Router::new().route("/ws/events", get(ws_handler))
+  }))
 }
 ```
 
-Uses axum's built-in WebSocket extractor (`axum::extract::ws`). No Dioxus WebSocket wrapper needed — the axum WebSocket is simpler and gives the exact path control the mobile client expects. `STATE.event_tx.subscribe()` creates a broadcast receiver. Each WebSocket client gets events as they're broadcast by `post_activity`.
-
-`Message::Text(json.into())` — axum 0.8's `Message::Text` takes `String` (axum wraps tungstenite internally and handles the `Utf8Bytes` conversion). If axum 0.8 exposes `Utf8Bytes` directly in its `Message::Text`, use `Message::Text(json)` without `.into()`.
+`Websocket<String, ()>` — sends `String` (JSON events), receives nothing (the mobile client only reads from this socket). Each connection subscribes to the broadcast channel. Events are serialized and sent as text. Client disconnect breaks the loop.
 
 **ActiveForm:** Creating WebSocket events endpoint
 

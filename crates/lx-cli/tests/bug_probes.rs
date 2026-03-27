@@ -96,16 +96,14 @@ fn bug_sections_equality() {
 }
 
 #[test]
-#[ignore]
-fn bug_screaming_case_constants() {
+fn fixed_screaming_case_constants() {
   let (ok, stdout, _) = run_lx("TARGET_GRADE = 93\nemit TARGET_GRADE");
   assert!(ok, "SCREAMING_CASE identifiers work");
   assert!(stdout.contains("93"));
 }
 
 #[test]
-#[ignore]
-fn bug_uppercase_keyword_field_names() {
+fn fixed_uppercase_keyword_field_names() {
   let (ok, stdout, _) = run_lx("r = {Agent: 1; Tool: 2}\nemit r.Agent");
   assert!(ok, "uppercase keyword field names work");
   assert!(stdout.contains("1"));
@@ -119,22 +117,19 @@ fn bug_pipe_plus_precedence() {
 }
 
 #[test]
-#[ignore]
-fn bug_find_returns_value() {
+fn fixed_find_returns_value() {
   let (ok, _, _) = run_lx("list = [1; 2; 3; 4; 5]\nfound = list | find (x) { x > 3 }\nassert (found == 4) \"find returns value\"");
   assert!(ok, "find returns value directly, not Some(value)");
 }
 
 #[test]
-#[ignore]
-fn bug_first_returns_value() {
+fn fixed_first_returns_value() {
   let (ok, _, _) = run_lx("list = [1; 2; 3]\nfirst_val = list | first\nassert (first_val == 1) \"first returns value\"");
   assert!(ok, "first returns value directly, not Some(value)");
 }
 
 #[test]
-#[ignore]
-fn bug_last_returns_value() {
+fn fixed_last_returns_value() {
   let (ok, _, _) = run_lx("list = [1; 2; 3]\nlast_val = list | last\nassert (last_val == 3) \"last returns value\"");
   assert!(ok, "last returns value directly, not Some(value)");
 }

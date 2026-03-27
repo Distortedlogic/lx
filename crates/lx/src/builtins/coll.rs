@@ -21,16 +21,12 @@ pub(crate) fn cmp_values(a: &LxVal, b: &LxVal) -> std::cmp::Ordering {
   }
 }
 
-fn maybe(v: Option<&LxVal>) -> LxVal {
-  v.map_or(LxVal::None, |v| LxVal::some(v.clone()))
-}
-
 fn bi_first(args: &[LxVal], sp: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  Ok(maybe(args[0].require_list("first", sp)?.first()))
+  Ok(args[0].require_list("first", sp)?.first().cloned().unwrap_or(LxVal::None))
 }
 
 fn bi_last(args: &[LxVal], sp: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  Ok(maybe(args[0].require_list("last", sp)?.last()))
+  Ok(args[0].require_list("last", sp)?.last().cloned().unwrap_or(LxVal::None))
 }
 
 fn bi_contains(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {

@@ -172,7 +172,7 @@ fn bi_find(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
     let items = get_list(&args[1], "find", sp)?;
     for v in items.iter() {
       if call_predicate(&args[0], v.clone(), sp, &ctx).await? {
-        return Ok(LxVal::some(v.clone()));
+        return Ok(v.clone());
       }
     }
     Ok(LxVal::None)

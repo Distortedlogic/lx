@@ -26,7 +26,7 @@ use std/time
     w = self.repetition_window
     w > 0 && (self.actions | len) >= w ? {
       window = self.actions | drop ((self.actions | len) - w)
-      head = window | first ^
+      head = window | first
       all_same = window | all? (== head)
       all_same ? { self.tripped <- "repetition: last {w} actions identical" }
     }

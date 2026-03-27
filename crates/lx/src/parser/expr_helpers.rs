@@ -1,7 +1,7 @@
 use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 
-use super::expr::{ident, ident_or_keyword, item_sep, skip_item_sep, skip_semis};
+use super::expr::{ident, ident_or_keyword, item_sep, skip_item_sep, skip_semis, type_name};
 use super::{ArenaRef, ExprId, Span, ss};
 use crate::ast::{Expr, ExprBlock, ListElem, MapEntry, Param, RecordField};
 use crate::lexer::token::TokenKind;
@@ -65,7 +65,7 @@ where
 
   let named_field = {
     let al = arena;
-    ident_or_keyword().then(just(TokenKind::Colon).ignore_then(expr).or_not()).map_with(move |(name, val), e| {
+    ident_or_keyword().or(type_name()).then(just(TokenKind::Colon).ignore_then(expr).or_not()).map_with(move |(name, val), e| {
       let value = val.unwrap_or_else(|| al.borrow_mut().alloc_expr(Expr::Ident(name), ss(e.span())));
       RecordField::Named { name, value }
     })
