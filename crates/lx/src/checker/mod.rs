@@ -63,6 +63,12 @@ pub struct CheckResult {
   pub semantic: SemanticModel,
 }
 
+impl CheckResult {
+  pub fn count_errors(&self, strict: bool) -> u32 {
+    self.diagnostics.iter().filter(|d| d.level == DiagLevel::Error || (strict && d.level == DiagLevel::Warning)).count() as u32
+  }
+}
+
 pub(crate) struct Checker<'a> {
   pub(crate) table: UnificationTable,
   pub(crate) type_arena: TypeArena,

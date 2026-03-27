@@ -70,7 +70,7 @@ fn recheck_source(fixed_source: &str) -> Result<CheckResult, String> {
 
 fn print_and_exit(result: &CheckResult, path: &str, source: &str, strict: bool) -> ExitCode {
   print_diagnostics(result, path, source, None);
-  if count_errors(result, strict) > 0 { ExitCode::from(1) } else { ExitCode::SUCCESS }
+  if result.count_errors(strict) > 0 { ExitCode::from(1) } else { ExitCode::SUCCESS }
 }
 
 fn try_apply_fixes(path: &str, source: &str, result: &CheckResult) -> FixOutcome {
@@ -91,10 +91,6 @@ fn try_apply_fixes(path: &str, source: &str, result: &CheckResult) -> FixOutcome
       FixOutcome::RecheckFailed
     },
   }
-}
-
-fn count_errors(result: &CheckResult, strict: bool) -> u32 {
-  result.diagnostics.iter().filter(|d| d.level == DiagLevel::Error || (strict && d.level == DiagLevel::Warning)).count() as u32
 }
 
 pub fn check_workspace(member_filter: Option<&str>, strict: bool, fix: bool) -> ExitCode {
@@ -163,7 +159,7 @@ pub fn check_workspace(member_filter: Option<&str>, strict: bool, fix: bool) -> 
           } else {
             (result, source)
           };
-          let file_errors = count_errors(&final_result, strict);
+          let file_errors = final_result.count_errors(strict);
           if file_errors == 0 && final_result.diagnostics.is_empty() {
             member_ok += 1;
           } else if file_errors == 0 {

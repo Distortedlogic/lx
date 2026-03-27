@@ -237,26 +237,14 @@ fn bi_method_of(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Re
   let name = s.as_ref();
   match &args[0] {
     LxVal::Object(o) => match o.methods.get(&crate::sym::intern(name)) {
-      Some(method) => Ok(inject_self_for_method(method, &args[0])),
+      Some(method) => Ok(method.bind_self(&args[0])),
       None => Ok(LxVal::None),
     },
     LxVal::Class(c) => match c.methods.get(&crate::sym::intern(name)) {
-      Some(method) => Ok(inject_self_for_method(method, &args[0])),
+      Some(method) => Ok(method.bind_self(&args[0])),
       None => Ok(LxVal::None),
     },
     _ => Ok(LxVal::None),
-  }
-}
-
-fn inject_self_for_method(method: &LxVal, self_val: &LxVal) -> LxVal {
-  if let LxVal::Func(lf) = method {
-    let env = lf.closure.child();
-    env.bind_str("self", self_val.clone());
-    let mut lf = lf.clone();
-    lf.closure = Arc::new(env);
-    LxVal::Func(lf)
-  } else {
-    method.clone()
   }
 }
 

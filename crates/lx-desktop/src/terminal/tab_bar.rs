@@ -37,7 +37,7 @@ pub fn TabBar(tabs_state: Signal<TabsState<DesktopPane>>, on_new_tab: EventHandl
               } else {
                   "text-[var(--outline)]"
               };
-              let highest_level = highest_notification_level(&tabs_state.read(), &tab.id);
+              let highest_level = tabs_state.read().highest_notification_level(&tab.id);
               let dot_class = highest_level
                   .map(|level| match level {
                       NotificationLevel::Error => {
@@ -163,7 +163,13 @@ pub fn TabBar(tabs_state: Signal<TabsState<DesktopPane>>, on_new_tab: EventHandl
   }
 }
 
-fn highest_notification_level(state: &TabsState<DesktopPane>, tab_id: &str) -> Option<NotificationLevel> {
-  let tab = state.tabs.iter().find(|t| t.id == tab_id)?;
-  tab.root().all_pane_ids().into_iter().filter_map(|id| state.get_notification(&id).map(|n| n.level)).max()
+trait TabsStateExt {
+  fn highest_notification_level(&self, tab_id: &str) -> Option<NotificationLevel>;
+}
+
+impl TabsStateExt for TabsState<DesktopPane> {
+  fn highest_notification_level(&self, tab_id: &str) -> Option<NotificationLevel> {
+    let tab = self.tabs.iter().find(|t| t.id == tab_id)?;
+    tab.root().all_pane_ids().into_iter().filter_map(|id| self.get_notification(&id).map(|n| n.level)).max()
+  }
 }

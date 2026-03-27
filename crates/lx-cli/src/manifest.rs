@@ -16,6 +16,23 @@ pub struct RootManifest {
   pub deps_table: Option<DepsTable>,
 }
 
+impl RootManifest {
+  pub fn validate(&self, path: &Path) -> Result<(), String> {
+    if let Some(ref pkg) = self.package {
+      match &pkg.version {
+        None => {
+          return Err(format!("{}: [package] requires a 'version' field", path.display()));
+        },
+        Some(v) if v.is_empty() => {
+          return Err(format!("{}: [package].version must not be empty", path.display()));
+        },
+        _ => {},
+      }
+    }
+    Ok(())
+  }
+}
+
 #[derive(Deserialize)]
 pub struct WorkspaceSection {
   pub members: Vec<String>,
@@ -111,23 +128,8 @@ pub fn load_manifest(root: &Path) -> Result<RootManifest, String> {
   let manifest_path = root.join(lx::LX_MANIFEST);
   let content = fs::read_to_string(&manifest_path).map_err(|e| format!("cannot read {}: {e}", manifest_path.display()))?;
   let manifest: RootManifest = toml::from_str(&content).map_err(|e| format!("invalid {}: {e}", manifest_path.display()))?;
-  validate_manifest(&manifest, &manifest_path)?;
+  manifest.validate(&manifest_path)?;
   Ok(manifest)
-}
-
-fn validate_manifest(manifest: &RootManifest, path: &Path) -> Result<(), String> {
-  if let Some(ref pkg) = manifest.package {
-    match &pkg.version {
-      None => {
-        return Err(format!("{}: [package] requires a 'version' field", path.display()));
-      },
-      Some(v) if v.is_empty() => {
-        return Err(format!("{}: [package].version must not be empty", path.display()));
-      },
-      _ => {},
-    }
-  }
-  Ok(())
 }
 
 pub fn deps_dir(root: &Path) -> PathBuf {
@@ -226,7 +228,7 @@ pub fn load_workspace(root: &Path) -> Result<Workspace, String> {
     }
     let member_content = fs::read_to_string(&member_manifest_path).map_err(|e| format!("cannot read {}: {e}", member_manifest_path.display()))?;
     let member_manifest: RootManifest = toml::from_str(&member_content).map_err(|e| format!("invalid {}: {e}", member_manifest_path.display()))?;
-    validate_manifest(&member_manifest, &member_manifest_path)?;
+    member_manifest.validate(&member_manifest_path)?;
     let pkg = member_manifest.package.ok_or_else(|| format!("{} has no [package] section", member_manifest_path.display()))?;
     let test = member_manifest.test.unwrap_or(TestSection { dir: None, pattern: None, threshold: None, runs: None });
     members.push(Member {

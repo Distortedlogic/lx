@@ -84,6 +84,26 @@ impl DesktopPane {
       Self::Chart { .. } => "\u{25A3}",
     }
   }
+
+  pub fn title(&self) -> String {
+    if let Some(n) = self.name() {
+      return n.to_string();
+    }
+    match self {
+      Self::Terminal { working_dir, command, .. } => {
+        if let Some(cmd) = command {
+          cmd.split_whitespace().next().unwrap_or("terminal").to_string()
+        } else {
+          working_dir.clone()
+        }
+      },
+      Self::Browser { url, .. } => url.split('/').nth(2).unwrap_or("browser").to_string(),
+      Self::Editor { file_path, .. } => file_path.rsplit('/').next().unwrap_or("editor").to_string(),
+      Self::Agent { model, .. } => model.clone(),
+      Self::Canvas { widget_type, .. } => widget_type.clone(),
+      Self::Chart { title, .. } => title.as_deref().unwrap_or("chart").to_string(),
+    }
+  }
 }
 
 impl PaneKind {

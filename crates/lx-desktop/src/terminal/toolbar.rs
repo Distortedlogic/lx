@@ -29,7 +29,7 @@ pub fn PaneToolbar(
   let mut conversion_open = use_signal(|| false);
   let current_kind = pane.kind();
   let icon = pane.icon();
-  let pane_title = derive_pane_title(&pane);
+  let pane_title = pane.title();
 
   let left_section = match &pane {
     DesktopPane::Browser { .. } => {
@@ -215,25 +215,5 @@ pub fn PaneToolbar(
         "\u{00D7}"
       }
     }
-  }
-}
-
-fn derive_pane_title(pane: &DesktopPane) -> String {
-  if let Some(n) = pane.name() {
-    return n.to_string();
-  }
-  match pane {
-    DesktopPane::Terminal { working_dir, command, .. } => {
-      if let Some(cmd) = command {
-        cmd.split_whitespace().next().unwrap_or("terminal").to_string()
-      } else {
-        working_dir.clone()
-      }
-    },
-    DesktopPane::Browser { url, .. } => url.split('/').nth(2).unwrap_or("browser").to_string(),
-    DesktopPane::Editor { file_path, .. } => file_path.rsplit('/').next().unwrap_or("editor").to_string(),
-    DesktopPane::Agent { model, .. } => model.clone(),
-    DesktopPane::Canvas { widget_type, .. } => widget_type.clone(),
-    DesktopPane::Chart { title, .. } => title.as_deref().unwrap_or("chart").to_string(),
   }
 }
