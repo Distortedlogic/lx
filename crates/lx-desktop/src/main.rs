@@ -1,5 +1,6 @@
 #[cfg(feature = "server")]
 fn main() {
+  use dioxus::prelude::DioxusRouterExt;
   dioxus::serve(|| async {
     let cfg = dioxus::server::ServeConfig::builder();
     Ok(axum::Router::new().serve_dioxus_application(cfg, lx_desktop::app::App))

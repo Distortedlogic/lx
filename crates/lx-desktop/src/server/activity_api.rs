@@ -1,34 +1,24 @@
-use std::sync::Arc;
+use axum::Json;
+use dioxus::prelude::*;
 
-use axum::extract::{Query, State};
-use axum::routing::get;
-use axum::{Json, Router};
-use serde::Deserialize;
-
-use super::ServerState;
 use crate::contexts::activity_log::ActivityEvent;
 
-#[derive(Deserialize)]
-struct ActivityQuery {
-  limit: Option<usize>,
+use super::STATE;
+
+#[get("/api/activity?limit")]
+pub async fn get_activity(limit: Option<usize>) -> Result<Json<Vec<ActivityEvent>>> {
+  let events = STATE.activity.read().await;
+  let limit = limit.unwrap_or(100).min(500);
+  Ok(Json(events.iter().take(limit).cloned().collect()))
 }
 
-async fn get_activity(State(state): State<Arc<ServerState>>, Query(query): Query<ActivityQuery>) -> Json<Vec<ActivityEvent>> {
-  let events = state.activity.read().await;
-  let limit = query.limit.unwrap_or(100).min(500);
-  let result: Vec<ActivityEvent> = events.iter().take(limit).cloned().collect();
-  Json(result)
-}
-
-async fn post_activity(State(state): State<Arc<ServerState>>, Json(event): Json<ActivityEvent>) -> Json<serde_json::Value> {
-  let mut events = state.activity.write().await;
-  events.push_front(event);
+#[post("/api/activity")]
+pub async fn post_activity(event: Json<ActivityEvent>) -> Result<Json<serde_json::Value>> {
+  let _ = STATE.event_tx.send(event.0.clone());
+  let mut events = STATE.activity.write().await;
+  events.push_front(event.0);
   if events.len() > 500 {
     events.pop_back();
   }
-  Json(serde_json::json!({ "status": "ok", "count": events.len() }))
-}
-
-pub fn routes() -> Router<Arc<ServerState>> {
-  Router::new().route("/api/activity", get(get_activity).post(post_activity))
+  Ok(Json(serde_json::json!({ "status": "ok", "count": events.len() })))
 }
