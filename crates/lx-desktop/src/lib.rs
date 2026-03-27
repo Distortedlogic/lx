@@ -4,8 +4,6 @@ pub mod layout;
 pub mod pages;
 pub mod panes;
 pub mod routes;
-#[cfg(feature = "server")]
-pub mod server;
 pub mod terminal;
 pub mod voice_backend;
 #[cfg(feature = "desktop")]

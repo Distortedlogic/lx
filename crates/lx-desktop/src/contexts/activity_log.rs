@@ -1,12 +1,7 @@
 use dioxus::prelude::*;
 use std::collections::VecDeque;
 
-#[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct ActivityEvent {
-  pub timestamp: String,
-  pub kind: String,
-  pub message: String,
-}
+pub use lx_api::types::ActivityEvent;
 
 #[derive(Clone, Copy)]
 pub struct ActivityLog {

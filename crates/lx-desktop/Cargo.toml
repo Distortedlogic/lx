@@ -28,6 +28,8 @@ common-pty = { path = "../../../dioxus-common/crates/common-pty" }
 common-voice = { path = "../../../dioxus-common/crates/common-voice" }
 common-whisper = { path = "../../../dioxus-common/crates/common-whisper" }
 
+lx-api = { path = "../lx-api", features = ["server"] }
+
 anyhow = "1.0.102"
 async-trait = "0.1.89"
 
