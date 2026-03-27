@@ -1,6 +1,7 @@
 mod display;
 mod func;
 mod impls;
+mod methods;
 mod serde_impl;
 
 pub use func::{AsyncBuiltinFn, BuiltinFunc, BuiltinKind, DynAsyncBuiltinFn, LxFunc, SyncBuiltinFn, mk_dyn_async};
@@ -289,17 +290,5 @@ impl LxVal {
   pub fn short_display(&self) -> String {
     let s = self.to_string();
     if s.len() > 80 { format!("{}...", &s[..77]) } else { s }
-  }
-
-  pub fn bind_self(&self, self_val: &LxVal) -> LxVal {
-    if let LxVal::Func(lf) = self {
-      let env = lf.closure.child();
-      env.bind_str("self", self_val.clone());
-      let mut lf = lf.clone();
-      lf.closure = Arc::new(env);
-      LxVal::Func(lf)
-    } else {
-      self.clone()
-    }
   }
 }
