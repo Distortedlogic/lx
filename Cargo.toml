@@ -4,6 +4,7 @@ members = [
   "crates/lx-cli",
   "crates/lx-desktop",
   "crates/lx-macros",
+  "crates/lx-mobile",
 ]
 exclude = ["reference/chumsky"]
 resolver = "2"
