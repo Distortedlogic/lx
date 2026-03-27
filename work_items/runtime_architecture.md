@@ -113,60 +113,35 @@ Same module name, same methods, different external tool. The lx code using `Brow
 
 Agents are lx classes defined with the `Agent` keyword. The Agent trait is defined in lx (`std/agent.lx`). An agent's `run` method is a yield loop — it yields values out, receives messages in, handles them, repeats.
 
-`spawn` is a keyword that creates a concurrent execution context for an Agent class. It instantiates the agent, starts its `run` method concurrently, and wires up channel-based communication:
+`spawn` is a keyword that creates a concurrent execution context for an Agent class. It instantiates the agent, starts its `run` method concurrently, wires up yield-based communication, and returns a handle with `ask` and `tell` methods:
 
 ```lx
-channel findings
-channel drafts
-
 Agent Researcher = {
-  publishes = [findings]
-  handle = (msg) { findings.send {topic: msg.topic, data: ...} }
+  role = () { "research agent" }
+  handle = (msg) { ... }
 }
 
-Agent Writer = {
-  subscribes = [findings]
-  publishes = [drafts]
-  handle = (msg) { drafts.send {content: ...} }
-}
-
-spawn Researcher
-spawn Writer
+researcher = spawn Researcher
+result = researcher.ask {task: "find papers"}
 ```
 
 The agent's name is derived from the class name (`"Researcher"`). Stream entries use this name in the `agent` field. Spawning the same class twice is an error — agent names are unique.
 
 Each spawned agent runs in its own concurrent context with its own module scope. Tool modules are not shared — each agent that needs a tool must `use tool` it in its own code. The event stream IS shared — all agents write to the same stream.
 
-### Channels
+### Agent communication
 
-Channels are the communication topology between agents. A channel is a named, typed conduit — agents publish to channels and subscribe to channels. The topology is the channel layout, visible at a glance without reading agent internals.
+The event stream is the shared communication channel between all agents:
 
-```lx
-channel findings
-channel drafts
-channel reviews
-```
+- `researcher.ask msg` — send a message to an agent, wait for a response (delivered via the agent's yield)
+- `researcher.tell msg` — send a message to an agent, do not wait
+- `yield value` inside an agent — send a value out, wait for the next message
+- `stream.xadd {kind: "broadcast", msg: ...}` — any agent can write to the stream directly
+- `stream.xread "$"` — any agent can read the stream directly
 
-Channels decouple senders from receivers. A publisher doesn't know who subscribes. A subscriber doesn't know who publishes. New agents can join existing channels without rewiring anything.
+The handle returned by `spawn` provides direct ask/tell for request-response. The stream provides broadcast and any-to-any messaging. The event stream logs all exchanges (`agent.ask`, `agent.tell`, `agent.response`, `yield.out`, `yield.in`).
 
-- `channel.send msg` — publish a message to the channel
-- `channel.recv` — block until a message arrives on the channel
-- `channel.recv {timeout_ms: N}` — block with timeout, returns `None` on timeout
-
-For request-response, a message can carry a reply channel:
-
-```lx
-channel requests
-channel responses
-
-requests.send {task: "find papers", reply: responses}
-result = responses.recv
-```
-
-The event stream logs all channel activity (`channel/send`, `channel/recv`). Channels are for structured agent-to-agent communication. The event stream is for observability — the global append-only log of everything that happened. They serve different purposes.
-
-No ACLs at the runtime level. All agents in the same program can publish to or subscribe to any channel they reference. The programmer controls the topology by declaring channels and deciding which agents use which channels.
+No ACLs at the runtime level. All agents in the same program share the stream and can message any agent they have a handle to. The programmer controls the topology by deciding which agents get handles to which other agents.
 
 For top-level programs (not spawned agents), `yield` delivers through the control channel — the orchestrator (CLI, desktop) receives the yielded value and responds via the inject command.
 
@@ -243,8 +218,9 @@ The `kind` field is a stream key for categorizing and filtering entries. These a
 | `tool/log` | `tool`, `level`, `msg` | Tool sends an MCP `notifications/message` |
 | `agent/spawn` | `agent_name`, `class` | lx code evaluates a `spawn` expression |
 | `agent/kill` | `agent_name` | An agent is killed |
-| `channel/send` | `channel`, `from`, `msg` | An agent publishes a message to a channel |
-| `channel/recv` | `channel`, `to`, `msg` | An agent receives a message from a channel |
+| `agent/ask` | `from`, `to`, `msg` | An agent sends an ask to another agent |
+| `agent/tell` | `from`, `to`, `msg` | An agent sends a tell to another agent |
+| `agent/response` | `from`, `to`, `response`, `duration_ms` | An agent responds to an ask |
 | `yield/out` | `prompt_id`, `value` | lx code evaluates a `yield` expression |
 | `yield/in` | `prompt_id`, `response` | A yield receives a response |
 
@@ -260,7 +236,7 @@ The interception point is in the interpreter's method dispatch for tool modules.
 
 This is a single code path in the interpreter that handles ALL tool module calls. Adding a new tool doesn't require any auto-logging code — it's automatic because the dispatch goes through the same path.
 
-The `call_id` is a per-agent monotonic counter incremented per tool call. Each agent maintains its own counter independently. The `call_id` pairs the `tool.call` and `tool.result` entries. The replay cache keys on `(agent_name, call_id)` — see Resume section.
+The `call_id` is a monotonic counter incremented per tool call during the program run. It pairs the `tool.call` and `tool.result` entries.
 
 ### Auto-logging: what gets logged beyond tool calls
 
