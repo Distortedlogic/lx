@@ -116,6 +116,9 @@ Comprehensive survey of how programming languages are designed and implemented �
 #### Debugger & Profiler
 - [debugger/landscape.md](debugger/landscape.md) — DAP specification, Python/Lua/Erlang debugger internals, trace hooks, breakpoints, flamegraphs, profilers
 
+#### Browser Automation for AI Agents
+- [tooling/browser-automation/landscape.md](tooling/browser-automation/landscape.md) — Playwright MCP vs Browser Use vs Agent Browser (Vercel) vs Stagehand: accessibility snapshots vs autonomous agents vs hybrid, token economics (27K-114K/task), ref-based interaction, auto-caching convergence
+
 #### Anthropic/Claude Rust SDKs
 - [tooling/anthropic-rust-sdks.md](tooling/anthropic-rust-sdks.md) — 30+ Rust crates: 11 direct API clients + 20+ Claude Code CLI wrappers; tokio/streaming, hooks, MCP, adoption metrics, ecosystem fragmentation analysis
 

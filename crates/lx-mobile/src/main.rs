@@ -1,11 +1,10 @@
-mod api_client;
 mod app;
 mod components;
 mod layout;
 mod pages;
 mod routes;
-mod ws_client;
 
 fn main() {
+  dioxus::fullstack::set_server_url("http://127.0.0.1:8080");
   dioxus::launch(app::App);
 }
