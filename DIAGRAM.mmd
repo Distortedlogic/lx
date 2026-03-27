@@ -31,32 +31,30 @@ async tree-walk eval`"]:::purple
     interpreter --> resolve["`**Module Resolution**
 → Rust stdlib (channel, fs, http, …)
 → LX stdlib (agent, tool, prompt, …)
-→ WASM components (wasm/ prefix)
+→ extensions (ext/ prefix)
 → workspace members
 → dependency crates
 → file-based imports`"]:::purple
 
-    resolve --> api["`**Plugin API Contract (WIT-defined)**
+    resolve --> api["`**Extension API Contract**
 ——— typed interfaces ———
 tool: call(name, args) → result
 user: confirm · choose · ask · notify
 protocol: send · receive · adapt
 infra: init · teardown · checkpoint
-stream: stream‹T› · future‹T› (WASIp3)
+stream: stream‹T› · future‹T›
 ——— data boundary ———
-Component Model typed ABI
+typed ABI across extension boundary
 records · variants · resources · lists
-no JSON marshaling · no raw bytes
 ——— sandbox ———
-fuel metering · epoch interruption
-WASI capability-based security
-per-component resource limits`"]:::blue
+capability-gated per extension
+resource limits · metering`"]:::blue
 
     interpreter --> events
 
-    api --> wasm_cap
+    api --> ext_cap
 
-    subgraph wasm_cap ["Capability Components — interpreter dispatch"]
+    subgraph ext_cap ["Capability Extensions — interpreter dispatch"]
         direction LR
         cap_bundled["`**Bundled Capabilities**
 all replaceable by name
@@ -73,23 +71,19 @@ MCP · A2A · AG-UI
 ——— infra ———
 PlanMode · Worktree · ToolSearch
 Hooks · Permissions · Context Mgmt
-——— guardrails (wrap other components) ———
+——— guardrails (wrap other extensions) ———
 content: relevance · safety · PII
 tool: risk rating · input/output validation
 policy: rules-based · constitutional`"]:::blue
-        cap_wit["`**WIT Worlds**
-world lx-tool { … }
-world lx-guardrail { … }
-world lx-protocol { … }
+        cap_iface["`**Extension Interfaces**
+lx-tool · lx-guardrail · lx-protocol
 ——————
 guardrails import + export the
 same interface (middleware wrap)
-composed via Linker
 ——————
 resource types for stateful handles
-(connections · sessions · stores)
-bindgen! → type-safe Rust traits`"]:::blue
-        cap_bundled ~~~ cap_wit
+(connections · sessions · stores)`"]:::blue
+        cap_bundled ~~~ cap_iface
     end
 
     subgraph events ["Event Streams — append-only · ordered · ring buffer"]

@@ -63,7 +63,7 @@ impl Interpreter {
       let LxVal::Trait(ref proto_trait) = proto else {
         continue;
       };
-      if self.try_match_variant(&*proto_trait.fields, rec, span).is_ok() {
+      if self.try_match_variant(&proto_trait.fields, rec, span).is_ok() {
         let mut result = rec.as_ref().clone();
         result.insert(crate::sym::intern("_variant"), LxVal::str(variant_name.as_str()));
         for field in proto_trait.fields.iter() {
