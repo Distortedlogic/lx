@@ -15,7 +15,6 @@ dioxus = { workspace = true, features = ["mobile", "router", "fullstack"] }
 lx-api = { path = "../lx-api" }
 serde = { workspace = true }
 serde_json = { workspace = true }
-tokio = { workspace = true }
 
 [lints]
 workspace = true

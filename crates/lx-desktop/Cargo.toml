@@ -20,7 +20,6 @@ workspace = true
 [dependencies]
 common-audio = { path = "../../../dioxus-common/crates/common-audio" }
 common-cdp = { path = "../../../dioxus-common/crates/common-cdp" }
-common-charts = { path = "../../../dioxus-common/crates/common-charts" }
 common-inference = { path = "../../../dioxus-common/crates/common-inference" }
 common-kokoro = { path = "../../../dioxus-common/crates/common-kokoro" }
 common-pane-tree = { path = "../../../dioxus-common/crates/common-pane-tree" }
