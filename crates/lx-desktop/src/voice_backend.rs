@@ -13,18 +13,10 @@ Write abbreviations, acronyms, and numbers as spoken words. Avoid parenthetical 
 static SESSION_ID: LazyLock<String> = LazyLock::new(|| uuid::Uuid::new_v4().to_string());
 static SESSION_CREATED: AtomicBool = AtomicBool::new(false);
 
-fn build_args_text(text: &str) -> Vec<&str> {
-  let mut args = vec!["-p", text, "--output-format", "text", "--system-prompt", SYSTEM_PROMPT];
-  if SESSION_CREATED.load(Ordering::Relaxed) {
-    args.extend(["--resume", &SESSION_ID]);
-  } else {
-    args.extend(["--session-id", &SESSION_ID]);
-  }
-  args
-}
-
-fn build_args_stream(text: &str) -> Vec<&str> {
-  let mut args = vec!["-p", text, "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--system-prompt", SYSTEM_PROMPT];
+fn build_args<'a>(text: &'a str, format_args: &[&'a str]) -> Vec<&'a str> {
+  let mut args = vec!["-p", text];
+  args.extend_from_slice(format_args);
+  args.extend(["--system-prompt", SYSTEM_PROMPT]);
   if SESSION_CREATED.load(Ordering::Relaxed) {
     args.extend(["--resume", &SESSION_ID]);
   } else {
@@ -38,7 +30,7 @@ pub struct ClaudeCliBackend;
 #[async_trait::async_trait]
 impl AgentBackend for ClaudeCliBackend {
   async fn query(&self, text: &str) -> anyhow::Result<String> {
-    let args = build_args_text(text);
+    let args = build_args(text, &["--output-format", "text"]);
     let output = tokio::process::Command::new("claude").args(&args).output().await?;
     if !output.status.success() {
       let stderr = String::from_utf8_lossy(&output.stderr);
@@ -52,7 +44,7 @@ impl AgentBackend for ClaudeCliBackend {
 
 pub async fn query_streaming(text: &str, mut on_chunk: impl FnMut(&str)) -> anyhow::Result<String> {
   use tokio::io::AsyncBufReadExt;
-  let args = build_args_stream(text);
+  let args = build_args(text, &["--output-format", "stream-json", "--verbose", "--include-partial-messages"]);
   let mut child = tokio::process::Command::new("claude").args(&args).stdout(Stdio::piped()).stderr(Stdio::null()).spawn()?;
   let stdout = child.stdout.take().ok_or_else(|| anyhow::anyhow!("no stdout"))?;
   let mut lines = tokio::io::BufReader::new(stdout).lines();

@@ -38,17 +38,6 @@ pub fn build() -> IndexMap<crate::sym::Sym, LxVal> {
   }
 }
 
-fn h_level(level: HeadingLevel) -> i64 {
-  match level {
-    HeadingLevel::H1 => 1,
-    HeadingLevel::H2 => 2,
-    HeadingLevel::H3 => 3,
-    HeadingLevel::H4 => 4,
-    HeadingLevel::H5 => 5,
-    HeadingLevel::H6 => 6,
-  }
-}
-
 pub(super) fn node_rec(type_str: &str, fields: Vec<(&str, LxVal)>) -> LxVal {
   let mut rec = IndexMap::new();
   rec.insert(crate::sym::intern("type"), LxVal::str(type_str));
@@ -114,7 +103,15 @@ fn parse_to_nodes(input: &str) -> Vec<LxVal> {
         let _ = stack.pop();
         match tag_end {
           TagEnd::Heading(level) => {
-            nodes.push(node_rec("heading", vec![("level", LxVal::int(h_level(level))), ("text", LxVal::str(text.trim()))]));
+            let h = match level {
+              HeadingLevel::H1 => 1,
+              HeadingLevel::H2 => 2,
+              HeadingLevel::H3 => 3,
+              HeadingLevel::H4 => 4,
+              HeadingLevel::H5 => 5,
+              HeadingLevel::H6 => 6,
+            };
+            nodes.push(node_rec("heading", vec![("level", LxVal::int(h)), ("text", LxVal::str(text.trim()))]));
           },
           TagEnd::Paragraph if !stack.iter().any(|b| matches!(b, Block::Item | Block::Quote)) => {
             nodes.push(node_rec("para", vec![("text", LxVal::str(text.trim()))]));

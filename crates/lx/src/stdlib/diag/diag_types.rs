@@ -93,3 +93,50 @@ pub struct Graph {
   pub edges: Vec<DiagEdge>,
   pub subgraphs: Vec<Subgraph>,
 }
+
+use std::str::FromStr;
+
+impl FromStr for NodeKind {
+  type Err = String;
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    match s {
+      "agent" => Ok(Self::Agent),
+      "tool" => Ok(Self::Tool),
+      "decision" => Ok(Self::Decision),
+      "fork" => Ok(Self::Fork),
+      "join" => Ok(Self::Join),
+      "loop" => Ok(Self::Loop),
+      "resource" => Ok(Self::Resource),
+      "user" => Ok(Self::User),
+      "io" => Ok(Self::Io),
+      "type" => Ok(Self::Type),
+      other => Err(format!("unknown node kind: {other}")),
+    }
+  }
+}
+
+impl FromStr for EdgeStyle {
+  type Err = String;
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    match s {
+      "solid" => Ok(Self::Solid),
+      "dashed" => Ok(Self::Dashed),
+      "double" => Ok(Self::Double),
+      other => Err(format!("unknown edge style: {other}")),
+    }
+  }
+}
+
+impl FromStr for EdgeType {
+  type Err = String;
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    match s {
+      "agent" => Ok(Self::Agent),
+      "stream" => Ok(Self::Stream),
+      "data" => Ok(Self::Data),
+      "io" => Ok(Self::Io),
+      "exec" => Ok(Self::Exec),
+      other => Err(format!("unknown edge type: {other}")),
+    }
+  }
+}

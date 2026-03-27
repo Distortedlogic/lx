@@ -2,7 +2,7 @@ use dioxus::prelude::*;
 use lx_api::run_api::get_run_status;
 use lx_api::types::RunState;
 
-use crate::components::pulse_indicator::{ExecutionState, PulseIndicator};
+use crate::components::{ExecutionState, PulseIndicator};
 
 #[component]
 pub fn Status() -> Element {

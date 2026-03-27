@@ -81,14 +81,3 @@ pub trait LlmBackend: Send + Sync {
   fn prompt(&self, text: &str, span: SourceSpan) -> Result<LxVal, LxError>;
   fn prompt_with(&self, opts: &LlmOpts, span: SourceSpan) -> Result<LxVal, LxError>;
 }
-
-pub trait UserBackend: Send + Sync {
-  fn confirm(&self, message: &str) -> Result<bool, String>;
-  fn choose(&self, message: &str, options: &[String]) -> Result<usize, String>;
-  fn ask(&self, message: &str, default: Option<&str>) -> Result<String, String>;
-  fn progress(&self, current: usize, total: usize, message: &str);
-  fn progress_pct(&self, pct: f64, message: &str);
-  fn status(&self, level: &str, message: &str);
-  fn table(&self, headers: &[String], rows: &[Vec<String>]);
-  fn check_signal(&self) -> Option<LxVal>;
-}

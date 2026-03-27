@@ -111,10 +111,10 @@ pub fn check_workspace(member_filter: Option<&str>, strict: bool, fix: bool) -> 
     return ExitCode::from(1);
   };
   let members: Vec<&manifest::Member> = if let Some(filter) = member_filter {
-    let found: Vec<_> = ws.members.iter().filter(|m| m.name == filter).collect();
+    let found: Vec<_> = ws.members.iter().filter(|m| m.pkg.name == filter).collect();
     if found.is_empty() {
       eprintln!("error: no member named '{filter}'");
-      eprintln!("available: {}", ws.members.iter().map(|m| m.name.as_str()).collect::<Vec<_>>().join(", "));
+      eprintln!("available: {}", ws.members.iter().map(|m| m.pkg.name.as_str()).collect::<Vec<_>>().join(", "));
       return ExitCode::from(1);
     }
     found
@@ -180,11 +180,11 @@ pub fn check_workspace(member_filter: Option<&str>, strict: bool, fix: bool) -> 
     let status = if member_err > 0 { "FAIL" } else { "ok" };
     let total_files = member_ok + member_err + member_parse_err;
     if member_fixed > 0 {
-      println!("{:<16} {total_files} checked, {member_fixed} fixed, {member_err} remaining errors — {status}", member.name);
+      println!("{:<16} {total_files} checked, {member_fixed} fixed, {member_err} remaining errors — {status}", member.pkg.name);
     } else if member_parse_err > 0 {
-      println!("{:<16} {total_files} checked, {member_err} type errors, {member_parse_err} parse errors — {status}", member.name);
+      println!("{:<16} {total_files} checked, {member_err} type errors, {member_parse_err} parse errors — {status}", member.pkg.name);
     } else {
-      println!("{:<16} {total_files} checked, {member_err} errors — {status}", member.name);
+      println!("{:<16} {total_files} checked, {member_err} errors — {status}", member.pkg.name);
     }
     total_ok += member_ok;
     total_err += member_err;

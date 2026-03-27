@@ -22,24 +22,24 @@ pub fn list_workspace() -> ExitCode {
 
   for member in &ws.members {
     let file_count = count_lx_files(&member.dir);
-    let entry_display = member.entry.as_deref().unwrap_or("(no entry)");
-    let version = member.version.as_deref().unwrap_or("0.0.0");
+    let entry_display = member.pkg.entry.as_deref().unwrap_or("(no entry)");
+    let version = member.pkg.version.as_deref().unwrap_or("0.0.0");
     let test_base = member.dir.join(&member.test_dir);
     let test_count = if test_base.exists() { count_matching_files(test_base.to_str().unwrap_or("."), &member.test_pattern) } else { 0 };
-    let desc = member.description.as_deref().unwrap_or("");
+    let desc = member.pkg.description.as_deref().unwrap_or("");
     let mut extra = String::new();
-    if let Some(ref lic) = member.license {
+    if let Some(ref lic) = member.pkg.license {
       extra.push_str(&format!(" [{lic}]"));
     }
-    if let Some(ref lx_ver) = member.lx {
+    if let Some(ref lx_ver) = member.pkg.lx {
       extra.push_str(&format!(" lx{lx_ver}"));
     }
-    if let Some(ref authors) = member.authors
+    if let Some(ref authors) = member.pkg.authors
       && !authors.is_empty()
     {
       extra.push_str(&format!(" by {}", authors.join(", ")));
     }
-    println!("  {:<12} {:<7} {:>3} files  {:<14} {:>3} tests  {desc}{extra}", member.name, version, file_count, entry_display, test_count,);
+    println!("  {:<12} {:<7} {:>3} files  {:<14} {:>3} tests  {desc}{extra}", member.pkg.name, version, file_count, entry_display, test_count,);
   }
   ExitCode::SUCCESS
 }

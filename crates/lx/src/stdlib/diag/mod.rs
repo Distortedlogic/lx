@@ -54,17 +54,18 @@ fn bi_to_graph_chart(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -
   Ok(LxVal::str(graph_to_echart_json(&graph).as_str()))
 }
 
-pub fn extract_mermaid<P>(program: &Program<P>) -> String {
+fn extract_graph_from_program<P>(program: &Program<P>) -> Graph {
   let mut walker = Walker::with_arena(&program.arena);
   let _ = walk_program(&mut walker, program);
-  to_mermaid(&walker.into_graph())
+  walker.into_graph()
+}
+
+pub fn extract_mermaid<P>(program: &Program<P>) -> String {
+  to_mermaid(&extract_graph_from_program(program))
 }
 
 pub fn extract_echart_json<P>(program: &Program<P>) -> String {
-  let mut walker = Walker::with_arena(&program.arena);
-  let _ = walk_program(&mut walker, program);
-  let graph = walker.into_graph();
-  graph_to_echart_json(&graph)
+  graph_to_echart_json(&extract_graph_from_program(program))
 }
 
 fn extract_graph(src: &str, span: SourceSpan) -> Result<Graph, LxError> {
@@ -114,42 +115,6 @@ fn graph_to_value(graph: &Graph) -> LxVal {
   }
 }
 
-fn parse_node_kind(s: &str) -> Result<NodeKind, String> {
-  match s {
-    "agent" => Ok(NodeKind::Agent),
-    "tool" => Ok(NodeKind::Tool),
-    "decision" => Ok(NodeKind::Decision),
-    "fork" => Ok(NodeKind::Fork),
-    "join" => Ok(NodeKind::Join),
-    "loop" => Ok(NodeKind::Loop),
-    "resource" => Ok(NodeKind::Resource),
-    "user" => Ok(NodeKind::User),
-    "io" => Ok(NodeKind::Io),
-    "type" => Ok(NodeKind::Type),
-    other => Err(format!("unknown node kind: {other}")),
-  }
-}
-
-fn parse_edge_style(s: &str) -> Result<EdgeStyle, String> {
-  match s {
-    "solid" => Ok(EdgeStyle::Solid),
-    "dashed" => Ok(EdgeStyle::Dashed),
-    "double" => Ok(EdgeStyle::Double),
-    other => Err(format!("unknown edge style: {other}")),
-  }
-}
-
-fn parse_edge_type(s: &str) -> Result<EdgeType, String> {
-  match s {
-    "agent" => Ok(EdgeType::Agent),
-    "stream" => Ok(EdgeType::Stream),
-    "data" => Ok(EdgeType::Data),
-    "io" => Ok(EdgeType::Io),
-    "exec" => Ok(EdgeType::Exec),
-    other => Err(format!("unknown edge type: {other}")),
-  }
-}
-
 fn value_to_graph(val: &LxVal, span: SourceSpan) -> Result<Graph, LxError> {
   let LxVal::Record(rec) = val else {
     return Err(LxError::type_err("diag.to_mermaid expects Graph record", span, None));
@@ -180,7 +145,7 @@ fn value_to_node(val: &LxVal, span: SourceSpan) -> Result<DiagNode, LxError> {
     n.to_u32()
   });
   let kind_str = require_str_field(rec, "kind", "diag.node", span)?;
-  let kind = parse_node_kind(&kind_str).map_err(|e| LxError::type_err(e, span, None))?;
+  let kind = kind_str.parse::<NodeKind>().map_err(|e| LxError::type_err(e, span, None))?;
   Ok(DiagNode {
     id: require_str_field(rec, "id", "diag.node", span)?.to_string(),
     label: require_str_field(rec, "label", "diag.node", span)?.to_string(),
@@ -195,9 +160,9 @@ fn value_to_edge(val: &LxVal, span: SourceSpan) -> Result<DiagEdge, LxError> {
     return Err(LxError::type_err("edge must be Record", span, None));
   };
   let style_str = require_str_field(rec, "style", "diag.edge", span)?;
-  let style = parse_edge_style(&style_str).map_err(|e| LxError::type_err(e, span, None))?;
+  let style = style_str.parse::<EdgeStyle>().map_err(|e| LxError::type_err(e, span, None))?;
   let edge_type_str = rec.get(&intern("edge_type")).and_then(|v| v.as_str()).unwrap_or("exec");
-  let edge_type = parse_edge_type(edge_type_str).map_err(|e| LxError::type_err(e, span, None))?;
+  let edge_type = edge_type_str.parse::<EdgeType>().map_err(|e| LxError::type_err(e, span, None))?;
   Ok(DiagEdge {
     from: require_str_field(rec, "from", "diag.edge", span)?.to_string(),
     to: require_str_field(rec, "to", "diag.edge", span)?.to_string(),

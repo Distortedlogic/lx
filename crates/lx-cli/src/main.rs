@@ -152,8 +152,8 @@ fn resolve_run_target(target: &str) -> String {
     return target.to_string();
   };
   for member in &ws.members {
-    if member.name == target {
-      let entry = member.entry.as_deref().unwrap_or("main.lx");
+    if member.pkg.name == target {
+      let entry = member.pkg.entry.as_deref().unwrap_or("main.lx");
       return member.dir.join(entry).to_string_lossy().to_string();
     }
   }

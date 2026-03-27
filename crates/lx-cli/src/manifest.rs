@@ -179,15 +179,15 @@ pub struct Workspace {
   pub members: Vec<Member>,
 }
 
+impl Workspace {
+  pub fn member_map(&self) -> HashMap<String, PathBuf> {
+    self.members.iter().map(|m| (m.pkg.name.clone(), m.dir.clone())).collect()
+  }
+}
+
 pub struct Member {
-  pub name: String,
-  pub version: Option<String>,
+  pub pkg: PackageSection,
   pub dir: PathBuf,
-  pub entry: Option<String>,
-  pub description: Option<String>,
-  pub license: Option<String>,
-  pub authors: Option<Vec<String>>,
-  pub lx: Option<String>,
   pub test_dir: String,
   pub test_pattern: String,
 }
@@ -228,24 +228,14 @@ pub fn load_workspace(root: &Path) -> Result<Workspace, String> {
     let pkg = member_manifest.package.ok_or_else(|| format!("{} has no [package] section", member_manifest_path.display()))?;
     let test = member_manifest.test.unwrap_or(TestSection { dir: None, pattern: None, threshold: None, runs: None });
     members.push(Member {
-      name: pkg.name,
-      version: pkg.version,
+      pkg,
       dir: member_dir,
-      entry: pkg.entry,
-      description: pkg.description,
-      license: pkg.license,
-      authors: pkg.authors,
-      lx: pkg.lx,
       test_dir: test.dir.unwrap_or_else(|| "tests/".into()),
       test_pattern: test.pattern.unwrap_or_else(|| "*.lx".into()),
     });
   }
 
   Ok(Workspace { members })
-}
-
-pub fn workspace_member_map(ws: &Workspace) -> HashMap<String, PathBuf> {
-  ws.members.iter().map(|m| (m.name.clone(), m.dir.clone())).collect()
 }
 
 pub fn try_load_workspace_members() -> HashMap<String, PathBuf> {
@@ -258,5 +248,5 @@ pub fn try_load_workspace_members() -> HashMap<String, PathBuf> {
   let Ok(ws) = load_workspace(&root) else {
     return HashMap::new();
   };
-  workspace_member_map(&ws)
+  ws.member_map()
 }

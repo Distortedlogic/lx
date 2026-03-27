@@ -40,10 +40,10 @@ pub fn run_workspace_tests(member_filter: Option<&str>) -> ExitCode {
   };
 
   let members: Vec<&Member> = if let Some(filter) = member_filter {
-    let found: Vec<_> = ws.members.iter().filter(|m| m.name == filter).collect();
+    let found: Vec<_> = ws.members.iter().filter(|m| m.pkg.name == filter).collect();
     if found.is_empty() {
       eprintln!("error: no member named '{filter}'");
-      eprintln!("available: {}", ws.members.iter().map(|m| m.name.as_str()).collect::<Vec<_>>().join(", "));
+      eprintln!("available: {}", ws.members.iter().map(|m| m.pkg.name.as_str()).collect::<Vec<_>>().join(", "));
       return ExitCode::from(1);
     }
     found
@@ -51,7 +51,7 @@ pub fn run_workspace_tests(member_filter: Option<&str>) -> ExitCode {
     ws.members.iter().collect()
   };
 
-  let ws_members = manifest::workspace_member_map(&ws);
+  let ws_members = ws.member_map();
   let mut total_passed = 0u32;
   let mut total_failed = 0u32;
   let mut member_results = Vec::new();
@@ -60,7 +60,7 @@ pub fn run_workspace_tests(member_filter: Option<&str>) -> ExitCode {
   for member in &members {
     let test_base = member.dir.join(&member.test_dir);
     if !test_base.exists() {
-      member_results.push((member.name.clone(), 0u32, 0u32, true));
+      member_results.push((member.pkg.name.clone(), 0u32, 0u32, true));
       continue;
     }
     let entries = discover_tests_with_pattern(test_base.to_str().unwrap_or("."), &member.test_pattern);
@@ -70,7 +70,7 @@ pub fn run_workspace_tests(member_filter: Option<&str>) -> ExitCode {
     if result.failed > 0 {
       any_failure = true;
     }
-    member_results.push((member.name.clone(), result.passed, result.failed, false));
+    member_results.push((member.pkg.name.clone(), result.passed, result.failed, false));
   }
 
   println!();

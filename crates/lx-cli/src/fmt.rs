@@ -89,7 +89,7 @@ pub fn fmt_workspace(member_filter: Option<&str>, check: bool) -> ExitCode {
   let mut grand_formatted = 0u32;
   let mut grand_failed = 0u32;
 
-  for member in ws.members.iter().filter(|m| member_filter.is_none() || member_filter == Some(m.name.as_str())) {
+  for member in ws.members.iter().filter(|m| member_filter.is_none() || member_filter == Some(m.pkg.name.as_str())) {
     let files = collect_lx_files(&member.dir);
     let mut total = 0u32;
     let mut formatted_count = 0u32;
@@ -126,7 +126,7 @@ pub fn fmt_workspace(member_filter: Option<&str>, check: bool) -> ExitCode {
       }
     }
 
-    eprintln!("{:<16} {} checked, {} formatted, {} failed", member.name, total, formatted_count, failed);
+    eprintln!("{:<16} {} checked, {} formatted, {} failed", member.pkg.name, total, formatted_count, failed);
     grand_total += total;
     grand_formatted += formatted_count;
     grand_failed += failed;
