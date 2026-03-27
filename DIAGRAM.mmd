@@ -54,11 +54,11 @@ per-component resource limits`"]:::blue
 
     interpreter --> events
 
-    api --> wasm_ext
+    api --> wasm_cap
 
-    subgraph wasm_ext ["WASM Components — wasmtime — all capabilities are plugins"]
+    subgraph wasm_cap ["Capability Components — interpreter dispatch"]
         direction LR
-        bundled["`**Bundled Components (ship with lx)**
+        cap_bundled["`**Bundled Capabilities**
 all replaceable by name
 ——— tools ———
 Bash · Read · Write · Edit
@@ -76,37 +76,20 @@ Hooks · Permissions · Context Mgmt
 ——— guardrails (wrap other components) ———
 content: relevance · safety · PII
 tool: risk rating · input/output validation
-policy: rules-based · constitutional
-——— stream subscribers ———
-stdio · lx-desktop · agent-mode
-CI/CD · headless`"]:::blue
-        wit["`**WIT Interfaces**
-define all plugin contracts
-——————
+policy: rules-based · constitutional`"]:::blue
+        cap_wit["`**WIT Worlds**
 world lx-tool { … }
 world lx-guardrail { … }
-world lx-subscriber { … }
 world lx-protocol { … }
 ——————
-guardrails = components that import
-+ export the same interface (wrap)
-composed via Linker as middleware
+guardrails import + export the
+same interface (middleware wrap)
+composed via Linker
 ——————
 resource types for stateful handles
 (connections · sessions · stores)
 bindgen! → type-safe Rust traits`"]:::blue
-        imports["`**Host Imports (WIT)**
-logging · config · env
-stream-emit · control
-terminal · network · fs
-(capability-gated per component)`"]:::blue
-        lifecycle["`**Component Lifecycle**
-cargo-component build
-lx plugin install · remove
-lx plugin list
-~/.lx/plugins/ · .lx/plugins/
-component composition via Linker`"]:::blue
-        bundled ~~~ wit ~~~ imports ~~~ lifecycle
+        cap_bundled ~~~ cap_wit
     end
 
     subgraph events ["Event Streams — append-only · ordered · ring buffer"]
@@ -161,13 +144,32 @@ native typed event delivery
 bounded buffer per consumer
 cooperative yield via fuel`"]:::teal
 
-    dispatch --> wasm_ext
+    dispatch --> wasm_cap
 
-    wasm_ext --> control["`**Control Channel**
+    subgraph wasm_stream ["Stream Components — event pipeline"]
+        direction LR
+        stream_bundled["`**Bundled Subscribers**
+all replaceable by name
+——————
+stdio · lx-desktop
+agent-mode · CI/CD
+headless`"]:::blue
+        stream_wit["`**WIT World**
+world lx-subscriber { … }
+——————
+on_event handler
+stream‹T› typed delivery
+emit derived events
+filter per stream`"]:::blue
+        stream_bundled ~~~ stream_wit
+    end
+
+    wasm_stream --> control["`**Control Channel**
 kill · pause · resume
 (WIT import back to interpreter)`"]:::teal
     control --> interpreter
 
     style desugars stroke:#ff6600,stroke-width:2px
     style events stroke:#4ec9b0,stroke-width:2px
-    style wasm_ext stroke:#0288d1,stroke-width:2px
+    style wasm_cap stroke:#0288d1,stroke-width:2px
+    style wasm_stream stroke:#0288d1,stroke-width:2px

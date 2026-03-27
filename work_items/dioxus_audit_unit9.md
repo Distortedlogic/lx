@@ -2,9 +2,11 @@
 
 ## Violation
 
-Idiomatic Dioxus pattern: `Signal<T>` implements `Fn() -> T` (via `Readable`), so `signal()` is the idiomatic shorthand for `signal.read().clone()`. This is a mechanical replacement across 4 files (6 instances). The approvals.rs instance is handled in Unit 4.
+Idiomatic Dioxus pattern: `Signal<T>` implements call syntax via `Readable`, so `signal()` is shorthand for `signal.read().clone()`. `dioxus_storage::use_persistent` returns `Signal<T>`, so call syntax works for persistent signals too.
 
-## Locations
+6 instances across 4 files. (The 7th instance in approvals.rs is handled in Unit 4.)
+
+## Changes
 
 ### 1. crates/lx-mobile/src/pages/events.rs, line 26
 
@@ -30,8 +32,6 @@ Replace with:
   let entries = creds();
 ```
 
-Note: `creds` is from `dioxus_storage::use_persistent` which returns a persistent signal. Verify it supports call syntax (implements `Readable` / `Fn`). If not, leave as-is.
-
 ### 3. crates/lx-desktop/src/terminal/toolbar.rs, line 24
 
 Current:
@@ -43,8 +43,6 @@ Replace with:
 ```rust
     let val = current_url();
 ```
-
-Note: `current_url` is a `ReadSignal<String>` (prop). `ReadSignal` implements `Readable` and supports call syntax.
 
 ### 4. crates/lx-desktop/src/pages/settings/state.rs, line 48
 
@@ -58,8 +56,6 @@ Replace with:
     let data = use_signal(|| saved());
 ```
 
-Note: `saved` is from `dioxus_storage::use_persistent`. Same caveat as #2.
-
 ### 5. crates/lx-desktop/src/pages/settings/state.rs, line 56
 
 Current:
@@ -72,7 +68,7 @@ Replace with:
     data.set((self.saved)());
 ```
 
-Note: Parentheses around `self.saved` are needed because `self.saved()` would try to call a method named `saved` on `self`. If `(self.saved)()` is less readable, keep `.read().clone()` — the audit rule for Store says ".cloned() is acceptable" when call syntax harms readability. Same principle applies here.
+Parentheses around `self.saved` are required — without them, `self.saved()` calls a method named `saved` on `self`, which doesn't exist.
 
 ### 6. crates/lx-desktop/src/pages/settings/state.rs, line 61
 
@@ -86,11 +82,7 @@ Replace with:
     saved.set((self.data)());
 ```
 
-Same parenthesization note as #5.
-
-## Judgment Call for #5 and #6
-
-`(self.saved)()` and `(self.data)()` are arguably less readable than `.read().clone()`. If the executing agent judges these harm readability, keep the original form for those two instances only.
+Same parenthesization as #5.
 
 ## Files Modified
 
