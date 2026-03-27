@@ -116,10 +116,24 @@ members = [
 
 **Subject:** Confirm the crate compiles
 
-**Description:** Run `cargo check -p lx-mobile`. If there are errors, fix them. Common issues:
-- `reqwest` workspace version is `0.13.2` but lx-mobile was written for `0.12`. The API may have changed. If `reqwest` methods have changed signatures, adapt the `api_client.rs` calls.
-- `tokio-tungstenite` workspace version is `0.29.0` but lx-mobile was written for `0.24`. The `connect_async` API may have changed. If `ws_client.rs` fails, adapt to the new API.
-- `tokio::spawn` inside `send_response` in `approvals.rs` requires the tokio runtime to be available. On mobile, Dioxus may or may not provide a tokio runtime. If this fails, replace with `dioxus::spawn`.
+**Description:** Run `cargo check -p lx-mobile`. Fix any errors. Known issues:
+
+**tokio-tungstenite 0.24→0.29:** `Message::Text` changed from `String` to `Utf8Bytes`. In `ws_client.rs`, the pattern `if let Message::Text(text) = msg` still compiles but `text` is now `Utf8Bytes`, not `String`. The `serde_json::from_str::<serde_json::Value>(&text)` call needs `text.as_str()` or `text.to_string()` since `Utf8Bytes` doesn't deref to `&str` the same way. Change:
+```rust
+if let Message::Text(text) = msg
+  && let Ok(val) = serde_json::from_str::<serde_json::Value>(&text)
+```
+To:
+```rust
+if let Message::Text(text) = msg
+  && let Ok(val) = serde_json::from_str::<serde_json::Value>(text.as_str())
+```
+
+If `Utf8Bytes` doesn't have `.as_str()`, use `&text.to_string()`.
+
+**reqwest 0.12→0.13:** The API methods used by `api_client.rs` (`.get()`, `.post()`, `.json()`, `.send()`, `.json()`) are unchanged between 0.12 and 0.13. No fixes needed.
+
+**tokio::spawn in approvals.rs:** `send_response` uses `tokio::spawn` which requires a tokio runtime. Dioxus mobile provides a tokio runtime (same as desktop). If it fails, replace with `dioxus::prelude::spawn`.
 
 **ActiveForm:** Verifying lx-mobile compilation
 
