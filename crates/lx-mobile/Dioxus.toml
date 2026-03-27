@@ -1,6 +1,6 @@
 [application]
 name = "lx-mobile"
-default_platform = "mobile"
+default_platform = "android"
 
 [application.mobile]
 bundle_identifier = "com.lx.mobile"

@@ -53,7 +53,7 @@ desktop:
 
 # run lx-mobile app
 mobile:
-    dx serve -p lx-mobile --platform mobile
+    dx serve -p lx-mobile --platform android
 
 # render all .mmd diagrams to .png
 diagrams:
