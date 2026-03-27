@@ -27,7 +27,7 @@ pub fn VoiceBanner() -> Element {
           {
             if voice_porcupine::is_available() {
               let samples: Vec<i16> = bytes.chunks_exact(2).map(|c| i16::from_le_bytes([c[0], c[1]])).collect();
-              if voice_porcupine::feed_samples(&samples).is_some() {
+              if voice_porcupine::feed_samples(&samples) {
                 handle_keyword_detected(voice_widget, ctx);
               }
             }

@@ -30,7 +30,7 @@ common-cdp = { path = "../../../dioxus-common/crates/common-cdp" }
 common-charts = { path = "../../../dioxus-common/crates/common-charts" }
 common-inference = { path = "../../../dioxus-common/crates/common-inference" }
 anyhow = "1"
-libloading = "0.8"
+sherpa-onnx = "1.12"
 async-trait = "0.1"
 base64 = "0.22"
 rodio = { version = "0.22", default-features = false, features = ["playback", "symphonia-wav", "symphonia-pcm"] }
