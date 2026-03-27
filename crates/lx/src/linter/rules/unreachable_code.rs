@@ -1,3 +1,5 @@
+use std::mem;
+
 use crate::ast::{AstArena, Expr, ExprBlock, ExprId, ExprLoop, ExprPar, Stmt, StmtId};
 use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::SemanticModel;
@@ -68,6 +70,6 @@ impl LintRule for UnreachableCode {
   }
 
   fn take_diagnostics(&mut self) -> Vec<Diagnostic> {
-    std::mem::take(&mut self.diagnostics)
+    mem::take(&mut self.diagnostics)
   }
 }

@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::sync::Arc;
 
 use indexmap::IndexMap;
@@ -9,15 +10,15 @@ use crate::runtime::RuntimeCtx;
 use crate::value::{LxVal, ValueKey};
 use miette::SourceSpan;
 
-pub(crate) fn cmp_values(a: &LxVal, b: &LxVal) -> std::cmp::Ordering {
+pub(crate) fn cmp_values(a: &LxVal, b: &LxVal) -> Ordering {
   match (a, b) {
     (LxVal::Int(x), LxVal::Int(y)) => x.cmp(y),
     (LxVal::Float(x), LxVal::Float(y)) => x.total_cmp(y),
-    (LxVal::Int(x), LxVal::Float(y)) => x.to_f64().map_or(std::cmp::Ordering::Greater, |xf| xf.total_cmp(y)),
-    (LxVal::Float(x), LxVal::Int(y)) => y.to_f64().map_or(std::cmp::Ordering::Less, |yf| x.total_cmp(&yf)),
+    (LxVal::Int(x), LxVal::Float(y)) => x.to_f64().map_or(Ordering::Greater, |xf| xf.total_cmp(y)),
+    (LxVal::Float(x), LxVal::Int(y)) => y.to_f64().map_or(Ordering::Less, |yf| x.total_cmp(&yf)),
     (LxVal::Str(x), LxVal::Str(y)) => x.cmp(y),
     (LxVal::Bool(x), LxVal::Bool(y)) => x.cmp(y),
-    _ => std::cmp::Ordering::Equal,
+    _ => Ordering::Equal,
   }
 }
 

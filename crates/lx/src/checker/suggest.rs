@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use similar::TextDiff;
 
 pub fn closest_matches(target: &str, candidates: &[&str], max: usize) -> Vec<String> {
@@ -5,7 +7,7 @@ pub fn closest_matches(target: &str, candidates: &[&str], max: usize) -> Vec<Str
     return Vec::new();
   }
   let mut scored: Vec<(f32, &str)> = candidates.iter().map(|&c| (TextDiff::from_chars(target, c).ratio(), c)).filter(|(ratio, _)| *ratio > 0.6).collect();
-  scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+  scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(Ordering::Equal));
   scored.into_iter().take(max).map(|(_, name)| name.to_string()).collect()
 }
 

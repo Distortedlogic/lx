@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
-use crate::error::LxError;
+use crate::error::{EvalSignal, LxError};
 use crate::folder::desugar;
+use crate::parser::parse;
+use crate::source::FileId;
 
 use super::Interpreter;
 
@@ -15,15 +17,15 @@ impl Interpreter {
       let Some(source) = crate::stdlib::lx_std_module_source(module_name) else { continue };
       let span = miette::SourceSpan::from(0..0);
       let (tokens, comments) = crate::lexer::lex(source).map_err(|e| LxError::runtime(format!("std/{module_name}: {e}"), span))?;
-      let result = crate::parser::parse(tokens, crate::source::FileId::new(0), comments, source);
+      let result = parse(tokens, FileId::new(0), comments, source);
       let surface = result.program.ok_or_else(|| LxError::runtime(format!("std/{module_name}: parse error"), span))?;
       let program = desugar(surface);
       self.arena = Arc::new(program.arena.clone());
       let stmts = program.stmts.clone();
       for sid in &stmts {
         self.eval_stmt(*sid).await.map_err(|e| match e {
-          crate::error::EvalSignal::Error(e) => e,
-          crate::error::EvalSignal::Break(_) => LxError::runtime("break outside loop", span),
+          EvalSignal::Error(e) => e,
+          EvalSignal::Break(_) => LxError::runtime("break outside loop", span),
         })?;
       }
     }

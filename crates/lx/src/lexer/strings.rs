@@ -1,3 +1,5 @@
+use std::mem;
+
 use super::Lexer;
 use super::raw_token::RawToken;
 use super::token::{Token, TokenKind};
@@ -8,7 +10,7 @@ use miette::{SourceOffset, SourceSpan};
 impl<'src> Lexer<'src> {
   fn flush_buf(&mut self, buf: &mut String, chunk_start: usize, make_kind: fn(String) -> TokenKind) {
     if !buf.is_empty() {
-      self.push(make_kind(std::mem::take(buf)), chunk_start, self.pos);
+      self.push(make_kind(mem::take(buf)), chunk_start, self.pos);
     }
   }
 

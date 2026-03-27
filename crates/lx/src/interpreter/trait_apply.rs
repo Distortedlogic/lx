@@ -1,7 +1,9 @@
-use crate::sym::Sym;
 use std::sync::Arc;
 
+use indexmap::IndexMap;
+
 use crate::error::{EvalResult, LxError};
+use crate::sym::Sym;
 use crate::value::{FieldDef, LxVal};
 use miette::SourceSpan;
 
@@ -79,7 +81,7 @@ impl Interpreter {
     Ok(LxVal::err_str(format!("Trait union {name}: no variant matched. Tried: {}", variants.iter().map(|v| v.as_str()).collect::<Vec<_>>().join(", "))))
   }
 
-  fn try_match_variant(&mut self, fields: &[FieldDef], rec: &Arc<indexmap::IndexMap<Sym, LxVal>>, span: SourceSpan) -> Result<(), LxError> {
+  fn try_match_variant(&mut self, fields: &[FieldDef], rec: &Arc<IndexMap<Sym, LxVal>>, span: SourceSpan) -> Result<(), LxError> {
     for field in fields.iter() {
       match rec.get(&field.name) {
         Some(val) => {

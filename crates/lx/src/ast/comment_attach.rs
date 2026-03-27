@@ -1,3 +1,4 @@
+use std::cmp::Reverse;
 use std::collections::HashMap;
 
 use crate::source::{AttachedComment, CommentMap, CommentPlacement, CommentStore};
@@ -31,7 +32,7 @@ pub fn attach_comments(stmts: &[StmtId], arena: &AstArena, comments: &CommentSto
     let end = offset + spanned.span.len();
     nodes.push((NodeId::TypeExpr(id), offset, end));
   }
-  nodes.sort_by_key(|&(_, offset, end)| (offset, std::cmp::Reverse(end)));
+  nodes.sort_by_key(|&(_, offset, end)| (offset, Reverse(end)));
 
   for (comment_idx, comment) in comments.all().iter().enumerate() {
     let c_offset = comment.span.offset();

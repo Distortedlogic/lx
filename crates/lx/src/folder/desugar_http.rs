@@ -1,6 +1,8 @@
 use miette::SourceSpan;
 
-use crate::ast::{AstArena, BinOp, ClassDeclData, ClassField, Expr, ExprBinary, ExprFieldAccess, FieldKind, KeywordDeclData, Stmt, StmtId, UseKind, UseStmt};
+use crate::ast::{
+  AstArena, BinOp, BindTarget, ClassDeclData, ClassField, Expr, ExprBinary, ExprFieldAccess, FieldKind, KeywordDeclData, Stmt, StmtId, UseKind, UseStmt,
+};
 use crate::folder::gen_ast::{gen_block, gen_field_call, gen_func, gen_ident, gen_list, gen_literal_str, gen_method, gen_record, gen_self_field};
 use crate::sym::{Sym, intern};
 
@@ -58,13 +60,7 @@ fn build_http_run(span: SourceSpan, arena: &mut AstArena) -> crate::ast::ExprId 
   };
   let url_expr = arena.alloc_expr(Expr::Binary(ExprBinary { op: BinOp::Concat, left: self_base_url, right: args_tool }), span);
   let url_assign = arena.alloc_stmt(
-    Stmt::Binding(crate::ast::Binding {
-      exported: false,
-      mutable: false,
-      target: crate::ast::BindTarget::Name(intern("url")),
-      type_ann: None,
-      value: url_expr,
-    }),
+    Stmt::Binding(crate::ast::Binding { exported: false, mutable: false, target: BindTarget::Name(intern("url")), type_ann: None, value: url_expr }),
     span,
   );
 

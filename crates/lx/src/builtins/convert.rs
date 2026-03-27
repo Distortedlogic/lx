@@ -1,4 +1,6 @@
 use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
 
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
@@ -99,7 +101,7 @@ fn bi_sleep(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<
       return Err(LxError::type_err(format!("sleep expects number, got {}", other.type_name()), span, None));
     },
   };
-  std::thread::sleep(std::time::Duration::from_secs_f64(secs));
+  thread::sleep(Duration::from_secs_f64(secs));
   Ok(LxVal::Unit)
 }
 

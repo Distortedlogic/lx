@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use super::Interpreter;
 use crate::ast::{FieldDecl, TraitEntry};
-use crate::error::{EvalResult, LxError};
+use crate::error::{EvalResult, EvalSignal, LxError};
 use crate::sym::Sym;
 use crate::value::{ConstraintExpr, FieldDef, LxVal};
 use miette::{SourceOffset, SourceSpan};
@@ -11,8 +11,8 @@ impl Interpreter {
   pub async fn call(&mut self, func: LxVal, arg: LxVal) -> Result<LxVal, LxError> {
     let span = SourceSpan::new(SourceOffset::from(0), 0);
     self.apply_func(func, arg, span).await.map_err(|e| match e {
-      crate::error::EvalSignal::Error(e) => e,
-      crate::error::EvalSignal::Break(_) => LxError::runtime("break outside loop", span),
+      EvalSignal::Error(e) => e,
+      EvalSignal::Break(_) => LxError::runtime("break outside loop", span),
     })
   }
 

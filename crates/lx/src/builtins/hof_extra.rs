@@ -6,7 +6,7 @@ use itertools::Itertools;
 
 use crate::error::LxError;
 use crate::runtime::RuntimeCtx;
-use crate::value::LxVal;
+use crate::value::{LxVal, ValueKey};
 use miette::SourceSpan;
 
 use super::BoxFut;
@@ -113,9 +113,9 @@ pub(super) fn bi_group_by(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>
     let mut groups = IndexMap::new();
     for v in items.iter() {
       let key = call(&args[0], v.clone(), sp, &ctx).await?;
-      groups.entry(crate::value::ValueKey(key)).or_insert_with(Vec::new).push(v.clone());
+      groups.entry(ValueKey(key)).or_insert_with(Vec::new).push(v.clone());
     }
-    let map: indexmap::IndexMap<crate::value::ValueKey, LxVal> = groups.into_iter().map(|(k, vs)| (k, LxVal::list(vs))).collect();
+    let map: indexmap::IndexMap<ValueKey, LxVal> = groups.into_iter().map(|(k, vs)| (k, LxVal::list(vs))).collect();
     Ok(LxVal::Map(Arc::new(map)))
   })
 }

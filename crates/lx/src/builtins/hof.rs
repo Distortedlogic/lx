@@ -1,3 +1,4 @@
+use std::ops::Deref;
 use std::sync::Arc;
 
 use num_traits::ToPrimitive;
@@ -55,7 +56,7 @@ pub(super) enum ListRef<'a> {
   Owned(Vec<LxVal>),
 }
 
-impl<'a> std::ops::Deref for ListRef<'a> {
+impl<'a> Deref for ListRef<'a> {
   type Target = [LxVal];
   fn deref(&self) -> &[LxVal] {
     match self {

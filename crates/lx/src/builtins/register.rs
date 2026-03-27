@@ -5,6 +5,7 @@ use num_bigint::BigInt;
 
 use crate::env::Env;
 use crate::error::LxError;
+use crate::interpreter::ambient::{global_context_current, global_context_get};
 use crate::runtime::{LogLevel, RuntimeCtx};
 use crate::value::LxVal;
 use miette::SourceSpan;
@@ -260,11 +261,11 @@ fn inject_self_for_method(method: &LxVal, self_val: &LxVal) -> LxVal {
 }
 
 fn bi_global_context_current(_args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  crate::interpreter::ambient::global_context_current()
+  global_context_current()
 }
 
 fn bi_global_context_get(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  crate::interpreter::ambient::global_context_get(&args[0], span)
+  global_context_get(&args[0], span)
 }
 
 fn bi_resolve_handler(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {

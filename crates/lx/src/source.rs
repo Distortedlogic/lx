@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use miette::SourceSpan;
 
 use crate::ast::{ExprId, NodeId, PatternId, StmtId, TypeExprId};
@@ -114,7 +116,7 @@ pub struct AttachedComment {
   pub placement: CommentPlacement,
 }
 
-pub type CommentMap = std::collections::HashMap<NodeId, Vec<AttachedComment>>;
+pub type CommentMap = HashMap<NodeId, Vec<AttachedComment>>;
 
 impl NodeId {
   pub fn in_file(self, file: FileId) -> GlobalNodeId {

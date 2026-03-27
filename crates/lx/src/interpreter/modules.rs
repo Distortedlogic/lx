@@ -1,4 +1,6 @@
-use std::path::PathBuf;
+use std::env;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use indexmap::IndexMap;
@@ -6,6 +8,9 @@ use indexmap::IndexMap;
 use crate::ast::{BindTarget, Core, Program, Stmt, StmtTypeDef, UseKind, UseStmt};
 use crate::error::LxError;
 use crate::folder::desugar;
+use crate::parser::parse;
+use crate::source::FileId;
+use crate::stdlib::wasm::load_plugin;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
@@ -71,7 +76,7 @@ impl Interpreter {
     }
     let plugin_dir = self.find_plugin_dir(name);
     let dir = plugin_dir.ok_or_else(|| LxError::runtime(format!("wasm plugin '{name}' not found"), span))?;
-    let exports = crate::stdlib::wasm::load_plugin(name, &dir, span)?;
+    let exports = load_plugin(name, &dir, span)?;
     self.module_cache.lock().insert(cache_key, exports.clone());
     Ok(exports)
   }
@@ -83,7 +88,7 @@ impl Interpreter {
         return Some(local);
       }
     }
-    if let Some(home) = std::env::var_os("HOME") {
+    if let Some(home) = env::var_os("HOME") {
       let global = PathBuf::from(home).join(".lx").join("plugins").join(name);
       if global.join(crate::PLUGIN_MANIFEST).exists() {
         return Some(global);
@@ -138,7 +143,7 @@ impl Interpreter {
       }
     }
     let (tokens, comments) = crate::lexer::lex(source).map_err(|e| LxError::runtime(format!("std/{name}: {e}"), span))?;
-    let result = crate::parser::parse(tokens, crate::source::FileId::new(0), comments, source);
+    let result = parse(tokens, FileId::new(0), comments, source);
     let surface = result.program.ok_or_else(|| LxError::runtime(format!("std/{name}: parse error"), span))?;
     let program = desugar(surface);
     let saved_source_dir = self.ctx.source_dir.lock().clone();
@@ -153,7 +158,7 @@ impl Interpreter {
   }
 
   async fn load_module(&mut self, file_path: &PathBuf, span: SourceSpan) -> Result<ModuleExports, LxError> {
-    let canonical = std::fs::canonicalize(file_path).map_err(|e| LxError::runtime(format!("cannot resolve module '{}': {e}", file_path.display()), span))?;
+    let canonical = fs::canonicalize(file_path).map_err(|e| LxError::runtime(format!("cannot resolve module '{}': {e}", file_path.display()), span))?;
     {
       let cache = self.module_cache.lock();
       if let Some(exports) = cache.get(&canonical) {
@@ -166,9 +171,9 @@ impl Interpreter {
         return Err(LxError::runtime(format!("circular import: {}", canonical.display()), span));
       }
     }
-    let source = std::fs::read_to_string(file_path).map_err(|e| LxError::runtime(format!("cannot read module '{}': {e}", file_path.display()), span))?;
+    let source = fs::read_to_string(file_path).map_err(|e| LxError::runtime(format!("cannot read module '{}': {e}", file_path.display()), span))?;
     let (tokens, comments) = crate::lexer::lex(&source).map_err(|e| LxError::runtime(format!("module '{}': {e}", file_path.display()), span))?;
-    let result = crate::parser::parse(tokens, crate::source::FileId::new(0), comments, &source);
+    let result = parse(tokens, FileId::new(0), comments, &source);
     let surface = result.program.ok_or_else(|| {
       let msgs: Vec<String> = result.errors.iter().map(|e| format!("{e}")).collect();
       LxError::runtime(format!("module '{}': {}", file_path.display(), msgs.join("; ")), span)
@@ -192,7 +197,7 @@ impl Interpreter {
   }
 }
 
-fn resolve_module_path(source_dir: &std::path::Path, path: &[&str], span: SourceSpan) -> Result<PathBuf, LxError> {
+fn resolve_module_path(source_dir: &Path, path: &[&str], span: SourceSpan) -> Result<PathBuf, LxError> {
   if path.is_empty() {
     return Err(LxError::runtime("empty module path", span));
   }

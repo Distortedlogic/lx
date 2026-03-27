@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use miette::{Diagnostic, SourceSpan};
 use thiserror::Error;
 
@@ -75,7 +77,7 @@ pub enum LxError {
   },
 
   #[error("{inner}")]
-  Sourced { source_name: String, source_text: std::sync::Arc<str>, inner: Box<LxError> },
+  Sourced { source_name: String, source_text: Arc<str>, inner: Box<LxError> },
 }
 
 impl LxError {
@@ -112,7 +114,7 @@ impl LxError {
     Self::Propagate { value: Box::new(value), span }
   }
 
-  pub fn with_source(self, name: String, text: std::sync::Arc<str>) -> Self {
+  pub fn with_source(self, name: String, text: Arc<str>) -> Self {
     Self::Sourced { source_name: name, source_text: text, inner: Box::new(self) }
   }
 }

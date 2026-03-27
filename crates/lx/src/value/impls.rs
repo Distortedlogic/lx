@@ -1,4 +1,5 @@
 use std::hash::{Hash, Hasher};
+use std::mem;
 
 use super::{LxVal, ValueKey};
 
@@ -75,7 +76,7 @@ impl LxVal {
   }
 
   pub(crate) fn hash_value<H: Hasher>(&self, state: &mut H) {
-    std::mem::discriminant(self).hash(state);
+    mem::discriminant(self).hash(state);
     match self {
       LxVal::Int(n) => n.hash(state),
       LxVal::Float(f) => f.to_bits().hash(state),

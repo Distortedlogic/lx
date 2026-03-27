@@ -11,6 +11,7 @@ mod register;
 mod shell;
 mod str;
 
+use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
@@ -20,7 +21,7 @@ use crate::runtime::RuntimeCtx;
 use crate::value::{AsyncBuiltinFn, BuiltinFunc, BuiltinKind, LxVal, SyncBuiltinFn};
 use miette::SourceSpan;
 
-pub(crate) type BoxFut = Pin<Box<dyn std::future::Future<Output = Result<LxVal, LxError>>>>;
+pub(crate) type BoxFut = Pin<Box<dyn Future<Output = Result<LxVal, LxError>>>>;
 
 macro_rules! register_builtins {
   ($env:expr, { $( $name:literal / $arity:literal => $func:expr ),* $(,)? }) => {{

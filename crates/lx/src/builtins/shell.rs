@@ -1,3 +1,4 @@
+use std::process::Command;
 use std::sync::Arc;
 
 use crate::env::Env;
@@ -9,7 +10,7 @@ use miette::SourceSpan;
 
 fn bi_bash(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let cmd = args[0].require_str("bash", span)?;
-  match std::process::Command::new("bash").arg("-c").arg(cmd).output() {
+  match Command::new("bash").arg("-c").arg(cmd).output() {
     Ok(output) => {
       let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
       let stderr = String::from_utf8_lossy(&output.stderr).into_owned();

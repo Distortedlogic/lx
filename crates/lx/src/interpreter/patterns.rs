@@ -1,4 +1,7 @@
+use std::collections::HashSet;
 use std::sync::Arc;
+
+use indexmap::IndexMap;
 
 use crate::ast::{ExprId, Literal, MatchArm, Pattern, PatternConstructor, PatternList, PatternRecord, StrPart};
 use crate::error::{EvalResult, LxError};
@@ -116,8 +119,8 @@ impl super::Interpreter {
           }
         }
         if let Some(rest_name) = rest {
-          let matched_keys: std::collections::HashSet<Sym> = fields.iter().map(|f| f.name).collect();
-          let remaining: indexmap::IndexMap<Sym, LxVal> = rec.iter().filter(|(k, _)| !matched_keys.contains(k)).map(|(k, v)| (*k, v.clone())).collect();
+          let matched_keys: HashSet<Sym> = fields.iter().map(|f| f.name).collect();
+          let remaining: IndexMap<Sym, LxVal> = rec.iter().filter(|(k, _)| !matched_keys.contains(k)).map(|(k, v)| (*k, v.clone())).collect();
           bindings.push((*rest_name, LxVal::record(remaining)));
         }
         Some(bindings)

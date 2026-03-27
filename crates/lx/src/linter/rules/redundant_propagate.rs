@@ -1,3 +1,5 @@
+use std::mem;
+
 use crate::ast::{AstArena, Expr, ExprId, ExprPropagate};
 use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::SemanticModel;
@@ -60,6 +62,6 @@ impl LintRule for RedundantPropagate {
   }
 
   fn take_diagnostics(&mut self) -> Vec<Diagnostic> {
-    std::mem::take(&mut self.diagnostics)
+    mem::take(&mut self.diagnostics)
   }
 }

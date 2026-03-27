@@ -10,6 +10,7 @@ use crate::ast::{
 };
 use crate::sym::{Sym, intern};
 use crate::visitor::transformer::AstTransformer;
+use crate::visitor::walk_transform::walk_transform_stmt;
 
 static GENSYM_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -38,12 +39,12 @@ impl AstTransformer for Desugarer {
         Stmt::KeywordDecl(data) => {
           let desugared = desugar_keyword(data, span, arena);
           for sid in desugared {
-            let transformed = crate::visitor::walk_transform::walk_transform_stmt(self, sid, arena);
+            let transformed = walk_transform_stmt(self, sid, arena);
             result.push(transformed);
           }
         },
         _ => {
-          let transformed = crate::visitor::walk_transform::walk_transform_stmt(self, sid, arena);
+          let transformed = walk_transform_stmt(self, sid, arena);
           result.push(transformed);
         },
       }

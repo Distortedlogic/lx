@@ -1,5 +1,7 @@
+use std::mem;
 use std::sync::Arc;
 
+use indexmap::IndexMap;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 
@@ -18,7 +20,7 @@ impl Interpreter {
     let fn_source_text = Arc::clone(&lf.source_text);
     let fn_source_name = Arc::clone(&lf.source_name);
     let saved = Arc::clone(&self.env);
-    let saved_source = std::mem::replace(&mut self.source, lf.source_text.to_string());
+    let saved_source = mem::replace(&mut self.source, lf.source_text.to_string());
     let saved_arena = Arc::clone(&self.arena);
     self.env = call_env;
     self.arena = Arc::clone(&lf.arena);
@@ -85,7 +87,7 @@ impl Interpreter {
       LxVal::Class(c) => {
         let overrides = match &arg {
           LxVal::Record(r) => r.as_ref().clone(),
-          LxVal::Unit => indexmap::IndexMap::new(),
+          LxVal::Unit => IndexMap::new(),
           _ => {
             return Err(LxError::type_err(format!("Class {} constructor expects Record or (), got {}", c.name, arg.type_name()), span, None).into());
           },

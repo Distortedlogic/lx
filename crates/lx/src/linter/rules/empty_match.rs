@@ -1,3 +1,5 @@
+use std::mem;
+
 use crate::ast::{AstArena, Expr, ExprId, ExprMatch};
 use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::SemanticModel;
@@ -50,6 +52,6 @@ impl LintRule for EmptyMatch {
   }
 
   fn take_diagnostics(&mut self) -> Vec<Diagnostic> {
-    std::mem::take(&mut self.diagnostics)
+    mem::take(&mut self.diagnostics)
   }
 }

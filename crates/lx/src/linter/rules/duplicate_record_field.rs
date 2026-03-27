@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::mem;
 
 use crate::ast::{AstArena, Expr, ExprId, RecordField};
 use crate::checker::diagnostics::DiagnosticKind;
@@ -57,6 +58,6 @@ impl LintRule for DuplicateRecordField {
   }
 
   fn take_diagnostics(&mut self) -> Vec<Diagnostic> {
-    std::mem::take(&mut self.diagnostics)
+    mem::take(&mut self.diagnostics)
   }
 }

@@ -1,3 +1,5 @@
+use std::mem;
+
 use crate::ast::{Core, Program, Stmt, UseKind};
 use crate::checker::diagnostics::DiagnosticKind;
 use crate::checker::semantic::{DefKind, DefinitionId, SemanticModel};
@@ -68,6 +70,6 @@ impl LintRule for UnusedImport {
   }
 
   fn take_diagnostics(&mut self) -> Vec<Diagnostic> {
-    std::mem::take(&mut self.diagnostics)
+    mem::take(&mut self.diagnostics)
   }
 }

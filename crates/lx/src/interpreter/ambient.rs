@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::sync::Arc;
 
 use async_recursion::async_recursion;
@@ -53,8 +54,8 @@ pub fn global_context_get(key_val: &LxVal, span: SourceSpan) -> Result<LxVal, Lx
 }
 
 thread_local! {
-    static AMBIENT_SNAPSHOT: std::cell::RefCell<IndexMap<crate::sym::Sym, LxVal>> =
-        std::cell::RefCell::new(IndexMap::new());
+    static AMBIENT_SNAPSHOT: RefCell<IndexMap<crate::sym::Sym, LxVal>> =
+        RefCell::new(IndexMap::new());
 }
 
 fn set_ambient_snapshot(fields: &IndexMap<crate::sym::Sym, LxVal>) {
