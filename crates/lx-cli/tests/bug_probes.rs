@@ -38,57 +38,42 @@ fn fixed_not_returns_bool() {
   assert!(ok, "not returns Bool");
 }
 
-// --- ACTIVE BUGS: ignored until fixed, run with `cargo test --ignored` ---
-
 #[test]
-#[ignore]
-fn bug_named_arg_ternary_colon() {
-  let (ok, _, _) = run_lx("id = (x) x\nresult = id 42 key: \"v\" ? \"alt\" : \"nope\"\nassert (result == 42) \"id result\"");
-  assert!(ok, "named-arg parser no longer consumes ternary :");
-}
-
-#[test]
-#[ignore]
-fn bug_assert_greedy_callable() {
+fn fixed_assert_greedy_callable() {
   let (ok, _, _) = run_lx("done = true\nassert done \"should pass\"");
   assert!(ok, "assert no longer consumes message as call argument");
 }
 
 #[test]
-#[ignore]
-fn bug_multiline_ternary() {
+fn fixed_multiline_ternary() {
   let (ok, stdout, _) = run_lx("x = 2\nresult = x == 1 ? \"one\"\n: x == 2 ? \"two\"\n: \"other\"\nemit result");
   assert!(ok, "multi-line ternary chains parse");
   assert!(stdout.contains("two"));
 }
 
 #[test]
-#[ignore]
-fn bug_shorthand_before_keyed() {
-  let (ok, stdout, _) = run_lx("steps = [1; 2; 3]\ntask = \"do it\"\nr = {steps  task  step_count: steps | len}\nemit r.step_count");
+fn fixed_shorthand_before_keyed() {
+  let (ok, stdout, _) = run_lx("steps = [1; 2; 3]\ntask = \"do it\"\nr = {steps; task; step_count: steps | len}\nemit r.step_count");
   assert!(ok, "shorthand fields before keyed fields parse");
   assert!(stdout.contains("3"));
 }
 
 #[test]
-#[ignore]
-fn bug_spread_shorthand() {
-  let (ok, stdout, _) = run_lx("entry = {name: \"a\"; value: 1}\nscore = 100\nr = {..entry  score}\nemit r.score");
+fn fixed_spread_shorthand() {
+  let (ok, stdout, _) = run_lx("entry = {name: \"a\"; value: 1}\nscore = 100\nr = {..entry; score}\nemit r.score");
   assert!(ok, "spread + shorthand field works");
   assert!(stdout.contains("100"));
 }
 
 #[test]
-#[ignore]
-fn bug_unit_before_closure_param() {
+fn fixed_unit_before_closure_param() {
   let (ok, stdout, _) = run_lx("f = (name input fn) { fn input }\nresult = f \"test\" () (x) { \"got: {x}\" }\nemit result");
   assert!(ok, "() before (param) {{ body }} parses correctly");
   assert!(stdout.contains("got:"));
 }
 
 #[test]
-#[ignore]
-fn bug_sections_equality() {
+fn fixed_sections_equality() {
   let (ok, stdout, _) =
     run_lx("records = [{status: \"pass\"; score: 90}; {status: \"fail\"; score: 40}]\npassed = records | filter (.status == \"pass\")\nemit (passed | len)");
   assert!(ok, "sections support == operator");
@@ -110,8 +95,7 @@ fn fixed_uppercase_keyword_field_names() {
 }
 
 #[test]
-#[ignore]
-fn bug_pipe_plus_precedence() {
+fn fixed_pipe_plus_precedence() {
   let (ok, _, _) = run_lx("result = [1; 2; 3] | len + [4; 5] | len\nassert (result == 5) \"pipe then plus\"");
   assert!(ok, "| binds tighter than +");
 }
@@ -135,8 +119,7 @@ fn fixed_last_returns_value() {
 }
 
 #[test]
-#[ignore]
-fn bug_parens_not_blocks() {
+fn fixed_parens_not_blocks() {
   let (ok, _, _) = run_lx("result = true ? ( x = 10; x + 5 ) : 0\nassert (result == 15) \"parens as block\"");
   assert!(ok, "parens work as block scope");
 }

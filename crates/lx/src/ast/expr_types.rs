@@ -55,6 +55,7 @@ pub enum Section {
   Field(Sym),
   Index(i64),
   BinOp(BinOp),
+  FieldCompare { field: Sym, op: BinOp, value: ExprId },
 }
 
 #[derive(Debug, Clone, PartialEq, AstWalk)]

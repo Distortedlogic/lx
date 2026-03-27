@@ -167,6 +167,14 @@ impl Formatter<'_> {
         self.write(".");
         self.write(&i.to_string());
       },
+      Section::FieldCompare { field, op, value } => {
+        self.write(".");
+        self.write(field.as_str());
+        self.space();
+        self.write(&op.to_string());
+        self.space();
+        self.emit_expr(*value);
+      },
     }
     self.write(")");
   }

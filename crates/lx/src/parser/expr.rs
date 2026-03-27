@@ -174,7 +174,6 @@ where
         let (cond, msg) = {
           let ar = al.borrow();
           if let Expr::Apply(app) = ar.expr(ex)
-            && let Expr::Grouped(_) = ar.expr(app.func)
             && let Expr::Literal(Literal::Str(_)) = ar.expr(app.arg)
           {
             (app.func, Some(app.arg))

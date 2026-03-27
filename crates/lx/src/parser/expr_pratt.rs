@@ -114,7 +114,7 @@ where
     .then_ignore(skip_semis())
     .delimited_by(just(TokenKind::LBrace), just(TokenKind::RBrace));
 
-  let ternary_tail = expr.clone().then(just(TokenKind::Colon).ignore_then(expr.clone()).or_not());
+  let ternary_tail = expr.clone().then(skip_semis().ignore_then(just(TokenKind::Colon)).ignore_then(expr.clone()).or_not());
   let question_rhs = match_arms.map(QRhs::Match).or(ternary_tail.map(|(t, e)| QRhs::Ternary(t, e)));
   let dot_field = dot_rhs(expr, arena.clone());
 
@@ -154,7 +154,7 @@ where
     binop!(left(23), TokenKind::DotDot, BinOp::Range),
     binop!(left(23), TokenKind::DotDotEq, BinOp::RangeInclusive),
     binop!(left(21), TokenKind::PlusPlus, BinOp::Concat),
-    infix(left(19), just(TokenKind::Pipe), move |l: ExprId, _, r: ExprId, e| {
+    infix(left(26), just(TokenKind::Pipe), move |l: ExprId, _, r: ExprId, e| {
       a6.borrow_mut().alloc_expr(Expr::Pipe(ExprPipe { left: l, right: r }), ss(e.span()))
     })
     .boxed(),

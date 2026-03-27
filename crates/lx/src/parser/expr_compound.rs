@@ -4,7 +4,7 @@ use chumsky::prelude::*;
 use super::expr::ident;
 use super::expr_pratt::{section_op, tok_to_op};
 use super::{ArenaRef, ExprId, Span, ss};
-use crate::ast::{Expr, ExprFunc, ExprTuple, ExprWith, Literal, Section, WithKind};
+use crate::ast::{BinOp, Expr, ExprBlock, ExprFunc, ExprTuple, ExprWith, Literal, Section, WithKind};
 use crate::lexer::token::TokenKind;
 use crate::sym::intern;
 
@@ -67,14 +67,33 @@ where
   let a7 = arena.clone();
   let a8 = arena.clone();
   let a_body = arena.clone();
+  let a_zf = arena.clone();
+  let a_pb = arena.clone();
+
+  let zero_arg_func = just(TokenKind::LParen)
+    .then(just(TokenKind::RParen))
+    .ignore_then(super::type_ann::generic_params())
+    .then(just(TokenKind::Arrow).ignore_then(super::type_ann::type_parser(arena.clone())).or_not())
+    .then(just(TokenKind::Amp).ignore_then(expr.clone().delimited_by(just(TokenKind::LParen), just(TokenKind::RParen))).or_not())
+    .then(super::expr_helpers::func_body_parser(expr.clone(), a_body.clone()))
+    .map_with(move |(((type_params, ret_type), guard), body), e| {
+      a_zf.borrow_mut().alloc_expr(Expr::Func(ExprFunc { params: vec![], type_params, ret_type, guard, body }), ss(e.span()))
+    });
 
   let unit = just(TokenKind::LParen).then(just(TokenKind::RParen)).map_with(move |_, e| a1.borrow_mut().alloc_expr(Expr::Literal(Literal::Unit), ss(e.span())));
 
   let field_section = just(TokenKind::LParen)
     .ignore_then(just(TokenKind::Dot))
     .ignore_then(ident())
+    .then(section_op().then(expr.clone()).or_not())
     .then_ignore(just(TokenKind::RParen))
-    .map_with(move |name, e| a2.borrow_mut().alloc_expr(Expr::Section(Section::Field(name)), ss(e.span())));
+    .map_with(move |(name, cmp), e| {
+      let section = match cmp {
+        Some((op_tok, value)) => Section::FieldCompare { field: name, op: tok_to_op(&op_tok), value },
+        None => Section::Field(name),
+      };
+      a2.borrow_mut().alloc_expr(Expr::Section(section), ss(e.span()))
+    });
 
   let index_section =
     just(TokenKind::LParen).ignore_then(just(TokenKind::Dot)).ignore_then(select! { TokenKind::Int(n) => n }).then_ignore(just(TokenKind::RParen)).map_with(
@@ -119,9 +138,14 @@ where
     .map_with(move |elems, e| a8.borrow_mut().alloc_expr(Expr::Tuple(ExprTuple { elems }), ss(e.span())));
 
   let grouped = just(TokenKind::LParen)
-    .ignore_then(expr)
+    .ignore_then(expr.clone())
     .then_ignore(just(TokenKind::RParen))
     .map_with(move |inner, e| arena.borrow_mut().alloc_expr(Expr::Grouped(inner), ss(e.span())));
 
-  choice((field_section, index_section, binop_section, right_section, func_def, unit, left_section, tuple, grouped))
+  let paren_block = just(TokenKind::LParen)
+    .ignore_then(super::expr::stmts_block(expr, a_pb.clone()))
+    .then_ignore(just(TokenKind::RParen))
+    .map_with(move |stmts, e| a_pb.borrow_mut().alloc_expr(Expr::Block(ExprBlock { stmts }), ss(e.span())));
+
+  choice((field_section, index_section, binop_section, right_section, zero_arg_func, unit, func_def, left_section, tuple, grouped, paren_block))
 }

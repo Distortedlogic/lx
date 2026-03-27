@@ -23,7 +23,7 @@ use std/fs
 
 +quote = (content) [md.blockquote content]
 
-+divider = () [md.hr]
++divider = () { [md.hr] }
 
 +conditional = (show heading blocks) {
   show ? (section heading blocks) : []

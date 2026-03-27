@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use miette::SourceSpan;
 
 use crate::ast::{
-  AstArena, BindTarget, Binding, ClassDeclData, Core, Expr, ExprApply, ExprBinary, ExprBlock, ExprFieldAccess, ExprFunc, ExprId, ExprMatch, ExprWith,
+  AstArena, BinOp, BindTarget, Binding, ClassDeclData, Core, Expr, ExprApply, ExprBinary, ExprBlock, ExprFieldAccess, ExprFunc, ExprId, ExprMatch, ExprWith,
   FieldKind, KeywordDeclData, KeywordKind, Literal, MatchArm, Param, Pattern, PatternConstructor, Program, Section, Stmt, StmtId, StrPart, Surface, UseKind,
   UseStmt, WithKind,
 };
@@ -117,6 +117,13 @@ fn desugar_section(s: Section, span: SourceSpan, arena: &mut AstArena) -> Expr {
       let body = arena.alloc_expr(Expr::Binary(ExprBinary { op, left: ai, right: bi }), span);
       let inner = alloc_lambda(b, body, span, arena);
       make_lambda_expr(a, inner)
+    },
+    Section::FieldCompare { field, op, value } => {
+      let p = gensym("x");
+      let pi = arena.alloc_expr(Expr::Ident(p), span);
+      let access = arena.alloc_expr(Expr::FieldAccess(ExprFieldAccess { expr: pi, field: FieldKind::Named(field) }), span);
+      let body = arena.alloc_expr(Expr::Binary(ExprBinary { op, left: access, right: value }), span);
+      make_lambda_expr(p, body)
     },
   }
 }
