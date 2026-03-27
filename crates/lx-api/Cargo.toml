@@ -1,0 +1,20 @@
+[package]
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+name = "lx-api"
+repository.workspace = true
+version = "0.1.0"
+
+[lints]
+workspace = true
+
+[dependencies]
+dioxus = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, optional = true }
+
+[features]
+default = []
+server = ["dep:tokio", "dioxus/server"]
