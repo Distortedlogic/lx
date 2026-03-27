@@ -12,6 +12,9 @@ use crate::sym::intern;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
+const ENTRY_RUN: &str = "run";
+const ENTRY_MAIN: &str = "main";
+
 pub(super) fn invoke_flow(flow_path: &str, input: &LxVal, ctx: &Arc<RuntimeCtx>, span: SourceSpan) -> Result<LxVal, LxError> {
   let path = if flow_path.starts_with("./") || flow_path.starts_with("../") {
     if let Some(ref dir) = *ctx.source_dir.lock() { dir.join(flow_path) } else { std::path::PathBuf::from(flow_path) }
@@ -59,17 +62,17 @@ fn find_flow_entry_name<P>(program: &Program<P>) -> Option<String> {
       && b.exported
       && let BindTarget::Name(ref name) = b.target
     {
-      if name == "run" {
+      if name == ENTRY_RUN {
         has_run = true;
-      } else if name == "main" {
+      } else if name == ENTRY_MAIN {
         has_main = true;
       }
     }
   }
   if has_run {
-    Some("run".into())
+    Some(ENTRY_RUN.into())
   } else if has_main {
-    Some("main".into())
+    Some(ENTRY_MAIN.into())
   } else {
     None
   }

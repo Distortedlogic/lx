@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
+use crate::ast::ANY_TYPE_NAME;
 use crate::error::{EvalResult, LxError};
 use crate::sym::Sym;
 use crate::value::{FieldDef, LxVal};
@@ -18,7 +19,7 @@ impl Interpreter {
     for field in fields.iter() {
       match rec.get(&field.name) {
         Some(val) => {
-          if field.type_name != "Any" && val.type_name() != field.type_name.as_str() {
+          if field.type_name != ANY_TYPE_NAME && val.type_name() != field.type_name.as_str() {
             return Ok(LxVal::err_str(format!("Trait {name}: field '{}' expected {}, got {}", field.name, field.type_name, val.type_name())));
           }
         },
@@ -85,7 +86,7 @@ impl Interpreter {
     for field in fields.iter() {
       match rec.get(&field.name) {
         Some(val) => {
-          if field.type_name != "Any" && val.type_name() != field.type_name.as_str() {
+          if field.type_name != ANY_TYPE_NAME && val.type_name() != field.type_name.as_str() {
             return Err(LxError::runtime(
               format!("field '{}': expected {}, got {} `{}`", field.name, field.type_name, val.type_name(), val.short_display()),
               span,

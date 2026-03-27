@@ -32,8 +32,10 @@ pub(crate) mod wasm_marshal;
 
 use crate::interpreter::ModuleExports;
 
+pub const STDLIB_ROOT: &str = "std";
+
 pub(crate) fn get_std_module(path: &[&str]) -> Option<ModuleExports> {
-  if path.len() < 2 || path[0] != "std" {
+  if path.len() < 2 || path[0] != STDLIB_ROOT {
     return None;
   }
   let bindings = match path[1] {
@@ -82,7 +84,7 @@ pub(crate) fn lx_std_module_source(name: &str) -> Option<&'static str> {
 }
 
 pub(crate) fn std_module_exists(path: &[&str]) -> bool {
-  if path.len() < 2 || path[0] != "std" {
+  if path.len() < 2 || path[0] != STDLIB_ROOT {
     return false;
   }
   matches!(

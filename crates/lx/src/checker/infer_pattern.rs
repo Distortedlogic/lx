@@ -6,6 +6,10 @@ use super::semantic::DefKind;
 use super::type_arena::TypeId;
 use super::types::Type;
 
+const CTOR_SOME: &str = "Some";
+const CTOR_OK: &str = "Ok";
+const CTOR_ERR: &str = "Err";
+
 impl Checker<'_> {
   pub(super) fn infer_pattern_bindings(&mut self, pid: PatternId, scrutinee_type: TypeId) {
     let resolved = self.table.resolve(scrutinee_type, &self.type_arena);
@@ -135,16 +139,16 @@ impl Checker<'_> {
     let scrut = self.type_arena.get(scrutinee_type).clone();
     let field_types = match &scrut {
       Type::Maybe(inner) => {
-        if ctor_name.as_str() == "Some" {
+        if ctor_name.as_str() == CTOR_SOME {
           vec![*inner]
         } else {
           vec![]
         }
       },
       Type::Result { ok, err } => {
-        if ctor_name.as_str() == "Ok" {
+        if ctor_name.as_str() == CTOR_OK {
           vec![*ok]
-        } else if ctor_name.as_str() == "Err" {
+        } else if ctor_name.as_str() == CTOR_ERR {
           vec![*err]
         } else {
           vec![]

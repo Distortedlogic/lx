@@ -4,6 +4,8 @@ use crate::ast::{AstArena, BindTarget, Binding, Stmt, StmtId, TraitEntry, UseKin
 use crate::sym::Sym;
 use miette::SourceSpan;
 
+use crate::stdlib::STDLIB_ROOT;
+
 use super::diagnostics::DiagnosticKind;
 use super::semantic::DefKind;
 use super::type_arena::TypeId;
@@ -90,7 +92,7 @@ impl Checker<'_> {
   fn resolve_use(&mut self, u: &UseStmt, span: SourceSpan) {
     let unknown = self.type_arena.unknown();
     let module_name = u.path.last().copied();
-    let is_std = u.path.first().is_some_and(|s| s.as_str() == "std");
+    let is_std = u.path.first().is_some_and(|s| s.as_str() == STDLIB_ROOT);
 
     let std_data: Option<(Vec<(Sym, TypeId)>, super::type_arena::TypeArena)> = if is_std && u.path.len() >= 2 {
       let module_key = u.path[1].as_str();

@@ -4,6 +4,8 @@ use strum::Display;
 use super::{ExprId, Literal, PatternId, TypeExprId};
 use crate::sym::Sym;
 
+pub const ANY_TYPE_NAME: &str = "Any";
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct UseStmt {
   pub path: Vec<Sym>,

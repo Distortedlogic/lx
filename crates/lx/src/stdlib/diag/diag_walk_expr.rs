@@ -7,6 +7,51 @@ use crate::visitor::prelude::*;
 use super::diag_helpers::{extract_field_call_parts, is_resource_action, is_resource_create, is_resource_module};
 use super::{EdgeStyle, NodeKind, Walker};
 
+enum StdlibModule {
+  Pool,
+  Saga,
+  Plan,
+  Retry,
+  Cron,
+  Circuit,
+  Trace,
+  Knowledge,
+  Memory,
+  Budget,
+  Context,
+  Tasks,
+  Profile,
+  User,
+  Http,
+  Fs,
+  Git,
+}
+
+impl StdlibModule {
+  fn from_str(s: &str) -> Option<Self> {
+    match s {
+      "pool" => Some(Self::Pool),
+      "saga" => Some(Self::Saga),
+      "plan" => Some(Self::Plan),
+      "retry" => Some(Self::Retry),
+      "cron" => Some(Self::Cron),
+      "circuit" => Some(Self::Circuit),
+      "trace" => Some(Self::Trace),
+      "knowledge" => Some(Self::Knowledge),
+      "memory" => Some(Self::Memory),
+      "budget" => Some(Self::Budget),
+      "context" => Some(Self::Context),
+      "tasks" => Some(Self::Tasks),
+      "profile" => Some(Self::Profile),
+      "user" => Some(Self::User),
+      "http" => Some(Self::Http),
+      "fs" => Some(Self::Fs),
+      "git" => Some(Self::Git),
+      _ => None,
+    }
+  }
+}
+
 pub(super) fn visit_apply_diag(w: &mut Walker<'_>, apply: &ExprApply, span: SourceSpan, arena: &AstArena) -> ControlFlow<()> {
   if let Some((module, method, args)) = uncurry_call(apply, arena) {
     if let Some(kind) = classify_call(module, method) {
@@ -64,26 +109,29 @@ fn uncurry_fn_call<'a>(apply: &'a ExprApply, arena: &'a AstArena) -> Option<(&'a
 }
 
 fn classify_call(module: &str, method: &str) -> Option<NodeKind> {
-  match module {
-    "pool" => Some(NodeKind::Fork),
-    "saga" => Some(NodeKind::Fork),
-    "plan" => Some(NodeKind::Fork),
-    "retry" => Some(NodeKind::Loop),
-    "cron" => Some(NodeKind::Loop),
-    "circuit" => Some(match method {
+  let m = StdlibModule::from_str(module)?;
+  match m {
+    StdlibModule::Pool | StdlibModule::Saga | StdlibModule::Plan => Some(NodeKind::Fork),
+    StdlibModule::Retry | StdlibModule::Cron => Some(NodeKind::Loop),
+    StdlibModule::Circuit => Some(match method {
       "check" => NodeKind::Decision,
       _ => NodeKind::Resource,
     }),
-    "user" => Some(NodeKind::User),
-    "trace" | "knowledge" | "memory" | "budget" | "context" | "tasks" | "profile" => {
+    StdlibModule::User => Some(NodeKind::User),
+    StdlibModule::Trace
+    | StdlibModule::Knowledge
+    | StdlibModule::Memory
+    | StdlibModule::Budget
+    | StdlibModule::Context
+    | StdlibModule::Tasks
+    | StdlibModule::Profile => {
       if is_resource_create(method) {
         None
       } else {
         Some(NodeKind::Resource)
       }
     },
-    "http" | "fs" | "git" => Some(NodeKind::Io),
-    _ => None,
+    StdlibModule::Http | StdlibModule::Fs | StdlibModule::Git => Some(NodeKind::Io),
   }
 }
 
