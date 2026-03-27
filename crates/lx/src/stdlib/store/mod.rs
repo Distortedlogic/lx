@@ -1,4 +1,5 @@
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock};
 
@@ -58,11 +59,11 @@ pub(super) fn persist(state: &StoreState, span: SourceSpan) -> Result<(), LxErro
   let record = LxVal::record(state.data.clone());
   let json_val = serde_json::Value::from(&record);
   let pretty = serde_json::to_string_pretty(&json_val).map_err(|e| LxError::runtime(format!("store: failed to serialize: {e}"), span))?;
-  std::fs::write(path, pretty).map_err(|e| LxError::runtime(format!("store: failed to persist to {}: {e}", path.display()), span))
+  fs::write(path, pretty).map_err(|e| LxError::runtime(format!("store: failed to persist to {}: {e}", path.display()), span))
 }
 
-fn load_from_disk(path: &std::path::Path) -> IndexMap<crate::sym::Sym, LxVal> {
-  let Ok(content) = std::fs::read_to_string(path) else {
+fn load_from_disk(path: &Path) -> IndexMap<crate::sym::Sym, LxVal> {
+  let Ok(content) = fs::read_to_string(path) else {
     return IndexMap::new();
   };
   let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&content) else {

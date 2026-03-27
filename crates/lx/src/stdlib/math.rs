@@ -1,3 +1,4 @@
+use std::f64::consts::{E, PI};
 use std::sync::Arc;
 
 use indexmap::IndexMap;
@@ -21,8 +22,8 @@ pub fn build() -> IndexMap<crate::sym::Sym, LxVal> {
     "min"   => "math.min",   2, bi_min;
     "max"   => "math.max",   2, bi_max
   };
-  m.insert(crate::sym::intern("pi"), LxVal::Float(std::f64::consts::PI));
-  m.insert(crate::sym::intern("e"), LxVal::Float(std::f64::consts::E));
+  m.insert(crate::sym::intern("pi"), LxVal::Float(PI));
+  m.insert(crate::sym::intern("e"), LxVal::Float(E));
   m.insert(crate::sym::intern("inf"), LxVal::Float(f64::INFINITY));
   m
 }

@@ -1,6 +1,8 @@
 use std::str::FromStr;
 use std::sync::Arc;
+use std::sync::LazyLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::thread;
 use std::time::Duration;
 
 use cron::Schedule;
@@ -18,7 +20,7 @@ pub(super) struct CronJob {
   pub(super) cancel: Arc<AtomicBool>,
 }
 
-pub(super) static JOBS: std::sync::LazyLock<DashMap<u64, CronJob>> = std::sync::LazyLock::new(DashMap::new);
+pub(super) static JOBS: LazyLock<DashMap<u64, CronJob>> = LazyLock::new(DashMap::new);
 
 pub(super) fn normalize_cron(expr: &str) -> String {
   let fields: Vec<&str> = expr.split_whitespace().collect();
@@ -64,7 +66,7 @@ pub(super) fn sleep_cancellable(dur: Duration, cancel: &AtomicBool) -> bool {
   let mut remaining = dur;
   while remaining > Duration::ZERO && !cancel.load(Ordering::Relaxed) {
     let chunk = remaining.min(Duration::from_millis(250));
-    std::thread::sleep(chunk);
+    thread::sleep(chunk);
     remaining = remaining.saturating_sub(chunk);
   }
   cancel.load(Ordering::Relaxed)

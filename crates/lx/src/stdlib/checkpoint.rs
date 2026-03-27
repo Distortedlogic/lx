@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -23,26 +24,26 @@ fn checkpoint_dir(store_path: &str, scope_name: &str) -> PathBuf {
 }
 
 fn write_checkpoint(dir: &Path, step_name: &str, value: &LxVal) -> Result<(), LxError> {
-  std::fs::create_dir_all(dir).map_err(|e| LxError::runtime(format!("checkpoint: failed to create dir: {e}"), (0, 0).into()))?;
+  fs::create_dir_all(dir).map_err(|e| LxError::runtime(format!("checkpoint: failed to create dir: {e}"), (0, 0).into()))?;
   let json_val = serde_json::Value::from(value);
   let pretty = serde_json::to_string_pretty(&json_val).map_err(|e| LxError::runtime(format!("checkpoint: serialize failed: {e}"), (0, 0).into()))?;
   let target = dir.join(format!("{step_name}.json"));
   let tmp = dir.join(format!(".{step_name}.tmp"));
-  std::fs::write(&tmp, &pretty).map_err(|e| LxError::runtime(format!("checkpoint: write failed: {e}"), (0, 0).into()))?;
-  std::fs::rename(&tmp, &target).map_err(|e| LxError::runtime(format!("checkpoint: rename failed: {e}"), (0, 0).into()))?;
+  fs::write(&tmp, &pretty).map_err(|e| LxError::runtime(format!("checkpoint: write failed: {e}"), (0, 0).into()))?;
+  fs::rename(&tmp, &target).map_err(|e| LxError::runtime(format!("checkpoint: rename failed: {e}"), (0, 0).into()))?;
   Ok(())
 }
 
 fn read_checkpoint(dir: &Path, step_name: &str) -> Option<LxVal> {
   let path = dir.join(format!("{step_name}.json"));
-  let content = std::fs::read_to_string(path).ok()?;
+  let content = fs::read_to_string(path).ok()?;
   let json_val: serde_json::Value = serde_json::from_str(&content).ok()?;
   Some(LxVal::from(json_val))
 }
 
 fn clear_checkpoints(dir: &Path) -> Result<(), LxError> {
   if dir.exists() {
-    std::fs::remove_dir_all(dir).map_err(|e| LxError::runtime(format!("checkpoint.clear: {e}"), (0, 0).into()))?;
+    fs::remove_dir_all(dir).map_err(|e| LxError::runtime(format!("checkpoint.clear: {e}"), (0, 0).into()))?;
   }
   Ok(())
 }

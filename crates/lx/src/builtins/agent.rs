@@ -1,24 +1,31 @@
+use std::fs;
+use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, LazyLock};
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::{Arc, LazyLock, Mutex};
 
 use dashmap::DashMap;
 
 use crate::error::LxError;
+use crate::interpreter::Interpreter;
+use crate::parser::parse;
 use crate::record;
 use crate::runtime::RuntimeCtx;
+use crate::source::FileId;
+use crate::stdlib::helpers::extract_handle_id;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
 struct AgentEntry {
-  to_agent: Option<Arc<std::sync::mpsc::Sender<LxVal>>>,
-  from_agent: Arc<std::sync::Mutex<std::sync::mpsc::Receiver<LxVal>>>,
+  to_agent: Option<Arc<Sender<LxVal>>>,
+  from_agent: Arc<Mutex<Receiver<LxVal>>>,
 }
 
 static AGENTS: LazyLock<DashMap<u64, AgentEntry>> = LazyLock::new(DashMap::new);
 static NEXT_AGENT_ID: AtomicU64 = AtomicU64::new(1);
 
 fn agent_id(val: &LxVal, fn_name: &str, span: SourceSpan) -> Result<u64, LxError> {
-  crate::stdlib::helpers::extract_handle_id(val, "__agent_id", fn_name, span)
+  extract_handle_id(val, "__agent_id", fn_name, span)
 }
 
 pub fn bi_agent_spawn(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
@@ -33,20 +40,20 @@ pub fn bi_agent_spawn(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) 
     .and_then(|v| v.as_str().map(|s| s.to_string()))
     .ok_or_else(|| LxError::type_err("agent.spawn: config needs 'script' or 'args' with script path", span, None))?;
 
-  let source = std::fs::read_to_string(&script_path).map_err(|e| LxError::runtime(format!("agent.spawn: cannot read {script_path}: {e}"), span))?;
+  let source = fs::read_to_string(&script_path).map_err(|e| LxError::runtime(format!("agent.spawn: cannot read {script_path}: {e}"), span))?;
 
   let (tokens, comments) = crate::lexer::lex(&source).map_err(|e| LxError::runtime(format!("agent.spawn: lex error: {e}"), span))?;
-  let result = crate::parser::parse(tokens, crate::source::FileId::new(0), comments, &source);
+  let result = parse(tokens, FileId::new(0), comments, &source);
   let surface = result.program.ok_or_else(|| LxError::runtime("agent.spawn: parse error", span))?;
   let program = crate::folder::desugar(surface);
 
-  let (to_agent_tx, to_agent_rx) = std::sync::mpsc::channel::<LxVal>();
-  let (from_agent_tx, from_agent_rx) = std::sync::mpsc::channel::<LxVal>();
+  let (to_agent_tx, to_agent_rx) = mpsc::channel::<LxVal>();
+  let (from_agent_tx, from_agent_rx) = mpsc::channel::<LxVal>();
 
   let id = NEXT_AGENT_ID.fetch_add(1, Ordering::Relaxed);
-  let source_dir = std::path::Path::new(&script_path).parent().map(|p| p.to_path_buf());
+  let source_dir = Path::new(&script_path).parent().map(|p| p.to_path_buf());
 
-  let yield_rx = Arc::new(std::sync::Mutex::new(to_agent_rx));
+  let yield_rx = Arc::new(Mutex::new(to_agent_rx));
   let yield_tx = Arc::new(from_agent_tx);
 
   tokio::task::spawn_blocking(move || {
@@ -56,7 +63,7 @@ pub fn bi_agent_spawn(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) 
       Arc::new(RuntimeCtx { source_dir: parking_lot::Mutex::new(source_dir), yield_: yield_backend, tokio_runtime: Arc::new(rt), ..RuntimeCtx::default() });
     let source_clone = source.clone();
     ctx.tokio_runtime.clone().block_on(async {
-      let mut interp = crate::interpreter::Interpreter::new(&source_clone, None, ctx);
+      let mut interp = Interpreter::new(&source_clone, None, ctx);
       if let Err(e) = interp.load_default_tools().await {
         eprintln!("[agent:spawn] load_default_tools failed: {e}");
         return;
@@ -67,7 +74,7 @@ pub fn bi_agent_spawn(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) 
     });
   });
 
-  AGENTS.insert(id, AgentEntry { to_agent: Some(Arc::new(to_agent_tx)), from_agent: Arc::new(std::sync::Mutex::new(from_agent_rx)) });
+  AGENTS.insert(id, AgentEntry { to_agent: Some(Arc::new(to_agent_tx)), from_agent: Arc::new(Mutex::new(from_agent_rx)) });
 
   Ok(record! {
     "__agent_id" => LxVal::int(id),
@@ -122,8 +129,8 @@ pub fn bi_agent_tell(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -
 }
 
 struct ChannelYieldBackend {
-  rx: Arc<std::sync::Mutex<std::sync::mpsc::Receiver<LxVal>>>,
-  tx: Arc<std::sync::mpsc::Sender<LxVal>>,
+  rx: Arc<Mutex<Receiver<LxVal>>>,
+  tx: Arc<Sender<LxVal>>,
 }
 
 impl crate::runtime::YieldBackend for ChannelYieldBackend {

@@ -12,6 +12,7 @@ use crate::lexer::lex;
 use crate::parser::parse;
 use crate::record;
 use crate::runtime::RuntimeCtx;
+use crate::source::FileId;
 use crate::std_module;
 use crate::stdlib::helpers::require_str_field;
 use crate::sym::{Sym, intern};
@@ -70,7 +71,7 @@ pub fn extract_echart_json<P>(program: &Program<P>) -> String {
 
 fn extract_graph(src: &str, span: SourceSpan) -> Result<Graph, LxError> {
   let (tokens, comments) = lex(src).map_err(|e| LxError::runtime(format!("diag: lex error: {e}"), span))?;
-  let result = parse(tokens, crate::source::FileId::new(0), comments, src);
+  let result = parse(tokens, FileId::new(0), comments, src);
   let program = result.program.ok_or_else(|| {
     let msgs: Vec<String> = result.errors.iter().map(|e| format!("{e}")).collect();
     LxError::runtime(format!("diag: parse errors: {}", msgs.join("; ")), span)

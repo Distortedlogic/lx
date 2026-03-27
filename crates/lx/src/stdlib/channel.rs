@@ -1,3 +1,5 @@
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock};
 
@@ -52,7 +54,7 @@ fn bi_create(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result
   Ok(LxVal::tuple(vec![sender, receiver]))
 }
 
-fn bi_send(args: Vec<LxVal>, span: SourceSpan, _ctx: Arc<RuntimeCtx>) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<LxVal, LxError>>>> {
+fn bi_send(args: Vec<LxVal>, span: SourceSpan, _ctx: Arc<RuntimeCtx>) -> Pin<Box<dyn Future<Output = Result<LxVal, LxError>>>> {
   Box::pin(async move {
     let id = chan_id(&args[0], "channel.send", span)?;
     let value = args[1].clone();
@@ -70,7 +72,7 @@ fn bi_send(args: Vec<LxVal>, span: SourceSpan, _ctx: Arc<RuntimeCtx>) -> std::pi
   })
 }
 
-fn bi_recv(args: Vec<LxVal>, span: SourceSpan, _ctx: Arc<RuntimeCtx>) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<LxVal, LxError>>>> {
+fn bi_recv(args: Vec<LxVal>, span: SourceSpan, _ctx: Arc<RuntimeCtx>) -> Pin<Box<dyn Future<Output = Result<LxVal, LxError>>>> {
   Box::pin(async move {
     let id = chan_id(&args[0], "channel.recv", span)?;
     let receiver = {

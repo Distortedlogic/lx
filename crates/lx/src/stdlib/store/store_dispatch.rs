@@ -1,5 +1,8 @@
+use std::fs;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
+
+use indexmap::IndexMap;
 
 use crate::builtins::{call_value_sync, mk};
 use crate::error::LxError;
@@ -39,7 +42,7 @@ pub fn store_method(name: &str, store_val: &LxVal) -> Option<LxVal> {
   method.map(|(mname, arity, func)| LxVal::BuiltinFunc(BuiltinFunc { name: mname, arity, kind: BuiltinKind::Sync(func), applied: vec![store_val.clone()] }))
 }
 
-pub fn object_insert(fields: indexmap::IndexMap<Sym, LxVal>) -> u64 {
+pub fn object_insert(fields: IndexMap<Sym, LxVal>) -> u64 {
   let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
   STORES.insert(id, StoreState { data: fields, path: None });
   id
@@ -131,14 +134,14 @@ fn bi_save_to(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resul
   let record = LxVal::record(s.data.clone());
   let json_val = serde_json::Value::from(&record);
   let pretty = serde_json::to_string_pretty(&json_val).map_err(|e| LxError::runtime(format!("store.save: serialization failed: {e}"), span))?;
-  std::fs::write(path, pretty).map_err(|e| LxError::runtime(format!("store.save: {e}"), span))?;
+  fs::write(path, pretty).map_err(|e| LxError::runtime(format!("store.save: {e}"), span))?;
   Ok(LxVal::Unit)
 }
 
 fn bi_load_from(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let path = args[1].require_str("store.load", span)?;
-  let content = std::fs::read_to_string(path).map_err(|e| LxError::runtime(format!("store.load: {e}"), span))?;
+  let content = fs::read_to_string(path).map_err(|e| LxError::runtime(format!("store.load: {e}"), span))?;
   let json_val: serde_json::Value = serde_json::from_str(&content).map_err(|e| LxError::runtime(format!("store.load: {e}"), span))?;
   let val = LxVal::from(json_val);
   let data = match val {
@@ -152,7 +155,7 @@ fn bi_load_from(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Res
 
 fn bi_merge(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
-  let source_data: indexmap::IndexMap<Sym, LxVal> = match &args[1] {
+  let source_data: IndexMap<Sym, LxVal> = match &args[1] {
     LxVal::Store { id: src_id } => {
       let src = get_store(*src_id, span)?;
       src.data.clone()

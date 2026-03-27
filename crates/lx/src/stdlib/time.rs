@@ -1,4 +1,6 @@
 use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
 
 use chrono::{DateTime, TimeZone, Utc};
 use indexmap::IndexMap;
@@ -43,7 +45,7 @@ fn bi_sleep(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<
       return Err(LxError::type_err("time.sleep expects Int or Float ms", span, None));
     },
   };
-  std::thread::sleep(std::time::Duration::from_millis(ms));
+  thread::sleep(Duration::from_millis(ms));
   Ok(LxVal::Unit)
 }
 

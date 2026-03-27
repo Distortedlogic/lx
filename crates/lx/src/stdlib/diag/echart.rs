@@ -1,5 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 
+use serde_json::{self, Value as JsonValue, json};
+
 use super::diag_walk::{EdgeType, Graph, NodeKind};
 
 pub(crate) fn graph_to_echart_json(graph: &Graph) -> String {
@@ -63,7 +65,7 @@ pub(crate) fn graph_to_echart_json(graph: &Graph) -> String {
       NodeKind::Type => "circle",
     }
   };
-  let categories = serde_json::json!([
+  let categories = json!([
       {"name": "agent", "itemStyle": {"color": "#e1f5fe", "borderColor": "#0288d1"}},
       {"name": "tool", "itemStyle": {"color": "#f3e5f5", "borderColor": "#7b1fa2"}},
       {"name": "decision", "itemStyle": {"color": "#fff3e0", "borderColor": "#ef6c00"}},
@@ -75,7 +77,7 @@ pub(crate) fn graph_to_echart_json(graph: &Graph) -> String {
       {"name": "type", "itemStyle": {"color": "#f5f5f5", "borderColor": "#616161"}},
       {"name": "default", "itemStyle": {"color": "#f5f5f5", "borderColor": "#616161"}}
   ]);
-  let nodes_json: Vec<serde_json::Value> = graph
+  let nodes_json: Vec<JsonValue> = graph
     .nodes
     .iter()
     .map(|n| {
@@ -83,8 +85,8 @@ pub(crate) fn graph_to_echart_json(graph: &Graph) -> String {
       let pos = layer_positions.entry(layer).or_insert(0);
       let y_pos = *pos;
       *pos += 1;
-      let symbol_size = if matches!(n.kind, NodeKind::Fork | NodeKind::Join) { serde_json::json!([40, 10]) } else { serde_json::json!(40) };
-      serde_json::json!({
+      let symbol_size = if matches!(n.kind, NodeKind::Fork | NodeKind::Join) { json!([40, 10]) } else { json!(40) };
+      json!({
           "name": n.id,
           "x": layer as f64 * 200.0,
           "y": y_pos as f64 * 120.0,
@@ -96,7 +98,7 @@ pub(crate) fn graph_to_echart_json(graph: &Graph) -> String {
       })
     })
     .collect();
-  let edges_json: Vec<serde_json::Value> = graph
+  let edges_json: Vec<JsonValue> = graph
     .edges
     .iter()
     .map(|e| {
@@ -107,18 +109,18 @@ pub(crate) fn graph_to_echart_json(graph: &Graph) -> String {
         EdgeType::Io => ("solid", "#00695c", 1),
         EdgeType::Exec => ("solid", "#666666", 1),
       };
-      let mut edge = serde_json::json!({
+      let mut edge = json!({
           "source": e.from,
           "target": e.to,
           "lineStyle": {"type": line_type, "color": color, "width": width, "curveness": 0.2}
       });
       if !e.label.is_empty() {
-        edge["label"] = serde_json::json!({"show": true, "formatter": e.label, "fontSize": 10});
+        edge["label"] = json!({"show": true, "formatter": e.label, "fontSize": 10});
       }
       edge
     })
     .collect();
-  serde_json::json!({
+  json!({
       "tooltip": {"trigger": "item"},
       "series": [{
           "type": "graph",

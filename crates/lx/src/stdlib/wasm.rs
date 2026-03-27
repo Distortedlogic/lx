@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::env;
+use std::fs;
 use std::path::Path;
 use std::sync::{Arc, LazyLock, Mutex, RwLock};
 
@@ -42,8 +44,7 @@ struct ExportDef {
 
 pub(crate) fn load_plugin(name: &str, plugin_dir: &Path, span: SourceSpan) -> Result<ModuleExports, LxError> {
   let toml_path = plugin_dir.join(crate::PLUGIN_MANIFEST);
-  let toml_str =
-    std::fs::read_to_string(&toml_path).map_err(|e| LxError::runtime(format!("plugin '{name}': cannot read {}: {e}", toml_path.display()), span))?;
+  let toml_str = fs::read_to_string(&toml_path).map_err(|e| LxError::runtime(format!("plugin '{name}': cannot read {}: {e}", toml_path.display()), span))?;
 
   let manifest: PluginToml = toml::from_str(&toml_str).map_err(|e| LxError::runtime(format!("plugin '{name}': invalid plugin.toml: {e}"), span))?;
 
@@ -83,7 +84,7 @@ pub(crate) fn load_plugin(name: &str, plugin_dir: &Path, span: SourceSpan) -> Re
     extism::UserData::new(()),
     |plugin: &mut extism::CurrentPlugin, inputs: &[extism::Val], outputs: &mut [extism::Val], _ud: extism::UserData<()>| {
       let key: String = plugin.memory_get_val(&inputs[0])?;
-      let val = std::env::var(&key).unwrap_or_default();
+      let val = env::var(&key).unwrap_or_default();
       let handle = plugin.memory_new(&val)?;
       outputs[0] = plugin.memory_to_val(handle);
       Ok(())

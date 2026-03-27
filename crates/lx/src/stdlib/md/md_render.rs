@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
+use indexmap::IndexMap;
+
 use crate::error::LxError;
 use crate::runtime::RuntimeCtx;
+use crate::sym::Sym;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
@@ -52,17 +55,17 @@ fn render_node(val: &LxVal) -> Option<String> {
   })
 }
 
-fn render_items(r: &indexmap::IndexMap<crate::sym::Sym, LxVal>, prefix: &str) -> String {
+fn render_items(r: &IndexMap<Sym, LxVal>, prefix: &str) -> String {
   let items = r.get(&crate::sym::intern("items")).and_then(|v| v.as_list()).cloned().unwrap_or_default();
   items.iter().map(|i| format!("{prefix}{i}")).collect::<Vec<_>>().join("\n")
 }
 
-fn render_ordered_items(r: &indexmap::IndexMap<crate::sym::Sym, LxVal>) -> String {
+fn render_ordered_items(r: &IndexMap<Sym, LxVal>) -> String {
   let items = r.get(&crate::sym::intern("items")).and_then(|v| v.as_list()).cloned().unwrap_or_default();
   items.iter().enumerate().map(|(i, item)| format!("{}. {item}", i + 1)).collect::<Vec<_>>().join("\n")
 }
 
-fn render_table(r: &indexmap::IndexMap<crate::sym::Sym, LxVal>) -> String {
+fn render_table(r: &IndexMap<Sym, LxVal>) -> String {
   let headers = r.get(&crate::sym::intern("headers")).and_then(|v| v.as_list()).cloned().unwrap_or_default();
   let rows = r.get(&crate::sym::intern("rows")).and_then(|v| v.as_list()).cloned().unwrap_or_default();
   let header_strs: Vec<String> = headers.iter().map(|h| format!("{h}")).collect();
