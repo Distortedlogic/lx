@@ -1,25 +1,24 @@
 use dioxus::prelude::*;
 
-use crate::contexts::status_bar::StatusBarState;
+use crate::contexts::status_bar::{StatusBarState, StatusBarStateStoreExt as _};
 
 #[component]
 pub fn StatusBar() -> Element {
-  let state = use_context::<StatusBarState>();
+  let state = use_context::<Store<StatusBarState>>();
   use_future(move || async move {
     if let Ok(output) = tokio::process::Command::new("git").args(["rev-parse", "--abbrev-ref", "HEAD"]).output().await
       && output.status.success()
     {
       let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
-      let mut branch_sig = state.branch;
-      branch_sig.set(branch);
+      state.branch().set(branch);
     }
   });
-  let pane_label = (state.pane_label)();
-  let branch = (state.branch)();
-  let line = (state.line)();
-  let col = (state.col)();
-  let encoding = (state.encoding)();
-  let notif_count = (state.notification_count)();
+  let pane_label = state.pane_label().cloned();
+  let branch = state.branch().cloned();
+  let line = state.line().cloned();
+  let col = state.col().cloned();
+  let encoding = state.encoding().cloned();
+  let notif_count = state.notification_count().cloned();
   rsx! {
     div { class: "flex items-center justify-between h-6 px-3 bg-[var(--surface-container-lowest)] border-t-2 border-[var(--outline)] text-xs uppercase tracking-[0.05em] font-mono shrink-0",
       div { class: "flex items-center gap-3",

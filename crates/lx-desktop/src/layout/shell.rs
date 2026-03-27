@@ -8,7 +8,7 @@ use super::menu_bar::MenuBar;
 use super::sidebar::Sidebar;
 use super::status_bar::StatusBar;
 use crate::contexts::activity_log::ActivityLog;
-use crate::contexts::status_bar::StatusBarState;
+use crate::contexts::status_bar::{StatusBarState, StatusBarStateStoreExt as _};
 use crate::panes::DesktopPane;
 use crate::routes::Route;
 use crate::terminal::{add_tab, use_provide_tabs};
@@ -31,12 +31,13 @@ type SpawnReceiver = mpsc::UnboundedReceiver<TerminalSpawnRequest>;
 #[component]
 pub fn Shell() -> Element {
   let tabs_state = use_provide_tabs();
-  let status_bar_state = StatusBarState::provide();
+  let status_bar_state =
+    use_store(|| StatusBarState { branch: "main".into(), line: 1, col: 1, encoding: "UTF-8".into(), notification_count: 0, pane_label: "READY".into() });
+  use_context_provider(|| status_bar_state);
   let _activity_log = ActivityLog::provide();
   use_effect(move || {
     let count = tabs_state.read().notifications.len();
-    let mut notif = status_bar_state.notification_count;
-    notif.set(count);
+    status_bar_state.notification_count().set(count);
   });
   #[cfg(feature = "desktop")]
   use_hook(|| {

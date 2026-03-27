@@ -1,14 +1,13 @@
-use super::state::{EnvEntry, SettingsState};
+use super::state::{EnvEntry, SettingsDataStoreExt as _, SettingsState};
 use dioxus::prelude::*;
 
 #[component]
 pub fn EnvVarsPanel() -> Element {
   let settings = use_context::<SettingsState>();
-  let mut data = settings.data;
   let mut new_key = use_signal(String::new);
   let mut new_value = use_signal(String::new);
 
-  let env_vars = settings.data.read().env_vars.clone();
+  let env_vars = settings.data.env_vars().cloned();
 
   rsx! {
     div { class: "bg-[var(--surface-container-lowest)] border-2 border-[var(--outline-variant)] p-0 overflow-hidden",
@@ -38,7 +37,7 @@ pub fn EnvVarsPanel() -> Element {
                     span {
                       class: "material-symbols-outlined text-sm text-[var(--outline)] cursor-pointer hover:text-[var(--error)]",
                       onclick: move |_| {
-                          data.write().env_vars.remove(i);
+                          settings.data.env_vars().write().remove(i);
                       },
                       "delete"
                     }
@@ -67,7 +66,7 @@ pub fn EnvVarsPanel() -> Element {
               let k = new_key().trim().to_string();
               let v = new_value().trim().to_string();
               if !k.is_empty() {
-                  data.write().env_vars.push(EnvEntry { key: k, value: v });
+                  settings.data.env_vars().push(EnvEntry { key: k, value: v });
                   new_key.set(String::new());
                   new_value.set(String::new());
               }

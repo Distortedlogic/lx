@@ -8,11 +8,21 @@ use dioxus::prelude::*;
 
 use self::pane_area::PaneArea;
 use self::voice_banner::VoiceBanner;
-use self::voice_context::VoiceContext;
+use self::voice_context::{PipelineStage, VoiceContext, VoiceData, VoiceStatus};
 
 #[component]
 pub fn Agents() -> Element {
-  let _ctx = VoiceContext::provide();
+  let data = use_store(|| VoiceData {
+    status: VoiceStatus::Idle,
+    transcript: Vec::new(),
+    pcm_buffer: Vec::new(),
+    rms: 0.0,
+    pipeline_stage: PipelineStage::Idle,
+    always_listen: false,
+    barge_in: false,
+  });
+  let ctx = VoiceContext { data, widget: Signal::new(None) };
+  use_context_provider(|| ctx);
 
   rsx! {
     div { class: "flex flex-col h-full",

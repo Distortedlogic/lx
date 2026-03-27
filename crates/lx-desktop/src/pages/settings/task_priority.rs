@@ -1,13 +1,12 @@
-use super::state::SettingsState;
+use super::state::{SettingsDataStoreExt as _, SettingsState};
 use dioxus::prelude::*;
 
 #[component]
 pub fn TaskPriorityPanel() -> Element {
   let settings = use_context::<SettingsState>();
-  let mut data = settings.data;
-  let priority = settings.data.read().task_priority;
-  let auto_scale = settings.data.read().auto_scale;
-  let redundant_verify = settings.data.read().redundant_verify;
+  let priority = settings.data.task_priority().cloned();
+  let auto_scale = settings.data.auto_scale().cloned();
+  let redundant_verify = settings.data.redundant_verify().cloned();
   let priority_display = format!("{priority:.2}");
 
   rsx! {
@@ -30,7 +29,7 @@ pub fn TaskPriorityPanel() -> Element {
         class: "w-full accent-[var(--warning)] mb-3",
         oninput: move |evt| {
             if let Ok(v) = evt.value().parse::<f64>() {
-                data.write().task_priority = v;
+                settings.data.task_priority().set(v);
             }
         },
       }
@@ -45,8 +44,8 @@ pub fn TaskPriorityPanel() -> Element {
             checked: auto_scale,
             class: "w-4 h-4 accent-[var(--warning)]",
             onchange: move |_| {
-                let mut d = data.write();
-                d.auto_scale = !d.auto_scale;
+                let current = settings.data.auto_scale().cloned();
+                settings.data.auto_scale().set(!current);
             },
           }
           "AUTO-SCALE_RESOURCES"
@@ -57,8 +56,8 @@ pub fn TaskPriorityPanel() -> Element {
             checked: redundant_verify,
             class: "w-4 h-4 accent-[var(--warning)]",
             onchange: move |_| {
-                let mut d = data.write();
-                d.redundant_verify = !d.redundant_verify;
+                let current = settings.data.redundant_verify().cloned();
+                settings.data.redundant_verify().set(!current);
             },
           }
           "REDUNDANT_VERIFICATION"

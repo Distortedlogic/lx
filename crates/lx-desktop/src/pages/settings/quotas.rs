@@ -1,4 +1,4 @@
-use super::state::SettingsState;
+use super::state::{SettingsDataStoreExt as _, SettingsState};
 use dioxus::prelude::*;
 
 struct QuotaDisplay {
@@ -11,13 +11,11 @@ struct QuotaDisplay {
 #[component]
 pub fn QuotasPanel() -> Element {
   let settings = use_context::<SettingsState>();
-  let data = settings.data.read();
   let quotas = [
-    QuotaDisplay { label: "COMPUTE_CORE", percent: data.compute_quota, min_label: "0.0 GHz/s", max_label: "12.4 GHz/s" },
-    QuotaDisplay { label: "MEMORY_BUFFER", percent: data.memory_quota, min_label: "0.0 GB", max_label: "64.0 GB" },
-    QuotaDisplay { label: "STORAGE_IO", percent: data.storage_quota, min_label: "0.0 MB/s", max_label: "1.0 GB/s" },
+    QuotaDisplay { label: "COMPUTE_CORE", percent: settings.data.compute_quota().cloned(), min_label: "0.0 GHz/s", max_label: "12.4 GHz/s" },
+    QuotaDisplay { label: "MEMORY_BUFFER", percent: settings.data.memory_quota().cloned(), min_label: "0.0 GB", max_label: "64.0 GB" },
+    QuotaDisplay { label: "STORAGE_IO", percent: settings.data.storage_quota().cloned(), min_label: "0.0 MB/s", max_label: "1.0 GB/s" },
   ];
-  drop(data);
 
   rsx! {
     div { class: "space-y-4",

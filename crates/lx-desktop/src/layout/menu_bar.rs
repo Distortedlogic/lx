@@ -192,11 +192,11 @@ fn render_menu_item(open_menu: Signal<Option<usize>>, item: &MenuItem) -> Elemen
   let shortcut = item.shortcut;
   let action = item.action;
   let has_action = action.is_some();
-  let disabled_class = if has_action { "text-[var(--on-surface)]" } else { "text-[var(--on-surface-variant)] opacity-50" };
 
   rsx! {
     button {
-      class: if has_action { "w-full flex items-center justify-between px-3 py-1.5 text-sm hover:bg-[var(--surface-container-highest)] transition-colors duration-100 {disabled_class}" } else { "w-full flex items-center justify-between px-3 py-1.5 text-sm transition-colors duration-100 {disabled_class}" },
+      class: "w-full flex items-center justify-between px-3 py-1.5 text-sm transition-colors duration-100",
+      class: if has_action { "text-[var(--on-surface)] hover:bg-[var(--surface-container-highest)]" } else { "text-[var(--on-surface-variant)] opacity-50" },
       disabled: !has_action,
       onclick: move |_| {
           if let Some(ref action) = action {

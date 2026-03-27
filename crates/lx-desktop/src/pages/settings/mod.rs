@@ -12,7 +12,7 @@ use self::task_priority::{ArchitectCard, SystemNotice, TaskPriorityPanel};
 
 #[component]
 pub fn Settings() -> Element {
-  let settings = SettingsState::provide();
+  let mut settings = SettingsState::provide();
   rsx! {
     div { class: "flex flex-col h-full p-4 overflow-auto gap-4",
       div { class: "flex items-center justify-between",

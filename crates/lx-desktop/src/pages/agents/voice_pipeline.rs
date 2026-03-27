@@ -1,6 +1,6 @@
 use std::sync::LazyLock;
 
-use super::voice_context::{PipelineStage, TranscriptEntry, VoiceContext, VoiceStatus};
+use super::voice_context::{PipelineStage, TranscriptEntry, VoiceContext, VoiceDataStoreExt as _, VoiceStatus};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as B64;
 use common_inference::InferenceClient as _;
@@ -82,12 +82,12 @@ async fn tts(text: &str) -> anyhow::Result<Vec<u8>> {
   common_kokoro::KOKORO.infer(&req).await
 }
 
-pub async fn run_pipeline(text: &str, agent_widget: dioxus_widget_bridge::TsWidgetHandle, mut ctx: VoiceContext) -> anyhow::Result<()> {
-  ctx.transcript.write().push(TranscriptEntry { is_user: true, text: text.to_owned() });
+pub async fn run_pipeline(text: &str, agent_widget: dioxus_widget_bridge::TsWidgetHandle, ctx: VoiceContext) -> anyhow::Result<()> {
+  ctx.data.transcript().push(TranscriptEntry { is_user: true, text: text.to_owned() });
 
   agent_widget.send_update(serde_json::json!({ "type": "user_display", "text": text }));
 
-  ctx.pipeline_stage.set(PipelineStage::QueryingLlm);
+  ctx.data.pipeline_stage().set(PipelineStage::QueryingLlm);
   let response = crate::voice_backend::query_streaming(text, |chunk| {
     agent_widget.send_update(serde_json::json!({ "type": "assistant_chunk", "text": chunk }));
   })
@@ -95,14 +95,14 @@ pub async fn run_pipeline(text: &str, agent_widget: dioxus_widget_bridge::TsWidg
   agent_widget.send_update(serde_json::json!({ "type": "assistant_done" }));
 
   if response.is_empty() {
-    ctx.pipeline_stage.set(PipelineStage::Idle);
+    ctx.data.pipeline_stage().set(PipelineStage::Idle);
     return Ok(());
   }
 
-  ctx.pipeline_stage.set(PipelineStage::SynthesizingSpeech);
+  ctx.data.pipeline_stage().set(PipelineStage::SynthesizingSpeech);
   let wav_bytes = tts(&response).await?;
 
-  ctx.status.set(VoiceStatus::Speaking);
+  ctx.data.status().set(VoiceStatus::Speaking);
 
   let wav_len = wav_bytes.len();
   info!("voice: TTS returned {wav_len} bytes, starting playback");
@@ -115,12 +115,13 @@ pub async fn run_pipeline(text: &str, agent_widget: dioxus_widget_bridge::TsWidg
   play_result??;
 
   let transcript_entry = response;
-  let mut t = ctx.transcript.write();
+  let mut transcript_store = ctx.data.transcript();
+  let mut t = transcript_store.write();
   match t.last_mut() {
     Some(entry) if !entry.is_user => entry.text.push_str(&format!(" {transcript_entry}")),
     _ => t.push(TranscriptEntry { is_user: false, text: transcript_entry }),
   }
 
-  ctx.pipeline_stage.set(PipelineStage::Idle);
+  ctx.data.pipeline_stage().set(PipelineStage::Idle);
   Ok(())
 }

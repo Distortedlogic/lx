@@ -7,7 +7,7 @@ pub struct EnvEntry {
   pub value: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Store, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SettingsData {
   pub env_vars: Vec<EnvEntry>,
   pub task_priority: f64,
@@ -38,26 +38,27 @@ impl Default for SettingsData {
 
 #[derive(Clone, Copy)]
 pub struct SettingsState {
-  pub data: Signal<SettingsData>,
+  pub data: Store<SettingsData>,
   pub saved: Signal<SettingsData>,
 }
 
 impl SettingsState {
   pub fn provide() -> Self {
     let saved = dioxus_storage::use_persistent("lx_settings", SettingsData::default);
-    let data = use_signal(|| saved.read().clone());
+    let data = use_store(|| saved.read().clone());
     let ctx = Self { data, saved };
     use_context_provider(|| ctx);
     ctx
   }
 
-  pub fn discard(&self) {
-    let mut data = self.data;
-    data.set((self.saved)());
+  pub fn discard(&mut self) {
+    let saved_val = (self.saved)();
+    self.data.set(saved_val);
   }
 
   pub fn execute(&self) {
+    let data_val = self.data.cloned();
     let mut saved = self.saved;
-    saved.set((self.data)());
+    saved.set(data_val);
   }
 }

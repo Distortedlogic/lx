@@ -1,4 +1,4 @@
-use super::voice_context::{PipelineStage, TranscriptEntry, VoiceContext, VoiceStatus};
+use super::voice_context::{PipelineStage, TranscriptEntry, VoiceContext, VoiceDataStoreExt as _, VoiceStatus};
 use super::{voice_pipeline, voice_porcupine};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as B64;
@@ -29,21 +29,21 @@ pub fn VoiceBanner() -> Element {
                 handle_keyword_detected(voice_widget, ctx);
               }
             }
-            if (ctx.status)() == VoiceStatus::Listening {
-              ctx.pcm_buffer.write().extend_from_slice(&bytes);
+            if ctx.data.status().cloned() == VoiceStatus::Listening {
+              ctx.data.pcm_buffer().write().extend_from_slice(&bytes);
             }
           }
         },
         Some("silence_detected") => {
-          let stage = (ctx.pipeline_stage)();
+          let stage = ctx.data.pipeline_stage().cloned();
           if stage != PipelineStage::Idle {
-            ctx.pcm_buffer.write().clear();
+            ctx.data.pcm_buffer().write().clear();
             continue;
           }
 
-          let buffer = std::mem::take(&mut *ctx.pcm_buffer.write());
+          let buffer = std::mem::take(&mut *ctx.data.pcm_buffer().write());
           if buffer.is_empty() {
-            if (ctx.always_listen)() {
+            if ctx.data.always_listen().cloned() {
               voice_widget.send_update(serde_json::json!({ "type": "resume_standby" }));
             } else {
               voice_widget.send_update(serde_json::json!({ "type": "stop_capture" }));
@@ -53,16 +53,16 @@ pub fn VoiceBanner() -> Element {
 
           spawn(async move {
             let result = handle_utterance(buffer, agent_widget, ctx).await;
-            if (ctx.barge_in)() {
-              ctx.barge_in.set(false);
+            if ctx.data.barge_in().cloned() {
+              ctx.data.barge_in().set(false);
               return;
             }
             if let Err(e) = &result {
               error!("voice: pipeline error: {e}");
-              ctx.transcript.write().push(TranscriptEntry { is_user: false, text: format!("Error: {e}") });
-              ctx.pipeline_stage.set(PipelineStage::Idle);
+              ctx.data.transcript().push(TranscriptEntry { is_user: false, text: format!("Error: {e}") });
+              ctx.data.pipeline_stage().set(PipelineStage::Idle);
             }
-            if (ctx.always_listen)() {
+            if ctx.data.always_listen().cloned() {
               voice_widget.send_update(serde_json::json!({ "type": "resume_standby" }));
             } else {
               voice_widget.send_update(serde_json::json!({ "type": "stop_capture" }));
@@ -71,19 +71,19 @@ pub fn VoiceBanner() -> Element {
         },
         Some("rms") => {
           if let Some(level) = msg["level"].as_f64() {
-            ctx.rms.set(level as f32);
+            ctx.data.rms().set(level as f32);
           }
         },
         Some("status_change") => match msg["status"].as_str() {
-          Some("idle") => ctx.status.set(VoiceStatus::Idle),
-          Some("standby") => ctx.status.set(VoiceStatus::Standby),
-          Some("listening") => ctx.status.set(VoiceStatus::Listening),
-          Some("processing") => ctx.status.set(VoiceStatus::Processing),
-          Some("speaking") => ctx.status.set(VoiceStatus::Speaking),
+          Some("idle") => ctx.data.status().set(VoiceStatus::Idle),
+          Some("standby") => ctx.data.status().set(VoiceStatus::Standby),
+          Some("listening") => ctx.data.status().set(VoiceStatus::Listening),
+          Some("processing") => ctx.data.status().set(VoiceStatus::Processing),
+          Some("speaking") => ctx.data.status().set(VoiceStatus::Speaking),
           _ => {},
         },
         Some("start_standby") | Some("cancel") => {
-          ctx.pcm_buffer.write().clear();
+          ctx.data.pcm_buffer().write().clear();
         },
         _ => {},
       }
@@ -116,7 +116,7 @@ pub fn VoiceBanner() -> Element {
     }
   });
 
-  let current_status = (ctx.status)();
+  let current_status = ctx.data.status().cloned();
   let is_active = current_status != VoiceStatus::Idle;
   let status_text = current_status.to_string();
   let bar_glow = if is_active { "shadow-[0_0_12px_var(--primary)]" } else { "" };
@@ -125,12 +125,13 @@ pub fn VoiceBanner() -> Element {
     _ if is_active => "\u{1F534}",
     _ => "\u{1F512}",
   };
-  let volume = ((ctx.rms)() / 0.3).min(1.0);
-  let stage = (ctx.pipeline_stage)();
-  let entries = ctx.transcript.read();
+  let volume = (ctx.data.rms().cloned() / 0.3).min(1.0);
+  let stage = ctx.data.pipeline_stage().cloned();
+  let transcript_store = ctx.data.transcript();
+  let entries = transcript_store.read();
   let turn_count = entries.iter().filter(|e| e.is_user).count();
   drop(entries);
-  let always_listen = (ctx.always_listen)();
+  let always_listen = ctx.data.always_listen().cloned();
   let porcupine_available = voice_porcupine::is_available();
 
   rsx! {
@@ -174,10 +175,10 @@ pub fn VoiceBanner() -> Element {
             class: "border border-[var(--outline-variant)] text-[var(--on-surface-variant)] rounded px-3 py-1.5 text-xs uppercase hover:bg-[var(--surface-container-high)] transition-colors duration-150 font-semibold",
             onclick: move |_| {
                 if always_listen {
-                    ctx.always_listen.set(false);
+                    ctx.data.always_listen().set(false);
                     voice_widget.send_update(serde_json::json!({ "type" : "stop_capture" }));
                 } else {
-                    ctx.always_listen.set(true);
+                    ctx.data.always_listen().set(true);
                     voice_widget
                         .send_update(serde_json::json!({ "type" : "start_standby_listen" }));
                 }
@@ -193,7 +194,7 @@ pub fn VoiceBanner() -> Element {
           button {
             class: "border border-[var(--outline)] text-[var(--on-surface)] rounded px-4 py-1.5 text-sm uppercase hover:bg-[var(--surface-container-high)] transition-colors duration-150 font-semibold",
             onclick: move |_| {
-                ctx.always_listen.set(false);
+                ctx.data.always_listen().set(false);
                 voice_widget.send_update(serde_json::json!({ "type" : "stop_capture" }));
             },
             "STOP"
@@ -217,16 +218,16 @@ pub fn VoiceBanner() -> Element {
   }
 }
 
-fn handle_keyword_detected(voice_widget: dioxus_widget_bridge::TsWidgetHandle, mut ctx: VoiceContext) {
-  let status = (ctx.status)();
+fn handle_keyword_detected(voice_widget: dioxus_widget_bridge::TsWidgetHandle, ctx: VoiceContext) {
+  let status = ctx.data.status().cloned();
   if status != VoiceStatus::Standby && status != VoiceStatus::Speaking {
     return;
   }
   if status == VoiceStatus::Speaking {
-    ctx.barge_in.set(true);
+    ctx.data.barge_in().set(true);
     voice_pipeline::stop_active_playback();
   }
-  ctx.pcm_buffer.write().clear();
+  ctx.data.pcm_buffer().write().clear();
   voice_porcupine::reset_buffer();
   voice_widget.send_update(serde_json::json!({ "type": "start_recording" }));
   spawn(async move {
@@ -234,11 +235,11 @@ fn handle_keyword_detected(voice_widget: dioxus_widget_bridge::TsWidgetHandle, m
   });
 }
 
-async fn handle_utterance(pcm: Vec<u8>, agent_widget: dioxus_widget_bridge::TsWidgetHandle, mut ctx: VoiceContext) -> anyhow::Result<()> {
-  ctx.pipeline_stage.set(PipelineStage::Transcribing);
+async fn handle_utterance(pcm: Vec<u8>, agent_widget: dioxus_widget_bridge::TsWidgetHandle, ctx: VoiceContext) -> anyhow::Result<()> {
+  ctx.data.pipeline_stage().set(PipelineStage::Transcribing);
   let text = voice_pipeline::transcribe(&pcm).await?;
   if text.is_empty() {
-    ctx.pipeline_stage.set(PipelineStage::Idle);
+    ctx.data.pipeline_stage().set(PipelineStage::Idle);
     return Ok(());
   }
   voice_pipeline::run_pipeline(&text, agent_widget, ctx).await

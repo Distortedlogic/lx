@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 use super::use_tabs_state;
 use crate::contexts::activity_log::ActivityLog;
-use crate::contexts::status_bar::StatusBarState;
+use crate::contexts::status_bar::{StatusBarState, StatusBarStateStoreImplExt as _};
 use crate::panes::DesktopPane;
 
 pub use super::browser_view::{BrowserNavCtx, BrowserView};
@@ -118,7 +118,7 @@ pub fn EditorView(editor_id: String, file_path: String, language: Option<String>
           Some("cursor") => {
             let line = msg["line"].as_u64().unwrap_or(1) as u32;
             let col = msg["col"].as_u64().unwrap_or(1) as u32;
-            let ctx = use_context::<StatusBarState>();
+            let mut ctx = use_context::<Store<StatusBarState>>();
             ctx.update_cursor(line, col);
           },
           Some("save") => {

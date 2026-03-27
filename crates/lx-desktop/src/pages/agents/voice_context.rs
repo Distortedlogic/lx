@@ -46,31 +46,19 @@ pub struct TranscriptEntry {
   pub text: String,
 }
 
-#[derive(Clone, Copy)]
-pub struct VoiceContext {
-  pub status: Signal<VoiceStatus>,
-  pub transcript: Signal<Vec<TranscriptEntry>>,
-  pub pcm_buffer: Signal<Vec<u8>>,
-  pub rms: Signal<f32>,
-  pub pipeline_stage: Signal<PipelineStage>,
-  pub widget: Signal<Option<dioxus_widget_bridge::TsWidgetHandle>>,
-  pub always_listen: Signal<bool>,
-  pub barge_in: Signal<bool>,
+#[derive(Store, Clone, PartialEq)]
+pub struct VoiceData {
+  pub status: VoiceStatus,
+  pub transcript: Vec<TranscriptEntry>,
+  pub pcm_buffer: Vec<u8>,
+  pub rms: f32,
+  pub pipeline_stage: PipelineStage,
+  pub always_listen: bool,
+  pub barge_in: bool,
 }
 
-impl VoiceContext {
-  pub fn provide() -> Self {
-    let ctx = Self {
-      status: Signal::new(VoiceStatus::Idle),
-      transcript: Signal::new(Vec::new()),
-      pcm_buffer: Signal::new(Vec::new()),
-      rms: Signal::new(0.0),
-      pipeline_stage: Signal::new(PipelineStage::Idle),
-      widget: Signal::new(None),
-      always_listen: Signal::new(false),
-      barge_in: Signal::new(false),
-    };
-    use_context_provider(|| ctx);
-    ctx
-  }
+#[derive(Clone, Copy)]
+pub struct VoiceContext {
+  pub data: Store<VoiceData>,
+  pub widget: Signal<Option<dioxus_widget_bridge::TsWidgetHandle>>,
 }
