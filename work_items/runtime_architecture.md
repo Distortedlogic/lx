@@ -48,13 +48,13 @@ The existing `MCP` keyword (`MCP Foo = {command: "...", args: [...]}`) desugars 
 
 ### Tool discovery
 
-The interpreter forwards any method name to the tool process via MCP `tools/call`. The tool decides what methods it accepts and returns an error for unknown ones. The interpreter does not gate method names — it passes them through and returns whatever the tool returns.
+The interpreter forwards any method name to the tool process via MCP `tools/call`. The tool decides what methods it accepts and returns an error for unknown ones. The interpreter does not validate method names against the `tools/list` result — `tools/list` is for discovery and introspection (e.g. UI autocomplete), not for gating calls at runtime. The tool process is the authority on what it accepts.
 
 ### How a call works
 
 1. The lx program evaluates `Browser.click "e2"`
 2. The interpreter resolves `Browser` — it's a tool module bound by `use tool`
-3. The interpreter resolves `.click` — it's a method discovered via `tools/list`
+3. The interpreter forwards `.click` as the method name to the tool process
 4. If an event stream is active, the interpreter xadds `{kind: "tool.call", tool: "Browser", method: "click", args: "e2"}`
 5. If resume replay cache has a matching entry (see Resume section), return the cached result and skip steps 6-8
 6. The MCP client sends `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"click","arguments":{"ref":"e2"}}}` on the tool process's stdin
@@ -111,19 +111,37 @@ Same module name, same methods, different external tool. The lx code using `Brow
 
 ### Agent integration
 
-When an agent is spawned via `agent.spawn`, it gets its own interpreter with its own module scope. Tool modules are NOT shared — each agent that needs a tool must `use tool` it in its own script. This means each agent gets its own MCP connection and its own tool process (or a separate session on the same process, depending on the tool).
+Agents are lx classes defined with the `Agent` keyword. The Agent trait is defined in lx (`std/agent.lx`). An agent's `run` method is a yield loop — it yields values out, receives messages in, handles them, repeats.
 
-The event stream IS shared — all agents write to the same stream. The `agent` field on each stream entry identifies which agent produced it.
+`spawn` is a keyword that creates a concurrent execution context for an Agent class. It instantiates the agent, starts its `run` method concurrently, wires up yield-based communication, and returns a handle with `ask` and `tell` methods:
+
+```lx
+Agent Researcher = {
+  role = () { "research agent" }
+  handle = (msg) { ... }
+}
+
+researcher = spawn Researcher
+result = researcher.ask {task: "find papers"}
+```
+
+The agent's name is derived from the class name (`"Researcher"`). Stream entries use this name in the `agent` field. Spawning the same class twice is an error — agent names are unique.
+
+Each spawned agent runs in its own concurrent context with its own module scope. Tool modules are not shared — each agent that needs a tool must `use tool` it in its own code. The event stream IS shared — all agents write to the same stream.
 
 ### Agent communication
 
-Agents are lx programs. The Agent trait is defined in lx (`std/agent.lx`). The event stream is the shared communication channel between all agents:
+The event stream is the shared communication channel between all agents:
 
-- `agent.ask(agent_id, msg)` — send a message to any agent, wait for a response
-- `agent.tell(agent_id, msg)` — send a message to any agent, do not wait
-- `yield value` — send a value out, wait for the next message
+- `researcher.ask msg` — send a message to an agent, wait for a response (delivered via the agent's yield)
+- `researcher.tell msg` — send a message to an agent, do not wait
+- `yield value` inside an agent — send a value out, wait for the next message
+- `stream.xadd {kind: "broadcast", msg: ...}` — any agent can write to the stream directly
+- `stream.xread "$"` — any agent can read the stream directly
 
-All agent communication flows through the event stream. Any agent can message any other agent by ID. The stream provides broadcast, pub/sub, and direct messaging through the same substrate. The event stream logs all exchanges (`agent.ask`, `agent.tell`, `agent.response`, `yield.out`, `yield.in`).
+The handle returned by `spawn` provides direct ask/tell for request-response. The stream provides broadcast and any-to-any messaging. The event stream logs all exchanges (`agent.ask`, `agent.tell`, `agent.response`, `yield.out`, `yield.in`).
+
+No ACLs at the runtime level. All agents in the same program share the stream and can message any agent they have a handle to. The programmer controls the topology by deciding which agents get handles to which other agents.
 
 For top-level programs (not spawned agents), `yield` delivers through the control channel — the orchestrator (CLI, desktop) receives the yielded value and responds via the inject command.
 
@@ -185,24 +203,26 @@ Each entry is a record with:
 
 ### Event kinds
 
-| Kind | Additional fields | Produced by |
+The `kind` field is a stream key for categorizing and filtering entries. These are not lx syntax — they're plain strings.
+
+| Kind | Additional fields | When it's written |
 |---|---|---|
-| `program.start` | `source_path` | Interpreter startup |
-| `program.done` | `result`, `duration_ms` | Interpreter shutdown |
-| `emit` | `value` | `emit` expression |
-| `log` | `level` (info/warn/err/debug), `msg` | `log.info/warn/err/debug` builtins |
-| `tool.call` | `call_id`, `tool`, `method`, `args` | Auto-logged before any tool module call |
-| `tool.result` | `call_id`, `tool`, `method`, `result` | Auto-logged after any tool module call |
-| `tool.error` | `call_id`, `tool`, `method`, `error` | Auto-logged when a tool module call fails |
-| `tool.log` | `tool`, `level`, `msg` | MCP `notifications/message` from a tool |
-| `agent.spawn` | `agent_id`, `script` | `agent.spawn` builtin |
-| `agent.kill` | `agent_id` | `agent.kill` builtin |
-| `agent.ask` | `from`, `to`, `msg` | `agent.ask` builtin |
-| `agent.tell` | `from`, `to`, `msg` | `agent.tell` builtin |
-| `agent.response` | `from`, `to`, `response`, `duration_ms` | Agent reply |
-| `yield.out` | `prompt_id`, `value` | `yield` expression (outgoing) |
-| `yield.in` | `prompt_id`, `response` | `yield` response (incoming) |
-| `error` | `error`, `span` | Runtime errors |
+| `program/start` | `source_path` | Program begins executing |
+| `program/done` | `result`, `duration_ms` | Program finishes |
+| `runtime/emit` | `value` | lx code evaluates an `emit` expression |
+| `runtime/log` | `level` (info/warn/err/debug), `msg` | lx code calls a `log.*` builtin |
+| `runtime/error` | `error`, `span` | A runtime error occurs |
+| `tool/call` | `call_id`, `tool`, `method`, `args` | Before a tool module method dispatches to MCP |
+| `tool/result` | `call_id`, `tool`, `method`, `result` | After a tool module method returns |
+| `tool/error` | `call_id`, `tool`, `method`, `error` | When a tool module method fails |
+| `tool/log` | `tool`, `level`, `msg` | Tool sends an MCP `notifications/message` |
+| `agent/spawn` | `agent_name`, `class` | lx code evaluates a `spawn` expression |
+| `agent/kill` | `agent_name` | An agent is killed |
+| `agent/ask` | `from`, `to`, `msg` | An agent sends an ask to another agent |
+| `agent/tell` | `from`, `to`, `msg` | An agent sends a tell to another agent |
+| `agent/response` | `from`, `to`, `response`, `duration_ms` | An agent responds to an ask |
+| `yield/out` | `prompt_id`, `value` | lx code evaluates a `yield` expression |
+| `yield/in` | `prompt_id`, `response` | A yield receives a response |
 
 ### Auto-logging: where it happens
 
@@ -349,7 +369,7 @@ The command set is fixed because it maps to interpreter operations: pause the ev
 - Event stream: interpreter → outside world (what happened)
 - Control channel: outside world → interpreter (what to do)
 
-A typical debug workflow: launch with `--control ws://localhost:8080`, connect a WebSocket client, send `{"cmd": "pause"}`, call `stream.xrange "-" "+"` to see what happened so far, send `{"cmd": "inspect"}` to see current state, send `{"cmd": "resume"}` to continue.
+A typical debug workflow: launch with `--control ws://localhost:8080`, connect a WebSocket client, send `{"cmd": "pause"}`, read `.lx/stream.jsonl` to see what happened so far, send `{"cmd": "inspect"}` to see current state, send `{"cmd": "resume"}` to continue.
 
 ---
 
