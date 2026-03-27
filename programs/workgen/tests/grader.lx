@@ -41,3 +41,20 @@ assert (parsed.passed == true)
 text_bad = "not json"
 parsed_bad = g.parse_response text_bad
 assert (parsed_bad.score == 0)
+
+-- structured response (json_schema path returns parsed record, no .text field)
+structured_result = {categories: [
+  {name: "coverage"; score: 80; feedback: "solid"};
+  {name: "quality"; score: 90; feedback: "clear"}
+]}
+assert (structured_result.text == None)
+structured_grade = g.assemble structured_result
+assert (structured_grade.passed == true)
+assert (structured_grade.score > 75)
+
+-- unstructured/fallback response (has .text field)
+text_result = {text: `{"categories":[{"name":"coverage","score":80,"feedback":"ok"},{"name":"quality","score":85,"feedback":"ok"}]}`}
+assert (text_result.text != None)
+response_text = text_result.text ?? ""
+text_grade = g.parse_response response_text
+assert (text_grade.passed == true)

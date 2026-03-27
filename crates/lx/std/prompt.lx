@@ -12,20 +12,20 @@
       parts <- [..parts; "{sec.name}:\n{sec.content}"]
     }
     (self.constraints | len) > 0 ? {
-      items = self.constraints | map (c) "- {c}" | join "\n"
-      parts <- [..parts; "Constraints:\n{items}"]
+      bullet_list = self.constraints | map (c) { "- {c}" }
+      parts <- [..parts; "Constraints:\n{bullet_list | join "\n"}"]
     }
     (self.instructions | len) > 0 ? {
-      items = self.instructions | map (i) "- {i}" | join "\n"
-      parts <- [..parts; "Instructions:\n{items}"]
+      bullet_list = self.instructions | map (i) { "- {i}" }
+      parts <- [..parts; "Instructions:\n{bullet_list | join "\n"}"]
     }
     (self.examples | len) > 0 ? {
-      items = self.examples | enumerate | map (pair) {
+      formatted = self.examples | enumerate | map (pair) {
         idx = pair.0
         ex = pair.1
         "Example {idx + 1}:\nInput: {ex.input}\nOutput: {ex.output}"
-      } | join "\n\n"
-      parts <- [..parts; "Examples:\n{items}"]
+      }
+      parts <- [..parts; "Examples:\n{formatted | join "\n\n"}"]
     }
     parts | join "\n\n"
   }
@@ -58,14 +58,13 @@
   trim_to_fit = (max_tokens) {
     text = self.render ()
     (text | len) // 4 <= max_tokens ? text : {
-      trimmed := self
       loop {
-        (trimmed.sections | len) == 0 ? break
-        trimmed <- {..trimmed; sections: trimmed.sections | take ((trimmed.sections | len) - 1)}
-        t = trimmed.render ()
+        (self.sections | len) == 0 ? break
+        self.sections <- self.sections | take ((self.sections | len) - 1)
+        t = self.render ()
         (t | len) // 4 <= max_tokens ? break
       }
-      trimmed.render ()
+      self.render ()
     }
   }
 

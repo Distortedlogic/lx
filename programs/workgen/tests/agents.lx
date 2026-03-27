@@ -1,0 +1,136 @@
+-- Agent construction, prompt building, and orchestrator helper tests.
+-- Exercises everything except actual LLM calls.
+
+use std/prompt {new_prompt}
+use std/md
+use ../agent/investigator {Investigator}
+use ../agent/validator {Validator}
+use ../agent/composer {Composer}
+use ../agent/reviser {Reviser}
+use ../agent/grader {Grader}
+use ../schema/audit {load item_count}
+-- agent construction
+inv = Investigator {}
+val = Validator {}
+comp = Composer {}
+rev = Reviser {}
+
+assert (type_of inv == "Object")
+assert (type_of val == "Object")
+assert (type_of comp == "Object")
+assert (type_of rev == "Object")
+
+-- tools and max_turns
+assert (inv.tools () == ["Read"; "Glob"; "Grep"; "Bash"])
+assert (inv.max_turns () == 30)
+assert (val.tools () == ["Read"; "Glob"; "Grep"; "Bash"])
+assert (val.max_turns () == 20)
+
+-- system prompts are non-empty strings
+assert (inv.system_prompt () | len > 0)
+assert (val.system_prompt () | len > 0)
+assert (comp.system_prompt () | len > 0)
+assert (rev.system_prompt () | len > 0)
+
+-- prompt building: investigator
+inv_msg = {audit_content: "## Check 1\nDo the thing"; root: "."}
+inv_prompt = inv.build_prompt inv_msg
+inv_rendered = inv_prompt.render ()
+assert (inv_rendered | contains? "Audit Checklist")
+assert (inv_rendered | contains? "Do the thing")
+assert (inv_rendered | contains? "Instructions")
+assert (inv_rendered | contains? "Constraints")
+
+-- prompt building: validator
+val_msg = {findings: "1. Found a bug in foo.rs"; root: "."}
+val_prompt = val.build_prompt val_msg
+val_rendered = val_prompt.render ()
+assert (val_rendered | contains? "Audit Findings")
+assert (val_rendered | contains? "Found a bug")
+assert (val_rendered | contains? "best practice")
+
+-- prompt building: composer
+comp_msg = {audit_content: "## Check 1\nStuff"; rules_content: "# Rules\nDo it right"; findings: "1. Bug found"}
+comp_prompt = comp.build_prompt comp_msg
+comp_rendered = comp_prompt.render ()
+assert (comp_rendered | contains? "Audit Checklist")
+assert (comp_rendered | contains? "Process Rules")
+assert (comp_rendered | contains? "Investigation Findings")
+
+-- prompt building: reviser
+rev_msg = {draft: "# Goal\nFix things"; feedback: "Missing CRITICAL REMINDERS"; round_num: 1}
+rev_prompt = rev.build_prompt rev_msg
+rev_rendered = rev_prompt.render ()
+assert (rev_rendered | contains? "Current Document")
+assert (rev_rendered | contains? "Feedback to Fix")
+assert (rev_rendered | contains? "Missing CRITICAL REMINDERS")
+
+-- grader prompt building
+g = Grader {
+  threshold: 75
+  rubric: [
+    {name: "coverage"; description: "all items found"; weight: 50}
+    {name: "quality"; description: "tasks are clear"; weight: 50}
+  ]
+}
+g_prompt = g.build_prompt "some work" "audit task"
+g_rendered = g_prompt.render ()
+assert (g_rendered | contains? "Task")
+assert (g_rendered | contains? "Work to Grade")
+assert (g_rendered | contains? "Rubric Categories")
+assert (g_rendered | contains? "coverage")
+
+-- grader schema is valid JSON
+schema = g.grading_schema ()
+parsed_schema = json.parse schema
+assert (parsed_schema != Err "")
+
+-- section checking (inline — orchestrator internals aren't exported)
+required_sections = ["Goal"; "Why"; "What changes"; "Files affected"; "Task List"; "CRITICAL REMINDERS"]
+check_sections = (draft) {
+  headings = md.parse draft | md.headings
+  heading_texts = headings | map (h) h.text
+  missing = required_sections | filter (req) {
+    heading_texts | any? (ht) { ht | contains? req } | not
+  }
+  (missing | len) == 0
+}
+
+good_draft = "# Goal\nFix bugs\n## Why\nThey're bad\n## What changes\nStuff\n## Files affected\nfoo.rs\n## Task List\n1. Do it\n## CRITICAL REMINDERS\nDon't break things"
+assert (check_sections good_draft == true)
+
+bad_draft = "# Goal\nFix bugs\n## Why\nThey're bad"
+assert (check_sections bad_draft == false)
+
+-- stuck detection (inline)
+is_stuck = (round scores) {
+  round < 3 ? false : {
+    recent = scores | drop ((scores | len) - 3)
+    best = recent | fold 0 (a b) { a > b ? a : b }
+    worst = recent | fold 100 (a b) { a < b ? a : b }
+    improving = best - worst > 2
+    not improving
+  }
+}
+assert (is_stuck 1 [50] == false)
+assert (is_stuck 2 [50; 55] == false)
+assert (is_stuck 3 [50; 51; 50] == true)
+assert (is_stuck 3 [50; 55; 60] == false)
+assert (is_stuck 4 [40; 50; 51; 50] == true)
+
+-- prompt with no constraints/instructions still renders
+bare = new_prompt "just system"
+bare_rendered = bare.render ()
+assert (bare_rendered | contains? "just system")
+assert (not (bare_rendered | contains? "Constraints"))
+assert (not (bare_rendered | contains? "Instructions"))
+
+-- prompt with multiple sections
+multi = new_prompt ""
+multi.add_section "A" "content a"
+multi.add_section "B" "content b"
+multi.add_section "C" "content c"
+multi_rendered = multi.render ()
+assert (multi_rendered | contains? "A:\ncontent a")
+assert (multi_rendered | contains? "B:\ncontent b")
+assert (multi_rendered | contains? "C:\ncontent c")

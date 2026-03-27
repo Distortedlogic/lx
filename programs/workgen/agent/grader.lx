@@ -18,8 +18,10 @@ use ../schema/grade {GradeResult CategoryScore}
       json_schema: schema_str
     } ^
 
-    response_text = result.text ?? ""
-    response_text | len == 0 ? (self.empty_result "empty LLM response") : (self.parse_response response_text)
+    result.text != None ? {
+      response_text = result.text ?? ""
+      response_text | len == 0 ? (self.empty_result "empty LLM response") : (self.parse_response response_text)
+    } : (self.assemble result)
   }
 
   build_prompt = (work task) {

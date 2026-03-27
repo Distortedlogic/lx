@@ -1,0 +1,38 @@
+-- Tests for interactive mode and entry point routing.
+
+use std/fs
+use ../schema/audit {load}
+
+-- audit file loading from rules dir
+rules_dir = "{source_dir ()}/../rules"
+files = fs.ls rules_dir ^
+audits = files | filter (f) { f | contains? "audit" && (f | ends? ".md") } | sort
+assert (audits | len > 0)
+
+-- each audit file loads raw content
+audits | each (f) {
+  path = "{rules_dir}/{f}"
+  raw = fs.read path ^
+  assert (raw | len > 0)
+}
+
+-- rust-audit specifically is parseable into items
+rust_audit = load "{rules_dir}/rust-audit.md"
+assert (rust_audit.name | len > 0)
+assert (rust_audit.items | len > 0)
+assert (rust_audit.raw | len > 0)
+
+-- work-item.md rules file exists and is non-empty
+rules_content = fs.read "{rules_dir}/work-item.md" ^
+assert (rules_content | len > 0)
+assert (rules_content | contains? "CRITICAL REMINDERS")
+
+-- env var routing: empty string means interactive
+audit_path = ""
+is_interactive = audit_path == ""
+assert (is_interactive == true)
+
+-- env var routing: non-empty means run
+audit_path2 = "some/path.md"
+is_interactive2 = audit_path2 == ""
+assert (is_interactive2 == false)

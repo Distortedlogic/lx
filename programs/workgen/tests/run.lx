@@ -10,14 +10,21 @@ use ../workflow/orchestrator
 use ./spec
 
 wi_grader = Grader {threshold: spec.threshold_pct; rubric: spec.rubric}
-rules_dir = "{source_dir ()}/../../rules"
+rules_dir = "{source_dir ()}/../rules"
 rules_content = fs.read "{rules_dir}/work-item.md" ^
+
+run_one = (scenario) {
+  audit = load scenario.audit ^
+  orchestrator.run_audit audit rules_content scenario.root wi_grader 3 ".lx/workgen_test" ^
+}
 
 run_scenario_impl = (scenario) {
   log.log "  --- {scenario.name} ---"
-  audit = load scenario.audit
-  result = orchestrator.run_audit audit rules_content scenario.root wi_grader 3 ".lx/workgen_test"
-  {name: scenario.name; passed: result.status == "pass"; score: result.score}
+  result = try run_one scenario
+  result ? {
+    Err e -> {name: scenario.name; passed: false; score: 0}
+    r -> {name: scenario.name; passed: r.status == "pass"; score: r.score}
+  }
 }
 
 +main = () {

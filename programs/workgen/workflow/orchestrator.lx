@@ -48,13 +48,13 @@ is_stuck = (round scores) {
   summaries audit | each (s) log.log "    {s}"
 
   log.log "  PHASE: investigate"
-  findings = investigator.act {audit_content: audit.raw; root: root; runner_dir: runner_dir; slug: slug}
+  findings = investigator.act {audit_content: audit.raw; root: root; runner_dir: runner_dir; slug: slug} ^
 
   log.log "  PHASE: validate"
   validate_round := 0
   validated_findings := findings
   loop {
-    val_result = validator.act {findings: validated_findings; root: root; runner_dir: runner_dir; slug: slug}
+    val_result = validator.act {findings: validated_findings; root: root; runner_dir: runner_dir; slug: slug} ^
     val_result.validated ? break ()
     validate_round <- validate_round + 1
     validate_round >= 3 ? {
@@ -66,7 +66,7 @@ is_stuck = (round scores) {
   }
 
   log.log "  PHASE: compose"
-  draft = composer.act {audit_content: audit.raw; rules_content: rules_content; findings: validated_findings; runner_dir: runner_dir; slug: slug}
+  draft = composer.act {audit_content: audit.raw; rules_content: rules_content; findings: validated_findings; runner_dir: runner_dir; slug: slug} ^
 
   out_path = "work_items/{audit.name}.md"
   fs.mkdir "work_items" ^
@@ -96,7 +96,7 @@ is_stuck = (round scores) {
     has_failed = failed_list | len > 0
     has_failed == false ? break ()
 
-    current_draft <- reviser.act {draft: current_draft; feedback: grade.feedback; runner_dir: runner_dir; slug: slug; round_num: round}
+    current_draft <- reviser.act {draft: current_draft; feedback: grade.feedback; runner_dir: runner_dir; slug: slug; round_num: round} ^
     fs.write out_path current_draft ^
 
     check_sections_impl current_draft
@@ -114,7 +114,7 @@ is_stuck = (round scores) {
 
 grade_and_log = (grader_inst draft task runner_dir slug) {
   log.log "  > grader: scoring draft..."
-  grade = grader_inst.act {work: draft; task: task}
+  grade = grader_inst.act {work: draft; task: task} ^
   log.save_debug runner_dir slug "grade.json" (json.encode_pretty grade)
   log.log "  GRADE: {grade.score}/100 | passed: {grade.passed} | {grade.feedback}"
   grade.categories | each (cat) {

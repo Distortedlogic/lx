@@ -7,12 +7,13 @@
 -- Usage: lx run workgen
 -- With specific audit: AUDIT_FILE=path/to/audit.md lx run workgen
 
+use std/env
 use std/fs
 use std/time
 use std/cron
 use pkg/log
 use ./store/status {RunStatus}
-use ./schema/audit
+use ./schema/audit : audit_parser
 use ./agent/grader {Grader}
 use ./workflow/orchestrator
 
@@ -34,7 +35,7 @@ wi_grader = Grader {
 rules_content = fs.read "{rules_dir}/work-item.md" ^
 
 +main = () {
-  audit_path = std/env.get "AUDIT_FILE" ?? ""
+  audit_path = env.get "AUDIT_FILE" ?? ""
   audit_path == "" ? (run_interactive ()) : (run audit_path)
 }
 

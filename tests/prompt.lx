@@ -1,0 +1,121 @@
+use std/prompt {new_prompt}
+
+-- empty prompt
+p0 = new_prompt ""
+r0 = p0.render ()
+assert (r0 == "")
+
+-- system only
+p1 = new_prompt "You are helpful"
+r1 = p1.render ()
+assert (r1 == "You are helpful")
+
+-- sections
+p2 = new_prompt "sys"
+p2.add_section "Context" "some context"
+r2 = p2.render ()
+assert (r2 | contains? "sys")
+assert (r2 | contains? "Context:\nsome context")
+
+-- multiple sections
+p3 = new_prompt ""
+p3.add_section "A" "aaa"
+p3.add_section "B" "bbb"
+r3 = p3.render ()
+assert (r3 | contains? "A:\naaa")
+assert (r3 | contains? "B:\nbbb")
+
+-- constraints render as bullet list
+p4 = new_prompt ""
+p4.add_constraint "no guessing"
+p4.add_constraint "be concise"
+r4 = p4.render ()
+assert (r4 | contains? "Constraints:")
+assert (r4 | contains? "- no guessing")
+assert (r4 | contains? "- be concise")
+
+-- instructions render as bullet list
+p5 = new_prompt ""
+p5.add_instruction "read the file"
+p5.add_instruction "check the output"
+r5 = p5.render ()
+assert (r5 | contains? "Instructions:")
+assert (r5 | contains? "- read the file")
+assert (r5 | contains? "- check the output")
+
+-- full prompt with all parts
+p6 = new_prompt "system text"
+p6.add_section "Data" "the data"
+p6.add_instruction "do stuff"
+p6.add_constraint "don't break"
+r6 = p6.render ()
+assert (r6 | contains? "system text")
+assert (r6 | contains? "Data:\nthe data")
+assert (r6 | contains? "Instructions:\n- do stuff")
+assert (r6 | contains? "Constraints:\n- don't break")
+
+-- parts are separated by double newlines
+assert (r6 | contains? "\n\n")
+
+-- chaining returns self
+p7 = new_prompt "s"
+ret = p7.add_section "X" "x"
+assert (type_of ret == "Object")
+
+-- compose merges two prompts
+pa = new_prompt "base"
+pa.add_section "SA" "a"
+pa.add_constraint "CA"
+
+pb = new_prompt "override"
+pb.add_section "SB" "b"
+pb.add_instruction "IB"
+
+pa.compose pb
+rc = pa.render ()
+assert (rc | contains? "override")
+assert (rc | contains? "SA:\na")
+assert (rc | contains? "SB:\nb")
+assert (rc | contains? "- CA")
+assert (rc | contains? "- IB")
+
+-- compose with empty system keeps original
+pc = new_prompt "keep"
+pd = new_prompt ""
+pd.add_constraint "new rule"
+pc.compose pd
+assert (pc.render () | contains? "keep")
+assert (pc.render () | contains? "- new rule")
+
+-- examples render with numbering
+pe = new_prompt ""
+pe.examples <- [{input: "hello"; output: "hi"}; {input: "bye"; output: "cya"}]
+re = pe.render ()
+assert (re | contains? "Examples:")
+assert (re | contains? "Example 1:")
+assert (re | contains? "Input: hello")
+assert (re | contains? "Output: hi")
+assert (re | contains? "Example 2:")
+assert (re | contains? "Input: bye")
+assert (re | contains? "Output: cya")
+
+-- examples empty means no Examples header
+pf = new_prompt "sys"
+pf.add_section "S" "s"
+rf = pf.render ()
+assert (not (rf | contains? "Examples"))
+
+-- trim_to_fit returns full text when under limit
+pg = new_prompt "short"
+pg.add_section "S" "content"
+rg = pg.trim_to_fit 10000
+assert (rg | contains? "short")
+assert (rg | contains? "S:\ncontent")
+
+-- trim_to_fit drops sections when over limit
+ph = new_prompt "sys"
+ph.add_section "A" "aaaa"
+ph.add_section "B" "bbbb"
+ph.add_section "C" "cccc"
+rh = ph.trim_to_fit 5
+assert (not (rh | contains? "C:\ncccc"))

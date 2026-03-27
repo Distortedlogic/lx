@@ -8,15 +8,20 @@ use pkg/log
 
   load = () {
     log.log "loading context files..."
-    tick = fs.read "agent/TICK.md" ^
-    inventory = fs.read "agent/INVENTORY.md" ^
-    reference = fs.read "agent/REFERENCE.md" ^
-    stdlib = fs.read "agent/STDLIB.md" ^
-    self.add_section "Context Bootstrap" tick
-    self.add_section "Inventory" inventory
-    self.add_section "Reference" reference
-    self.add_section "Stdlib" stdlib
-    total = (tick | len) + (inventory | len) + (reference | len) + (stdlib | len)
+    files = [
+      {name: "Context Bootstrap"; path: "agent/TICK.md"}
+      {name: "Inventory"; path: "agent/INVENTORY.md"}
+      {name: "Reference"; path: "agent/REFERENCE.md"}
+      {name: "Stdlib"; path: "agent/STDLIB.md"}
+    ]
+    total := 0
+    files | each (f) {
+      content = fs.read f.path ?? ""
+      (content | len) > 0 ? {
+        self.add_section f.name content
+        total <- total + (content | len)
+      }
+    }
     log.log "context loaded ({total} chars)"
     self
   }

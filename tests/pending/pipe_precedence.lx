@@ -1,0 +1,14 @@
+-- Pipe precedence with closure args.
+-- `x | map (c) expr | join sep` parses `| join sep` as part of the
+-- map callback body instead of the outer pipeline.
+-- Workaround: use braces `map (c) { expr }` to scope the callback.
+
+items = ["a"; "b"; "c"]
+
+-- this SHOULD work but doesn't — join receives a Str, not a List
+-- result = items | map (x) "({x})" | join ", "
+-- assert (result == "(a), (b), (c)")
+
+-- workaround: braces scope the callback
+result = items | map (x) { "({x})" } | join ", "
+assert (result == "(a), (b), (c)")

@@ -43,7 +43,7 @@ use std/md
 +task_summaries = (wi) { wi.tasks | map (t) task_summary t }
 
 section_content = (sections name) {
-  found = sections | find (s) { s.title == name }
+  found = sections | find (s) { (s.title | lower) == (name | lower) }
   (found ?? {content: ""}).content | trim
 }
 

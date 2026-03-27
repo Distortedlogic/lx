@@ -1,0 +1,28 @@
+-- try should catch TypeErrors, not just Propagate errors.
+-- Currently try only catches LxError::Propagate (from ^).
+-- TypeErrors like "field access on Err" pass through uncaught.
+
+fail_fn = (x) {
+  result = Err "nope"
+  result.status
+}
+
+-- this SHOULD catch the TypeError but doesn't
+-- r = try fail_fn "test"
+-- r ? {
+--   Err e -> assert true
+--   v -> assert false
+-- }
+
+-- workaround: use ^ to convert Err to Propagate before field access
+safe_fn = (x) {
+  result = Err "nope"
+  val = result ^
+  val.status
+}
+
+r = try safe_fn "test"
+r ? {
+  Err e -> assert true
+  v -> assert false
+}

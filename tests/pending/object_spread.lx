@@ -1,0 +1,20 @@
+-- Object spread into record literal.
+-- {..obj; field: new_val} fails when obj is an Object (from a Class).
+-- Spread only works on Records.
+
+Trait Foo = {
+  x: Int = 0
+  items: List = []
+}
+
+Class Bar : [Foo] = { x: 0 }
+
+b := Bar {}
+
+-- this SHOULD work but doesn't — "spread requires Record, got Object"
+-- updated = {..b; items: [1; 2; 3]}
+-- assert (updated.items == [1; 2; 3])
+
+-- workaround: mutate the field directly
+b.items <- [1; 2; 3]
+assert (b.items == [1; 2; 3])

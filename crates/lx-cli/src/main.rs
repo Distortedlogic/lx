@@ -173,7 +173,7 @@ fn run_file(path: &str, _json: bool) -> ExitCode {
   let mut ctx_val = if std::io::stdin().is_terminal() { RuntimeCtx { ..RuntimeCtx::default() } } else { RuntimeCtx::default() };
   ctx_val.workspace_members = ws_members;
   ctx_val.dep_dirs = dep_dirs;
-  apply_manifest_backends(&mut ctx_val);
+  apply_manifest_backends(&mut ctx_val, path);
   let ctx = Arc::new(ctx_val);
   match run::run(&source, path, &ctx) {
     Ok(()) => ExitCode::SUCCESS,
@@ -194,11 +194,9 @@ fn run_file(path: &str, _json: bool) -> ExitCode {
   }
 }
 
-fn apply_manifest_backends(ctx: &mut RuntimeCtx) {
-  let Ok(cwd) = std::env::current_dir() else {
-    return;
-  };
-  let Some(root) = manifest::find_manifest_root(&cwd) else {
+fn apply_manifest_backends(ctx: &mut RuntimeCtx, file_path: &str) {
+  let file_dir = std::path::Path::new(file_path).parent().unwrap_or(std::path::Path::new("."));
+  let Some(root) = manifest::find_manifest_root(file_dir) else {
     return;
   };
   let Ok(m) = manifest::load_manifest(&root) else {

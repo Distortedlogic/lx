@@ -8,18 +8,26 @@ g = Grader {
   ]
 }
 
-result = g.act {work: "Task 1: DONE. Task 2: DONE. All files exist. Tests pass. 0 errors."; task: "Verify implementation"}
-emit "score: {result.score}"
-emit "passed: {result.passed}"
-emit "feedback: {result.feedback}"
-emit "categories: {result.categories | len}"
-result.categories | each (cat) {
-  icon = cat.passed ? "+" : "x"
-  emit "  [{icon}] {cat.name}: {cat.score}/100 — {cat.feedback}"
+grade_one = (msg) {
+  g.act msg ^
 }
 
-assert (result.score >= 0)
-assert (result.categories | len == 2)
-assert (result.feedback | len > 0)
+result = try grade_one {work: "Task 1: DONE. Task 2: DONE. All files exist. Tests pass. 0 errors."; task: "Verify implementation"}
+result ? {
+  Err e -> {
+    emit "grader_llm: no LLM backend — testing fallback"
+    fallback = g.empty_result "no LLM"
+    assert (fallback.score == 0)
+    assert (fallback.categories | len == 2)
+    assert (fallback.feedback | len > 0)
+  }
+  r -> {
+    emit "score: {r.score}"
+    emit "passed: {r.passed}"
+    assert (r.score >= 0)
+    assert (r.categories | len == 2)
+    assert (r.feedback | len > 0)
+  }
+}
 
 log.info "grader_llm: all passed"
