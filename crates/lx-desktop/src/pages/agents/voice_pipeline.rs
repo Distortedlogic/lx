@@ -15,31 +15,34 @@ static AUDIO_SINK: LazyLock<rodio::MixerDeviceSink> = LazyLock::new(|| {
   sink
 });
 
+static ACTIVE_PLAYER: LazyLock<std::sync::Mutex<Option<std::sync::Arc<rodio::Player>>>> = LazyLock::new(|| std::sync::Mutex::new(None));
+
+pub fn stop_active_playback() {
+  if let Some(player) = ACTIVE_PLAYER.lock().expect("lock poisoned").take() {
+    player.stop();
+  }
+}
+
+pub fn play_wav_interruptible(wav_bytes: Vec<u8>) -> tokio::task::JoinHandle<anyhow::Result<()>> {
+  tokio::task::spawn_blocking(move || {
+    let cursor = std::io::Cursor::new(wav_bytes);
+    let player = rodio::play(AUDIO_SINK.mixer(), cursor).map_err(|e| {
+      error!("voice: rodio::play failed: {e}");
+      e
+    })?;
+    let player = std::sync::Arc::new(player);
+    *ACTIVE_PLAYER.lock().expect("lock poisoned") = Some(std::sync::Arc::clone(&player));
+    player.sleep_until_end();
+    *ACTIVE_PLAYER.lock().expect("lock poisoned") = None;
+    info!("voice: playback finished");
+    Ok(())
+  })
+}
+
 pub async fn transcribe(pcm: &[u8]) -> anyhow::Result<String> {
   let wav = common_audio::wrap_pcm_as_wav(pcm, common_audio::SAMPLE_RATE, common_audio::CHANNELS, common_audio::BITS_PER_SAMPLE);
   let transcription = common_whisper::WHISPER.infer(&TranscribeRequest { audio_data: B64.encode(&wav), language: Some("en".into()) }).await?;
   Ok(transcription.text.trim().to_owned())
-}
-
-pub fn match_trigger(text: &str, triggers: &[String]) -> Option<String> {
-  let text_words: Vec<&str> = text.split_whitespace().collect();
-  let mut sorted: Vec<&String> = triggers.iter().collect();
-  sorted.sort_by_key(|b| std::cmp::Reverse(b.len()));
-  for trigger in sorted {
-    let trigger_words: Vec<&str> = trigger.split_whitespace().collect();
-    let n = trigger_words.len();
-    if text_words.len() >= n {
-      let matches = text_words[..n].iter().zip(trigger_words.iter()).all(|(a, b)| {
-        let a_clean: String = a.chars().filter(|c| c.is_alphanumeric()).collect();
-        let b_clean: String = b.chars().filter(|c| c.is_alphanumeric()).collect();
-        a_clean.eq_ignore_ascii_case(&b_clean)
-      });
-      if matches {
-        return Some(text_words[n..].join(" "));
-      }
-    }
-  }
-  None
 }
 
 pub fn generate_ack_tone() -> Vec<u8> {
@@ -103,7 +106,7 @@ pub async fn run_pipeline(text: &str, agent_widget: dioxus_widget_bridge::TsWidg
 
   let wav_len = wav_bytes.len();
   info!("voice: TTS returned {wav_len} bytes, starting playback");
-  let play_result = play_wav(wav_bytes).await;
+  let play_result = play_wav_interruptible(wav_bytes).await;
   match &play_result {
     Ok(Ok(())) => info!("voice: playback finished"),
     Ok(Err(e)) => error!("voice: playback error: {e}"),

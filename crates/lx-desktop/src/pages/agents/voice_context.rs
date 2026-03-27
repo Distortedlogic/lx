@@ -27,7 +27,6 @@ pub enum PipelineStage {
   Transcribing,
   QueryingLlm,
   SynthesizingSpeech,
-  AwaitingQuery,
 }
 
 impl std::fmt::Display for PipelineStage {
@@ -37,7 +36,6 @@ impl std::fmt::Display for PipelineStage {
       Self::Transcribing => write!(f, "TRANSCRIBING"),
       Self::QueryingLlm => write!(f, "QUERYING_LLM"),
       Self::SynthesizingSpeech => write!(f, "SYNTHESIZING_SPEECH"),
-      Self::AwaitingQuery => write!(f, "AWAITING_QUERY"),
     }
   }
 }
@@ -56,8 +54,8 @@ pub struct VoiceContext {
   pub rms: Signal<f32>,
   pub pipeline_stage: Signal<PipelineStage>,
   pub widget: Signal<Option<dioxus_widget_bridge::TsWidgetHandle>>,
-  pub trigger_words: Signal<Vec<String>>,
   pub always_listen: Signal<bool>,
+  pub barge_in: Signal<bool>,
 }
 
 impl VoiceContext {
@@ -69,8 +67,8 @@ impl VoiceContext {
       rms: Signal::new(0.0),
       pipeline_stage: Signal::new(PipelineStage::Idle),
       widget: Signal::new(None),
-      trigger_words: Signal::new(vec!["hey claude".into(), "ok claude".into(), "claude".into()]),
       always_listen: Signal::new(false),
+      barge_in: Signal::new(false),
     };
     use_context_provider(|| ctx);
     ctx

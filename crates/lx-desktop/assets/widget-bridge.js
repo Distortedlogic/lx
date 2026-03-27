@@ -38992,32 +38992,18 @@ registerProcessor('capture', Capture);
 			const state = {
 				capture,
 				status: "idle",
-				dx,
-				hasSpeech: false
+				dx
 			};
 			states.set(elementId, state);
 			capture.onChunk = (b64pcm) => {
-				if (state.status === "listening" || state.status === "standby") {
-					state.hasSpeech = true;
-					dx.send({
-						type: "audio_chunk",
-						data: b64pcm,
-						seq: capture.currentSeq
-					});
-				}
+				if (state.status !== "idle") dx.send({
+					type: "audio_chunk",
+					data: b64pcm,
+					seq: capture.currentSeq
+				});
 			};
 			capture.onSilence = () => {
-				if (state.status === "standby") {
-					if (!state.hasSpeech) {
-						capture.resetVad();
-						return;
-					}
-					state.hasSpeech = false;
-					transition(state, "processing");
-					dx.send({ type: "silence_detected" });
-				} else if (state.status === "listening") {
-					state.hasSpeech = false;
-					capture.stop();
+				if (state.status === "listening") {
 					transition(state, "processing");
 					dx.send({ type: "silence_detected" });
 				}
@@ -39042,13 +39028,16 @@ registerProcessor('capture', Capture);
 					break;
 				case "start_standby_listen":
 					if (state.status !== "idle") return;
-					state.hasSpeech = false;
 					state.capture.start().then(() => {
 						transition(state, "standby");
 					});
 					break;
+				case "start_recording":
+					if (state.status !== "standby" && state.status !== "speaking") return;
+					state.capture.resetVad();
+					transition(state, "listening");
+					break;
 				case "resume_standby":
-					state.hasSpeech = false;
 					if (!state.capture.isRunning) state.capture.start().then(() => {
 						state.capture.resetVad();
 						transition(state, "standby");
@@ -39057,11 +39046,6 @@ registerProcessor('capture', Capture);
 						state.capture.resetVad();
 						transition(state, "standby");
 					}
-					break;
-				case "awaiting_query":
-					state.hasSpeech = false;
-					state.capture.resetVad();
-					transition(state, "listening");
 					break;
 				case "stop_capture":
 					state.capture.stop();

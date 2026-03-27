@@ -14,8 +14,20 @@ path = "src/main.rs"
 name = "lx_desktop"
 path = "src/lib.rs"
 
-[lints]
-workspace = true
+[lints.rust]
+elided_lifetimes_in_paths = "warn"
+trivial_numeric_casts = "warn"
+unsafe_code = "allow"
+unused_extern_crates = "warn"
+unused_import_braces = "warn"
+unused_lifetimes = "warn"
+
+[lints.clippy]
+manual_let_else = "warn"
+needless_pass_by_value = "warn"
+uninlined_format_args = "warn"
+unwrap_used = "warn"
+wildcard_imports = "warn"
 
 [dependencies]
 common-pane-tree = { path = "../../../dioxus-common/crates/common-pane-tree" }
@@ -30,6 +42,7 @@ common-cdp = { path = "../../../dioxus-common/crates/common-cdp" }
 common-charts = { path = "../../../dioxus-common/crates/common-charts" }
 common-inference = { path = "../../../dioxus-common/crates/common-inference" }
 anyhow = "1"
+libloading = "0.8"
 async-trait = "0.1"
 base64 = "0.22"
 rodio = { version = "0.22", default-features = false, features = ["playback", "symphonia-wav", "symphonia-pcm"] }

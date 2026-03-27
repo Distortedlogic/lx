@@ -1,5 +1,5 @@
 use super::voice_context::{PipelineStage, TranscriptEntry, VoiceContext, VoiceStatus};
-use super::voice_pipeline;
+use super::{voice_pipeline, voice_porcupine};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as B64;
 use dioxus::logger::tracing::error;
@@ -25,12 +25,20 @@ pub fn VoiceBanner() -> Element {
           if let Some(data) = msg["data"].as_str()
             && let Ok(bytes) = B64.decode(data)
           {
-            ctx.pcm_buffer.write().extend_from_slice(&bytes);
+            if voice_porcupine::is_available() {
+              let samples: Vec<i16> = bytes.chunks_exact(2).map(|c| i16::from_le_bytes([c[0], c[1]])).collect();
+              if voice_porcupine::feed_samples(&samples).is_some() {
+                handle_keyword_detected(voice_widget, ctx);
+              }
+            }
+            if (ctx.status)() == VoiceStatus::Listening {
+              ctx.pcm_buffer.write().extend_from_slice(&bytes);
+            }
           }
         },
         Some("silence_detected") => {
           let stage = (ctx.pipeline_stage)();
-          if stage != PipelineStage::Idle && stage != PipelineStage::AwaitingQuery {
+          if stage != PipelineStage::Idle {
             ctx.pcm_buffer.write().clear();
             continue;
           }
@@ -45,30 +53,21 @@ pub fn VoiceBanner() -> Element {
             continue;
           }
 
-          let is_awaiting = stage == PipelineStage::AwaitingQuery;
-          let is_standby = (ctx.always_listen)() && !is_awaiting;
-
           spawn(async move {
-            let result = handle_utterance(buffer, is_awaiting, is_standby, voice_widget, agent_widget, ctx).await;
-            match result {
-              Err(e) => {
-                error!("voice: pipeline error: {e}");
-                ctx.transcript.write().push(TranscriptEntry { is_user: false, text: format!("Error: {e}") });
-                ctx.pipeline_stage.set(PipelineStage::Idle);
-                if (ctx.always_listen)() {
-                  voice_widget.send_update(serde_json::json!({ "type": "resume_standby" }));
-                } else {
-                  voice_widget.send_update(serde_json::json!({ "type": "stop_capture" }));
-                }
-              },
-              Ok(true) => {
-                if (ctx.always_listen)() {
-                  voice_widget.send_update(serde_json::json!({ "type": "resume_standby" }));
-                } else {
-                  voice_widget.send_update(serde_json::json!({ "type": "stop_capture" }));
-                }
-              },
-              Ok(false) => {},
+            let result = handle_utterance(buffer, agent_widget, ctx).await;
+            if (ctx.barge_in)() {
+              ctx.barge_in.set(false);
+              return;
+            }
+            if let Err(e) = &result {
+              error!("voice: pipeline error: {e}");
+              ctx.transcript.write().push(TranscriptEntry { is_user: false, text: format!("Error: {e}") });
+              ctx.pipeline_stage.set(PipelineStage::Idle);
+            }
+            if (ctx.always_listen)() {
+              voice_widget.send_update(serde_json::json!({ "type": "resume_standby" }));
+            } else {
+              voice_widget.send_update(serde_json::json!({ "type": "stop_capture" }));
             }
           });
         },
@@ -85,7 +84,9 @@ pub fn VoiceBanner() -> Element {
           Some("speaking") => ctx.status.set(VoiceStatus::Speaking),
           _ => {},
         },
-        Some("start_standby") | Some("cancel") => ctx.pcm_buffer.write().clear(),
+        Some("start_standby") | Some("cancel") => {
+          ctx.pcm_buffer.write().clear();
+        },
         _ => {},
       }
     }
@@ -132,6 +133,7 @@ pub fn VoiceBanner() -> Element {
   let turn_count = entries.iter().filter(|e| e.is_user).count();
   drop(entries);
   let always_listen = (ctx.always_listen)();
+  let porcupine_available = voice_porcupine::is_available();
 
   rsx! {
     div { class: "flex flex-col h-full",
@@ -167,22 +169,24 @@ pub fn VoiceBanner() -> Element {
           }
         }
         div { class: "flex-1" }
-        button {
-          class: "border border-[var(--outline-variant)] text-[var(--on-surface-variant)] rounded px-3 py-1.5 text-xs uppercase hover:bg-[var(--surface-container-high)] transition-colors duration-150 font-semibold",
-          onclick: move |_| {
-              if always_listen {
-                  ctx.always_listen.set(false);
-                  voice_widget.send_update(serde_json::json!({ "type" : "stop_capture" }));
-              } else {
-                  ctx.always_listen.set(true);
-                  voice_widget
-                      .send_update(serde_json::json!({ "type" : "start_standby_listen" }));
-              }
-          },
-          if always_listen {
-            "ALWAYS LISTEN: ON"
-          } else {
-            "ALWAYS LISTEN: OFF"
+        if porcupine_available {
+          button {
+            class: "border border-[var(--outline-variant)] text-[var(--on-surface-variant)] rounded px-3 py-1.5 text-xs uppercase hover:bg-[var(--surface-container-high)] transition-colors duration-150 font-semibold",
+            onclick: move |_| {
+                if always_listen {
+                    ctx.always_listen.set(false);
+                    voice_widget.send_update(serde_json::json!({ "type" : "stop_capture" }));
+                } else {
+                    ctx.always_listen.set(true);
+                    voice_widget
+                        .send_update(serde_json::json!({ "type" : "start_standby_listen" }));
+                }
+            },
+            if always_listen {
+              "ALWAYS LISTEN: ON"
+            } else {
+              "ALWAYS LISTEN: OFF"
+            }
           }
         }
         if is_active {
@@ -213,55 +217,29 @@ pub fn VoiceBanner() -> Element {
   }
 }
 
-async fn handle_utterance(
-  pcm: Vec<u8>,
-  is_awaiting: bool,
-  is_standby: bool,
-  voice_widget: dioxus_widget_bridge::TsWidgetHandle,
-  agent_widget: dioxus_widget_bridge::TsWidgetHandle,
-  mut ctx: VoiceContext,
-) -> anyhow::Result<bool> {
+fn handle_keyword_detected(voice_widget: dioxus_widget_bridge::TsWidgetHandle, mut ctx: VoiceContext) {
+  let status = (ctx.status)();
+  if status != VoiceStatus::Standby && status != VoiceStatus::Speaking {
+    return;
+  }
+  if status == VoiceStatus::Speaking {
+    ctx.barge_in.set(true);
+    voice_pipeline::stop_active_playback();
+  }
+  ctx.pcm_buffer.write().clear();
+  voice_porcupine::reset_buffer();
+  voice_widget.send_update(serde_json::json!({ "type": "start_recording" }));
+  spawn(async move {
+    let _ = voice_pipeline::play_wav(voice_pipeline::generate_ack_tone()).await;
+  });
+}
+
+async fn handle_utterance(pcm: Vec<u8>, agent_widget: dioxus_widget_bridge::TsWidgetHandle, mut ctx: VoiceContext) -> anyhow::Result<()> {
   ctx.pipeline_stage.set(PipelineStage::Transcribing);
   let text = voice_pipeline::transcribe(&pcm).await?;
   if text.is_empty() {
     ctx.pipeline_stage.set(PipelineStage::Idle);
-    return Ok(true);
+    return Ok(());
   }
-
-  if is_awaiting {
-    voice_pipeline::run_pipeline(&text, agent_widget, ctx).await?;
-    return Ok(true);
-  }
-
-  if is_standby {
-    let triggers = ctx.trigger_words.read().clone();
-    match voice_pipeline::match_trigger(&text, &triggers) {
-      None => {
-        ctx.pipeline_stage.set(PipelineStage::Idle);
-        voice_widget.send_update(serde_json::json!({ "type": "resume_standby" }));
-        return Ok(false);
-      },
-      Some(query) if query.is_empty() => {
-        ctx.pipeline_stage.set(PipelineStage::AwaitingQuery);
-        let ack_wav = voice_pipeline::generate_ack_tone();
-        let _ = voice_pipeline::play_wav(ack_wav).await;
-        voice_widget.send_update(serde_json::json!({ "type": "awaiting_query" }));
-        spawn(async move {
-          tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-          if (ctx.pipeline_stage)() == PipelineStage::AwaitingQuery {
-            ctx.pipeline_stage.set(PipelineStage::Idle);
-            voice_widget.send_update(serde_json::json!({ "type": "resume_standby" }));
-          }
-        });
-        return Ok(false);
-      },
-      Some(query) => {
-        voice_pipeline::run_pipeline(&query, agent_widget, ctx).await?;
-      },
-    }
-    return Ok(true);
-  }
-
-  voice_pipeline::run_pipeline(&text, agent_widget, ctx).await?;
-  Ok(true)
+  voice_pipeline::run_pipeline(&text, agent_widget, ctx).await
 }
