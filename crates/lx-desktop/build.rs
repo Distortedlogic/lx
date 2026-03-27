@@ -1,8 +1,10 @@
+use std::env;
+use std::fs;
 use std::path::Path;
 use std::process::Command;
 
 fn main() {
-  let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
+  let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
   let root = Path::new(&manifest_dir).parent().expect("crates dir").parent().expect("repo root");
   let dioxus_common = root.join("../dioxus-common");
   let assets = Path::new(&manifest_dir).join("assets");
@@ -11,7 +13,7 @@ fn main() {
   for dir in &["src", "widgets"] {
     let d = widget_bridge_dir.join(dir);
     if d.exists()
-      && let Ok(entries) = std::fs::read_dir(&d)
+      && let Ok(entries) = fs::read_dir(&d)
     {
       for entry in entries.flatten() {
         if entry.path().extension().is_some_and(|e| e == "ts") {
@@ -23,7 +25,7 @@ fn main() {
   for pkg in &["audio-playback", "audio-capture"] {
     let pkg_src = dioxus_common.join(format!("ts/{pkg}/src"));
     if pkg_src.exists()
-      && let Ok(entries) = std::fs::read_dir(&pkg_src)
+      && let Ok(entries) = fs::read_dir(&pkg_src)
     {
       for entry in entries.flatten() {
         if entry.path().extension().is_some_and(|e| e == "ts") {
@@ -48,7 +50,7 @@ fn main() {
 
   for (src, dst) in &copies {
     if src.exists() {
-      std::fs::copy(src, dst).unwrap_or_else(|e| panic!("failed to copy {}: {e}", src.display()));
+      fs::copy(src, dst).unwrap_or_else(|e| panic!("failed to copy {}: {e}", src.display()));
     }
   }
 

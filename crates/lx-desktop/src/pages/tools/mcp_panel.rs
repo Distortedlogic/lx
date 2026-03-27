@@ -1,8 +1,10 @@
+use std::io;
+
 use dioxus::prelude::*;
 
-async fn load_mcp_servers() -> Result<Vec<String>, std::io::Error> {
+async fn load_mcp_servers() -> Result<Vec<String>, io::Error> {
   let content = tokio::fs::read_to_string(".mcp.json").await?;
-  let json: serde_json::Value = serde_json::from_str(&content).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+  let json: serde_json::Value = serde_json::from_str(&content).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
   Ok(json.get("mcpServers").and_then(|v| v.as_object()).map(|obj| obj.keys().cloned().collect()).unwrap_or_default())
 }
 

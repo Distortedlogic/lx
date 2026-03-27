@@ -1,3 +1,5 @@
+use std::fmt::{self, Display, Formatter};
+
 use dioxus::prelude::*;
 
 #[derive(Clone, Copy, PartialEq)]
@@ -9,8 +11,8 @@ pub enum VoiceStatus {
   Speaking,
 }
 
-impl std::fmt::Display for VoiceStatus {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for VoiceStatus {
+  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
     match self {
       Self::Idle => write!(f, "IDLE"),
       Self::Standby => write!(f, "STANDBY"),
@@ -29,8 +31,8 @@ pub enum PipelineStage {
   SynthesizingSpeech,
 }
 
-impl std::fmt::Display for PipelineStage {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for PipelineStage {
+  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
     match self {
       Self::Idle => write!(f, ""),
       Self::Transcribing => write!(f, "TRANSCRIBING"),

@@ -1,3 +1,5 @@
+use std::mem;
+
 use super::voice_context::{PipelineStage, TranscriptEntry, VoiceContext, VoiceDataStoreExt, VoiceStatus};
 use super::{voice_pipeline, voice_porcupine};
 use base64::Engine;
@@ -41,7 +43,7 @@ pub fn VoiceBanner() -> Element {
             continue;
           }
 
-          let buffer = std::mem::take(&mut *ctx.data.pcm_buffer().write());
+          let buffer = mem::take(&mut *ctx.data.pcm_buffer().write());
           if buffer.is_empty() {
             if ctx.data.always_listen().cloned() {
               voice_widget.send_update(serde_json::json!({ "type": "resume_standby" }));

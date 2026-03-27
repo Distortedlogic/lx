@@ -1,4 +1,6 @@
-use std::sync::LazyLock;
+use std::f64::consts::PI;
+use std::io::Cursor;
+use std::sync::{Arc, LazyLock, Mutex};
 
 use super::voice_context::{PipelineStage, TranscriptEntry, VoiceContext, VoiceDataStoreExt, VoiceStatus};
 use base64::Engine;
@@ -15,7 +17,7 @@ static AUDIO_SINK: LazyLock<rodio::MixerDeviceSink> = LazyLock::new(|| {
   sink
 });
 
-static ACTIVE_PLAYER: LazyLock<std::sync::Mutex<Option<std::sync::Arc<rodio::Player>>>> = LazyLock::new(|| std::sync::Mutex::new(None));
+static ACTIVE_PLAYER: LazyLock<Mutex<Option<Arc<rodio::Player>>>> = LazyLock::new(|| Mutex::new(None));
 
 pub fn stop_active_playback() {
   if let Some(player) = ACTIVE_PLAYER.lock().expect("lock poisoned").take() {
@@ -25,13 +27,13 @@ pub fn stop_active_playback() {
 
 pub fn play_wav_interruptible(wav_bytes: Vec<u8>) -> tokio::task::JoinHandle<anyhow::Result<()>> {
   tokio::task::spawn_blocking(move || {
-    let cursor = std::io::Cursor::new(wav_bytes);
+    let cursor = Cursor::new(wav_bytes);
     let player = rodio::play(AUDIO_SINK.mixer(), cursor).map_err(|e| {
       error!("voice: rodio::play failed: {e}");
       e
     })?;
-    let player = std::sync::Arc::new(player);
-    *ACTIVE_PLAYER.lock().expect("lock poisoned") = Some(std::sync::Arc::clone(&player));
+    let player = Arc::new(player);
+    *ACTIVE_PLAYER.lock().expect("lock poisoned") = Some(Arc::clone(&player));
     player.sleep_until_end();
     *ACTIVE_PLAYER.lock().expect("lock poisoned") = None;
     info!("voice: playback finished");
@@ -53,7 +55,7 @@ pub fn generate_ack_tone() -> Vec<u8> {
   let mut pcm = Vec::with_capacity(duration_samples * 2);
   for i in 0..duration_samples {
     let t = i as f64 / sample_rate as f64;
-    let mut sample = (t * freq * 2.0 * std::f64::consts::PI).sin() * 0.3;
+    let mut sample = (t * freq * 2.0 * PI).sin() * 0.3;
     if i < fade_samples {
       sample *= i as f64 / fade_samples as f64;
     } else if i >= duration_samples - fade_samples {
@@ -67,7 +69,7 @@ pub fn generate_ack_tone() -> Vec<u8> {
 
 pub fn play_wav(wav_bytes: Vec<u8>) -> tokio::task::JoinHandle<anyhow::Result<()>> {
   tokio::task::spawn_blocking(move || {
-    let cursor = std::io::Cursor::new(wav_bytes);
+    let cursor = Cursor::new(wav_bytes);
     let player = rodio::play(AUDIO_SINK.mixer(), cursor).map_err(|e| {
       error!("voice: rodio::play failed: {e}");
       e

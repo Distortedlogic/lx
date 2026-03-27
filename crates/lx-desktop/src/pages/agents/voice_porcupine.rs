@@ -1,3 +1,5 @@
+use std::env;
+use std::path::Path;
 use std::sync::{LazyLock, Mutex};
 
 use dioxus::logger::tracing::{info, warn};
@@ -10,8 +12,8 @@ struct DetectorState {
 }
 
 static ENGINE: LazyLock<Option<Mutex<DetectorState>>> = LazyLock::new(|| {
-  let wakeword_path = std::env::var("RUSTPOTTER_WAKEWORD_PATH").ok()?;
-  if !std::path::Path::new(&wakeword_path).exists() {
+  let wakeword_path = env::var("RUSTPOTTER_WAKEWORD_PATH").ok()?;
+  if !Path::new(&wakeword_path).exists() {
     warn!("rustpotter: wakeword file not found: {wakeword_path}");
     return None;
   }

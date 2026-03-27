@@ -1,3 +1,5 @@
+use std::env;
+
 use common_pane_tree::{PaneNode, SplitDirection, TabsState};
 use dioxus::prelude::*;
 
@@ -18,7 +20,7 @@ struct Menu {
 fn make_new_terminal_action(tabs_state: Signal<TabsState<DesktopPane>>) -> EventHandler<()> {
   EventHandler::new(move |_| {
     let id = uuid::Uuid::new_v4().to_string();
-    let wd = std::env::current_dir().map(|p| p.to_string_lossy().to_string()).unwrap_or_else(|_| ".".into());
+    let wd = env::current_dir().map(|p| p.to_string_lossy().to_string()).unwrap_or_else(|_| ".".into());
     add_terminal_tab(tabs_state, id, "Terminal".into(), wd, None);
   })
 }
@@ -40,7 +42,7 @@ fn build_menus(mut tabs_state: Signal<TabsState<DesktopPane>>) -> Vec<Menu> {
     let focused = tabs_state.read().focused_pane_id.clone();
     if let Some(fid) = focused {
       let new_id = uuid::Uuid::new_v4().to_string();
-      let wd = std::env::current_dir().map(|p| p.to_string_lossy().to_string()).unwrap_or_else(|_| ".".into());
+      let wd = env::current_dir().map(|p| p.to_string_lossy().to_string()).unwrap_or_else(|_| ".".into());
       let new_pane = DesktopPane::Terminal { id: new_id, working_dir: wd, command: None, name: None };
       tabs_state.write().split_pane(&fid, SplitDirection::Horizontal, PaneNode::Leaf(new_pane));
     }
@@ -50,7 +52,7 @@ fn build_menus(mut tabs_state: Signal<TabsState<DesktopPane>>) -> Vec<Menu> {
     let focused = tabs_state.read().focused_pane_id.clone();
     if let Some(fid) = focused {
       let new_id = uuid::Uuid::new_v4().to_string();
-      let wd = std::env::current_dir().map(|p| p.to_string_lossy().to_string()).unwrap_or_else(|_| ".".into());
+      let wd = env::current_dir().map(|p| p.to_string_lossy().to_string()).unwrap_or_else(|_| ".".into());
       let new_pane = DesktopPane::Terminal { id: new_id, working_dir: wd, command: None, name: None };
       tabs_state.write().split_pane(&fid, SplitDirection::Vertical, PaneNode::Leaf(new_pane));
     }

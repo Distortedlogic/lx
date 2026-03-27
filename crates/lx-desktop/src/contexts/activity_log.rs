@@ -1,5 +1,7 @@
-use dioxus::prelude::*;
 use std::collections::VecDeque;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use dioxus::prelude::*;
 
 pub use lx_api::types::ActivityEvent;
 
@@ -16,7 +18,7 @@ impl ActivityLog {
   }
 
   pub fn push(&self, kind: &str, message: &str) {
-    let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0).to_string();
+    let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0).to_string();
     let event = ActivityEvent { timestamp, kind: kind.to_string(), message: message.to_string() };
     let mut events_sig = self.events;
     let mut events = events_sig.write();

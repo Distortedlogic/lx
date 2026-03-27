@@ -1,3 +1,4 @@
+use std::env;
 use std::sync::{Arc, Mutex};
 
 use common_pane_tree::{DividerInfo, Pane, PaneNode, Rect, SplitDirection, TabsState};
@@ -13,7 +14,7 @@ use crate::terminal::use_tabs_state;
 use crate::terminal::view::{AgentView, BrowserNavCtx, BrowserView, CanvasView, ChartView, EditorView, TerminalView};
 
 fn create_new_tab(tabs_state: Signal<TabsState<DesktopPane>>) {
-  let working_dir = std::env::current_dir().ok().map(|p| p.display().to_string()).unwrap_or_else(|| ".".into());
+  let working_dir = env::current_dir().ok().map(|p| p.display().to_string()).unwrap_or_else(|| ".".into());
   let id = Uuid::new_v4().to_string();
   let title = format!("Terminal {}", tabs_state.read().tabs.len() + 1);
   crate::terminal::add_terminal_tab(tabs_state, id, title, working_dir, None);
