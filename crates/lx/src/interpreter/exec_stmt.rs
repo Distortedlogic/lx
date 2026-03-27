@@ -163,7 +163,7 @@ impl Interpreter {
     }
   }
 
-  fn maybe_combine_clauses(env: &Arc<Env>, name: Sym, val: LxVal) -> LxVal {
+  fn maybe_combine_clauses(env: &Env, name: Sym, val: LxVal) -> LxVal {
     let LxVal::Func(new_func) = &val else { return val };
     let Some(existing) = env.get(name) else { return val };
     match existing {
