@@ -7,7 +7,7 @@ use crate::runtime::{DenyHttpBackend, HttpBackend, RuntimeCtx};
 use crate::value::LxVal;
 use miette::SourceSpan;
 
-use super::sandbox::{POLICIES, Policy, policy_id};
+use super::sandbox::{Policy, get_policy, policy_id};
 
 thread_local! {
     static POLICY_STACK: RefCell<Vec<u64>> = const { RefCell::new(Vec::new()) };
@@ -33,7 +33,7 @@ fn build_restricted_ctx(base: &Arc<RuntimeCtx>, policy: &Policy) -> Arc<RuntimeC
 
 pub fn bi_scope(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let pid = policy_id(&args[0], span)?;
-  let policy = POLICIES.get(&pid).ok_or_else(|| LxError::runtime("sandbox: policy not found", span))?.clone();
+  let policy = get_policy(pid, span)?.clone();
 
   let restricted_ctx = build_restricted_ctx(ctx, &policy);
 

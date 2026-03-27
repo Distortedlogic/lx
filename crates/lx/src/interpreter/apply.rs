@@ -80,8 +80,8 @@ impl Interpreter {
         applied.push(arg);
         if applied.len() < arity { Ok(LxVal::TaggedCtor { tag, arity, applied }) } else { Ok(LxVal::Tagged { tag, values: Arc::new(applied) }) }
       },
-      LxVal::Trait(ref t) if !t.fields.is_empty() => self.apply_trait_fields(t.name.as_str(), &t.fields, &arg, span).await,
-      LxVal::TraitUnion { name, variants } => Ok(self.apply_trait_union(name.as_str(), &variants, &arg, span).await?),
+      LxVal::Trait(ref t) if !t.fields.is_empty() => self.apply_trait_fields(t.name.as_str(), &*t.fields, &arg, span).await,
+      LxVal::TraitUnion { name, variants } => Ok(self.apply_trait_union(name.as_str(), &*variants, &arg, span).await?),
       LxVal::Class(c) => {
         let overrides = match &arg {
           LxVal::Record(r) => r.as_ref().clone(),

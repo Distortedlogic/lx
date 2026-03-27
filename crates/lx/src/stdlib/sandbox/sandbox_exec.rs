@@ -5,7 +5,7 @@ use crate::runtime::RuntimeCtx;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
-use super::sandbox::{POLICIES, policy_id};
+use super::sandbox::{get_policy, policy_id};
 
 pub fn bi_exec(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let _pid = policy_id(&args[0], span)?;
@@ -19,7 +19,7 @@ pub fn bi_exec(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resu
 
 pub fn bi_spawn(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let pid = policy_id(&args[0], span)?;
-  let policy = POLICIES.get(&pid).ok_or_else(|| LxError::runtime("sandbox: policy not found", span))?;
+  let policy = get_policy(pid, span)?;
 
   if !policy.agent {
     return Ok(LxVal::err_str("agent spawning denied by sandbox policy"));

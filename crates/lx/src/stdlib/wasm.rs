@@ -28,11 +28,10 @@ struct PluginMeta {
   wasm: String,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Default, serde::Deserialize)]
+#[serde(default)]
 struct SandboxConfig {
-  #[serde(default)]
   wasi: Option<bool>,
-  #[serde(default)]
   fuel: Option<u64>,
 }
 
@@ -42,7 +41,7 @@ struct ExportDef {
 }
 
 pub(crate) fn load_plugin(name: &str, plugin_dir: &Path, span: SourceSpan) -> Result<ModuleExports, LxError> {
-  let toml_path = plugin_dir.join("plugin.toml");
+  let toml_path = plugin_dir.join(crate::PLUGIN_MANIFEST);
   let toml_str =
     std::fs::read_to_string(&toml_path).map_err(|e| LxError::runtime(format!("plugin '{name}': cannot read {}: {e}", toml_path.display()), span))?;
 

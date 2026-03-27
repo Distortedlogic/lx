@@ -60,12 +60,6 @@ impl From<String> for Sym {
   }
 }
 
-impl From<&String> for Sym {
-  fn from(s: &String) -> Self {
-    intern(s)
-  }
-}
-
 pub fn intern(s: &str) -> Sym {
   Sym(interner().get_or_intern(s))
 }

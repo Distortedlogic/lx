@@ -52,7 +52,7 @@ impl Interpreter {
     Ok(LxVal::record(result))
   }
 
-  pub(super) async fn apply_trait_union(&mut self, name: &str, variants: &Arc<Vec<Sym>>, arg: &LxVal, span: SourceSpan) -> Result<LxVal, LxError> {
+  pub(super) async fn apply_trait_union(&mut self, name: &str, variants: &[Sym], arg: &LxVal, span: SourceSpan) -> Result<LxVal, LxError> {
     let LxVal::Record(rec) = arg else {
       return Ok(LxVal::err_str(format!("Trait union {name}: expected Record, got {}", arg.type_name())));
     };
@@ -63,7 +63,7 @@ impl Interpreter {
       let LxVal::Trait(ref proto_trait) = proto else {
         continue;
       };
-      if self.try_match_variant(&proto_trait.fields, rec, span).is_ok() {
+      if self.try_match_variant(&*proto_trait.fields, rec, span).is_ok() {
         let mut result = rec.as_ref().clone();
         result.insert(crate::sym::intern("_variant"), LxVal::str(variant_name.as_str()));
         for field in proto_trait.fields.iter() {
@@ -79,7 +79,7 @@ impl Interpreter {
     Ok(LxVal::err_str(format!("Trait union {name}: no variant matched. Tried: {}", variants.iter().map(|v| v.as_str()).collect::<Vec<_>>().join(", "))))
   }
 
-  fn try_match_variant(&mut self, fields: &Arc<Vec<FieldDef>>, rec: &Arc<indexmap::IndexMap<Sym, LxVal>>, span: SourceSpan) -> Result<(), LxError> {
+  fn try_match_variant(&mut self, fields: &[FieldDef], rec: &Arc<indexmap::IndexMap<Sym, LxVal>>, span: SourceSpan) -> Result<(), LxError> {
     for field in fields.iter() {
       match rec.get(&field.name) {
         Some(val) => {

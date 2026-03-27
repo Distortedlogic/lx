@@ -79,13 +79,13 @@ impl Interpreter {
   fn find_plugin_dir(&self, name: &str) -> Option<PathBuf> {
     if let Some(ref source_dir) = self.source_dir {
       let local = source_dir.join(".lx").join("plugins").join(name);
-      if local.join("plugin.toml").exists() {
+      if local.join(crate::PLUGIN_MANIFEST).exists() {
         return Some(local);
       }
     }
     if let Some(home) = std::env::var_os("HOME") {
       let global = PathBuf::from(home).join(".lx").join("plugins").join(name);
-      if global.join("plugin.toml").exists() {
+      if global.join(crate::PLUGIN_MANIFEST).exists() {
         return Some(global);
       }
     }

@@ -40,6 +40,10 @@ fn make_handle(id: u64) -> LxVal {
   }
 }
 
+pub(super) fn get_policy(id: u64, span: SourceSpan) -> Result<dashmap::mapref::one::Ref<'static, u64, Policy>, LxError> {
+  POLICIES.get(&id).ok_or_else(|| LxError::runtime("sandbox: policy not found", span))
+}
+
 pub fn build() -> IndexMap<crate::sym::Sym, LxVal> {
   std_module! {
     "policy"    => "sandbox.policy",    1, bi_policy;
@@ -68,7 +72,7 @@ fn bi_policy(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result
 
 fn bi_describe(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let id = policy_id(&args[0], span)?;
-  let p = POLICIES.get(&id).ok_or_else(|| LxError::runtime("sandbox: policy not found", span))?;
+  let p = get_policy(id, span)?;
   Ok(policy_to_describe(&p))
 }
 
@@ -86,7 +90,7 @@ fn bi_permits(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resul
       return Err(LxError::type_err("sandbox.permits expects Str target", span, None));
     },
   };
-  let p = POLICIES.get(&id).ok_or_else(|| LxError::runtime("sandbox: policy not found", span))?;
+  let p = get_policy(id, span)?;
   Ok(LxVal::Bool(permits_check(&p, &capability, &target)))
 }
 
@@ -97,7 +101,7 @@ fn bi_merge(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<
   let mut policies = Vec::new();
   for h in handles.iter() {
     let id = policy_id(h, span)?;
-    let p = POLICIES.get(&id).ok_or_else(|| LxError::runtime("sandbox: policy not found", span))?;
+    let p = get_policy(id, span)?;
     policies.push(p.clone());
   }
   let merged = intersect_policies(&policies);
@@ -111,7 +115,7 @@ fn bi_attenuate(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Res
   let LxVal::Record(overrides) = &args[1] else {
     return Err(LxError::type_err("sandbox.attenuate expects Record overrides", span, None));
   };
-  let parent = POLICIES.get(&parent_id).ok_or_else(|| LxError::runtime("sandbox: policy not found", span))?.clone();
+  let parent = get_policy(parent_id, span)?.clone();
   let child = parse_policy(overrides, span)?;
   let narrowed = intersect_policies(&[parent, child]);
   let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
