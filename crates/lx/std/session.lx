@@ -44,7 +44,7 @@ use std/time
     snapshot = self.checkpoints.get cp_id
     snapshot ? {
       None -> Err "checkpoint not found: {cp_id}"
-      Some entries -> {
+      entries -> {
         self.messages.keys () | each (k) { self.messages.remove k }
         entries | each (e) { self.messages.set e.key e.value }
         Ok ()

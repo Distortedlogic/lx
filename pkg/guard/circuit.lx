@@ -8,7 +8,7 @@ check_rep_window = (acts w) {
   act_len = len acts
   n = act_len - w
   window = drop n acts
-  head = first window ^
+  head = first window
   same_count = window | filter (== head) | len
   same_count == w ? "repetition: last {w} actions identical" : None
 }

@@ -94,7 +94,7 @@ pid_val = pid_result | split " " | first | to_int ?? 1
     n = len acts
     n < 5 ? false : {
       window = drop (n - 5) acts
-      last_act = last window ^
+      last_act = last window
       same = window | keep (a) a.type == last_act.type && a.target == last_act.target
       (len same) == 5
     }
@@ -110,7 +110,7 @@ pid_val = pid_result | split " " | first | to_int ?? 1
     acts = self.actions | keep is_action
     n = len acts
     n == 0 ? 0 : {
-      last_act = last acts ^
+      last_act = last acts
       window = (window_size < n) ? (drop (n - window_size) acts) : acts
       same = window | keep (a) a.type == last_act.type && a.target == last_act.target
       len same

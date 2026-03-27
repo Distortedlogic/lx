@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use miette::SourceSpan;
 
 use crate::ast::{
-  AstArena, BinOp, BindTarget, Binding, ClassDeclData, Core, Expr, ExprApply, ExprBinary, ExprBlock, ExprFieldAccess, ExprFunc, ExprId, ExprMatch, ExprWith,
+  AstArena, BindTarget, Binding, ClassDeclData, Core, Expr, ExprApply, ExprBinary, ExprBlock, ExprFieldAccess, ExprFunc, ExprId, ExprMatch, ExprWith,
   FieldKind, KeywordDeclData, KeywordKind, Literal, MatchArm, Param, Pattern, PatternConstructor, Program, Section, Stmt, StmtId, StrPart, Surface, UseKind,
   UseStmt, WithKind,
 };

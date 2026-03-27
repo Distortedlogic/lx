@@ -78,7 +78,7 @@ use std/time
     existing = p1.knowledge.get e.key
     existing ? {
       None -> p1.knowledge.set e.key e.value
-      Some ex -> {
+      ex -> {
         newer = (e.value.timestamp ?? 0) > (ex.timestamp ?? 0)
         newer ? (p1.knowledge.set e.key e.value) : ()
       }
@@ -91,11 +91,11 @@ use std/time
 +age = (profile domain) {
   entry = profile.knowledge.get domain
   entry ? {
-    Some e -> {
+    None -> -1
+    e -> {
       now = time.now ()
       now.ms - (e.timestamp ?? 0)
     }
-    None -> -1
   }
 }
 

@@ -125,7 +125,7 @@ classify_trend = (avg_delta recent_delta) {
       actual = window < n ? window : n
       num_deltas == 0 ? ({avg_delta: 0.0; recent_delta: 0.0; trend: "insufficient"; samples: actual}) : {
         avg_d = (deltas | fold 0.0 (+)) / num_deltas
-        recent_d = last deltas ^
+        recent_d = last deltas
         trend = classify_trend avg_d recent_d
         {avg_delta: avg_d; recent_delta: recent_d; trend: trend; samples: actual}
       }

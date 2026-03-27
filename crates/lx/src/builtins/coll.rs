@@ -49,13 +49,13 @@ fn bi_get(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<Lx
       if idx < 0 {
         return Ok(LxVal::None);
       }
-      Ok(maybe(l.get(idx as usize)))
+      Ok(l.get(idx as usize).cloned().unwrap_or(LxVal::None))
     },
     LxVal::Record(r) => {
       let key = args[0].require_str("get", span)?;
-      Ok(maybe(r.get(&crate::sym::intern(key))))
+      Ok(r.get(&crate::sym::intern(key)).cloned().unwrap_or(LxVal::None))
     },
-    LxVal::Map(m) => Ok(maybe(m.get(&ValueKey(args[0].clone())))),
+    LxVal::Map(m) => Ok(m.get(&ValueKey(args[0].clone())).cloned().unwrap_or(LxVal::None)),
     other => Err(LxError::type_err(format!("get expects List/Record/Map, got {}", other.type_name()), span, None)),
   }
 }
