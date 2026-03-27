@@ -1,29 +1,22 @@
+use dioxus::fullstack::{WebSocketOptions, use_websocket};
 use dioxus::prelude::*;
-
-use crate::api_client::LxClient;
-use crate::ws_client::EventWsClient;
+use lx_api::types::ActivityEvent;
+use lx_api::ws_events::ws_events;
 
 #[component]
 pub fn Events() -> Element {
-  let client: Signal<LxClient> = use_context();
-  let mut events: Signal<Vec<serde_json::Value>> = use_signal(Vec::new);
+  let mut events: Signal<Vec<ActivityEvent>> = use_signal(Vec::new);
   let mut filter = use_signal(|| "all".to_string());
   let expanded: Signal<std::collections::HashSet<usize>> = use_signal(Default::default);
 
-  use_future(move || {
-    let base_url = client.read().base_url_for_spawn();
-    async move {
-      let ws_client = EventWsClient::new(&base_url);
-      let (tx, mut rx) = tokio::sync::mpsc::channel::<serde_json::Value>(256);
-      tokio::spawn(async move {
-        ws_client.connect_and_stream(tx).await;
-      });
-      while let Some(val) = rx.recv().await {
-        let mut evts = events.write();
-        evts.push(val);
-        if evts.len() > 10_000 {
-          evts.remove(0);
-        }
+  let mut socket = use_websocket(|| ws_events(WebSocketOptions::new()));
+
+  use_future(move || async move {
+    while let Ok(event) = socket.recv().await {
+      let mut evts = events.write();
+      evts.push(event);
+      if evts.len() > 10_000 {
+        evts.remove(0);
       }
     }
   });
@@ -36,7 +29,7 @@ pub fn Events() -> Element {
       if current_filter == "all" {
         return true;
       }
-      e.get("type").and_then(|t| t.as_str()).is_some_and(|t| event_type_matches(t, &current_filter))
+      event_type_matches(&e.kind, &current_filter)
     })
     .cloned()
     .collect();
@@ -88,12 +81,11 @@ fn event_type_matches(event_type: &str, filter: &str) -> bool {
   }
 }
 
-fn render_mobile_event(idx: usize, event: &serde_json::Value, expanded: &Signal<std::collections::HashSet<usize>>) -> Element {
-  let event_type = event.get("type").and_then(|t| t.as_str()).unwrap_or("unknown");
-  let agent = event.get("agent_id").and_then(|a| a.as_str()).unwrap_or("system");
+fn render_mobile_event(idx: usize, event: &ActivityEvent, expanded: &Signal<std::collections::HashSet<usize>>) -> Element {
   let is_expanded = expanded.read().contains(&idx);
-  let detail = serde_json::to_string_pretty(event).unwrap_or_default();
+  let detail = format!("kind: {}\ntimestamp: {}\nmessage: {}", event.kind, event.timestamp, event.message);
   let mut expanded = *expanded;
+  let kind = event.kind.clone();
   rsx! {
     div {
       class: "p-2 bg-[var(--surface-container)] rounded text-xs cursor-pointer",
@@ -106,8 +98,7 @@ fn render_mobile_event(idx: usize, event: &serde_json::Value, expanded: &Signal<
           }
       },
       div {
-        span { class: "text-[var(--outline)]", "[{agent}] " }
-        span { class: "text-[var(--on-surface-variant)]", "{event_type}" }
+        span { class: "text-[var(--on-surface-variant)]", "{kind}" }
       }
       if is_expanded {
         pre { class: "mt-1 text-[var(--outline)] whitespace-pre-wrap break-all",

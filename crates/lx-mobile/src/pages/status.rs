@@ -1,11 +1,11 @@
 use dioxus::prelude::*;
+use lx_api::run_api::get_run_status;
 
-use crate::api_client::LxClient;
 use crate::components::pulse_indicator::{ExecutionState, PulseIndicator};
 
 #[component]
 pub fn Status() -> Element {
-  let client: Signal<LxClient> = use_context();
+  let mut action = use_action(get_run_status);
   let mut exec_state = use_signal(|| ExecutionState::Idle);
   let mut source_path = use_signal(|| "none".to_string());
   let mut elapsed = use_signal(|| 0u64);
@@ -14,36 +14,32 @@ pub fn Status() -> Element {
 
   use_future(move || async move {
     loop {
-      let c = client.read();
-      match c.fetch_run_status().await {
-        Ok(status) => {
-          let state = match status.status.as_str() {
-            "running" => ExecutionState::Running,
-            "completed" => ExecutionState::Done,
-            "failed" => ExecutionState::Error,
-            "waiting" => ExecutionState::Waiting,
-            _ => ExecutionState::Idle,
-          };
-          exec_state.set(state);
-          if let Some(path) = status.source_path {
-            source_path.set(path);
-          }
-          if let Some(ms) = status.elapsed_ms {
-            elapsed.set(ms);
-          }
-          if let Some(c) = status.cost {
-            cost.set(c);
-          }
-          error_msg.set(status.error);
-        },
-        Err(_) => {
-          exec_state.set(ExecutionState::Idle);
-        },
-      }
-      drop(c);
+      action.call();
       tokio::time::sleep(std::time::Duration::from_secs(2)).await;
     }
   });
+
+  if let Some(Ok(status)) = action.value() {
+    let status = status.read();
+    let state = match status.status.as_str() {
+      "running" => ExecutionState::Running,
+      "completed" => ExecutionState::Done,
+      "failed" => ExecutionState::Error,
+      "waiting" => ExecutionState::Waiting,
+      _ => ExecutionState::Idle,
+    };
+    exec_state.set(state);
+    if let Some(ref path) = status.source_path {
+      source_path.set(path.clone());
+    }
+    if let Some(ms) = status.elapsed_ms {
+      elapsed.set(ms);
+    }
+    if let Some(c) = status.cost {
+      cost.set(c);
+    }
+    error_msg.set(status.error.clone());
+  }
 
   rsx! {
     div { class: "flex flex-col items-center gap-6 pt-8",
