@@ -183,14 +183,12 @@ impl SemanticModelBuilder {
   }
 
   pub fn names_in_scope(&self) -> Vec<Sym> {
-    let mut names = Vec::new();
-    for &scope_id in &self.scope_stack {
-      if let Some(defs) = self.scope_definitions.get(&scope_id) {
-        for &def_id in defs {
-          names.push(self.definitions[def_id.index()].name);
-        }
-      }
-    }
+    let mut names: Vec<_> = self
+      .scope_stack
+      .iter()
+      .filter_map(|scope_id| self.scope_definitions.get(scope_id))
+      .flat_map(|defs| defs.iter().map(|&d| self.definitions[d.index()].name))
+      .collect();
     names.sort();
     names.dedup();
     names

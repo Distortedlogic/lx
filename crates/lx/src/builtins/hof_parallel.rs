@@ -17,10 +17,7 @@ async fn parallel_map_batch(items: &[LxVal], func: &LxVal, sp: SourceSpan, ctx: 
     futures.push(async move { call(&f, v, sp, &ctx).await });
   }
   let results = futures::future::join_all(futures).await;
-  let mut out = Vec::with_capacity(results.len());
-  for r in results {
-    out.push(r?);
-  }
+  let out: Vec<_> = results.into_iter().collect::<Result<_, _>>()?;
   Ok(out)
 }
 

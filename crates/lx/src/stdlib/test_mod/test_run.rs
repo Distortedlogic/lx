@@ -79,12 +79,10 @@ fn run_one_scenario(scenario_val: &LxVal, rc: &RunCtx<'_>) -> Result<LxVal, LxEr
 
     let grader_input = LxVal::tuple(vec![output.clone(), scenario_val.clone()]);
     let scores_val = call_value_sync(rc.grader, grader_input, span, rc.ctx)?;
-    let scores_map = match &scores_val {
-      LxVal::Record(r) => r.as_ref().clone(),
-      _ => {
-        return Err(LxError::runtime(format!("test.run: grader must return Record, got {}", scores_val.type_name()), span));
-      },
+    let LxVal::Record(r) = &scores_val else {
+      return Err(LxError::runtime(format!("test.run: grader must return Record, got {}", scores_val.type_name()), span));
     };
+    let scores_map = r.as_ref().clone();
 
     let weighted = compute_weighted_score(&scores_map, rc.weights);
     run_scores.push(weighted);
@@ -119,10 +117,7 @@ fn run_scenarios(spec_fields: &IndexMap<crate::sym::Sym, LxVal>, scenarios: &[Lx
   let flow_path = require_str_field(spec_fields, "flow", "test.run", span)?.to_string();
   let grader = spec_fields.get(&crate::sym::intern("grader")).ok_or_else(|| LxError::runtime("test.run: spec missing 'grader'", span))?;
   let threshold = spec_fields.get(&crate::sym::intern("threshold")).and_then(|v| v.as_float()).unwrap_or(0.75);
-  let weights_map = match spec_fields.get(&crate::sym::intern("weights")) {
-    Some(LxVal::Record(r)) => r.as_ref().clone(),
-    _ => IndexMap::new(),
-  };
+  let weights_map = if let Some(LxVal::Record(r)) = spec_fields.get(&crate::sym::intern("weights")) { r.as_ref().clone() } else { IndexMap::new() };
   let setup = spec_fields.get(&crate::sym::intern("setup")).filter(|v| !matches!(v, LxVal::None));
   let teardown = spec_fields.get(&crate::sym::intern("teardown")).filter(|v| !matches!(v, LxVal::None));
   let spec_name = spec_fields.get(&crate::sym::intern("name")).and_then(|v| v.as_str()).unwrap_or("unnamed");
@@ -147,10 +142,7 @@ fn run_scenarios(spec_fields: &IndexMap<crate::sym::Sym, LxVal>, scenarios: &[Lx
   } else {
     let sum: f64 = scenario_results
       .iter()
-      .filter_map(|s| match s {
-        LxVal::Record(r) => r.get(&crate::sym::intern("score")).and_then(|v| v.as_float()),
-        _ => None,
-      })
+      .filter_map(|s| if let LxVal::Record(r) = s { r.get(&crate::sym::intern("score")).and_then(|v| v.as_float()) } else { None })
       .sum();
     sum / scenario_results.len() as f64
   };
@@ -166,20 +158,14 @@ fn run_scenarios(spec_fields: &IndexMap<crate::sym::Sym, LxVal>, scenarios: &[Lx
 
 pub(crate) fn bi_run(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let spec_fields = extract_record(&args[0], "test.run", span)?;
-  let scenarios = match spec_fields.get(&crate::sym::intern("scenarios")) {
-    Some(LxVal::List(list)) => list.as_ref().clone(),
-    _ => Vec::new(),
-  };
+  let scenarios = if let Some(LxVal::List(list)) = spec_fields.get(&crate::sym::intern("scenarios")) { list.as_ref().clone() } else { Vec::new() };
   run_scenarios(spec_fields, &scenarios, span, ctx)
 }
 
 pub(crate) fn bi_run_scenario(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let spec_fields = extract_record(&args[0], "test.run_scenario", span)?;
   let target_name = args[1].require_str("test.run_scenario", span)?;
-  let scenarios = match spec_fields.get(&crate::sym::intern("scenarios")) {
-    Some(LxVal::List(list)) => list.as_ref().clone(),
-    _ => Vec::new(),
-  };
+  let scenarios = if let Some(LxVal::List(list)) = spec_fields.get(&crate::sym::intern("scenarios")) { list.as_ref().clone() } else { Vec::new() };
   let matching: Vec<LxVal> = scenarios
     .into_iter()
     .filter(|s| match s {

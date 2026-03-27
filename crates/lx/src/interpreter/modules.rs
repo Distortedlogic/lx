@@ -103,9 +103,7 @@ impl Interpreter {
     }
     let member_dir = self.ctx.workspace_members.get(path[0])?;
     let mut result = member_dir.clone();
-    for segment in &path[1..] {
-      result.push(segment);
-    }
+    result.extend(&path[1..]);
     result.set_extension("lx");
     Some(result)
   }
@@ -127,9 +125,7 @@ impl Interpreter {
       return None;
     }
     let mut result = dep_dir.clone();
-    for segment in &path[1..] {
-      result.push(segment);
-    }
+    result.extend(&path[1..]);
     result.set_extension("lx");
     if result.exists() { Some(result) } else { None }
   }
@@ -211,9 +207,7 @@ fn resolve_module_path(source_dir: &Path, path: &[&str], span: SourceSpan) -> Re
     if idx == 0 {
       idx = 1;
     }
-    for segment in &path[idx..] {
-      base.push(segment);
-    }
+    base.extend(&path[idx..]);
     base
   } else {
     return Err(LxError::runtime(format!("unknown module path: {} (use ./relative, std/module, or dep-name/module)", path.join("/")), span));

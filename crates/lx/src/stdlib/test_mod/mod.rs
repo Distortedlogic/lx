@@ -27,10 +27,7 @@ pub fn build() -> IndexMap<crate::sym::Sym, LxVal> {
 }
 
 pub(super) fn extract_record<'a>(v: &'a LxVal, name: &str, span: SourceSpan) -> Result<&'a IndexMap<crate::sym::Sym, LxVal>, LxError> {
-  match v {
-    LxVal::Record(r) => Ok(r.as_ref()),
-    _ => Err(LxError::type_err(format!("{name}: expected Record, got {}", v.type_name()), span, None)),
-  }
+  if let LxVal::Record(r) = v { Ok(r.as_ref()) } else { Err(LxError::type_err(format!("{name}: expected Record, got {}", v.type_name()), span, None)) }
 }
 
 pub(super) fn score_to_f64(v: &LxVal) -> Option<f64> {
@@ -97,13 +94,12 @@ fn bi_scenario(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resu
   };
 
   let mut new_spec = spec_fields.clone();
-  let scenarios = match new_spec.get(&crate::sym::intern("scenarios")) {
-    Some(LxVal::List(list)) => {
-      let mut new_list = list.as_ref().clone();
-      new_list.push(scenario);
-      LxVal::list(new_list)
-    },
-    _ => LxVal::list(vec![scenario]),
+  let scenarios = if let Some(LxVal::List(list)) = new_spec.get(&crate::sym::intern("scenarios")) {
+    let mut new_list = list.as_ref().clone();
+    new_list.push(scenario);
+    LxVal::list(new_list)
+  } else {
+    LxVal::list(vec![scenario])
   };
   new_spec.insert(crate::sym::intern("scenarios"), scenarios);
   Ok(LxVal::record(new_spec))

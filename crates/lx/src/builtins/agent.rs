@@ -29,10 +29,10 @@ fn agent_id(val: &LxVal, fn_name: &str, span: SourceSpan) -> Result<u64, LxError
 }
 
 pub fn bi_agent_spawn(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let config = match &args[0] {
-    LxVal::Record(r) => r.clone(),
-    _ => return Err(LxError::type_err("agent.spawn: expected config Record", span, None)),
+  let LxVal::Record(config) = &args[0] else {
+    return Err(LxError::type_err("agent.spawn: expected config Record", span, None));
   };
+  let config = config.clone();
 
   let script_path = config
     .get(&crate::sym::intern("script"))

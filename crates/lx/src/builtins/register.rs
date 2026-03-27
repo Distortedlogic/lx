@@ -231,10 +231,10 @@ fn bi_json_encode_pretty(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx
 }
 
 fn bi_method_of(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let name = match &args[1] {
-    LxVal::Str(s) => s.as_ref(),
-    _ => return Ok(LxVal::None),
+  let LxVal::Str(s) = &args[1] else {
+    return Ok(LxVal::None);
   };
+  let name = s.as_ref();
   match &args[0] {
     LxVal::Object(o) => match o.methods.get(&crate::sym::intern(name)) {
       Some(method) => Ok(inject_self_for_method(method, &args[0])),

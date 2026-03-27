@@ -3,6 +3,7 @@ mod quotas;
 pub mod state;
 mod task_priority;
 
+use crate::styles::FLEX_BETWEEN;
 use dioxus::prelude::*;
 
 use self::env_vars::EnvVarsPanel;
@@ -15,7 +16,7 @@ pub fn Settings() -> Element {
   let mut settings = SettingsState::provide();
   rsx! {
     div { class: "flex flex-col h-full p-4 overflow-auto gap-4",
-      div { class: "flex items-center justify-between",
+      div { class: FLEX_BETWEEN,
         span { class: "text-sm text-[var(--outline)] uppercase tracking-wider",
           "SYSTEM / AGENT_CONFIG_V2"
         }

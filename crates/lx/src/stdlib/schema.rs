@@ -180,8 +180,5 @@ fn bi_validate_all(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> R
 fn bi_check(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
   let constraints = extract_schema(args, "schema.check", span)?;
   let data = args[1].require_record("schema.check", span)?;
-  match do_validate(constraints, data, false, span, ctx)? {
-    LxVal::Ok(_) => Ok(LxVal::Bool(true)),
-    _ => Ok(LxVal::Bool(false)),
-  }
+  Ok(LxVal::Bool(matches!(do_validate(constraints, data, false, span, ctx)?, LxVal::Ok(_))))
 }

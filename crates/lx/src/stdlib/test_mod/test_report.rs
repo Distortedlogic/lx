@@ -13,10 +13,7 @@ pub(crate) fn bi_report(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>)
   let results = extract_record(&args[0], "test.report", span)?;
   let spec_name = results.get(&crate::sym::intern("spec")).and_then(|v| v.as_str()).unwrap_or("unnamed");
   let threshold = results.get(&crate::sym::intern("threshold")).and_then(|v| v.as_float()).unwrap_or(0.75);
-  let scenarios = match results.get(&crate::sym::intern("scenarios")) {
-    Some(LxVal::List(list)) => list.as_ref().clone(),
-    _ => Vec::new(),
-  };
+  let scenarios = if let Some(LxVal::List(list)) = results.get(&crate::sym::intern("scenarios")) { list.as_ref().clone() } else { Vec::new() };
 
   let mut out = String::new();
   out.push_str(spec_name);
@@ -45,10 +42,7 @@ fn format_scenario(sr: &IndexMap<crate::sym::Sym, LxVal>, out: &mut String, pass
   let s_mean = sr.get(&crate::sym::intern("mean")).and_then(|v| v.as_float()).unwrap_or(s_score);
   let s_min = sr.get(&crate::sym::intern("min")).and_then(|v| v.as_float()).unwrap_or(s_score);
   let s_max = sr.get(&crate::sym::intern("max")).and_then(|v| v.as_float()).unwrap_or(s_score);
-  let runs = match sr.get(&crate::sym::intern("runs")) {
-    Some(LxVal::List(l)) => l.len(),
-    _ => 0,
-  };
+  let runs = if let Some(LxVal::List(l)) = sr.get(&crate::sym::intern("runs")) { l.len() } else { 0 };
   if s_passed {
     *passed_count += 1;
   }

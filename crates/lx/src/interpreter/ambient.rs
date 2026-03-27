@@ -15,10 +15,7 @@ use super::Interpreter;
 const AMBIENT_KEY: &str = "__ambient_context";
 
 pub fn get_ambient(interp: &Interpreter) -> IndexMap<crate::sym::Sym, LxVal> {
-  match interp.env.get(crate::sym::intern(AMBIENT_KEY)) {
-    Some(LxVal::Record(r)) => r.as_ref().clone(),
-    _ => IndexMap::new(),
-  }
+  if let Some(LxVal::Record(r)) = interp.env.get(crate::sym::intern(AMBIENT_KEY)) { r.as_ref().clone() } else { IndexMap::new() }
 }
 
 fn build_context_record(fields: &IndexMap<crate::sym::Sym, LxVal>) -> LxVal {

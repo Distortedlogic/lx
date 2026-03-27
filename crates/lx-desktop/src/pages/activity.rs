@@ -1,4 +1,5 @@
 use crate::contexts::activity_log::ActivityLog;
+use crate::styles::{FLEX_BETWEEN, PAGE_HEADING};
 use dioxus::prelude::*;
 
 #[component]
@@ -8,10 +9,8 @@ pub fn Activity() -> Element {
 
   rsx! {
     div { class: "flex flex-col h-full p-4 overflow-auto gap-4",
-      div { class: "flex items-center justify-between",
-        h1 { class: "text-2xl font-bold uppercase tracking-wider text-[var(--on-surface)] font-[var(--font-display)]",
-          "ACTIVITY_LOG"
-        }
+      div { class: FLEX_BETWEEN,
+        h1 { class: PAGE_HEADING, "ACTIVITY_LOG" }
         span { class: "text-xs text-[var(--outline)] uppercase tracking-wider",
           "{events.len()} EVENTS"
         }
