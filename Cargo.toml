@@ -80,3 +80,6 @@ needless_pass_by_value = "warn"
 uninlined_format_args = "warn"
 unwrap_used = "warn"
 wildcard_imports = "warn"
+
+[patch.crates-io]
+half = { git = "https://github.com/starkat99/half-rs", tag = "v2.3.1" }
