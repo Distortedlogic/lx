@@ -62,25 +62,29 @@ async tree-walk eval`"]:::purple
 → dependency crates
 → file-based imports`"]:::purple
 
-    interpreter --> api["`**Plugin API Contract**
-——— interpreter calls into plugins via ———
+    interpreter --> api["`**Plugin API Contract (WIT-defined)**
+——— typed interfaces ———
 tool: call(name, args) → result
 user: confirm · choose · ask · notify
 protocol: send · receive · adapt
 infra: init · teardown · checkpoint
-stream: subscribe(names, handler)
+stream: stream‹T› · future‹T› (WASIp3)
 ——— data boundary ———
-JSON in · JSON out
-no shared memory · no direct Rust calls
-sandboxed: WASI · fuel limits`"]:::blue
+Component Model typed ABI
+records · variants · resources · lists
+no JSON marshaling · no raw bytes
+——— sandbox ———
+fuel metering · epoch interruption
+WASI capability-based security
+per-component resource limits`"]:::blue
 
     interpreter --> events
 
     api --> wasm_ext
 
-    subgraph wasm_ext ["WASM Plugins — Extism — all capabilities are plugins"]
+    subgraph wasm_ext ["WASM Components — wasmtime — all capabilities are plugins"]
         direction LR
-        bundled["`**Bundled Plugins (ship with lx)**
+        bundled["`**Bundled Components (ship with lx)**
 all replaceable by name
 ——— tools ———
 Bash · Read · Write · Edit
@@ -98,26 +102,28 @@ Hooks · Permissions · Context Mgmt
 ——— stream subscribers ———
 stdio · lx-desktop · agent-mode
 CI/CD · headless`"]:::blue
-        manifest["`**plugin.toml**
-same format for all plugins
+        wit["`**WIT Interfaces**
+define all plugin contracts
 ——————
-[exports] capability impls
-function name + arity
+world lx-tool { … }
+world lx-subscriber { … }
+world lx-protocol { … }
 ——————
-[subscriptions] event streams
-stream names · handler export
-per-stream filters`"]:::blue
-        host_fns["`**Host Functions**
-plugin_log (leveled)
-plugin_get_config (env)
-stream_emit (derived events)
-control (kill · pause · resume)`"]:::blue
-        lifecycle["`**Plugin Lifecycle**
-lx plugin new · install
-lx plugin list · remove
-~/.lx/plugins/ (global)
-.lx/plugins/ (local)`"]:::blue
-        bundled ~~~ manifest ~~~ host_fns ~~~ lifecycle
+resource types for stateful handles
+(connections · sessions · stores)
+bindgen! → type-safe Rust traits`"]:::blue
+        imports["`**Host Imports (WIT)**
+logging · config · env
+stream-emit · control
+terminal · network · fs
+(capability-gated per component)`"]:::blue
+        lifecycle["`**Component Lifecycle**
+cargo-component build
+lx plugin install · remove
+lx plugin list
+~/.lx/plugins/ · .lx/plugins/
+component composition via Linker`"]:::blue
+        bundled ~~~ wit ~~~ imports ~~~ lifecycle
     end
 
     subgraph events ["Event Streams — append-only · ordered · ring buffer"]
@@ -167,16 +173,16 @@ pruned`"]:::teal
 
     events --> dispatch["`**Stream Dispatcher**
 async task · off hot path
-fan-out to all subscribers
+WASIp3 stream‹T› · future‹T›
+native typed event delivery
 bounded buffer per consumer
-drop policy: oldest · newest
-· backpressure`"]:::teal
+cooperative yield via fuel`"]:::teal
 
     dispatch --> wasm_ext
 
     wasm_ext --> control["`**Control Channel**
 kill · pause · resume
-(host function back to interpreter)`"]:::teal
+(WIT import back to interpreter)`"]:::teal
     control --> interpreter
 
     style desugars stroke:#ff6600,stroke-width:2px
