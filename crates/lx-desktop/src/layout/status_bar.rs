@@ -5,16 +5,14 @@ use crate::contexts::status_bar::StatusBarState;
 #[component]
 pub fn StatusBar() -> Element {
   let state = use_context::<StatusBarState>();
-  use_effect(move || {
-    spawn(async move {
-      if let Ok(output) = tokio::process::Command::new("git").args(["rev-parse", "--abbrev-ref", "HEAD"]).output().await
-        && output.status.success()
-      {
-        let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        let mut branch_sig = state.branch;
-        branch_sig.set(branch);
-      }
-    });
+  use_future(move || async move {
+    if let Ok(output) = tokio::process::Command::new("git").args(["rev-parse", "--abbrev-ref", "HEAD"]).output().await
+      && output.status.success()
+    {
+      let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
+      let mut branch_sig = state.branch;
+      branch_sig.set(branch);
+    }
   });
   let pane_label = (state.pane_label)();
   let branch = (state.branch)();
