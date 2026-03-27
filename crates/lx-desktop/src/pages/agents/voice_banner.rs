@@ -11,9 +11,7 @@ pub fn VoiceBanner() -> Element {
   let (voice_element_id, voice_widget) = use_ts_widget("voice", serde_json::json!({}));
   let (agent_element_id, agent_widget) = use_ts_widget("agent", serde_json::json!({}));
   let mut ctx = use_context::<VoiceContext>();
-  use_effect(move || {
-    ctx.widget.set(Some(voice_widget));
-  });
+  use_hook(|| ctx.widget.set(Some(voice_widget)));
 
   use_future(move || async move {
     loop {
