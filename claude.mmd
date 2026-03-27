@@ -17,7 +17,10 @@ settings chain merged (project → user → global)
 → environment variables · model preferences
 → CLI flag overrides
   (--model · --allowedTools
-  --disallowedTools · etc.)
+  --disallowedTools
+  --dangerously-skip-permissions
+  --max-turns · --system-prompt
+  --append-system-prompt · etc.)
 hooks registered
 → PreToolUse · PostToolUse
 → UserPromptSubmit · Stop
@@ -30,16 +33,20 @@ tool inventory resolved:
 keybindings loaded
 if resuming: rehydrate prior conversation history`"]:::cyan
 
-    init --> wait["1.0.0 Await User Input"]:::teal
+    init --> interact{{"0.2.0 mode?"}}:::purple
+    interact -- "interactive" --> wait["1.0.0 Await User Input"]:::teal
     wait -- "user exits\n(Ctrl+C · /exit · close)" --> done(["10.0.0 Session End"]):::teal
+
+    interact -- "non-interactive\n(--print · piped stdin)" --> ni_input["0.0.3 Load Input\n——————\nprompt from --print flag\nor piped from stdin\nsingle input · no interaction loop"]:::cyan
+    ni_input --> hooks
 
     wait --> parse{{"1.1.0 input type?"}}:::purple
     parse -- "free text · image\nPDF · notebook path" --> hooks
     parse -- "/command" --> slash{{"1.2.0 built-in\nor skill?"}}:::teal
     slash -- "built-in\n(/help · /clear · /cost\n/model · /fast · /login)" --> cli["1.0.1 CLI Command\n——————\nprocessed locally\nno model invocation"]:::cyan
     cli --> wait
-    slash -- "/compact" --> compact["1.0.4 User-Triggered Compact\n——————\nmanual context compression\n(vs. automatic at limit)\nuser can specify what to preserve\nmodel summarizes then continues"]:::cyan
-    compact --> wait
+    slash -- "/compact" --> compact_cmd["1.0.4 User-Triggered Compact\n——————\nmanual context compression\n(vs. automatic at limit)\nuser can specify what to preserve\nmodel summarizes then continues"]:::cyan
+    compact_cmd --> wait
     slash -- "skill\n(/commit · /review-pr\n/simplify · /loop · etc.)" --> skill["1.0.2 Expand Skill\n——————\nskill name → full prompt\ninjected as user message"]:::cyan
     skill --> hooks
     parse -- "! shell-command" --> passthru["1.0.3 Shell Pass-through\n——————\nexecute in user's session\nstdout + stderr land\nin conversation context"]:::cyan
@@ -66,6 +73,8 @@ hook output treated as from user`"]:::orange
 system prompt
 → role · safety rules · tool instructions
 → output efficiency · risk guidelines
+→ --system-prompt / --append-system-prompt
+  overrides (if provided)
 CLAUDE.md chain
 → project rules (root → each nested dir)
 → overrides default behavior
@@ -123,6 +132,9 @@ state modifiers (if active):
   (no Edit, Write, NotebookEdit)
 → worktree: isolated git environment`"]:::yellow
 
+    generate -. "Escape (cancel)" .-> cancelled["4.0.2 Cancelled\n——————\ngeneration interrupted\npartial output preserved\nin conversation history"]:::red
+    cancelled --> wait
+
     generate --> has_tools{{"4.1.0 tool calls\nin response?"}}:::teal
     has_tools -- "no" --> display["4.0.1 Display Text\n——————\nstreamed markdown rendered\ncode blocks syntax-highlighted\ntoken usage + cost tracked"]:::cyan
     display --> stop_hooks
@@ -134,7 +146,7 @@ state modifiers (if active):
     deferred -- "no" --> perm
 
     perm{{"5.2.0 permission\ncheck"}}:::teal
-    perm -- "auto-allow\n(allowlist match)" --> pre_hooks
+    perm -- "auto-allow\n(allowlist match or\n--dangerously-skip-permissions)" --> pre_hooks
     perm -- "needs approval" --> approve{{"5.3.0 user\napproves?"}}:::yellow
     approve -- "yes" --> pre_hooks
     approve -- "no" --> denied["5.0.2 Denied\n——————\ndo not re-attempt same call\nadjust approach or ask user"]:::red
@@ -159,7 +171,8 @@ state modifiers (if active):
 ⟳ execution
 → Bash (shell command, sandboxed by default;
   dangerouslyDisableSandbox to override;
-  foreground or background mode)
+  foreground or background mode;
+  configurable timeout, default 120s max 600s)
 → LSP (language server protocol query)
 ———
 ⟳ user interaction
@@ -191,10 +204,12 @@ state modifiers (if active):
 → CronCreate · CronList · CronDelete
 → RemoteTrigger (invoke remote agent)`"]:::orange
 
+    exec -. "Escape (cancel)" .-> cancelled
+
     exec --> post_hooks["7.0.1 PostToolUse Hooks Fire\n——————\nhook sees tool name + result\ncan log · validate · alert"]:::cyan
     post_hooks --> result{{"7.1.0 result?"}}:::teal
 
-    result -- "error" --> error["7.0.2 Error Captured\n——————\nerror in result payload\nmodel sees on next generation\nadjusts approach — no blind retry\ndiagnoses root cause first"]:::red
+    result -- "error" --> error["7.0.2 Error Captured\n——————\nerror in result payload\n(tool failure · timeout · sandbox\nviolation · precondition failure)\nmodel sees on next generation\nadjusts approach — no blind retry\ndiagnoses root cause first"]:::red
     error --> more
 
     result -- "success" --> dispatch{{"7.2.0 special\npost-execution?"}}:::teal
@@ -258,18 +273,22 @@ subagent lifecycle:
   (resumes with full context preserved)
 → on completion: single result to parent
 → subagent context then discarded`"]:::yellow
-    agent --> collect["8.0.1 Collect Result\n——————\nresult message returned\nto parent context"]:::cyan
+    agent --> collect["8.0.2 Collect Result\n——————\nresult message returned\nto parent context"]:::cyan
     collect --> more
 
     dispatch -- "standard tool" --> more{{"7.3.0 more calls\nin batch?"}}:::purple
     more -- "yes" --> batch
     more -- "no" --> feedback["7.0.3 Feed Results\n——————\nall batch results appended\nas tool-result turn in history\nsystem reminders re-injected\n(deferred tools · skills ·\nmemory · date · CLAUDE.md)"]:::cyan
-    feedback --> generate
+    feedback --> turns{{"7.4.0 --max-turns\nreached?"}}:::teal
+    turns -- "no" --> generate
+    turns -- "yes" --> display
 
     stop_hooks["9.0.0 Stop Hooks Fire\n——————\nmodel turn complete (no tool calls)\nhooks can log · alert ·\nor inject feedback"]:::cyan
     stop_hooks --> stop_fb{{"9.1.0 hook injected\nfeedback?"}}:::teal
     stop_fb -- "yes\n(re-enter generation)" --> assemble
-    stop_fb -- "no" --> compress{{"9.2.0 context\nnearing limit?"}}:::teal
+    stop_fb -- "no" --> is_ni{{"9.2.0 non-interactive?"}}:::teal
+    is_ni -- "yes\n(--print · piped)" --> done
+    is_ni -- "no" --> compress{{"9.3.0 context\nnearing limit?"}}:::teal
     compress -- "yes" --> auto_compress["9.0.1 Auto-Compress\n——————\nsystem-triggered compression\nsummarize earlier messages\npreserve key information\n(tool results · decisions · code)\nconversation continues seamlessly\n(distinct from /compact which\nis user-triggered — see 1.0.4)"]:::cyan
     auto_compress --> wait
     compress -- "no" --> wait

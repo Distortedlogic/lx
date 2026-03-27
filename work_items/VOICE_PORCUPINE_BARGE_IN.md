@@ -2,13 +2,13 @@
 
 ## Goal
 
-Replace the Whisper-based trigger word loop with Porcupine keyword detection (via the Porcupine C library loaded through Rust FFI) and add barge-in — the ability to interrupt TTS playback mid-speech by saying the keyword. When Porcupine is unavailable (missing library/key), fall back to the existing Whisper-based trigger detection without barge-in.
+Replace the Whisper-based trigger word loop with Porcupine keyword detection (via the Porcupine C library loaded through Rust FFI) and add barge-in — the ability to interrupt TTS playback mid-speech by saying the keyword. When Porcupine is unavailable (missing library/key), the ALWAYS LISTEN button is hidden. Push-to-talk always works regardless of Porcupine availability.
 
 ## Why
 
 The current Whisper-based standby loop has two fundamental problems:
 
-1. **No barge-in.** The mic is gated by status — no audio flows during Speaking. The user must wait for TTS to finish before re-activating. Real voice assistants let you interrupt mid-speech.
+1. **No barge-in.** The mic is gated by status — no audio flows during Speaking. The user must wait for TTS to finish before re-activating.
 
 2. **High latency for keyword detection.** Every utterance goes through silence detection (2s) + Whisper transcription (~200ms) + string matching. Porcupine detects keywords in <100ms from a continuous audio stream, without waiting for silence.
 
@@ -25,16 +25,25 @@ The Dioxus desktop app loads JS via `document::eval(WIDGET_BRIDGE_JS)` — inlin
 ```
 JS AudioWorklet (16kHz PCM)
     │
-    ▼ onChunk (always, no status gate)
+    ▼ onChunk (all non-idle states — standby, listening, processing, speaking)
 voice.ts sends audio_chunk to Rust
     │
     ▼ voice_banner.rs audio_chunk handler
-    ├── always: decode base64 → i16 samples → feed to Porcupine frame buffer
+    ├── if Porcupine available: decode base64 → i16 samples → feed to Porcupine frame buffer
     │     └── for each 512-sample frame: porcupine.process()
     │           └── keyword detected → handle_keyword_detected()
     │
     └── if status == Listening: also accumulate in pcm_buffer for Whisper
 ```
+
+### Mic lifecycle: never stops in always-listen mode
+
+The mic (AudioCapture) starts when always-listen is enabled and NEVER stops until the user disables always-listen or presses STOP. Specifically:
+
+- `onSilence` does NOT call `capture.stop()`. It only transitions status and sends `silence_detected`. This is critical — stopping capture kills barge-in because no audio flows during Speaking.
+- `stop_capture` is the ONLY command that calls `capture.stop()`. Rust sends it only when exiting always-listen mode or PTT mode.
+- In PTT mode (always_listen off): `start_capture` starts the mic, silence fires, pipeline runs, Rust sends `stop_capture` after pipeline → mic stops → idle. Mic is alive through the pipeline but Rust ignores chunks (status is Processing, not Listening).
+- In always-listen mode: mic stays alive across all state transitions. After pipeline, Rust sends `resume_standby` → VAD reset → standby. Porcupine processes audio during Speaking, enabling barge-in.
 
 ### State machine
 
@@ -69,10 +78,11 @@ Push-to-talk (always_listen off, unchanged):
 [Idle] ──start_capture──▶ [Listening] ──silence──▶ [Processing] ──▶ ... ──▶ [Idle]
 ```
 
-Two modes, controlled by `always_listen`:
-- **Porcupine available + always_listen ON:** Porcupine keyword detection in standby + barge-in during speaking
-- **Porcupine unavailable + always_listen ON:** Existing Whisper-based standby loop, no barge-in (fallback)
-- **always_listen OFF:** Push-to-talk, no keyword detection (unchanged)
+Two modes:
+- **always_listen ON (requires Porcupine):** keyword detection in standby + barge-in during speaking
+- **always_listen OFF:** push-to-talk, no keyword detection
+
+When Porcupine is unavailable, the ALWAYS LISTEN button is hidden. There is no Whisper-based fallback — the Whisper trigger code (`match_trigger`, `AwaitingQuery`, `trigger_words`, `hasSpeech`) is removed entirely.
 
 ### Porcupine C API (5 functions via libloading)
 
@@ -95,54 +105,65 @@ int32_t pv_sample_rate(void);              // returns 16000
 
 ### Barge-in via rodio Player::stop()
 
-`rodio::Player::stop()` sets an internal `AtomicBool` (`controls.stopped`) which causes the audio source iterator to yield `None`, which signals the `sleep_until_end()` receiver to complete. `Player` is `Send + Sync` (all fields are `Arc`/`Mutex`/`Atomic`-based). This means `stop()` can be called from the async executor thread while `sleep_until_end()` blocks in `spawn_blocking`.
+`rodio::Player::stop()` sets an internal `AtomicBool` (`controls.stopped`) which causes the audio source iterator to yield `None`, which signals the `sleep_until_end()` receiver to complete. `Player` is `Send + Sync` (all fields are `Arc`/`Mutex`/`Atomic`-based — verified in `/home/entropybender/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rodio-0.22.2/src/player.rs`). This means `stop()` can be called from the async executor thread while `sleep_until_end()` blocks in `spawn_blocking`.
 
 Implementation:
 ```rust
-static ACTIVE_PLAYER: LazyLock<std::sync::Mutex<Option<Arc<rodio::Player>>>> =
+static ACTIVE_PLAYER: LazyLock<std::sync::Mutex<Option<std::sync::Arc<rodio::Player>>>> =
     LazyLock::new(|| std::sync::Mutex::new(None));
 ```
 
-`play_wav_interruptible`: creates `Arc<Player>`, stores a clone in `ACTIVE_PLAYER`, calls `sleep_until_end()` on the original, clears `ACTIVE_PLAYER` after return.
+`play_wav_interruptible`: creates Player, wraps in `Arc`, stores a clone in `ACTIVE_PLAYER`, calls `sleep_until_end()` on its own Arc, clears `ACTIVE_PLAYER` after return.
 
-`stop_active_playback`: takes `Arc<Player>` from `ACTIVE_PLAYER`, calls `stop()`. The other `Arc` (in `spawn_blocking`) is still alive — `sleep_until_end()` returns when the source stops.
+`stop_active_playback`: takes `Arc<Player>` from `ACTIVE_PLAYER` (leaves `None`), calls `stop()`. The other Arc (in `spawn_blocking`) still holds a reference — `sleep_until_end()` returns when the source stops. Then the spawn_blocking thread clears `ACTIVE_PLAYER` which is already `None` (taken by stop) — no-op.
 
 ### Barge-in coordination
 
-When `stop_active_playback()` is called, `run_pipeline`'s `sleep_until_end()` returns early. The pipeline continues to update transcript and set `pipeline_stage = Idle`. Meanwhile, `handle_keyword_detected` already sent `start_recording` to JS. Without coordination, the pipeline's post-completion logic (send `resume_standby`) would override the `start_recording`.
+When `stop_active_playback()` is called, `run_pipeline`'s `sleep_until_end()` returns early. The pipeline continues to update transcript and set `pipeline_stage = Idle`. Meanwhile, `handle_keyword_detected` already sent `start_recording` to JS. Without coordination, the pipeline's post-completion logic (send `resume_standby`) would override the `start_recording` and transition JS back to standby.
 
-Fix: `barge_in: Signal<bool>` in VoiceContext. `handle_keyword_detected` sets it `true` before stopping playback. The pipeline spawn's post-completion check: if `barge_in` is true, clear it and don't send `resume_standby`. The `handle_keyword_detected` handler already managed the state transition.
+Fix: `barge_in: Signal<bool>` in VoiceContext. `handle_keyword_detected` sets it `true` before stopping playback. The pipeline spawn's post-completion check: if `barge_in` is true, clear it and return without sending any widget command.
 
-Ordering guarantee: `handle_keyword_detected` runs in the `use_future` message loop. The pipeline `spawn` runs as a separate Dioxus task. The message loop processes the keyword event first (setting `barge_in = true` and calling `stop_active_playback`), then yields at the next `recv().await`. The `spawn_blocking` thread (now unblocked by `stop()`) completes, and the pipeline spawn task runs next, sees `barge_in = true`, and skips `resume_standby`.
+Ordering guarantee: `handle_keyword_detected` runs in the `use_future` message loop (processing an `audio_chunk` message). The pipeline runs in a separate `spawn` task. Dioxus's cooperative async executor processes the message loop first (it's actively running when the audio_chunk arrives), sets `barge_in = true`, calls `stop_active_playback()`. Then it yields at the next `recv().await`. The `spawn_blocking` thread (now unblocked by `stop()`) completes. The pipeline spawn task runs next, sees `barge_in = true`, clears it, and returns without sending `resume_standby`.
+
+After the barge-in cleanup, `barge_in` is `false`. The new pipeline (from the barge-in query) runs clean — its post-completion logic sees `barge_in = false` and sends `resume_standby` normally.
 
 ### Echo during Speaking
 
-The TTS plays through rodio (native ALSA/PipeWire). The mic captures via WebAudio (WebKit2GTK). The mic picks up TTS through room acoustics. Porcupine is designed to detect wake words in noisy environments — it fires only when its trained keyword pattern matches with sufficient confidence (tunable via `sensitivity`, default 0.5). The TTS voice ("am_michael") is spectrally distinct from the user saying "Computer" or a custom keyword. False triggers from TTS echo are unlikely at default sensitivity. If they occur, lower sensitivity to 0.3.
+The TTS plays through rodio (native ALSA/PipeWire). The mic captures via WebAudio (WebKit2GTK). The mic picks up TTS through room acoustics (not a software loopback — these are separate audio subsystems). Porcupine is designed to detect wake words in noisy environments — it fires only when its trained keyword pattern matches with sufficient confidence (tunable via `sensitivity`, default 0.5). The TTS voice ("am_michael") is spectrally distinct from the user saying "Computer" or a custom keyword. False triggers from TTS echo are unlikely at default sensitivity. If they occur, lower sensitivity to 0.3.
+
+### VAD behavior through the pipeline
+
+After `onSilence` fires (listening → processing), the AudioWorklet keeps running (mic is alive). The VAD keeps getting fed. During TTS playback, the mic picks up speaker output — RMS goes above threshold, `isSpeech = true`, the silence timer resets. When TTS stops, silence accumulates. After 2s, `silenceExceeded` fires again. But status is "processing" or "speaking" (not "listening"), so `onSilence` is ignored — no duplicate `silence_detected` events.
+
+After `resume_standby` or `start_recording`, `resetVad()` is called, resetting the silence timer. No stale silence state carries over.
+
+### Rapid keyword detection
+
+If Porcupine fires in multiple consecutive frames (user says the keyword and multiple frames score above threshold), `handle_keyword_detected` runs multiple times. On the second call, the Rust-side `ctx.status` might still be `Standby` or `Speaking` (the `status_change("listening")` message from JS hasn't arrived yet — it's in the JS→Rust message queue behind the current `audio_chunk`). So the second call passes the status guard and re-clears buffers + re-sends `start_recording`. This is redundant but harmless — JS receives two `start_recording` commands, the second is a no-op (already in listening, `resetVad` just restarts the timer).
 
 ### Configuration
 
-Three environment variables, all optional:
+Four environment variables, all optional:
 
 | Variable | Purpose | If missing |
 |----------|---------|-----------|
-| `PICOVOICE_ACCESS_KEY` | Picovoice account key (free at console.picovoice.ai) | Porcupine disabled, Whisper fallback |
+| `PICOVOICE_ACCESS_KEY` | Picovoice account key (free at console.picovoice.ai) | Porcupine disabled |
 | `PICOVOICE_MODEL_PATH` | Path to `porcupine_params.pv` | Porcupine disabled |
-| `PICOVOICE_KEYWORD_PATH` | Path to `.ppn` keyword file (e.g., `Computer_en_linux_v3_0_0.ppn`) | Porcupine disabled |
+| `PICOVOICE_KEYWORD_PATH` | Path to `.ppn` keyword file | Porcupine disabled |
+| `PICOVOICE_LIBRARY_PATH` | Path to `libpv_porcupine.so` | Falls back to system library search (`LD_LIBRARY_PATH`, `/usr/local/lib`, etc.) |
 
-The library path for `libpv_porcupine.so` is resolved via `PICOVOICE_LIBRARY_PATH` env var, or falls back to standard library search (`LD_LIBRARY_PATH`, `/usr/local/lib`, etc.).
-
-When Porcupine is disabled, the ALWAYS LISTEN button still works using the existing Whisper-based standby loop (no barge-in). The audio_chunk handler skips the Porcupine feed path.
+When any of the first three are missing, `ENGINE` initializes to `None`, `is_available()` returns `false`, and the ALWAYS LISTEN button is hidden in the UI.
 
 ## Files affected
 
 | File | Repo | Change |
 |------|------|--------|
-| `ts/widget-bridge/widgets/voice.ts` | dioxus-common | Always send chunks, onSilence only in listening, add `start_recording` command, remove `awaiting_query` command |
+| `ts/widget-bridge/widgets/voice.ts` | dioxus-common | Always send chunks in non-idle states, remove `capture.stop()` from onSilence, add `start_recording` command, remove `awaiting_query` and `hasSpeech` |
 | `crates/lx-desktop/Cargo.toml` | lx | Add `libloading = "0.8"` |
 | `crates/lx-desktop/src/pages/agents/voice_porcupine.rs` | lx | NEW: FFI wrapper for libpv_porcupine.so, lazy init, frame buffer + process |
-| `crates/lx-desktop/src/pages/agents/voice_context.rs` | lx | Remove AwaitingQuery, add porcupine_buffer + barge_in signals, add porcupine_available |
+| `crates/lx-desktop/src/pages/agents/voice_context.rs` | lx | Remove AwaitingQuery + trigger_words, add barge_in signal |
 | `crates/lx-desktop/src/pages/agents/voice_pipeline.rs` | lx | Remove match_trigger, add ACTIVE_PLAYER + play_wav_interruptible + stop_active_playback |
-| `crates/lx-desktop/src/pages/agents/voice_banner.rs` | lx | Porcupine audio routing, keyword_detected handler, barge-in coordination, simplified handle_utterance |
+| `crates/lx-desktop/src/pages/agents/voice_banner.rs` | lx | Porcupine audio routing, keyword_detected handler, barge-in coordination, simplified handle_utterance, hide ALWAYS LISTEN when Porcupine unavailable |
 | `crates/lx-desktop/src/pages/agents/mod.rs` | lx | Add `mod voice_porcupine;` |
 
 ## Task List
@@ -186,7 +207,6 @@ const voiceWidget: Widget = {
 
     capture.onSilence = () => {
       if (state.status === "listening") {
-        capture.stop();
         transition(state, "processing");
         dx.send({ type: "silence_detected" });
       }
@@ -254,20 +274,30 @@ const voiceWidget: Widget = {
 registerWidget("voice", voiceWidget);
 ```
 
-Key changes from current:
-- **`hasSpeech` flag removed.** No longer needed — Porcupine handles keyword detection, not silence-then-check.
-- **`onChunk` sends in ALL non-idle states** (`standby`, `listening`, `processing`, `speaking`). Rust decides what to do with the audio (Porcupine feed vs pcm_buffer).
-- **`onSilence` only fires in `"listening"` state.** In standby, Porcupine handles detection. In processing/speaking, silence is irrelevant.
-- **`start_recording` command added.** Resets VAD and transitions to `"listening"`. Used after Porcupine keyword detection to begin recording the query. Accepts both `"standby"` and `"speaking"` as source states (the latter for barge-in).
-- **`awaiting_query` command removed.** No longer needed — Porcupine fires instantly, no "trigger word only" edge case.
-- **`resume_standby` kept** for post-pipeline return to standby. Still checks `capture.isRunning` and restarts if needed.
+Key changes from current voice.ts:
+
+**`capture.stop()` removed from `onSilence`.** This is the critical change. The mic stays alive through the entire pipeline (processing → speaking), which is required for Porcupine to detect keywords during TTS playback (barge-in). Only `stop_capture` calls `capture.stop()`.
+
+**`hasSpeech` flag removed.** Porcupine handles keyword detection, not silence-then-check.
+
+**`onChunk` sends in ALL non-idle states** (standby, listening, processing, speaking). Rust decides what to do with the audio (Porcupine feed vs pcm_buffer).
+
+**`onSilence` only fires in `"listening"` state.** In standby, Porcupine handles detection. In processing/speaking, silence is irrelevant.
+
+**`start_recording` command added.** Resets VAD and transitions to `"listening"`. Used after Porcupine keyword detection. Accepts `"standby"` and `"speaking"` as source states.
+
+**`awaiting_query` command removed.** No longer needed.
+
+**`resume_standby` kept** for post-pipeline return to standby. Still checks `capture.isRunning` and restarts if needed (covers the PTT → pipeline → always_listen_toggled_on edge case, though unusual).
+
+**PTT behavior preserved.** `start_capture` starts the mic and enters listening. Silence fires (no capture.stop), transitions to processing, sends silence_detected. After pipeline, Rust sends `stop_capture` which stops the mic. The mic is alive during the pipeline but Rust ignores chunks (only buffers in Listening status).
 
 ### Task 2: Create Porcupine FFI module
 
 Create `/home/entropybender/repos/lx/crates/lx-desktop/src/pages/agents/voice_porcupine.rs`:
 
 ```rust
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::os::raw::c_char;
 use std::sync::{LazyLock, Mutex};
 
@@ -316,11 +346,15 @@ static ENGINE: LazyLock<Option<PorcupineEngine>> = LazyLock::new(|| {
     let access_key = std::env::var("PICOVOICE_ACCESS_KEY").ok()?;
     let model_path = std::env::var("PICOVOICE_MODEL_PATH").ok()?;
     let keyword_path = std::env::var("PICOVOICE_KEYWORD_PATH").ok()?;
-    let lib_path = std::env::var("PICOVOICE_LIBRARY_PATH").unwrap_or_else(|_| "libpv_porcupine.so".into());
+    let lib_path = std::env::var("PICOVOICE_LIBRARY_PATH")
+        .unwrap_or_else(|_| "libpv_porcupine.so".into());
 
     let lib = match unsafe { libloading::Library::new(&lib_path) } {
         Ok(l) => l,
-        Err(e) => { warn!("porcupine: failed to load {lib_path}: {e}"); return None; },
+        Err(e) => {
+            warn!("porcupine: failed to load {lib_path}: {e}");
+            return None;
+        },
     };
 
     let (init_fn, delete_fn, process_fn, frame_length_fn) = unsafe {
@@ -331,7 +365,13 @@ static ENGINE: LazyLock<Option<PorcupineEngine>> = LazyLock::new(|| {
         (init, delete, process, frame_length)
     };
 
-    let porcupine_lib = PorcupineLib { _lib: lib, init: init_fn, delete: delete_fn, process: process_fn, frame_length: frame_length_fn };
+    let porcupine_lib = PorcupineLib {
+        _lib: lib,
+        init: init_fn,
+        delete: delete_fn,
+        process: process_fn,
+        frame_length: frame_length_fn,
+    };
     let frame_len = unsafe { (porcupine_lib.frame_length)() } as usize;
 
     let c_access_key = CString::new(access_key).ok()?;
@@ -343,8 +383,11 @@ static ENGINE: LazyLock<Option<PorcupineEngine>> = LazyLock::new(|| {
 
     let status = unsafe {
         (porcupine_lib.init)(
-            c_access_key.as_ptr(), c_model_path.as_ptr(),
-            1, keyword_paths.as_ptr(), sensitivities.as_ptr(),
+            c_access_key.as_ptr(),
+            c_model_path.as_ptr(),
+            1,
+            keyword_paths.as_ptr(),
+            sensitivities.as_ptr(),
             &mut handle,
         )
     };
@@ -388,25 +431,26 @@ Also add `libloading = "0.8"` to `[dependencies]` in `/home/entropybender/repos/
 
 FFI safety notes:
 - `PorcupineEngine` wraps a raw C pointer. `Send + Sync` is manually implemented because the C library is thread-safe (documented by Picovoice: "Porcupine is thread-safe for `process()` calls from different threads on the same instance").
-- `PorcupineLib` holds the `Library` to keep the .so loaded for the lifetime of the engine.
-- `ENGINE` is a `LazyLock<Option<...>>` — `None` when any env var is missing or init fails. All code paths check `is_available()` or `ENGINE.as_ref()?` before use.
-- `FRAME_BUFFER` accumulates samples across audio_chunk messages and drains in 512-sample frames (Porcupine's required frame size).
-- `feed_samples` returns `Some(keyword_index)` if a keyword was detected in any frame of this batch, `None` otherwise.
+- `PorcupineLib` holds the `Library` via `_lib` to keep the .so loaded for the lifetime of the engine. The function pointers are only valid while the Library is alive.
+- `ENGINE` is `LazyLock<Option<...>>` — `None` when any of the three required env vars is missing or init fails. All code paths check `is_available()` or `ENGINE.as_ref()?`.
+- `FRAME_BUFFER` accumulates i16 samples across audio_chunk messages. `feed_samples` drains in `frame_len`-sample chunks (512 for Porcupine at 16kHz). Audio chunks from the worklet are ~4000 samples each, yielding ~7 Porcupine frames per chunk.
+- `feed_samples` returns `Some(keyword_index)` if a keyword was detected in any frame of this batch, `None` otherwise. If multiple frames detect in the same batch, the last detection index is returned (all detections are for the same keyword in practice).
+- `reset_buffer` clears residual samples. Called by `handle_keyword_detected` to prevent stale audio from the keyword utterance leaking into the query recording.
 
 ### Task 3: Update VoiceContext
 
 In `/home/entropybender/repos/lx/crates/lx-desktop/src/pages/agents/voice_context.rs`:
 
-Remove `AwaitingQuery` from `PipelineStage` enum and its `Display` impl.
+**Remove `AwaitingQuery`** from the `PipelineStage` enum and its `Display` match arm.
 
-Remove `trigger_words: Signal<Vec<String>>` from `VoiceContext` struct and `provide()`.
+**Remove `trigger_words: Signal<Vec<String>>`** from the `VoiceContext` struct and its initialization in `provide()`.
 
-Add to `VoiceContext`:
+**Add** to `VoiceContext` struct:
 ```rust
 pub barge_in: Signal<bool>,
 ```
 
-Initialize in `provide()`:
+**Add** to `provide()` initialization:
 ```rust
 barge_in: Signal::new(false),
 ```
@@ -415,7 +459,7 @@ barge_in: Signal::new(false),
 
 In `/home/entropybender/repos/lx/crates/lx-desktop/src/pages/agents/voice_pipeline.rs`:
 
-**Remove `match_trigger` function entirely** (lines 24-43).
+**Remove the `match_trigger` function entirely** (the `pub fn match_trigger(text: &str, triggers: &[String]) -> Option<String>` function and its body).
 
 **Add** after the existing `AUDIO_SINK` static:
 
@@ -428,11 +472,7 @@ pub fn stop_active_playback() {
         player.stop();
     }
 }
-```
 
-**Add** `play_wav_interruptible` alongside the existing `play_wav`:
-
-```rust
 pub fn play_wav_interruptible(wav_bytes: Vec<u8>) -> tokio::task::JoinHandle<anyhow::Result<()>> {
     tokio::task::spawn_blocking(move || {
         let cursor = std::io::Cursor::new(wav_bytes);
@@ -450,20 +490,16 @@ pub fn play_wav_interruptible(wav_bytes: Vec<u8>) -> tokio::task::JoinHandle<any
 }
 ```
 
-**Modify `run_pipeline`** to use `play_wav_interruptible` instead of `play_wav`:
-
-Replace the existing playback section (from `let wav_len` through `play_result??`) with:
+**Modify `run_pipeline`**: replace the existing playback section. Find the lines:
 ```rust
-let wav_len = wav_bytes.len();
-info!("voice: TTS returned {wav_len} bytes, starting playback");
-let play_result = play_wav_interruptible(wav_bytes).await;
-match &play_result {
-    Ok(Ok(())) => {},
-    Ok(Err(e)) => error!("voice: playback error: {e}"),
-    Err(e) => error!("voice: spawn_blocking panicked: {e}"),
-}
-play_result??;
+let play_result = play_wav(wav_bytes).await;
 ```
+Replace `play_wav` with `play_wav_interruptible`:
+```rust
+let play_result = play_wav_interruptible(wav_bytes).await;
+```
+
+The existing `play_wav` function is kept — it is still used by the ack tone in voice_banner.rs (the ack tone is non-interruptible, 150ms, not worth the Arc overhead).
 
 ### Task 5: Rewrite voice_banner.rs with Porcupine integration
 
@@ -521,15 +557,20 @@ pub fn VoiceBanner() -> Element {
                     let buffer = std::mem::take(&mut *ctx.pcm_buffer.write());
                     if buffer.is_empty() {
                         if (ctx.always_listen)() {
-                            voice_widget.send_update(serde_json::json!({ "type": "resume_standby" }));
+                            voice_widget.send_update(
+                                serde_json::json!({ "type": "resume_standby" }),
+                            );
                         } else {
-                            voice_widget.send_update(serde_json::json!({ "type": "stop_capture" }));
+                            voice_widget.send_update(
+                                serde_json::json!({ "type": "stop_capture" }),
+                            );
                         }
                         continue;
                     }
 
                     spawn(async move {
-                        let result = handle_utterance(buffer, agent_widget, ctx).await;
+                        let result =
+                            handle_utterance(buffer, agent_widget, ctx).await;
                         if (ctx.barge_in)() {
                             ctx.barge_in.set(false);
                             return;
@@ -543,9 +584,13 @@ pub fn VoiceBanner() -> Element {
                             ctx.pipeline_stage.set(PipelineStage::Idle);
                         }
                         if (ctx.always_listen)() {
-                            voice_widget.send_update(serde_json::json!({ "type": "resume_standby" }));
+                            voice_widget.send_update(
+                                serde_json::json!({ "type": "resume_standby" }),
+                            );
                         } else {
-                            voice_widget.send_update(serde_json::json!({ "type": "stop_capture" }));
+                            voice_widget.send_update(
+                                serde_json::json!({ "type": "stop_capture" }),
+                            );
                         }
                     });
                 },
@@ -562,7 +607,9 @@ pub fn VoiceBanner() -> Element {
                     Some("speaking") => ctx.status.set(VoiceStatus::Speaking),
                     _ => {},
                 },
-                Some("start_standby") | Some("cancel") => ctx.pcm_buffer.write().clear(),
+                Some("start_standby") | Some("cancel") => {
+                    ctx.pcm_buffer.write().clear();
+                },
                 _ => {},
             }
         }
@@ -586,7 +633,8 @@ pub fn VoiceBanner() -> Element {
                 .await
                 {
                     Ok(_) => {
-                        agent_widget.send_update(serde_json::json!({ "type": "assistant_done" }));
+                        agent_widget
+                            .send_update(serde_json::json!({ "type": "assistant_done" }));
                     },
                     Err(e) => {
                         agent_widget.send_update(
@@ -613,6 +661,7 @@ pub fn VoiceBanner() -> Element {
     let turn_count = entries.iter().filter(|e| e.is_user).count();
     drop(entries);
     let always_listen = (ctx.always_listen)();
+    let porcupine_available = voice_porcupine::is_available();
 
     rsx! {
         div { class: "flex flex-col h-full",
@@ -648,25 +697,33 @@ pub fn VoiceBanner() -> Element {
                     }
                 }
                 div { class: "flex-1" }
-                button {
-                    class: "border border-[var(--outline-variant)] text-[var(--on-surface-variant)] rounded px-3 py-1.5 text-xs uppercase hover:bg-[var(--surface-container-high)] transition-colors duration-150 font-semibold",
-                    onclick: move |_| {
-                        if always_listen {
-                            ctx.always_listen.set(false);
-                            voice_widget.send_update(serde_json::json!({ "type": "stop_capture" }));
-                        } else {
-                            ctx.always_listen.set(true);
-                            voice_widget.send_update(serde_json::json!({ "type": "start_standby_listen" }));
-                        }
-                    },
-                    if always_listen { "ALWAYS LISTEN: ON" } else { "ALWAYS LISTEN: OFF" }
+                if porcupine_available {
+                    button {
+                        class: "border border-[var(--outline-variant)] text-[var(--on-surface-variant)] rounded px-3 py-1.5 text-xs uppercase hover:bg-[var(--surface-container-high)] transition-colors duration-150 font-semibold",
+                        onclick: move |_| {
+                            if always_listen {
+                                ctx.always_listen.set(false);
+                                voice_widget.send_update(
+                                    serde_json::json!({ "type": "stop_capture" }),
+                                );
+                            } else {
+                                ctx.always_listen.set(true);
+                                voice_widget.send_update(
+                                    serde_json::json!({ "type": "start_standby_listen" }),
+                                );
+                            }
+                        },
+                        if always_listen { "ALWAYS LISTEN: ON" } else { "ALWAYS LISTEN: OFF" }
+                    }
                 }
                 if is_active {
                     button {
                         class: "border border-[var(--outline)] text-[var(--on-surface)] rounded px-4 py-1.5 text-sm uppercase hover:bg-[var(--surface-container-high)] transition-colors duration-150 font-semibold",
                         onclick: move |_| {
                             ctx.always_listen.set(false);
-                            voice_widget.send_update(serde_json::json!({ "type": "stop_capture" }));
+                            voice_widget.send_update(
+                                serde_json::json!({ "type": "stop_capture" }),
+                            );
                         },
                         "STOP"
                     }
@@ -674,7 +731,9 @@ pub fn VoiceBanner() -> Element {
                     button {
                         class: "border border-[var(--primary)] text-[var(--primary)] rounded px-4 py-1.5 text-sm uppercase hover:bg-[var(--primary)]/10 transition-colors duration-150 font-semibold",
                         onclick: move |_| {
-                            voice_widget.send_update(serde_json::json!({ "type": "start_capture" }));
+                            voice_widget.send_update(
+                                serde_json::json!({ "type": "start_capture" }),
+                            );
                         },
                         "PUSH TO TALK"
                     }
@@ -724,19 +783,19 @@ async fn handle_utterance(
 }
 ```
 
-Key changes from current:
+Key changes from current voice_banner.rs:
 
-**`audio_chunk` handler has two paths.** First: if Porcupine is available, decode bytes to i16 samples and feed to `voice_porcupine::feed_samples()`. If keyword detected, call `handle_keyword_detected()`. Second: if status is Listening, accumulate in pcm_buffer for Whisper. Both paths run on every chunk.
+**`audio_chunk` handler has two independent paths.** Path 1: if Porcupine is available, decode bytes to i16 samples and feed to `voice_porcupine::feed_samples()`. If keyword detected, call `handle_keyword_detected()`. Path 2: if status is Listening, accumulate in pcm_buffer for Whisper. Both paths execute on every chunk — they are not mutually exclusive.
 
-**`silence_detected` simplified.** No `is_awaiting`/`is_standby` branching. The concurrent pipeline guard checks `stage != Idle` (no AwaitingQuery). `handle_utterance` just transcribes and runs the pipeline — no trigger matching.
+**`silence_detected` handler simplified.** No `is_awaiting`/`is_standby` branching. The concurrent pipeline guard only checks `stage != Idle` (no AwaitingQuery variant). `handle_utterance` transcribes and runs the pipeline unconditionally.
 
-**Barge-in coordination.** In the spawn block after `handle_utterance`, if `barge_in` is true, clear it and return — don't send resume_standby or stop_capture, because `handle_keyword_detected` already sent `start_recording`.
+**Barge-in coordination in the spawn block.** After `handle_utterance` returns, if `barge_in` is true, clear it and return immediately — don't send `resume_standby` or `stop_capture`. `handle_keyword_detected` already sent `start_recording` to JS.
 
-**`handle_keyword_detected`** runs synchronously in the message loop (called from audio_chunk handler). Only fires in Standby or Speaking. In Speaking: sets `barge_in = true`, calls `stop_active_playback()`. In both: clears pcm_buffer + Porcupine frame buffer, sends `start_recording` to JS, spawns ack tone playback.
+**`handle_keyword_detected`** runs synchronously from the audio_chunk handler in the message loop. Only fires when status is Standby or Speaking (other states: returns early). In Speaking: sets `barge_in = true`, calls `stop_active_playback()`. In both: clears pcm_buffer (drop any audio from the keyword utterance), clears Porcupine frame buffer (same reason), sends `start_recording` to JS (transitions to listening for the query), spawns ack tone playback (non-blocking, plays concurrently with the beginning of the query recording).
 
-**`handle_utterance` is simplified.** No trigger word matching. Transcribe → pipeline. The trigger detection already happened via Porcupine (or the user pressed PTT). Returns `anyhow::Result<()>` (no bool needed — the barge_in signal handles coordination).
+**`handle_utterance` simplified.** No trigger word matching. Transcribe → pipeline. Returns `anyhow::Result<()>` (no bool — barge_in signal handles coordination).
 
-**Whisper fallback.** When Porcupine is unavailable (`voice_porcupine::is_available()` returns false), the audio_chunk handler skips the Porcupine feed. The ALWAYS LISTEN button still works — in standby, silence_detected fires as it did before the Porcupine work, but without trigger word matching. Every utterance goes straight to the pipeline (no keyword gate). This is a simpler fallback than the full Whisper trigger matching — the user activates always-listen knowing that any speech triggers the pipeline. The Whisper `match_trigger` code is removed entirely.
+**ALWAYS LISTEN button hidden when Porcupine unavailable.** The `porcupine_available` local is read once from `voice_porcupine::is_available()` and used in a conditional `if porcupine_available { ... }` around the button. When Porcupine is not set up, the button does not render — only PUSH TO TALK and STOP are shown.
 
 ---
 
