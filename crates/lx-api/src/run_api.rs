@@ -18,8 +18,8 @@ static PROMPTS: LazyLock<RwLock<Vec<PendingPrompt>>> = LazyLock::new(|| RwLock::
 
 #[get("/api/health")]
 pub async fn health() -> Result<serde_json::Value> {
-  let events: tokio::sync::RwLockReadGuard<'_, std::collections::VecDeque<crate::types::ActivityEvent>> = ACTIVITY.read().await;
-  let event_count = events.len();
+  let guard = ACTIVITY.read().await;
+  let event_count = (*guard).len();
   Ok(serde_json::json!({ "status": "ok", "events": event_count }))
 }
 

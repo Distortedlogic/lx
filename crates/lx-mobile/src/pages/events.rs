@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use dioxus::fullstack::{WebSocketOptions, use_websocket};
 use dioxus::prelude::*;
 use lx_api::types::ActivityEvent;
@@ -5,7 +7,7 @@ use lx_api::ws_events::ws_events;
 
 #[component]
 pub fn Events() -> Element {
-  let mut events: Signal<Vec<ActivityEvent>> = use_signal(Vec::new);
+  let mut events: Signal<VecDeque<ActivityEvent>> = use_signal(VecDeque::new);
   let mut filter = use_signal(|| "all".to_string());
   let expanded: Signal<std::collections::HashSet<usize>> = use_signal(Default::default);
 
@@ -14,9 +16,9 @@ pub fn Events() -> Element {
   use_future(move || async move {
     while let Ok(event) = socket.recv().await {
       let mut evts = events.write();
-      evts.push(event);
+      evts.push_back(event);
       if evts.len() > 10_000 {
-        evts.remove(0);
+        evts.pop_front();
       }
     }
   });

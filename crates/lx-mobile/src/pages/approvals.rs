@@ -28,12 +28,6 @@ pub fn Approvals() -> Element {
   }
 }
 
-fn send_response(prompt_id: u64, value: serde_json::Value) {
-  spawn(async move {
-    let _ = post_respond(PromptResponse { prompt_id, response: value }).await;
-  });
-}
-
 fn render_prompt(prompt: &PendingPrompt) -> Element {
   match prompt.kind.as_str() {
     "confirm" => {
@@ -45,12 +39,28 @@ fn render_prompt(prompt: &PendingPrompt) -> Element {
           div { class: "flex gap-2",
             button {
               class: "px-3 py-1 bg-[var(--success)] rounded text-sm",
-              onclick: move |_| send_response(pid, serde_json::json!(true)),
+              onclick: move |_| {
+                  spawn(async move {
+                      let _ = post_respond(PromptResponse {
+                              prompt_id: pid,
+                              response: serde_json::json!(true),
+                          })
+                          .await;
+                  });
+              },
               "Yes"
             }
             button {
               class: "px-3 py-1 bg-[var(--error)] rounded text-sm",
-              onclick: move |_| send_response(pid, serde_json::json!(false)),
+              onclick: move |_| {
+                  spawn(async move {
+                      let _ = post_respond(PromptResponse {
+                              prompt_id: pid,
+                              response: serde_json::json!(false),
+                          })
+                          .await;
+                  });
+              },
               "No"
             }
           }
@@ -67,7 +77,15 @@ fn render_prompt(prompt: &PendingPrompt) -> Element {
           for (i , opt) in options.iter().enumerate() {
             button {
               class: "block w-full text-left px-3 py-1 bg-[var(--surface-container-high)] rounded text-sm hover:bg-[var(--surface-bright)]",
-              onclick: move |_| send_response(pid, serde_json::json!(i)),
+              onclick: move |_| {
+                  spawn(async move {
+                      let _ = post_respond(PromptResponse {
+                              prompt_id: pid,
+                              response: serde_json::json!(i),
+                          })
+                          .await;
+                  });
+              },
               "{opt}"
             }
           }
@@ -94,7 +112,13 @@ fn render_prompt(prompt: &PendingPrompt) -> Element {
               disabled: input_text.read().is_empty(),
               onclick: move |_| {
                   let val = input_text.read().clone();
-                  send_response(pid, serde_json::json!(val));
+                  spawn(async move {
+                      let _ = post_respond(PromptResponse {
+                              prompt_id: pid,
+                              response: serde_json::json!(val),
+                          })
+                          .await;
+                  });
                   input_text.set(String::new());
               },
               "Send"

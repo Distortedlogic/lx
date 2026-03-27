@@ -1,4 +1,4 @@
-#[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ActivityEvent {
   pub timestamp: String,
   pub kind: String,
