@@ -1,7 +1,7 @@
 use dioxus::logger::tracing::error;
 use dioxus::prelude::*;
 use lx_api::run_api::{get_prompts, post_respond};
-use lx_api::types::{PendingPrompt, PromptResponse};
+use lx_api::types::{PendingPrompt, PromptKind, PromptResponse};
 
 #[component]
 pub fn Approvals() -> Element {
@@ -22,8 +22,8 @@ pub fn Approvals() -> Element {
 }
 
 fn render_prompt(prompt: &PendingPrompt) -> Element {
-  match prompt.kind.as_str() {
-    "confirm" => {
+  match prompt.kind {
+    PromptKind::Confirm => {
       let pid = prompt.prompt_id;
       let message = prompt.message.clone();
       rsx! {
@@ -66,7 +66,7 @@ fn render_prompt(prompt: &PendingPrompt) -> Element {
         }
       }
     },
-    "choose" => {
+    PromptKind::Choose => {
       let pid = prompt.prompt_id;
       let message = prompt.message.clone();
       let options = prompt.options.clone().unwrap_or_default();
@@ -94,7 +94,7 @@ fn render_prompt(prompt: &PendingPrompt) -> Element {
         }
       }
     },
-    "ask" => {
+    PromptKind::Ask => {
       let pid = prompt.prompt_id;
       let message = prompt.message.clone();
       let mut input_text = use_signal(String::new);
@@ -132,6 +132,5 @@ fn render_prompt(prompt: &PendingPrompt) -> Element {
         }
       }
     },
-    _ => rsx! {},
   }
 }

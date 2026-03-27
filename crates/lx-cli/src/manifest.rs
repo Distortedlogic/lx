@@ -39,13 +39,45 @@ pub struct TestSection {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum EmitBackend {
+  Noop,
+  Stdout,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum LogBackend {
+  Noop,
+  Stderr,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum LlmBackend {
+  ClaudeCode,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum HttpBackend {
+  Reqwest,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum YieldBackend {
+  StdinStdout,
+}
+
+#[derive(Deserialize)]
 pub struct BackendsSection {
-  pub llm: Option<String>,
-  pub http: Option<String>,
-  pub emit: Option<String>,
+  pub llm: Option<LlmBackend>,
+  pub http: Option<HttpBackend>,
+  pub emit: Option<EmitBackend>,
   #[serde(rename = "yield")]
-  pub yield_backend: Option<String>,
-  pub log: Option<String>,
+  pub yield_backend: Option<YieldBackend>,
+  pub log: Option<LogBackend>,
 }
 
 #[derive(Deserialize)]

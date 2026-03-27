@@ -5,10 +5,68 @@ use dioxus::prelude::*;
 use lx_api::types::ActivityEvent;
 use lx_api::ws_events::ws_events;
 
+#[derive(Clone, Debug, Default, PartialEq)]
+pub enum EventFilter {
+  #[default]
+  All,
+  Ai,
+  Emit,
+  Log,
+  Shell,
+  Messages,
+  Agents,
+  Progress,
+  Errors,
+}
+
+impl EventFilter {
+  const ALL: &[EventFilter] = &[
+    EventFilter::All,
+    EventFilter::Ai,
+    EventFilter::Emit,
+    EventFilter::Log,
+    EventFilter::Shell,
+    EventFilter::Messages,
+    EventFilter::Agents,
+    EventFilter::Progress,
+    EventFilter::Errors,
+  ];
+
+  fn matches(&self, event_type: &str) -> bool {
+    match self {
+      EventFilter::All => true,
+      EventFilter::Ai => event_type.starts_with("ai_"),
+      EventFilter::Emit => event_type == "emit",
+      EventFilter::Log => event_type == "log",
+      EventFilter::Shell => event_type.starts_with("shell_"),
+      EventFilter::Messages => event_type.starts_with("message_") || event_type == "user_prompt" || event_type == "user_response",
+      EventFilter::Agents => event_type.starts_with("agent_"),
+      EventFilter::Progress => {
+        event_type == "progress" || event_type == "program_started" || event_type == "program_finished" || event_type == "trace_span_recorded"
+      },
+      EventFilter::Errors => event_type == "error",
+    }
+  }
+
+  fn label(&self) -> &'static str {
+    match self {
+      EventFilter::All => "all",
+      EventFilter::Ai => "ai",
+      EventFilter::Emit => "emit",
+      EventFilter::Log => "log",
+      EventFilter::Shell => "shell",
+      EventFilter::Messages => "messages",
+      EventFilter::Agents => "agents",
+      EventFilter::Progress => "progress",
+      EventFilter::Errors => "errors",
+    }
+  }
+}
+
 #[component]
 pub fn Events() -> Element {
   let mut events: Signal<VecDeque<ActivityEvent>> = use_signal(VecDeque::new);
-  let mut filter = use_signal(|| "all".to_string());
+  let mut filter = use_signal(EventFilter::default);
   let expanded: Signal<std::collections::HashSet<usize>> = use_signal(Default::default);
 
   let mut socket = use_websocket(|| ws_events(WebSocketOptions::new()));
@@ -24,17 +82,7 @@ pub fn Events() -> Element {
   });
 
   let current_filter = filter.read().clone();
-  let visible: Vec<_> = events
-    .read()
-    .iter()
-    .filter(|e| {
-      if current_filter == "all" {
-        return true;
-      }
-      event_type_matches(&e.kind, &current_filter)
-    })
-    .cloned()
-    .collect();
+  let visible: Vec<_> = events.read().iter().filter(|e| current_filter.matches(&e.kind)).cloned().collect();
 
   let total = events.read().len();
   let visible_count = visible.len();
@@ -43,15 +91,15 @@ pub fn Events() -> Element {
     div { class: "space-y-4",
       h2 { class: "text-lg font-bold", "Events ({visible_count}/{total})" }
       div { class: "flex gap-2 flex-wrap",
-        for f in FILTER_OPTIONS {
+        for f in EventFilter::ALL {
           button {
             class: "px-2 py-1 text-xs rounded",
             class: if current_filter == *f { "bg-[var(--primary)] text-[var(--on-primary)]" } else { "bg-[var(--surface-container-high)] text-[var(--on-surface-variant)]" },
             onclick: {
-                let f = f.to_string();
+                let f = f.clone();
                 move |_| filter.set(f.clone())
             },
-            "{f}"
+            "{f.label()}"
           }
         }
       }
@@ -64,22 +112,6 @@ pub fn Events() -> Element {
         }
       }
     }
-  }
-}
-
-const FILTER_OPTIONS: &[&str] = &["all", "ai", "emit", "log", "shell", "messages", "agents", "progress", "errors"];
-
-fn event_type_matches(event_type: &str, filter: &str) -> bool {
-  match filter {
-    "ai" => event_type.starts_with("ai_"),
-    "emit" => event_type == "emit",
-    "log" => event_type == "log",
-    "shell" => event_type.starts_with("shell_"),
-    "messages" => event_type.starts_with("message_") || event_type == "user_prompt" || event_type == "user_response",
-    "agents" => event_type.starts_with("agent_"),
-    "progress" => event_type == "progress" || event_type == "program_started" || event_type == "program_finished" || event_type == "trace_span_recorded",
-    "errors" => event_type == "error",
-    _ => true,
   }
 }
 

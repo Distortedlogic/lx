@@ -205,36 +205,31 @@ fn apply_manifest_backends(ctx: &mut RuntimeCtx, file_path: &str) {
   let Some(backends) = m.backends else {
     return;
   };
-  if let Some(ref name) = backends.emit {
-    match name.as_str() {
-      "noop" => ctx.emit = Arc::new(NoopEmitBackend),
-      "stdout" => {},
-      other => eprintln!("warning: unknown emit backend '{other}'"),
+  if let Some(ref backend) = backends.emit {
+    match backend {
+      manifest::EmitBackend::Noop => ctx.emit = Arc::new(NoopEmitBackend),
+      manifest::EmitBackend::Stdout => {},
     }
   }
-  if let Some(ref name) = backends.log {
-    match name.as_str() {
-      "noop" => ctx.log = Arc::new(NoopLogBackend),
-      "stderr" => {},
-      other => eprintln!("warning: unknown log backend '{other}'"),
+  if let Some(ref backend) = backends.log {
+    match backend {
+      manifest::LogBackend::Noop => ctx.log = Arc::new(NoopLogBackend),
+      manifest::LogBackend::Stderr => {},
     }
   }
-  if let Some(ref name) = backends.llm {
-    match name.as_str() {
-      "claude-code" => ctx.llm = Arc::new(llm_backend::ClaudeCodeLlmBackend),
-      other => eprintln!("warning: unknown llm backend '{other}'"),
+  if let Some(ref backend) = backends.llm {
+    match backend {
+      manifest::LlmBackend::ClaudeCode => ctx.llm = Arc::new(llm_backend::ClaudeCodeLlmBackend),
     }
   }
-  if let Some(ref name) = backends.http {
-    match name.as_str() {
-      "reqwest" => {},
-      other => eprintln!("warning: unknown http backend '{other}'"),
+  if let Some(ref backend) = backends.http {
+    match backend {
+      manifest::HttpBackend::Reqwest => {},
     }
   }
-  if let Some(ref name) = backends.yield_backend {
-    match name.as_str() {
-      "stdin-stdout" => {},
-      other => eprintln!("warning: unknown yield backend '{other}'"),
+  if let Some(ref backend) = backends.yield_backend {
+    match backend {
+      manifest::YieldBackend::StdinStdout => {},
     }
   }
 }
