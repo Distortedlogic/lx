@@ -96,29 +96,16 @@ pub fn TerminalView(terminal_id: String, working_dir: String, command: Option<St
 #[component]
 pub fn EditorView(editor_id: String, file_path: String, language: Option<String>) -> Element {
   let fp = file_path.clone();
-  let content = use_resource(move || {
+  let content = use_loader(move || {
     let fp = fp.clone();
-    async move {
-      if fp.is_empty() {
-        String::new()
-      } else {
-        match tokio::fs::read_to_string(&fp).await {
-          Ok(s) => s,
-          Err(e) => {
-            error!("editor: failed to read {fp}: {e}");
-            format!("Error reading file: {e}")
-          },
-        }
-      }
-    }
-  });
+    async move { if fp.is_empty() { Ok(String::new()) } else { tokio::fs::read_to_string(&fp).await } }
+  })?;
 
   let (element_id, widget) = use_ts_widget("editor", serde_json::json!({}));
 
   use_effect(move || {
-    if let Some(text) = content.value().read().as_ref() {
-      widget.send_update(serde_json::json!({ "content": text }));
-    }
+    let text = content.read();
+    widget.send_update(serde_json::json!({ "content": &*text }));
   });
 
   let file_path_save = file_path.clone();
