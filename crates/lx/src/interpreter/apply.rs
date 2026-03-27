@@ -96,7 +96,7 @@ impl Interpreter {
         }
         for v in fields.values_mut() {
           if let LxVal::Store { id: store_id } = v {
-            *store_id = crate::stdlib::store_clone(*store_id);
+            *store_id = crate::stdlib::store_clone(*store_id).map_err(|e| LxError::runtime(e, span))?;
           }
         }
         let id = crate::stdlib::object_insert(fields);

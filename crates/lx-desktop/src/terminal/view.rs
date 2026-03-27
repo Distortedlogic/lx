@@ -96,7 +96,19 @@ pub fn EditorView(editor_id: String, file_path: String, language: Option<String>
   let fp = file_path.clone();
   let content = use_resource(move || {
     let fp = fp.clone();
-    async move { if fp.is_empty() { String::new() } else { tokio::fs::read_to_string(&fp).await.unwrap_or_default() } }
+    async move {
+      if fp.is_empty() {
+        String::new()
+      } else {
+        match tokio::fs::read_to_string(&fp).await {
+          Ok(s) => s,
+          Err(e) => {
+            error!("editor: failed to read {fp}: {e}");
+            format!("Error reading file: {e}")
+          },
+        }
+      }
+    }
   });
 
   let (element_id, widget) = use_ts_widget("editor", serde_json::json!({}));
@@ -125,7 +137,9 @@ pub fn EditorView(editor_id: String, file_path: String, language: Option<String>
               let fp = file_path.clone();
               if !fp.is_empty() {
                 let text = text.to_owned();
-                let _ = tokio::fs::write(&fp, &text).await;
+                if let Err(e) = tokio::fs::write(&fp, &text).await {
+                  error!("editor: failed to save {fp}: {e}");
+                }
               }
             }
           },

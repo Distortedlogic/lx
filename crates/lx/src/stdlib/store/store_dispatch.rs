@@ -92,11 +92,11 @@ pub fn store_len(id: u64) -> usize {
   STORES.get(&id).map(|s| s.data.len()).unwrap_or(0)
 }
 
-pub fn store_clone(id: u64) -> u64 {
-  let data = STORES.get(&id).map(|s| s.data.clone()).unwrap_or_default();
+pub fn store_clone(id: u64) -> Result<u64, String> {
+  let data = STORES.get(&id).map(|s| s.data.clone()).ok_or_else(|| format!("store_clone: store {id} not found"))?;
   let new_id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
   STORES.insert(new_id, StoreState { data, path: None });
-  new_id
+  Ok(new_id)
 }
 
 pub fn build_constructor() -> LxVal {
@@ -129,7 +129,7 @@ fn bi_save_to(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resul
   let s = get_store(id, span)?;
   let record = LxVal::record(s.data.clone());
   let json_val = serde_json::Value::from(&record);
-  let pretty = serde_json::to_string_pretty(&json_val).unwrap_or_default();
+  let pretty = serde_json::to_string_pretty(&json_val).map_err(|e| LxError::runtime(format!("store.save: serialization failed: {e}"), span))?;
   std::fs::write(path, pretty).map_err(|e| LxError::runtime(format!("store.save: {e}"), span))?;
   Ok(LxVal::Unit)
 }

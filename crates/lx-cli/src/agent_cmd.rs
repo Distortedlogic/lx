@@ -66,7 +66,7 @@ pub fn run_agent(script_path: &str) -> ExitCode {
     match ctx.tokio_runtime.block_on(interp.call(handler.clone(), msg)) {
       Ok(result) => {
         let j = serde_json::Value::from(&result);
-        println!("{}", serde_json::to_string(&j).unwrap_or_default());
+        println!("{}", serde_json::to_string(&j).expect("serde_json::Value serialization is infallible"));
       },
       Err(e) => println!("{}", serde_json::json!({"__err": format!("{e}")})),
     }

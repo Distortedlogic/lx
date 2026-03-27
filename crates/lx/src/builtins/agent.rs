@@ -57,8 +57,13 @@ pub fn bi_agent_spawn(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) 
     let source_clone = source.clone();
     ctx.tokio_runtime.clone().block_on(async {
       let mut interp = crate::interpreter::Interpreter::new(&source_clone, None, ctx);
-      interp.load_default_tools().await.ok();
-      let _ = interp.exec(&program).await;
+      if let Err(e) = interp.load_default_tools().await {
+        eprintln!("[agent:spawn] load_default_tools failed: {e}");
+        return;
+      }
+      if let Err(e) = interp.exec(&program).await {
+        eprintln!("[agent:spawn] exec failed: {e}");
+      }
     });
   });
 

@@ -1,3 +1,4 @@
+use dioxus::logger::tracing::error;
 use dioxus::prelude::*;
 use lx_api::run_api::{get_prompts, post_respond};
 use lx_api::types::{PendingPrompt, PromptResponse};
@@ -33,11 +34,14 @@ fn render_prompt(prompt: &PendingPrompt) -> Element {
               class: "px-3 py-1 bg-[var(--success)] rounded text-sm",
               onclick: move |_| {
                   spawn(async move {
-                      let _ = post_respond(PromptResponse {
+                      if let Err(e) = post_respond(PromptResponse {
                               prompt_id: pid,
                               response: serde_json::json!(true),
                           })
-                          .await;
+                          .await
+                      {
+                          error!("approval respond failed: {e}");
+                      }
                   });
               },
               "Yes"
@@ -46,11 +50,14 @@ fn render_prompt(prompt: &PendingPrompt) -> Element {
               class: "px-3 py-1 bg-[var(--error)] rounded text-sm",
               onclick: move |_| {
                   spawn(async move {
-                      let _ = post_respond(PromptResponse {
+                      if let Err(e) = post_respond(PromptResponse {
                               prompt_id: pid,
                               response: serde_json::json!(false),
                           })
-                          .await;
+                          .await
+                      {
+                          error!("approval respond failed: {e}");
+                      }
                   });
               },
               "No"
@@ -71,11 +78,14 @@ fn render_prompt(prompt: &PendingPrompt) -> Element {
               class: "block w-full text-left px-3 py-1 bg-[var(--surface-container-high)] rounded text-sm hover:bg-[var(--surface-bright)]",
               onclick: move |_| {
                   spawn(async move {
-                      let _ = post_respond(PromptResponse {
+                      if let Err(e) = post_respond(PromptResponse {
                               prompt_id: pid,
                               response: serde_json::json!(i),
                           })
-                          .await;
+                          .await
+                      {
+                          error!("approval respond failed: {e}");
+                      }
                   });
               },
               "{opt}"
@@ -105,11 +115,14 @@ fn render_prompt(prompt: &PendingPrompt) -> Element {
               onclick: move |_| {
                   let val = input_text.read().clone();
                   spawn(async move {
-                      let _ = post_respond(PromptResponse {
+                      if let Err(e) = post_respond(PromptResponse {
                               prompt_id: pid,
                               response: serde_json::json!(val),
                           })
-                          .await;
+                          .await
+                      {
+                          error!("approval respond failed: {e}");
+                      }
                   });
                   input_text.set(String::new());
               },
