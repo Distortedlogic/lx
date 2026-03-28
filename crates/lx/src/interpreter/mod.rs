@@ -149,8 +149,32 @@ impl Interpreter {
     Ok(result)
   }
 
+  async fn check_control_flags(&self, eid: ExprId) -> EvalResult<()> {
+    use std::sync::atomic::Ordering::Relaxed;
+    let cancelled = || Err(LxError::runtime("program cancelled via control channel", self.arena.expr_span(eid)).into());
+    if self.ctx.cancel_flag.load(Relaxed) {
+      return cancelled();
+    }
+    while self.ctx.global_pause.load(Relaxed) {
+      tokio::task::yield_now().await;
+      if self.ctx.cancel_flag.load(Relaxed) {
+        return cancelled();
+      }
+    }
+    if let Some(ref name) = self.agent_name
+      && let Some(flag) = crate::runtime::agent_registry::get_agent_pause_flag(name)
+    {
+      while flag.load(Relaxed) {
+        tokio::task::yield_now().await;
+      }
+    }
+    Ok(())
+  }
+
   #[async_recursion(?Send)]
   pub(crate) async fn eval(&mut self, eid: ExprId) -> EvalResult<LxVal> {
+    self.check_control_flags(eid).await?;
+
     let span = self.arena.expr_span(eid);
     if let (Some(rx_arc), Some(handle_fn)) = (&self.agent_mailbox_rx, &self.agent_handle_fn) {
       let mut rx = rx_arc.lock().await;

@@ -46,3 +46,7 @@ pub fn agent_names() -> Vec<String> {
 pub fn get_agent_entry(name: &str) -> Option<dashmap::mapref::one::Ref<'_, String, AgentHandle>> {
   AGENT_REGISTRY.get(name)
 }
+
+pub fn get_agent_pause_flag(name: &str) -> Option<Arc<std::sync::atomic::AtomicBool>> {
+  AGENT_REGISTRY.get(name).map(|e| Arc::clone(&e.pause_flag))
+}

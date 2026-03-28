@@ -148,7 +148,7 @@ fn execute_tests(entries: &[TestEntry], workspace_members: &HashMap<String, Path
       ..RuntimeCtx::default()
     });
     let filename = entry.path.to_str().unwrap_or(&entry.name);
-    match crate::run::run(&source, filename, &ctx) {
+    match crate::run::run(&source, filename, &ctx, None) {
       Ok(()) => {
         println!("PASS {}", entry.name);
         passed += 1;

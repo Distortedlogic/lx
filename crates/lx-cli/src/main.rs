@@ -35,6 +35,8 @@ enum Command {
     file: String,
     #[arg(long)]
     json: bool,
+    #[arg(long)]
+    control: Option<String>,
   },
   Test {
     #[arg()]
@@ -99,9 +101,9 @@ enum PluginAction {
 fn main() -> ExitCode {
   let cli = Cli::parse();
   match cli.command {
-    Command::Run { file, json } => {
+    Command::Run { file, json, control } => {
       let resolved = resolve_run_target(&file);
-      run_file(&resolved, json)
+      run_file(&resolved, json, control.as_deref())
     },
     Command::Check { file, member, strict, fix } => {
       if let Some(file) = file {
@@ -162,7 +164,7 @@ fn resolve_run_target(target: &str) -> String {
   target.to_string()
 }
 
-fn run_file(path: &str, _json: bool) -> ExitCode {
+fn run_file(path: &str, _json: bool, control_spec: Option<&str>) -> ExitCode {
   let source = match fs::read_to_string(path) {
     Ok(s) => s,
     Err(e) => {
@@ -176,9 +178,16 @@ fn run_file(path: &str, _json: bool) -> ExitCode {
   ctx_val.workspace_members = ws_members;
   ctx_val.dep_dirs = dep_dirs;
   apply_manifest_backends(&mut ctx_val, path);
+  if let Some(spec) = control_spec
+    && spec == "stdin"
+  {
+    let (inject_tx, inject_rx) = tokio::sync::mpsc::channel::<lx::value::LxVal>(1);
+    ctx_val.inject_tx = Some(inject_tx);
+    ctx_val.yield_ = Arc::new(lx::runtime::ControlYieldBackend { inject_rx: Arc::new(tokio::sync::Mutex::new(inject_rx)) });
+  }
   let ctx = Arc::new(ctx_val);
   ctx.tokio_runtime.block_on(setup_external_stream(&ctx, path));
-  match run::run(&source, path, &ctx) {
+  match run::run(&source, path, &ctx, control_spec) {
     Ok(()) => ExitCode::SUCCESS,
     Err(errors) => {
       let named = miette::NamedSource::new(path, source.clone());

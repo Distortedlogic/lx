@@ -26,6 +26,9 @@ fn build_restricted_ctx(base: &Arc<RuntimeCtx>, policy: &Policy) -> Arc<RuntimeC
     test_runs: base.test_runs,
     event_stream: base.event_stream.clone(),
     network_denied,
+    global_pause: base.global_pause.clone(),
+    cancel_flag: base.cancel_flag.clone(),
+    inject_tx: base.inject_tx.clone(),
   })
 }
 

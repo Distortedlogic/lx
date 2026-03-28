@@ -1,7 +1,12 @@
 pub mod agent_registry;
 pub mod channel_registry;
+pub mod control;
+pub mod control_stdin;
+pub mod control_tcp;
+pub mod control_ws;
 mod defaults;
 
+pub use control::*;
 pub use defaults::*;
 
 use std::collections::HashMap;
@@ -29,6 +34,11 @@ pub struct RuntimeCtx {
   pub event_stream: Arc<crate::event_stream::EventStream>,
   #[default(false)]
   pub network_denied: bool,
+  #[default(Arc::new(std::sync::atomic::AtomicBool::new(false)))]
+  pub global_pause: Arc<std::sync::atomic::AtomicBool>,
+  #[default(Arc::new(std::sync::atomic::AtomicBool::new(false)))]
+  pub cancel_flag: Arc<std::sync::atomic::AtomicBool>,
+  pub inject_tx: Option<tokio::sync::mpsc::Sender<crate::value::LxVal>>,
 }
 
 pub trait YieldBackend: Send + Sync {

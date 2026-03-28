@@ -64,7 +64,8 @@ smart-default = { version = "0.7" }
 strum = { version = "0.28.0", features = ["derive"] }
 syn = { version = "2", features = ["full"] }
 thiserror = { version = "2.0.18" }
-tokio = { version = "1.50.0", features = ["io-util", "macros", "process", "rt-multi-thread", "sync", "time"] }
+tokio = { version = "1.50.0", features = ["io-std", "io-util", "macros", "net", "process", "rt-multi-thread", "sync", "time"] }
+tokio-tungstenite = { version = "0.29" }
 toml = { version = "0.9.8" }
 uuid = { version = "1.23.0", features = ["v4"] }
 webkit2gtk = { version = "=2.0.1", features = ["v2_38"] }
