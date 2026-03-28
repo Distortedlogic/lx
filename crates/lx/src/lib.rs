@@ -6,6 +6,7 @@ pub mod builtins;
 pub mod checker;
 pub mod env;
 pub mod error;
+pub mod event_stream;
 pub mod folder;
 pub mod formatter;
 pub mod interpreter;

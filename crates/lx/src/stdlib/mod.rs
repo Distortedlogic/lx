@@ -3,6 +3,7 @@ mod checkpoint;
 mod cron;
 pub mod diag;
 mod env;
+mod events;
 mod fs;
 pub(crate) mod helpers;
 mod http;
@@ -44,6 +45,7 @@ pub(crate) fn get_std_module(path: &[&str]) -> Option<ModuleExports> {
     "math" => math::build(),
     "fs" => fs::build(),
     "env" => env::build(),
+    "events" => events::build(),
     "http" => http::build(),
     "md" => md::build(),
     "introspect" => introspect::build(),
@@ -94,6 +96,7 @@ pub(crate) fn std_module_exists(path: &[&str]) -> bool {
       | "math"
       | "fs"
       | "env"
+      | "events"
       | "http"
       | "md"
       | "introspect"

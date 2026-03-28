@@ -26,6 +26,7 @@ fn build_restricted_ctx(base: &Arc<RuntimeCtx>, policy: &Policy) -> Arc<RuntimeC
     workspace_members: base.workspace_members.clone(),
     dep_dirs: base.dep_dirs.clone(),
     tokio_runtime: base.tokio_runtime.clone(),
+    event_stream: base.event_stream.clone(),
     test_threshold: base.test_threshold,
     test_runs: base.test_runs,
   })

@@ -34,6 +34,8 @@ pub struct RuntimeCtx {
   pub dep_dirs: HashMap<String, PathBuf>,
   #[default(Arc::new(tokio::runtime::Runtime::new().expect("failed to create tokio runtime")))]
   pub tokio_runtime: Arc<tokio::runtime::Runtime>,
+  #[default(Arc::new(crate::event_stream::EventStream::new(None)))]
+  pub event_stream: Arc<crate::event_stream::EventStream>,
   pub test_threshold: Option<f64>,
   pub test_runs: Option<u32>,
 }
