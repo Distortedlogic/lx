@@ -1,10 +1,7 @@
 -- tell/ask operator tests
--- verifies ~> and ~>? desugar to agent.tell/agent.ask
+-- verifies ~> (tell) and ~>? (ask) work as infix messaging operators
 
-assert (type_of agent.tell == "Func")
-assert (type_of agent.ask == "Func")
-
-f = (target msg) { try agent.tell target msg }
-g = (target msg) { try agent.ask target msg }
+f = (target msg) { try target ~> msg }
+g = (target msg) { try target ~>? msg }
 assert (type_of f == "Func")
 assert (type_of g == "Func")

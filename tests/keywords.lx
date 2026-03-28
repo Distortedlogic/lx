@@ -45,7 +45,7 @@ assert (g.check () | ok?)
 g.tick ()
 assert (g.is_tripped ())
 
--- CLI
+-- CLI (deprecated, use `use tool` instead)
 CLI TestCli = {
   command: "echo"
   tool_defs: [{name: "hello", subcommand: "hello"}]
@@ -65,7 +65,7 @@ api = TestApi {}
 assert api.base_url == "https://httpbin.org"
 assert (methods_of api | any? (== "run"))
 
--- MCP
+-- MCP (deprecated, use `use tool` instead)
 MCP TestServer = {
   command: "echo"
   args: ["test"]

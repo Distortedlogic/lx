@@ -29,11 +29,7 @@ impl super::Interpreter {
       let module = Arc::clone(&module_name);
       let counter = Arc::clone(&call_counter);
       let event_stream = Arc::clone(&self.ctx.event_stream);
-      let source = self.source.clone();
-      let source_dir = self.source_dir.clone();
       let ctx_ref = Arc::clone(&self.ctx);
-      let module_cache = Arc::clone(&self.module_cache);
-      let loading = Arc::clone(&self.loading);
 
       let dispatch = mk_dyn_async(
         "lx_tool.call",
@@ -44,11 +40,7 @@ impl super::Interpreter {
           let module = Arc::clone(&module);
           let counter = Arc::clone(&counter);
           let event_stream = Arc::clone(&event_stream);
-          let source = source.clone();
-          let source_dir = source_dir.clone();
           let ctx_ref = Arc::clone(&ctx_ref);
-          let module_cache = Arc::clone(&module_cache);
-          let loading = Arc::clone(&loading);
           Box::pin(async move {
             let call_id = counter.fetch_add(1, Ordering::Relaxed);
             let arg = args.into_iter().next().unwrap_or(LxVal::Unit);
@@ -60,11 +52,7 @@ impl super::Interpreter {
             call_fields.insert(intern("args"), arg.clone());
             event_stream.xadd("tool/call", "main", None, call_fields);
 
-            let mut interp = super::Interpreter::new(&source, source_dir, Arc::clone(&ctx_ref));
-            interp.module_cache = module_cache;
-            interp.loading = loading;
-
-            let result = interp.apply_func(func_val, arg, call_span).await;
+            let result = crate::builtins::call_value(&func_val, arg, call_span, &ctx_ref).await;
 
             match result {
               Ok(val) => {
@@ -76,12 +64,8 @@ impl super::Interpreter {
                 event_stream.xadd("tool/result", "main", None, result_fields);
                 Ok(val)
               },
-              Err(signal) => {
-                let err_msg = match &signal {
-                  crate::error::EvalSignal::Error(e) => e.to_string(),
-                  crate::error::EvalSignal::Break(_) => "unexpected break in lx tool".to_string(),
-                  crate::error::EvalSignal::AgentStop => "agent stopped".to_string(),
-                };
+              Err(e) => {
+                let err_msg = e.to_string();
                 let mut error_fields = IndexMap::new();
                 error_fields.insert(intern("call_id"), LxVal::int(call_id as i64));
                 error_fields.insert(intern("tool"), LxVal::str(module.as_ref()));
