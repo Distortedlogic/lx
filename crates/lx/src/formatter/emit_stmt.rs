@@ -252,6 +252,10 @@ impl Formatter<'_> {
   }
 
   fn emit_use(&mut self, u: &UseStmt) {
+    if let UseKind::Tool { command, alias } = &u.kind {
+      self.write(&format!("use tool \"{}\" as {}", command.as_str(), alias.as_str()));
+      return;
+    }
     self.write("use ");
     for (i, seg) in u.path.iter().enumerate() {
       if i > 0 {
@@ -275,6 +279,7 @@ impl Formatter<'_> {
         }
         self.write(" }");
       },
+      UseKind::Tool { .. } => unreachable!(),
     }
   }
 

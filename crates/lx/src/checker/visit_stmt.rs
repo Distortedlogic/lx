@@ -167,6 +167,10 @@ impl Checker<'_> {
           }
         }
       },
+      UseKind::Tool { alias, .. } => {
+        let def_id = self.sem.add_definition(*alias, DefKind::Import, span, false);
+        self.sem.set_definition_type(def_id, unknown);
+      },
     }
   }
 

@@ -20,6 +20,9 @@ impl Interpreter {
   pub(super) async fn eval_use(&mut self, use_stmt: &UseStmt, span: SourceSpan) -> Result<(), LxError> {
     let str_path: Vec<&str> = use_stmt.path.iter().map(|s| s.as_str()).collect();
     let str_joined = str_path.join("/");
+    if let UseKind::Tool { command, alias } = &use_stmt.kind {
+      return Err(LxError::runtime(format!("tool modules not yet implemented (use tool \"{command}\" as {alias})"), span));
+    }
     let exports = if crate::stdlib::std_module_exists(&str_path) {
       if let Some(rust_exports) = crate::stdlib::get_std_module(&str_path) {
         rust_exports
@@ -61,6 +64,7 @@ impl Interpreter {
           env.bind(*name, val.clone());
         }
       },
+      UseKind::Tool { .. } => unreachable!(),
     }
     self.env = Arc::new(env);
     Ok(())
