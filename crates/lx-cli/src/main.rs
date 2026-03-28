@@ -5,7 +5,6 @@ mod init;
 mod install;
 mod install_ops;
 mod listing;
-mod llm_backend;
 mod lockfile;
 mod manifest;
 mod plugin;
@@ -19,7 +18,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use lx::runtime::{NoopEmitBackend, NoopLogBackend, RuntimeCtx};
+use lx::runtime::RuntimeCtx;
 
 use clap::{Parser, Subcommand};
 
@@ -197,7 +196,7 @@ fn run_file(path: &str, _json: bool) -> ExitCode {
   }
 }
 
-fn apply_manifest_backends(ctx: &mut RuntimeCtx, file_path: &str) {
+fn apply_manifest_backends(_ctx: &mut RuntimeCtx, file_path: &str) {
   let file_dir = Path::new(file_path).parent().unwrap_or(Path::new("."));
   let Some(root) = manifest::find_manifest_root(file_dir) else {
     return;
@@ -208,28 +207,6 @@ fn apply_manifest_backends(ctx: &mut RuntimeCtx, file_path: &str) {
   let Some(backends) = m.backends else {
     return;
   };
-  if let Some(ref backend) = backends.emit {
-    match backend {
-      manifest::EmitBackend::Noop => ctx.emit = Arc::new(NoopEmitBackend),
-      manifest::EmitBackend::Stdout => {},
-    }
-  }
-  if let Some(ref backend) = backends.log {
-    match backend {
-      manifest::LogBackend::Noop => ctx.log = Arc::new(NoopLogBackend),
-      manifest::LogBackend::Stderr => {},
-    }
-  }
-  if let Some(ref backend) = backends.llm {
-    match backend {
-      manifest::LlmBackend::ClaudeCode => ctx.llm = Arc::new(llm_backend::ClaudeCodeLlmBackend),
-    }
-  }
-  if let Some(ref backend) = backends.http {
-    match backend {
-      manifest::HttpBackend::Reqwest => {},
-    }
-  }
   if let Some(ref backend) = backends.yield_backend {
     match backend {
       manifest::YieldBackend::StdinStdout => {},

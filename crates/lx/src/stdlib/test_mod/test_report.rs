@@ -31,7 +31,10 @@ pub(crate) fn bi_report(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>)
   let spec_score = results.get(&crate::sym::intern("score")).and_then(|v| v.as_float()).unwrap_or(0.0);
   out.push_str(&format!("\nOverall: {spec_score:.2} — {passed_count}/{total} scenarios passed (threshold: {threshold:.2})\n"));
 
-  ctx.emit.emit(&LxVal::str(out), span)?;
+  println!("{out}");
+  let mut fields = indexmap::IndexMap::new();
+  fields.insert(crate::sym::intern("value"), LxVal::str(&out));
+  ctx.event_stream.xadd("runtime/emit", "main", None, fields);
   Ok(LxVal::Unit)
 }
 

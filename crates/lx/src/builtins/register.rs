@@ -5,25 +5,37 @@ use num_bigint::BigInt;
 
 use crate::env::Env;
 use crate::error::LxError;
-use crate::interpreter::ambient::{global_context_current, global_context_get};
-use crate::runtime::{LogLevel, RuntimeCtx};
+use crate::runtime::RuntimeCtx;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
 use super::mk;
+use super::register_helpers::{
+  bi_agent_implements, bi_global_context_current, bi_global_context_get, bi_json_encode, bi_json_encode_pretty, bi_json_parse, bi_method_of, bi_methods_of,
+  bi_resolve_handler, bi_source_dir, bi_try,
+};
 
-fn make_log_builtin(name: &'static str, level: LogLevel) -> LxVal {
-  fn log_fn(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>, level: LogLevel, name: &str) -> Result<LxVal, LxError> {
-    let s = args[0].require_str(&format!("log.{name}"), span)?;
-    ctx.log.log(level, s);
-    Ok(LxVal::Unit)
-  }
-  match level {
-    LogLevel::Info => mk(name, 1, |a, s, c| log_fn(a, s, c, LogLevel::Info, "info")),
-    LogLevel::Warn => mk(name, 1, |a, s, c| log_fn(a, s, c, LogLevel::Warn, "warn")),
-    LogLevel::Err => mk(name, 1, |a, s, c| log_fn(a, s, c, LogLevel::Err, "err")),
-    LogLevel::Debug => mk(name, 1, |a, s, c| log_fn(a, s, c, LogLevel::Debug, "debug")),
-  }
+fn log_at(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>, level: &str) -> Result<LxVal, LxError> {
+  let s = args[0].require_str(&format!("log.{level}"), span)?;
+  eprintln!("[{}] {}", level.to_uppercase(), s);
+  let mut fields = indexmap::IndexMap::new();
+  fields.insert(crate::sym::intern("level"), LxVal::str(level));
+  fields.insert(crate::sym::intern("msg"), LxVal::str(s));
+  ctx.event_stream.xadd("runtime/log", "main", None, fields);
+  Ok(LxVal::Unit)
+}
+
+fn bi_log_info(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+  log_at(args, span, ctx, "info")
+}
+fn bi_log_warn(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+  log_at(args, span, ctx, "warn")
+}
+fn bi_log_err(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+  log_at(args, span, ctx, "err")
+}
+fn bi_log_debug(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+  log_at(args, span, ctx, "debug")
 }
 
 fn bi_not(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
@@ -143,10 +155,10 @@ pub fn register(env: &Env) {
   super::str::register(env);
   super::coll::register(env);
   let mut log_fields = IndexMap::new();
-  log_fields.insert(crate::sym::intern("info"), make_log_builtin("log.info", LogLevel::Info));
-  log_fields.insert(crate::sym::intern("warn"), make_log_builtin("log.warn", LogLevel::Warn));
-  log_fields.insert(crate::sym::intern("err"), make_log_builtin("log.err", LogLevel::Err));
-  log_fields.insert(crate::sym::intern("debug"), make_log_builtin("log.debug", LogLevel::Debug));
+  log_fields.insert(crate::sym::intern("info"), mk("log.info", 1, bi_log_info));
+  log_fields.insert(crate::sym::intern("warn"), mk("log.warn", 1, bi_log_warn));
+  log_fields.insert(crate::sym::intern("err"), mk("log.err", 1, bi_log_err));
+  log_fields.insert(crate::sym::intern("debug"), mk("log.debug", 1, bi_log_debug));
   env.bind_str("log", LxVal::record(log_fields));
   super::hof::register(env);
   super::shell::register(env);
@@ -205,106 +217,4 @@ pub fn register(env: &Env) {
   ctx_fields.insert(crate::sym::intern("get"), mk("context.get", 1, bi_global_context_get));
   env.bind_str("context", LxVal::record(ctx_fields));
   env.bind_str("source_dir", mk("source_dir", 0, bi_source_dir));
-}
-
-fn bi_source_dir(_args: &[LxVal], _span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let dir = ctx.source_dir.lock().clone();
-  match dir {
-    Some(p) => Ok(LxVal::str(p.to_string_lossy())),
-    None => Ok(LxVal::str(".")),
-  }
-}
-
-fn bi_agent_implements(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let target_trait = match &args[1] {
-    LxVal::Str(s) => s.to_string(),
-    LxVal::Trait(t) => t.name.as_str().to_string(),
-    LxVal::Class(c) => c.name.as_str().to_string(),
-    _ => String::new(),
-  };
-  let has = match &args[0] {
-    LxVal::Object(o) => o.traits.iter().any(|t| t.as_str() == target_trait.as_str()),
-    LxVal::Class(c) => c.traits.iter().any(|t| t.as_str() == target_trait.as_str()),
-    LxVal::Record(r) => r
-      .get(&crate::sym::intern("traits"))
-      .or_else(|| r.get(&crate::sym::intern("__traits")))
-      .and_then(|v| v.as_list())
-      .map(|l| l.iter().any(|v| v.as_str() == Some(target_trait.as_str())))
-      .unwrap_or(false),
-    _ => false,
-  };
-  Ok(LxVal::Bool(has))
-}
-
-fn bi_json_parse(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let s = args[0].require_str("json.parse", span)?;
-  match serde_json::from_str::<serde_json::Value>(s) {
-    Ok(jv) => Ok(LxVal::ok(LxVal::from(jv))),
-    Err(e) => Ok(LxVal::err_str(e.to_string())),
-  }
-}
-
-fn bi_json_encode(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let s = serde_json::to_string(&args[0]).map_err(|e| LxError::runtime(e.to_string(), span))?;
-  Ok(LxVal::str(s))
-}
-
-fn bi_json_encode_pretty(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let s = serde_json::to_string_pretty(&args[0]).map_err(|e| LxError::runtime(e.to_string(), span))?;
-  Ok(LxVal::str(s))
-}
-
-fn bi_method_of(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let LxVal::Str(s) = &args[1] else {
-    return Ok(LxVal::None);
-  };
-  let name = s.as_ref();
-  match &args[0] {
-    LxVal::Object(o) => match o.methods.get(&crate::sym::intern(name)) {
-      Some(method) => Ok(method.bind_self(&args[0])),
-      None => Ok(LxVal::None),
-    },
-    LxVal::Class(c) => match c.methods.get(&crate::sym::intern(name)) {
-      Some(method) => Ok(method.bind_self(&args[0])),
-      None => Ok(LxVal::None),
-    },
-    _ => Ok(LxVal::None),
-  }
-}
-
-fn bi_global_context_current(_args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  global_context_current()
-}
-
-fn bi_global_context_get(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  global_context_get(&args[0], span)
-}
-
-fn bi_resolve_handler(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let agent = &args[0];
-  if let LxVal::Record(r) = agent
-    && let Some(h) = r.get(&crate::sym::intern("handler"))
-  {
-    return Ok(h.clone());
-  }
-  Ok(LxVal::None)
-}
-
-fn bi_try(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let f = &args[0];
-  let arg = args[1].clone();
-  match crate::builtins::call_value_sync(f, arg, span, ctx) {
-    Ok(v) => Ok(v),
-    Err(LxError::Propagate { value, .. }) => Ok(LxVal::Err(value)),
-    Err(e) => Err(e),
-  }
-}
-
-fn bi_methods_of(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  let names = match &args[0] {
-    LxVal::Object(o) => o.methods.keys().map(LxVal::str).collect(),
-    LxVal::Class(c) => c.methods.keys().map(LxVal::str).collect(),
-    _ => vec![],
-  };
-  Ok(LxVal::list(names))
 }

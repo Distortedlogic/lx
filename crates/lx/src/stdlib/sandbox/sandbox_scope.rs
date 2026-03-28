@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::builtins::call_value_sync;
 use crate::error::LxError;
-use crate::runtime::{DenyHttpBackend, HttpBackend, RuntimeCtx};
+use crate::runtime::RuntimeCtx;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
@@ -14,21 +14,18 @@ thread_local! {
 }
 
 fn build_restricted_ctx(base: &Arc<RuntimeCtx>, policy: &Policy) -> Arc<RuntimeCtx> {
-  let http: Arc<dyn HttpBackend> = if policy.net_allow.is_empty() { Arc::new(DenyHttpBackend) } else { base.http.clone() };
+  let network_denied = policy.net_allow.is_empty();
 
   Arc::new(RuntimeCtx {
-    emit: base.emit.clone(),
-    http,
     yield_: base.yield_.clone(),
-    log: base.log.clone(),
-    llm: base.llm.clone(),
     source_dir: parking_lot::Mutex::new(base.source_dir.lock().clone()),
     workspace_members: base.workspace_members.clone(),
     dep_dirs: base.dep_dirs.clone(),
     tokio_runtime: base.tokio_runtime.clone(),
-    event_stream: base.event_stream.clone(),
     test_threshold: base.test_threshold,
     test_runs: base.test_runs,
+    event_stream: base.event_stream.clone(),
+    network_denied,
   })
 }
 

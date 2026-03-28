@@ -242,7 +242,10 @@ impl Interpreter {
       },
       Expr::Emit(ExprEmit { value }) => {
         let v = self.eval(value).await?;
-        self.ctx.emit.emit(&v, span)?;
+        println!("{v}");
+        let mut fields = indexmap::IndexMap::new();
+        fields.insert(crate::sym::intern("value"), v);
+        self.ctx.event_stream.xadd("runtime/emit", "main", None, fields);
         Ok(LxVal::Unit)
       },
       Expr::Yield(ExprYield { value }) => {
