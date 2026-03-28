@@ -236,6 +236,7 @@ impl Interpreter {
             agent_name: None,
             agent_mailbox_rx: None,
             agent_handle_fn: None,
+            next_ask_id: std::sync::atomic::AtomicU64::new(1),
           };
           Some(tmp.eval(d_eid).await?)
         },

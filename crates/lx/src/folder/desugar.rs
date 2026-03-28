@@ -55,14 +55,8 @@ impl AstTransformer for Desugarer {
   fn leave_expr(&mut self, _id: ExprId, expr: Expr, span: SourceSpan, arena: &mut AstArena) -> (Expr, SourceSpan) {
     let result = match expr {
       Expr::Pipe(p) => Expr::Apply(ExprApply { func: p.right, arg: p.left }),
-      Expr::Tell(t) => {
-        let call = super::gen_ast::gen_field_call("agent", "tell", &[t.target, t.msg], span, arena);
-        arena.expr(call).clone()
-      },
-      Expr::Ask(a) => {
-        let call = super::gen_ast::gen_field_call("agent", "ask", &[a.target, a.msg], span, arena);
-        arena.expr(call).clone()
-      },
+      Expr::Tell(_) => expr,
+      Expr::Ask(_) => expr,
       Expr::Section(s) => desugar_section(s, span, arena),
       Expr::Ternary(t) => desugar_ternary(t.cond, t.then_, t.else_, span, arena),
       Expr::Coalesce(c) => desugar_coalesce(c.expr, c.default, span, arena),

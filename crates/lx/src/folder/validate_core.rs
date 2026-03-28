@@ -28,8 +28,6 @@ impl AstVisitor for CoreValidator {
   fn visit_expr(&mut self, _id: ExprId, expr: &Expr, span: SourceSpan) -> VisitAction {
     match expr {
       Expr::Pipe(_) => panic!("Core AST contains Expr::Pipe at offset {}. The desugarer should have converted this to Expr::Apply.", span.offset()),
-      Expr::Tell(_) => panic!("Core AST contains Expr::Tell at offset {}. The desugarer should have converted this to agent.tell call.", span.offset()),
-      Expr::Ask(_) => panic!("Core AST contains Expr::Ask at offset {}. The desugarer should have converted this to agent.ask call.", span.offset()),
       Expr::Section(_) => panic!("Core AST contains Expr::Section at offset {}. The desugarer should have converted this to a lambda.", span.offset()),
       Expr::Ternary(_) => panic!("Core AST contains Expr::Ternary at offset {}. The desugarer should have converted this to Expr::Match.", span.offset()),
       Expr::Coalesce(_) => panic!("Core AST contains Expr::Coalesce at offset {}. The desugarer should have converted this to Expr::Match.", span.offset()),

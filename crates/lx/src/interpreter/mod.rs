@@ -5,9 +5,11 @@ mod apply_helpers;
 mod collections;
 mod default_tools;
 mod eval;
+mod eval_assert;
 mod eval_ops;
 mod exec_stmt;
 mod hints;
+mod messaging;
 mod modules;
 mod patterns;
 mod trait_apply;
@@ -50,6 +52,7 @@ pub struct Interpreter {
   pub(crate) agent_name: Option<String>,
   pub(crate) agent_mailbox_rx: Option<Arc<tokio::sync::Mutex<tokio::sync::mpsc::Receiver<crate::runtime::agent_registry::AgentMessage>>>>,
   pub(crate) agent_handle_fn: Option<LxVal>,
+  pub(crate) next_ask_id: std::sync::atomic::AtomicU64,
 }
 
 impl Interpreter {
@@ -77,6 +80,7 @@ impl Interpreter {
       agent_name: None,
       agent_mailbox_rx: None,
       agent_handle_fn: None,
+      next_ask_id: std::sync::atomic::AtomicU64::new(1),
     }
   }
 
@@ -93,6 +97,7 @@ impl Interpreter {
       agent_name: None,
       agent_mailbox_rx: None,
       agent_handle_fn: None,
+      next_ask_id: std::sync::atomic::AtomicU64::new(1),
     }
   }
 
@@ -178,7 +183,9 @@ impl Interpreter {
       },
       Expr::Binary(ExprBinary { op, left, right }) => self.eval_binary(&op, left, right, span).await,
       Expr::Unary(ExprUnary { op, operand }) => self.eval_unary(&op, operand, span).await,
-      Expr::Pipe(_) | Expr::Tell(_) | Expr::Ask(_) => unreachable!(),
+      Expr::Pipe(_) => unreachable!(),
+      Expr::Tell(t) => self.eval_tell(t.target, t.msg, span).await,
+      Expr::Ask(a) => self.eval_ask(a.target, a.msg, span).await,
       Expr::Apply(ExprApply { func, arg }) => {
         let f = self.eval(func).await?;
         if let Expr::NamedArg(ExprNamedArg { name, value }) = self.arena.expr(arg) {
