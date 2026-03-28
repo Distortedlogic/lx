@@ -16,21 +16,47 @@ long term solution?
 → simple and concise?
 → minimally knotted?
 }
+——— rejection rules ———
+may ONLY reject by citing a
+verifiable factual blocker
+(e.g. struct X has no field Y,
+function Z does not exist)
+———
+rejections based on judgment,
+opinion, or preference are
+NOT valid rejections
 ——— returns ———
 validated solution(s)
-or rejected with alternatives`"]:::orange
+or rejected with factual blockers`"]:::orange
     validate --> val_check{{"1.1.0 validated?"}}:::teal
 
-    val_check -- "no" --> rethink["`**1.2.0 Rethink (Spawn Subagent)**
+    val_check -- "no" --> verify_reject["`**1.1.1 Verify Rejection (Spawn Subagent)**
 ——— input ———
-rejection reasons · alternatives
+rejection with factual claims
+———
+→ independently read the codebase
+→ confirm every factual claim
+———
+if a factual claim is false
+→ discard rejection → validated
+if alternative contradicts source
+authority (research, user instructions)
+→ discard alternative → validated
+———
+only rejections with verified
+factual blockers proceed`"]:::yellow
+    verify_reject -- "verified" --> rethink["`**1.2.0 Rethink (Spawn Subagent)**
+——— input ———
+verified rejection · factual blockers
 ———
 → revise approach
 → re-evaluate tradeoffs
 → produce new candidate`"]:::orange
+    verify_reject -- "discarded" --> val_check_pass
+    val_check -- "yes" --> val_check_pass((" ")):::teal
     rethink --> validate
 
-    val_check -- "yes" --> organize["`**2.0.0 Organize (Spawn Subagent)**
+    val_check_pass --> organize["`**2.0.0 Organize (Spawn Subagent)**
 ——— input ———
 validated solution(s)
 ———

@@ -55,17 +55,16 @@ The interpreter forwards any method name to the tool process via MCP `tools/call
 1. The lx program evaluates `Browser.click "e2"`
 2. The interpreter resolves `Browser` — it's a tool module bound by `use tool`
 3. The interpreter forwards `.click` as the method name to the tool process
-4. If an event stream is active, the interpreter xadds `{kind: "tool.call", tool: "Browser", method: "click", args: "e2"}`
-5. If resume replay cache has a matching entry (see Resume section), return the cached result and skip steps 6-8
-6. The MCP client sends `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"click","arguments":{"ref":"e2"}}}` on the tool process's stdin
-7. The tool process does the work, writes a JSON-RPC response on stdout
-8. The MCP client reads the response, deserializes the result to `LxVal`
-9. If an event stream is active, the interpreter xadds `{kind: "tool.result", tool: "Browser", method: "click", result: ...}`
-10. The `LxVal` result is returned to the lx program
+4. The interpreter xadds `{kind: "tool/call", tool: "Browser", method: "click", args: "e2"}` to the event stream
+5. The MCP client sends `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"click","arguments":{"ref":"e2"}}}` on the tool process's stdin
+6. The tool process does the work, writes a JSON-RPC response on stdout
+7. The MCP client reads the response, deserializes the result to `LxVal`
+8. The interpreter xadds `{kind: "tool/result", tool: "Browser", method: "click", result: ...}` to the event stream
+9. The `LxVal` result is returned to the lx program
 
 ### How tool logs work
 
-The MCP protocol has `notifications/message`. When the tool process sends a log notification through the JSON-RPC protocol on stdout, the interpreter's MCP client receives it and xadds it to the event stream as `{kind: "tool.log", tool: "Browser", level: "info", msg: "..."}`.
+The MCP protocol has `notifications/message`. When the tool process sends a log notification through the JSON-RPC protocol on stdout, the interpreter's MCP client receives it and xadds it to the event stream as `{kind: "tool/log", tool: "Browser", level: "info", msg: "..."}`.
 
 stderr on the tool process is unstructured noise that lx ignores. stdout is exclusively the JSON-RPC protocol channel.
 
@@ -86,7 +85,13 @@ use tool "agent-browser" as ab
 +click = (ref) { ab.interact {action: "click", ref: ref} }
 ```
 
-Another lx program imports it with `use ./my_browser as Browser`. Same module interface. The calling code doesn't know if it's talking to an MCP server or lx code.
+Another lx program imports it with the same `use tool` syntax:
+
+```lx
+use tool "./my_browser.lx" as Browser
+```
+
+The interpreter sees the `.lx` extension and loads it as a pure lx module, but routes calls through tool dispatch — same auto-logging, same observability, same module interface. The calling code doesn't know if it's talking to an MCP server or lx code. There is one `use tool` mechanism, not two import styles.
 
 ### Swapping backends
 
@@ -105,70 +110,119 @@ Same module name, same methods, different external tool. The lx code using `Brow
 ### Error handling
 
 - **MCP error response:** The MCP protocol includes error codes and messages in JSON-RPC responses. The interpreter wraps these as `LxVal::Err` with the error message. The lx program handles them normally.
-- **Process crash:** Returns `Err "tool 'Browser' process exited unexpectedly"`. The connection is dead — subsequent calls return the same error. The lx program can re-execute `use tool` to spawn a fresh process and rebind the module, or handle the error and move on. The interpreter does not auto-reconnect.
+- **Process crash:** Returns `Err "tool 'Browser' process exited unexpectedly"`. The connection is dead — subsequent calls return the same error. `use tool` is valid in any scope (not just top-level), so the lx program can re-execute it inside an error handler to spawn a fresh process and rebind the module. The interpreter does not auto-reconnect.
 - **Timeouts:** Handled by the MCP protocol. The MCP client manages request timeouts and sends `$/cancelRequest` when they expire. lx does not define its own timeout mechanism.
 - **Tool not found:** If the command binary doesn't exist on PATH, `use tool` fails immediately with `Err "command 'agent-browser' not found"`.
 
 ### Agent integration
 
-Agents are lx classes defined with the `Agent` keyword. The Agent trait is defined in lx (`std/agent.lx`). An agent's `run` method is a yield loop — it yields values out, receives messages in, handles them, repeats.
+Agents are lx classes defined with the `Agent` keyword. The Agent trait is defined in lx (`std/agent.lx`). An agent defines `handle`, `run`, or both:
 
-`spawn` is a keyword that creates a concurrent execution context for an Agent class. It instantiates the agent, starts its `run` method concurrently, and wires up channel-based communication:
+- **`handle`** — the reactive interface. The runtime calls it when a message arrives. The return value is delivered back to `ask` callers (or discarded for `tell`).
+- **`run`** — the autonomous interface. The runtime calls it once on spawn. The agent drives its own execution — polling, watching, scheduling, whatever it needs.
+
+If only `handle` is defined, the runtime provides a default `run` that loops on incoming messages and dispatches to `handle`. If only `run` is defined, the agent ignores messages. If both are defined, the runtime runs `run` as the agent's main task and calls `handle` when messages arrive — no entanglement, no polling. Execution within the agent is serialized: if `run` is mid-expression-eval when a message arrives, `handle` waits for that expression to finish. An expression is one AST node — a function call, a tool call, an assignment. A tool call that takes 30 seconds is one expression; `handle` waits the full 30 seconds. Between expressions, the runtime can interleave `handle`. No concurrent access to agent state.
+
+`stop` is a keyword available inside agent code (both `handle` and `run`). It terminates the agent — cancels `run`, drains pending messages, unsubscribes from all channels, and writes an `agent/kill` entry to the event stream. After `stop`, the agent is gone. `tell` or `ask` targeting a stopped agent returns `Err "agent 'Name' not running"`.
+
+`spawn` is a keyword that creates a concurrent async task for an Agent class. It instantiates the agent, starts it concurrently, and wires up messaging:
 
 ```lx
-channel findings
-channel drafts
+channel research
+channel writing
 
+-- reactive agent: responds to messages
 Agent Researcher = {
-  publishes = [findings]
-  handle = (msg) { findings.send {topic: msg.topic, data: ...} }
+  subscribes = [research]
+  handle = (msg) {
+    result = do_research msg.topic
+    {topic: msg.topic, data: result}
+  }
 }
 
-Agent Writer = {
-  subscribes = [findings]
-  publishes = [drafts]
-  handle = (msg) { drafts.send {content: ...} }
+-- autonomous agent: drives its own loop, also responds to messages
+Agent Watcher = {
+  handle = (msg) {
+    (msg.cmd == "stop") ? { stop } : {}
+  }
+  run = () {
+    use std/events
+    last = "$"
+    loop {
+      entry = events.xread last {timeout_ms: 5000}
+      entry ? {
+        (entry.kind == "runtime/error") ? {
+          tell "Coordinator" {alert: entry}
+        } : {}
+        last = entry.id
+      } : {}
+    }
+  }
 }
 
 spawn Researcher
-spawn Writer
+spawn Watcher
+
+-- discover agents on the research channel, send messages directly
+peers = research.members
+result = ask peers.0 {topic: "quantum computing"}
 ```
 
-The agent's name is derived from the class name (`"Researcher"`). Stream entries use this name in the `agent` field. Spawning the same class twice is an error — agent names are unique.
+Each agent class is spawned once — agent names are unique, derived from the class name (`"Researcher"`, `"Watcher"`). Spawning the same class twice is an error. If you need multiple agents serving the same role, define distinct classes and subscribe them to the same channel (see Channels below).
 
-Each spawned agent runs in its own concurrent context with its own module scope. Tool modules are not shared — each agent that needs a tool must `use tool` it in its own code. The event stream IS shared — all agents write to the same stream.
+Each spawned agent runs in its own concurrent async task with its own module scope. Tool modules are not shared — each agent that needs a tool must `use tool` it in its own code. The event stream IS shared — all agents write to the same stream.
+
+### Messaging: `tell` and `ask`
+
+Agents communicate directly via `tell` (fire-and-forget) and `ask` (request-response). Both dispatch to the target agent's `handle` method:
+
+- `tell agent_name msg` — send a message, don't wait. The agent's `handle` is called; the return value is discarded.
+- `ask agent_name msg` — send a message, suspend the calling task until the agent's `handle` returns. The return value of `handle` becomes the result of `ask`.
+
+```lx
+tell "Researcher" {topic: "quantum computing"}
+
+result = ask "Researcher" {topic: "quantum computing"}
+```
+
+`tell` and `ask` are the only message primitives. They target agents by name. `ask` suspends only the calling task — other agents and the main program continue executing. `run` does not participate in messaging — it's the agent's private autonomous loop. An agent with only `run` and no `handle` cannot receive messages via `tell`/`ask`. The event stream logs all messages (`agent/tell`, `agent/ask`, `agent/reply`).
+
+The main program is not an agent and cannot be targeted by `tell` or `ask` — it has no `handle` method. The main program can send messages to agents (it can call `tell` and `ask`), but agents cannot send messages back to it. Agents that need to surface results to the main program write to the event stream; the main program reads them via `events.xrange` or `events.xread`.
+
+For top-level programs (not spawned agents), `yield` suspends execution and waits for a response. The delivery mechanism is the `YieldBackend` trait on `RuntimeCtx` — the host environment (CLI, desktop, test harness) provides the implementation. When a control channel is active, the CLI's `YieldBackend` implementation writes the yielded value to stdout and waits for an `inject` command on the control channel. When no control channel is active, the host can still implement `YieldBackend` however it wants (e.g. the test harness auto-responds). The control channel is one transport for yield responses, not the only one. Within agents, `yield` is not used — agents communicate via `tell`/`ask`.
 
 ### Channels
 
-Channels are the communication topology between agents. A channel is a named, typed conduit — agents publish to channels and subscribe to channels. The topology is the channel layout, visible at a glance without reading agent internals.
+Channels are the discovery and topology layer. A channel is a named group that agents subscribe to, declaring their interest or capability. The topology is visible at a glance without reading agent internals.
 
 ```lx
-channel findings
-channel drafts
-channel reviews
+channel research
+channel writing
+channel review
 ```
 
-Channels decouple senders from receivers. A publisher doesn't know who subscribes. A subscriber doesn't know who publishes. New agents can join existing channels without rewiring anything.
+- `channel.members` — returns the list of agent names currently subscribed to this channel
+- `channel.subscribe agent_name` — imperatively register an agent on this channel at runtime
 
-- `channel.send msg` — publish a message to the channel
-- `channel.recv` — block until a message arrives on the channel
-- `channel.recv {timeout_ms: N}` — block with timeout, returns `None` on timeout
+Agents can also subscribe declaratively via `subscribes = [channel1, channel2]` on the Agent class. `subscribes` is a reserved field — the runtime reads it on `spawn` and auto-registers the agent on the listed channels before calling `run` or accepting messages. Declarative subscription is the common case; `channel.subscribe` exists for dynamic registration after spawn.
 
-For request-response, a message can carry a reply channel:
+Channels do not carry messages. They are a registry — you query a channel to discover which agents handle a topic, then send messages directly via `tell`/`ask`. New agents can join existing channels without rewiring anything.
+
+Why channels instead of just `tell "Researcher" msg`? Direct naming works when the caller knows exactly which agent to talk to. Channels matter when it doesn't — dynamic agent pools where the count or names aren't known at write time, broadcasting to all agents with a capability, or letting new agents join a role without updating callers:
 
 ```lx
-channel requests
-channel responses
+channel workers
 
-requests.send {task: "find papers", reply: responses}
-result = responses.recv
+Agent FastWorker = { subscribes = [workers], handle = (msg) { ... } }
+Agent ThoroughWorker = { subscribes = [workers], handle = (msg) { ... } }
+spawn FastWorker
+spawn ThoroughWorker
+
+-- fan out to all workers without knowing their names or count
+workers.members | each (w) { tell w {task: next_task()} }
 ```
 
-The event stream logs all channel activity (`channel/send`, `channel/recv`). Channels are for structured agent-to-agent communication. The event stream is for observability — the global append-only log of everything that happened. They serve different purposes.
-
-No ACLs at the runtime level. All agents in the same program can publish to or subscribe to any channel they reference. The programmer controls the topology by declaring channels and deciding which agents use which channels.
-
-For top-level programs (not spawned agents), `yield` delivers through the control channel — the orchestrator (CLI, desktop) receives the yielded value and responds via the inject command.
+No ACLs at the runtime level. All agents in the same program can subscribe to any channel and message any agent by name. The programmer controls the topology by declaring channels and deciding which agents subscribe to which.
 
 ---
 
@@ -178,15 +232,14 @@ For top-level programs (not spawned agents), `yield` delivers through the contro
 
 An ordered, append-only log of everything that happened during program execution. Every tool call, every result, every emit, every log, every error, every agent message — with timestamps, source spans, and agent IDs. Three layers, not alternatives:
 
-- **In-memory stream** — always on. The runtime's live event log. Agents within the same program subscribe via xread. This is the stream.
-- **JSONL persistence** — automatic. The in-memory stream writes to `.lx/stream.jsonl` during execution. Enables resume across restarts and post-hoc debug. This is the stream's durability layer.
+- **In-memory stream** — always on. The runtime's live event log. lx programs can subscribe via `events.xread`. This is the stream.
+- **JSONL persistence** — automatic. The in-memory stream writes to `.lx/stream.jsonl` during execution. Enables post-hoc debug. This is the stream's durability layer.
 - **External streaming** — optional. An MCP server (e.g. Valkey) for cross-process subscription and distributed access. Configured in the manifest. This is the stream's distribution layer.
 
-Three purposes from the same data:
+Two purposes from the same data:
 
 - **Observability** — xread on the in-memory stream for real-time watching within the program, or the external backend for cross-process
 - **Debug** — xrange on the in-memory stream during execution, or read the JSONL file after the fact
-- **Resume** — load the JSONL file on restart, replay cached tool results
 
 ### Configuration
 
@@ -199,21 +252,19 @@ For cross-process streaming, the manifest configures an external backend:
 command = "valkey-stream-mcp"
 ```
 
-When an external backend is configured, the interpreter writes to both the in-memory stream and the external backend. The JSONL file is still written for resume.
+When an external backend is configured, the interpreter writes to both the in-memory stream and the external backend. The JSONL file is still written regardless.
 
-The `stream` module is always available in lx programs — no import needed.
+The event stream is accessed via `use std/events`. The name `events` is intentional — `stream` is reserved for the existing `std/stream` module (the lazy pull-based data stream with map/filter/collect). Making it an explicit import means lx library code can depend on it — immune cell agents, monitoring tools, debug utilities can all be written as `.lx` modules that `use std/events` and operate on the stream programmatically.
 
-This does NOT conflict with the existing `std/stream` module (the lazy pull-based data stream with map/filter/collect). That module is imported via `use std/stream`. Different module, different purpose. The lazy data stream is for transforming data. The event stream is for runtime history. They coexist.
+### Events module methods
 
-### Stream module methods
-
-- `stream.xadd {kind: "...", ...}` — append an entry, returns the generated ID string
-- `stream.xrange start end` — read entries between two IDs. `"-"` means beginning, `"+"` means end. Returns a list of entry records.
-- `stream.xrange start end {count: N}` — read at most N entries in the range
-- `stream.xread last_id` — block until a new entry appears after `last_id`. `"$"` means "from now." Returns the entry.
-- `stream.xread last_id {timeout_ms: N}` — block with timeout. Returns `None` on timeout.
-- `stream.xlen` — return entry count
-- `stream.xtrim {maxlen: N}` — remove entries beyond the max length (oldest first)
+- `events.xadd {kind: "...", ...}` — append an entry, returns the generated ID string
+- `events.xrange start end` — read entries between two IDs. `"-"` means beginning, `"+"` means end. Returns a list of entry records.
+- `events.xrange start end {count: N}` — read at most N entries in the range
+- `events.xread last_id` — block until a new entry appears after `last_id`. `"$"` means "from now." Returns the entry.
+- `events.xread last_id {timeout_ms: N}` — block with timeout. Returns `None` on timeout.
+- `events.xlen` — return entry count
+- `events.xtrim {maxlen: N}` — remove entries beyond the max length (oldest first)
 
 ### Stream entry format
 
@@ -243,32 +294,35 @@ The `kind` field is a stream key for categorizing and filtering entries. These a
 | `tool/log` | `tool`, `level`, `msg` | Tool sends an MCP `notifications/message` |
 | `agent/spawn` | `agent_name`, `class` | lx code evaluates a `spawn` expression |
 | `agent/kill` | `agent_name` | An agent is killed |
-| `channel/send` | `channel`, `from`, `msg` | An agent publishes a message to a channel |
-| `channel/recv` | `channel`, `to`, `msg` | An agent receives a message from a channel |
-| `yield/out` | `prompt_id`, `value` | lx code evaluates a `yield` expression |
-| `yield/in` | `prompt_id`, `response` | A yield receives a response |
+| `agent/tell` | `from`, `to`, `msg` | An agent sends a fire-and-forget message |
+| `agent/ask` | `ask_id`, `from`, `to`, `msg` | An agent sends a request and suspends its task for reply |
+| `agent/reply` | `ask_id`, `from`, `to`, `msg` | An agent replies to an ask |
+| `channel/subscribe` | `channel`, `agent_name` | An agent subscribes to a channel |
+| `yield/out` | `prompt_id`, `value` | Top-level program evaluates a `yield` expression |
+| `yield/in` | `prompt_id`, `response` | A yield receives a response via the YieldBackend |
 
 ### Auto-logging: where it happens
 
 The interception point is in the interpreter's method dispatch for tool modules. When the interpreter evaluates a field access + call on a module that was created by `use tool`, the dispatch path is:
 
 1. `eval` resolves the field access (`Browser.click`) — recognizes `Browser` as a tool module
-2. Before calling the MCP client, it xadds `tool.call` to the stream (if stream is active)
+2. Before calling the MCP client, it xadds `tool/call` to the stream
 3. Calls the MCP client
-4. After the call returns, it xadds `tool.result` or `tool.error` to the stream
+4. After the call returns, it xadds `tool/result` or `tool/error` to the stream
 5. Returns the result to the lx program
 
 This is a single code path in the interpreter that handles ALL tool module calls. Adding a new tool doesn't require any auto-logging code — it's automatic because the dispatch goes through the same path.
 
-The `call_id` is a per-agent monotonic counter incremented per tool call. Each agent maintains its own counter independently. The `call_id` pairs the `tool.call` and `tool.result` entries. The replay cache keys on `(agent_name, call_id)` — see Resume section.
+The `call_id` is a per-agent monotonic counter incremented per tool call. Each agent maintains its own counter independently — spawned agents initialize theirs on spawn, the top-level program (`"main"`) initializes its counter to 1 at program start. Since multiple agents can each have a `call_id` of 1, the correlation key for pairing `tool/call` with `tool/result` in the stream is `(agent, call_id)` — both fields are present on every tool event entry.
 
 ### Auto-logging: what gets logged beyond tool calls
 
 - `emit` expression — the interpreter's eval case for `Expr::Emit` xadds to the stream after calling `ctx.emit`
 - `log.*` builtins — each log builtin xadds to the stream after calling `ctx.log`
-- `yield` expression — the interpreter's eval case for `Expr::Yield` xadds `yield.out` before yielding and `yield.in` after receiving the response
-- `agent.*` builtins — agent.spawn/kill/ask/tell xadd to the stream
-- Program start/done — the interpreter xadds `program.start` at the beginning and `program.done` at the end
+- `yield` expression — the interpreter's eval case for `Expr::Yield` xadds `yield/out` before yielding and `yield/in` after receiving the response (top-level programs only)
+- `tell`/`ask` — the interpreter xadds `agent/tell`, `agent/ask`, `agent/reply` on each message
+- `agent.*` builtins — agent.spawn/kill xadd to the stream
+- Program start/done — the interpreter xadds `program/start` at the beginning and `program/done` at the end
 
 These are a fixed set of interception points in the interpreter — one per language keyword/builtin that produces side effects. They're not extensible because the set of interpreter operations that produce events is fixed.
 
@@ -280,22 +334,24 @@ For causal ordering within a single agent, entries are naturally ordered because
 
 ### Trimming
 
-No auto-trim. The JSONL file and in-memory stream grow for the duration of the program. The lx program can call `stream.xtrim {maxlen: 10000}` explicitly if needed. Most lx programs are finite workflows — the stream is bounded by the program's lifetime. If trimming is needed for long-running programs, the lx program does it explicitly.
+No auto-trim. The JSONL file and in-memory stream grow for the duration of the program. The lx program can call `events.xtrim {maxlen: 10000}` explicitly if needed. Most lx programs are finite workflows — the stream is bounded by the program's lifetime. If trimming is needed for long-running programs, the lx program does it explicitly.
 
 ### Direct use from lx programs
 
 The lx program can write to and read from the stream directly:
 
 ```lx
-stream.xadd {kind: "checkpoint", state: some_data}
+use std/events
 
-entries = stream.xrange "-" "+"
+events.xadd {kind: "checkpoint", state: some_data}
+
+entries = events.xrange "-" "+"
 errors = entries | filter (e) { e.kind == "error" }
 
 -- watch for new events in real time
 last = "$"
 loop {
-  entry = stream.xread last {timeout_ms: 5000}
+  entry = events.xread last {timeout_ms: 5000}
   entry ? {
     emit entry
     last = entry.id
@@ -307,37 +363,18 @@ loop {
 
 Debug is reading the stream. The stream contains: what happened (kind), when (ts), where in source (span), which agent (agent), what arguments (args), what result (result), what went wrong (error). A debug view is a filtered xrange.
 
-### Resume
-
-**How matching works:** Each tool call gets a monotonic `call_id` (1, 2, 3, ...) assigned by the interpreter in the order calls are encountered during execution. The call_id is deterministic — the same program with the same inputs produces the same sequence of call_ids because the control flow is the same.
-
-On restart with an existing JSONL file:
-
-1. The interpreter loads the JSONL file into the in-memory stream
-2. It scans for `tool.call` + `tool.result` pairs, keyed by `call_id`
-3. It builds a replay cache: `HashMap<u64, LxVal>` mapping call_id to cached result
-4. It resets the call_id counter to 1
-5. It begins executing the program normally
-6. When a tool call is reached, the interpreter checks: is there a cached result for the current call_id?
-7. If yes: return the cached result, skip the actual MCP call, increment call_id
-8. If no: the cache is exhausted. Execute the call live, xadd the result, increment call_id. All subsequent calls are live.
-
-**What gets replayed:** Only tool calls (external MCP calls). These are the expensive, non-deterministic operations.
-
-**What gets re-executed:** `emit`, `log`, `yield`, store operations, pure lx computation. These are either cheap (emit/log), stateful (store), or interactive (yield — the orchestrator may have changed).
-
-**When replay breaks:** If the program's control flow changes between runs (different code, different conditional branches due to external state), the call_id sequence diverges from the cached entries. At that point the cache misses and execution continues live. This is safe — it just means less replay benefit, not incorrect behavior.
-
 ### External streaming backend
 
-For cross-process subscription, the dev writes an MCP server that handles `xadd`, `xrange`, `xread`, `xlen`, `xtrim` and configures it in the manifest:
+For cross-process access, the dev writes an MCP server that handles `xadd`, `xrange`, `xread`, `xlen`, `xtrim` and configures it in the manifest:
 
 ```toml
 [stream]
 command = "valkey-stream-mcp"
 ```
 
-The interpreter writes to both the in-memory stream (for in-process subscription) and the external backend (for cross-process subscription). The JSONL file is always written regardless. The external backend is an additional distribution layer, not a replacement for the in-memory stream or the JSONL persistence.
+The interpreter writes to both the in-memory stream (for in-process access) and the external backend (for cross-process access). The JSONL file is always written regardless. The external backend is an additional distribution layer, not a replacement for the in-memory stream or the JSONL persistence.
+
+**Use cases for external streaming:** Admin panels that read the stream to build a real-time debug view of a running program. Immune cell agents — separate lx programs that monitor the event stream of another program, watching for anomalies and reacting (e.g. pausing a misbehaving agent via the control channel when they spot something in the stream). Post-hoc analysis tools that read stream history to reconstruct what happened. The external backend makes the stream available to anything outside the running process.
 
 ---
 
@@ -364,8 +401,10 @@ Default is no control channel — the program runs uncontrolled. Adding `--contr
 
 | Command | Request | Response |
 |---|---|---|
-| pause | `{"cmd": "pause"}` | `{"ok": true}` |
-| resume | `{"cmd": "resume"}` | `{"ok": true}` |
+| pause | `{"cmd": "pause"}` | `{"ok": true}` — pauses all agents |
+| pause (targeted) | `{"cmd": "pause", "agent": "Researcher"}` | `{"ok": true}` — pauses one agent |
+| resume | `{"cmd": "resume"}` | `{"ok": true}` — resumes all paused agents |
+| resume (targeted) | `{"cmd": "resume", "agent": "Researcher"}` | `{"ok": true}` — resumes one agent |
 | cancel | `{"cmd": "cancel"}` | `{"ok": true}` (then program exits) |
 | inspect | `{"cmd": "inspect"}` | `{"ok": true, "state": {"call_stack": [...], "env": {...}, "stream_position": "1679083200123-5"}}` |
 | inject | `{"cmd": "inject", "value": ...}` | `{"ok": true}` (value delivered to pending yield) |
@@ -376,8 +415,8 @@ All commands are single-line JSON. Responses are single-line JSON. The wire form
 
 The control channel is a separate async task, independent of the interpreter's eval loop. The interpreter does not poll or check it. The control channel task acts on the interpreter from outside:
 
-- **Cancel:** The control channel task tells the MCP client to drop the in-flight connection. The blocked call returns `Err "cancelled"`. The interpreter sees the error and stops the program. Cancel works mid-call — the interpreter doesn't need to be between steps.
-- **Pause:** The control channel task sets a pause flag on the interpreter's shared state. The interpreter checks this flag before the next eval step and waits until it's cleared. If the interpreter is mid-tool-call, pause takes effect when the call returns.
+- **Cancel:** The control channel task sends `$/cancelRequest` to the tool process, waits a short grace period, then SIGKILLs the child process. The blocked call returns `Err "cancelled"`. The interpreter sees the error and stops the program. Cancel works mid-call — the interpreter doesn't need to be between steps.
+- **Pause:** The control channel task sets a pause flag — either globally (all agents) or on a specific agent's state. The interpreter checks the relevant pause flag before the next eval step and waits until it's cleared. If the interpreter is mid-tool-call, pause takes effect when the call returns. Targeted pause is the key mechanism for immune cell agents: an agent watching the event stream sees something wrong, finds the offending agent's name and call_id in the stream, and sends a targeted pause through the control channel.
 - **Resume:** The control channel task clears the pause flag. The interpreter continues.
 - **Inspect:** The control channel task reads the interpreter's state directly (env, call stack, stream position) and responds. This can happen while the interpreter is paused or between steps.
 - **Inject:** The control channel task delivers a value to a pending yield's response channel.
@@ -405,11 +444,11 @@ The current `RuntimeCtx` has `EmitBackend`, `LogBackend`, `LlmBackend`, `HttpBac
 
 In the target architecture, all of these go away. The event stream and control channel replace them:
 
-- `EmitBackend` → `emit` writes a stream entry: `{kind: "emit", value: ...}`
-- `LogBackend` → `log.*` writes a stream entry: `{kind: "log", level: "...", msg: "..."}`
+- `EmitBackend` → `emit` writes a stream entry: `{kind: "runtime/emit", value: ...}`
+- `LogBackend` → `log.*` writes a stream entry: `{kind: "runtime/log", level: "...", msg: "..."}`
 - `LlmBackend` → LLM is an external tool module: `use tool "claude-mcp" as llm`
 - `HttpBackend` → HTTP is an external tool module: `use tool "http-mcp" as http`
-- `YieldBackend` → stays. Yield logs to the stream (`yield.out`, `yield.in`) but the actual value delivery depends on context: the control channel for top-level programs, the agent communication mechanism for spawned agents. The YieldBackend trait abstracts over which is active.
+- `YieldBackend` → stays. It's the host-provided trait that handles yield delivery — the CLI implementation uses the control channel, the test harness auto-responds, other hosts implement it however they want. Yield also logs to the stream (`yield/out`, `yield/in`). Spawned agents do not use yield — they communicate via `tell`/`ask`.
 
 RuntimeCtx holds the in-memory event stream, the control channel, and the yield backend. Everything else is either a stream entry or a tool module.
 
@@ -423,12 +462,10 @@ The `CLI` keyword desugars to a class that shells out via `bash`. `use tool` pro
 
 ### Existing `stream` module
 
-The existing `std/stream` module (`stream.from`, `stream.map`, `stream.filter`, `stream.collect`, etc.) is a lazy pull-based data processing stream. It is unrelated to the event stream. They coexist:
+The existing `std/stream` module (`stream.from`, `stream.map`, `stream.filter`, `stream.collect`, etc.) is a lazy pull-based data processing stream. It is unrelated to the event stream. They coexist under different names:
 
-- `use std/stream` — lazy data stream for transforming lists/iterators
-- `stream` (always available, no import) — runtime event stream for execution history
-
-Different syntax, different module, different purpose. No collision.
+- `use std/stream` — lazy data stream for transforming lists/iterators (`stream.map`, `stream.filter`, etc.)
+- `use std/events` — runtime event stream for execution history (`events.xadd`, `events.xrange`, etc.)
 
 ---
 
@@ -449,9 +486,7 @@ No Rust. No recompilation. No plugin system. MCP servers and lx code.
 | Component | Ships as |
 |---|---|
 | MCP client | Built into interpreter, connects to tool processes via `use tool` |
-| Tool module dispatch | Built into interpreter, bridges module method calls to MCP `tools/call` |
-| Tool dispatch | Built into interpreter, forwards method names to tool process, tool decides what it accepts |
+| Tool module dispatch | Built into interpreter, forwards module method calls to MCP `tools/call`, tool decides what it accepts |
 | Event stream auto-logging | Built into interpreter, interception at tool module dispatch + emit/log/yield/agent |
 | In-memory event stream | Built into interpreter, always on, JSONL persistence to `.lx/stream.jsonl` automatic |
-| Resume/replay cache | Built into interpreter, activated when stream history exists on startup |
 | Control transports (stdin, WS, TCP) | Built into interpreter, selected via `--control` flag |
