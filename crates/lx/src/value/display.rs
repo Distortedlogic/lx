@@ -79,6 +79,7 @@ impl fmt::Display for LxVal {
       LxVal::Type(s) => write!(f, "{s}"),
       LxVal::Store { id } => write!(f, "<Store#{id}>"),
       LxVal::Stream { id } => write!(f, "<Stream#{id}>"),
+      LxVal::ToolModule(tm) => write!(f, "<ToolModule:{}>", tm.alias),
     }
   }
 }

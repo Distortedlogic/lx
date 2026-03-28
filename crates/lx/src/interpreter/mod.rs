@@ -46,6 +46,7 @@ pub struct Interpreter {
   pub(crate) loading: Arc<Mutex<HashSet<PathBuf>>>,
   pub(crate) ctx: Arc<RuntimeCtx>,
   pub(crate) arena: Arc<AstArena>,
+  pub(crate) tool_modules: Vec<Arc<crate::tool_module::ToolModule>>,
 }
 
 impl Interpreter {
@@ -61,6 +62,7 @@ impl Interpreter {
       loading: Arc::new(Mutex::new(HashSet::new())),
       ctx,
       arena: Arc::new(AstArena::new()),
+      tool_modules: vec![],
     }
   }
 
@@ -73,6 +75,7 @@ impl Interpreter {
       loading: Arc::new(Mutex::new(HashSet::new())),
       ctx,
       arena,
+      tool_modules: vec![],
     }
   }
 
@@ -113,6 +116,9 @@ impl Interpreter {
         EvalSignal::Error(e) => e,
         EvalSignal::Break(_) => LxError::runtime("break outside loop", self.arena.stmt_span(*sid)),
       })?;
+    }
+    for tm in &self.tool_modules {
+      tm.shutdown().await;
     }
     Ok(result)
   }

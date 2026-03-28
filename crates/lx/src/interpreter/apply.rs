@@ -232,6 +232,7 @@ impl Interpreter {
             loading: Arc::clone(&self.loading),
             ctx: Arc::clone(&self.ctx),
             arena: Arc::clone(&self.arena),
+            tool_modules: vec![],
           };
           Some(tmp.eval(d_eid).await?)
         },

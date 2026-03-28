@@ -113,6 +113,8 @@ pub enum LxVal {
   Stream {
     id: u64,
   },
+  #[strum(serialize = "ToolModule")]
+  ToolModule(Arc<crate::tool_module::ToolModule>),
 }
 
 #[derive(Debug, Clone)]

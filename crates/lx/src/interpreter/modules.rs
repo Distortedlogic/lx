@@ -21,7 +21,16 @@ impl Interpreter {
     let str_path: Vec<&str> = use_stmt.path.iter().map(|s| s.as_str()).collect();
     let str_joined = str_path.join("/");
     if let UseKind::Tool { command, alias } = &use_stmt.kind {
-      return Err(LxError::runtime(format!("tool modules not yet implemented (use tool \"{command}\" as {alias})"), span));
+      let cmd_str = command.as_str();
+      let alias_str = alias.as_str();
+      let tm = crate::tool_module::ToolModule::new(cmd_str, alias_str).await.map_err(|e| LxError::runtime(e, span))?;
+      let tm_arc = Arc::new(tm);
+      self.tool_modules.push(Arc::clone(&tm_arc));
+      let val = LxVal::ToolModule(tm_arc);
+      let env = self.env.child();
+      env.bind(*alias, val);
+      self.env = Arc::new(env);
+      return Ok(());
     }
     let exports = if crate::stdlib::std_module_exists(&str_path) {
       if let Some(rust_exports) = crate::stdlib::get_std_module(&str_path) {
