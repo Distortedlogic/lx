@@ -47,6 +47,9 @@ pub struct Interpreter {
   pub(crate) ctx: Arc<RuntimeCtx>,
   pub(crate) arena: Arc<AstArena>,
   pub(crate) tool_modules: Vec<Arc<crate::tool_module::ToolModule>>,
+  pub(crate) agent_name: Option<String>,
+  pub(crate) agent_mailbox_rx: Option<Arc<tokio::sync::Mutex<tokio::sync::mpsc::Receiver<crate::runtime::agent_registry::AgentMessage>>>>,
+  pub(crate) agent_handle_fn: Option<LxVal>,
 }
 
 impl Interpreter {
@@ -63,6 +66,9 @@ impl Interpreter {
       ctx,
       arena: Arc::new(AstArena::new()),
       tool_modules: vec![],
+      agent_name: None,
+      agent_mailbox_rx: None,
+      agent_handle_fn: None,
     }
   }
 
@@ -76,6 +82,9 @@ impl Interpreter {
       ctx,
       arena,
       tool_modules: vec![],
+      agent_name: None,
+      agent_mailbox_rx: None,
+      agent_handle_fn: None,
     }
   }
 
@@ -88,6 +97,7 @@ impl Interpreter {
     self.eval(eid).await.map_err(|e| match e {
       EvalSignal::Error(e) => e,
       EvalSignal::Break(_) => LxError::runtime("break outside loop", span),
+      EvalSignal::AgentStop => LxError::runtime("agent stopped", span),
     })
   }
 
@@ -115,6 +125,7 @@ impl Interpreter {
       result = self.eval_stmt(*sid).await.map_err(|e| match e {
         EvalSignal::Error(e) => e,
         EvalSignal::Break(_) => LxError::runtime("break outside loop", self.arena.stmt_span(*sid)),
+        EvalSignal::AgentStop => LxError::runtime("agent stopped", self.arena.stmt_span(*sid)),
       })?;
     }
     for tm in &self.tool_modules {
@@ -126,6 +137,16 @@ impl Interpreter {
   #[async_recursion(?Send)]
   pub(crate) async fn eval(&mut self, eid: ExprId) -> EvalResult<LxVal> {
     let span = self.arena.expr_span(eid);
+    if let (Some(rx_arc), Some(handle_fn)) = (&self.agent_mailbox_rx, &self.agent_handle_fn) {
+      let mut rx = rx_arc.lock().await;
+      while let Ok(msg) = rx.try_recv() {
+        let result = crate::builtins::call_value(handle_fn, msg.payload.clone(), span, &self.ctx).await.unwrap_or_else(|e| LxVal::err_str(e.to_string()));
+        if let Some(reply) = msg.reply {
+          let _ = reply.send(result);
+        }
+      }
+      drop(rx);
+    }
     let expr = self.arena.expr(eid).clone();
     match expr {
       Expr::Literal(ref lit) => self.eval_literal(lit, span).await,
@@ -198,6 +219,19 @@ impl Interpreter {
       Expr::Par(ExprPar { ref stmts }) => self.eval_par(stmts).await,
       Expr::Sel(ref arms) => self.eval_sel(arms, span).await,
       Expr::Timeout(ExprTimeout { ms, body }) => self.eval_timeout(ms, body, span).await,
+      Expr::Spawn(class_expr) => {
+        let class_val = self.eval(class_expr).await?;
+        let result = crate::builtins::agent::bi_agent_spawn(vec![class_val], span, Arc::clone(&self.ctx)).await;
+        result.map_err(EvalSignal::Error)
+      },
+      Expr::Stop => {
+        let name = self.agent_name.as_ref().ok_or_else(|| LxError::runtime("stop: not inside an agent", span))?;
+        crate::runtime::agent_registry::remove_agent(name);
+        let mut fields = IndexMap::new();
+        fields.insert(intern("agent"), LxVal::str(name));
+        self.ctx.event_stream.xadd("agent/kill", name, None, fields);
+        Err(EvalSignal::AgentStop)
+      },
       Expr::Emit(ExprEmit { value }) => {
         let v = self.eval(value).await?;
         self.ctx.emit.emit(&v, span)?;

@@ -12,6 +12,7 @@ pub type EvalResult<T> = Result<T, EvalSignal>;
 pub enum EvalSignal {
   Error(LxError),
   Break(LxVal),
+  AgentStop,
 }
 
 impl From<LxError> for EvalSignal {

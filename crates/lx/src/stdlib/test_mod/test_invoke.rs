@@ -49,6 +49,7 @@ pub(super) fn invoke_flow(flow_path: &str, input: &LxVal, ctx: &Arc<RuntimeCtx>,
       interp.apply_func(entry, input.clone(), span).await.map_err(|e| match e {
         EvalSignal::Error(e) => e,
         EvalSignal::Break(_) => LxError::runtime("break outside loop", span),
+        EvalSignal::AgentStop => LxError::runtime("agent stopped", span),
       })
     })
   })

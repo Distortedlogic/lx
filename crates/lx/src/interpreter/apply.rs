@@ -233,6 +233,9 @@ impl Interpreter {
             ctx: Arc::clone(&self.ctx),
             arena: Arc::clone(&self.arena),
             tool_modules: vec![],
+            agent_name: None,
+            agent_mailbox_rx: None,
+            agent_handle_fn: None,
           };
           Some(tmp.eval(d_eid).await?)
         },

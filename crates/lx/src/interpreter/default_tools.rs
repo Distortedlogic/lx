@@ -26,6 +26,7 @@ impl Interpreter {
         self.eval_stmt(*sid).await.map_err(|e| match e {
           EvalSignal::Error(e) => e,
           EvalSignal::Break(_) => LxError::runtime("break outside loop", span),
+          EvalSignal::AgentStop => LxError::runtime("agent stopped", span),
         })?;
       }
     }

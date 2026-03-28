@@ -17,24 +17,16 @@ assert (no_match == None) "find no match returns None"
 -- cron.every exists
 assert (type_of cron.every == "Func") "cron.every exists"
 
--- agent default tools/max_turns
-Agent NoToolAgent = {
-  role = () { "tester" }
-  goal = () { "test" }
-}
-nta = NoToolAgent {}
-assert (nta.tools () == []) "agent default tools is empty list"
-assert (nta.max_turns () == 25) "agent default max_turns is 25"
+-- agent default subscribes
+Agent NoSubAgent = {}
+nsa = NoSubAgent {}
+assert (nsa.subscribes () == []) "agent default subscribes is empty list"
 
--- agent custom tools/max_turns
-Agent ToolAgent = {
-  role = () { "tool user" }
-  goal = () { "test" }
-  tools = () { ["Bash"; "Read"] }
-  max_turns = () { 10 }
+-- agent custom subscribes
+Agent SubAgent = {
+  subscribes = () { ["events"; "logs"] }
 }
-ta = ToolAgent {}
-assert (ta.tools () == ["Bash"; "Read"]) "agent custom tools"
-assert (ta.max_turns () == 10) "agent custom max_turns"
+sa = SubAgent {}
+assert (sa.subscribes () == ["events"; "logs"]) "agent custom subscribes"
 
 emit "gotchas_runtime: all checks passed"

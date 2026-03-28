@@ -106,7 +106,19 @@ impl Interpreter {
       let source_dir = self.source_dir.clone();
       let arena = Arc::clone(&self.arena);
       futures.push(async move {
-        let mut interp = Interpreter { env, source, source_dir, module_cache, loading, ctx, arena, tool_modules: vec![] };
+        let mut interp = Interpreter {
+          env,
+          source,
+          source_dir,
+          module_cache,
+          loading,
+          ctx,
+          arena,
+          tool_modules: vec![],
+          agent_name: None,
+          agent_mailbox_rx: None,
+          agent_handle_fn: None,
+        };
         interp.eval_stmt(sid).await
       });
     }
@@ -132,7 +144,19 @@ impl Interpreter {
       let arm_expr = arm.expr;
       let arm_handler = arm.handler;
       futures.push(Box::pin(async move {
-        let mut interp = Interpreter { env, source, source_dir, module_cache, loading, ctx, arena, tool_modules: vec![] };
+        let mut interp = Interpreter {
+          env,
+          source,
+          source_dir,
+          module_cache,
+          loading,
+          ctx,
+          arena,
+          tool_modules: vec![],
+          agent_name: None,
+          agent_mailbox_rx: None,
+          agent_handle_fn: None,
+        };
         let v = interp.eval(arm_expr).await?;
         let saved = Arc::clone(&interp.env);
         let child = interp.env.child();
@@ -203,7 +227,19 @@ impl Interpreter {
     let source_dir = self.source_dir.clone();
     let arena = Arc::clone(&self.arena);
     let body_fut = async move {
-      let mut interp = Interpreter { env, source, source_dir, module_cache, loading, ctx, arena, tool_modules: vec![] };
+      let mut interp = Interpreter {
+        env,
+        source,
+        source_dir,
+        module_cache,
+        loading,
+        ctx,
+        arena,
+        tool_modules: vec![],
+        agent_name: None,
+        agent_mailbox_rx: None,
+        agent_handle_fn: None,
+      };
       interp.eval(body_eid).await
     };
     tokio::select! {

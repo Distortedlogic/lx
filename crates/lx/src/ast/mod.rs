@@ -104,6 +104,8 @@ pub enum Expr {
   Par(ExprPar),
   Sel(Vec<SelArm>),
   Timeout(ExprTimeout),
+  Spawn(ExprId),
+  Stop,
 
   Emit(ExprEmit),
   Yield(ExprYield),

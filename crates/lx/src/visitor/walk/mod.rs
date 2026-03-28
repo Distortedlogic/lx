@@ -218,6 +218,8 @@ pub fn walk_expr<V: AstVisitor + ?Sized>(v: &mut V, id: ExprId, arena: &AstArena
     Expr::Emit(emit) => walk_emit_dispatch(v, id, emit, span, arena)?,
     Expr::Yield(yld) => walk_yield_dispatch(v, id, yld, span, arena)?,
     Expr::With(with) => walk_with_dispatch(v, id, with, span, arena)?,
+    Expr::Spawn(inner) => dispatch_expr(v, *inner, arena)?,
+    Expr::Stop => {},
     Expr::Grouped(inner) => dispatch_expr(v, *inner, arena)?,
   }
   ControlFlow::Continue(())

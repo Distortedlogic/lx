@@ -123,6 +123,11 @@ impl Checker<'_> {
         self.synth_sel_type(&arms, span)
       },
       Expr::Timeout(timeout) => self.synth_timeout_type(timeout.ms, timeout.body),
+      Expr::Spawn(inner) => {
+        self.synth_expr(*inner);
+        self.type_arena.unknown()
+      },
+      Expr::Stop => self.type_arena.unit(),
       Expr::Emit(emit) => {
         self.synth_expr(emit.value);
         self.type_arena.unit()

@@ -45,6 +45,11 @@ impl Checker<'_> {
       Expr::Block(ExprBlock { stmts }) => self.check_block(stmts, expected),
       Expr::Grouped(inner) => self.check_expr(*inner, expected),
       Expr::Pipe(_) | Expr::Tell(_) | Expr::Ask(_) | Expr::Section(_) | Expr::Ternary(_) | Expr::Coalesce(_) => unreachable!(),
+      Expr::Spawn(inner) => {
+        self.check_expr(*inner, expected);
+        self.synth_expr(eid)
+      },
+      Expr::Stop => self.type_arena.unit(),
       Expr::Literal(_)
       | Expr::Ident(_)
       | Expr::TypeConstructor(_)

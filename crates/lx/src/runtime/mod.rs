@@ -1,7 +1,9 @@
+pub mod agent_registry;
 mod defaults;
 mod noop;
 mod restricted;
 
+pub use agent_registry::*;
 pub use defaults::*;
 pub use noop::*;
 pub use restricted::*;

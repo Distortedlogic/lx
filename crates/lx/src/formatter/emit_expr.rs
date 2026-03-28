@@ -80,6 +80,13 @@ impl Formatter<'_> {
         self.write(" ~>? ");
         self.emit_expr(a.msg);
       },
+      Expr::Spawn(inner) => {
+        self.write("spawn ");
+        self.emit_expr(*inner);
+      },
+      Expr::Stop => {
+        self.write("stop");
+      },
       Expr::Grouped(inner) => {
         self.write("(");
         self.emit_expr(*inner);

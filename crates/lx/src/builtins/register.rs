@@ -163,10 +163,34 @@ pub fn register(env: &Env) {
   env.bind_str("json", LxVal::record(json_fields));
 
   let mut agent_fields = IndexMap::new();
-  agent_fields.insert(crate::sym::intern("spawn"), mk("agent.spawn", 1, super::agent::bi_agent_spawn));
-  agent_fields.insert(crate::sym::intern("kill"), mk("agent.kill", 1, super::agent::bi_agent_kill));
-  agent_fields.insert(crate::sym::intern("ask"), mk("agent.ask", 2, super::agent::bi_agent_ask));
-  agent_fields.insert(crate::sym::intern("tell"), mk("agent.tell", 2, super::agent::bi_agent_tell));
+  agent_fields.insert(
+    crate::sym::intern("spawn"),
+    super::mk_async("agent.spawn", 1, |args, span, ctx| Box::pin(crate::builtins::agent::bi_agent_spawn(args, span, ctx))),
+  );
+  agent_fields.insert(
+    crate::sym::intern("kill"),
+    mk("agent.kill", 1, |args, span, _ctx| {
+      let name = args[0].require_str("agent.kill", span)?;
+      match crate::runtime::agent_registry::remove_agent(name) {
+        Some(_) => Ok(LxVal::ok_unit()),
+        None => Ok(LxVal::err_str(format!("agent '{name}' not running"))),
+      }
+    }),
+  );
+  agent_fields.insert(
+    crate::sym::intern("exists"),
+    mk("agent.exists", 1, |args, span, _ctx| {
+      let name = args[0].require_str("agent.exists", span)?;
+      Ok(LxVal::Bool(crate::runtime::agent_registry::agent_exists(name)))
+    }),
+  );
+  agent_fields.insert(
+    crate::sym::intern("list"),
+    mk("agent.list", 0, |_args, _span, _ctx| {
+      let names = crate::runtime::agent_registry::agent_names();
+      Ok(LxVal::list(names.into_iter().map(LxVal::str).collect()))
+    }),
+  );
   agent_fields.insert(crate::sym::intern("implements"), mk("agent.implements", 2, bi_agent_implements));
   env.bind_str("agent", LxVal::record(agent_fields));
 

@@ -22,13 +22,10 @@ exported_each [1; 2]
 assert (acc == [11; 12]) "BUG-FIXED: each closure capture in + function"
 
 -- Agent Trait defaults not injected into Class : [Agent]
-Class BareAgent : [Agent] = {
-  role = () { "test" }
-  goal = () { "test" }
-}
+Class BareAgent : [Agent] = {}
 ba = BareAgent {}
-assert (methods_of ba | any? (== "think") == true) "BUG-FIXED: Agent think injected"
 assert (methods_of ba | any? (== "handle") == true) "BUG-FIXED: Agent handle injected"
-assert (methods_of ba | any? (== "think_with") == true) "BUG-FIXED: Agent think_with injected"
+assert (methods_of ba | any? (== "run") == true) "BUG-FIXED: Agent run injected"
+assert (methods_of ba | any? (== "subscribes") == true) "BUG-FIXED: Agent subscribes injected"
 
 emit "bugs_active: all checks passed"

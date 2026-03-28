@@ -30,6 +30,8 @@ where
       TokenKind::Yield => intern("yield"),
       TokenKind::With => intern("with"),
       TokenKind::Timeout => intern("timeout"),
+      TokenKind::Spawn => intern("spawn"),
+      TokenKind::Stop => intern("stop"),
       TokenKind::As => intern("as"),
   }
 }
@@ -111,6 +113,8 @@ where
     let a9 = arena.clone();
     let a10 = arena.clone();
     let a11 = arena.clone();
+    let a12 = arena.clone();
+    let a13 = arena.clone();
 
     let literal = select! {
         TokenKind::Int(n) => Literal::Int(n),
@@ -207,6 +211,18 @@ where
 
     let with_expr = super::expr_pratt::with_parser(expr.clone(), arena.clone());
 
+    let spawn_expr = {
+      let al = a12.clone();
+      just(TokenKind::Spawn)
+        .ignore_then(type_name().map_with(move |n, e| al.borrow_mut().alloc_expr(Expr::TypeConstructor(n), ss(e.span()))))
+        .map_with(move |class_eid, e| a13.borrow_mut().alloc_expr(Expr::Spawn(class_eid), ss(e.span())))
+    };
+
+    let stop_expr = {
+      let al = a12;
+      just(TokenKind::Stop).map_with(move |_, e| al.borrow_mut().alloc_expr(Expr::Stop, ss(e.span())))
+    };
+
     let atom = choice((
       literal,
       string_lit,
@@ -222,6 +238,8 @@ where
       with_expr,
       break_expr,
       assert_expr,
+      spawn_expr,
+      stop_expr,
       type_ctor,
       ident_expr,
     ))

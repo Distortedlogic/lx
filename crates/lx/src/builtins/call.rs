@@ -52,6 +52,7 @@ pub(crate) async fn call_value(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Ar
       interp.apply_func(LxVal::MultiFunc(clauses.clone()), arg, span).await.map_err(|e| match e {
         EvalSignal::Error(e) => e,
         EvalSignal::Break(_) => LxError::runtime("break outside loop", span),
+        EvalSignal::AgentStop => LxError::runtime("agent stopped", span),
       })
     },
     LxVal::TaggedCtor { tag, arity, applied } => {

@@ -83,6 +83,8 @@ pub enum TokenKind {
   Yield,
   With,
   Timeout,
+  Spawn,
+  Stop,
   As,
 
   AgentKw,
