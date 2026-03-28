@@ -177,6 +177,7 @@ fn run_file(path: &str, _json: bool) -> ExitCode {
   ctx_val.dep_dirs = dep_dirs;
   apply_manifest_backends(&mut ctx_val, path);
   let ctx = Arc::new(ctx_val);
+  ctx.tokio_runtime.block_on(setup_external_stream(&ctx, path));
   match run::run(&source, path, &ctx) {
     Ok(()) => ExitCode::SUCCESS,
     Err(errors) => {
@@ -204,13 +205,35 @@ fn apply_manifest_backends(_ctx: &mut RuntimeCtx, file_path: &str) {
   let Ok(m) = manifest::load_manifest(&root) else {
     return;
   };
-  let Some(backends) = m.backends else {
-    return;
-  };
-  if let Some(ref backend) = backends.yield_backend {
+  if let Some(ref backends) = m.backends
+    && let Some(ref backend) = backends.yield_backend
+  {
     match backend {
       manifest::YieldBackend::StdinStdout => {},
     }
+  }
+}
+
+async fn setup_external_stream(ctx: &Arc<RuntimeCtx>, file_path: &str) {
+  let file_dir = Path::new(file_path).parent().unwrap_or(Path::new("."));
+  let Some(root) = manifest::find_manifest_root(file_dir) else {
+    return;
+  };
+  let Ok(m) = manifest::load_manifest(&root) else {
+    return;
+  };
+  let Some(stream_config) = m.stream else {
+    return;
+  };
+  let command = stream_config.command;
+  match lx::mcp_client::McpClient::spawn(&command).await {
+    Ok(client) => {
+      let client_arc = Arc::new(tokio::sync::Mutex::new(client));
+      ctx.event_stream.set_external_client(client_arc);
+    },
+    Err(e) => {
+      eprintln!("[stream:external] failed to connect to '{command}': {e}");
+    },
   }
 }
 

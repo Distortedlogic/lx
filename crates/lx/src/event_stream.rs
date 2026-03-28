@@ -1,9 +1,11 @@
 use std::io::Write;
+use std::sync::Arc;
 
 use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
 use serde::ser::SerializeMap;
 
+use crate::mcp_client::McpClient;
 use crate::sym::{Sym, intern};
 use crate::value::LxVal;
 
@@ -12,6 +14,7 @@ pub struct EventStream {
   last_ms: Mutex<(u64, u64)>,
   notify: tokio::sync::Notify,
   jsonl_writer: Mutex<Option<std::io::BufWriter<std::fs::File>>>,
+  external_client: Mutex<Option<Arc<tokio::sync::Mutex<McpClient>>>>,
 }
 
 #[derive(Debug, Clone)]
@@ -55,7 +58,13 @@ impl EventStream {
       let file = std::fs::OpenOptions::new().create(true).append(true).open(p).ok()?;
       Some(std::io::BufWriter::new(file))
     });
-    Self { entries: RwLock::new(Vec::new()), last_ms: Mutex::new((0, 0)), notify: tokio::sync::Notify::new(), jsonl_writer: Mutex::new(writer) }
+    Self {
+      entries: RwLock::new(Vec::new()),
+      last_ms: Mutex::new((0, 0)),
+      notify: tokio::sync::Notify::new(),
+      jsonl_writer: Mutex::new(writer),
+      external_client: Mutex::new(None),
+    }
   }
 
   pub fn has_jsonl(&self) -> bool {
@@ -69,6 +78,10 @@ impl EventStream {
     if let Ok(file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
       *self.jsonl_writer.lock() = Some(std::io::BufWriter::new(file));
     }
+  }
+
+  pub fn set_external_client(&self, client: Arc<tokio::sync::Mutex<McpClient>>) {
+    *self.external_client.lock() = Some(client);
   }
 
   pub fn xadd(&self, kind: &str, agent: &str, span: Option<SpanInfo>, fields: IndexMap<Sym, LxVal>) -> String {
@@ -101,6 +114,16 @@ impl EventStream {
       }
     }
     self.notify.notify_waiters();
+
+    if let Some(client) = self.external_client.lock().clone() {
+      let entry_json = serde_json::to_value(&entry).unwrap_or(serde_json::Value::Null);
+      tokio::task::spawn(async move {
+        if let Err(e) = client.lock().await.tools_call("xadd", entry_json).await {
+          eprintln!("[stream:external] xadd failed: {e}");
+        }
+      });
+    }
+
     id
   }
 
@@ -154,6 +177,13 @@ impl EventStream {
           notified.await;
         },
       }
+    }
+  }
+
+  pub async fn shutdown_external(&self) {
+    let client = self.external_client.lock().take();
+    if let Some(client) = client {
+      client.lock().await.shutdown().await;
     }
   }
 

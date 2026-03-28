@@ -145,6 +145,7 @@ impl Interpreter {
     for tm in &self.tool_modules {
       tm.shutdown().await;
     }
+    self.ctx.event_stream.shutdown_external().await;
     Ok(result)
   }
 

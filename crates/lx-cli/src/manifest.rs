@@ -11,6 +11,7 @@ pub struct RootManifest {
   pub package: Option<PackageSection>,
   pub test: Option<TestSection>,
   pub backends: Option<BackendsSection>,
+  pub stream: Option<StreamSection>,
   pub dependencies: Option<HashMap<String, DepSpec>>,
   #[serde(rename = "deps")]
   pub deps_table: Option<DepsTable>,
@@ -67,6 +68,11 @@ pub enum YieldBackend {
 pub struct BackendsSection {
   #[serde(rename = "yield")]
   pub yield_backend: Option<YieldBackend>,
+}
+
+#[derive(Deserialize)]
+pub struct StreamSection {
+  pub command: String,
 }
 
 #[derive(Deserialize)]
