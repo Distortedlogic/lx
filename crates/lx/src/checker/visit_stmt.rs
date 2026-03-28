@@ -77,6 +77,10 @@ impl Checker<'_> {
         self.type_arena.unit()
       },
       Stmt::KeywordDecl(_) => self.type_arena.unit(),
+      Stmt::ChannelDecl(name) => {
+        self.sem.add_definition(name, DefKind::Binding, span, false);
+        self.type_arena.unit()
+      },
       Stmt::FieldUpdate(fu) => {
         self.synth_expr(fu.value);
         self.type_arena.unit()

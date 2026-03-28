@@ -243,6 +243,7 @@ impl Interpreter {
       },
       Expr::Stop => {
         let name = self.agent_name.as_ref().ok_or_else(|| LxError::runtime("stop: not inside an agent", span))?;
+        crate::runtime::channel_registry::channel_unsubscribe_all(name);
         crate::runtime::agent_registry::remove_agent(name);
         let mut fields = IndexMap::new();
         fields.insert(intern("agent"), LxVal::str(name));

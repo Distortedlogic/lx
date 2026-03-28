@@ -44,6 +44,7 @@ pub enum Stmt {
   FieldUpdate(StmtFieldUpdate),
   #[walk(skip)]
   Use(UseStmt),
+  ChannelDecl(Sym),
   Expr(ExprId),
 }
 

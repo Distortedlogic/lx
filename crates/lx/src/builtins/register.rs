@@ -183,6 +183,7 @@ pub fn register(env: &Env) {
     crate::sym::intern("kill"),
     mk("agent.kill", 1, |args, span, _ctx| {
       let name = args[0].require_str("agent.kill", span)?;
+      crate::runtime::channel_registry::channel_unsubscribe_all(name);
       match crate::runtime::agent_registry::remove_agent(name) {
         Some(_) => Ok(LxVal::ok_unit()),
         None => Ok(LxVal::err_str(format!("agent '{name}' not running"))),

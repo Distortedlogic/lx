@@ -168,7 +168,8 @@ impl Checker<'_> {
       | Stmt::ClassDecl(_)
       | Stmt::KeywordDecl(_)
       | Stmt::FieldUpdate(_)
-      | Stmt::Use(_) => {
+      | Stmt::Use(_)
+      | Stmt::ChannelDecl(_) => {
         self.check_stmt(last, arena);
         self.type_arena.unit()
       },

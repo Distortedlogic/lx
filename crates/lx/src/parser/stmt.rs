@@ -40,10 +40,10 @@ where
   let a4 = arena.clone();
   let a5 = arena.clone();
   let a6 = arena.clone();
+  let a_chan = arena.clone();
 
   let use_stmt = use_parser(arena.clone());
   let exported = just(TokenKind::Export).or_not().map(|e| e.is_some());
-
   let keyword_stmt = super::stmt_keyword::keyword_parser(expr.clone());
   let trait_stmt = trait_parser(expr.clone(), arena.clone());
   let class_stmt = super::stmt_class::class_parser(expr.clone());
@@ -51,6 +51,9 @@ where
   let binding = binding_parser(expr.clone(), arena.clone());
   let field_update = field_update_parser(expr.clone(), arena);
 
+  let channel_decl = just(TokenKind::ChannelKw)
+    .ignore_then(select! { TokenKind::Ident(name) => name })
+    .map_with(move |name, e| a_chan.borrow_mut().alloc_stmt(Stmt::ChannelDecl(name), ss(e.span())));
   let expr_stmt = expr.map_with(move |eid, ctx| a1.borrow_mut().alloc_stmt(Stmt::Expr(eid), ss(ctx.span())));
 
   choice((
@@ -79,6 +82,7 @@ where
       a5.borrow_mut().alloc_stmt(Stmt::Binding(b), ss(e.span()))
     }),
     field_update,
+    channel_decl,
     expr_stmt,
   ))
 }

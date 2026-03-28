@@ -98,6 +98,7 @@ pub enum TokenKind {
   McpKw,
   CliKw,
   HttpKw,
+  ChannelKw,
 
   Export,
   Semi,

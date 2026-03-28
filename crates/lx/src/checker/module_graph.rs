@@ -48,6 +48,7 @@ pub fn extract_signature(program: &Program<Core>, semantic: &SemanticModel) -> M
       | Stmt::TraitUnion(_)
       | Stmt::FieldUpdate(_)
       | Stmt::Use(_)
+      | Stmt::ChannelDecl(_)
       | Stmt::Expr(_) => {},
     }
   }

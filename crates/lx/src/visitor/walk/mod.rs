@@ -137,6 +137,7 @@ pub fn walk_stmt<V: AstVisitor + ?Sized>(v: &mut V, id: StmtId, arena: &AstArena
     Stmt::Expr(eid) => {
       dispatch_expr(v, *eid, arena)?;
     },
+    Stmt::ChannelDecl(_) => {},
   }
   ControlFlow::Continue(())
 }

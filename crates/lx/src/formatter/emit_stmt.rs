@@ -17,6 +17,10 @@ impl Formatter<'_> {
       Stmt::KeywordDecl(data) => self.emit_keyword_decl(data),
       Stmt::FieldUpdate(fu) => self.emit_field_update(fu),
       Stmt::Use(u) => self.emit_use(u),
+      Stmt::ChannelDecl(name) => {
+        self.write("channel ");
+        self.write(name.as_str());
+      },
       Stmt::Expr(eid) => self.emit_expr(*eid),
     }
   }
@@ -284,15 +288,16 @@ impl Formatter<'_> {
   }
 
   pub(super) fn emit_type_params(&mut self, params: &[crate::sym::Sym]) {
-    if !params.is_empty() {
-      self.write("[");
-      for (i, p) in params.iter().enumerate() {
-        if i > 0 {
-          self.write("; ");
-        }
-        self.write(p.as_str());
-      }
-      self.write("]");
+    if params.is_empty() {
+      return;
     }
+    self.write("[");
+    for (i, p) in params.iter().enumerate() {
+      if i > 0 {
+        self.write("; ");
+      }
+      self.write(p.as_str());
+    }
+    self.write("]");
   }
 }

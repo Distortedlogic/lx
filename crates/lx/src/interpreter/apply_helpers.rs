@@ -35,6 +35,7 @@ impl Interpreter {
         LxVal::Store { .. } => {
           Ok(crate::stdlib::store_method(name.as_str(), &val).ok_or_else(|| LxError::type_err(format!("Store has no method '{name}'"), span, None))?)
         },
+        LxVal::Channel { name: channel_name } => Ok(crate::runtime::channel_registry::channel_dispatch(channel_name.as_str(), name.as_str(), span)?),
         LxVal::ToolModule(tm) => {
           let method_name = name.as_str().to_string();
           let tm = Arc::clone(tm);

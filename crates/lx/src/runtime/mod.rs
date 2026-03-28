@@ -1,4 +1,5 @@
 pub mod agent_registry;
+pub mod channel_registry;
 mod defaults;
 
 pub use defaults::*;

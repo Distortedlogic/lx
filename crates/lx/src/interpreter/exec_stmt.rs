@@ -114,6 +114,15 @@ impl Interpreter {
         Ok(LxVal::Unit)
       },
       Stmt::KeywordDecl(_) => unreachable!("keyword not desugared"),
+      Stmt::ChannelDecl(name) => {
+        let channel_name = name.as_str().to_string();
+        crate::runtime::channel_registry::create_channel(&channel_name);
+        let channel_val = LxVal::Channel { name: *name };
+        let env = self.env.child();
+        env.bind(*name, channel_val);
+        self.env = Arc::new(env);
+        Ok(LxVal::Unit)
+      },
       Stmt::ClassDecl(data) => {
         let mut defaults_map = IndexMap::new();
         for f in &data.fields {

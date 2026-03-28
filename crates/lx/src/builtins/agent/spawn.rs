@@ -72,6 +72,18 @@ pub fn bi_agent_spawn(args: Vec<LxVal>, span: SourceSpan, ctx: Arc<RuntimeCtx>) 
 
     register_agent(name.clone(), handle).map_err(|msg| LxError::runtime(msg, span))?;
 
+    if let Some(subscribes_val) = class.defaults.get(&intern("subscribes"))
+      && let LxVal::List(channels) = subscribes_val
+    {
+      for ch in channels.iter() {
+        if let LxVal::Channel { name: ch_name } = ch {
+          crate::runtime::channel_registry::channel_subscribe(ch_name.as_str(), &name).unwrap_or_else(|e| eprintln!("auto-subscribe failed: {e}"));
+        } else if let Some(ch_name) = ch.as_str() {
+          crate::runtime::channel_registry::channel_subscribe(ch_name, &name).unwrap_or_else(|e| eprintln!("auto-subscribe failed: {e}"));
+        }
+      }
+    }
+
     let mut fields = indexmap::IndexMap::new();
     fields.insert(intern("agent"), LxVal::str(&name));
     ctx.event_stream.xadd("agent/spawn", &name, None, fields);

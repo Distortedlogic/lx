@@ -28,6 +28,7 @@ pub(super) fn ident_or_keyword(text: &str) -> TokenKind {
     "with" => TokenKind::With,
     "timeout" => TokenKind::Timeout,
     "as" => TokenKind::As,
+    "channel" => TokenKind::ChannelKw,
     "spawn" => TokenKind::Spawn,
     "stop" => TokenKind::Stop,
     _ => TokenKind::Ident(crate::sym::intern(text)),

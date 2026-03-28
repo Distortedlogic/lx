@@ -113,6 +113,9 @@ pub enum LxVal {
   Stream {
     id: u64,
   },
+  Channel {
+    name: Sym,
+  },
   #[strum(serialize = "ToolModule")]
   ToolModule(Arc<crate::tool_module::ToolModule>),
 }
