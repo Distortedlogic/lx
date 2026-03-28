@@ -22,6 +22,13 @@ impl Interpreter {
     let str_joined = str_path.join("/");
     if let UseKind::Tool { command, alias } = &use_stmt.kind {
       let cmd_str = command.as_str();
+      if cmd_str.ends_with(".lx") {
+        let val = self.build_lx_tool_module(cmd_str, span).await?;
+        let env = self.env.child();
+        env.bind(*alias, val);
+        self.env = Arc::new(env);
+        return Ok(());
+      }
       let alias_str = alias.as_str();
       let tm = crate::tool_module::ToolModule::new(cmd_str, alias_str).await.map_err(|e| LxError::runtime(e, span))?;
       let tm_arc = Arc::new(tm);
@@ -166,7 +173,7 @@ impl Interpreter {
     Ok(exports)
   }
 
-  async fn load_module(&mut self, file_path: &PathBuf, span: SourceSpan) -> Result<ModuleExports, LxError> {
+  pub(crate) async fn load_module(&mut self, file_path: &PathBuf, span: SourceSpan) -> Result<ModuleExports, LxError> {
     let canonical = fs::canonicalize(file_path).map_err(|e| LxError::runtime(format!("cannot resolve module '{}': {e}", file_path.display()), span))?;
     {
       let cache = self.module_cache.lock();
