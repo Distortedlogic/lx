@@ -176,9 +176,6 @@ fn run_file(path: &str, _json: bool) -> ExitCode {
   let mut ctx_val = if std::io::stdin().is_terminal() { RuntimeCtx { ..RuntimeCtx::default() } } else { RuntimeCtx::default() };
   ctx_val.workspace_members = ws_members;
   ctx_val.dep_dirs = dep_dirs;
-  let jsonl_dir = Path::new(path).parent().unwrap_or(Path::new(".")).join(".lx");
-  let jsonl_path = jsonl_dir.join("stream.jsonl");
-  ctx_val.event_stream = Arc::new(lx::event_stream::EventStream::new(Some(jsonl_path)));
   apply_manifest_backends(&mut ctx_val, path);
   let ctx = Arc::new(ctx_val);
   match run::run(&source, path, &ctx) {

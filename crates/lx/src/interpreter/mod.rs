@@ -57,6 +57,14 @@ impl Interpreter {
     let env = Env::default();
     crate::builtins::register(&env);
     *ctx.source_dir.lock() = source_dir.clone();
+
+    if !ctx.event_stream.has_jsonl()
+      && let Some(ref dir) = source_dir
+    {
+      let jsonl_path = dir.join(".lx").join("stream.jsonl");
+      ctx.event_stream.enable_jsonl(jsonl_path);
+    }
+
     Self {
       env: Arc::new(env),
       source: source.to_string(),

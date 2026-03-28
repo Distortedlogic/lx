@@ -11,7 +11,7 @@ pub struct EventStream {
   entries: RwLock<Vec<StreamEntry>>,
   last_ms: Mutex<(u64, u64)>,
   notify: tokio::sync::Notify,
-  jsonl_path: Option<Mutex<std::io::BufWriter<std::fs::File>>>,
+  jsonl_writer: Mutex<Option<std::io::BufWriter<std::fs::File>>>,
 }
 
 #[derive(Debug, Clone)]
@@ -53,9 +53,22 @@ impl EventStream {
         let _ = std::fs::create_dir_all(parent);
       }
       let file = std::fs::OpenOptions::new().create(true).append(true).open(p).ok()?;
-      Some(Mutex::new(std::io::BufWriter::new(file)))
+      Some(std::io::BufWriter::new(file))
     });
-    Self { entries: RwLock::new(Vec::new()), last_ms: Mutex::new((0, 0)), notify: tokio::sync::Notify::new(), jsonl_path: writer }
+    Self { entries: RwLock::new(Vec::new()), last_ms: Mutex::new((0, 0)), notify: tokio::sync::Notify::new(), jsonl_writer: Mutex::new(writer) }
+  }
+
+  pub fn has_jsonl(&self) -> bool {
+    self.jsonl_writer.lock().is_some()
+  }
+
+  pub fn enable_jsonl(&self, path: std::path::PathBuf) {
+    if let Some(parent) = path.parent() {
+      let _ = std::fs::create_dir_all(parent);
+    }
+    if let Ok(file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+      *self.jsonl_writer.lock() = Some(std::io::BufWriter::new(file));
+    }
   }
 
   pub fn xadd(&self, kind: &str, agent: &str, span: Option<SpanInfo>, fields: IndexMap<Sym, LxVal>) -> String {
@@ -71,10 +84,10 @@ impl EventStream {
     let id = format!("{ms}-{seq}");
     let entry = StreamEntry { id: id.clone(), kind: kind.to_string(), agent: agent.to_string(), ts: ms, span, fields };
     self.entries.write().push(entry.clone());
-    if let Some(ref writer) = self.jsonl_path {
+    let mut guard = self.jsonl_writer.lock();
+    if let Some(ref mut w) = *guard {
       match serde_json::to_string(&entry) {
         Ok(json) => {
-          let mut w = writer.lock();
           if let Err(e) = writeln!(w, "{json}") {
             eprintln!("event_stream: JSONL write failed: {e}");
           }
