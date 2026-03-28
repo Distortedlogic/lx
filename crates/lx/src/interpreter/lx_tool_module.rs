@@ -15,6 +15,7 @@ impl super::Interpreter {
     let exports = self.load_module(&file_path, span).await?;
 
     let module_name: Arc<str> = Arc::from(command);
+    let agent_name: Arc<str> = Arc::from(self.agent_name.as_deref().unwrap_or("main"));
     let call_counter = Arc::new(AtomicU64::new(1));
     let mut fields = IndexMap::new();
 
@@ -27,6 +28,7 @@ impl super::Interpreter {
       let func_val = val.clone();
       let method_name: Arc<str> = Arc::from(name.as_str());
       let module = Arc::clone(&module_name);
+      let agent = Arc::clone(&agent_name);
       let counter = Arc::clone(&call_counter);
       let event_stream = Arc::clone(&self.ctx.event_stream);
       let ctx_ref = Arc::clone(&self.ctx);
@@ -38,6 +40,7 @@ impl super::Interpreter {
           let func_val = func_val.clone();
           let method_name = Arc::clone(&method_name);
           let module = Arc::clone(&module);
+          let agent = Arc::clone(&agent);
           let counter = Arc::clone(&counter);
           let event_stream = Arc::clone(&event_stream);
           let ctx_ref = Arc::clone(&ctx_ref);
@@ -50,7 +53,7 @@ impl super::Interpreter {
             call_fields.insert(intern("tool"), LxVal::str(module.as_ref()));
             call_fields.insert(intern("method"), LxVal::str(method_name.as_ref()));
             call_fields.insert(intern("args"), arg.clone());
-            event_stream.xadd("tool/call", "main", None, call_fields);
+            event_stream.xadd("tool/call", &agent, None, call_fields);
 
             let result = crate::builtins::call_value(&func_val, arg, call_span, &ctx_ref).await;
 
@@ -61,7 +64,7 @@ impl super::Interpreter {
                 result_fields.insert(intern("tool"), LxVal::str(module.as_ref()));
                 result_fields.insert(intern("method"), LxVal::str(method_name.as_ref()));
                 result_fields.insert(intern("result"), val.clone());
-                event_stream.xadd("tool/result", "main", None, result_fields);
+                event_stream.xadd("tool/result", &agent, None, result_fields);
                 Ok(val)
               },
               Err(e) => {
@@ -71,7 +74,7 @@ impl super::Interpreter {
                 error_fields.insert(intern("tool"), LxVal::str(module.as_ref()));
                 error_fields.insert(intern("method"), LxVal::str(method_name.as_ref()));
                 error_fields.insert(intern("error"), LxVal::str(&err_msg));
-                event_stream.xadd("tool/error", "main", None, error_fields);
+                event_stream.xadd("tool/error", &agent, None, error_fields);
                 Err(LxError::runtime(format!("lx tool '{module}' method '{method_name}': {err_msg}"), call_span))
               },
             }

@@ -24,6 +24,7 @@ pub fn run(source: &str, filename: &str, ctx: &Arc<RuntimeCtx>, control_spec: Op
         global_pause: std::sync::Arc::clone(&ctx.global_pause),
         cancel_flag: std::sync::Arc::clone(&ctx.cancel_flag),
         inject_tx: ctx.inject_tx.clone(),
+        event_stream: std::sync::Arc::clone(&ctx.event_stream),
       });
       let state_clone = std::sync::Arc::clone(&state);
       let spec_owned = spec.to_string();

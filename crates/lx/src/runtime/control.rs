@@ -4,6 +4,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use serde::{Deserialize, Serialize};
 
 use crate::error::LxError;
+use crate::event_stream::EventStream;
 use crate::value::LxVal;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -61,6 +62,7 @@ pub struct ControlChannelState {
   pub global_pause: Arc<AtomicBool>,
   pub cancel_flag: Arc<AtomicBool>,
   pub inject_tx: Option<tokio::sync::mpsc::Sender<LxVal>>,
+  pub event_stream: Arc<EventStream>,
 }
 
 pub fn handle_command(cmd: ControlCommand, state: &ControlChannelState) -> ControlResponse {
@@ -121,7 +123,8 @@ fn handle_inspect(state: &ControlChannelState) -> ControlResponse {
       AgentInspect { name, paused: agent_paused }
     })
     .collect();
-  let stream_position = String::from("0-0");
+  let last_entries = state.event_stream.xrange("-", "+", None);
+  let stream_position = last_entries.last().map(|e| e.id.clone()).unwrap_or_else(|| String::from("0-0"));
   ControlResponse::with_state(InspectState { paused, agents, stream_position })
 }
 

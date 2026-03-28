@@ -279,7 +279,8 @@ impl Interpreter {
         println!("{v}");
         let mut fields = indexmap::IndexMap::new();
         fields.insert(crate::sym::intern("value"), v);
-        self.ctx.event_stream.xadd("runtime/emit", "main", None, fields);
+        let agent = self.agent_name.as_deref().unwrap_or("main");
+        self.ctx.event_stream.xadd("runtime/emit", agent, None, fields);
         Ok(LxVal::Unit)
       },
       Expr::Yield(ExprYield { value }) => {

@@ -14,12 +14,6 @@ pub struct McpClient {
   command: String,
 }
 
-#[derive(Debug, Clone, serde::Deserialize)]
-pub struct ToolInfo {
-  pub name: String,
-  pub description: Option<String>,
-}
-
 impl McpClient {
   pub async fn spawn(command: &str) -> Result<Self, String> {
     let parts: Vec<&str> = command.split_whitespace().collect();
@@ -67,14 +61,6 @@ impl McpClient {
     stdin.flush().await.map_err(|e| e.to_string())?;
 
     Ok(())
-  }
-
-  pub async fn tools_list(&mut self) -> Result<Vec<ToolInfo>, String> {
-    let resp = self.send_request("tools/list", json!({})).await?;
-
-    let tools_val = resp.get("result").and_then(|r| r.get("tools")).ok_or_else(|| "tools/list: no result.tools in response".to_string())?;
-
-    serde_json::from_value(tools_val.clone()).map_err(|e| format!("tools/list parse: {e}"))
   }
 
   pub async fn tools_call(&mut self, tool_name: &str, arguments: serde_json::Value) -> Result<serde_json::Value, String> {
