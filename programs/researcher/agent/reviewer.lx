@@ -1,0 +1,55 @@
+-- Reviewer — reads the assembled draft and identifies specific gaps.
+-- Not a rubric grader. Returns actionable gap descriptions:
+-- "section 3 has no primary sources for X" or "section 5 only
+-- covers Y superficially — needs concrete examples."
+
+use std/prompt {new_prompt}
+use pkg/log
+use ../schema/research {Gap}
+
++Agent Reviewer = {
+  system_prompt = () { "You are critically reviewing a research document for gaps, thin spots, and missing information. Output JSON only." }
+
+  review_schema = () {
+    `{"type":"object","properties":{"gaps":{"type":"array","items":{"type":"object","properties":{"section_title":{"type":"string"},"description":{"type":"string"},"search_hint":{"type":"string"}},"required":["section_title","description","search_hint"]}},"overall":{"type":"string"}},"required":["gaps","overall"]}`
+  }
+
+  on_turn_start = (msg) { log.log "  > reviewer: identify gaps..." }
+
+  on_turn_end = (msg result) {
+    log.save_debug msg.runner_dir "research" "review.json" (json.encode_pretty result)
+    log.log "  < review: {result.gaps | len} gaps found"
+  }
+
+  act = (msg) {
+    p = new_prompt (self.system_prompt ())
+    p.add_section "Research Topic" msg.topic
+    p.add_section "Document" msg.draft
+    p.add_instruction "Read the entire document critically"
+    p.add_instruction "For each gap, identify: which section, what's missing, and a search query to find it"
+    p.add_instruction "Look for: unsupported claims, thin sections with no concrete examples, missing sources, surface-level treatment of important subtopics"
+    p.add_instruction "Also check: are there obvious subtopics that should be covered but aren't?"
+    p.add_constraint "Only flag real gaps — not stylistic preferences"
+    p.add_constraint "Each gap must have a specific search_hint that would help fill it"
+    p.add_constraint "If the document is solid, return an empty gaps list"
+
+    result = self.think_with {
+      prompt: (p.render ())
+      json_schema: (self.review_schema ())
+    } ^
+
+    parsed = result.text ? {
+      None -> result
+      t -> json.parse t ? {
+        Err _ -> {gaps: []; overall: "parse error"}
+        Ok v -> v
+      }
+    }
+
+    gaps = parsed.gaps | map (g) {
+      Gap {section_title: g.section_title; description: g.description; search_hint: g.search_hint}
+    }
+
+    {gaps: gaps; overall: parsed.overall}
+  }
+}

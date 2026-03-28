@@ -1,0 +1,61 @@
+-- Outliner — produces a section outline grounded in what the Scout found.
+-- The outline is shaped by actual findings, not the topic in isolation.
+-- Sections go where the knowledge is — thin areas get fewer sections,
+-- rich areas get broken out in detail.
+
+use std/prompt {new_prompt}
+use pkg/log
+use ../schema/research {Outline Section}
+
++Agent Outliner = {
+  system_prompt = () { "You are structuring a research document based on what was actually found. Output JSON only." }
+
+  outline_schema = () {
+    `{"type":"object","properties":{"intro":{"type":"string"},"sections":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string"},"scope":{"type":"string"},"search_hints":{"type":"array","items":{"type":"string"}}},"required":["title","scope","search_hints"]}},"output_name":{"type":"string"}},"required":["intro","sections","output_name"]}`
+  }
+
+  on_turn_start = (msg) { log.log "  > outliner: structure from findings..." }
+
+  on_turn_end = (msg result) {
+    log.save_debug msg.runner_dir "research" "outline.json" (json.encode_pretty result)
+    log.log "  < outline: {result.sections | len} sections"
+  }
+
+  act = (msg) {
+    p = new_prompt (self.system_prompt ())
+    p.add_section "Topic" msg.topic
+    p.add_section "Scout Notes" msg.sweep_notes
+    p.add_instruction "Design an outline based on what was found — not what you wish was found"
+    p.add_instruction "Rich areas get detailed sections; thin areas get combined or noted briefly"
+    p.add_instruction "Each section needs: title, scope (what it covers), search_hints (2-3 queries for deeper research)"
+    p.add_instruction "Include an intro paragraph summarizing the landscape as discovered"
+    p.add_instruction "Produce output_name as snake_case filename (no extension)"
+    p.add_constraint "4-8 sections — enough to cover the terrain, not so many they're shallow"
+    p.add_constraint "search_hints should be specific enough to find primary sources, not generic"
+    p.add_constraint "Section titles should be numbered: 1. Name, 2. Name, etc."
+
+    result = self.think_with {
+      prompt: (p.render ())
+      json_schema: (self.outline_schema ())
+    } ^
+
+    parsed = result.text ? {
+      None -> result
+      t -> json.parse t ? {
+        Err _ -> result
+        Ok v -> v
+      }
+    }
+
+    sections = parsed.sections | map (s) {
+      Section {title: s.title; scope: s.scope; search_hints: s.search_hints}
+    }
+
+    Outline {
+      topic: msg.topic
+      intro: parsed.intro
+      sections: sections
+      output_name: parsed.output_name
+    }
+  }
+}

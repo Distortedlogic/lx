@@ -7,3 +7,6 @@
 [submodule "reference/webkit2gtk"]
 	path = reference/webkit2gtk
 	url = https://github.com/tauri-apps/webkit2gtk-rs.git
+[submodule "reference/paperclip"]
+	path = reference/paperclip
+	url = https://github.com/paperclipai/paperclip.git

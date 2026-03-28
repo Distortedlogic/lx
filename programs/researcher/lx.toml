@@ -1,0 +1,12 @@
+[package]
+name = "researcher"
+version = "0.1.0"
+entry = "main.lx"
+description = "Deep web research on a topic — produces a research markdown file"
+
+[backends]
+llm = "claude-code"
+
+[test]
+dir = "tests/"
+pattern = "*.lx"

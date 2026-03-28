@@ -1,0 +1,18 @@
++Schema Section = {
+  title: Str = "section heading"
+  scope: Str = "what this section should cover"
+  search_hints: List = "suggested search queries for deeper research"
+}
+
++Schema Outline = {
+  topic: Str = "the research topic"
+  intro: Str = "1-2 paragraph introduction derived from sweep findings"
+  sections: List = "ordered list of Section entries"
+  output_name: Str = "snake_case filename without extension"
+}
+
++Schema Gap = {
+  section_title: Str = "which section is thin"
+  description: Str = "what specifically is missing or weak"
+  search_hint: Str = "suggested search query to fill this gap"
+}

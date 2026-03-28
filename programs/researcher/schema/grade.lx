@@ -1,0 +1,14 @@
++Schema GradeResult = {
+  score: Int = "0-100 weighted score across all rubric categories"
+  passed: Bool = "true if score >= threshold and no category failed"
+  categories: List = "per-category scores with name, score, passed, feedback"
+  feedback: Str = "human-readable summary of what passed and failed"
+  failed: List = "names of categories that scored below 70"
+}
+
++Schema CategoryScore = {
+  name: Str = "rubric category name"
+  score: Int = "0-100 score for this category"
+  passed: Bool = "true if score >= 70"
+  feedback: Str = "evaluator feedback for this category"
+}

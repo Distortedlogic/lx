@@ -1,0 +1,80 @@
+-- Writer — the core research agent. For a given section, does targeted
+-- deep search then writes that section. Also used for gap-filling:
+-- given a specific gap description, searches for what's missing and
+-- rewrites the section with new material integrated.
+
+use std/prompt {new_prompt}
+use pkg/log
+
++Agent Writer = {
+  tools = () { ["WebSearch"; "WebFetch"] }
+  max_turns = () { 25 }
+
+  system_prompt = () { "You are a technical researcher and writer. Search deeply on the specific topic, then write a thorough section. Interleave searching and thinking — if you find something interesting, follow it." }
+
+  on_turn_start = (msg) { log.log "  > writer: {msg.section_title}..." }
+
+  on_turn_end = (msg result) {
+    slug = msg.section_title | lower | replace " " "_"
+    log.save_debug msg.runner_dir "research" "section_{slug}.md" result
+    log.log "  < section done: {result | lines | len} lines"
+  }
+
+  act = (msg) {
+    p = new_prompt (self.system_prompt ())
+    p.add_section "Section Title" msg.section_title
+    p.add_section "Scope" msg.scope
+    p.add_section "Search Hints" (msg.search_hints | join "\n")
+    p.add_section "Sweep Context" msg.sweep_context
+    msg.existing_draft ? {
+      None -> ()
+      draft -> p.add_section "Existing Draft (to improve)" draft
+    }
+    msg.gap ? {
+      None -> ()
+      gap -> p.add_section "Gap to Fill" gap
+    }
+    p.add_instruction "Search using the hints and your own follow-up queries"
+    p.add_instruction "Fetch and read the most relevant pages"
+    p.add_instruction "Write the section with concrete facts, data, code examples where relevant"
+    p.add_instruction "Cite sources inline as [Title](URL) markdown links"
+    p.add_instruction "Use ### subsections if the material warrants it"
+    p.add_constraint "Output ONLY the section markdown — starting with ## heading, no preamble"
+    p.add_constraint "Technical precision — proper terminology, correct capitalization"
+    p.add_constraint "No hedging, no filler — concrete claims backed by what you found"
+    p.add_constraint "If you cannot find solid information on something, say so explicitly rather than padding"
+
+    result = self.think_with { prompt: (p.render ()) } ^
+    result.text
+  }
+}
+
++Agent GapFiller = {
+  tools = () { ["WebSearch"; "WebFetch"] }
+  max_turns = () { 15 }
+
+  system_prompt = () { "You are filling a specific gap in a research document. Search for exactly what is missing, then rewrite the section with the new material integrated." }
+
+  on_turn_start = (msg) { log.log "  > fill gap: {msg.gap.section_title} — {msg.gap.description}..." }
+
+  on_turn_end = (msg result) {
+    slug = msg.gap.section_title | lower | replace " " "_"
+    log.save_debug msg.runner_dir "research" "fill_{slug}.md" result
+    log.log "  < gap filled: {result | lines | len} lines"
+  }
+
+  act = (msg) {
+    p = new_prompt (self.system_prompt ())
+    p.add_section "Gap Description" msg.gap.description
+    p.add_section "Search Hint" msg.gap.search_hint
+    p.add_section "Current Section" msg.current_section
+    p.add_instruction "Search specifically for: {msg.gap.description}"
+    p.add_instruction "Integrate new findings into the existing section text"
+    p.add_instruction "Maintain the existing structure and tone"
+    p.add_constraint "Output the complete rewritten section — not just the new parts"
+    p.add_constraint "Cite new sources inline as [Title](URL)"
+
+    result = self.think_with { prompt: (p.render ()) } ^
+    result.text
+  }
+}

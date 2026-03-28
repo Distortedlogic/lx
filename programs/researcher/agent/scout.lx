@@ -1,0 +1,37 @@
+-- Scout — broad initial sweep to discover the landscape of a topic.
+-- No preconceptions. Search widely, follow interesting threads,
+-- return raw notes about what exists. This shapes everything downstream.
+
+use std/prompt {new_prompt}
+use pkg/log
+
++Agent Scout = {
+  tools = () { ["WebSearch"; "WebFetch"] }
+  max_turns = () { 30 }
+
+  system_prompt = () { "You are exploring a topic for the first time. Search broadly, follow threads, build a map of what exists. You are scouting — not writing a report." }
+
+  on_turn_start = (msg) { log.log "  > scout: broad sweep on '{msg.topic}'..." }
+
+  on_turn_end = (msg result) {
+    log.save_debug msg.runner_dir "research" "sweep.md" result
+    log.log "  < sweep: {result | lines | len} lines of notes"
+  }
+
+  act = (msg) {
+    p = new_prompt (self.system_prompt ())
+    p.add_section "Topic" msg.topic
+    p.add_instruction "Run 5-8 varied web searches to map the landscape of this topic"
+    p.add_instruction "Start broad, then follow threads that look substantive"
+    p.add_instruction "Fetch pages that look like primary sources — official docs, papers, authoritative posts"
+    p.add_instruction "For each source, note: URL, what it covers, how authoritative it seems"
+    p.add_instruction "Identify the major sub-topics, key players, important distinctions, and open questions"
+    p.add_instruction "Note which areas have rich sources and which seem underexplored"
+    p.add_constraint "Do not synthesize into prose — produce raw structured notes"
+    p.add_constraint "Do not fabricate — only report what you actually found"
+    p.add_constraint "Note surprising findings or threads worth following deeper"
+
+    result = self.think_with { prompt: (p.render ()) } ^
+    result.text
+  }
+}

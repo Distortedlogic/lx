@@ -1,0 +1,37 @@
+-- Polisher — final pass over the assembled document.
+-- Ensures convention compliance, consistent numbering, Sources section,
+-- and overall coherence. Not a rewrite — a cleanup.
+
+use std/prompt {new_prompt}
+use pkg/log
+
++Agent Polisher = {
+  system_prompt = () { "You are making a final editing pass on a research document. Fix inconsistencies, ensure conventions, clean up. Output the complete document." }
+
+  on_turn_start = (msg) { log.log "  > polisher: final pass..." }
+
+  on_turn_end = (msg result) {
+    log.save_debug msg.runner_dir "research" "polished.md" result
+    log.log "  < polished: {result | lines | len} lines"
+  }
+
+  act = (msg) {
+    p = new_prompt (self.system_prompt ())
+    p.add_section "Document" msg.draft
+    p.add_section "Topic" msg.topic
+    p.add_instruction "Ensure H1 title exists (exactly one) and matches the topic"
+    p.add_instruction "Ensure 1-2 paragraph intro after title, followed by ---"
+    p.add_instruction "Ensure sections are numbered consistently: ## 1. Name, ## 2. Name"
+    p.add_instruction "Ensure subsections follow parent: ### 1.1, ### 1.2"
+    p.add_instruction "Ensure a Sources section at the end with all cited URLs grouped by topic"
+    p.add_instruction "Collect any inline [Title](URL) links that aren't in Sources and add them"
+    p.add_instruction "Fix any inconsistent capitalization of language/tool names"
+    p.add_constraint "Do not add new content — only fix structure and consistency"
+    p.add_constraint "Do not remove content"
+    p.add_constraint "No YAML frontmatter, no HTML"
+    p.add_constraint "Start with '# Title' — nothing before it"
+
+    result = self.think_with { prompt: (p.render ()) } ^
+    result.text
+  }
+}
