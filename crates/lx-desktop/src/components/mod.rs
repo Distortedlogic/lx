@@ -1,9 +1,19 @@
 pub mod ui;
 
+pub mod comment_thread;
+pub mod copy_text;
 pub mod empty_state;
 pub mod entity_row;
+pub mod filter_bar;
 pub mod identity;
+pub mod inline_editor;
+pub mod inline_entity_selector;
+pub mod markdown_body;
+pub mod metric_card;
+pub mod page_skeleton;
+pub mod page_tab_bar;
 pub mod priority_icon;
 pub mod status_badge;
 pub mod status_colors;
 pub mod status_icon;
+pub mod toast_viewport;
