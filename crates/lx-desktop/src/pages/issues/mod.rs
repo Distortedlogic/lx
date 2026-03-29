@@ -81,6 +81,7 @@ pub fn Issues() -> Element {
 #[component]
 pub fn IssueDetail(issue_id: String) -> Element {
   let agents: Vec<AgentRef> = Vec::new();
+  let nav = navigator();
 
   rsx! {
     IssueDetailPage {
@@ -110,7 +111,9 @@ pub fn IssueDetail(issue_id: String) -> Element {
       documents: Vec::new(),
       workspace: None,
       agents: agents.clone(),
-      on_back: move |_| {},
+      on_back: move |_| {
+          nav.go_back();
+      },
       on_update: move |_: (String, String)| {},
       on_add_comment: move |_: String| {},
     }

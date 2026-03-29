@@ -27,13 +27,19 @@ pub fn Sidebar() -> Element {
             icon: "pulse_alert",
           }
           SidebarNavItem {
+            to: Route::Issues {},
+            label: "Issues",
+            icon: "task_alt",
+          }
+          SidebarNavItem { to: Route::Inbox {}, label: "Inbox", icon: "inbox" }
+          SidebarNavItem {
             to: Route::Costs {},
-            label: "COSTS",
+            label: "Costs",
             icon: "payments",
           }
           SidebarNavItem {
             to: Route::Approvals {},
-            label: "APPROVALS",
+            label: "Approvals",
             icon: "verified_user",
           }
         }
@@ -41,18 +47,18 @@ pub fn Sidebar() -> Element {
           SidebarNavItem { to: Route::Tools {}, label: "Tools", icon: "build" }
           SidebarNavItem {
             to: Route::Projects {},
-            label: "PROJECTS",
+            label: "Projects",
             icon: "hexagon",
           }
-          SidebarNavItem { to: Route::Goals {}, label: "GOALS", icon: "target" }
+          SidebarNavItem { to: Route::Goals {}, label: "Goals", icon: "target" }
           SidebarNavItem {
             to: Route::Routines {},
-            label: "ROUTINES",
+            label: "Routines",
             icon: "repeat",
           }
           SidebarNavItem {
             to: Route::OrgChart {},
-            label: "ORG",
+            label: "Org",
             icon: "account_tree",
           }
           SidebarNavItem {

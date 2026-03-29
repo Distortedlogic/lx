@@ -1,6 +1,6 @@
 mod budget_tab;
 mod config_form;
-mod detail;
+pub(crate) mod detail;
 pub mod list;
 mod live_run_widget;
 mod new_agent;
@@ -24,7 +24,23 @@ pub fn Agents() -> Element {
   let mut show_new_dialog = use_signal(|| false);
   let agents: Vec<AgentSummary> = Vec::new();
 
-  let selected_detail: Option<AgentDetail> = selected_agent_id.read().as_ref().and_then(|_id| None);
+  let selected_detail: Option<AgentDetail> = selected_agent_id.read().as_ref().and_then(|id| agents.iter().find(|a| a.id == *id)).map(|s| AgentDetail {
+    id: s.id.clone(),
+    name: s.name.clone(),
+    role: s.role.clone(),
+    title: s.title.clone(),
+    status: s.status.clone(),
+    adapter_type: s.adapter_type.clone(),
+    icon: s.icon.clone(),
+    last_heartbeat_at: s.last_heartbeat_at.clone(),
+    reports_to: s.reports_to.clone(),
+    created_at: s.created_at.clone(),
+    budget_monthly_cents: 0,
+    spent_monthly_cents: 0,
+    adapter_config: serde_json::Value::Object(Default::default()),
+    runtime_config: serde_json::Value::Object(Default::default()),
+    pause_reason: None,
+  });
 
   rsx! {
     match selected_detail {
