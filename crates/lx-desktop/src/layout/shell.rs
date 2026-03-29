@@ -35,6 +35,13 @@ pub fn Shell() -> Element {
     use_store(|| StatusBarState { branch: "main".into(), line: 1, col: 1, encoding: "UTF-8".into(), notification_count: 0, pane_label: "READY".into() });
   use_context_provider(|| status_bar_state);
   let _activity_log = ActivityLog::provide();
+  let _theme = crate::contexts::theme::ThemeState::provide();
+  let _toast = crate::contexts::toast::ToastState::provide();
+  let _dialog = crate::contexts::dialog::DialogState::provide();
+  let _panel = crate::contexts::panel::PanelState::provide();
+  let _sidebar_ctx = crate::contexts::sidebar::SidebarState::provide();
+  let _breadcrumb = crate::contexts::breadcrumb::BreadcrumbState::provide();
+  let _company = crate::contexts::company::CompanyState::provide();
   use_effect(move || {
     let count = tabs_state.read().notifications.len();
     status_bar_state.notification_count().set(count);

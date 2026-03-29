@@ -1,2 +1,9 @@
 pub mod activity_log;
+pub mod breadcrumb;
+pub mod company;
+pub mod dialog;
+pub mod panel;
+pub mod sidebar;
 pub mod status_bar;
+pub mod theme;
+pub mod toast;
