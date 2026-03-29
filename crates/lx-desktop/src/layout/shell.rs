@@ -4,7 +4,10 @@ use common_pane_tree::{PaneNode, TabsState};
 use dioxus::prelude::*;
 use tokio::sync::mpsc;
 
+use super::breadcrumb_bar::BreadcrumbBar;
+use super::company_rail::CompanyRail;
 use super::menu_bar::MenuBar;
+use super::properties_panel::PropertiesPanel;
 use super::sidebar::Sidebar;
 use super::status_bar::StatusBar;
 use crate::contexts::activity_log::ActivityLog;
@@ -63,25 +66,32 @@ pub fn Shell() -> Element {
       ResizeHandles {}
       MenuBar {}
       div { class: "flex flex-1 min-h-0",
+        CompanyRail {}
         Sidebar {}
-        main { class: "flex-1 flex flex-col p-0 min-h-0",
-          div { class: "flex-1 min-h-0 overflow-auto",
-            ErrorBoundary {
-              handle_error: |errors: ErrorContext| {
-                  let msg = errors
-                      .error()
-                      .map_or_else(|| "Page error".to_owned(), |e| e.to_string());
-                  rsx! {
-                    div { class: "p-4 text-[var(--error)]", "{msg}" }
+        div { class: "flex min-w-0 flex-col flex-1 h-full",
+          BreadcrumbBar {}
+          div { class: "flex flex-1 min-h-0",
+            main { class: "flex-1 flex flex-col p-0 min-h-0",
+              div { class: "flex-1 min-h-0 overflow-auto p-6",
+                ErrorBoundary {
+                  handle_error: |errors: ErrorContext| {
+                      let msg = errors
+                          .error()
+                          .map_or_else(|| "Page error".to_owned(), |e| e.to_string());
+                      rsx! {
+                        div { class: "p-4 text-[var(--error)]", "{msg}" }
+                      }
+                  },
+                  SuspenseBoundary {
+                    fallback: |_| rsx! {
+                      div { class: "flex items-center justify-center h-full text-[var(--outline)]", "Loading..." }
+                    },
+                    Outlet::<Route> {}
                   }
-              },
-              SuspenseBoundary {
-                fallback: |_| rsx! {
-                  div { class: "flex items-center justify-center h-full text-[var(--outline)]", "Loading..." }
-                },
-                Outlet::<Route> {}
+                }
               }
             }
+            PropertiesPanel {}
           }
         }
       }
