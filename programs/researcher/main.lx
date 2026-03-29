@@ -1,13 +1,16 @@
--- Deep Web Researcher — produces research markdown files from a topic.
+-- Deep Web Researcher — iterative, adaptive research that produces
+-- structured markdown documents in the research/ conventions.
 --
--- Pipeline: plan → search → synthesize → grade → revise loop.
--- Planner decomposes the topic into questions and domains.
--- Searcher runs web searches and fetches pages for each question.
--- Synthesizer composes raw notes into a structured research document
--- following the research/ conventions (numbered sections, sources, no frontmatter).
--- Grader + Reviser loop refines until quality threshold is met.
+-- How it works (reflecting how research actually happens):
+--   1. Scout sweep — broad search to discover the landscape
+--   2. Outline from findings — structure shaped by what exists, not wishes
+--   3. Per-section deep write — each section gets its own targeted search
+--   4. Review + fill — Reviewer finds specific gaps, GapFiller targets them
+--   5. Polish — final convention compliance pass
 --
--- Output lands in research/ following the existing directory conventions.
+-- The outline comes from the sweep, not the topic alone. Writing and
+-- searching are interleaved per-section. Gap-filling is targeted:
+-- "section 3 needs primary sources on X" → search for X → integrate.
 --
 -- Usage: TOPIC="your topic here" lx run researcher
 --        TOPIC="your topic" OUTPUT_DIR="custom/path" lx run researcher
@@ -17,23 +20,10 @@ use std/fs
 use std/time
 use std/cron
 use pkg/log
-use ./agent/grader {Grader}
 use ./workflow/orchestrator
 
-max_rounds = 3
 runner_dir = ".lx/researcher"
 default_output_dir = "research"
-
-research_grader = Grader {
-  threshold: 75
-  rubric: [
-    {name: "coverage"; description: "all planned questions and domains are addressed in the document"; weight: 20}
-    {name: "depth"; description: "each section has concrete facts, data, examples, or code — not surface-level summaries"; weight: 25}
-    {name: "accuracy"; description: "claims are supported by cited sources, no fabricated information"; weight: 20}
-    {name: "structure"; description: "follows research conventions: H1 title, numbered sections, Sources at end, no YAML frontmatter"; weight: 15}
-    {name: "sources"; description: "sources are cited with markdown links, grouped by topic, from authoritative origins"; weight: 20}
-  ]
-}
 
 +main = () {
   topic = env.get "TOPIC" ?? ""
@@ -63,15 +53,13 @@ research_grader = Grader {
     emit "[{ts}] heartbeat — {mins}m elapsed"
   }
 
-  result = orchestrator.run_research topic research_grader max_rounds runner_dir output_dir
+  result = orchestrator.run_research topic runner_dir output_dir
   elapsed = (time.now().ms - start_ms) // 1000
 
   log.log ""
   log.log "=== DONE ==="
-  icon = result.status == "pass" ? "OK" : "FAIL"
-  log.log "  [{icon}] {result.topic} — {result.score}/100 ({result.rounds} rounds, {elapsed}s)"
-  result.status == "pass" ? log.log "  output: {result.path}"
-  result.status != "pass" ? log.log "  feedback: {result.feedback}"
+  log.log "  {result.topic} — {result.gap_rounds} review rounds, {elapsed}s"
+  log.log "  output: {result.path}"
 }
 
 main ()

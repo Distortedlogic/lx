@@ -1,124 +1,158 @@
--- Research Orchestrator — pipeline: plan → search → synthesize → grade → revise.
--- Stuck detection: bail if 3+ rounds with grade not improving.
+-- Research Orchestrator — iterative, adaptive research loop.
+--
+-- sweep → outline_from_findings → [per-section: deep_search + write]
+--   → assemble → review → [per-gap: targeted_fill] → polish
+--
+-- The outline comes from what the Scout found, not from the topic alone.
+-- Each section gets its own deep search + write pass.
+-- The Reviewer returns specific gaps, not rubric scores.
+-- Gap-filling is targeted: search for exactly what's missing.
 
 use std/fs
 use std/md
 use pkg/log
-use ../agent/planner {Planner}
-use ../agent/searcher {Searcher}
-use ../agent/synthesizer {Synthesizer}
-use ../agent/reviser {Reviser}
+use ../agent/scout {Scout}
+use ../agent/outliner {Outliner}
+use ../agent/writer {Writer GapFiller}
+use ../agent/reviewer {Reviewer}
+use ../agent/polisher {Polisher}
 
-planner = Planner {}
-searcher = Searcher {}
-synthesizer = Synthesizer {}
-reviser = Reviser {}
+scout = Scout {}
+outliner = Outliner {}
+writer = Writer {}
+gap_filler = GapFiller {}
+reviewer = Reviewer {}
+polisher = Polisher {}
 
-required_headings = ["Sources"]
+max_gap_rounds = 2
+max_gaps_per_round = 4
 
-check_structure = (draft) {
-  headings = md.parse draft | md.headings
-  heading_texts = headings | map (h) h.text
-  has_h1 = headings | any? (h) h.level == 1
-  has_sources = required_headings | all? (req) {
-    heading_texts | any? (ht) { ht | contains? req }
-  }
-  has_numbered = headings | any? (h) h.level == 2 && (h.text | matches? "^\\d+\\.")
-  issues := []
-  has_h1 == false ? { issues <- [..issues; "missing H1 title"] }
-  has_sources == false ? { issues <- [..issues; "missing Sources section"] }
-  has_numbered == false ? { issues <- [..issues; "sections should be numbered (## 1. Name)"] }
-  ok = issues | len == 0
-  ok ? log.log "  structure: valid" : log.log "  structure: {issues | join "; "}"
-  ok
-}
-
-is_stuck = (round scores) {
-  round < 3 ? false : {
-    recent = scores | drop ((scores | len) - 3)
-    best = recent | fold 0 (a b) { a > b ? a : b }
-    worst = recent | fold 100 (a b) { a < b ? a : b }
-    improving = best - worst > 2
-    not improving
-  }
-}
-
-+run_research = (topic grader_inst max_rounds runner_dir output_dir) {
++run_research = (topic runner_dir output_dir) {
   log.log ""
   log.log "=== researcher: {topic} ==="
 
-  log.log "  PHASE: plan"
-  brief = planner.act {topic: topic; runner_dir: runner_dir} ^
-  log.log "  scope: {brief.scope}"
-  brief.questions | each (q) log.log "    ? {q}"
-  brief.domains | each (d) log.log "    @ {d}"
+  log.log "  PHASE: sweep"
+  sweep_notes = scout.act {topic: topic; runner_dir: runner_dir} ^
 
-  log.log "  PHASE: search"
-  search_result = searcher.act {brief: brief; runner_dir: runner_dir} ^
+  log.log "  PHASE: outline"
+  outline = outliner.act {topic: topic; sweep_notes: sweep_notes; runner_dir: runner_dir} ^
+  log.log "  output: {outline.output_name}.md"
+  outline.sections | enumerate | each (i sec) {
+    log.log "    {i + 1}. {sec.title}"
+  }
 
-  log.log "  PHASE: synthesize"
-  draft = synthesizer.act {
-    brief: brief
-    raw_notes: search_result.raw_notes
-    runner_dir: runner_dir
-  } ^
+  log.log "  PHASE: deep write (per-section)"
+  section_drafts := []
+  outline.sections | each (sec) {
+    section_md = writer.act {
+      section_title: sec.title
+      scope: sec.scope
+      search_hints: sec.search_hints
+      sweep_context: sweep_notes
+      existing_draft: None
+      gap: None
+      runner_dir: runner_dir
+    } ^
+    section_drafts <- [..section_drafts; {title: sec.title; content: section_md}]
+  }
 
-  out_path = "{output_dir}/{brief.output_name}.md"
+  log.log "  PHASE: assemble"
+  draft = assemble_document topic outline section_drafts
+  out_path = "{output_dir}/{outline.output_name}.md"
   fs.mkdir output_dir ^
   fs.write out_path draft ^
-  log.log "  written: {out_path}"
+  log.log "  written: {out_path} ({draft | lines | len} lines)"
 
-  check_structure draft
-
-  log.log "  PHASE: grade + revise loop"
-  grade = grade_and_log grader_inst draft "research document on {topic}" runner_dir
-
+  log.log "  PHASE: review + fill gaps"
   current_draft := draft
-  scores := [grade.score]
-  round := 0
+  gap_round := 0
   loop {
-    grade.passed == true ? break ()
-    round <- round + 1
-    round > max_rounds ? break ()
+    gap_round <- gap_round + 1
+    gap_round > max_gap_rounds ? break ()
 
-    stuck = is_stuck round scores
-    stuck ? {
-      log.log "  STUCK: 3+ rounds, grade not improving ({scores | map to_str | join " → "})"
-      break ()
+    review = reviewer.act {topic: topic; draft: current_draft; runner_dir: runner_dir} ^
+    gaps = review.gaps
+    log.log "  review round {gap_round}: {gaps | len} gaps — {review.overall}"
+    (gaps | len) == 0 ? break ()
+
+    actionable = gaps | take max_gaps_per_round
+    actionable | each (gap) {
+      log.log "    gap: {gap.section_title} — {gap.description}"
+      current_section = extract_section current_draft gap.section_title
+      filled = gap_filler.act {
+        gap: gap
+        current_section: current_section
+        runner_dir: runner_dir
+      } ^
+      current_draft <- replace_section current_draft gap.section_title filled
     }
-
-    has_failed = grade.failed | len > 0
-    has_failed == false ? break ()
-
-    current_draft <- reviser.act {
-      draft: current_draft
-      feedback: grade.feedback
-      runner_dir: runner_dir
-      round_num: round
-    } ^
     fs.write out_path current_draft ^
-
-    check_structure current_draft
-    grade = grade_and_log grader_inst current_draft "research document on {topic}" runner_dir
-    scores <- [..scores; grade.score]
   }
 
-  score = grade.score
-  passed = grade.passed
-  status_str = passed ? "pass" : "fail"
+  log.log "  PHASE: polish"
+  polished = polisher.act {draft: current_draft; topic: topic; runner_dir: runner_dir} ^
+  fs.write out_path polished ^
+  log.log "  final: {out_path} ({polished | lines | len} lines)"
 
-  log.log "  >>> {status_str | upper} — {score}/100 in {round} revision rounds"
-  {status: status_str; score: score; rounds: round; topic: topic; path: out_path; feedback: grade.feedback}
+  {status: "done"; topic: topic; path: out_path; gap_rounds: gap_round}
 }
 
-grade_and_log = (grader_inst draft task runner_dir) {
-  log.log "  > grader: scoring draft..."
-  grade = grader_inst.act {work: draft; task: task} ^
-  log.save_debug runner_dir "research" "grade.json" (json.encode_pretty grade)
-  log.log "  GRADE: {grade.score}/100 | passed: {grade.passed} | {grade.feedback}"
-  grade.categories | each (cat) {
-    icon = cat.passed ? "+" : "x"
-    log.log "    [{icon}] {cat.name}: {cat.score}/100 — {cat.feedback}"
+assemble_document = (topic outline section_drafts) {
+  parts := ["# {topic}"; ""; outline.intro; ""; "---"]
+
+  section_drafts | each (sec) {
+    parts <- [..parts; ""; sec.content]
   }
-  grade
+
+  parts <- [..parts; ""; "## Sources"; ""; "Sources are cited inline throughout each section."]
+  parts | join "\n"
+}
+
+extract_section = (draft section_title) {
+  heading_line = "## {section_title}"
+  in_section := false
+  section_lines := []
+  draft | lines | each (line) {
+    line | starts? heading_line ? {
+      in_section <- true
+      section_lines <- [line]
+    } : {
+      in_section ? {
+        is_next_h2 = (line | starts? "## ") && (not (line | starts? "### "))
+        is_next_h2 ? {
+          in_section <- false
+        } : {
+          section_lines <- [..section_lines; line]
+        }
+      }
+    }
+  }
+  section_lines | join "\n"
+}
+
+replace_section = (draft section_title new_content) {
+  heading_prefix = "## {section_title}"
+  in_section := false
+  result_lines := []
+  replaced := false
+  draft | lines | each (line) {
+    line | starts? heading_prefix ? {
+      in_section <- true
+      replaced <- true
+      new_content | lines | each (nl) {
+        result_lines <- [..result_lines; nl]
+      }
+    } : {
+      in_section ? {
+        is_next_h2 = (line | starts? "## ") && (not (line | starts? "### "))
+        is_next_h2 ? {
+          in_section <- false
+          result_lines <- [..result_lines; line]
+        }
+      } : {
+        result_lines <- [..result_lines; line]
+      }
+    }
+  }
+  replaced == false ? draft : (result_lines | join "\n")
 }

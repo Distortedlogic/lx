@@ -1,14 +1,19 @@
 -- Saga step definitions for the cognitive pipeline with real compensations
 -- Source: each step has a do/undo pair — undo actually reverses side effects
+-- Steps: perceive → recall → reason → execute → re_reason → critic → respond
+-- re_reason: feeds tool/specialist results back into reasoning
+-- critic: inner critic reviews before final response on complex inputs
 
 use pkg/store/trace {TraceStore}
-use ./handoff {as_context}
+use ../handoff {as_context}
 use ../contracts {Response}
 use pkg/agent/perception : perceive
 use pkg/agent/reasoning : reason
-use ./tieredmem : mem
-use ../lib/tools : tools
-use ../lib/context_mgr : ctx_mgr
+use ../tieredmem : mem
+use ../tools : tools
+use ../context_mgr : ctx_mgr
+use ../agents/dispatcher : dispatch
+use pkg/agent/quality
 
 +build = (input: Str; state: Any; memory_store: Any; context_win: Any; workforce: Any; trace_session: Any; saga_ctx: Any) -> [Any] {
   [
@@ -22,10 +27,8 @@ use ../lib/context_mgr : ctx_mgr
         p
       }
       undo: (result) {
-        key = saga_ctx.get "perception_key" ?? "perception_unknown"
         ctx_mgr.clear_ephemeral context_win
         saga_ctx.set "perception_key" ""
-        log.info "perception compensated — cleared context entry {key}"
       }
     }
     {
@@ -35,11 +38,10 @@ use ../lib/context_mgr : ctx_mgr
         recalled = mem.recall memory_store perception.raw perception.domain
         trace_session.record {name: "recall" input: perception.domain output: "found {len recalled}"} ?? ()
         saga_ctx.set "recall_count" (len recalled)
+        saga_ctx.set "lessons" (recalled | filter (m) (m.tags ?? []) | any? (== "lesson") | map (.content))
         recalled | take 10
       }
-      undo: (result) {
-        saga_ctx.set "recall_count" 0
-      }
+      undo: (result) { saga_ctx.set "recall_count" 0 }
       depends: ["perceive"]
     }
     {
@@ -47,25 +49,19 @@ use ../lib/context_mgr : ctx_mgr
       do: (prev) {
         perception = prev.perceive
         memories = prev.recall | map (.content) | join "\n"
+        lessons = saga_ctx.get "lessons" ?? []
 
-        handoff = Handoff {
-          from: "perception"
-          to: "reasoning"
-          context: as_context {intent: perception.intent; domain: perception.domain; complexity: perception.complexity  memories}
-          task: perception.raw
-        }
-
-        chain = reason.reason handoff.task handoff.context [] ^
+        handoff = as_context {intent: perception.intent; domain: perception.domain; complexity: perception.complexity; memories}
+        hints = [..lessons; "decompose into sub-problems"; "challenge assumptions"]
+        chain = reason.reason perception.raw handoff hints ^
         ctx_mgr.add_reasoning context_win chain
         saga_ctx.set "reasoning_key" "reasoning_{chain.goal | take 20}"
         trace_session.record {name: "reason" input: perception.intent output: chain.strategy} ?? ()
         chain
       }
       undo: (result) {
-        key = saga_ctx.get "reasoning_key" ?? "reasoning_unknown"
         ctx_mgr.clear_ephemeral context_win
         saga_ctx.set "reasoning_key" ""
-        log.info "reasoning compensated — cleared context entry {key}"
       }
       depends: ["perceive" "recall"]
     }
@@ -75,17 +71,7 @@ use ../lib/context_mgr : ctx_mgr
         perception = prev.perceive
         chain = prev.reason
 
-        perception.requires_agents ? {
-          dispatch = use ../agents/dispatcher
-          dispatch.fan_out workforce [{
-            id: "deep_analysis"
-            specialist: "analyst"
-            instruction: chain.conclusion
-            context: perception.raw
-            constraints: []
-            timeout_ms: 30000
-          }] ^
-        } : perception.requires_tools ? {
+        tool_results = perception.requires_tools ? {
           available = tools.available_tools ()
           selected = tools.select_tools chain.conclusion available ^
           selected | map (tool) {
@@ -95,36 +81,78 @@ use ../lib/context_mgr : ctx_mgr
               ? { Ok r -> r; Err e -> {tool: tool.name; success: false; output: e; tokens_used: 0; duration_ms: 0} }
           }
         } : []
+
+        specialist_results = perception.requires_agents ? {
+          dispatch.fan_out workforce [{
+            id: "deep_analysis"; specialist: "analyst"
+            instruction: chain.conclusion; context: perception.raw
+            constraints: []; timeout_ms: 30000
+          }] ^
+        } : []
+
+        {tools: tool_results; specialists: specialist_results}
       }
-      undo: (result) log.info "execution compensated — tool results discarded"
+      undo: (result) log.info "execution compensated — results discarded"
       depends: ["reason"]
+    }
+    {
+      id: "re_reason"
+      do: (prev) {
+        chain = prev.reason
+        exec = prev.execute
+        all_results = [..(exec.tools); ..(exec.specialists)]
+        successful = all_results | filter (r) r.success ?? true
+
+        successful | not empty? ? {
+          summaries = successful | map (r) "[{r.tool ?? r.specialist ?? "?"}]: {(r.output ?? "") | to_str | take 200}" | join "\n"
+          refined = reason.reason chain.goal "{chain.conclusion}\nNew information:\n{summaries}" ["integrate"; "refine"] ^
+          trace_session.record {name: "re_reason" input: "refine" output: refined.strategy} ?? ()
+          refined
+        } : chain
+      }
+      undo: (result) log.info "re-reason compensated"
+      depends: ["reason" "execute"]
+    }
+    {
+      id: "critic"
+      do: (prev) {
+        perception = prev.perceive
+        chain = prev.re_reason
+        content = chain.conclusion
+
+        workforce.critic != None ? {
+          critique = workforce.critic ~>? {
+            action: "critique"; content: content; content_type: "text"
+            task: perception.raw; confidence: chain.confidence
+          } ^
+          trace_session.record {name: "critic" input: perception.raw output: critique.severity ?? "none"} ?? ()
+
+          (critique.severity ?? "none") == "high" ? {
+            refined = quality.refine_response content "{perception.raw}\nCritique: {critique.flaws ?? [] | join "; "}" ?? content
+            {content: refined; confidence: critique.revised_confidence ?? chain.confidence; chain: chain}
+          } : {content: content; confidence: chain.confidence; chain: chain}
+        } : {content: content; confidence: chain.confidence; chain: chain}
+      }
+      undo: (result) log.info "critic compensated"
+      depends: ["re_reason"]
     }
     {
       id: "respond"
       do: (prev) {
-        chain = prev.reason
-        results = prev.execute
-        successful = results | filter (r) r.success ?? true
+        reviewed = prev.critic
+        chain = reviewed.chain
+        exec = prev.execute
+        all_results = [..(exec.tools); ..(exec.specialists)]
+        successful = all_results | filter (r) r.success ?? true
 
-        handoff = Handoff {
-          from: "execution"
-          to: "response"
-          context: as_context {
-            goal: chain.goal
-            conclusion: chain.conclusion
-            strategy: chain.strategy
-            tool_count: successful | len
-          }
-          task: chain.goal
+        content = reviewed.content
+        successful | not empty? && content == chain.conclusion ? {
+          content <- tools.integrate_results successful chain.goal ^
         }
-
-        content = successful | len > 0 ? {
-          tools.integrate_results successful handoff.task ^
-        } : chain.conclusion
 
         Response {
           content
-          confidence: chain.confidence
+          confidence: reviewed.confidence
           reasoning_depth: chain.thoughts | len
           tools_used: successful | map (r) "{r.tool ?? ""}"
           sources: successful | map (r) "{r.tool ?? "reasoning"}" | uniq
@@ -132,7 +160,7 @@ use ../lib/context_mgr : ctx_mgr
         }
       }
       undo: (result) log.info "response compensated — not emitted"
-      depends: ["reason" "execute"]
+      depends: ["critic" "execute"]
     }
   ]
 }

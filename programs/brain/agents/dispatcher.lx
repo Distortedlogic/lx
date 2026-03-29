@@ -1,6 +1,7 @@
 -- Multi-agent dispatcher: spawns and coordinates specialist agents
 -- Source: the brain's workforce coordinator — spawn, route, fan-out, reconcile, supervise
 -- Architecture: agents spawned as subprocesses, communicate via ~>?, pub/sub for events
+-- spawn_needed: selective spawning based on perception (complex → all, moderate → analyst only)
 
 use ../intercept {intercept}
 use ../capability {capabilities}
@@ -19,10 +20,26 @@ use pkg/schema/contracts {AgentTask AgentResult}
   {analyst  critic  researcher}
 }
 
++spawn_needed = (perception: Any) -> Any {
+  needs_analyst = perception.requires_agents || perception.complexity == "complex"
+  needs_critic = perception.complexity == "complex"
+  needs_researcher = perception.requires_tools && (perception.domain ?? "" | contains? "research")
+
+  (analyst critic researcher) = par {
+    needs_analyst ? (agent.spawn {command: "lx" args: ["run" "brain/agents/analyst.lx"]} ^) : None
+    needs_critic ? (agent.spawn {command: "lx" args: ["run" "brain/agents/critic.lx"]} ^) : None
+    needs_researcher ? (agent.spawn {command: "lx" args: ["run" "brain/agents/researcher.lx"]} ^) : None
+  }
+
+  {analyst; critic; researcher}
+}
+
 +setup_tracing = (workforce: Any; session: Any) -> Any {
-  trace_wrap = (worker name) intercept worker (msg next) {
-    session.record {name: "{name}_msg" input: msg.action ?? "unknown"} ?? ()
-    next msg
+  trace_wrap = (worker name) {
+    worker == None ? None : intercept worker (msg next) {
+      session.record {name: "{name}_msg" input: msg.action ?? "unknown"} ?? ()
+      next msg
+    }
   }
 
   {
@@ -39,9 +56,9 @@ use pkg/schema/contracts {AgentTask AgentResult}
     response: agent.topic "response"
   }
 
-  agent.subscribe_filtered topics.perception workforce.analyst (msg) msg.complexity ?? "simple" == "complex"
-  agent.subscribe topics.reasoning workforce.critic
-  agent.subscribe topics.response workforce.researcher
+  workforce.analyst != None ? agent.subscribe_filtered topics.perception workforce.analyst (msg) msg.complexity ?? "simple" == "complex"
+  workforce.critic != None ? agent.subscribe topics.reasoning workforce.critic
+  workforce.researcher != None ? agent.subscribe topics.response workforce.researcher
 
   topics
 }
@@ -73,26 +90,19 @@ use pkg/schema/contracts {AgentTask AgentResult}
 }
 
 route_to_worker = (workforce: Any; specialist: Str) -> Any {
-  caps = [
-    capabilities workforce.analyst ^
-    capabilities workforce.critic ^
-    capabilities workforce.researcher ^
-  ]
-    | zip [workforce.analyst workforce.critic workforce.researcher]
+  active = [
+    workforce.analyst != None ? [workforce.analyst] : []
+    workforce.critic != None ? [workforce.critic] : []
+    workforce.researcher != None ? [workforce.researcher] : []
+  ] | flat_map (x) x
 
-  matched = caps | find (cap_worker) {
-    (cap worker) = cap_worker
-    cap.domains ?? [] | contains? specialist
-  }
-
-  matched ? {
-    None -> specialist ? {
-      "analyst" -> workforce.analyst
-      "critic" -> workforce.critic
-      "researcher" -> workforce.researcher
-      _ -> workforce.analyst
+  active | empty? ? Err "no active specialists" : {
+    specialist ? {
+      "analyst" -> workforce.analyst ?? active | first
+      "critic" -> workforce.critic ?? active | first
+      "researcher" -> workforce.researcher ?? active | first
+      _ -> active | first
     }
-    (cap worker) -> worker
   }
 }
 
@@ -139,16 +149,16 @@ route_to_worker = (workforce: Any; specialist: Str) -> Any {
 
 +status = (workforce: Any) -> Any {
   {
-    analyst: workforce.analyst | to_str
-    critic: workforce.critic | to_str
-    researcher: workforce.researcher | to_str
+    analyst: workforce.analyst != None ? "running" : "idle"
+    critic: workforce.critic != None ? "running" : "idle"
+    researcher: workforce.researcher != None ? "running" : "idle"
   }
 }
 
 +shutdown = (workforce: Any) -> Any {
   par {
-    agent.kill workforce.analyst
-    agent.kill workforce.critic
-    agent.kill workforce.researcher
+    workforce.analyst != None ? agent.kill workforce.analyst : ()
+    workforce.critic != None ? agent.kill workforce.critic : ()
+    workforce.researcher != None ? agent.kill workforce.researcher : ()
   }
 }

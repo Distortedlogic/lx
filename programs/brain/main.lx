@@ -1,14 +1,14 @@
--- Claude's Brain: the main cognitive loop
--- Source: perception → reasoning → planning → execution → reflection → response
--- Architecture: sel racing for fast/thorough paths, with...as for scoped resources
+-- Claude's Brain: adaptive cognitive loop
+-- Perception decides the path:
+--   trivial/simple → think_fast: direct reasoning, quick check
+--   moderate → think_moderate: reason + tools + re-reason with results
+--   complex → think_deep: specialists + tools + re-reason + critic gate
+-- Memory lessons shape strategy. Dialogue state shapes responses.
 
 use std/time
 use ./workflow/workflow
-
 use pkg/agent/perception {Perception}
 use pkg/agent/reasoning {ReasoningChain}
-use ./agents/monitor {CognitiveState}
-use pkg/agent/reflect {FeedbackSignal}
 use ./contracts {Response PerceptionEvent ReasoningEvent}
 use pkg/agent/perception : perceive_mod
 use pkg/agent/reasoning : reason_mod
@@ -18,186 +18,206 @@ use ./context_mgr : ctx
 use ./identity : id
 use pkg/agent/quality
 use ./agents/monitor : mon
+use ./dialogue : dialogue
+use pkg/agent/reflect : reflection
+use ./agents/dispatcher : dispatch
 
-+think = (input: Str; history: [Any]) -> Any {
++think = (input: Str; history: [Any]; conversation: Any) -> Any {
   state := mon.init ()
   context_win = ctx.init 128000
   identity = id.core ()
-
   ctx.pin_identity context_win identity
+  memory_store = mem.init "{env.home ()}/.lx/brain" "claude"
 
-  workflow.run "brain" input (trace_session) {
-    memory_store = mem.init "{env.home ()}/.lx/brain" "claude"
-      perception_topic = agent.topic "perception"
-      reasoning_topic = agent.topic "reasoning"
+  workflow.run "brain" input (trace) {
+    state <- mon.tick state
+    gate = id.gate_destructive input
+    gate ? { Err reason -> { emit "Blocked: {reason}"; Err reason }; Ok _ -> () }
 
-      state <- mon.tick state
-      perception = perceive_mod.perceive input history ^
-      ctx.add_perception context_win perception
-      state <- mon.record_action state "perceive" perception.intent
-      trace_session.record {name: "perception" input: input output: perception.intent} ?? ()
+    perception = perceive_mod.perceive input history ^
+    ctx.add_perception context_win perception
+    state <- mon.record_action state "perceive" perception.intent
+    trace.record {name: "perception"; input: input; output: perception.intent} ?? ()
 
-      agent.publish perception_topic PerceptionEvent {
-        perception: perception
-        timestamp: time.now ()
-      }
+    recalled = mem.recall memory_store perception.raw perception.domain
+    lessons = recalled | filter (m) (m.tags ?? []) | any? (== "lesson") | map (.content)
+    memory_ctx = recalled | take 5 | map (.content) | join "\n"
 
-      mon.checkpoint state "perceived"
+    user_style = conversation.user_style ?? "neutral"
 
-      chain = race_reasoning perception state memory_store context_win ^
-      ctx.add_reasoning context_win chain
-      state <- mon.record_action state "reason" chain.strategy
-      trace_session.record {name: "reasoning" input: perception.intent output: chain.conclusion} ?? ()
+    result = perception.complexity ? {
+      "trivial" -> think_fast perception memory_ctx state trace
+      "simple" -> think_fast perception memory_ctx state trace
+      "moderate" -> think_moderate perception memory_ctx lessons state context_win trace
+      "complex" -> think_deep perception memory_ctx lessons state context_win trace
+      _ -> think_fast perception memory_ctx state trace
+    }
 
-      agent.publish reasoning_topic ReasoningEvent {
-        chain: chain
-        strategy: chain.strategy
-        timestamp: time.now ()
-      }
+    reflect_and_learn result.response perception memory_store state lessons
+    ctx.manage_pressure context_win
+    mem.save memory_store ?? ()
+    emit result.response.content
 
-      mon.checkpoint state "reasoned"
-
-      tool_results = perception ? {
-        {requires_tools: true; requires_agents: true ..} -> execute_tools chain perception state ^
-        {requires_tools: true ..} -> execute_tools chain perception state ^
-        _ -> []
-      }
-
-      tool_results | each (r) ctx.add_tool_result context_win r
-      state <- mon.record_action state "execute" "tools:{len tool_results}"
-      mon.checkpoint state "executed"
-
-      response = assemble_response chain tool_results perception identity state ^
-      trace_session.record {name: "response" input: chain.conclusion output: response.content} ?? ()
-
-      (response quality_result) = ensure_quality response perception.raw state ?? (response  quality.quick_check response.content perception.raw)
-
-      reflect_and_learn response perception memory_store state ?? ()
-
-      ctx.manage_pressure context_win
-      mem.save memory_store ?? ()
-
-      emit response.content
-
-      Ok {
-        response: response
-        quality: quality_result
-        state: mon.status_report state
-        trace: trace_session
-      }
+    Ok {response: result.response; quality: result.quality; state: mon.status_report state; trace: trace}
   }
 }
 
-race_reasoning = (perception: Perception; state: Any; memory_store: Any; context_win: Any) -> ReasoningChain {
+think_fast = (p: Perception; mem_ctx: Str; state: Any; trace: Any) -> Any {
+  chain = reason_mod.reason p.raw mem_ctx [] ^
+  state <- mon.record_action state "reason" "fast"
+  trace.record {name: "reason"; input: p.intent; output: chain.conclusion} ?? ()
+  response = make_response chain [] p
+  {response: response; quality: quality.quick_check response.content p.raw}
+}
+
+think_moderate = (p: Perception; mem_ctx: Str; lessons: [Str]; state: Any; ctx_win: Any; trace: Any) -> Any {
+  hints = [..(lessons | take 2); "consider edge cases"; "verify assumptions"]
+  chain = race_reasoning p mem_ctx hints state ^
+  state <- mon.record_action state "reason" chain.strategy
+  ctx.add_reasoning ctx_win chain
+  trace.record {name: "reason"; input: p.intent; output: chain.conclusion} ?? ()
+
+  tool_results = p.requires_tools ? execute_tools chain p state ^ : []
+  tool_results | each (r) ctx.add_tool_result ctx_win r
+  state <- mon.record_action state "execute" "tools:{len tool_results}"
+
+  chain = tool_results | not empty? ? re_reason chain tool_results p ^ : chain
+
+  response = make_response chain tool_results p
+  grade = quality.grade_response response.content p.raw
+  response = grade.passed ? response : {
+    refined = quality.refine_response response.content p.raw ?? response.content
+    {..response; content: refined}
+  }
+  {response: response; quality: grade}
+}
+
+think_deep = (p: Perception; mem_ctx: Str; lessons: [Str]; state: Any; ctx_win: Any; trace: Any) -> Any {
+  hints = [..lessons; "decompose into sub-problems"; "challenge assumptions"]
+  chain = sel {
+    reason_mod.reason p.raw mem_ctx hints ^ -> it
+    timeout 10000 -> reason_mod.reason p.raw mem_ctx ["keep it simple"] ^
+  }
+  state <- mon.record_action state "reason" chain.strategy
+  ctx.add_reasoning ctx_win chain
+  trace.record {name: "reason"; input: p.intent; output: chain.conclusion} ?? ()
+
+  workforce = dispatch.spawn_needed p ^
+  tool_results = p.requires_tools ? execute_tools chain p state ^ : []
+  tool_results | each (r) ctx.add_tool_result ctx_win r
+
+  specialist_results = workforce.analyst != None ? {
+    traced = dispatch.setup_tracing workforce trace
+    dispatch.fan_out traced [{
+      id: "deep_analysis"; specialist: "analyst"
+      instruction: chain.conclusion; context: p.raw
+      constraints: []; timeout_ms: 30000
+    }] ^
+  } : []
+
+  all_results = [..tool_results; ..specialist_results]
+  chain = all_results | not empty? ? re_reason chain all_results p ^ : chain
+
+  response = make_response chain all_results p
+  response = workforce.critic != None ? critic_gate response p workforce trace ^ : response
+  grade = quality.grade_response response.content p.raw
+  dispatch.shutdown workforce
+  {response: response; quality: grade}
+}
+
+race_reasoning = (p: Perception; mem_ctx: Str; hints: [Str]; state: Any) -> ReasoningChain {
   mon.guard state "reasoning" ^
-
-  recalled = mem.recall memory_store perception.raw perception.domain
-  context_from_memory = recalled | take 5 | map (.content) | join "\n"
-
-  perception ? {
-    {complexity: "trivial" ..} -> reason_mod.reason perception.raw context_from_memory []
-    {complexity: "simple" ..} -> reason_mod.reason perception.raw context_from_memory []
-    {complexity: "moderate" ..} -> reason_mod.reason perception.raw context_from_memory
-      ["consider edge cases" "verify assumptions"]
-    {complexity: "complex"; ambiguity: a ..} & (a > 0.5) -> {
-      sel {
-        reason_mod.reason perception.raw context_from_memory
-          ["decompose into sub-problems" "challenge assumptions" "resolve ambiguity first"] -> it
-        timeout 10000 -> reason_mod.reason perception.raw context_from_memory ["keep it simple"]
-      }
+  (p.ambiguity ?? 0.0) > 0.5 ? {
+    sel {
+      reason_mod.reason p.raw mem_ctx [..hints; "resolve ambiguity first"] ^ -> it
+      timeout 10000 -> reason_mod.reason p.raw mem_ctx ["keep it simple"] ^
     }
-    {complexity: "complex" ..} -> {
-      sel {
-        reason_mod.reason perception.raw context_from_memory
-          ["decompose into sub-problems" "challenge assumptions"] -> it
-        timeout 10000 -> reason_mod.reason perception.raw context_from_memory ["keep it simple"]
-      }
-    }
-    _ -> reason_mod.reason perception.raw context_from_memory []
-  }
+  } : reason_mod.reason p.raw mem_ctx hints ^
 }
 
-execute_tools = (chain: ReasoningChain; perception: Perception; state: Any) -> [Any] {
+re_reason = (chain: ReasoningChain; results: [Any]; p: Perception) -> ReasoningChain {
+  successful = results | filter (r) r.success ?? true
+  summaries = successful | map (r) "[{r.tool ?? r.specialist ?? "result"}]: {(r.output ?? "") | to_str | take 200}" | join "\n"
+  reason_mod.reason chain.goal "{chain.conclusion}\n\nNew information:\n{summaries}" ["integrate new information"; "refine conclusion"] ^
+}
+
+execute_tools = (chain: ReasoningChain; p: Perception; state: Any) -> [Any] {
   available = tool_mod.available_tools ()
   selected = tool_mod.select_tools chain.conclusion available ^
   state <- mon.spend state (len selected * 500) (len selected)
-
   mon.guard state "tool execution" ^
-
   selected | map (tool) {
-    request = {tool: tool.name; args: chain.conclusion; reason: perception.intent; priority: "normal"; timeout_ms: 30000}
+    request = {tool: tool.name; args: chain.conclusion; reason: p.intent; priority: "normal"; timeout_ms: 30000}
     tool_mod.execute_with_retry request state.breaker ? {
       Ok r -> r
-      Err e -> {
-        log.warn "tool {tool.name} failed: {e}"
-        {tool: tool.name; success: false; output: e; tokens_used: 0; duration_ms: 0}
-      }
+      Err e -> {tool: tool.name; success: false; output: "{e}"; tokens_used: 0; duration_ms: 0}
     }
   }
 }
 
-assemble_response = (chain: ReasoningChain; tool_results: [Any]; perception: Perception; identity: Any; state: Any) -> Response {
-  content = tool_results | not empty? ? tool_mod.integrate_results tool_results chain.goal ^ : chain.conclusion
+critic_gate = (response: Response; p: Perception; workforce: Any; trace: Any) -> Response {
+  critique = workforce.critic ~>? {
+    action: "critique"; content: response.content; content_type: "text"
+    task: p.raw; confidence: response.confidence
+  } ^
+  trace.record {name: "critic"; input: p.raw; output: critique.severity ?? "none"} ?? ()
+  (critique.severity ?? "none") == "high" ? {
+    refined = quality.refine_response response.content "{p.raw}\nCritique: {critique.flaws ?? [] | join "; "}" ?? response.content
+    {..response; content: refined; confidence: critique.revised_confidence ?? response.confidence}
+  } : response
+}
 
+make_response = (chain: ReasoningChain; results: [Any]; p: Perception) -> Response {
+  successful = results | filter (r) r.success ?? true
+  content = successful | not empty? ? tool_mod.integrate_results successful chain.goal ^ : chain.conclusion
   Response {
-    content
-    confidence: chain.confidence
-    reasoning_depth: chain.thoughts | len
-    tools_used: tool_results | filter (.success) | map (.tool)
-    sources: tool_results | not empty? ? tool_results | map (.tool) | uniq : ["reasoning"]
+    content; confidence: chain.confidence; reasoning_depth: chain.thoughts | len
+    tools_used: successful | map (r) r.tool ?? ""
+    sources: successful | not empty? ? successful | map (r) r.tool ?? "reasoning" | uniq : ["reasoning"]
     follow_up: []
   }
 }
 
-ensure_quality = (response: Response; task: Str; state: Any) -> (Response Any) {
-  mon.should_simplify state ? (response  quality.quick_check response.content task) : {
-    grade = quality.grade_response response.content task
+reflect_and_learn = (response: Response; p: Perception; mem_store: Any; state: Any; lessons: [Str]) -> Any {
+  refl = reflection.reflect p.raw response.content "quality response" ??
+    {action: p.raw; outcome: response.content; quality: 0.5; lesson: ""; should_remember: false; strategy_worked: true}
 
-    grade.passed ? (response grade) : {
-      log.info "below threshold ({grade.score}), refining..."
-      refined_content = quality.refine_response response.content task ?? response.content
-      ({..response; content: refined_content}  quality.grade_response refined_content task)
-    }
-  }
-}
-
-reflect_and_learn = (response: Response; perception: Perception; memory_store: Any; state: Any) -> Any {
-  response.confidence > 0.7 && perception.complexity != "trivial" ? {
-    mem.remember memory_store {
-      content: "Q: {perception.raw | take 100} → A approach: {perception.intent}/{perception.domain}"
-      domain: perception.domain
-      confidence: response.confidence
-      source: "self_reflection"
-      tags: [perception.intent perception.domain]
+  refl.should_remember && (refl.lesson | len) > 0 ? {
+    mem.remember mem_store {
+      content: refl.lesson; domain: p.domain; confidence: refl.quality
+      source: "reflection"; tags: ["lesson"; p.intent; p.domain]
     } ?? ()
   } : ()
 
+  response.confidence > 0.7 && p.complexity != "trivial" ? {
+    mem.remember mem_store {
+      content: "Q: {p.raw | take 100} → strategy: {p.intent}/{p.domain}"
+      domain: p.domain; confidence: response.confidence
+      source: "self_reflection"; tags: [p.intent; p.domain]
+    } ?? ()
+  } : ()
   state <- mon.record_action state "reflect" "confidence:{response.confidence}"
 }
 
 +main = () -> Any {
   emit "Claude brain initialized"
-
-  input := yield {kind: "ready" data: "awaiting input"}
+  conversation := dialogue.init_conversation ()
+  input := yield {kind: "ready"; data: "awaiting input"}
 
   loop {
     mon.guard (mon.init ()) "main loop" ? {
-      Err reason -> {
-        emit "Brain halted: {reason}"
-        break ()
-      }
+      Err reason -> { emit "Brain halted: {reason}"; break () }
       Ok _ -> ()
     }
-
-    result = think input [] ^
+    conversation <- dialogue.add_turn conversation "user" input
+    result = think input [] conversation ^
+    conversation <- dialogue.add_turn conversation "assistant" result.response.content
 
     input <- yield {
-      kind: "response"
-      data: result.response.content
-      confidence: result.response.confidence
-      state: result.state
+      kind: "response"; data: result.response.content
+      confidence: result.response.confidence; state: result.state
+      turn: dialogue.turn_count conversation
     }
-
     input ?? break ()
   }
 }
