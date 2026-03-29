@@ -1,35 +1,50 @@
-mod pane_area;
-mod voice_banner;
-mod voice_context;
-mod voice_pipeline;
-mod voice_porcupine;
+mod config_form;
+mod detail;
+pub mod list;
+mod new_agent;
+mod overview;
+pub mod types;
 
+use self::detail::AgentDetailShell;
+use self::list::AgentList;
+use self::new_agent::{NewAgentDialog, NewAgentPayload};
+use self::types::{AgentDetail, AgentSummary};
 use dioxus::prelude::*;
-
-use self::pane_area::PaneArea;
-use self::voice_banner::VoiceBanner;
-use self::voice_context::{PipelineStage, VoiceContext, VoiceData, VoiceStatus};
 
 #[component]
 pub fn Agents() -> Element {
-  let data = use_store(|| VoiceData {
-    status: VoiceStatus::Idle,
-    transcript: Vec::new(),
-    pcm_buffer: Vec::new(),
-    rms: 0.0,
-    pipeline_stage: PipelineStage::Idle,
-    always_listen: false,
-    barge_in: false,
-  });
-  let ctx = VoiceContext { data, widget: Signal::new(None) };
-  use_context_provider(|| ctx);
+  let mut selected_agent_id = use_signal(|| Option::<String>::None);
+  let mut show_new_dialog = use_signal(|| false);
+  let agents: Vec<AgentSummary> = Vec::new();
+
+  let selected_detail: Option<AgentDetail> = selected_agent_id.read().as_ref().and_then(|_id| None);
 
   rsx! {
-    div { class: "flex flex-col h-full",
-      div { class: "flex-1 min-h-0 border-b border-[var(--outline-variant)]/15",
-        VoiceBanner {}
-      }
-      div { class: "flex-1 min-h-0", PaneArea {} }
+    match selected_detail {
+        Some(agent) => rsx! {
+          AgentDetailShell {
+            agent,
+            on_back: move |_| selected_agent_id.set(None),
+            on_run: move |_| {},
+            on_pause: move |_| {},
+            on_resume: move |_| {},
+            on_terminate: move |_| {},
+          }
+        },
+        None => rsx! {
+          AgentList {
+            agents,
+            on_select: move |id: String| selected_agent_id.set(Some(id)),
+            on_new_agent: move |_| show_new_dialog.set(true),
+          }
+        },
+    }
+    NewAgentDialog {
+      open: *show_new_dialog.read(),
+      on_close: move |_| show_new_dialog.set(false),
+      on_create: move |_payload: NewAgentPayload| {
+          show_new_dialog.set(false);
+      },
     }
   }
 }

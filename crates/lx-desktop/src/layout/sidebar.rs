@@ -12,6 +12,11 @@ pub fn Sidebar() -> Element {
       nav { class: "flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 px-3 py-2",
         div { class: "flex flex-col gap-0.5",
           SidebarNavItem {
+            to: Route::Dashboard {},
+            label: "Dashboard",
+            icon: "dashboard",
+          }
+          SidebarNavItem {
             to: Route::Agents {},
             label: "Agents",
             icon: "smart_toy",
@@ -21,9 +26,35 @@ pub fn Sidebar() -> Element {
             label: "Activity",
             icon: "pulse_alert",
           }
+          SidebarNavItem {
+            to: Route::Costs {},
+            label: "COSTS",
+            icon: "payments",
+          }
+          SidebarNavItem {
+            to: Route::Approvals {},
+            label: "APPROVALS",
+            icon: "verified_user",
+          }
         }
         SidebarSection { label: "System",
           SidebarNavItem { to: Route::Tools {}, label: "Tools", icon: "build" }
+          SidebarNavItem {
+            to: Route::Projects {},
+            label: "PROJECTS",
+            icon: "hexagon",
+          }
+          SidebarNavItem { to: Route::Goals {}, label: "GOALS", icon: "target" }
+          SidebarNavItem {
+            to: Route::Routines {},
+            label: "ROUTINES",
+            icon: "repeat",
+          }
+          SidebarNavItem {
+            to: Route::OrgChart {},
+            label: "ORG",
+            icon: "account_tree",
+          }
           SidebarNavItem {
             to: Route::Settings {},
             label: "Settings",

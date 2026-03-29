@@ -1,9 +1,13 @@
 pub mod ui;
 
+pub mod command_palette;
 pub mod comment_thread;
+pub mod company_pattern_icon;
+pub mod company_switcher;
 pub mod copy_text;
 pub mod empty_state;
 pub mod entity_row;
+pub mod file_tree;
 pub mod filter_bar;
 pub mod identity;
 pub mod inline_editor;

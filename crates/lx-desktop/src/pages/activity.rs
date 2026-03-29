@@ -1,44 +1,54 @@
-use crate::contexts::activity_log::ActivityLog;
-use crate::styles::{FLEX_BETWEEN, PAGE_HEADING};
 use dioxus::prelude::*;
+
+use crate::components::empty_state::EmptyState;
+use crate::contexts::activity_log::ActivityLog;
+use crate::contexts::breadcrumb::BreadcrumbEntry;
 
 #[component]
 pub fn Activity() -> Element {
+  let breadcrumb_state = use_context::<crate::contexts::breadcrumb::BreadcrumbState>();
+  use_effect(move || {
+    breadcrumb_state.set(vec![BreadcrumbEntry { label: "Activity".into(), href: None }]);
+  });
+
   let log = use_context::<ActivityLog>();
   let events = log.events.read();
+  let mut filter = use_signal(|| "all".to_string());
+
+  let mut entity_types: Vec<String> = events.iter().map(|e| e.kind.clone()).collect();
+  entity_types.sort();
+  entity_types.dedup();
+
+  let current_filter = filter();
+  let filtered: Vec<_> = if current_filter == "all" { events.iter().collect() } else { events.iter().filter(|e| e.kind == current_filter).collect() };
 
   rsx! {
-    div { class: "flex flex-col h-full p-4 overflow-auto gap-4",
-      div { class: FLEX_BETWEEN,
-        h1 { class: PAGE_HEADING, "ACTIVITY_LOG" }
-        span { class: "text-xs text-[var(--outline)] uppercase tracking-wider",
-          "{events.len()} EVENTS"
+    div { class: "space-y-4",
+      div { class: "flex items-center justify-end",
+        select {
+          class: "h-8 rounded-md border border-gray-600 bg-gray-800 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500",
+          value: "{current_filter}",
+          onchange: move |evt: Event<FormData>| filter.set(evt.value()),
+          option { value: "all", "All types" }
+          for kind in entity_types.iter() {
+            option { value: "{kind}", "{kind}" }
+          }
         }
       }
-      if events.is_empty() {
-        div { class: "flex-1 flex items-center justify-center",
-          p { class: "text-sm text-[var(--outline)]", "No activity recorded yet" }
-        }
+
+      if filtered.is_empty() {
+        EmptyState { icon: "history", message: "No activity recorded yet." }
       } else {
-        div { class: "bg-[var(--surface-container-lowest)] border-2 border-[var(--outline-variant)] overflow-hidden",
-          div { class: "flex text-[10px] uppercase tracking-wider text-[var(--on-surface-variant)] py-3 px-4 border-b border-[var(--outline-variant)] bg-[var(--surface-container-high)]",
-            span { class: "w-32 shrink-0", "TIMESTAMP" }
-            span { class: "w-24 shrink-0", "KIND" }
-            span { class: "flex-1", "MESSAGE" }
-          }
-          div { class: "flex flex-col max-h-[calc(100vh-12rem)] overflow-y-auto",
-            for event in events.iter() {
-              div { class: "flex items-center px-4 py-2.5 border-b border-[var(--outline-variant)]/15 hover:bg-[var(--surface-container)] transition-colors duration-150 text-xs",
-                span { class: "w-32 shrink-0 text-[var(--outline)] font-mono",
-                  "{event.timestamp}"
-                }
-                span { class: "w-24 shrink-0 text-[var(--primary)] uppercase font-semibold",
-                  "{event.kind}"
-                }
-                span { class: "flex-1 text-[var(--on-surface-variant)]",
-                  "{event.message}"
-                }
+        div { class: "border border-gray-700 divide-y divide-gray-700 overflow-hidden",
+          for event in filtered.iter() {
+            div { class: "flex items-center px-4 py-2.5 hover:bg-white/5 transition-colors text-sm",
+              span { class: "w-40 shrink-0 text-gray-500 font-mono text-xs",
+                "{event.timestamp}"
               }
+              span { class: "w-28 shrink-0 text-[var(--primary)] uppercase font-semibold text-xs",
+                "{event.kind}"
+              }
+              span { class: "flex-1 text-gray-300 truncate", "{event.message}" }
             }
           }
         }

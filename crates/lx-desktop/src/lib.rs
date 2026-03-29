@@ -1,9 +1,11 @@
 pub mod app;
 pub mod components;
 pub mod contexts;
+pub mod hooks;
 pub mod layout;
 pub mod pages;
 pub mod panes;
+pub mod plugins;
 pub mod routes;
 pub mod styles;
 pub mod terminal;

@@ -10,6 +10,7 @@ use super::menu_bar::MenuBar;
 use super::properties_panel::PropertiesPanel;
 use super::sidebar::Sidebar;
 use super::status_bar::StatusBar;
+use crate::components::command_palette::CommandPalette;
 use crate::components::toast_viewport::ToastViewport;
 use crate::contexts::activity_log::ActivityLog;
 use crate::contexts::status_bar::{StatusBarState, StatusBarStateStoreExt};
@@ -98,6 +99,7 @@ pub fn Shell() -> Element {
       }
       StatusBar {}
       ToastViewport {}
+      CommandPalette {}
     }
   }
 }

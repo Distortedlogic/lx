@@ -1,4 +1,8 @@
+pub mod company_settings;
 mod env_vars;
+pub mod instance_experimental;
+pub mod instance_general;
+pub mod instance_settings;
 mod quotas;
 pub mod state;
 mod task_priority;
@@ -6,7 +10,11 @@ mod task_priority;
 use crate::styles::FLEX_BETWEEN;
 use dioxus::prelude::*;
 
+pub use self::company_settings::CompanySettings;
 use self::env_vars::EnvVarsPanel;
+pub use self::instance_experimental::InstanceExperimental;
+pub use self::instance_general::InstanceGeneral;
+pub use self::instance_settings::InstanceHeartbeats;
 use self::quotas::QuotasPanel;
 use self::state::SettingsState;
 use self::task_priority::TaskPriorityPanel;

@@ -1,0 +1,114 @@
+use super::types::{ADAPTER_LABELS, AgentDetail};
+use crate::styles::{BTN_OUTLINE_SM, BTN_PRIMARY_SM, INPUT_FIELD};
+use dioxus::prelude::*;
+
+#[component]
+pub fn AgentConfigPanel(agent: AgentDetail) -> Element {
+  let mut adapter_type = use_signal(|| agent.adapter_type.clone());
+  let mut model = use_signal(|| agent.adapter_config.get("model").and_then(|v| v.as_str()).unwrap_or("").to_string());
+  let mut heartbeat_enabled = use_signal(|| agent.runtime_config.get("heartbeat").and_then(|v| v.get("enabled")).and_then(|v| v.as_bool()).unwrap_or(false));
+  let mut interval_sec = use_signal(|| agent.runtime_config.get("heartbeat").and_then(|v| v.get("intervalSec")).and_then(|v| v.as_u64()).unwrap_or(300) as u32);
+  let mut dirty = use_signal(|| false);
+
+  rsx! {
+    div { class: "max-w-3xl space-y-6",
+      ConfigSection { title: "Adapter",
+        div { class: "space-y-3",
+          label { class: "text-xs text-[var(--outline)] block", "Adapter type" }
+          select {
+            class: INPUT_FIELD,
+            value: "{adapter_type}",
+            onchange: move |evt| {
+                adapter_type.set(evt.value().to_string());
+                dirty.set(true);
+            },
+            for (key , label) in ADAPTER_LABELS {
+              option { value: *key, "{label}" }
+            }
+          }
+          label { class: "text-xs text-[var(--outline)] block", "Model" }
+          input {
+            class: INPUT_FIELD,
+            value: "{model}",
+            placeholder: "e.g. claude-sonnet-4-20250514",
+            oninput: move |evt| {
+                model.set(evt.value().to_string());
+                dirty.set(true);
+            },
+          }
+        }
+      }
+      ConfigSection { title: "Heartbeat",
+        div { class: "space-y-3",
+          div { class: "flex items-center justify-between",
+            span { class: "text-sm text-[var(--on-surface)]", "Enabled" }
+            ToggleSwitch {
+              checked: *heartbeat_enabled.read(),
+              on_toggle: move |v: bool| {
+                  heartbeat_enabled.set(v);
+                  dirty.set(true);
+              },
+            }
+          }
+          if *heartbeat_enabled.read() {
+            div {
+              label { class: "text-xs text-[var(--outline)] block mb-1",
+                "Interval (seconds)"
+              }
+              input {
+                class: INPUT_FIELD,
+                r#type: "number",
+                value: "{interval_sec}",
+                oninput: move |evt| {
+                    if let Ok(v) = evt.value().parse::<u32>() {
+                        interval_sec.set(v);
+                        dirty.set(true);
+                    }
+                },
+              }
+            }
+          }
+        }
+      }
+      if *dirty.read() {
+        div { class: "flex items-center justify-end gap-2 pt-4 border-t border-[var(--outline-variant)]/30",
+          button {
+            class: BTN_OUTLINE_SM,
+            onclick: move |_| dirty.set(false),
+            "Cancel"
+          }
+          button {
+            class: BTN_PRIMARY_SM,
+            onclick: move |_| dirty.set(false),
+            "Save"
+          }
+        }
+      }
+    }
+  }
+}
+
+#[component]
+fn ConfigSection(title: &'static str, children: Element) -> Element {
+  rsx! {
+    div { class: "border border-[var(--outline-variant)]/30 rounded-lg",
+      div { class: "px-4 py-3 border-b border-[var(--outline-variant)]/30",
+        h3 { class: "text-sm font-medium text-[var(--on-surface)]", "{title}" }
+      }
+      div { class: "px-4 py-4", {children} }
+    }
+  }
+}
+
+#[component]
+fn ToggleSwitch(checked: bool, on_toggle: EventHandler<bool>) -> Element {
+  let bg = if checked { "bg-green-600" } else { "bg-[var(--outline-variant)]" };
+  let translate = if checked { "translate-x-4" } else { "translate-x-0.5" };
+  rsx! {
+    button {
+      class: "relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 {bg}",
+      onclick: move |_| on_toggle.call(!checked),
+      span { class: "inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform {translate}" }
+    }
+  }
+}
