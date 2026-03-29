@@ -1,6 +1,10 @@
+use super::budget_tab::BudgetTab;
 use super::config_form::AgentConfigPanel;
 use super::list::StatusBadge;
 use super::overview::AgentOverview;
+use super::run_types::{BudgetSummary, SkillSnapshot};
+use super::runs_tab::RunsTab;
+use super::skills_tab::SkillsTab;
 use super::types::{AgentDetail as AgentDetailData, AgentDetailTab, role_label};
 use crate::styles::{BTN_OUTLINE_SM, TAB_ACTIVE, TAB_INACTIVE};
 use dioxus::prelude::*;
@@ -82,13 +86,35 @@ pub fn AgentDetailShell(
             AgentConfigPanel { agent: agent.clone() }
           },
           AgentDetailTab::Runs => rsx! {
-            p { class: "text-sm text-[var(--outline)]", "Runs tab (Unit 8)" }
+            RunsTab { runs: Vec::new(), agent_route_id: agent.id.clone() }
           },
           AgentDetailTab::Skills => rsx! {
-            p { class: "text-sm text-[var(--outline)]", "Skills tab (Unit 8)" }
+            SkillsTab {
+              snapshot: SkillSnapshot {
+                  entries: Vec::new(),
+                  desired_skills: Vec::new(),
+              },
+            }
           },
           AgentDetailTab::Budget => rsx! {
-            p { class: "text-sm text-[var(--outline)]", "Budget tab (Unit 8)" }
+            BudgetTab {
+              summary: BudgetSummary {
+                  amount: agent.budget_monthly_cents,
+                  observed_amount: agent.spent_monthly_cents,
+                  remaining_amount: (agent.budget_monthly_cents - agent.spent_monthly_cents)
+                      .max(0),
+                  utilization_percent: if agent.budget_monthly_cents > 0 {
+                      agent.spent_monthly_cents as f64 / agent.budget_monthly_cents as f64 * 100.0
+                  } else {
+                      0.0
+                  },
+                  warn_percent: 80,
+                  hard_stop_enabled: true,
+                  status: "ok".to_string(),
+                  is_active: agent.budget_monthly_cents > 0,
+              },
+              on_save: move |_cents: i64| {},
+            }
           },
       }
     }

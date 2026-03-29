@@ -14,6 +14,7 @@ pub mod inline_editor;
 pub mod inline_entity_selector;
 pub mod markdown_body;
 pub mod metric_card;
+pub mod onboarding;
 pub mod page_skeleton;
 pub mod page_tab_bar;
 pub mod priority_icon;

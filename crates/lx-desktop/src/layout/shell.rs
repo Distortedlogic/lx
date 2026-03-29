@@ -11,11 +11,13 @@ use super::properties_panel::PropertiesPanel;
 use super::sidebar::Sidebar;
 use super::status_bar::StatusBar;
 use crate::components::command_palette::CommandPalette;
+use crate::components::onboarding::OnboardingWizard;
 use crate::components::toast_viewport::ToastViewport;
 use crate::contexts::activity_log::ActivityLog;
+use crate::contexts::live_updates::LiveUpdatesProvider;
+use crate::contexts::onboarding::OnboardingCtx;
 use crate::contexts::status_bar::{StatusBarState, StatusBarStateStoreExt};
 use crate::panes::DesktopPane;
-use crate::routes::Route;
 use crate::terminal::{add_tab, use_provide_tabs};
 
 #[cfg(feature = "desktop")]
@@ -47,6 +49,7 @@ pub fn Shell() -> Element {
   let _sidebar_ctx = crate::contexts::sidebar::SidebarState::provide();
   let _breadcrumb = crate::contexts::breadcrumb::BreadcrumbState::provide();
   let _company = crate::contexts::company::CompanyState::provide();
+  let _onboarding = OnboardingCtx::provide();
   use_effect(move || {
     let count = tabs_state.read().notifications.len();
     status_bar_state.notification_count().set(count);
@@ -88,7 +91,7 @@ pub fn Shell() -> Element {
                     fallback: |_| rsx! {
                       div { class: "flex items-center justify-center h-full text-[var(--outline)]", "Loading..." }
                     },
-                    Outlet::<Route> {}
+                    LiveUpdatesProvider {}
                   }
                 }
               }
@@ -100,6 +103,7 @@ pub fn Shell() -> Element {
       StatusBar {}
       ToastViewport {}
       CommandPalette {}
+      OnboardingWizard {}
     }
   }
 }

@@ -54,10 +54,10 @@ pub fn CommandPalette() -> Element {
 
   rsx! {
     div {
-      class: "fixed inset-0 z-50 bg-black/50",
+      class: "fixed inset-0 z-[60] bg-black/50",
       onclick: move |_| open.set(false),
       div {
-        class: "fixed top-[20%] left-1/2 -translate-x-1/2 w-full max-w-md bg-[var(--surface-container)] border border-[var(--outline)] shadow-2xl z-50",
+        class: "fixed top-[20%] left-1/2 -translate-x-1/2 w-full max-w-md bg-[var(--surface-container)] border border-[var(--outline)] shadow-2xl z-[60]",
         onclick: move |e| e.stop_propagation(),
         input {
           class: "w-full px-4 py-3 bg-transparent border-b border-[var(--outline-variant)] text-[var(--on-surface)] text-sm outline-none placeholder:text-[var(--outline)]",

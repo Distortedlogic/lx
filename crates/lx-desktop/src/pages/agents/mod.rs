@@ -1,8 +1,15 @@
+mod budget_tab;
 mod config_form;
 mod detail;
 pub mod list;
+mod live_run_widget;
 mod new_agent;
 mod overview;
+mod run_detail;
+pub mod run_types;
+mod runs_tab;
+mod skills_tab;
+mod transcript;
 pub mod types;
 
 use self::detail::AgentDetailShell;
