@@ -1,83 +1,9 @@
-use std::collections::HashMap;
-
 use dioxus::html::geometry::WheelDelta;
 use dioxus::prelude::*;
 
+use super::chart_helpers::{build_children_map, nodes_from_events, status_dot_color};
 use super::chart_layout::{CARD_H, CARD_W, collect_edges, compute_bounding_box, flatten_layout, layout_forest};
 use crate::contexts::activity_log::ActivityLog;
-use crate::pages::routines::types::OrgNode;
-
-fn nodes_from_events(log: &ActivityLog) -> Vec<OrgNode> {
-  let events = log.events.read();
-  let mut nodes_map: HashMap<String, OrgNode> = HashMap::new();
-
-  for event in events.iter() {
-    match event.kind.as_str() {
-      "agent_start" | "agent_running" | "agent_spawn" => {
-        let name = event.message.clone();
-        let id = name.to_lowercase().replace(' ', "-");
-        nodes_map.entry(id.clone()).or_insert_with(|| OrgNode {
-          id,
-          name,
-          role: "Agent".into(),
-          status: if event.kind == "agent_running" { "running".into() } else { "active".into() },
-          reports_to: None,
-          connected_to: Vec::new(),
-        });
-      },
-      "agent_reports_to" => {
-        let parts: Vec<&str> = event.message.splitn(2, "->").collect();
-        if parts.len() == 2 {
-          let child_name = parts[0].trim();
-          let parent_name = parts[1].trim();
-          let child_id = child_name.to_lowercase().replace(' ', "-");
-          let parent_id = parent_name.to_lowercase().replace(' ', "-");
-          if let Some(node) = nodes_map.get_mut(&child_id) {
-            node.reports_to = Some(parent_id);
-          }
-        }
-      },
-      k if k == "tell" || k == "ask" || k.contains("message") => {
-        let parts: Vec<&str> = event.message.splitn(2, "->").collect();
-        if parts.len() == 2 {
-          let from_name = parts[0].trim();
-          let to_name = parts[1].trim();
-          let from_id = from_name.to_lowercase().replace(' ', "-");
-          let to_id = to_name.to_lowercase().replace(' ', "-");
-          if let Some(node) = nodes_map.get_mut(&from_id)
-            && !node.connected_to.contains(&to_id)
-          {
-            node.connected_to.push(to_id);
-          }
-        }
-      },
-      _ => {},
-    }
-  }
-
-  nodes_map.into_values().collect()
-}
-
-fn build_children_map(nodes: &[OrgNode]) -> HashMap<String, Vec<OrgNode>> {
-  let mut map: HashMap<String, Vec<OrgNode>> = HashMap::new();
-  for node in nodes {
-    if let Some(parent_id) = &node.reports_to {
-      map.entry(parent_id.clone()).or_default().push(node.clone());
-    }
-  }
-  map
-}
-
-fn status_dot_color(status: &str) -> &'static str {
-  match status {
-    "running" => "var(--tertiary)",
-    "active" => "var(--success)",
-    "paused" | "idle" => "var(--warning)",
-    "error" => "var(--error)",
-    "terminated" => "var(--outline)",
-    _ => "var(--outline)",
-  }
-}
 
 #[component]
 pub fn OrgChart() -> Element {
@@ -86,7 +12,7 @@ pub fn OrgChart() -> Element {
 
   let has_nodes = !all.is_empty();
   let children_map = build_children_map(&all);
-  let roots: Vec<OrgNode> = all.iter().filter(|n| n.reports_to.is_none()).cloned().collect();
+  let roots: Vec<_> = all.iter().filter(|n| n.reports_to.is_none()).cloned().collect();
   let layout = layout_forest(&roots, &children_map);
   let flat = flatten_layout(&layout);
   let edges = collect_edges(&layout);
@@ -95,6 +21,8 @@ pub fn OrgChart() -> Element {
   let mut pan_x = use_signal(|| 0.0f64);
   let mut pan_y = use_signal(|| 0.0f64);
   let mut zoom = use_signal(|| 1.0f64);
+  let mut container_w = use_signal(|| 800.0f64);
+  let mut container_h = use_signal(|| 600.0f64);
   let mut dragging = use_signal(|| false);
   let mut drag_start_x = use_signal(|| 0.0f64);
   let mut drag_start_y = use_signal(|| 0.0f64);
@@ -103,20 +31,20 @@ pub fn OrgChart() -> Element {
   let mut mounted = use_signal(|| false);
 
   use_effect(move || {
-    if !mounted() {
+    let cw = container_w();
+    let ch = container_h();
+    if !mounted() && cw > 0.0 && ch > 0.0 {
       if let Some(ref bb) = bbox {
         let content_w = bb.max_x - bb.min_x;
         let content_h = bb.max_y - bb.min_y;
-        let vw = 800.0_f64;
-        let vh = 600.0_f64;
         let margin = 40.0;
-        let scale_x = (vw - margin * 2.0) / content_w;
-        let scale_y = (vh - margin * 2.0) / content_h;
+        let scale_x = (cw - margin * 2.0) / content_w;
+        let scale_y = (ch - margin * 2.0) / content_h;
         let fit_z = scale_x.min(scale_y).clamp(0.2, 1.5);
         let cx = bb.min_x + content_w / 2.0;
         let cy = bb.min_y + content_h / 2.0;
-        pan_x.set(vw / 2.0 - cx * fit_z);
-        pan_y.set(vh / 2.0 - cy * fit_z);
+        pan_x.set(cw / 2.0 - cx * fit_z);
+        pan_y.set(ch / 2.0 - cy * fit_z);
         zoom.set(fit_z);
       }
       mounted.set(true);
@@ -144,6 +72,18 @@ pub fn OrgChart() -> Element {
     div {
       class: "w-full flex-1 min-h-0 overflow-hidden relative",
       style: "cursor: {cursor}",
+      onmounted: move |evt: MountedEvent| {
+          spawn(async move {
+              if let Ok(rect) = evt.data().get_client_rect().await {
+                  let w = rect.width();
+                  let h = rect.height();
+                  if w > 0.0 && h > 0.0 {
+                      container_w.set(w);
+                      container_h.set(h);
+                  }
+              }
+          });
+      },
       onmousedown: move |evt| {
           dragging.set(true);
           let coords = evt.client_coordinates();
@@ -206,8 +146,8 @@ pub fn OrgChart() -> Element {
               if let Some(ref bb) = bbox {
                   let content_w = bb.max_x - bb.min_x;
                   let content_h = bb.max_y - bb.min_y;
-                  let vw = 800.0_f64;
-                  let vh = 600.0_f64;
+                  let vw = container_w();
+                  let vh = container_h();
                   let margin = 40.0;
                   let scale_x = (vw - margin * 2.0) / content_w;
                   let scale_y = (vh - margin * 2.0) / content_h;
@@ -266,9 +206,16 @@ pub fn OrgChart() -> Element {
                   class: "absolute bg-[var(--surface-container)] border border-[var(--outline-variant)] rounded-lg shadow-sm select-none transition-shadow hover:shadow-md hover:border-[var(--on-surface)]/20",
                   style: "left: {node.x}px; top: {node.y}px; width: {card_w}px; min-height: {card_h}px",
                   div { class: "flex items-center px-4 py-3 gap-3",
-                    span {
-                      class: "h-3 w-3 rounded-full shrink-0",
-                      style: "background-color: {dot_color}",
+                    if let Some(ref icon) = node.icon {
+                      span {
+                        class: "material-symbols-outlined text-base shrink-0 text-[var(--on-surface-variant)]",
+                        "{icon}"
+                      }
+                    } else {
+                      span {
+                        class: "h-3 w-3 rounded-full shrink-0",
+                        style: "background-color: {dot_color}",
+                      }
                     }
                     div { class: "flex flex-col min-w-0 flex-1",
                       span { class: "text-sm font-semibold text-[var(--on-surface)] leading-tight",
