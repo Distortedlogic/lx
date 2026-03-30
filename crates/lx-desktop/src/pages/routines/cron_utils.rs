@@ -101,13 +101,7 @@ pub fn describe_schedule(cron: &str) -> String {
     },
     SchedulePreset::Monthly => {
       let dom: u32 = parsed.day_of_month.parse().unwrap_or(1);
-      let suffix = match dom {
-        1 | 21 | 31 => "st",
-        2 | 22 => "nd",
-        3 | 23 => "rd",
-        _ => "th",
-      };
-      format!("Monthly on the {dom}{suffix} at {time_str}")
+      format!("Monthly on the {} at {time_str}", ordinal(dom))
     },
     SchedulePreset::Custom => {
       let trimmed = cron.trim();
@@ -124,4 +118,20 @@ fn format_time(h: u32, m: u32) -> String {
     _ => (h - 12, "PM"),
   };
   format!("{display_h}:{m:02} {period}")
+}
+
+pub fn ordinal_suffix(n: u32) -> &'static str {
+  match (n % 10, n % 100) {
+    (1, 11) => "th",
+    (2, 12) => "th",
+    (3, 13) => "th",
+    (1, _) => "st",
+    (2, _) => "nd",
+    (3, _) => "rd",
+    _ => "th",
+  }
+}
+
+pub fn ordinal(n: u32) -> String {
+  format!("{n}{}", ordinal_suffix(n))
 }

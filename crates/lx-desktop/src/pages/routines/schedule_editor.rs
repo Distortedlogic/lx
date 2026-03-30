@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 
-use super::cron_utils::{build_cron, describe_schedule, parse_cron_to_preset};
+use super::cron_utils::{build_cron, describe_schedule, ordinal, parse_cron_to_preset};
 use crate::components::ui::select::{Select, SelectOption};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -244,7 +244,7 @@ fn render_pickers(
       Select {
         class: "{select_cls} w-[80px]",
         value: cur_dom.to_string(),
-        options: (1..=31u32).map(|d| SelectOption::new(d.to_string(), d.to_string())).collect::<Vec<_>>(),
+        options: (1..=31u32).map(|d| SelectOption::new(d.to_string(), ordinal(d))).collect::<Vec<_>>(),
         onchange: move |val: String| on_dom(val),
       }
     },
