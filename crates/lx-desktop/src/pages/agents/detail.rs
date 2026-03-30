@@ -2,10 +2,11 @@ use super::budget_tab::BudgetTab;
 use super::config_form::AgentConfigPanel;
 use super::list::StatusBadge;
 use super::overview::AgentOverview;
-use super::run_types::{BudgetSummary, SkillSnapshot};
+use super::run_types::{BudgetSummary, HeartbeatRun, SkillSnapshot};
 use super::runs_tab::RunsTab;
 use super::skills_tab::SkillsTab;
 use super::types::{AgentDetail as AgentDetailData, AgentDetailTab, role_label};
+use crate::contexts::activity_log::ActivityLog;
 use crate::styles::{BTN_OUTLINE_SM, TAB_ACTIVE, TAB_INACTIVE};
 use dioxus::prelude::*;
 
@@ -19,6 +20,40 @@ pub fn AgentDetailShell(
   on_terminate: EventHandler<()>,
 ) -> Element {
   let mut active_tab = use_signal(|| AgentDetailTab::Overview);
+
+  let log = use_context::<ActivityLog>();
+  let all_events = log.events.read();
+
+  let agent_events: Vec<_> = all_events.iter().filter(|e| e.message.contains(&agent.name) || e.kind.contains("agent")).cloned().collect();
+
+  let runs: Vec<HeartbeatRun> = {
+    let mut run_list = Vec::new();
+    for event in agent_events.iter() {
+      if event.kind == "agent_start" || event.kind == "agent_running" {
+        let status = if event.kind == "agent_running" { "running" } else { "queued" };
+        let already = run_list.iter().any(|r: &HeartbeatRun| r.id == event.timestamp);
+        if !already {
+          run_list.push(HeartbeatRun {
+            id: event.timestamp.clone(),
+            agent_id: agent.id.clone(),
+            company_id: String::new(),
+            status: status.to_string(),
+            invocation_source: "on_demand".to_string(),
+            trigger_detail: None,
+            started_at: Some(event.timestamp.clone()),
+            finished_at: None,
+            created_at: event.timestamp.clone(),
+            error: None,
+            error_code: None,
+            usage_json: None,
+            result_json: None,
+            context_snapshot: None,
+          });
+        }
+      }
+    }
+    run_list
+  };
 
   let role_text = role_label(&agent.role);
   let subtitle = match &agent.title {
@@ -86,7 +121,7 @@ pub fn AgentDetailShell(
             AgentConfigPanel { agent: agent.clone() }
           },
           AgentDetailTab::Runs => rsx! {
-            RunsTab { runs: Vec::new(), agent_route_id: agent.id.clone() }
+            RunsTab { runs: runs.clone(), agent_route_id: agent.id.clone() }
           },
           AgentDetailTab::Skills => rsx! {
             SkillsTab {

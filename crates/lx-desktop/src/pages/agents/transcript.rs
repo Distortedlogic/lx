@@ -1,4 +1,5 @@
 use dioxus::prelude::*;
+use lx_api::types::ActivityEvent;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TranscriptBlock {
@@ -8,14 +9,26 @@ pub enum TranscriptBlock {
   Event { label: String, text: String, tone: String, ts: String },
 }
 
+fn event_to_block(event: &ActivityEvent) -> TranscriptBlock {
+  match event.kind.as_str() {
+    "log" | "agent_message" | "message" => TranscriptBlock::Message { role: "assistant".into(), text: event.message.clone(), ts: event.timestamp.clone() },
+    "thinking" => TranscriptBlock::Thinking { text: event.message.clone(), ts: event.timestamp.clone() },
+    k if k.contains("tool") => {
+      TranscriptBlock::ToolUse { name: event.kind.clone(), input_summary: event.message.clone(), result: None, is_error: false, ts: event.timestamp.clone() }
+    },
+    k if k.contains("error") => {
+      TranscriptBlock::Event { label: "error".into(), text: event.message.clone(), tone: "error".into(), ts: event.timestamp.clone() }
+    },
+    _ => TranscriptBlock::Event { label: event.kind.clone(), text: event.message.clone(), tone: "info".into(), ts: event.timestamp.clone() },
+  }
+}
+
 #[component]
-pub fn TranscriptView(run_id: String) -> Element {
-  let entries: Vec<TranscriptBlock> = vec![
-    TranscriptBlock::Message { role: "system".into(), text: format!("Run {run_id} transcript"), ts: "00:00".into() },
-    TranscriptBlock::Thinking { text: "Analyzing...".into(), ts: "00:01".into() },
-    TranscriptBlock::ToolUse { name: "example".into(), input_summary: "...".into(), result: None, is_error: false, ts: "00:02".into() },
-    TranscriptBlock::Event { label: "done".into(), text: "Complete".into(), tone: "success".into(), ts: "00:03".into() },
-  ];
+pub fn TranscriptView(run_id: String, #[props(optional)] events: Option<Vec<ActivityEvent>>) -> Element {
+  let entries: Vec<TranscriptBlock> = match events {
+    Some(evts) => evts.iter().map(event_to_block).collect(),
+    None => vec![],
+  };
 
   if entries.is_empty() {
     return rsx! {
