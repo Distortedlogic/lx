@@ -16,8 +16,6 @@ impl Formatter<'_> {
       KeywordKind::Guard => "Guard",
       KeywordKind::Workflow => "Workflow",
       KeywordKind::Schema => "Schema",
-      KeywordKind::Mcp => "MCP",
-      KeywordKind::Cli => "CLI",
       KeywordKind::Http => "HTTP",
     };
     self.write(kw);

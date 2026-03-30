@@ -1,6 +1,5 @@
 pub mod desugar;
 mod desugar_http;
-mod desugar_mcp_cli;
 mod desugar_schema;
 mod desugar_uses;
 pub(crate) mod gen_ast;

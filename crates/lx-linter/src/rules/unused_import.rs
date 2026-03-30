@@ -47,7 +47,6 @@ impl LintRule for UnusedImport {
         UseKind::Whole => use_stmt.path.last().map(|n| vec![*n]).unwrap_or_default(),
         UseKind::Alias(alias) => vec![*alias],
         UseKind::Selective(names) => names.clone(),
-        UseKind::Tool { alias, .. } => vec![*alias],
       };
 
       for name in &names_to_check {

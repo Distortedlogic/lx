@@ -194,3 +194,13 @@ body {
 .animate-transcript-enter {
   animation: transcript-block-enter 300ms ease-out both;
 }
+
+.collapsible-open {
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 200ms ease-out;
+}
+
+.collapsible-closed {
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 200ms ease-out;
+}

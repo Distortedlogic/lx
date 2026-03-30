@@ -198,17 +198,7 @@ fn desugar_keyword(data: KeywordDeclData, span: SourceSpan, arena: &mut AstArena
   if data.keyword == KeywordKind::Schema {
     return super::desugar_schema::desugar_schema(data, span, arena);
   }
-  if data.keyword == KeywordKind::Mcp {
-    eprintln!(
-      "warning: MCP keyword is deprecated. Use `use tool \"{}\" as {}` instead.",
-      data.fields.iter().find(|f| f.name.as_str() == "command").map(|_| "<command>").unwrap_or("<command>"),
-      data.name,
-    );
-    return super::desugar_mcp_cli::desugar_mcp(data, span, arena);
   }
-  if data.keyword == KeywordKind::Cli {
-    eprintln!("warning: CLI keyword is deprecated. Use `use tool` with an MCP server instead of `CLI {}`.", data.name,);
-    return super::desugar_mcp_cli::desugar_cli(data, span, arena);
   }
   if data.keyword == KeywordKind::Http {
     return super::desugar_http::desugar_http(data, span, arena);
