@@ -198,8 +198,6 @@ fn desugar_keyword(data: KeywordDeclData, span: SourceSpan, arena: &mut AstArena
   if data.keyword == KeywordKind::Schema {
     return super::desugar_schema::desugar_schema(data, span, arena);
   }
-  }
-  }
   if data.keyword == KeywordKind::Http {
     return super::desugar_http::desugar_http(data, span, arena);
   }
