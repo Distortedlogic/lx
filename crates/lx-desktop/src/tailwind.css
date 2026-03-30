@@ -12,6 +12,27 @@
   --radius-xl: 0rem;
   --radius-2xl: 0rem;
   --radius-3xl: 0rem;
+  --radius-full: 9999px;
+
+  --color-background: var(--surface);
+  --color-foreground: var(--on-surface);
+  --color-card: var(--surface-container);
+  --color-card-foreground: var(--on-surface);
+  --color-popover: var(--surface-container-high);
+  --color-popover-foreground: var(--on-surface);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--on-primary);
+  --color-secondary: var(--surface-container-high);
+  --color-secondary-foreground: var(--on-surface);
+  --color-muted: var(--surface-container);
+  --color-muted-foreground: var(--on-surface-variant);
+  --color-accent: var(--surface-container-high);
+  --color-accent-foreground: var(--on-surface);
+  --color-destructive: var(--error);
+  --color-border: var(--outline-variant);
+  --color-input: var(--outline-variant);
+  --color-ring: var(--primary);
+  --color-ring-offset: var(--surface);
 }
 
 :root {

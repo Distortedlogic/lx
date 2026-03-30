@@ -1,0 +1,37 @@
+[package]
+edition.workspace = true
+license.workspace = true
+name = "lx-eval"
+version = "0.1.0"
+
+[dependencies]
+lx-span = { path = "../lx-span" }
+lx-ast = { path = "../lx-ast" }
+lx-parser = { path = "../lx-parser" }
+lx-desugar = { path = "../lx-desugar" }
+lx-value = { path = "../lx-value" }
+async-recursion.workspace = true
+chrono.workspace = true
+cron.workspace = true
+dashmap.workspace = true
+extism.workspace = true
+futures.workspace = true
+indexmap.workspace = true
+itertools.workspace = true
+miette.workspace = true
+num-bigint.workspace = true
+num-integer.workspace = true
+num-traits.workspace = true
+parking_lot.workspace = true
+pulldown-cmark.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+similar.workspace = true
+smart-default.workspace = true
+tokio.workspace = true
+tokio-tungstenite.workspace = true
+toml.workspace = true
+
+[lints]
+workspace = true
