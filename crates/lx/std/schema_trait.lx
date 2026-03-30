@@ -1,9 +1,0 @@
-+Trait Schema = {
-  validate = (data) {
-    (type_of data) != "Record" ? (Err {error: "expected Record, got {type_of data}"}) : (Ok data)
-  }
-
-  schema = () {
-    {type: "object", properties: {}, required: []}
-  }
-}

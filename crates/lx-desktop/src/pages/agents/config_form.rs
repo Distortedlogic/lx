@@ -98,7 +98,7 @@ pub fn AgentConfigPanel(
                 interval_sec.set(original_interval);
                 dirty.set(false);
                 if let Some(ref handler) = on_cancel {
-                  handler.call(());
+                    handler.call(());
                 }
             },
             "Cancel"
@@ -107,14 +107,14 @@ pub fn AgentConfigPanel(
             class: BTN_PRIMARY_SM,
             onclick: move |_| {
                 let update = ConfigUpdate {
-                  adapter_type: adapter_type.read().clone(),
-                  model: model.read().clone(),
-                  heartbeat_enabled: *heartbeat_enabled.read(),
-                  heartbeat_interval_sec: *interval_sec.read(),
+                    adapter_type: adapter_type.read().clone(),
+                    model: model.read().clone(),
+                    heartbeat_enabled: *heartbeat_enabled.read(),
+                    heartbeat_interval_sec: *interval_sec.read(),
                 };
                 dirty.set(false);
                 if let Some(ref handler) = on_save {
-                  handler.call(update);
+                    handler.call(update);
                 }
             },
             "Save"

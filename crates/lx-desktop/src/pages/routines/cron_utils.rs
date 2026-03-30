@@ -74,3 +74,54 @@ pub fn build_cron(preset: &SchedulePreset, hour: &str, minute: &str, day_of_week
     SchedulePreset::Custom => String::new(),
   }
 }
+
+pub fn describe_schedule(cron: &str) -> String {
+  let parsed = parse_cron_to_preset(cron);
+  let h: u32 = parsed.hour.parse().unwrap_or(0);
+  let m: u32 = parsed.minute.parse().unwrap_or(0);
+  let time_str = format_time(h, m);
+
+  match parsed.preset {
+    SchedulePreset::EveryMinute => "Every minute".to_string(),
+    SchedulePreset::EveryHour => format!("Every hour at minute {m:02}"),
+    SchedulePreset::EveryDay => format!("Every day at {time_str}"),
+    SchedulePreset::Weekdays => format!("Weekdays at {time_str}"),
+    SchedulePreset::Weekly => {
+      let dow_name = match parsed.day_of_week.as_str() {
+        "0" => "Sunday",
+        "1" => "Monday",
+        "2" => "Tuesday",
+        "3" => "Wednesday",
+        "4" => "Thursday",
+        "5" => "Friday",
+        "6" => "Saturday",
+        _ => "Monday",
+      };
+      format!("Every {dow_name} at {time_str}")
+    },
+    SchedulePreset::Monthly => {
+      let dom: u32 = parsed.day_of_month.parse().unwrap_or(1);
+      let suffix = match dom {
+        1 | 21 | 31 => "st",
+        2 | 22 => "nd",
+        3 | 23 => "rd",
+        _ => "th",
+      };
+      format!("Monthly on the {dom}{suffix} at {time_str}")
+    },
+    SchedulePreset::Custom => {
+      let trimmed = cron.trim();
+      if trimmed.is_empty() { "No schedule set".to_string() } else { format!("Custom: {trimmed}") }
+    },
+  }
+}
+
+fn format_time(h: u32, m: u32) -> String {
+  let (display_h, period) = match h {
+    0 => (12, "AM"),
+    1..=11 => (h, "AM"),
+    12 => (12, "PM"),
+    _ => (h - 12, "PM"),
+  };
+  format!("{display_h}:{m:02} {period}")
+}

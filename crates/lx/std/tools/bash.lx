@@ -1,8 +1,0 @@
--- default tool: execute shell commands via bash builtin
-
-Tool Bash = {
-  name: "bash"
-  description: "Execute shell commands"
-  params: {command: Str}
-  run = (args) { bash args.command }
-}

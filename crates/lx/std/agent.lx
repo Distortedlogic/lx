@@ -1,5 +1,0 @@
-+Trait Agent = {
-  handle = (msg) { msg }
-  run = () { }
-  subscribes = () { [] }
-}

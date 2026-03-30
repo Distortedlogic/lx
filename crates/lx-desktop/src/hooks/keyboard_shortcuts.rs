@@ -1,45 +1,44 @@
 use dioxus::prelude::*;
 
-pub struct ShortcutHandlers {
-  pub on_new_issue: Option<EventHandler<()>>,
-  pub on_toggle_sidebar: Option<EventHandler<()>>,
-  pub on_toggle_panel: Option<EventHandler<()>>,
-}
+use crate::components::command_palette::CommandPaletteOpen;
+use crate::contexts::dialog::DialogState;
 
-pub fn use_keyboard_shortcuts(handlers: &ShortcutHandlers) -> EventHandler<KeyboardEvent> {
-  let input_focused = use_signal(|| false);
-  let on_new_issue = handlers.on_new_issue;
-  let on_toggle_sidebar = handlers.on_toggle_sidebar;
-  let on_toggle_panel = handlers.on_toggle_panel;
+pub fn use_keyboard_shortcuts() -> EventHandler<KeyboardEvent> {
+  let mut palette_open = use_context::<CommandPaletteOpen>();
+  let dialog = use_context::<DialogState>();
 
   EventHandler::new(move |event: KeyboardEvent| {
-    if input_focused() {
-      return;
-    }
-
     let key = event.key();
     let modifiers = event.modifiers();
-    let has_modifier = modifiers.ctrl() || modifiers.meta() || modifiers.alt();
+    let cmd_or_ctrl = modifiers.meta() || modifiers.ctrl();
 
-    if !has_modifier {
-      match key {
-        Key::Character(ref c) if c == "c" => {
-          if let Some(ref handler) = on_new_issue {
-            handler.call(());
-          }
-        },
-        Key::Character(ref c) if c == "[" => {
-          if let Some(ref handler) = on_toggle_sidebar {
-            handler.call(());
-          }
-        },
-        Key::Character(ref c) if c == "]" => {
-          if let Some(ref handler) = on_toggle_panel {
-            handler.call(());
-          }
-        },
-        _ => {},
+    if key == Key::Escape {
+      if *palette_open.0.read() {
+        palette_open.0.set(false);
+        return;
       }
+      if *dialog.new_issue_open.read() {
+        dialog.close_new_issue();
+        return;
+      }
+      if *dialog.new_project_open.read() {
+        dialog.close_new_project();
+        return;
+      }
+      if *dialog.new_agent_open.read() {
+        dialog.close_new_agent();
+        return;
+      }
+      if *dialog.onboarding_open.read() {
+        dialog.close_onboarding();
+        return;
+      }
+    }
+
+    if cmd_or_ctrl && key == Key::Character("k".into()) {
+      event.prevent_default();
+      let current = *palette_open.0.read();
+      palette_open.0.set(!current);
     }
   })
 }

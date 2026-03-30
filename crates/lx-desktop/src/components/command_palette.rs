@@ -32,10 +32,9 @@ fn matches_query(label: &str, query: &str) -> bool {
 
 #[component]
 pub fn CommandPalette() -> Element {
-  let mut open = use_signal(|| false);
+  let palette = use_context::<CommandPaletteOpen>();
+  let mut open = palette.0;
   let mut query = use_signal(String::new);
-
-  use_context_provider(|| CommandPaletteOpen(open));
 
   use_effect(move || {
     if !open() {

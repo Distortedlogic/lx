@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 
-use super::cron_utils::{build_cron, parse_cron_to_preset};
+use super::cron_utils::{build_cron, describe_schedule, parse_cron_to_preset};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SchedulePreset {
@@ -91,6 +91,9 @@ pub fn ScheduleEditor(value: String, on_change: EventHandler<String>) -> Element
 
   rsx! {
     div { class: "flex flex-col gap-3",
+      p { class: "text-xs text-[var(--outline)] italic",
+        "{describe_schedule(&value)}"
+      }
       select {
         class: "{select_cls} w-full",
         value: "{cur_preset.to_value()}",

@@ -10,13 +10,14 @@ use super::menu_bar::MenuBar;
 use super::properties_panel::PropertiesPanel;
 use super::sidebar::Sidebar;
 use super::status_bar::StatusBar;
-use crate::components::command_palette::CommandPalette;
+use crate::components::command_palette::{CommandPalette, CommandPaletteOpen};
 use crate::components::onboarding::OnboardingWizard;
 use crate::components::toast_viewport::ToastViewport;
 use crate::contexts::activity_log::ActivityLog;
 use crate::contexts::live_updates::LiveUpdatesProvider;
 use crate::contexts::onboarding::OnboardingCtx;
 use crate::contexts::status_bar::{StatusBarState, StatusBarStateStoreExt};
+use crate::hooks::keyboard_shortcuts::use_keyboard_shortcuts;
 use crate::panes::DesktopPane;
 use crate::terminal::{add_tab, use_provide_tabs};
 
@@ -50,6 +51,7 @@ pub fn Shell() -> Element {
   let _breadcrumb = crate::contexts::breadcrumb::BreadcrumbState::provide();
   let _company = crate::contexts::company::CompanyState::provide();
   let _onboarding = OnboardingCtx::provide();
+  use_context_provider(|| CommandPaletteOpen(Signal::new(false)));
   use_effect(move || {
     let count = tabs_state.read().notifications.len();
     status_bar_state.notification_count().set(count);
@@ -66,8 +68,12 @@ pub fn Shell() -> Element {
   });
   use_context_provider(|| spawn_channel.0.clone());
   spawn_terminal_listener(tabs_state, &spawn_channel.1);
+  let key_handler = use_keyboard_shortcuts();
   rsx! {
-    div { class: "relative h-screen overflow-hidden bg-[var(--surface)] text-[var(--on-surface)] flex flex-col",
+    div {
+      class: "relative h-screen overflow-hidden bg-[var(--surface)] text-[var(--on-surface)] flex flex-col",
+      tabindex: "0",
+      onkeydown: move |e| key_handler.call(e),
       ResizeHandles {}
       MenuBar {}
       div { class: "flex flex-1 min-h-0",
