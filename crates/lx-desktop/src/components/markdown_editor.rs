@@ -1,4 +1,5 @@
 use dioxus::prelude::*;
+use uuid::Uuid;
 
 use super::markdown_body::MarkdownBody;
 
