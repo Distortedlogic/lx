@@ -57,11 +57,11 @@ use dioxus::prelude::*;
 #[component]
 pub fn ChartCard(title: String, #[props(optional)] subtitle: Option<String>, children: Element) -> Element {
   rsx! {
-    div { class: "border border-gray-700 rounded-lg p-4 space-y-3",
+    div { class: "border border-[var(--outline-variant)]/30 rounded-lg p-4 space-y-3",
       div {
-        h3 { class: "text-xs font-medium text-gray-400", "{title}" }
+        h3 { class: "text-xs font-medium text-[var(--outline)]", "{title}" }
         if let Some(ref sub) = subtitle {
-          span { class: "text-[10px] text-gray-500", "{sub}" }
+          span { class: "text-[10px] text-[var(--outline)]/60", "{sub}" }
         }
       }
       {children}
@@ -81,7 +81,7 @@ pub fn ActivitySummaryChart(buckets: Vec<usize>) -> Element {
             rsx! {
               div {
                 key: "{i}",
-                class: "flex-1 bg-gray-700/30 rounded-sm",
+                class: "flex-1 bg-[var(--surface-container-high)]/30 rounded-sm",
                 style: "height: {pct}%",
               }
             }
@@ -94,7 +94,7 @@ pub fn ActivitySummaryChart(buckets: Vec<usize>) -> Element {
 #[component]
 pub fn EventBreakdownChart(segments: Vec<(String, usize)>) -> Element {
   let max_val = segments.iter().map(|(_, c)| *c).max().unwrap_or(1).max(1);
-  let colors = ["bg-emerald-700/30", "bg-cyan-700/30", "bg-amber-700/30", "bg-red-700/30", "bg-violet-700/30"];
+  let colors = ["bg-[var(--success)]/30", "bg-[var(--tertiary)]/30", "bg-[var(--warning)]/30", "bg-[var(--error)]/30", "bg-violet-700/30"];
   rsx! {
     div { class: "flex items-end gap-[3px] h-20",
       for (i , (_label , count)) in segments.iter().enumerate() {
@@ -107,7 +107,7 @@ pub fn EventBreakdownChart(segments: Vec<(String, usize)>) -> Element {
                 key: "{i}",
                 class: "flex-1 {color} rounded-sm relative group",
                 style: "height: {pct}%",
-                div { class: "absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] text-gray-400 opacity-0 group-hover:opacity-100 whitespace-nowrap",
+                div { class: "absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] text-[var(--outline)] opacity-0 group-hover:opacity-100 whitespace-nowrap",
                   "{_label}: {count}"
                 }
               }
@@ -122,7 +122,7 @@ pub fn EventBreakdownChart(segments: Vec<(String, usize)>) -> Element {
             span {
               class: "w-2 h-2 rounded-sm {colors[i % colors.len()]}",
             }
-            span { class: "text-[10px] text-gray-400", "{label} ({count})" }
+            span { class: "text-[10px] text-[var(--outline)]", "{label} ({count})" }
           }
         }
       }

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::sym::Sym;
+use lx_span::sym::Sym;
 
 use super::Checker;
 use super::type_arena::TypeId;

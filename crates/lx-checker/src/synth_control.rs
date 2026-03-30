@@ -1,5 +1,5 @@
-use crate::ast::{ExprId, SelArm, Stmt, StmtId, WithKind};
-use crate::sym::intern;
+use lx_ast::ast::{ExprId, SelArm, Stmt, StmtId, WithKind};
+use lx_span::sym::intern;
 use miette::SourceSpan;
 
 use super::diagnostics::DiagnosticKind;

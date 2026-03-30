@@ -2,7 +2,7 @@ use std::fmt;
 
 use num_bigint::BigInt;
 
-use crate::sym::Sym;
+use lx_span::sym::Sym;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Pat {

@@ -1,4 +1,4 @@
-use crate::ast::{Expr, ExprBlock, ExprFunc, ExprId, ListElem, MatchArm, Stmt, StmtId};
+use lx_ast::ast::{Expr, ExprBlock, ExprFunc, ExprId, ListElem, MatchArm, Stmt, StmtId};
 
 use super::Checker;
 use super::narrowing;

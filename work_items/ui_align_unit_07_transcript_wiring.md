@@ -127,7 +127,7 @@ pub fn TranscriptView(run_id: String, #[props(optional)] events: Option<Vec<Acti
 - `kind` contains `"error"` -> `TranscriptBlock::Event` with tone `"error"`
 - All other kinds -> `TranscriptBlock::Event` with tone `"info"`
 
-The `events` prop is `Option<Vec<ActivityEvent>>` so existing call sites (`run_detail.rs` line 37, `live_run_widget.rs` line 83) that pass only `run_id` continue to compile and render an empty transcript. Those call sites will be wired in a future unit when per-run event streams exist.
+The `events` prop is `Option<Vec<ActivityEvent>>` so existing call sites (`run_detail.rs` line 37, `live_run_widget.rs` line 83) that pass only `run_id` continue to compile and render an empty transcript. Those files are unchanged in this unit.
 
 ---
 

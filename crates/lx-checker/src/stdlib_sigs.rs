@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::sym::intern;
+use lx_span::sym::intern;
 
 use super::module_graph::ModuleSignature;
 use super::type_arena::{TypeArena, TypeId};

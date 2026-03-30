@@ -1,4 +1,3 @@
-use crate::sym::Sym;
 mod capture;
 mod check_expr;
 pub mod diagnostics;
@@ -22,25 +21,22 @@ pub mod unification;
 mod visit_stmt;
 
 use std::collections::HashMap;
-
 use std::sync::Arc;
 
 use la_arena::ArenaMap;
 
-use crate::ast::{AstArena, Core, ExprId, Program, Stmt, StmtId, TypeExpr, TypeExprId};
-use crate::visitor::{AstVisitor, VisitAction};
 use diagnostics::{DiagnosticKind, Fix};
+use lx_ast::ast::{AstArena, Core, ExprId, Program, Stmt, StmtId, TypeExpr, TypeExprId};
+use lx_ast::visitor::{AstVisitor, VisitAction};
+use lx_span::sym::Sym;
 use miette::SourceSpan;
 use module_graph::ModuleSignature;
 use narrowing::NarrowingEnv;
 use semantic::{SemanticModel, SemanticModelBuilder};
 use type_arena::{TypeArena, TypeId};
-
 use type_error::TypeError;
 use types::{Type, Variant};
 use unification::UnificationTable;
-
-use crate::linter::{RuleRegistry, lint};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiagLevel {
@@ -147,7 +143,7 @@ impl<'a> Checker<'a> {
         if t != self.type_arena.unknown() {
           return t;
         }
-        let sym = crate::sym::intern(name.as_str());
+        let sym = lx_span::sym::intern(name.as_str());
         if let Some(variant_names) = self.type_defs.get(&sym).cloned() {
           let variants = variant_names.iter().map(|vn| Variant { name: *vn, fields: vec![] }).collect();
           return self.type_arena.alloc(Type::Union { name: sym, variants });
@@ -177,7 +173,7 @@ impl<'a> Checker<'a> {
             self.type_arena.alloc(Type::Result { ok, err })
           },
           _ => {
-            let sym = crate::sym::intern(name.as_str());
+            let sym = lx_span::sym::intern(name.as_str());
             if let Some(variant_names) = self.type_defs.get(&sym).cloned() {
               let variants = variant_names.iter().map(|vn| Variant { name: *vn, fields: vec![] }).collect();
               self.type_arena.alloc(Type::Union { name: sym, variants })
@@ -230,7 +226,7 @@ impl<'a> Checker<'a> {
   }
 
   fn check_program(&mut self, program: &Program<Core>) {
-    let _ = crate::visitor::walk_program(self, program);
+    let _ = lx_ast::visitor::walk_program(self, program);
   }
 }
 
@@ -249,10 +245,7 @@ pub fn check(program: &Program<Core>, source: Arc<str>) -> CheckResult {
   let mut checker = Checker::new(&program.arena);
   checker.check_program(program);
   let semantic = checker.sem.build(checker.expr_types, checker.type_defs, checker.trait_fields, checker.type_arena);
-  let mut diagnostics = checker.diagnostics;
-  let mut registry = RuleRegistry::default_rules();
-  let lint_diags = lint(program, &semantic, &mut registry);
-  diagnostics.extend(lint_diags);
+  let diagnostics = checker.diagnostics;
   CheckResult { diagnostics, source, semantic }
 }
 
@@ -276,9 +269,6 @@ pub fn check_with_imports(program: &Program<Core>, source: Arc<str>, import_sign
   checker.import_signatures = import_signatures;
   checker.check_program(program);
   let semantic = checker.sem.build(checker.expr_types, checker.type_defs, checker.trait_fields, checker.type_arena);
-  let mut diagnostics = checker.diagnostics;
-  let mut registry = RuleRegistry::default_rules();
-  let lint_diags = lint(program, &semantic, &mut registry);
-  diagnostics.extend(lint_diags);
+  let diagnostics = checker.diagnostics;
   CheckResult { diagnostics, source, semantic }
 }

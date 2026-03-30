@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
-use crate::ast::{BindTarget, Core, Program, Stmt};
-use crate::sym::Sym;
+use lx_ast::ast::{BindTarget, Core, Program, Stmt};
+use lx_span::sym::Sym;
 
 use super::semantic::SemanticModel;
 use super::type_arena::{TypeArena, TypeId};
 
 pub struct ModuleSignature {
-  pub file: Option<crate::source::FileId>,
+  pub file: Option<lx_span::source::FileId>,
   pub bindings: HashMap<Sym, TypeId>,
   pub types: HashMap<Sym, Vec<Sym>>,
   pub traits: HashMap<Sym, Vec<(Sym, TypeId)>>,

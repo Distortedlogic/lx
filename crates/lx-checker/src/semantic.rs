@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use la_arena::ArenaMap;
 
-use crate::ast::ExprId;
-use crate::sym::Sym;
+use lx_ast::ast::ExprId;
+use lx_span::sym::Sym;
 use miette::SourceSpan;
 
 use super::type_arena::{TypeArena, TypeId};

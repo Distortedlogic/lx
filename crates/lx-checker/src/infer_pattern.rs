@@ -1,5 +1,5 @@
-use crate::ast::{FieldPattern, Pattern, PatternConstructor, PatternId, PatternList, PatternRecord};
-use crate::sym::Sym;
+use lx_ast::ast::{FieldPattern, Pattern, PatternConstructor, PatternId, PatternList, PatternRecord};
+use lx_span::sym::Sym;
 
 use super::Checker;
 use super::semantic::DefKind;

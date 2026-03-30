@@ -1,4 +1,4 @@
-use crate::ast::{BinOp, Expr, ExprBlock, ExprBreak, ExprId, ExprLoop, ExprPar, ExprPropagate, ExprTuple, FieldKind, ListElem, Literal, RecordField, UnaryOp};
+use lx_ast::ast::{BinOp, Expr, ExprBlock, ExprBreak, ExprId, ExprLoop, ExprPar, ExprPropagate, ExprTuple, FieldKind, ListElem, Literal, RecordField, UnaryOp};
 use miette::SourceSpan;
 
 use super::diagnostics::DiagnosticKind;

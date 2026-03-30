@@ -355,4 +355,4 @@ After all changes:
 - `dioxus_storage` is no longer imported in `chart.rs` (the crate is still a dependency for other files).
 - Empty ActivityLog shows the "No agents detected" empty state.
 - Agent events create nodes; `reports_to` events create hierarchy; `tell`/`ask` events populate `connected_to`.
-- The `connected_to` field on OrgNode is available for future visualization of communication topology edges (not rendered in this unit, only data-populated).
+- The `connected_to` field on OrgNode is populated from `tell`/`ask` events.

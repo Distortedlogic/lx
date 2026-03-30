@@ -57,15 +57,15 @@ Each line in the JSONL file is a JSON object with at minimum a `type` field and 
 
 **File:** `/home/entropybender/repos/lx/crates/lx-desktop/Cargo.toml`
 
+Delete the following line entirely (no replacement):
+
 **old_string:**
 ```
 tokio-tungstenite = { workspace = true }
 ```
 
 **new_string:**
-```
-notify = { version = "8", default-features = false, features = ["macos_kqueue"] }
-```
+(empty — line is deleted)
 
 ### Step 2: Rewrite live_updates.rs
 
@@ -279,27 +279,9 @@ fn dispatch_event(activity_log: &ActivityLog, event: &StreamEvent) {
 }
 ```
 
-### Step 3: Remove `futures` crate if unused elsewhere
+### Step 3: Leave `futures` in Cargo.toml
 
-Run the following grep to verify `futures` is not imported anywhere else in `lx-desktop`:
-
-```
-grep -r "use futures" crates/lx-desktop/src/ --include="*.rs"
-```
-
-If `live_updates.rs` was the only user, also remove from Cargo.toml:
-
-**File:** `/home/entropybender/repos/lx/crates/lx-desktop/Cargo.toml`
-
-**old_string:**
-```
-futures = { workspace = true }
-```
-
-**new_string:**
-(delete this line entirely)
-
-If other files use `futures`, leave it.
+Leave the `futures` dependency in Cargo.toml — it is used by `terminal/browser_view.rs`.
 
 ---
 

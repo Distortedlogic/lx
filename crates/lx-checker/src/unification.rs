@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use ena::unify::{InPlaceUnificationTable, UnifyKey};
 
-use crate::sym::Sym;
+use lx_span::sym::Sym;
 
 use super::type_arena::{TypeArena, TypeId};
 use super::type_error::{TypeContext, TypeError};

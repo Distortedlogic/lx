@@ -6,6 +6,7 @@ version = "0.1.0"
 
 [dependencies]
 lx-ast = { path = "../lx-ast" }
+lx-checker = { path = "../lx-checker" }
 lx-desugar = { path = "../lx-desugar" }
 lx-fmt = { path = "../lx-fmt" }
 lx-macros = { path = "../lx-macros" }

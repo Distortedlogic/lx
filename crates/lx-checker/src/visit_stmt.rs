@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
-use crate::ast::{AstArena, BindTarget, Binding, Stmt, StmtId, TraitEntry, UseKind, UseStmt};
-use crate::sym::Sym;
+use lx_ast::ast::{AstArena, BindTarget, Binding, Stmt, StmtId, TraitEntry, UseKind, UseStmt};
+use lx_span::sym::Sym;
 use miette::SourceSpan;
 
-use crate::stdlib::STDLIB_ROOT;
+const STDLIB_ROOT: &str = "std";
 
 use super::diagnostics::DiagnosticKind;
 use super::semantic::DefKind;

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use crate::ast::Pattern;
-use crate::sym::Sym;
+use lx_ast::ast::Pattern;
+use lx_span::sym::Sym;
 
 use super::type_arena::{TypeArena, TypeId};
 use super::types::Type;

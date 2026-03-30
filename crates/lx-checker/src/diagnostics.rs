@@ -2,7 +2,7 @@ use std::fmt;
 
 use miette::SourceSpan;
 
-use crate::sym::Sym;
+use lx_span::sym::Sym;
 
 use super::type_arena::TypeArena;
 use super::type_error::TypeError;

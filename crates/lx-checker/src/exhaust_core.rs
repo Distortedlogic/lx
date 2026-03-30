@@ -1,4 +1,4 @@
-use crate::sym::Sym;
+use lx_span::sym::Sym;
 
 use super::exhaust_types::{CtorId, LitPat, Pat};
 

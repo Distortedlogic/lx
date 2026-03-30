@@ -1,12 +1,12 @@
 use std::collections::HashSet;
 use std::ops::ControlFlow;
 
-use crate::ast::{
+use lx_ast::ast::{
   AstArena, BindTarget, Binding, ExprBlock, ExprFunc, ExprId, ExprLoop, ExprMatch, ExprPar, ExprWith, FieldPattern, PatternId, StmtId, WithKind,
 };
-use crate::sym::Sym;
-use crate::visitor::prelude::*;
-use crate::visitor::{walk_binding, walk_func};
+use lx_ast::visitor::prelude::*;
+use lx_ast::visitor::{walk_binding, walk_func};
+use lx_span::sym::Sym;
 
 struct FreeVarCollector<'a> {
   arena: &'a AstArena,

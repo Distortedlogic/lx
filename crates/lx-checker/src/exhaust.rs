@@ -1,5 +1,5 @@
-use crate::ast::{AstArena, FieldPattern, Literal, MatchArm, Pattern, PatternConstructor, PatternId, PatternList, PatternRecord, StrPart};
-use crate::sym::{self, Sym};
+use lx_ast::ast::{AstArena, FieldPattern, Literal, MatchArm, Pattern, PatternConstructor, PatternId, PatternList, PatternRecord, StrPart};
+use lx_span::sym::{self, Sym};
 
 use super::exhaust_core::find_witnesses;
 use super::exhaust_types::{LitPat, Pat};

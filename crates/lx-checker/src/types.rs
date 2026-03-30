@@ -1,5 +1,5 @@
-use crate::sym::Sym;
 use ena::unify::{NoError, UnifyKey, UnifyValue};
+use lx_span::sym::Sym;
 
 use super::type_arena::TypeId;
 

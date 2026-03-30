@@ -240,7 +240,7 @@ New text:
 use super::config_form::{AgentConfigPanel, ConfigUpdate};
 ```
 
-### Change 2b: Wire on_save with ActivityLog logging
+### Change 2b: Pass on_save and on_cancel callbacks
 
 Old text (lines 85-87):
 ```rust
@@ -254,15 +254,13 @@ New text:
           AgentDetailTab::Config => rsx! {
             AgentConfigPanel {
               agent: agent.clone(),
-              on_save: move |update: ConfigUpdate| {
-                  log.push("config_save", &format!("{}: adapter={}, model={}", agent.name, update.adapter_type, update.model));
-              },
+              on_save: move |_update: ConfigUpdate| {},
               on_cancel: move |_| {},
             }
           },
 ```
 
-This logs a `config_save` event to ActivityLog when the user saves. The `on_cancel` handler is a no-op (the form already resets its own signals). In a future unit, `on_save` will also mutate the agent's in-memory state or persist to backend.
+The `on_cancel` handler is a no-op (the form already resets its own signals).
 
 ---
 

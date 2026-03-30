@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use crate::ast::{Expr, ExprId, FieldKind, Literal, MapEntry, MatchArm, Param, RecordField, StrPart, TypeExprId};
-use crate::sym::{self, Sym};
+use lx_ast::ast::{Expr, ExprId, FieldKind, Literal, MapEntry, MatchArm, Param, RecordField, StrPart, TypeExprId};
+use lx_span::sym::{self, Sym};
 use miette::SourceSpan;
 
 use super::capture::free_vars;
