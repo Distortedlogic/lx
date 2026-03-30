@@ -2,6 +2,7 @@ use dioxus::prelude::*;
 
 use super::identity::Identity;
 use super::markdown_body::MarkdownBody;
+use super::markdown_editor::MarkdownEditor;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Comment {
@@ -13,12 +14,12 @@ pub struct Comment {
 
 #[component]
 pub fn CommentThread(comments: Vec<Comment>, on_add: EventHandler<String>) -> Element {
-  let mut body = use_signal(String::new);
+  let mut body = dioxus_storage::use_persistent("lx_comment_draft", String::new);
   let mut submitting = use_signal(|| false);
   let count = comments.len();
 
-  let handle_submit = move |_| {
-    let text = body().trim().to_string();
+  let mut submit = move |text: String| {
+    let text = text.trim().to_string();
     if text.is_empty() {
       return;
     }
@@ -54,17 +55,20 @@ pub fn CommentThread(comments: Vec<Comment>, on_add: EventHandler<String>) -> El
         }
       }
       div { class: "space-y-2",
-        textarea {
-          class: "w-full bg-[var(--surface-container)] border border-[var(--outline-variant)] rounded p-2 text-sm outline-none resize-none min-h-[60px] placeholder:text-[var(--outline)]",
-          placeholder: "Leave a comment...",
-          value: "{body}",
-          oninput: move |evt: Event<FormData>| body.set(evt.value()),
+        MarkdownEditor {
+          value: body(),
+          on_change: move |v: String| body.set(v),
+          on_submit: move |v: String| submit(v),
+          placeholder: "Leave a comment...".to_string(),
         }
-        div { class: "flex items-center justify-end",
+        div { class: "flex items-center justify-between",
+          span { class: "text-[11px] text-[var(--outline)]",
+            "Cmd+Enter to submit"
+          }
           button {
             class: "px-3 py-1.5 bg-[var(--primary)] hover:brightness-110 text-[var(--on-primary)] text-sm rounded transition-colors disabled:opacity-50",
             disabled: body().trim().is_empty() || submitting(),
-            onclick: handle_submit,
+            onclick: move |_| submit(body()),
             if submitting() {
               "Posting..."
             } else {

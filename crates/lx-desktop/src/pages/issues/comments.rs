@@ -1,11 +1,21 @@
 use dioxus::prelude::*;
 
 use super::types::{AgentRef, IssueComment};
+use crate::components::markdown_body::MarkdownBody;
+use crate::components::markdown_editor::MarkdownEditor;
 use crate::styles::BTN_PRIMARY_SM;
 
 #[component]
 pub fn CommentThread(comments: Vec<IssueComment>, agents: Vec<AgentRef>, on_add: EventHandler<String>) -> Element {
-  let mut draft = use_signal(String::new);
+  let mut draft = dioxus_storage::use_persistent("lx_issue_comment_draft", String::new);
+
+  let mut submit = move |text: String| {
+    let body = text.trim().to_string();
+    if !body.is_empty() {
+      on_add.call(body);
+      draft.set(String::new());
+    }
+  };
 
   rsx! {
     div { class: "space-y-4",
@@ -17,23 +27,20 @@ pub fn CommentThread(comments: Vec<IssueComment>, agents: Vec<AgentRef>, on_add:
         CommentBubble { comment: comment.clone(), agents: agents.clone() }
       }
       div { class: "space-y-2",
-        textarea {
-          class: "w-full rounded border border-[var(--outline-variant)] px-3 py-2 bg-transparent outline-none text-sm min-h-[80px] resize-y placeholder:text-[var(--outline)]/40",
-          placeholder: "Write a comment...",
-          value: "{draft}",
-          oninput: move |evt| draft.set(evt.value().to_string()),
+        MarkdownEditor {
+          value: draft(),
+          on_change: move |v: String| draft.set(v),
+          on_submit: move |v: String| submit(v),
+          placeholder: "Write a comment...".to_string(),
         }
-        div { class: "flex justify-end",
+        div { class: "flex items-center justify-between",
+          span { class: "text-[11px] text-[var(--outline)]",
+            "Cmd+Enter to submit"
+          }
           button {
             class: BTN_PRIMARY_SM,
             disabled: draft.read().trim().is_empty(),
-            onclick: move |_| {
-                let body = draft.read().trim().to_string();
-                if !body.is_empty() {
-                    on_add.call(body);
-                    draft.set(String::new());
-                }
-            },
+            onclick: move |_| submit(draft()),
             "Comment"
           }
         }
@@ -56,9 +63,7 @@ fn CommentBubble(comment: IssueComment, agents: Vec<AgentRef>) -> Element {
         span { class: "text-xs font-medium text-[var(--on-surface)]", "{author}" }
         span { class: "text-xs text-[var(--outline)]", "{comment.created_at}" }
       }
-      div { class: "text-sm text-[var(--on-surface-variant)] whitespace-pre-wrap",
-        "{comment.body}"
-      }
+      MarkdownBody { content: comment.body.clone() }
     }
   }
 }
