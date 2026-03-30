@@ -76,6 +76,7 @@ pub fn MarkdownEditor(
 fn EditorTextarea(value: String, placeholder: String, on_change: EventHandler<String>, #[props(optional)] on_submit: Option<EventHandler<String>>) -> Element {
   rsx! {
     textarea {
+      id: "lx-md-editor",
       class: "w-full min-h-[8rem] max-h-80 p-3 bg-transparent outline-none text-sm font-mono text-[var(--on-surface)] placeholder:text-[var(--outline)]/40 resize-y",
       value: "{value}",
       placeholder: "{placeholder}",
@@ -103,6 +104,49 @@ fn ModeButton(label: &'static str, active: bool, on_click: EventHandler<()>) -> 
   }
 }
 
+fn insert_at_cursor(value: &str, before: &str, after: &str, on_change: EventHandler<String>) {
+  let val = value.to_string();
+  let before = before.to_string();
+  let after = after.to_string();
+  spawn(async move {
+    let js = r#"
+      (function() {
+        var el = document.getElementById('lx-md-editor');
+        if (!el) return JSON.stringify({start: -1, end: -1});
+        return JSON.stringify({start: el.selectionStart, end: el.selectionEnd});
+      })()
+    "#;
+    let (start, end) = match document::eval(js).await {
+      Ok(result) => {
+        let s = result.to_string();
+        let s = s.trim_matches('"');
+        match serde_json::from_str::<serde_json::Value>(s) {
+          Ok(v) => {
+            let st = v["start"].as_i64().unwrap_or(-1);
+            let en = v["end"].as_i64().unwrap_or(-1);
+            if st >= 0 && en >= 0 { (st as usize, en as usize) } else { (val.len(), val.len()) }
+          },
+          Err(_) => (val.len(), val.len()),
+        }
+      },
+      Err(_) => (val.len(), val.len()),
+    };
+
+    let start = start.min(val.len());
+    let end = end.min(val.len());
+    let selected = &val[start..end];
+    let new_value = format!("{}{}{}{}{}", &val[..start], before, selected, after, &val[end..]);
+    on_change.call(new_value);
+
+    let new_cursor = start + before.len() + selected.len();
+    let set_cursor_js = format!(
+      "setTimeout(function() {{ var el = document.getElementById('lx-md-editor'); if (el) {{ el.selectionStart = {pos}; el.selectionEnd = {pos}; el.focus(); }} }}, 0)",
+      pos = new_cursor
+    );
+    let _ = document::eval(&set_cursor_js).await;
+  });
+}
+
 #[component]
 fn ToolbarButtons(value: String, on_change: EventHandler<String>) -> Element {
   rsx! {
@@ -110,36 +154,36 @@ fn ToolbarButtons(value: String, on_change: EventHandler<String>) -> Element {
       ToolbarBtn {
         icon: "format_bold",
         on_click: {
-            let v = value.clone();
-            move |_| on_change.call(format!("{v}****"))
+          let v = value.clone();
+          move |_| insert_at_cursor(&v, "**", "**", on_change)
         },
       }
       ToolbarBtn {
         icon: "format_italic",
         on_click: {
-            let v = value.clone();
-            move |_| on_change.call(format!("{v}**"))
+          let v = value.clone();
+          move |_| insert_at_cursor(&v, "*", "*", on_change)
         },
       }
       ToolbarBtn {
         icon: "code",
         on_click: {
-            let v = value.clone();
-            move |_| on_change.call(format!("{v}\n```\n\n```"))
+          let v = value.clone();
+          move |_| insert_at_cursor(&v, "\n```\n", "\n```", on_change)
         },
       }
       ToolbarBtn {
         icon: "link",
         on_click: {
-            let v = value.clone();
-            move |_| on_change.call(format!("{v}[text](url)"))
+          let v = value.clone();
+          move |_| insert_at_cursor(&v, "[", "](url)", on_change)
         },
       }
       ToolbarBtn {
         icon: "title",
         on_click: {
-            let v = value.clone();
-            move |_| on_change.call(format!("{v}\n## "))
+          let v = value.clone();
+          move |_| insert_at_cursor(&v, "\n## ", "", on_change)
         },
       }
     }
