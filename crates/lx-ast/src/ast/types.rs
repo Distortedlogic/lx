@@ -17,7 +17,6 @@ pub enum UseKind {
   Whole,
   Alias(Sym),
   Selective(Vec<Sym>),
-  Tool { command: Sym, alias: Sym },
 }
 
 #[derive(Debug, Clone, PartialEq, AstWalk)]
@@ -109,8 +108,6 @@ pub enum KeywordKind {
   Guard,
   Workflow,
   Schema,
-  Mcp,
-  Cli,
   Http,
 }
 

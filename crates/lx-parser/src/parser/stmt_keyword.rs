@@ -31,8 +31,6 @@ where
     just(TokenKind::SessionKw).to(KeywordKind::Session),
     just(TokenKind::GuardKw).to(KeywordKind::Guard),
     just(TokenKind::WorkflowKw).to(KeywordKind::Workflow),
-    just(TokenKind::McpKw).to(KeywordKind::Mcp),
-    just(TokenKind::CliKw).to(KeywordKind::Cli),
     just(TokenKind::HttpKw).to(KeywordKind::Http),
   ));
 

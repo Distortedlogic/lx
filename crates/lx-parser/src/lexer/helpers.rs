@@ -47,8 +47,6 @@ pub(super) fn type_name_or_keyword(text: &str) -> TokenKind {
     "Guard" => TokenKind::GuardKw,
     "Workflow" => TokenKind::WorkflowKw,
     "Schema" => TokenKind::SchemaKw,
-    "MCP" => TokenKind::McpKw,
-    "CLI" => TokenKind::CliKw,
     "HTTP" => TokenKind::HttpKw,
     _ => TokenKind::TypeName(lx_span::sym::intern(text)),
   }

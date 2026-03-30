@@ -88,18 +88,6 @@ fn use_parser<'a, I>(arena: ArenaRef) -> impl Parser<'a, I, StmtId, extra::Err<R
 where
   I: ValueInput<'a, Token = TokenKind, Span = Span>,
 {
-  let arena_tool = arena.clone();
-  let raw_string = just(TokenKind::StrStart).ignore_then(select! { TokenKind::StrChunk(s) => s }).then_ignore(just(TokenKind::StrEnd));
-
-  let use_tool =
-    just(TokenKind::Use).ignore_then(just(TokenKind::ToolKw)).ignore_then(raw_string).then_ignore(just(TokenKind::As)).then(name_or_type()).map_with(
-      move |(command_str, alias), e| {
-        let command = intern(&command_str);
-        let stmt = Stmt::Use(UseStmt { path: vec![], kind: UseKind::Tool { command, alias } });
-        arena_tool.borrow_mut().alloc_stmt(stmt, ss(e.span()))
-      },
-    );
-
   let path_seg = super::expr::ident_or_keyword();
 
   let dotdot_prefix = just(TokenKind::DotDot).then_ignore(just(TokenKind::Slash)).to(intern(".."));
@@ -128,7 +116,7 @@ where
     arena.borrow_mut().alloc_stmt(Stmt::Use(UseStmt { path: prefix, kind }), ss(e.span()))
   });
 
-  use_tool.or(use_path)
+  use_path
 }
 
 fn binding_parser<'a, I>(

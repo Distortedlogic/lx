@@ -49,8 +49,6 @@ where
       TokenKind::GuardKw => intern("Guard"),
       TokenKind::WorkflowKw => intern("Workflow"),
       TokenKind::SchemaKw => intern("Schema"),
-      TokenKind::McpKw => intern("Mcp"),
-      TokenKind::CliKw => intern("Cli"),
       TokenKind::HttpKw => intern("Http"),
   }
 }

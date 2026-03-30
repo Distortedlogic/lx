@@ -95,8 +95,6 @@ pub enum TokenKind {
   GuardKw,
   WorkflowKw,
   SchemaKw,
-  McpKw,
-  CliKw,
   HttpKw,
   ChannelKw,
 
