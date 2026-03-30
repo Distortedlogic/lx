@@ -46,11 +46,7 @@ impl Interpreter {
     for (name, decl) in tools {
       match decl {
         ToolDecl::Lx { path } => {
-          let resolved = if path.is_absolute() {
-            path
-          } else {
-            self.source_dir.as_ref().map(|d| d.join(&path)).unwrap_or(path)
-          };
+          let resolved = if path.is_absolute() { path } else { self.source_dir.as_ref().map(|d| d.join(&path)).unwrap_or(path) };
           let exports = self.load_module(&resolved, span).await?;
           let record = LxVal::record(exports.bindings);
           let env = self.env.child();
@@ -58,9 +54,7 @@ impl Interpreter {
           self.env = Arc::new(env);
         },
         ToolDecl::Mcp { command } => {
-          let tm = crate::tool_module::ToolModule::new(&command, &name)
-            .await
-            .map_err(|e| LxError::runtime(format!("tool '{name}': {e}"), span))?;
+          let tm = crate::tool_module::ToolModule::new(&command, &name).await.map_err(|e| LxError::runtime(format!("tool '{name}': {e}"), span))?;
           let tm_arc = Arc::new(tm);
           self.tool_modules.push(Arc::clone(&tm_arc));
           let val = self.build_mcp_tool_record(&name, &tm_arc);

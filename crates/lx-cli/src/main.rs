@@ -201,12 +201,8 @@ fn apply_manifest_tools(ctx: &mut RuntimeCtx, file_path: &str) {
   };
   for (name, spec) in tools {
     let decl = match spec {
-      manifest::ToolSpec::Lx { path } => {
-        lx::prelude::ToolDecl::Lx { path: root.join(path) }
-      },
-      manifest::ToolSpec::Mcp { command } => {
-        lx::prelude::ToolDecl::Mcp { command }
-      },
+      manifest::ToolSpec::Lx { path } => lx::prelude::ToolDecl::Lx { path: root.join(path) },
+      manifest::ToolSpec::Mcp { command } => lx::prelude::ToolDecl::Mcp { command },
     };
     ctx.tools.insert(name, decl);
   }

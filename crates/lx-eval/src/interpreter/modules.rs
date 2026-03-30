@@ -63,8 +63,6 @@ impl Interpreter {
     Ok(())
   }
 
-
-
   fn resolve_workspace_module(&self, path: &[&str]) -> Option<PathBuf> {
     if path.len() < 2 {
       return None;

@@ -84,4 +84,3 @@ impl ToolModule {
     client.shutdown().await;
   }
 }
-
