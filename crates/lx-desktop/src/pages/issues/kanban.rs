@@ -54,20 +54,19 @@ pub fn KanbanBoardView(
           move |_| {
               if *drag_active.read()
                   && let Some(issue_id) = dragging_issue_id.read().clone()
+                  && let Some(target_status) = drag_over_column.read().clone()
               {
-                  if let Some(target_status) = drag_over_column.read().clone() {
-                      let source_status = issues.iter()
-                          .find(|i| i.id == issue_id)
-                          .map(|i| i.status.clone());
-                      if source_status.as_deref() == Some(target_status.as_str()) {
-                          if let Some(idx) = *drag_over_index.read() {
-                              if let Some(ref handler) = on_reorder {
-                                  handler.call((issue_id, target_status, idx));
-                              }
-                          }
-                      } else {
-                          on_status_change.call((issue_id, target_status));
+                  let source_status = issues.iter()
+                      .find(|i| i.id == issue_id)
+                      .map(|i| i.status.clone());
+                  if source_status.as_deref() == Some(target_status.as_str()) {
+                      if let Some(idx) = *drag_over_index.read()
+                          && let Some(ref handler) = on_reorder
+                      {
+                          handler.call((issue_id, target_status, idx));
                       }
+                  } else {
+                      on_status_change.call((issue_id, target_status));
                   }
               }
               drag_active.set(false);

@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 use uuid::Uuid;
 
-use super::drag_drop::{build_markdown_links, install_drop_listener, read_dropped_files, DragOverlay, DroppedFile};
+use super::drag_drop::{DragOverlay, DroppedFile, build_markdown_links, install_drop_listener, read_dropped_files};
 use super::editor_textarea::EditorTextarea;
 use super::markdown_body::MarkdownBody;
 use super::markdown_toolbar::ToolbarButtons;
@@ -75,11 +75,14 @@ pub fn MarkdownEditor(
     let candidates = candidates.clone();
     let value = value.clone();
     move |dir: &'static str| {
-      if !mention_visible() { return; }
-      let filtered: Vec<_> = candidates.iter().filter(|c| {
-        mention_query().is_empty() || c.name.to_lowercase().contains(&mention_query().to_lowercase())
-      }).collect();
-      if filtered.is_empty() { return; }
+      if !mention_visible() {
+        return;
+      }
+      let filtered: Vec<_> =
+        candidates.iter().filter(|c| mention_query().is_empty() || c.name.to_lowercase().contains(&mention_query().to_lowercase())).collect();
+      if filtered.is_empty() {
+        return;
+      }
       match dir {
         "down" => mention_selected.set((mention_selected() + 1) % filtered.len()),
         "up" => mention_selected.set(mention_selected().checked_sub(1).unwrap_or(filtered.len() - 1)),
@@ -92,12 +95,12 @@ pub fn MarkdownEditor(
             mention_visible.set(false);
             mention_query.set(String::new());
           }
-        }
+        },
         "dismiss" => {
           mention_visible.set(false);
           mention_query.set(String::new());
-        }
-        _ => {}
+        },
+        _ => {},
       }
     }
   };
@@ -125,7 +128,7 @@ pub fn MarkdownEditor(
                 handler.call(dropped.clone());
               }
               let links = build_markdown_links(&dropped);
-              on_change.call(format!("{}{}", value, links));
+              on_change.call(format!("{value}{links}"));
             }
           });
         }
