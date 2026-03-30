@@ -1,5 +1,5 @@
 -- Tool orchestration: selection, execution, result integration
--- Source: bridges cognitive intent to concrete actions via MCP/shell/AI
+-- Source: bridges cognitive intent to concrete actions via shell/AI tools
 -- Delegates generic tool operations to pkg/kit/tool_executor.
 
 use pkg/agent/budget
@@ -11,17 +11,6 @@ Prompt ExecutionPlanPrompt = {
   system: "You create step-by-step execution plans using available tools."
 }
 
-MCP CognitiveTools = {
-  Read {path: Str} -> {content: Str}
-  Write {path: Str; content: Str} -> {success: Bool}
-  Edit {path: Str; old: Str; new: Str} -> {success: Bool}
-  Glob {pattern: Str} -> [Str]
-  Grep {pattern: Str; path: Str} -> [{file: Str; line: Int; content: Str}]
-  Bash {command: Str} -> {stdout: Str; stderr: Str; code: Int}
-  Agent {prompt: Str} -> {result: Str}
-  WebSearch {query: Str} -> [{title: Str; url: Str; snippet: Str}]
-  WebFetch {url: Str} -> {body: Str; status: Int}
-}
 
 tool_costs = %{
   "Read": 0.01  "Write": 0.01  "Edit": 0.01  "Glob": 0.005

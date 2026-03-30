@@ -23,6 +23,7 @@ fn build_restricted_ctx(base: &Arc<dyn BuiltinCtx>, policy: &Policy) -> Arc<dyn 
     source_dir: parking_lot::Mutex::new(base.source_dir()),
     workspace_members: rtx.workspace_members.clone(),
     dep_dirs: rtx.dep_dirs.clone(),
+    tools: rtx.tools.clone(),
     tokio_runtime: rtx.tokio_runtime.clone(),
     test_threshold: base.test_threshold(),
     test_runs: base.test_runs(),

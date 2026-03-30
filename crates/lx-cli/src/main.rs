@@ -7,14 +7,13 @@ mod install_ops;
 mod listing;
 mod lockfile;
 mod manifest;
-mod plugin;
 mod run;
 mod testing;
 
 use std::env;
 use std::fs;
 use std::io::IsTerminal;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
 
@@ -84,18 +83,6 @@ enum Command {
     #[arg()]
     package: Option<String>,
   },
-  Plugin {
-    #[command(subcommand)]
-    action: PluginAction,
-  },
-}
-
-#[derive(Subcommand)]
-enum PluginAction {
-  Install { path: PathBuf },
-  List,
-  Remove { name: String },
-  New { name: String },
 }
 
 fn main() -> ExitCode {
@@ -132,12 +119,6 @@ fn main() -> ExitCode {
     Command::Init { name, flow } => init::run_init(name.as_deref(), flow),
     Command::Install { package } => install::run_install(package.as_deref()),
     Command::Update { package } => install::run_update(package.as_deref()),
-    Command::Plugin { action } => match action {
-      PluginAction::Install { path } => plugin::install(&path),
-      PluginAction::List => plugin::list(),
-      PluginAction::Remove { name } => plugin::remove(&name),
-      PluginAction::New { name } => plugin::new_plugin(&name),
-    },
   }
 }
 
@@ -177,6 +158,7 @@ fn run_file(path: &str, _json: bool, control_spec: Option<&str>) -> ExitCode {
   let mut ctx_val = if std::io::stdin().is_terminal() { RuntimeCtx { ..RuntimeCtx::default() } } else { RuntimeCtx::default() };
   ctx_val.workspace_members = ws_members;
   ctx_val.dep_dirs = dep_dirs;
+  apply_manifest_tools(&mut ctx_val, path);
   apply_manifest_backends(&mut ctx_val, path);
   if let Some(spec) = control_spec
     && spec == "stdin"
@@ -203,6 +185,30 @@ fn run_file(path: &str, _json: bool, control_spec: Option<&str>) -> ExitCode {
       }
       ExitCode::from(1)
     },
+  }
+}
+
+fn apply_manifest_tools(ctx: &mut RuntimeCtx, file_path: &str) {
+  let file_dir = Path::new(file_path).parent().unwrap_or(Path::new("."));
+  let Some(root) = manifest::find_manifest_root(file_dir) else {
+    return;
+  };
+  let Ok(m) = manifest::load_manifest(&root) else {
+    return;
+  };
+  let Some(tools) = m.tools else {
+    return;
+  };
+  for (name, spec) in tools {
+    let decl = match spec {
+      manifest::ToolSpec::Lx { path } => {
+        lx::prelude::ToolDecl::Lx { path: root.join(path) }
+      },
+      manifest::ToolSpec::Mcp { command } => {
+        lx::prelude::ToolDecl::Mcp { command }
+      },
+    };
+    ctx.tools.insert(name, decl);
   }
 }
 

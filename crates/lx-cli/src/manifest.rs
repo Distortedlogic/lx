@@ -15,6 +15,7 @@ pub struct RootManifest {
   pub dependencies: Option<HashMap<String, DepSpec>>,
   #[serde(rename = "deps")]
   pub deps_table: Option<DepsTable>,
+  pub tools: Option<HashMap<String, ToolSpec>>,
 }
 
 impl RootManifest {
@@ -85,6 +86,13 @@ pub struct DepsTable {
 pub enum DepSpec {
   Git { git: String, branch: Option<String>, tag: Option<String>, rev: Option<String> },
   Path { path: String },
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum ToolSpec {
+  Lx { path: String },
+  Mcp { command: String },
 }
 
 pub fn find_manifest_root(start: &Path) -> Option<PathBuf> {

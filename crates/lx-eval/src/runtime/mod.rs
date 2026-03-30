@@ -18,6 +18,12 @@ use smart_default::SmartDefault;
 use lx_value::{EventStream, LxError, LxVal};
 use miette::SourceSpan;
 
+#[derive(Debug, Clone)]
+pub enum ToolDecl {
+  Lx { path: PathBuf },
+  Mcp { command: String },
+}
+
 #[derive(SmartDefault)]
 pub struct RuntimeCtx {
   #[default(Arc::new(StdinStdoutYieldBackend))]
@@ -25,6 +31,7 @@ pub struct RuntimeCtx {
   pub source_dir: parking_lot::Mutex<Option<PathBuf>>,
   pub workspace_members: HashMap<String, PathBuf>,
   pub dep_dirs: HashMap<String, PathBuf>,
+  pub tools: HashMap<String, ToolDecl>,
   #[default(Arc::new(tokio::runtime::Runtime::new().expect("failed to create tokio runtime")))]
   pub tokio_runtime: Arc<tokio::runtime::Runtime>,
   pub test_threshold: Option<f64>,

@@ -38,7 +38,6 @@ derive_more = { version = "2.1.1", features = ["deref", "display", "from", "try_
 dirs = { version = "6.0.0" }
 dioxus = { version = "0.7.3", features = ["fullstack", "router"] }
 ena = { version = "0.14" }
-extism = { version = "1.20.0" }
 futures = { version = "0.3.32" }
 indexmap = { version = "2.13.0" }
 itertools = { version = "0.14" }

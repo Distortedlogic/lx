@@ -13,6 +13,7 @@ pub mod prelude {
 
   pub use lx_eval::interpreter::Interpreter;
   pub use lx_eval::runtime::RuntimeCtx;
+  pub use lx_eval::runtime::ToolDecl;
 
   pub use lx_value::error::LxError;
 }

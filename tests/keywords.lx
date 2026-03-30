@@ -1,5 +1,5 @@
 -- keyword desugaring tests
--- verifies Agent, Tool, Store, Guard, CLI, HTTP, MCP, export prefix, composition, equivalence
+-- verifies Agent, Tool, Store, Guard, HTTP, export prefix, composition, equivalence
 
 -- Agent
 Agent TestAgent = {
@@ -45,16 +45,6 @@ assert (g.check () | ok?)
 g.tick ()
 assert (g.is_tripped ())
 
--- CLI (deprecated, use `use tool` instead)
-CLI TestCli = {
-  command: "echo"
-  tool_defs: [{name: "hello", subcommand: "hello"}]
-}
-c = TestCli {}
-assert c.command == "echo"
-assert (c.tool_defs | len == 1)
-assert (methods_of c | any? (== "run"))
-
 -- HTTP
 HTTP TestApi = {
   base_url: "https://httpbin.org"
@@ -64,16 +54,6 @@ HTTP TestApi = {
 api = TestApi {}
 assert api.base_url == "https://httpbin.org"
 assert (methods_of api | any? (== "run"))
-
--- MCP (deprecated, use `use tool` instead)
-MCP TestServer = {
-  command: "echo"
-  args: ["test"]
-}
-srv = TestServer {}
-assert srv.command == "echo"
-assert srv.args == ["test"]
-assert (methods_of srv | any? (== "run"))
 
 -- Export prefix (+ before and after keyword)
 +Schema BeforeKeyword = { x: Int = "test" }

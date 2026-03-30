@@ -42,6 +42,7 @@ pub fn run(source: &str, filename: &str, ctx: &Arc<RuntimeCtx>, control_spec: Op
     }
 
     interp.load_default_tools().await.map_err(|e| vec![e])?;
+    interp.load_declared_tools().await.map_err(|e| vec![e])?;
     match interp.exec(&program).await {
       Ok(val) => {
         if !matches!(val, lx_value::LxVal::Unit) {
