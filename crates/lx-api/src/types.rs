@@ -3,6 +3,8 @@ pub struct ActivityEvent {
   pub timestamp: String,
   pub kind: String,
   pub message: String,
+  #[serde(default)]
+  pub token_count: Option<u32>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]

@@ -30,6 +30,7 @@ pub struct ToolItem {
   pub result: Option<String>,
   pub is_error: bool,
   pub status: ToolStatus,
+  pub token_count: Option<u32>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -42,7 +43,7 @@ pub struct StderrLine {
 pub enum TranscriptBlock {
   Message { role: String, text: String, ts: String },
   Thinking { text: String, ts: String },
-  Tool { name: String, input: String, result: Option<String>, is_error: bool, status: ToolStatus, ts: String },
+  Tool { name: String, input: String, result: Option<String>, is_error: bool, status: ToolStatus, ts: String, token_count: Option<u32> },
   Activity { name: String, status: ToolStatus, ts: String },
   CommandGroup { items: Vec<ToolItem>, ts: String },
   ToolGroup { items: Vec<ToolItem>, ts: String },
@@ -65,6 +66,7 @@ fn event_to_block(event: &ActivityEvent) -> TranscriptBlock {
       is_error: false,
       status: ToolStatus::Running,
       ts: event.timestamp.clone(),
+      token_count: event.token_count,
     },
     "tool_result" => TranscriptBlock::Tool {
       name: "tool".into(),
@@ -73,6 +75,7 @@ fn event_to_block(event: &ActivityEvent) -> TranscriptBlock {
       is_error: false,
       status: ToolStatus::Completed,
       ts: event.timestamp.clone(),
+      token_count: event.token_count,
     },
     "tool_error" => TranscriptBlock::Tool {
       name: "tool".into(),
@@ -81,6 +84,7 @@ fn event_to_block(event: &ActivityEvent) -> TranscriptBlock {
       is_error: true,
       status: ToolStatus::Error,
       ts: event.timestamp.clone(),
+      token_count: event.token_count,
     },
     "command_group" => TranscriptBlock::CommandGroup {
       items: vec![ToolItem {
@@ -90,6 +94,7 @@ fn event_to_block(event: &ActivityEvent) -> TranscriptBlock {
         result: None,
         is_error: false,
         status: ToolStatus::Running,
+        token_count: event.token_count,
       }],
       ts: event.timestamp.clone(),
     },
@@ -101,6 +106,7 @@ fn event_to_block(event: &ActivityEvent) -> TranscriptBlock {
         result: None,
         is_error: false,
         status: ToolStatus::Running,
+        token_count: event.token_count,
       }],
       ts: event.timestamp.clone(),
     },
@@ -116,6 +122,7 @@ fn event_to_block(event: &ActivityEvent) -> TranscriptBlock {
       is_error: false,
       status: ToolStatus::Running,
       ts: event.timestamp.clone(),
+      token_count: event.token_count,
     },
     k if k.contains("error") => {
       TranscriptBlock::Event { label: "error".into(), text: event.message.clone(), detail: None, tone: "error".into(), ts: event.timestamp.clone() }
@@ -157,7 +164,8 @@ pub fn TranscriptView(run_id: String, #[props(optional)] events: Option<Vec<Acti
   }
 
   let active_btn = "text-xs px-2 py-1 rounded transition-colors bg-[var(--primary)] text-[var(--on-primary)]";
-  let inactive_btn = "text-xs px-2 py-1 rounded transition-colors bg-[var(--surface-container)] text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]";
+  let inactive_btn =
+    "text-xs px-2 py-1 rounded transition-colors bg-[var(--surface-container)] text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]";
   let cur_mode = mode();
   let cur_density = density();
 

@@ -19,7 +19,7 @@ impl ActivityLog {
 
   pub fn push(&self, kind: &str, message: &str) {
     let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0).to_string();
-    let event = ActivityEvent { timestamp, kind: kind.to_string(), message: message.to_string() };
+    let event = ActivityEvent { timestamp, kind: kind.to_string(), message: message.to_string(), token_count: None };
     let mut events_sig = self.events;
     let mut events = events_sig.write();
     events.push_front(event);

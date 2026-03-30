@@ -1,4 +1,4 @@
-use super::transcript::{TranscriptDensity, TranscriptMode, ToolStatus, TranscriptBlock, summarize_tool_input};
+use super::transcript::{ToolStatus, TranscriptBlock, TranscriptDensity, TranscriptMode, summarize_tool_input};
 use super::transcript_groups::{render_command_group, render_stderr_group, render_tool_group};
 use crate::components::markdown_body::MarkdownBody;
 use dioxus::prelude::*;
@@ -39,7 +39,7 @@ pub fn TranscriptBlockView(block: TranscriptBlock, mode: TranscriptMode, density
         }
       }
     },
-    TranscriptBlock::Tool { name, input, result, is_error, status, .. } => {
+    TranscriptBlock::Tool { name, input, result, is_error, status, token_count, .. } => {
       let status_label = match status {
         ToolStatus::Running => "Running",
         ToolStatus::Completed => "Completed",
@@ -62,6 +62,9 @@ pub fn TranscriptBlockView(block: TranscriptBlock, mode: TranscriptMode, density
             span { class: "material-symbols-outlined text-sm {status_color}", "{icon}" }
             span { class: "text-[11px] font-semibold uppercase tracking-widest text-[var(--on-surface-variant)]", "{name}" }
             span { class: "text-[10px] font-semibold uppercase tracking-wider {status_color}", "{status_label}" }
+            if let Some(tokens) = token_count {
+              span { class: "text-[10px] text-[var(--outline)] tabular-nums ml-1", "{tokens} tok" }
+            }
             button {
               class: "ml-auto text-[var(--outline)] hover:text-[var(--on-surface)] transition-colors",
               onclick: move |_| tool_open.set(!tool_open()),
