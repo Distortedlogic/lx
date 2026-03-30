@@ -44,13 +44,13 @@ pub fn Select(
   let filtered_for_trigger = filtered.clone();
   let onchange_for_trigger = onchange;
   let trigger_key_handler = move |evt: KeyboardEvent| {
-    handle_select_key(evt, open, focused_index, search_query, filtered_len, &filtered_for_trigger, onchange_for_trigger);
+    handle_select_key(&evt, open, focused_index, search_query, filtered_len, &filtered_for_trigger, onchange_for_trigger);
   };
 
   let filtered_for_search = filtered.clone();
   let onchange_for_search = onchange;
   let search_key_handler = move |evt: KeyboardEvent| {
-    handle_select_key(evt, open, focused_index, search_query, filtered_len, &filtered_for_search, onchange_for_search);
+    handle_select_key(&evt, open, focused_index, search_query, filtered_len, &filtered_for_search, onchange_for_search);
   };
 
   rsx! {
@@ -122,7 +122,7 @@ pub fn Select(
 }
 
 fn handle_select_key(
-  evt: KeyboardEvent,
+  evt: &KeyboardEvent,
   mut open: Signal<bool>,
   mut focused_index: Signal<usize>,
   mut search_query: Signal<String>,
