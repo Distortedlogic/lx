@@ -23,6 +23,8 @@ pub struct OrgNode {
   pub role: String,
   pub status: String,
   pub reports_to: Option<String>,
+  #[serde(default)]
+  pub connected_to: Vec<String>,
 }
 
 pub const CONCURRENCY_POLICIES: &[(&str, &str)] = &[

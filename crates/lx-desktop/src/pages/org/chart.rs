@@ -3,15 +3,58 @@ use std::collections::HashMap;
 use dioxus::prelude::*;
 
 use super::chart_layout::{CARD_H, CARD_W, collect_edges, flatten_layout, layout_forest};
+use crate::contexts::activity_log::ActivityLog;
 use crate::pages::routines::types::OrgNode;
 
-fn default_org_nodes() -> Vec<OrgNode> {
-  vec![
-    OrgNode { id: "ceo-1".into(), name: "Atlas".into(), role: "CEO".into(), status: "active".into(), reports_to: None },
-    OrgNode { id: "eng-1".into(), name: "Nova".into(), role: "Engineering Lead".into(), status: "active".into(), reports_to: Some("ceo-1".into()) },
-    OrgNode { id: "ops-1".into(), name: "Orbit".into(), role: "Operations".into(), status: "paused".into(), reports_to: Some("ceo-1".into()) },
-    OrgNode { id: "dev-1".into(), name: "Spark".into(), role: "Developer".into(), status: "active".into(), reports_to: Some("eng-1".into()) },
-  ]
+fn nodes_from_events(log: &ActivityLog) -> Vec<OrgNode> {
+  let events = log.events.read();
+  let mut nodes_map: HashMap<String, OrgNode> = HashMap::new();
+
+  for event in events.iter() {
+    match event.kind.as_str() {
+      "agent_start" | "agent_running" | "agent_spawn" => {
+        let name = event.message.clone();
+        let id = name.to_lowercase().replace(' ', "-");
+        nodes_map.entry(id.clone()).or_insert_with(|| OrgNode {
+          id,
+          name,
+          role: "Agent".into(),
+          status: if event.kind == "agent_running" { "running".into() } else { "active".into() },
+          reports_to: None,
+          connected_to: Vec::new(),
+        });
+      },
+      "agent_reports_to" => {
+        let parts: Vec<&str> = event.message.splitn(2, "->").collect();
+        if parts.len() == 2 {
+          let child_name = parts[0].trim();
+          let parent_name = parts[1].trim();
+          let child_id = child_name.to_lowercase().replace(' ', "-");
+          let parent_id = parent_name.to_lowercase().replace(' ', "-");
+          if let Some(node) = nodes_map.get_mut(&child_id) {
+            node.reports_to = Some(parent_id);
+          }
+        }
+      },
+      k if k == "tell" || k == "ask" || k.contains("message") => {
+        let parts: Vec<&str> = event.message.splitn(2, "->").collect();
+        if parts.len() == 2 {
+          let from_name = parts[0].trim();
+          let to_name = parts[1].trim();
+          let from_id = from_name.to_lowercase().replace(' ', "-");
+          let to_id = to_name.to_lowercase().replace(' ', "-");
+          if let Some(node) = nodes_map.get_mut(&from_id)
+            && !node.connected_to.contains(&to_id)
+          {
+            node.connected_to.push(to_id);
+          }
+        }
+      },
+      _ => {},
+    }
+  }
+
+  nodes_map.into_values().collect()
 }
 
 fn build_children_map(nodes: &[OrgNode]) -> HashMap<String, Vec<OrgNode>> {
@@ -37,9 +80,10 @@ fn status_dot_color(status: &str) -> &'static str {
 
 #[component]
 pub fn OrgChart() -> Element {
-  let nodes = dioxus_storage::use_persistent("lx_org_nodes", default_org_nodes);
+  let log = use_context::<ActivityLog>();
+  let all = nodes_from_events(&log);
 
-  let all = nodes();
+  let has_nodes = !all.is_empty();
   let children_map = build_children_map(&all);
   let roots: Vec<OrgNode> = all.iter().filter(|n| n.reports_to.is_none()).cloned().collect();
   let layout = layout_forest(&roots, &children_map);
@@ -61,6 +105,16 @@ pub fn OrgChart() -> Element {
   let is_dragging = dragging();
 
   let cursor = if is_dragging { "grabbing" } else { "grab" };
+
+  if !has_nodes {
+    return rsx! {
+      div { class: "flex items-center justify-center h-64",
+        p { class: "text-sm text-[var(--outline)]",
+          "No agents detected. Run an agent to populate the org chart."
+        }
+      }
+    };
+  }
 
   rsx! {
     div {
