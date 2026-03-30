@@ -109,7 +109,9 @@ pub fn Dashboard() -> Element {
         }
         div { class: "border border-[var(--outline-variant)] divide-y divide-[var(--outline-variant)] overflow-hidden",
           for event in events.iter().take(10) {
-            div { class: "px-4 py-2.5 text-sm hover:bg-[var(--on-surface)]/5 transition-colors",
+            div {
+              key: "{event.timestamp}-{event.kind}-{event.message}",
+              class: "px-4 py-2.5 text-sm hover:bg-[var(--on-surface)]/5 transition-colors animate-activity-enter",
               div { class: "flex gap-3",
                 p { class: "flex-1 min-w-0 truncate",
                   span { class: "text-[var(--on-surface-variant)] font-mono text-xs",

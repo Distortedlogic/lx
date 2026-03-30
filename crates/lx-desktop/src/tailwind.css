@@ -102,3 +102,22 @@ body {
 .animate-fade-in {
   animation: fade-in 150ms ease-out;
 }
+
+@keyframes activity-row-enter {
+  0% {
+    opacity: 0;
+    background-color: rgba(156, 255, 147, 0.08);
+  }
+  40% {
+    opacity: 1;
+    background-color: rgba(156, 255, 147, 0.06);
+  }
+  100% {
+    opacity: 1;
+    background-color: transparent;
+  }
+}
+
+.animate-activity-enter {
+  animation: activity-row-enter 800ms ease-out both;
+}

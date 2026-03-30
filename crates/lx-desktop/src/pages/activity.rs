@@ -41,7 +41,9 @@ pub fn Activity() -> Element {
       } else {
         div { class: "border border-[var(--outline-variant)] divide-y divide-[var(--outline-variant)] overflow-hidden",
           for event in filtered.iter() {
-            div { class: "flex items-center px-4 py-2.5 hover:bg-[var(--on-surface)]/5 transition-colors text-sm",
+            div {
+              key: "{event.timestamp}-{event.kind}-{event.message}",
+              class: "flex items-center px-4 py-2.5 hover:bg-[var(--on-surface)]/5 transition-colors text-sm animate-activity-enter",
               span { class: "w-40 shrink-0 text-[var(--outline)] font-mono text-xs",
                 "{event.timestamp}"
               }
