@@ -1,8 +1,18 @@
 use dioxus::prelude::*;
 
 use super::types::{AgentRef, PRIORITY_ORDER, STATUS_ORDER};
+use crate::components::markdown_editor::MarkdownEditor;
 use crate::components::ui::select::{Select, SelectOption};
 use crate::styles::{BTN_OUTLINE_SM, BTN_PRIMARY_SM};
+
+#[derive(serde::Serialize, serde::Deserialize, Default)]
+struct IssueDraft {
+  title: String,
+  description: String,
+  status: String,
+  priority: String,
+  assignee: Option<String>,
+}
 
 #[derive(Clone, Debug)]
 pub struct NewIssuePayload;
@@ -15,6 +25,48 @@ pub fn NewIssueDialog(open: bool, agents: Vec<AgentRef>, on_close: EventHandler<
   let mut priority = use_signal(|| "medium".to_string());
   let mut assignee = use_signal(|| Option::<String>::None);
 
+  use_effect(move || {
+    if open {
+      spawn(async move {
+        let result = document::eval(
+          r#"
+                  let d = localStorage.getItem("lx-new-issue-draft");
+                  return d || "";
+                  "#,
+        )
+        .await;
+        if let Ok(val) = result {
+          if let Some(s) = val.as_str() {
+            if let Ok(draft) = serde_json::from_str::<IssueDraft>(s) {
+              title.set(draft.title);
+              description.set(draft.description);
+              status.set(draft.status);
+              priority.set(draft.priority);
+              assignee.set(draft.assignee);
+            }
+          }
+        }
+      });
+    }
+  });
+
+  use_effect(move || {
+    let draft = IssueDraft {
+      title: title.read().clone(),
+      description: description.read().clone(),
+      status: status.read().clone(),
+      priority: priority.read().clone(),
+      assignee: assignee.read().clone(),
+    };
+    if let Ok(json) = serde_json::to_string(&draft) {
+      let js = format!(r#"localStorage.setItem("lx-new-issue-draft", {})"#, serde_json::json!(json));
+      let js = js.clone();
+      spawn(async move {
+        let _ = document::eval(&js).await;
+      });
+    }
+  });
+
   if !open {
     return rsx! {};
   }
@@ -23,6 +75,12 @@ pub fn NewIssueDialog(open: bool, agents: Vec<AgentRef>, on_close: EventHandler<
     div {
       class: "fixed inset-0 z-50 flex items-center justify-center bg-black/50",
       onclick: move |_| on_close.call(()),
+      onkeydown: move |evt: KeyboardEvent| {
+          if evt.modifiers().meta() && evt.key() == Key::Enter && !title.read().trim().is_empty() {
+              spawn(async move { let _ = document::eval(r#"localStorage.removeItem("lx-new-issue-draft")"#).await; });
+              on_create.call(NewIssuePayload);
+          }
+      },
       div {
         class: "bg-[var(--surface-container)] border border-[var(--outline-variant)] rounded-lg w-full max-w-lg overflow-hidden",
         onclick: move |evt| evt.stop_propagation(),
@@ -41,11 +99,11 @@ pub fn NewIssueDialog(open: bool, agents: Vec<AgentRef>, on_close: EventHandler<
             value: "{title}",
             oninput: move |evt| title.set(evt.value().to_string()),
           }
-          textarea {
-            class: "w-full rounded border border-[var(--outline-variant)] px-3 py-2 bg-transparent outline-none text-sm min-h-[100px] resize-y placeholder:text-[var(--outline)]/40",
-            placeholder: "Description (optional)",
-            value: "{description}",
-            oninput: move |evt| description.set(evt.value().to_string()),
+          MarkdownEditor {
+              value: description.read().clone(),
+              on_change: move |val: String| description.set(val),
+              placeholder: "Description (optional)".to_string(),
+              class: "min-h-[120px]".to_string(),
           }
           div { class: "grid grid-cols-3 gap-3",
             div {
@@ -97,6 +155,7 @@ pub fn NewIssueDialog(open: bool, agents: Vec<AgentRef>, on_close: EventHandler<
             disabled: title.read().trim().is_empty(),
             onclick: {
                 move |_| {
+                    spawn(async move { let _ = document::eval(r#"localStorage.removeItem("lx-new-issue-draft")"#).await; });
                     on_create.call(NewIssuePayload);
                 }
             },
