@@ -42,21 +42,11 @@ pub fn gen_func(params: &[&str], body: ExprId, span: SourceSpan, arena: &mut Ast
   arena.alloc_expr(Expr::Func(ExprFunc { params, type_params: vec![], ret_type: None, guard: None, body }), span)
 }
 
-pub fn gen_propagate(inner: ExprId, span: SourceSpan, arena: &mut AstArena) -> ExprId {
-  arena.alloc_expr(Expr::Propagate(ExprPropagate { inner }), span)
-}
-
-pub fn gen_field_update(obj: &str, field: &str, value: ExprId, span: SourceSpan, arena: &mut AstArena) -> StmtId {
-  arena.alloc_stmt(Stmt::FieldUpdate(StmtFieldUpdate { name: intern(obj), fields: vec![intern(field)], value }), span)
-}
 
 pub fn gen_literal_str(s: &str, span: SourceSpan, arena: &mut AstArena) -> ExprId {
   arena.alloc_expr(Expr::Literal(Literal::Str(vec![StrPart::Text(s.to_string())])), span)
 }
 
-pub fn gen_none(span: SourceSpan, arena: &mut AstArena) -> ExprId {
-  arena.alloc_expr(Expr::Ident(intern("None")), span)
-}
 
 pub fn gen_record(fields: Vec<(Sym, ExprId)>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
   let record_fields = fields.into_iter().map(|(name, value)| RecordField::Named { name, value }).collect();
