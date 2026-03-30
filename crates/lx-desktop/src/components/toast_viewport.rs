@@ -29,7 +29,12 @@ fn render_toast(toast: &ToastItem, state: ToastState) -> Element {
   let action = toast.action.clone();
 
   rsx! {
-    li { class: "pointer-events-auto rounded-sm border shadow-lg backdrop-blur-xl {tc}",
+    li {
+      class: format!(
+        "pointer-events-auto rounded-sm border shadow-lg backdrop-blur-xl {} {}",
+        tc,
+        if toast.dismissing { "animate-toast-exit" } else { "animate-toast-enter" }
+      ),
       div { class: "flex items-start gap-3 px-3 py-2.5",
         span { class: "mt-1 h-2 w-2 shrink-0 rounded-full {dc}" }
         div { class: "min-w-0 flex-1",
@@ -47,7 +52,7 @@ fn render_toast(toast: &ToastItem, state: ToastState) -> Element {
         }
         button {
           class: "mt-0.5 shrink-0 rounded p-1 opacity-50 hover:bg-white/10 hover:opacity-100",
-          onclick: move |_| state.dismiss(&id),
+          onclick: move |_| state.start_dismiss(&id),
           span { class: "material-symbols-outlined text-sm", "close" }
         }
       }
@@ -66,10 +71,20 @@ pub fn ToastViewport() -> Element {
 
   use_future(move || async move {
     loop {
-      tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+      tokio::time::sleep(std::time::Duration::from_millis(250)).await;
       let now = timestamp_ms();
-      let expired: Vec<String> = toasts.read().iter().filter(|t| now.saturating_sub(t.created_at) >= t.ttl_ms).map(|t| t.id.clone()).collect();
-      for id in expired {
+
+      let to_start_dismiss: Vec<String> =
+        toasts.read().iter().filter(|t| !t.dismissing && now.saturating_sub(t.created_at) >= t.ttl_ms).map(|t| t.id.clone()).collect();
+
+      for id in &to_start_dismiss {
+        state.start_dismiss(id);
+      }
+
+      let to_remove: Vec<String> =
+        toasts.read().iter().filter(|t| t.dismissing && now.saturating_sub(t.created_at) >= t.ttl_ms + 300).map(|t| t.id.clone()).collect();
+
+      for id in to_remove {
         state.dismiss(&id);
       }
     }
