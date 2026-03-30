@@ -2,7 +2,7 @@ use dioxus::html::geometry::WheelDelta;
 use dioxus::prelude::*;
 
 use super::chart_helpers::{build_children_map, nodes_from_events, status_dot_color};
-use super::chart_layout::{CARD_H, CARD_W, collect_edges, compute_bounding_box, flatten_layout, layout_forest};
+use super::chart_layout::{CARD_H, CARD_W, collect_edges, collect_lateral_edges, compute_bounding_box, flatten_layout, layout_forest};
 use crate::contexts::activity_log::ActivityLog;
 
 #[component]
@@ -16,6 +16,7 @@ pub fn OrgChart() -> Element {
   let layout = layout_forest(&roots, &children_map);
   let flat = flatten_layout(&layout);
   let edges = collect_edges(&layout);
+  let lateral_edges = collect_lateral_edges(&flat);
   let bbox = compute_bounding_box(&flat);
 
   let mut pan_x = use_signal(|| 0.0f64);
@@ -186,6 +187,36 @@ pub fn OrgChart() -> Element {
                     fill: "none",
                     stroke: "var(--outline-variant)",
                     stroke_width: "1.5",
+                  }
+                }
+            }
+          }
+          for (from, to, label) in lateral_edges.iter() {
+            {
+                let x1 = from.x + CARD_W / 2.0;
+                let y1 = from.y + CARD_H / 2.0;
+                let x2 = to.x + CARD_W / 2.0;
+                let y2 = to.y + CARD_H / 2.0;
+                let mid_x = (x1 + x2) / 2.0;
+                let mid_y = (y1 + y2) / 2.0;
+                let d = format!("M {x1} {y1} L {x2} {y2}");
+                rsx! {
+                  path {
+                    key: "lateral-{from.id}-{to.id}",
+                    d: "{d}",
+                    fill: "none",
+                    stroke: "var(--outline)",
+                    stroke_width: "1",
+                    stroke_dasharray: "4 3",
+                  }
+                  text {
+                    x: "{mid_x}",
+                    y: "{mid_y}",
+                    text_anchor: "middle",
+                    dy: "-4",
+                    fill: "var(--outline)",
+                    font_size: "10",
+                    "{label}"
                   }
                 }
             }

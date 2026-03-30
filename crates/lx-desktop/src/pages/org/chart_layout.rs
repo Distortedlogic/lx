@@ -17,6 +17,7 @@ pub struct LayoutNode {
   pub x: f64,
   pub y: f64,
   pub children: Vec<LayoutNode>,
+  pub connected_to: Vec<(String, String)>,
 }
 
 pub fn subtree_width(node_id: &str, children_map: &HashMap<String, Vec<OrgNode>>) -> f64 {
@@ -57,6 +58,7 @@ pub fn layout_tree(node: &OrgNode, x: f64, y: f64, children_map: &HashMap<String
     x: x + (total_w - CARD_W) / 2.0,
     y,
     children: layout_children,
+    connected_to: node.connected_to.clone(),
   }
 }
 
@@ -126,4 +128,17 @@ pub fn compute_bounding_box(nodes: &[&LayoutNode]) -> Option<BoundingBox> {
     max_y = max_y.max(n.y + CARD_H);
   }
   Some(BoundingBox { min_x, min_y, max_x, max_y })
+}
+
+pub fn collect_lateral_edges<'a>(flat: &[&'a LayoutNode]) -> Vec<(&'a LayoutNode, &'a LayoutNode, &'a str)> {
+  let positions: HashMap<&str, &LayoutNode> = flat.iter().map(|n| (n.id.as_str(), *n)).collect();
+  let mut edges = Vec::new();
+  for node in flat {
+    for (target_id, label) in &node.connected_to {
+      if let Some(target) = positions.get(target_id.as_str()) {
+        edges.push((*node, *target, label.as_str()));
+      }
+    }
+  }
+  edges
 }

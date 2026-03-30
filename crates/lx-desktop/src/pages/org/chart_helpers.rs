@@ -43,10 +43,11 @@ pub fn nodes_from_events(log: &ActivityLog) -> Vec<OrgNode> {
           let to_name = parts[1].trim();
           let from_id = from_name.to_lowercase().replace(' ', "-");
           let to_id = to_name.to_lowercase().replace(' ', "-");
+          let label = k.to_string();
           if let Some(node) = nodes_map.get_mut(&from_id)
-            && !node.connected_to.contains(&to_id)
+            && !node.connected_to.iter().any(|(id, _)| id == &to_id)
           {
-            node.connected_to.push(to_id);
+            node.connected_to.push((to_id, label));
           }
         }
       },

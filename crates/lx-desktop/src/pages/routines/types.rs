@@ -24,7 +24,7 @@ pub struct OrgNode {
   pub status: String,
   pub reports_to: Option<String>,
   #[serde(default)]
-  pub connected_to: Vec<String>,
+  pub connected_to: Vec<(String, String)>,
   #[serde(default)]
   pub icon: Option<String>,
 }
