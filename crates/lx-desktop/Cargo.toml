@@ -41,7 +41,6 @@ futures = { workspace = true }
 pulldown-cmark = { version = "0.12", default-features = false, features = ["html"] }
 reqwest = { workspace = true }
 thiserror = { workspace = true }
-tokio-tungstenite = { workspace = true }
 rodio = { workspace = true }
 rustpotter = { workspace = true }
 serde = { workspace = true }
