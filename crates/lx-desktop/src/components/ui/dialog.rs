@@ -18,7 +18,7 @@ pub fn DialogContent(open: Signal<bool>, #[props(default)] class: String, #[prop
   rsx! {
     div {
       "data-slot": "dialog-overlay",
-      class: "fixed inset-0 z-50 bg-black/50",
+      class: "fixed inset-0 z-50 bg-black/50 animate-fade-in",
       onclick: move |_| open.set(false),
     }
     div {

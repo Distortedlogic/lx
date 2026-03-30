@@ -24,9 +24,9 @@ pub fn NewAgentDialog(open: bool, on_close: EventHandler<()>, on_create: EventHa
         div { class: "flex items-center justify-between px-4 py-2.5 border-b border-[var(--outline-variant)]",
           span { class: "text-sm text-[var(--outline)]", "New Agent" }
           button {
-            class: "text-[var(--outline)] hover:text-[var(--on-surface)] text-lg",
+            class: "text-[var(--outline)] hover:text-[var(--on-surface)]",
             onclick: move |_| on_close.call(()),
-            "x"
+            span { class: "material-symbols-outlined text-lg", "close" }
           }
         }
         div { class: "p-6 space-y-4",

@@ -55,10 +55,25 @@ fn render_toast(toast: &ToastItem, state: ToastState) -> Element {
   }
 }
 
+fn timestamp_ms() -> u64 {
+  std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+}
+
 #[component]
 pub fn ToastViewport() -> Element {
   let state = use_context::<ToastState>();
   let toasts = state.toasts;
+
+  use_future(move || async move {
+    loop {
+      tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+      let now = timestamp_ms();
+      let expired: Vec<String> = toasts.read().iter().filter(|t| now.saturating_sub(t.created_at) >= t.ttl_ms).map(|t| t.id.clone()).collect();
+      for id in expired {
+        state.dismiss(&id);
+      }
+    }
+  });
 
   if toasts.read().is_empty() {
     return rsx! {};
