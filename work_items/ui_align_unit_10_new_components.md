@@ -220,18 +220,20 @@ pub fn ScrollToBottom(
   #[props(optional)] class: Option<String>,
 ) -> Element {
   let extra = class.as_deref().unwrap_or("");
-  let mut child_count = use_signal(|| 0usize);
   let mut user_scrolled_up = use_signal(|| false);
+  let mut render_count = use_signal(|| 0u64);
   let sentinel_id = "scroll-sentinel";
 
+  render_count += 1;
+
   use_effect(move || {
-    let count = child_count();
-    if count > 0 && !user_scrolled_up() {
+    let _tick = render_count();
+    if !user_scrolled_up() {
       spawn(async move {
         let js = format!(
           "document.getElementById('{sentinel_id}')?.scrollIntoView({{ behavior: 'smooth' }})"
         );
-        let _ = eval(&js).await;
+        let _ = document::eval(&js).await;
       });
     }
   });
@@ -250,7 +252,7 @@ pub fn ScrollToBottom(
                 return diff > 40 ? 'true' : 'false';
               }})()"#
             );
-            match eval(&js).await {
+            match document::eval(&js).await {
               Ok(val) => {
                   let is_up = val.to_string().contains("true");
                   user_scrolled_up.set(is_up);
@@ -260,9 +262,7 @@ pub fn ScrollToBottom(
           });
       },
       {children}
-      div { id: sentinel_id,
-        onmounted: move |_| child_count.set(child_count() + 1),
-      }
+      div { id: sentinel_id }
     }
   }
 }
@@ -273,9 +273,9 @@ pub fn ScrollToBottom(
 **Component behavior:**
 - Wraps children in a scrollable container
 - Appends an invisible sentinel `div` at the bottom
-- On mount and whenever `child_count` changes (triggering the effect), scrolls the sentinel into view using `eval` with `scrollIntoView`
+- Increments `render_count` on every render. The `use_effect` depends on `render_count`, so it runs on every render. If the user has not scrolled up, it scrolls the sentinel into view via `document::eval` with `scrollIntoView`
 - On scroll events, checks if the user has scrolled more than 40px above the bottom. If so, sets `user_scrolled_up = true` to suppress auto-scrolling
-- When the user scrolls back to bottom (within 40px), auto-scroll resumes
+- When the user scrolls back to bottom (within 40px threshold), auto-scroll resumes
 - `class` prop allows caller to set height/width constraints
 
 ---

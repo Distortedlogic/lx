@@ -1,10 +1,10 @@
 use std::collections::HashSet;
 
-use crate::ast::{AstArena, BindTarget, Expr, ExprBlock, ExprId, ExprLoop, ExprPar, Program, Stmt, StmtId};
-use crate::checker::diagnostics::DiagnosticKind;
-use crate::checker::semantic::{DefKind, DefinitionInfo, SemanticModel};
-use crate::checker::{DiagLevel, Diagnostic};
-use crate::sym::Sym;
+use lx_ast::ast::{AstArena, BindTarget, Expr, ExprBlock, ExprId, ExprLoop, ExprPar, Program, Stmt, StmtId};
+use lx_checker::diagnostics::DiagnosticKind;
+use lx_checker::semantic::{DefKind, DefinitionInfo, SemanticModel};
+use lx_checker::{DiagLevel, Diagnostic};
+use lx_span::sym::Sym;
 
 pub fn check_unused_mut<P>(program: &Program<P>, model: &SemanticModel, arena: &AstArena) -> Vec<Diagnostic> {
   let mut_defs: Vec<(usize, &DefinitionInfo)> = model.definitions.iter().enumerate().filter(|(_, d)| d.mutable && matches!(d.kind, DefKind::Binding)).collect();

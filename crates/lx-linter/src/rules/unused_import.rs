@@ -1,10 +1,10 @@
 use std::mem;
 
-use crate::ast::{Core, Program, Stmt, UseKind};
-use crate::checker::diagnostics::DiagnosticKind;
-use crate::checker::semantic::{DefKind, DefinitionId, SemanticModel};
-use crate::checker::{DiagLevel, Diagnostic};
-use crate::linter::rule::{LintRule, RuleCategory};
+use crate::rule::{LintRule, RuleCategory};
+use lx_ast::ast::{Core, Program, Stmt, UseKind};
+use lx_checker::diagnostics::DiagnosticKind;
+use lx_checker::semantic::{DefKind, DefinitionId, SemanticModel};
+use lx_checker::{DiagLevel, Diagnostic};
 
 pub struct UnusedImport {
   diagnostics: Vec<Diagnostic>,

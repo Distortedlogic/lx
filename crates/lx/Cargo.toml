@@ -8,6 +8,7 @@ version = "0.1.0"
 lx-ast = { path = "../lx-ast" }
 lx-checker = { path = "../lx-checker" }
 lx-desugar = { path = "../lx-desugar" }
+lx-linter = { path = "../lx-linter" }
 lx-fmt = { path = "../lx-fmt" }
 lx-macros = { path = "../lx-macros" }
 lx-parser = { path = "../lx-parser" }

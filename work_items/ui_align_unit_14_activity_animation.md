@@ -69,21 +69,23 @@ Dashboard "Recent Activity" rows at lines 74-88:
 
 No `key` attribute. No animation classes.
 
+Depends on: Unit 02 (color sweep), Unit 04 (dialog fade-in animation).
+
 ## Step 1: Add CSS animation to `crates/lx-desktop/src/tailwind.css`
 
-Append at the end of the file (after line 75):
+Append at the end of the file, after Unit 04's additions:
 
 Find:
 ```css
-::-webkit-scrollbar-thumb:hover {
-  background: var(--surface-bright);
+.animate-fade-in {
+  animation: fade-in 150ms ease-out;
 }
 ```
 
 Replace with:
 ```css
-::-webkit-scrollbar-thumb:hover {
-  background: var(--surface-bright);
+.animate-fade-in {
+  animation: fade-in 150ms ease-out;
 }
 
 @keyframes activity-row-enter {
@@ -112,16 +114,16 @@ The rgb values `156, 255, 147` match `--primary: #9cff93`.
 
 Find:
 ```rust
-        div { class: "border border-gray-700 divide-y divide-gray-700 overflow-hidden",
+        div { class: "border border-[var(--outline-variant)] divide-y divide-[var(--outline-variant)] overflow-hidden",
           for event in filtered.iter() {
-            div { class: "flex items-center px-4 py-2.5 hover:bg-white/5 transition-colors text-sm",
-              span { class: "w-40 shrink-0 text-gray-500 font-mono text-xs",
+            div { class: "flex items-center px-4 py-2.5 hover:bg-[var(--on-surface)]/5 transition-colors text-sm",
+              span { class: "w-40 shrink-0 text-[var(--outline)] font-mono text-xs",
                 "{event.timestamp}"
               }
               span { class: "w-28 shrink-0 text-[var(--primary)] uppercase font-semibold text-xs",
                 "{event.kind}"
               }
-              span { class: "flex-1 text-gray-300 truncate", "{event.message}" }
+              span { class: "flex-1 text-[var(--on-surface)] truncate", "{event.message}" }
             }
           }
         }
@@ -129,18 +131,18 @@ Find:
 
 Replace with:
 ```rust
-        div { class: "border border-gray-700 divide-y divide-gray-700 overflow-hidden",
+        div { class: "border border-[var(--outline-variant)] divide-y divide-[var(--outline-variant)] overflow-hidden",
           for event in filtered.iter() {
             div {
               key: "{event.timestamp}-{event.kind}-{event.message}",
-              class: "flex items-center px-4 py-2.5 hover:bg-white/5 transition-colors text-sm animate-activity-enter",
-              span { class: "w-40 shrink-0 text-gray-500 font-mono text-xs",
+              class: "flex items-center px-4 py-2.5 hover:bg-[var(--on-surface)]/5 transition-colors text-sm animate-activity-enter",
+              span { class: "w-40 shrink-0 text-[var(--outline)] font-mono text-xs",
                 "{event.timestamp}"
               }
               span { class: "w-28 shrink-0 text-[var(--primary)] uppercase font-semibold text-xs",
                 "{event.kind}"
               }
-              span { class: "flex-1 text-gray-300 truncate", "{event.message}" }
+              span { class: "flex-1 text-[var(--on-surface)] truncate", "{event.message}" }
             }
           }
         }
@@ -154,17 +156,17 @@ Changes:
 
 Find:
 ```rust
-        div { class: "border border-gray-700 divide-y divide-gray-700 overflow-hidden",
+        div { class: "border border-[var(--outline-variant)] divide-y divide-[var(--outline-variant)] overflow-hidden",
           for event in events.iter().take(10) {
-            div { class: "px-4 py-2.5 text-sm hover:bg-white/5 transition-colors",
+            div { class: "px-4 py-2.5 text-sm hover:bg-[var(--on-surface)]/5 transition-colors",
               div { class: "flex gap-3",
                 p { class: "flex-1 min-w-0 truncate",
-                  span { class: "text-gray-400 font-mono text-xs",
+                  span { class: "text-[var(--on-surface-variant)] font-mono text-xs",
                     "{event.kind}"
                   }
                   span { class: "ml-2", "{event.message}" }
                 }
-                span { class: "text-xs text-gray-500 shrink-0", "{event.timestamp}" }
+                span { class: "text-xs text-[var(--outline)] shrink-0", "{event.timestamp}" }
               }
             }
           }
@@ -173,19 +175,19 @@ Find:
 
 Replace with:
 ```rust
-        div { class: "border border-gray-700 divide-y divide-gray-700 overflow-hidden",
+        div { class: "border border-[var(--outline-variant)] divide-y divide-[var(--outline-variant)] overflow-hidden",
           for event in events.iter().take(10) {
             div {
               key: "{event.timestamp}-{event.kind}-{event.message}",
-              class: "px-4 py-2.5 text-sm hover:bg-white/5 transition-colors animate-activity-enter",
+              class: "px-4 py-2.5 text-sm hover:bg-[var(--on-surface)]/5 transition-colors animate-activity-enter",
               div { class: "flex gap-3",
                 p { class: "flex-1 min-w-0 truncate",
-                  span { class: "text-gray-400 font-mono text-xs",
+                  span { class: "text-[var(--on-surface-variant)] font-mono text-xs",
                     "{event.kind}"
                   }
                   span { class: "ml-2", "{event.message}" }
                 }
-                span { class: "text-xs text-gray-500 shrink-0", "{event.timestamp}" }
+                span { class: "text-xs text-[var(--outline)] shrink-0", "{event.timestamp}" }
               }
             }
           }

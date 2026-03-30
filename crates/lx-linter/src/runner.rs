@@ -1,10 +1,10 @@
 use super::registry::RuleRegistry;
 use super::rule::LintRule;
-use crate::ast::Core;
-use crate::checker::Diagnostic;
-use crate::checker::semantic::SemanticModel;
-use crate::linter::rules::mut_never_mutated::check_unused_mut;
-use crate::visitor::prelude::*;
+use crate::rules::mut_never_mutated::check_unused_mut;
+use lx_ast::ast::Core;
+use lx_ast::visitor::prelude::*;
+use lx_checker::Diagnostic;
+use lx_checker::semantic::SemanticModel;
 
 struct LintWalker<'a> {
   rules: &'a mut [Box<dyn LintRule>],

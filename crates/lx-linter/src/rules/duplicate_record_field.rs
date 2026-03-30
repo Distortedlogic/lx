@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 use std::mem;
 
-use crate::ast::{AstArena, Expr, ExprId, RecordField};
-use crate::checker::diagnostics::DiagnosticKind;
-use crate::checker::semantic::SemanticModel;
-use crate::checker::{DiagLevel, Diagnostic};
-use crate::linter::rule::{LintRule, RuleCategory};
+use crate::rule::{LintRule, RuleCategory};
+use lx_ast::ast::{AstArena, Expr, ExprId, RecordField};
+use lx_checker::diagnostics::DiagnosticKind;
+use lx_checker::semantic::SemanticModel;
+use lx_checker::{DiagLevel, Diagnostic};
 use miette::SourceSpan;
 
 pub struct DuplicateRecordField {

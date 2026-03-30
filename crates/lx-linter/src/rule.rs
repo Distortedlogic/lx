@@ -1,6 +1,6 @@
-use crate::ast::{AstArena, Core, Expr, ExprId, Program, Stmt, StmtId};
-use crate::checker::Diagnostic;
-use crate::checker::semantic::SemanticModel;
+use lx_ast::ast::{AstArena, Core, Expr, ExprId, Program, Stmt, StmtId};
+use lx_checker::Diagnostic;
+use lx_checker::semantic::SemanticModel;
 use miette::SourceSpan;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
