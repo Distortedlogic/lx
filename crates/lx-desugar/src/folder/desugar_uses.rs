@@ -1,8 +1,8 @@
 use miette::SourceSpan;
 
-use crate::ast::{AgentMethod, AstArena, ClassField, Expr, ListElem, Literal, StrPart};
 use crate::folder::gen_ast::{gen_apply, gen_func, gen_method};
-use crate::sym::{Sym, intern};
+use lx_ast::ast::{AgentMethod, AstArena, ClassField, Expr, ListElem, Literal, StrPart};
+use lx_span::sym::{Sym, intern};
 
 fn tool_field_name(type_name: Sym) -> Sym {
   intern(&format!("__tool_{}", type_name.as_str().to_lowercase()))

@@ -1,6 +1,6 @@
 [workspace]
 exclude = ["reference/chumsky"]
-members = ["crates/lx", "crates/lx-api", "crates/lx-ast", "crates/lx-cli", "crates/lx-desktop", "crates/lx-macros", "crates/lx-mobile", "crates/lx-parser", "crates/lx-span"]
+members = ["crates/lx", "crates/lx-api", "crates/lx-ast", "crates/lx-cli", "crates/lx-desktop", "crates/lx-desugar", "crates/lx-macros", "crates/lx-mobile", "crates/lx-parser", "crates/lx-span"]
 resolver = "2"
 
 [workspace.package]

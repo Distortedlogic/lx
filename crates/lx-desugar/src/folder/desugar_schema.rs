@@ -1,10 +1,10 @@
 use miette::SourceSpan;
 
-use crate::ast::{
+use lx_ast::ast::{
   AgentMethod, AstArena, BinOp, BindTarget, Binding, ClassDeclData, ClassField, Expr, ExprApply, ExprBinary, ExprBlock, ExprFunc, ExprId, ExprUnary,
   KeywordDeclData, ListElem, Literal, Param, RecordField, Stmt, StmtId, StrPart, TraitEntry, UseKind, UseStmt,
 };
-use crate::sym::intern;
+use lx_span::sym::intern;
 
 fn gen_str(s: &str, span: SourceSpan, arena: &mut AstArena) -> ExprId {
   arena.alloc_expr(Expr::Literal(Literal::Str(vec![StrPart::Text(s.to_string())])), span)

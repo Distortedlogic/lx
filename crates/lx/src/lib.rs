@@ -12,7 +12,7 @@ pub mod checker;
 pub mod env;
 pub mod error;
 pub mod event_stream;
-pub mod folder;
+pub use lx_desugar::folder;
 pub mod formatter;
 pub mod interpreter;
 pub mod linter;

@@ -1,12 +1,13 @@
 use miette::SourceSpan;
 
-use crate::ast::{
-  AstArena, BinOp, BindTarget, ClassDeclData, ClassField, Expr, ExprBinary, ExprFieldAccess, FieldKind, KeywordDeclData, Stmt, StmtId, UseKind, UseStmt,
-};
 use crate::folder::gen_ast::{gen_block, gen_field_call, gen_func, gen_ident, gen_list, gen_literal_str, gen_method, gen_record, gen_self_field};
-use crate::sym::{Sym, intern};
+use lx_ast::ast::{
+  AgentMethod, AstArena, BinOp, BindTarget, Binding, ClassDeclData, ClassField, Expr, ExprBinary, ExprFieldAccess, ExprId, FieldKind, KeywordDeclData, Stmt,
+  StmtId, UseKind, UseStmt,
+};
+use lx_span::sym::{Sym, intern};
 
-fn has_user_method(methods: &[crate::ast::AgentMethod], name: &str) -> bool {
+fn has_user_method(methods: &[AgentMethod], name: &str) -> bool {
   let sym = intern(name);
   methods.iter().any(|m| m.name == sym)
 }
@@ -52,17 +53,15 @@ pub(super) fn desugar_http(data: KeywordDeclData, span: SourceSpan, arena: &mut 
   vec![use_tool, use_http, class_stmt]
 }
 
-fn build_http_run(span: SourceSpan, arena: &mut AstArena) -> crate::ast::ExprId {
+fn build_http_run(span: SourceSpan, arena: &mut AstArena) -> ExprId {
   let self_base_url = gen_self_field("base_url", span, arena);
   let args_tool = {
     let args = gen_ident("args", span, arena);
     arena.alloc_expr(Expr::FieldAccess(ExprFieldAccess { expr: args, field: FieldKind::Named(intern("tool")) }), span)
   };
   let url_expr = arena.alloc_expr(Expr::Binary(ExprBinary { op: BinOp::Concat, left: self_base_url, right: args_tool }), span);
-  let url_assign = arena.alloc_stmt(
-    Stmt::Binding(crate::ast::Binding { exported: false, mutable: false, target: BindTarget::Name(intern("url")), type_ann: None, value: url_expr }),
-    span,
-  );
+  let url_assign = arena
+    .alloc_stmt(Stmt::Binding(Binding { exported: false, mutable: false, target: BindTarget::Name(intern("url")), type_ann: None, value: url_expr }), span);
 
   let args_method = {
     let args = gen_ident("args", span, arena);

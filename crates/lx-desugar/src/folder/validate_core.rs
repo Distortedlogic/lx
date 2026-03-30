@@ -1,5 +1,5 @@
-use crate::ast::{Core, KeywordKind, WithKind};
-use crate::visitor::prelude::*;
+use lx_ast::ast::{Core, KeywordKind, WithKind};
+use lx_ast::visitor::prelude::*;
 
 struct CoreValidator;
 

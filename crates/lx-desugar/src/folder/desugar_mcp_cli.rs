@@ -1,14 +1,14 @@
 use miette::SourceSpan;
 
-use crate::ast::{
-  AgentMethod, AstArena, BinOp, ClassDeclData, ClassField, Expr, ExprBinary, ExprFieldAccess, ExprId, ExprMatch, FieldKind, KeywordDeclData, Literal, MatchArm,
-  Pattern, Stmt, StmtId, UseKind, UseStmt,
-};
 use crate::folder::gen_ast::{
   gen_apply, gen_block, gen_field_call, gen_field_update, gen_func, gen_ident, gen_list, gen_literal_str, gen_method, gen_none, gen_propagate, gen_record,
   gen_self_field,
 };
-use crate::sym::{Sym, intern};
+use lx_ast::ast::{
+  AgentMethod, AstArena, BinOp, ClassDeclData, ClassField, Expr, ExprBinary, ExprFieldAccess, ExprId, ExprMatch, FieldKind, KeywordDeclData, Literal, MatchArm,
+  Pattern, Stmt, StmtId, UseKind, UseStmt,
+};
+use lx_span::sym::{Sym, intern};
 
 fn has_user_method(methods: &[AgentMethod], name: &str) -> bool {
   let sym = intern(name);

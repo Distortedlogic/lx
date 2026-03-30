@@ -3,14 +3,14 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use miette::SourceSpan;
 
-use crate::ast::{
+use lx_ast::ast::{
   AstArena, BindTarget, Binding, ClassDeclData, Core, Expr, ExprApply, ExprBinary, ExprBlock, ExprFieldAccess, ExprFunc, ExprId, ExprMatch, ExprWith,
   FieldKind, KeywordDeclData, KeywordKind, Literal, MatchArm, Param, Pattern, PatternConstructor, Program, Section, Stmt, StmtId, StrPart, Surface, UseKind,
   UseStmt, WithKind,
 };
-use crate::sym::{Sym, intern};
-use crate::visitor::transformer::AstTransformer;
-use crate::visitor::walk_transform::walk_transform_stmt;
+use lx_ast::visitor::transformer::AstTransformer;
+use lx_ast::visitor::walk_transform::walk_transform_stmt;
+use lx_span::sym::{Sym, intern};
 
 static GENSYM_COUNTER: AtomicU64 = AtomicU64::new(0);
 

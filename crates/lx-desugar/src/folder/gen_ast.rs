@@ -1,10 +1,10 @@
 use miette::SourceSpan;
 
-use crate::ast::{
+use lx_ast::ast::{
   AgentMethod, AstArena, Expr, ExprApply, ExprBlock, ExprFieldAccess, ExprFunc, ExprId, ExprPropagate, FieldKind, ListElem, Literal, Param, RecordField, Stmt,
   StmtFieldUpdate, StmtId, StrPart,
 };
-use crate::sym::{Sym, intern};
+use lx_span::sym::{Sym, intern};
 
 pub fn gen_ident(name: &str, span: SourceSpan, arena: &mut AstArena) -> ExprId {
   arena.alloc_expr(Expr::Ident(intern(name)), span)
