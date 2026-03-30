@@ -126,23 +126,15 @@ In the `WizardFooter` render, replace the existing `if *loading.read() { "Workin
 if *loading.read() {
     div { class: "flex items-center gap-2",
         span { class: "material-symbols-outlined text-sm animate-spin", "progress_activity" }
-        span { "{}", loading_text.read().as_deref().unwrap_or("Working...") }
+        {
+            let text = loading_text.read().as_ref().cloned().unwrap_or_else(|| "Working...".into());
+            rsx! { span { "{text}" } }
+        }
     }
 }
 ```
 
-Note: The `animate-spin` class provides a CSS rotation animation. If it doesn't resolve via Tailwind, add this to `tailwind.css`:
-
-```css
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-.animate-spin {
-  animation: spin 1s linear infinite;
-}
-```
-
-However, Tailwind v4 includes `animate-spin` by default, so this should work without additions.
+Note: The `animate-spin` class is provided by Tailwind v4. No CSS addition needed.
 
 ### 6. Update step_agent.rs to add model ID field
 

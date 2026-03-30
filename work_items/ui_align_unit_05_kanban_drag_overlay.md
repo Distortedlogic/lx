@@ -56,7 +56,7 @@ In the `KanbanColumn` component:
 
 ### Step 4: Add pointer tracking to the board container
 
-In `KanbanBoardView`, wrap the existing `div { class: "flex gap-3 ..." }` in an outer div that handles all pointer events at the board level:
+In `KanbanBoardView`, wrap the existing `div { class: "flex gap-3 overflow-x-auto pb-4 -mx-2 px-2" }` in an outer div that handles all pointer events at the board level:
 
 ```rust
 div {
@@ -120,7 +120,40 @@ onmouseleave: move |_| {
 
 ### Step 6: Pass new signals to child components
 
-Pass `drag_active`, `pointer_start`, `pointer_pos`, and `pending_drag_id` to `KanbanColumn` and `KanbanCard` via their component props. Add the corresponding `#[component]` parameters.
+Update `KanbanColumn` signature from:
+```rust
+fn KanbanColumn(
+  status: String, issues: Vec<Issue>, agents: Vec<AgentRef>,
+  on_select: EventHandler<String>, on_status_change: EventHandler<(String, String)>,
+  dragging_issue_id: Signal<Option<String>>, drag_over_column: Signal<Option<String>>,
+) -> Element
+```
+to:
+```rust
+fn KanbanColumn(
+  status: String, issues: Vec<Issue>, agents: Vec<AgentRef>,
+  on_select: EventHandler<String>, on_status_change: EventHandler<(String, String)>,
+  dragging_issue_id: Signal<Option<String>>, drag_over_column: Signal<Option<String>>,
+  drag_active: Signal<bool>, pending_drag_id: Signal<Option<String>>,
+  pointer_start: Signal<(f64, f64)>, pointer_pos: Signal<(f64, f64)>,
+) -> Element
+```
+
+Update `KanbanCard` signature from:
+```rust
+fn KanbanCard(issue: Issue, agents: Vec<AgentRef>, dragging_issue_id: Signal<Option<String>>, on_click: EventHandler<()>) -> Element
+```
+to:
+```rust
+fn KanbanCard(
+  issue: Issue, agents: Vec<AgentRef>,
+  dragging_issue_id: Signal<Option<String>>, drag_active: Signal<bool>,
+  pending_drag_id: Signal<Option<String>>, pointer_start: Signal<(f64, f64)>,
+  on_click: EventHandler<()>,
+) -> Element
+```
+
+Pass the new signals at the call sites in `KanbanBoardView` and `KanbanColumn`.
 
 ### Step 7: Update KanbanCard opacity logic
 

@@ -92,7 +92,7 @@ pub fn push(&self, input: ToastInput) -> Option<String> {
 }
 ```
 
-Note: The return type changes from `String` to `Option<String>`. Any callers that use the returned ID must be updated to handle `Option<String>`. Search the codebase for calls to `.push(ToastInput` and update them. If no callers use the returned ID (likely), the change is transparent since the return value gets discarded.
+The return type changes from `String` to `Option<String>`. No callers in the codebase use the return value of `push` (verified). The change is transparent.
 
 ### Step 4: Add `dismissing` state to `ToastItem` in `toast.rs`
 

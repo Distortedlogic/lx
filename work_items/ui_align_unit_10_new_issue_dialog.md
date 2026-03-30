@@ -117,7 +117,8 @@ use_effect(move || {
     };
     if let Ok(json) = serde_json::to_string(&draft) {
         let js = format!(r#"localStorage.setItem("lx-new-issue-draft", {})"#, serde_json::json!(json));
-        _ = document::eval(&js);
+        let js = js.clone();
+        spawn(async move { let _ = document::eval(&js).await; });
     }
 });
 ```
@@ -125,12 +126,10 @@ use_effect(move || {
 Add a clear-draft call when the issue is successfully created. In the `on_create` button's `onclick` handler, before calling `on_create.call(NewIssuePayload)`, add:
 
 ```rust
-_ = document::eval(r#"localStorage.removeItem("lx-new-issue-draft")"#);
+spawn(async move { let _ = document::eval(r#"localStorage.removeItem("lx-new-issue-draft")"#).await; });
 ```
 
-Also clear the draft when the dialog is explicitly cancelled (in both Cancel button and backdrop click). Add the same `removeItem` call in the `on_close` handlers. Since `on_close` is called from 3 places (backdrop, X button, Cancel button), the cleanest approach is to add a helper closure at the top of the rsx block:
-
-Actually, since `on_close` is an `EventHandler<()>` prop, the caller handles closing. We should clear the draft in the create path only. Drafts persist across cancel so the user can reopen and continue. Only clear on successful create.
+Drafts persist across cancel so the user can reopen and continue. Only clear on successful create.
 
 ### 4. Add Cmd+Enter keyboard shortcut to submit
 
@@ -139,7 +138,7 @@ Add an `onkeydown` handler to the outer dialog container div (the one with class
 ```rust
 onkeydown: move |evt: KeyboardEvent| {
     if evt.modifiers().meta() && evt.key() == Key::Enter && !title.read().trim().is_empty() {
-        _ = document::eval(r#"localStorage.removeItem("lx-new-issue-draft")"#);
+        spawn(async move { let _ = document::eval(r#"localStorage.removeItem("lx-new-issue-draft")"#).await; });
         on_create.call(NewIssuePayload);
     }
 },
@@ -147,31 +146,7 @@ onkeydown: move |evt: KeyboardEvent| {
 
 Place this right after the `onclick: move |_| on_close.call(())` on the backdrop div.
 
-### 5. Replace native selects with custom Select (depends on Unit 06)
-
-After Unit 06 lands a custom `Select` component, replace the three `<select>` elements for Status, Priority, and Assignee with the new component. Until Unit 06 is done, leave the native selects in place.
-
-When Unit 06 is complete, the replacement pattern for each select is:
-
-**Status select** -- replace the `select { ... }` block in the Status column with:
-
-```rust
-Select {
-    value: status.read().clone(),
-    onchange: move |val: String| status.set(val),
-    for s in STATUS_ORDER {
-        SelectItem { value: s.to_string(), "{s}" }
-    }
-}
-```
-
-**Priority select** -- same pattern with `priority` signal and `PRIORITY_ORDER`.
-
-**Assignee select** -- same pattern with `assignee` signal, plus `SelectItem { value: "".to_string(), "Unassigned" }` as the first option, then iterate `agents`.
-
-The exact props will depend on Unit 06's final API. Adapt accordingly but preserve the same signal bindings.
-
-### 6. Verify serde dependency
+### 5. Verify serde dependency
 
 The `IssueDraft` struct uses `serde::Serialize` and `serde::Deserialize`. Confirm that `serde` with `derive` feature is already in `crates/lx-desktop/Cargo.toml` dependencies. It should be, since `crates/lx-desktop/src/pages/issues/types.rs` already uses `#[derive(Serialize, Deserialize)]`.
 

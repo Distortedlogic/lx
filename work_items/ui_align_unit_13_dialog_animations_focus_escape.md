@@ -129,9 +129,7 @@ pub fn DialogContent(
               open.set(false);
           }
       },
-      if show_close_button {
-        // ... existing close button unchanged
-      }
+      // Preserve the existing close button code (dialog.rs lines 34-59) unchanged.
       {children}
     }
   }

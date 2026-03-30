@@ -229,28 +229,6 @@ The two CommentThread components use different storage keys to avoid overwriting
 - Generic CommentThread: `"lx_comment_draft"`
 - Issue-specific CommentThread: `"lx_issue_comment_draft"`
 
-This means there is one draft slot per component type. If per-entity drafts are needed later (e.g., per-issue), the key would need to include the entity ID. That is out of scope for this unit.
-
-### Step 4: Cmd+Enter behavior
-
-The `MarkdownEditor` already handles Cmd+Enter in `EditorTextarea` (line 83-88 of markdown_editor.rs):
-
-```rust
-onkeydown: move |evt| {
-    if evt.modifiers().meta() && evt.key() == Key::Enter
-      && let Some(ref handler) = on_submit
-    {
-      handler.call(value.clone());
-    }
-},
-```
-
-Both CommentThread components now pass `on_submit` to `MarkdownEditor`, which calls the same `submit` closure used by the button. No additional keyboard handling is needed.
-
-### Step 5: Draft auto-clear on submit
-
-Both `submit` closures call `draft.set(String::new())` after `on_add.call(body)`. Because `dioxus_storage::use_persistent` auto-syncs to localStorage, the draft is cleared from storage immediately on submit.
-
 ## Verification
 
 1. Run `just diagnose` to confirm no compilation errors or warnings.

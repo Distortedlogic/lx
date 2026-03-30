@@ -58,8 +58,6 @@ textarea {
 }
 ```
 
-If multiple editors could be on screen simultaneously, pass a unique ID prop instead. For now, a fixed ID is sufficient.
-
 ### Step 2: Create a helper function for cursor-position insertion
 
 Add this function above `ToolbarButtons` (around line 106):

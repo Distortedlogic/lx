@@ -100,11 +100,7 @@ Replace the existing "Fit" button `onclick` handler and add a `use_effect` that 
 
 In the `OrgChart` component, **after** the line `let edges = collect_edges(&layout);` and **before** the signal declarations, add:
 
-```rust
-let bbox = compute_bounding_box(&flat);
-```
-
-Wait -- `flat` is defined after the signal declarations. Reorder: move `let flat = flatten_layout(&layout);` up to right after `let edges = collect_edges(&layout);` so `bbox` can use it. Then add:
+`flat` is already defined before `edges` in the current code (line 90 before line 91). No reorder needed. Add after `flat`:
 
 ```rust
 let bbox = compute_bounding_box(&flat);

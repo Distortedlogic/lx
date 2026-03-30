@@ -111,8 +111,14 @@ rsx! {
                 button {
                     class: "absolute top-2 right-2 text-xs text-[var(--outline)] hover:text-[var(--on-surface)] transition-colors",
                     title: "Copy source",
-                    onclick: move |_| {
-                        // copy to clipboard via eval
+                    onclick: {
+                        let source = config.source_text.clone();
+                        move |_| {
+                            let escaped = source.replace('\\', "\\\\").replace('\'', "\\'").replace('\n', "\\n");
+                            spawn(async move {
+                                let _ = document::eval(&format!("navigator.clipboard.writeText('{}')", escaped)).await;
+                            });
+                        }
                     },
                     span { class: "material-symbols-outlined text-sm", "content_copy" }
                 }
@@ -270,15 +276,13 @@ Keep the dirty-tracking save bar from the original, but only for the editable fi
 }
 ```
 
-### Step 11: Keep ConfigSection and ToggleSwitch helpers
+### Step 11: Keep ConfigSection, delete ToggleSwitch
 
-`ConfigSection` stays unchanged (lines 128-138 of original). `ToggleSwitch` can be removed since heartbeat config is gone. If `ToggleSwitch` is used elsewhere in the codebase, keep it; if not, delete it.
-
-Search for `ToggleSwitch` usage: `grep -r "ToggleSwitch" crates/lx-desktop/src/`. If only used in `config_form.rs`, delete it.
+`ConfigSection` stays unchanged (lines 128-138 of original). Delete `ToggleSwitch` -- it is only used in `config_form.rs`.
 
 ### Step 12: Update call sites
 
-Find where `AgentConfigPanel` is rendered. It will be in the agent detail page (likely `pages/agents/detail.rs` or similar). The caller must now construct a `LxAgentConfig` instead of passing `AgentDetail`. For now, the caller can build a placeholder:
+`AgentConfigPanel` is rendered in `pages/agents/detail.rs`. The caller must now construct a `LxAgentConfig` instead of passing `AgentDetail`. For now, the caller builds a default:
 
 ```rust
 let config = LxAgentConfig {
@@ -295,7 +299,7 @@ let config = LxAgentConfig {
 };
 ```
 
-This placeholder will be replaced when the desktop app gains the ability to parse `.lx` files and extract agent declarations from the AST.
+The form renders with empty/default data until AST parsing is wired.
 
 ### Step 13: File length check
 

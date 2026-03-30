@@ -32,7 +32,7 @@ Expand the keyboard_shortcuts hook into a registration-based system where compon
 In `keyboard_shortcuts.rs`, define:
 
 ```rust
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use dioxus::prelude::*;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -49,14 +49,14 @@ struct ShortcutEntry {
     id: &'static str,
     priority: ShortcutPriority,
     matcher: Arc<dyn Fn(&KeyboardEvent) -> bool + Send + Sync>,
-    handler: Arc<Mutex<Option<EventHandler<KeyboardEvent>>>>,
+    handler: Callback<KeyboardEvent>,
 }
 ```
 
 - `id`: unique string per registration (e.g., `"cmd_palette_toggle"`, `"dialog_escape"`)
 - `priority`: higher priority entries are checked first
 - `matcher`: pure function that returns true if this entry matches the event
-- `handler`: the action to run when matched; wrapped in `Arc<Mutex>` for thread safety
+- `handler`: `dioxus::prelude::Callback<KeyboardEvent>` — this is `Send + Sync` unlike `EventHandler`
 
 ### Step 2: Define the ShortcutRegistry context type
 
@@ -84,14 +84,14 @@ impl ShortcutRegistry {
         id: &'static str,
         priority: ShortcutPriority,
         matcher: impl Fn(&KeyboardEvent) -> bool + Send + Sync + 'static,
-        handler: EventHandler<KeyboardEvent>,
+        handler: Callback<KeyboardEvent>,
     ) {
         let mut entries = self.entries;
         let entry = ShortcutEntry {
             id,
             priority,
             matcher: Arc::new(matcher),
-            handler: Arc::new(Mutex::new(Some(handler))),
+            handler,
         };
         entries.write().push(entry);
         entries.write().sort_by(|a, b| b.priority.cmp(&a.priority));
@@ -106,12 +106,8 @@ impl ShortcutRegistry {
         let entries = self.entries.read();
         for entry in entries.iter() {
             if (entry.matcher)(event) {
-                if let Ok(guard) = entry.handler.lock() {
-                    if let Some(ref handler) = *guard {
-                        handler.call(event.clone());
-                        return;
-                    }
-                }
+                entry.handler.call(event.clone());
+                return;
             }
         }
     }
@@ -193,7 +189,7 @@ use_hook(move || {
         "global_cmd_k",
         ShortcutPriority::Global,
         key_match(Key::Character("k".into()), true),
-        EventHandler::new(move |evt: KeyboardEvent| {
+        Callback::new(move |evt: KeyboardEvent| {
             evt.prevent_default();
             let current = *palette_open_sig.0.read();
             palette_open_sig.0.set(!current);
@@ -204,7 +200,7 @@ use_hook(move || {
         "global_escape",
         ShortcutPriority::Global,
         escape_match(),
-        EventHandler::new(move |_evt: KeyboardEvent| {
+        Callback::new(move |_evt: KeyboardEvent| {
             if *dialog.onboarding_open.read() {
                 dialog.close_onboarding();
             } else if *dialog.new_agent_open.read() {
@@ -238,7 +234,7 @@ use_effect(move || {
             "cmd_palette_escape",
             ShortcutPriority::Modal,
             escape_match(),
-            EventHandler::new(move |_: KeyboardEvent| {
+            Callback::new(move |_: KeyboardEvent| {
                 open.set(false);
             }),
         );
@@ -259,7 +255,7 @@ pub fn use_shortcut(
     id: &'static str,
     priority: ShortcutPriority,
     matcher: impl Fn(&KeyboardEvent) -> bool + Send + Sync + 'static,
-    handler: EventHandler<KeyboardEvent>,
+    handler: Callback<KeyboardEvent>,
 ) {
     let registry = use_context::<ShortcutRegistry>();
 
@@ -280,7 +276,7 @@ This hook handles the full lifecycle: register on mount, unregister on drop. Com
 In `keyboard_shortcuts.rs`, the imports needed:
 
 ```rust
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use dioxus::prelude::*;
 ```
 

@@ -300,7 +300,7 @@ let key_handler = {
 };
 ```
 
-Wire this into both the trigger button's `onkeydown` and the search input's `onkeydown` from Steps 6 and 7. Because the closure captures signals and the filtered vec, it needs to be defined once and cloned/called from both places. In practice, since Dioxus closures capture by move, define it as a separate `EventHandler` or use two separate closures that share the same logic pattern.
+Wire this into both the trigger button's `onkeydown` and the search input's `onkeydown` from Steps 6 and 7. Use two separate closures with the same logic pattern — one for the trigger `onkeydown` and one for the search input `onkeydown`. Both closures capture the same signals and perform identical logic.
 
 ### Step 10: Reset focused_index when search query changes
 
@@ -334,12 +334,12 @@ Select {
 }
 ```
 
-Files to search (run `grep -r "SelectItem\|Select {" crates/lx-desktop/src/`):
-- `pages/agents/config_form.rs` -- adapter type select (line 35-44): convert `ADAPTER_LABELS` to `Vec<SelectOption>`
-- `pages/issues/new_issue.rs` -- priority/status selects: convert to `SelectOption`
-- Any `onboarding` step files using selects
-
-Note: `config_form.rs` currently uses a raw `<select>` element, not the `Select` component. Convert that too.
+Files that use `Select`/`SelectItem` or raw `<select>` elements (exhaustive list):
+- `pages/agents/config_form.rs` -- adapter type raw `<select>` (lines 35-44): convert to `Select` with `ADAPTER_LABELS` as `Vec<SelectOption>`
+- `pages/issues/new_issue.rs` -- status/priority/assignee raw `<select>` elements (lines 49-93): convert to `Select` with `Vec<SelectOption>`
+- `pages/routines/schedule_editor.rs` -- preset, hour, minute, day selectors: convert raw `<select>` to `Select`
+- `components/onboarding/step_agent.rs` -- adapter and role raw `<select>` elements (lines 39-59): convert to `Select`
+- `pages/activity.rs` -- type filter raw `<select>` (lines 16-24): convert to `Select`
 
 ### Step 13: Update mod.rs if needed
 

@@ -13,7 +13,11 @@ Expand `TranscriptView` from 4 block types to 9, matching Paperclip's `RunTransc
 
 - `crates/lx-desktop/src/pages/agents/transcript.rs` (currently 124 lines)
 
-This file will grow significantly. If it exceeds 300 lines, split rendering functions into a sibling file `crates/lx-desktop/src/pages/agents/transcript_blocks.rs` and add `mod transcript_blocks;` to the parent `mod.rs`.
+This will exceed 300 lines. Split as follows:
+
+- **`transcript.rs`**: `TranscriptBlock` enum, `ToolStatus`, `ToolItem`, `StderrLine`, `event_to_block`, and `TranscriptView` component.
+- **`transcript_blocks.rs`** (new): `TranscriptBlockView` component and all individual block rendering functions.
+- **`mod.rs`**: Add `mod transcript_blocks;`.
 
 ## Context: Current State
 
@@ -189,11 +193,32 @@ TranscriptBlock::Thinking { text, .. } => {
 
 #### Tool block (expanded with status + collapsible detail)
 
-This uses a `use_signal` for open/closed state. Default open if error.
+All signal hooks for collapsible sections are called unconditionally at the top of `TranscriptBlockView`, before the match. The Tool block reads from the pre-allocated signal.
+
+Inside `TranscriptBlockView`, before the match on `block`, declare all collapsible signals unconditionally:
+
+```rust
+let mut tool_open = use_signal(|| false);
+let mut cmd_group_open = use_signal(|| false);
+let mut tool_group_open = use_signal(|| false);
+let mut stderr_open = use_signal(|| false);
+let mut stdout_open = use_signal(|| true);
+```
+
+Then set the initial value for the Tool block based on block data, after signals are created but before rendering:
+
+```rust
+if let TranscriptBlock::Tool { is_error, .. } = &block {
+    if *is_error && !tool_open() {
+        tool_open.set(true);
+    }
+}
+```
+
+Then in the match arm:
 
 ```rust
 TranscriptBlock::Tool { name, input, result, is_error, status, .. } => {
-  let mut open = use_signal(|| is_error);
   let status_label = match status {
     ToolStatus::Running => "Running",
     ToolStatus::Completed => "Completed",
@@ -218,16 +243,16 @@ TranscriptBlock::Tool { name, input, result, is_error, status, .. } => {
         span { class: "text-[10px] font-semibold uppercase tracking-wider {status_color}", "{status_label}" }
         button {
           class: "ml-auto text-[var(--outline)] hover:text-[var(--on-surface)] transition-colors",
-          onclick: move |_| open.set(!open()),
+          onclick: move |_| tool_open.set(!tool_open()),
           span { class: "material-symbols-outlined text-sm",
-            if open() { "expand_more" } else { "chevron_right" }
+            if tool_open() { "expand_more" } else { "chevron_right" }
           }
         }
       }
-      if !input.is_empty() && !open() {
+      if !input.is_empty() && !tool_open() {
         p { class: "text-xs text-[var(--outline)] font-mono truncate", "{input}" }
       }
-      if open() {
+      if tool_open() {
         div { class: "grid gap-3 lg:grid-cols-2",
           div {
             div { class: "mb-1 text-[10px] font-semibold uppercase tracking-widest text-[var(--on-surface-variant)]", "Input" }
@@ -278,26 +303,25 @@ TranscriptBlock::Activity { name, status, .. } => {
 
 ```rust
 TranscriptBlock::CommandGroup { items, .. } => {
-  let mut open = use_signal(|| false);
   let has_error = items.iter().any(|i| i.is_error);
   let is_running = items.iter().any(|i| matches!(i.status, ToolStatus::Running));
   let title = if is_running { "Executing command".to_string() } else if items.len() == 1 { "Executed command".to_string() } else { format!("Executed {} commands", items.len()) };
   rsx! {
-    div { class: if has_error && open() { "rounded-lg border border-[var(--error)]/20 bg-[var(--error)]/[0.04] p-3" } else { "" },
+    div { class: if has_error && cmd_group_open() { "rounded-lg border border-[var(--error)]/20 bg-[var(--error)]/[0.04] p-3" } else { "" },
       div {
         class: "flex items-center gap-2 cursor-pointer",
-        onclick: move |_| open.set(!open()),
+        onclick: move |_| cmd_group_open.set(!cmd_group_open()),
         span { class: "material-symbols-outlined text-sm text-[var(--outline)]", "terminal" }
         span { class: "text-[11px] font-semibold uppercase tracking-widest text-[var(--on-surface-variant)]/70", "{title}" }
         button {
           class: "ml-auto text-[var(--outline)] hover:text-[var(--on-surface)] transition-colors",
-          onclick: move |evt| { evt.stop_propagation(); open.set(!open()); },
+          onclick: move |evt| { evt.stop_propagation(); cmd_group_open.set(!cmd_group_open()); },
           span { class: "material-symbols-outlined text-sm",
-            if open() { "expand_more" } else { "chevron_right" }
+            if cmd_group_open() { "expand_more" } else { "chevron_right" }
           }
         }
       }
-      if open() {
+      if cmd_group_open() {
         div { class: "mt-3 space-y-3",
           for (idx , item) in items.iter().enumerate() {
             div { key: "{idx}", class: "space-y-2",
@@ -324,7 +348,6 @@ TranscriptBlock::CommandGroup { items, .. } => {
 
 ```rust
 TranscriptBlock::ToolGroup { items, .. } => {
-  let mut open = use_signal(|| false);
   let has_error = items.iter().any(|i| i.is_error);
   let is_running = items.iter().any(|i| matches!(i.status, ToolStatus::Running));
   let title = if is_running { format!("Using {} tools", items.len()) } else { format!("Used {} tools ({} calls)", items.len(), items.len()) };
@@ -332,18 +355,18 @@ TranscriptBlock::ToolGroup { items, .. } => {
     div { class: "rounded-lg border border-[var(--outline-variant)]/40 bg-[var(--surface-container)]/25",
       div {
         class: "flex items-center gap-2 px-3 py-2.5 cursor-pointer",
-        onclick: move |_| open.set(!open()),
+        onclick: move |_| tool_group_open.set(!tool_group_open()),
         span { class: "material-symbols-outlined text-sm text-[var(--outline)]", "build" }
         span { class: "text-[11px] font-semibold uppercase tracking-widest text-[var(--on-surface-variant)]/70", "{title}" }
         button {
           class: "ml-auto text-[var(--outline)] hover:text-[var(--on-surface)] transition-colors",
-          onclick: move |evt| { evt.stop_propagation(); open.set(!open()); },
+          onclick: move |evt| { evt.stop_propagation(); tool_group_open.set(!tool_group_open()); },
           span { class: "material-symbols-outlined text-sm",
-            if open() { "expand_more" } else { "chevron_right" }
+            if tool_group_open() { "expand_more" } else { "chevron_right" }
           }
         }
       }
-      if open() {
+      if tool_group_open() {
         div { class: "space-y-2 border-t border-[var(--outline-variant)]/30 px-3 py-3",
           for (idx , item) in items.iter().enumerate() {
             div { key: "{idx}", class: "space-y-1.5",
@@ -390,22 +413,24 @@ TranscriptBlock::ToolGroup { items, .. } => {
 ```
 
 #### StderrGroup block (new)
+
+Uses the `stderr_open` signal declared at the top of `TranscriptBlockView`.
+
 ```rust
 TranscriptBlock::StderrGroup { lines, .. } => {
-  let mut open = use_signal(|| false);
   let count = lines.len();
   let noun = if count == 1 { "line" } else { "lines" };
   rsx! {
     div { class: "rounded-lg border border-[var(--warning)]/20 bg-[var(--warning)]/[0.06] p-2 text-[var(--warning)]",
       div {
         class: "flex items-center gap-2 cursor-pointer",
-        onclick: move |_| open.set(!open()),
+        onclick: move |_| stderr_open.set(!stderr_open()),
         span { class: "text-[10px] font-semibold uppercase tracking-wider", "{count} log {noun}" }
         span { class: "material-symbols-outlined text-sm",
-          if open() { "expand_more" } else { "chevron_right" }
+          if stderr_open() { "expand_more" } else { "chevron_right" }
         }
       }
-      if open() {
+      if stderr_open() {
         pre { class: "mt-2 overflow-x-auto whitespace-pre-wrap break-words font-mono text-[11px] text-[var(--warning)]/80 pl-5",
           for line in lines.iter() {
             "{line.text}\n"
@@ -418,22 +443,24 @@ TranscriptBlock::StderrGroup { lines, .. } => {
 ```
 
 #### Stdout block (new)
+
+Uses the `stdout_open` signal declared at the top of `TranscriptBlockView`.
+
 ```rust
 TranscriptBlock::Stdout { text, .. } => {
-  let mut open = use_signal(|| true);
   rsx! {
     div {
       div { class: "flex items-center gap-2",
         span { class: "text-[10px] font-semibold uppercase tracking-widest text-[var(--on-surface-variant)]", "stdout" }
         button {
           class: "text-[var(--outline)] hover:text-[var(--on-surface)] transition-colors",
-          onclick: move |_| open.set(!open()),
+          onclick: move |_| stdout_open.set(!stdout_open()),
           span { class: "material-symbols-outlined text-sm",
-            if open() { "expand_more" } else { "chevron_right" }
+            if stdout_open() { "expand_more" } else { "chevron_right" }
           }
         }
       }
-      if open() {
+      if stdout_open() {
         pre { class: "mt-2 overflow-x-auto whitespace-pre-wrap break-words font-mono text-xs text-[var(--on-surface)]/80", "{text}" }
       }
     }
@@ -478,13 +505,13 @@ TranscriptBlock::Event { label, text, detail, tone, .. } => {
 
 ### Step 4: File splitting
 
-After implementing all variants, count lines. If the file exceeds 300 lines:
+This will exceed 300 lines. Split as follows:
 
-1. Create `crates/lx-desktop/src/pages/agents/transcript_blocks.rs`
+1. Create `crates/lx-desktop/src/pages/agents/transcript_blocks.rs`.
 2. Move the `TranscriptBlockView` component and all individual block rendering into that file.
 3. Keep the `TranscriptBlock` enum, `ToolStatus`, `ToolItem`, `StderrLine`, `event_to_block`, and `TranscriptView` in `transcript.rs`.
-4. In `transcript_blocks.rs`, add `use super::*;` or import the needed types.
-5. In the parent `mod.rs`, add `mod transcript_blocks;`.
+4. In `transcript_blocks.rs`, add `use super::*;` as the first line.
+5. In `crates/lx-desktop/src/pages/agents/mod.rs`, add `mod transcript_blocks;`.
 
 ## Verification
 

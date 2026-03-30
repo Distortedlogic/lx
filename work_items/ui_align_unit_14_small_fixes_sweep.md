@@ -6,6 +6,7 @@ Five small fixes from the UI alignment audit: FilterBar primitive usage, ScrollT
 
 ## Preconditions
 
+- Unit 02 (transcript block expansion) must be complete first — Step 3b applies animations to `TranscriptBlockView` match arms which change in Unit 02
 - Unit 12 (toast animations) should be complete first so that `tailwind.css` has the toast keyframes already appended (this unit adds more keyframes after them)
 - Unit 13 (dialog animations) should be complete first so that `tailwind.css` has the dialog keyframes already appended
 
@@ -49,19 +50,7 @@ Old:
       }
 ```
 
-New:
-```rust
-      Button {
-        variant: ButtonVariant::Ghost,
-        size: ButtonSize::Xs,
-        onclick: move |_| on_clear.call(()),
-        "Clear all"
-      }
-```
-
-Note: The `Button` component does not have an `onclick` prop by default -- it renders a `<button>` element. Check if Dioxus event spreading works here. If not, wrap the `Button` in an outer element or add the `onclick` on the Button. In Dioxus, event handlers on custom components are spread to the root element if the component supports it. Since `Button` renders a `<button>` with no `onclick` prop, you may need to instead keep it as a raw button but use the button_variant_class helper:
-
-Alternative 1b (if Button component does not accept onclick):
+New (the `Button` component does not accept an `onclick` prop, so use `button_variant_class` helper):
 ```rust
       button {
         class: button_variant_class(ButtonVariant::Ghost, ButtonSize::Xs),
@@ -70,7 +59,7 @@ Alternative 1b (if Button component does not accept onclick):
       }
 ```
 
-This requires importing `button_variant_class` instead of `Button`:
+This requires importing `button_variant_class`:
 ```rust
 use super::ui::button::{button_variant_class, ButtonVariant, ButtonSize};
 ```
@@ -136,11 +125,9 @@ File: `crates/lx-desktop/src/tailwind.css`
 }
 ```
 
-3b. Apply the class in `transcript.rs`. In each branch of the `TranscriptBlockView` match, add `animate-transcript-enter` to the outermost div's class string.
+3b. Apply the class in the transcript rendering. Since Unit 02 (transcript block expansion) must be applied first, the `TranscriptBlockView` component will be in `transcript_blocks.rs` with 9 match arms instead of the original 4. Add `animate-transcript-enter` to the outermost div's class string in EVERY match arm of `TranscriptBlockView`, regardless of line numbers.
 
-File: `crates/lx-desktop/src/pages/agents/transcript.rs`
-
-For the `Message` branch (line 59), change:
+For example, the `Message` branch's outermost div changes from:
 ```
 "flex gap-3 p-3 rounded-lg {bg}"
 ```
