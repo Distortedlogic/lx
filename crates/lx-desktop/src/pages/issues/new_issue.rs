@@ -49,21 +49,40 @@ pub fn NewIssueDialog(open: bool, agents: Vec<AgentRef>, on_close: EventHandler<
     }
   });
 
+  let mut save_gen = use_signal(|| 0u64);
+
   use_effect(move || {
-    let draft = IssueDraft {
-      title: title.read().clone(),
-      description: description.read().clone(),
-      status: status.read().clone(),
-      priority: priority.read().clone(),
-      assignee: assignee.read().clone(),
-    };
-    if let Ok(json) = serde_json::to_string(&draft) {
-      let js = format!(r#"localStorage.setItem("lx-new-issue-draft", {})"#, serde_json::json!(json));
-      let js = js.clone();
-      spawn(async move {
-        let _ = document::eval(&js).await;
-      });
+    let _ = title.read();
+    let _ = description.read();
+    let _ = status.read();
+    let _ = priority.read();
+    let _ = assignee.read();
+    let cur = *save_gen.peek();
+    save_gen.set(cur + 1);
+  });
+
+  use_effect(move || {
+    let generation = *save_gen.read();
+    if generation == 0 {
+      return;
     }
+    spawn(async move {
+      tokio::time::sleep(std::time::Duration::from_millis(800)).await;
+      if *save_gen.read() != generation {
+        return;
+      }
+      let draft = IssueDraft {
+        title: title.read().clone(),
+        description: description.read().clone(),
+        status: status.read().clone(),
+        priority: priority.read().clone(),
+        assignee: assignee.read().clone(),
+      };
+      if let Ok(json) = serde_json::to_string(&draft) {
+        let js = format!(r#"localStorage.setItem("lx-new-issue-draft", {})"#, serde_json::json!(json));
+        let _ = document::eval(&js).await;
+      }
+    });
   });
 
   if !open {
