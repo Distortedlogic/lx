@@ -111,12 +111,10 @@ where
 
   let kind = alias.or(selective).or_not().map(|k| k.unwrap_or(UseKind::Whole));
 
-  let use_path = just(TokenKind::Use).ignore_then(prefix_parts).then(segments).then(kind).map_with(move |((mut prefix, segs), kind), e| {
+  just(TokenKind::Use).ignore_then(prefix_parts).then(segments).then(kind).map_with(move |((mut prefix, segs), kind), e| {
     prefix.extend(segs);
     arena.borrow_mut().alloc_stmt(Stmt::Use(UseStmt { path: prefix, kind }), ss(e.span()))
-  });
-
-  use_path
+  })
 }
 
 fn binding_parser<'a, I>(

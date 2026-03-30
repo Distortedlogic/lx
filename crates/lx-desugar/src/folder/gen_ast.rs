@@ -1,8 +1,7 @@
 use miette::SourceSpan;
 
 use lx_ast::ast::{
-  AgentMethod, AstArena, Expr, ExprApply, ExprBlock, ExprFieldAccess, ExprFunc, ExprId, ExprPropagate, FieldKind, ListElem, Literal, Param, RecordField, Stmt,
-  StmtFieldUpdate, StmtId, StrPart,
+  AgentMethod, AstArena, Expr, ExprApply, ExprBlock, ExprFieldAccess, ExprFunc, ExprId, FieldKind, ListElem, Literal, Param, RecordField, StmtId, StrPart,
 };
 use lx_span::sym::{Sym, intern};
 
@@ -42,11 +41,9 @@ pub fn gen_func(params: &[&str], body: ExprId, span: SourceSpan, arena: &mut Ast
   arena.alloc_expr(Expr::Func(ExprFunc { params, type_params: vec![], ret_type: None, guard: None, body }), span)
 }
 
-
 pub fn gen_literal_str(s: &str, span: SourceSpan, arena: &mut AstArena) -> ExprId {
   arena.alloc_expr(Expr::Literal(Literal::Str(vec![StrPart::Text(s.to_string())])), span)
 }
-
 
 pub fn gen_record(fields: Vec<(Sym, ExprId)>, span: SourceSpan, arena: &mut AstArena) -> ExprId {
   let record_fields = fields.into_iter().map(|(name, value)| RecordField::Named { name, value }).collect();
