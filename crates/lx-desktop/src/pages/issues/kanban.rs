@@ -11,6 +11,9 @@ pub fn KanbanBoardView(
   on_select: EventHandler<String>,
   on_status_change: EventHandler<(String, String)>,
 ) -> Element {
+  let dragging_issue_id = use_signal(|| Option::<String>::None);
+  let drag_over_column = use_signal(|| Option::<String>::None);
+
   let columns: Vec<(&str, Vec<&Issue>)> = BOARD_STATUSES
     .iter()
     .map(|status| {
@@ -27,6 +30,9 @@ pub fn KanbanBoardView(
           issues: col_issues.iter().map(|i| (*i).clone()).collect(),
           agents: agents.clone(),
           on_select,
+          on_status_change,
+          dragging_issue_id,
+          drag_over_column,
         }
       }
     }
@@ -34,9 +40,27 @@ pub fn KanbanBoardView(
 }
 
 #[component]
-fn KanbanColumn(status: String, issues: Vec<Issue>, agents: Vec<AgentRef>, on_select: EventHandler<String>) -> Element {
+fn KanbanColumn(
+  status: String,
+  issues: Vec<Issue>,
+  agents: Vec<AgentRef>,
+  on_select: EventHandler<String>,
+  on_status_change: EventHandler<(String, String)>,
+  dragging_issue_id: Signal<Option<String>>,
+  drag_over_column: Signal<Option<String>>,
+) -> Element {
   let label = status_label(&status);
   let count = issues.len();
+  let is_drag_over = drag_over_column.read().as_deref() == Some(status.as_str());
+  let status_drop = status.clone();
+  let status_over = status.clone();
+  let status_leave = status.clone();
+
+  let drop_highlight = if is_drag_over {
+    "flex-1 min-h-[120px] rounded-md p-1 space-y-1 bg-[var(--primary)]/10 ring-1 ring-[var(--primary)]/40 transition-colors"
+  } else {
+    "flex-1 min-h-[120px] rounded-md p-1 space-y-1 bg-[var(--surface-container)]/20 transition-colors"
+  };
 
   rsx! {
     div { class: "flex flex-col min-w-[260px] w-[260px] shrink-0",
@@ -51,11 +75,30 @@ fn KanbanColumn(status: String, issues: Vec<Issue>, agents: Vec<AgentRef>, on_se
           "{count}"
         }
       }
-      div { class: "flex-1 min-h-[120px] rounded-md p-1 space-y-1 bg-[var(--surface-container)]/20",
+      div {
+        class: "{drop_highlight}",
+        ondragover: move |evt| {
+            evt.prevent_default();
+            drag_over_column.set(Some(status_over.clone()));
+        },
+        ondragleave: move |_| {
+            if drag_over_column.read().as_deref() == Some(status_leave.as_str()) {
+                drag_over_column.set(None);
+            }
+        },
+        ondrop: move |evt| {
+            evt.prevent_default();
+            drag_over_column.set(None);
+            if let Some(issue_id) = dragging_issue_id.read().clone() {
+                on_status_change.call((issue_id, status_drop.clone()));
+            }
+            dragging_issue_id.set(None);
+        },
         for issue in issues.iter() {
           KanbanCard {
             issue: issue.clone(),
             agents: agents.clone(),
+            dragging_issue_id,
             on_click: {
                 let id = issue.identifier.clone().unwrap_or_else(|| issue.id.clone());
                 move |_| on_select.call(id.clone())
@@ -68,13 +111,27 @@ fn KanbanColumn(status: String, issues: Vec<Issue>, agents: Vec<AgentRef>, on_se
 }
 
 #[component]
-fn KanbanCard(issue: Issue, agents: Vec<AgentRef>, on_click: EventHandler<()>) -> Element {
+fn KanbanCard(issue: Issue, agents: Vec<AgentRef>, dragging_issue_id: Signal<Option<String>>, on_click: EventHandler<()>) -> Element {
   let id_display = issue.identifier.as_deref().unwrap_or(&issue.id[..8.min(issue.id.len())]);
   let assignee_name = issue.assignee_agent_id.as_ref().and_then(|aid| agents.iter().find(|a| &a.id == aid).map(|a| a.name.clone()));
+  let is_dragging = dragging_issue_id.read().as_deref() == Some(issue.id.as_str());
+  let card_cls = if is_dragging {
+    "rounded-md border border-[var(--outline-variant)]/30 bg-[var(--surface-container)] p-2.5 w-full text-left opacity-30 transition-opacity cursor-grabbing"
+  } else {
+    "rounded-md border border-[var(--outline-variant)]/30 bg-[var(--surface-container)] p-2.5 w-full text-left hover:shadow-sm transition-shadow cursor-grab"
+  };
+  let drag_id = issue.id.clone();
 
   rsx! {
-    button {
-      class: "rounded-md border border-[var(--outline-variant)]/30 bg-[var(--surface-container)] p-2.5 w-full text-left hover:shadow-sm transition-shadow",
+    div {
+      class: "{card_cls}",
+      draggable: "true",
+      ondragstart: move |_| {
+          dragging_issue_id.set(Some(drag_id.clone()));
+      },
+      ondragend: move |_| {
+          dragging_issue_id.set(None);
+      },
       onclick: move |_| on_click.call(()),
       div { class: "flex items-start gap-1.5 mb-1.5",
         span { class: "text-xs text-[var(--outline)] font-mono shrink-0", "{id_display}" }
