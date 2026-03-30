@@ -33,6 +33,12 @@
   --color-input: var(--outline-variant);
   --color-ring: var(--primary);
   --color-ring-offset: var(--surface);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
 }
 
 :root {
@@ -63,6 +69,12 @@
   --color-chart-axis: #3A3A4A;
   --color-chart-split: #2A2A3A;
   --color-chart-tooltip: #191919;
+
+  --chart-1: #9cff93;
+  --chart-2: #81ecff;
+  --chart-3: #fcaf00;
+  --chart-4: #ff7351;
+  --chart-5: #c4b5fd;
 }
 
 body {
