@@ -9,7 +9,6 @@ mod eval_assert;
 mod eval_ops;
 mod exec_stmt;
 mod hints;
-mod lx_tool_module;
 mod messaging;
 mod modules;
 mod patterns;

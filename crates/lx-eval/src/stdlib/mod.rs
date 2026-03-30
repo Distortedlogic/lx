@@ -28,8 +28,6 @@ pub(crate) use store_dispatch::{build_constructor, object_get_field, object_inse
 mod test;
 mod time;
 mod trait_ops;
-pub(crate) mod wasm;
-pub(crate) mod wasm_marshal;
 
 use lx_value::ModuleExports;
 

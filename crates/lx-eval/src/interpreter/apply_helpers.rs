@@ -1,5 +1,3 @@
-use std::future::Future;
-use std::pin::Pin;
 use std::sync::Arc;
 
 use num_traits::ToPrimitive;
@@ -35,16 +33,6 @@ impl Interpreter {
           Ok(crate::stdlib::store_method(name.as_str(), &val).ok_or_else(|| LxError::type_err(format!("Store has no method '{name}'"), span, None))?)
         },
         LxVal::Channel { name: channel_name } => Ok(crate::runtime::channel_registry::channel_dispatch(channel_name.as_str(), name.as_str(), span)?),
-        LxVal::ToolModule(tm) => {
-          let method_name = name.as_str().to_string();
-          let tm = Arc::clone(tm);
-          Ok(LxVal::BuiltinFunc(lx_value::BuiltinFunc {
-            name: "tool.call",
-            arity: 3,
-            kind: lx_value::BuiltinKind::Async(bi_tool_dispatch),
-            applied: vec![LxVal::ToolModule(tm), LxVal::str(method_name)],
-          }))
-        },
         other => Err(LxError::type_err(format!("field access on {}, not Record", other.type_name()), span, None).into()),
       },
       FieldKind::Index(idx) => {
@@ -109,13 +97,3 @@ impl Interpreter {
   }
 }
 
-fn bi_tool_dispatch(args: Vec<LxVal>, span: SourceSpan, ctx: Arc<dyn lx_value::BuiltinCtx>) -> Pin<Box<dyn Future<Output = Result<LxVal, LxError>>>> {
-  Box::pin(async move {
-    let LxVal::ToolModule(tm) = &args[0] else {
-      return Err(LxError::runtime("tool.call: invalid tool module", span));
-    };
-    let method = args[1].as_str().ok_or_else(|| LxError::runtime("tool.call: invalid method name", span))?;
-    let arg = args[2].clone();
-    tm.call_tool(method, arg, ctx.event_stream(), "main").await
-  })
-}

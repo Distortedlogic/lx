@@ -14,7 +14,6 @@ async-recursion.workspace = true
 chrono.workspace = true
 cron.workspace = true
 dashmap.workspace = true
-extism.workspace = true
 futures.workspace = true
 indexmap.workspace = true
 itertools.workspace = true

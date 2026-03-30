@@ -1,4 +1,4 @@
-pub use lx_span::{LX_MANIFEST, PLUGIN_MANIFEST};
+pub use lx_span::LX_MANIFEST;
 
 pub mod builtins;
 pub mod interpreter;

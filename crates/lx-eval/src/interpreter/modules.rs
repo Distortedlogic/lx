@@ -1,11 +1,9 @@
-use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use indexmap::IndexMap;
 
-use crate::stdlib::wasm::load_plugin;
 use lx_ast::ast::{BindTarget, Core, Program, Stmt, StmtTypeDef, UseKind, UseStmt};
 use lx_desugar::folder::desugar;
 use lx_parser::parser::parse;
@@ -22,25 +20,6 @@ impl Interpreter {
   pub(super) async fn eval_use(&mut self, use_stmt: &UseStmt, span: SourceSpan) -> Result<(), LxError> {
     let str_path: Vec<&str> = use_stmt.path.iter().map(|s| s.as_str()).collect();
     let str_joined = str_path.join("/");
-    if let UseKind::Tool { command, alias } = &use_stmt.kind {
-      let cmd_str = command.as_str();
-      if cmd_str.ends_with(".lx") {
-        let val = self.build_lx_tool_module(cmd_str, span).await?;
-        let env = self.env.child();
-        env.bind(*alias, val);
-        self.env = Arc::new(env);
-        return Ok(());
-      }
-      let alias_str = alias.as_str();
-      let tm = crate::tool_module::ToolModule::new(cmd_str, alias_str).await.map_err(|e| LxError::runtime(e, span))?;
-      let tm_arc = Arc::new(tm);
-      self.tool_modules.push(Arc::clone(&tm_arc));
-      let val = LxVal::ToolModule(tm_arc);
-      let env = self.env.child();
-      env.bind(*alias, val);
-      self.env = Arc::new(env);
-      return Ok(());
-    }
     let exports = if crate::stdlib::std_module_exists(&str_path) {
       if let Some(rust_exports) = crate::stdlib::get_std_module(&str_path) {
         rust_exports
@@ -49,8 +28,6 @@ impl Interpreter {
       } else {
         return Err(LxError::runtime(format!("unknown stdlib module: {}", str_path.join("/")), span));
       }
-    } else if let Some(plugin_name) = str_joined.strip_prefix("wasm/") {
-      self.load_wasm_plugin(plugin_name, span)?
     } else if let Some(file_path) = self.resolve_workspace_module(&str_path) {
       self.load_module(&file_path, span).await?
     } else if let Some(file_path) = self.resolve_dep_module(&str_path) {
@@ -82,42 +59,12 @@ impl Interpreter {
           env.bind(*name, val.clone());
         }
       },
-      UseKind::Tool { .. } => unreachable!(),
     }
     self.env = Arc::new(env);
     Ok(())
   }
 
-  fn load_wasm_plugin(&self, name: &str, span: SourceSpan) -> Result<ModuleExports, LxError> {
-    let cache_key = PathBuf::from(format!("__wasm_{name}"));
-    {
-      let cache = self.module_cache.lock();
-      if let Some(exports) = cache.get(&cache_key) {
-        return Ok(exports.clone());
-      }
-    }
-    let plugin_dir = self.find_plugin_dir(name);
-    let dir = plugin_dir.ok_or_else(|| LxError::runtime(format!("wasm plugin '{name}' not found"), span))?;
-    let exports = load_plugin(name, &dir, span)?;
-    self.module_cache.lock().insert(cache_key, exports.clone());
-    Ok(exports)
-  }
 
-  fn find_plugin_dir(&self, name: &str) -> Option<PathBuf> {
-    if let Some(ref source_dir) = self.source_dir {
-      let local = source_dir.join(".lx").join("plugins").join(name);
-      if local.join(crate::PLUGIN_MANIFEST).exists() {
-        return Some(local);
-      }
-    }
-    if let Some(home) = env::var_os("HOME") {
-      let global = PathBuf::from(home).join(".lx").join("plugins").join(name);
-      if global.join(crate::PLUGIN_MANIFEST).exists() {
-        return Some(global);
-      }
-    }
-    None
-  }
 
   fn resolve_workspace_module(&self, path: &[&str]) -> Option<PathBuf> {
     if path.len() < 2 {
