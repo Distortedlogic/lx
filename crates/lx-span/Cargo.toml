@@ -1,0 +1,13 @@
+[package]
+edition.workspace = true
+license.workspace = true
+name = "lx-span"
+version = "0.1.0"
+
+[dependencies]
+lasso.workspace = true
+miette.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

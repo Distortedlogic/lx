@@ -119,3 +119,9 @@ impl LxError {
     Self::Sourced { source_name: name, source_text: text, inner: Box::new(self) }
   }
 }
+
+impl From<lx_span::error::ParseError> for LxError {
+  fn from(e: lx_span::error::ParseError) -> Self {
+    Self::Parse { msg: e.msg, span: e.span, help: e.help }
+  }
+}
