@@ -98,7 +98,7 @@ fn url_to_name(url: &str) -> String {
 }
 
 fn write_dep_to_toml(root: &Path, name: &str, spec: &DepSpec) -> Result<(), String> {
-  let manifest_path = root.join(lx::LX_MANIFEST);
+  let manifest_path = root.join(lx_span::LX_MANIFEST);
   let content = fs::read_to_string(&manifest_path).map_err(|e| format!("cannot read lx.toml: {e}"))?;
   let dep_line = match spec {
     DepSpec::Git { git, branch, tag, rev } => {

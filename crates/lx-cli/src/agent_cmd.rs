@@ -4,6 +4,8 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
 
+use lx::prelude::*;
+
 pub fn run_agent(script_path: &str) -> ExitCode {
   let source = match fs::read_to_string(script_path) {
     Ok(s) => s,
@@ -12,14 +14,14 @@ pub fn run_agent(script_path: &str) -> ExitCode {
       return ExitCode::from(1);
     },
   };
-  let (tokens, comments) = match lx::lexer::lex(&source) {
+  let (tokens, comments) = match lex(&source) {
     Ok(t) => t,
     Err(e) => {
       eprintln!("agent error: {e}");
       return ExitCode::from(1);
     },
   };
-  let result = lx::parser::parse(tokens, lx::source::FileId::new(0), comments, &source);
+  let result = parse(tokens, FileId::new(0), comments, &source);
   let surface = match result.program {
     Some(p) => {
       for e in &result.errors {
@@ -34,10 +36,10 @@ pub fn run_agent(script_path: &str) -> ExitCode {
       return ExitCode::from(1);
     },
   };
-  let program = lx::folder::desugar(surface);
+  let program = desugar(surface);
   let source_dir = Path::new(script_path).parent().map(|p| p.to_path_buf());
-  let ctx = Arc::new(lx::runtime::RuntimeCtx::default());
-  let mut interp = lx::interpreter::Interpreter::new(&source, source_dir, Arc::clone(&ctx));
+  let ctx = Arc::new(RuntimeCtx::default());
+  let mut interp = Interpreter::new(&source, source_dir, Arc::clone(&ctx));
   if let Err(e) = ctx.tokio_runtime.block_on(interp.load_default_tools()) {
     eprintln!("agent error: {e}");
     return ExitCode::from(1);
@@ -63,7 +65,7 @@ pub fn run_agent(script_path: &str) -> ExitCode {
         continue;
       },
     };
-    let msg = lx::value::LxVal::from(json_val);
+    let msg = lx_value::LxVal::from(json_val);
     match ctx.tokio_runtime.block_on(interp.call(handler.clone(), msg)) {
       Ok(result) => {
         let j = serde_json::Value::from(&result);

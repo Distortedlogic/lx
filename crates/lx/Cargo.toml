@@ -6,7 +6,6 @@ version = "0.1.0"
 
 [dependencies]
 lx-span = { path = "../lx-span" }
-lx-ast = { path = "../lx-ast" }
 lx-parser = { path = "../lx-parser" }
 lx-desugar = { path = "../lx-desugar" }
 lx-checker = { path = "../lx-checker" }

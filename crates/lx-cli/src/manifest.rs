@@ -90,7 +90,7 @@ pub enum DepSpec {
 pub fn find_manifest_root(start: &Path) -> Option<PathBuf> {
   let mut dir = start.to_path_buf();
   loop {
-    let candidate = dir.join(lx::LX_MANIFEST);
+    let candidate = dir.join(lx_span::LX_MANIFEST);
     if candidate.exists() {
       return Some(dir);
     }
@@ -101,7 +101,7 @@ pub fn find_manifest_root(start: &Path) -> Option<PathBuf> {
 }
 
 pub fn load_manifest(root: &Path) -> Result<RootManifest, String> {
-  let manifest_path = root.join(lx::LX_MANIFEST);
+  let manifest_path = root.join(lx_span::LX_MANIFEST);
   let content = fs::read_to_string(&manifest_path).map_err(|e| format!("cannot read {}: {e}", manifest_path.display()))?;
   let manifest: RootManifest = toml::from_str(&content).map_err(|e| format!("invalid {}: {e}", manifest_path.display()))?;
   manifest.validate(&manifest_path)?;
@@ -175,7 +175,7 @@ pub struct Member {
 pub fn find_workspace_root(start: &Path) -> Option<PathBuf> {
   let mut dir = start.to_path_buf();
   loop {
-    let candidate = dir.join(lx::LX_MANIFEST);
+    let candidate = dir.join(lx_span::LX_MANIFEST);
     if candidate.exists() {
       let content = fs::read_to_string(&candidate).ok()?;
       let manifest: RootManifest = toml::from_str(&content).ok()?;
@@ -190,7 +190,7 @@ pub fn find_workspace_root(start: &Path) -> Option<PathBuf> {
 }
 
 pub fn load_workspace(root: &Path) -> Result<Workspace, String> {
-  let manifest_path = root.join(lx::LX_MANIFEST);
+  let manifest_path = root.join(lx_span::LX_MANIFEST);
   let content = fs::read_to_string(&manifest_path).map_err(|e| format!("cannot read {}: {e}", manifest_path.display()))?;
   let manifest: RootManifest = toml::from_str(&content).map_err(|e| format!("invalid {}: {e}", manifest_path.display()))?;
   let ws = manifest.workspace.ok_or_else(|| format!("{} has no [workspace] section", manifest_path.display()))?;
@@ -198,7 +198,7 @@ pub fn load_workspace(root: &Path) -> Result<Workspace, String> {
   let mut members = Vec::new();
   for member_path in &ws.members {
     let member_dir = root.join(member_path);
-    let member_manifest_path = member_dir.join(lx::LX_MANIFEST);
+    let member_manifest_path = member_dir.join(lx_span::LX_MANIFEST);
     if !member_manifest_path.exists() {
       return Err(format!("member '{}' has no lx.toml at {}", member_path, member_manifest_path.display()));
     }

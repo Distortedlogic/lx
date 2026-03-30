@@ -34,7 +34,7 @@ fn validate_plugin_name(name: &str) -> Result<(), String> {
 }
 
 fn read_manifest(dir: &Path) -> Result<PluginManifest, String> {
-  let manifest_path = dir.join(lx::PLUGIN_MANIFEST);
+  let manifest_path = dir.join(lx_span::PLUGIN_MANIFEST);
   let content = fs::read_to_string(&manifest_path).map_err(|e| format!("cannot read {}: {e}", manifest_path.display()))?;
   let manifest: PluginManifest = toml::from_str(&content).map_err(|e| format!("invalid plugin.toml in {}: {e}", dir.display()))?;
   if manifest.plugin.name.is_empty() {
@@ -227,7 +227,7 @@ pub fn new_plugin(name: &str) -> ExitCode {
   let writes: Vec<(PathBuf, &str)> = vec![
     (dir.join("Cargo.toml"), &cargo_toml),
     (dir.join("src").join("lib.rs"), &lib_rs),
-    (dir.join(lx::PLUGIN_MANIFEST), &plugin_toml),
+    (dir.join(lx_span::PLUGIN_MANIFEST), &plugin_toml),
     (dir.join(".cargo").join("config.toml"), cargo_config),
   ];
   for (path, content) in writes {

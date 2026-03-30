@@ -30,7 +30,7 @@ pub fn run_init(name: Option<&str>, flow: bool) -> ExitCode {
     format!("[package]\nname = \"{project_name}\"\nversion = \"0.1.0\"\nentry = \"src/main.lx\"\n")
   };
 
-  let manifest_path = project_dir.join(lx::LX_MANIFEST);
+  let manifest_path = project_dir.join(lx_span::LX_MANIFEST);
   if manifest_path.exists() {
     eprintln!("error: lx.toml already exists");
     return ExitCode::from(1);
