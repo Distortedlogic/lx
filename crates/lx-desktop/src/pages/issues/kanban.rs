@@ -1,6 +1,7 @@
 use dioxus::prelude::*;
 
-use super::types::{AgentRef, Issue, priority_icon_class, status_icon_class, status_label};
+use super::kanban_card::{KanbanCard, render_drag_overlay};
+use super::types::{AgentRef, Issue, status_icon_class, status_label};
 
 const BOARD_STATUSES: &[&str] = &["backlog", "todo", "in_progress", "in_review", "blocked", "done", "cancelled"];
 
@@ -10,6 +11,7 @@ pub fn KanbanBoardView(
   agents: Vec<AgentRef>,
   on_select: EventHandler<String>,
   on_status_change: EventHandler<(String, String)>,
+  #[props(optional)] on_reorder: Option<EventHandler<(String, String, usize)>>,
 ) -> Element {
   let mut dragging_issue_id = use_signal(|| Option::<String>::None);
   let mut drag_over_column = use_signal(|| Option::<String>::None);
@@ -17,6 +19,7 @@ pub fn KanbanBoardView(
   let pointer_start = use_signal(|| (0.0f64, 0.0f64));
   let mut pointer_pos = use_signal(|| (0.0f64, 0.0f64));
   let mut pending_drag_id = use_signal(|| Option::<String>::None);
+  let mut drag_over_index = use_signal(|| Option::<usize>::None);
 
   let columns: Vec<(&str, Vec<&Issue>)> = BOARD_STATUSES
     .iter()
@@ -46,16 +49,31 @@ pub fn KanbanBoardView(
       },
       onmouseup: {
           let on_status_change = on_status_change;
+          let on_reorder = on_reorder;
           move |_| {
               if *drag_active.read()
                   && let Some(issue_id) = dragging_issue_id.read().clone()
-                      && let Some(target_status) = drag_over_column.read().clone() {
+              {
+                  if let Some(target_status) = drag_over_column.read().clone() {
+                      let source_status = issues.iter()
+                          .find(|i| i.id == issue_id)
+                          .map(|i| i.status.clone());
+                      if source_status.as_deref() == Some(target_status.as_str()) {
+                          if let Some(idx) = *drag_over_index.read() {
+                              if let Some(ref handler) = on_reorder {
+                                  handler.call((issue_id, target_status, idx));
+                              }
+                          }
+                      } else {
                           on_status_change.call((issue_id, target_status));
                       }
+                  }
+              }
               drag_active.set(false);
               dragging_issue_id.set(None);
               pending_drag_id.set(None);
               drag_over_column.set(None);
+              drag_over_index.set(None);
           }
       },
       onmouseleave: move |_| {
@@ -63,6 +81,7 @@ pub fn KanbanBoardView(
           dragging_issue_id.set(None);
           pending_drag_id.set(None);
           drag_over_column.set(None);
+          drag_over_index.set(None);
       },
       div { class: "flex gap-3 overflow-x-auto pb-4 -mx-2 px-2",
         for (status , col_issues) in columns.iter() {
@@ -78,6 +97,7 @@ pub fn KanbanBoardView(
             pending_drag_id,
             pointer_start,
             pointer_pos,
+            drag_over_index,
           }
         }
       }
@@ -105,6 +125,7 @@ fn KanbanColumn(
   pending_drag_id: Signal<Option<String>>,
   pointer_start: Signal<(f64, f64)>,
   pointer_pos: Signal<(f64, f64)>,
+  drag_over_index: Signal<Option<usize>>,
 ) -> Element {
   let label = status_label(&status);
   let count = issues.len();
@@ -141,108 +162,38 @@ fn KanbanColumn(
         onmouseleave: move |_| {
             if drag_over_column.read().as_deref() == Some(status_leave.as_str()) {
                 drag_over_column.set(None);
+                drag_over_index.set(None);
             }
         },
-        for issue in issues.iter() {
-          KanbanCard {
-            issue: issue.clone(),
-            agents: agents.clone(),
-            dragging_issue_id,
-            drag_active,
-            pending_drag_id,
-            pointer_start,
-            on_click: {
-                let id = issue.identifier.clone().unwrap_or_else(|| issue.id.clone());
-                move |_| on_select.call(id.clone())
+        for (idx , issue) in issues.iter().enumerate() {
+          if *drag_active.read() && is_drag_over && drag_over_index.read().as_ref() == Some(&idx) {
+            div { class: "h-0.5 rounded bg-[var(--primary)] mx-1 my-0.5" }
+          }
+          div {
+            onmouseenter: {
+              let status_for_enter = status.clone();
+              move |_| {
+                if *drag_active.read() && drag_over_column.read().as_deref() == Some(status_for_enter.as_str()) {
+                  drag_over_index.set(Some(idx));
+                }
+              }
             },
-          }
-        }
-      }
-    }
-  }
-}
-
-#[component]
-fn KanbanCard(
-  issue: Issue,
-  agents: Vec<AgentRef>,
-  dragging_issue_id: Signal<Option<String>>,
-  drag_active: Signal<bool>,
-  pending_drag_id: Signal<Option<String>>,
-  pointer_start: Signal<(f64, f64)>,
-  on_click: EventHandler<()>,
-) -> Element {
-  let id_display = issue.identifier.as_deref().unwrap_or(&issue.id[..8.min(issue.id.len())]);
-  let assignee_name = issue.assignee_agent_id.as_ref().and_then(|aid| agents.iter().find(|a| &a.id == aid).map(|a| a.name.clone()));
-  let is_dragging = *drag_active.read() && dragging_issue_id.read().as_deref() == Some(issue.id.as_str());
-  let card_cls = if is_dragging {
-    "rounded-md border border-[var(--outline-variant)]/30 bg-[var(--surface-container)] p-2.5 w-full text-left opacity-30 transition-opacity cursor-grabbing"
-  } else {
-    "rounded-md border border-[var(--outline-variant)]/30 bg-[var(--surface-container)] p-2.5 w-full text-left hover:shadow-sm transition-shadow cursor-grab"
-  };
-  let drag_id = issue.id.clone();
-
-  rsx! {
-    div {
-      class: "{card_cls}",
-      onmousedown: move |evt| {
-          let coords = evt.client_coordinates();
-          pointer_start.set((coords.x, coords.y));
-          pending_drag_id.set(Some(drag_id.clone()));
-      },
-      onclick: move |_| on_click.call(()),
-      div { class: "flex items-start gap-1.5 mb-1.5",
-        span { class: "text-xs text-[var(--outline)] font-mono shrink-0", "{id_display}" }
-      }
-      p { class: "text-sm leading-snug text-[var(--on-surface)] line-clamp-2 mb-2",
-        "{issue.title}"
-      }
-      div { class: "flex items-center gap-2",
-        span { class: "material-symbols-outlined text-xs {priority_icon_class(&issue.priority)}",
-          match issue.priority.as_str() {
-              "critical" => "priority_high",
-              "high" => "arrow_upward",
-              "low" => "arrow_downward",
-              _ => "remove",
-          }
-        }
-        if let Some(name) = assignee_name {
-          span { class: "text-xs text-[var(--outline)]", "{name}" }
-        }
-      }
-    }
-  }
-}
-
-fn render_drag_overlay(issue: &Issue, agents: &[AgentRef], pos: (f64, f64)) -> Element {
-  let id_display = issue.identifier.as_deref().unwrap_or(&issue.id[..8.min(issue.id.len())]);
-  let assignee_name = issue.assignee_agent_id.as_ref().and_then(|aid| agents.iter().find(|a| &a.id == aid).map(|a| a.name.clone()));
-  let style =
-    format!("position: fixed; left: {}px; top: {}px; width: 240px; pointer-events: none; z-index: 50; transform: translate(-50%, -50%);", pos.0, pos.1);
-
-  rsx! {
-    div {
-      style: "{style}",
-      div {
-        class: "rounded-md border border-[var(--outline-variant)]/30 bg-[var(--surface-container)] p-2.5 shadow-lg ring-1 ring-[var(--primary)]/20",
-        div { class: "flex items-start gap-1.5 mb-1.5",
-          span { class: "text-xs text-[var(--outline)] font-mono shrink-0", "{id_display}" }
-        }
-        p { class: "text-sm leading-snug text-[var(--on-surface)] line-clamp-2 mb-2",
-          "{issue.title}"
-        }
-        div { class: "flex items-center gap-2",
-          span { class: "material-symbols-outlined text-xs {priority_icon_class(&issue.priority)}",
-            match issue.priority.as_str() {
-                "critical" => "priority_high",
-                "high" => "arrow_upward",
-                "low" => "arrow_downward",
-                _ => "remove",
+            KanbanCard {
+              issue: issue.clone(),
+              agents: agents.clone(),
+              dragging_issue_id,
+              drag_active,
+              pending_drag_id,
+              pointer_start,
+              on_click: {
+                  let id = issue.identifier.clone().unwrap_or_else(|| issue.id.clone());
+                  move |_| on_select.call(id.clone())
+              },
             }
           }
-          if let Some(name) = assignee_name {
-            span { class: "text-xs text-[var(--outline)]", "{name}" }
-          }
+        }
+        if *drag_active.read() && is_drag_over && drag_over_index.read().as_ref() == Some(&issues.len()) {
+          div { class: "h-0.5 rounded bg-[var(--primary)] mx-1 my-0.5" }
         }
       }
     }

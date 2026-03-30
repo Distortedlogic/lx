@@ -2,6 +2,7 @@ mod comments;
 mod detail;
 mod documents;
 mod kanban;
+mod kanban_card;
 mod list;
 mod new_issue;
 mod properties;
