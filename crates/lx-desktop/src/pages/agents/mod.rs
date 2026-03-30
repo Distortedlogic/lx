@@ -10,6 +10,8 @@ pub mod run_types;
 mod runs_tab;
 mod skills_tab;
 mod transcript;
+mod transcript_blocks;
+mod transcript_groups;
 pub mod types;
 
 use self::detail::AgentDetailShell;

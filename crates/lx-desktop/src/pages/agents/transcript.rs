@@ -1,25 +1,83 @@
+use super::transcript_blocks;
 use dioxus::prelude::*;
 use lx_api::types::ActivityEvent;
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ToolStatus {
+  Running,
+  Completed,
+  Error,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ToolItem {
+  pub ts: String,
+  pub name: String,
+  pub input: String,
+  pub result: Option<String>,
+  pub is_error: bool,
+  pub status: ToolStatus,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StderrLine {
+  pub ts: String,
+  pub text: String,
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TranscriptBlock {
   Message { role: String, text: String, ts: String },
   Thinking { text: String, ts: String },
-  ToolUse { name: String, input_summary: String, result: Option<String>, is_error: bool, ts: String },
-  Event { label: String, text: String, tone: String, ts: String },
+  Tool { name: String, input: String, result: Option<String>, is_error: bool, status: ToolStatus, ts: String },
+  Activity { name: String, status: ToolStatus, ts: String },
+  CommandGroup { items: Vec<ToolItem>, ts: String },
+  ToolGroup { items: Vec<ToolItem>, ts: String },
+  StderrGroup { lines: Vec<StderrLine>, ts: String },
+  Stdout { text: String, ts: String },
+  Event { label: String, text: String, detail: Option<String>, tone: String, ts: String },
 }
 
 fn event_to_block(event: &ActivityEvent) -> TranscriptBlock {
   match event.kind.as_str() {
-    "log" | "agent_message" | "message" => TranscriptBlock::Message { role: "assistant".into(), text: event.message.clone(), ts: event.timestamp.clone() },
+    "log" | "agent_message" | "message" | "assistant" | "user" => {
+      let role = if event.kind == "user" { "user" } else { "assistant" };
+      TranscriptBlock::Message { role: role.into(), text: event.message.clone(), ts: event.timestamp.clone() }
+    },
     "thinking" => TranscriptBlock::Thinking { text: event.message.clone(), ts: event.timestamp.clone() },
-    k if k.contains("tool") => {
-      TranscriptBlock::ToolUse { name: event.kind.clone(), input_summary: event.message.clone(), result: None, is_error: false, ts: event.timestamp.clone() }
+    "tool_call" => TranscriptBlock::Tool {
+      name: event.kind.clone(),
+      input: event.message.clone(),
+      result: None,
+      is_error: false,
+      status: ToolStatus::Running,
+      ts: event.timestamp.clone(),
+    },
+    "tool_result" => TranscriptBlock::Tool {
+      name: "tool".into(),
+      input: String::new(),
+      result: Some(event.message.clone()),
+      is_error: false,
+      status: ToolStatus::Completed,
+      ts: event.timestamp.clone(),
+    },
+    "stderr" => {
+      TranscriptBlock::StderrGroup { lines: vec![StderrLine { ts: event.timestamp.clone(), text: event.message.clone() }], ts: event.timestamp.clone() }
+    },
+    "stdout" => TranscriptBlock::Stdout { text: event.message.clone(), ts: event.timestamp.clone() },
+    "activity" => TranscriptBlock::Activity { name: event.message.clone(), status: ToolStatus::Running, ts: event.timestamp.clone() },
+    k if k.contains("tool") => TranscriptBlock::Tool {
+      name: event.kind.clone(),
+      input: event.message.clone(),
+      result: None,
+      is_error: false,
+      status: ToolStatus::Running,
+      ts: event.timestamp.clone(),
     },
     k if k.contains("error") => {
-      TranscriptBlock::Event { label: "error".into(), text: event.message.clone(), tone: "error".into(), ts: event.timestamp.clone() }
+      TranscriptBlock::Event { label: "error".into(), text: event.message.clone(), detail: None, tone: "error".into(), ts: event.timestamp.clone() }
     },
-    _ => TranscriptBlock::Event { label: event.kind.clone(), text: event.message.clone(), tone: "info".into(), ts: event.timestamp.clone() },
+    _ => TranscriptBlock::Event { label: event.kind.clone(), text: event.message.clone(), detail: None, tone: "info".into(), ts: event.timestamp.clone() },
   }
 }
 
@@ -43,81 +101,8 @@ pub fn TranscriptView(run_id: String, #[props(optional)] events: Option<Vec<Acti
   rsx! {
     div { class: "space-y-2",
       for entry in entries.iter() {
-        TranscriptBlockView { block: entry.clone() }
+        transcript_blocks::TranscriptBlockView { block: entry.clone() }
       }
     }
-  }
-}
-
-#[component]
-fn TranscriptBlockView(block: TranscriptBlock) -> Element {
-  match block {
-    TranscriptBlock::Message { role, text, .. } => {
-      let icon = if role == "assistant" { "smart_toy" } else { "person" };
-      let bg = if role == "assistant" { "bg-[var(--surface-container)]" } else { "bg-[var(--surface-container-high)]" };
-      rsx! {
-        div { class: "flex gap-3 p-3 rounded-lg {bg}",
-          span { class: "material-symbols-outlined text-sm text-[var(--outline)] shrink-0 mt-0.5",
-            "{icon}"
-          }
-          div { class: "flex-1 min-w-0 text-sm text-[var(--on-surface)] whitespace-pre-wrap break-words",
-            "{text}"
-          }
-        }
-      }
-    },
-    TranscriptBlock::Thinking { text, .. } => {
-      rsx! {
-        div { class: "flex gap-3 p-3 rounded-lg bg-[var(--warning)]/5 border border-[var(--warning)]/10",
-          span { class: "material-symbols-outlined text-sm text-[var(--warning)] shrink-0 mt-0.5",
-            "psychology"
-          }
-          div { class: "flex-1 min-w-0 text-xs text-[var(--outline)] italic whitespace-pre-wrap",
-            "{text}"
-          }
-        }
-      }
-    },
-    TranscriptBlock::ToolUse { name, input_summary, result, is_error, .. } => {
-      let border = if is_error { "border-[var(--error)]/20" } else { "border-[var(--outline-variant)]/20" };
-      rsx! {
-        div { class: "border {border} rounded-lg p-3 space-y-2",
-          div { class: "flex items-center gap-2",
-            span { class: "material-symbols-outlined text-sm text-[var(--outline)]",
-              "build"
-            }
-            span { class: "text-xs font-medium text-[var(--on-surface)]",
-              "{name}"
-            }
-          }
-          if !input_summary.is_empty() {
-            p { class: "text-xs text-[var(--outline)] font-mono truncate",
-              "{input_summary}"
-            }
-          }
-          if let Some(res) = result {
-            div { class: "text-xs font-mono whitespace-pre-wrap max-h-32 overflow-y-auto p-2 bg-[var(--surface-container)] rounded",
-              "{res}"
-            }
-          }
-        }
-      }
-    },
-    TranscriptBlock::Event { label, text, tone, .. } => {
-      let color = match tone.as_str() {
-        "error" => "text-[var(--error)]",
-        "warn" => "text-[var(--warning)]",
-        "info" => "text-[var(--tertiary)]",
-        _ => "text-[var(--outline)]",
-      };
-      rsx! {
-        div { class: "flex items-center gap-2 py-1",
-          span { class: "text-[10px] font-semibold uppercase tracking-wider {color}",
-            "{label}"
-          }
-          span { class: "text-xs text-[var(--outline)]", "{text}" }
-        }
-      }
-    },
   }
 }
