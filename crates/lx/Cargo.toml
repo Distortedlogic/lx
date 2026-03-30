@@ -7,6 +7,7 @@ version = "0.1.0"
 [dependencies]
 lx-ast = { path = "../lx-ast" }
 lx-macros = { path = "../lx-macros" }
+lx-parser = { path = "../lx-parser" }
 lx-span = { path = "../lx-span" }
 async-recursion.workspace = true
 chrono.workspace = true

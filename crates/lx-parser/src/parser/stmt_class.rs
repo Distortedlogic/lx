@@ -4,9 +4,9 @@ use chumsky::prelude::*;
 use super::ExprId;
 use super::Span;
 use super::expr::{name_or_type, type_name};
-use crate::ast::{AgentMethod, ClassDeclData, ClassField};
 use crate::lexer::token::TokenKind;
-use crate::sym::Sym;
+use lx_ast::ast::{AgentMethod, ClassDeclData, ClassField};
+use lx_span::sym::Sym;
 
 pub fn class_body<'a, I>(
   expr: impl Parser<'a, I, ExprId, extra::Err<Rich<'a, TokenKind, Span>>> + Clone,

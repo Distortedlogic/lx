@@ -3,9 +3,9 @@ use chumsky::prelude::*;
 
 use super::expr::{ident, ident_or_keyword, item_sep, skip_item_sep, skip_semis, type_name};
 use super::{ArenaRef, ExprId, Span, ss};
-use crate::ast::{Expr, ExprBlock, ListElem, MapEntry, Param, RecordField};
 use crate::lexer::token::TokenKind;
-use crate::sym::intern;
+use lx_ast::ast::{Expr, ExprBlock, ListElem, MapEntry, Param, RecordField};
+use lx_span::sym::intern;
 
 pub(super) fn list_parser<'a, I>(
   expr: impl Parser<'a, I, ExprId, extra::Err<Rich<'a, TokenKind, Span>>> + Clone,

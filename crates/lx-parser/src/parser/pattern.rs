@@ -3,9 +3,9 @@ use chumsky::prelude::*;
 
 use super::expr::{ident, type_name};
 use super::{ArenaRef, PatternId, Span, ss};
-use crate::ast::{FieldPattern, Literal, Pattern, PatternConstructor, PatternList, PatternRecord, StrPart};
 use crate::lexer::token::TokenKind;
-use crate::sym::intern;
+use lx_ast::ast::{FieldPattern, Literal, Pattern, PatternConstructor, PatternList, PatternRecord, StrPart};
+use lx_span::sym::intern;
 
 pub(super) fn pattern_parser<'a, I>(arena: ArenaRef) -> impl Parser<'a, I, PatternId, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
 where

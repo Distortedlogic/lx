@@ -4,11 +4,11 @@ use chumsky::prelude::*;
 
 use super::expr::{semi_sep, skip_semis, type_name};
 use super::{ArenaRef, ExprId, Span, ss};
-use crate::ast::{
+use crate::lexer::token::TokenKind;
+use lx_ast::ast::{
   BinOp, Expr, ExprApply, ExprAsk, ExprBinary, ExprCoalesce, ExprFieldAccess, ExprMatch, ExprPipe, ExprPropagate, ExprTell, ExprTernary, ExprUnary, FieldKind,
   Literal, MatchArm, StrPart, UnaryOp,
 };
-use crate::lexer::token::TokenKind;
 
 pub(super) fn tok_to_op(tok: &TokenKind) -> BinOp {
   super::token_to_binop(tok).expect("section_op guarantees valid operator")

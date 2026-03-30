@@ -1,13 +1,13 @@
 use super::Lexer;
 use super::token::{Token, TokenKind};
-use crate::error::LxError;
+use lx_span::error::ParseError;
 use miette::SourceSpan;
 use num_bigint::BigInt;
 
 impl<'src> Lexer<'src> {
-  pub(super) fn emit_int(&mut self, slice: &str, prefix_len: usize, radix: u32, span: SourceSpan) -> Result<(), LxError> {
+  pub(super) fn emit_int(&mut self, slice: &str, prefix_len: usize, radix: u32, span: SourceSpan) -> Result<(), ParseError> {
     let d = Self::strip_underscores(&slice[prefix_len..]);
-    let v = BigInt::parse_bytes(d.as_bytes(), radix).ok_or_else(|| LxError::parse("invalid integer literal", span, None))?;
+    let v = BigInt::parse_bytes(d.as_bytes(), radix).ok_or_else(|| ParseError::new("invalid integer literal", span, None))?;
     self.emit(Token::new(TokenKind::Int(v), span));
     Ok(())
   }
@@ -31,7 +31,7 @@ pub(super) fn ident_or_keyword(text: &str) -> TokenKind {
     "channel" => TokenKind::ChannelKw,
     "spawn" => TokenKind::Spawn,
     "stop" => TokenKind::Stop,
-    _ => TokenKind::Ident(crate::sym::intern(text)),
+    _ => TokenKind::Ident(lx_span::sym::intern(text)),
   }
 }
 
@@ -50,6 +50,6 @@ pub(super) fn type_name_or_keyword(text: &str) -> TokenKind {
     "MCP" => TokenKind::McpKw,
     "CLI" => TokenKind::CliKw,
     "HTTP" => TokenKind::HttpKw,
-    _ => TokenKind::TypeName(crate::sym::intern(text)),
+    _ => TokenKind::TypeName(lx_span::sym::intern(text)),
   }
 }

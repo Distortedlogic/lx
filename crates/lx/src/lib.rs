@@ -1,5 +1,7 @@
 pub use lx_ast::ast;
 pub use lx_ast::visitor;
+pub use lx_parser::lexer;
+pub use lx_parser::parser;
 pub use lx_span::sym;
 
 pub const PLUGIN_MANIFEST: &str = lx_span::PLUGIN_MANIFEST;
@@ -13,10 +15,8 @@ pub mod event_stream;
 pub mod folder;
 pub mod formatter;
 pub mod interpreter;
-pub mod lexer;
 pub mod linter;
 pub mod mcp_client;
-pub mod parser;
 pub mod runtime;
 pub mod source;
 pub mod stdlib;

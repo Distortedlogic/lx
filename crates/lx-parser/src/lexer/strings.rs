@@ -3,8 +3,8 @@ use std::mem;
 use super::Lexer;
 use super::raw_token::RawToken;
 use super::token::{Token, TokenKind};
-use crate::error::LxError;
 use logos::Logos;
+use lx_span::error::ParseError;
 use miette::{SourceOffset, SourceSpan};
 
 impl<'src> Lexer<'src> {
@@ -14,14 +14,14 @@ impl<'src> Lexer<'src> {
     }
   }
 
-  pub(super) fn read_string(&mut self, start: usize) -> Result<(), LxError> {
+  pub(super) fn read_string(&mut self, start: usize) -> Result<(), ParseError> {
     self.push(TokenKind::StrStart, start, start + 1);
     let mut buf = String::new();
     let mut chunk_start = self.pos;
     loop {
       match self.peek() {
         None => {
-          return Err(LxError::parse("unterminated string", self.sp(start, self.pos), None));
+          return Err(ParseError::new("unterminated string", self.sp(start, self.pos), None));
         },
         Some('"') => {
           if !buf.is_empty() {
@@ -33,7 +33,7 @@ impl<'src> Lexer<'src> {
         },
         Some('\\') => {
           self.advance();
-          let esc = self.advance().ok_or_else(|| LxError::parse("unterminated escape sequence", self.sp(start, self.pos), None))?;
+          let esc = self.advance().ok_or_else(|| ParseError::new("unterminated escape sequence", self.sp(start, self.pos), None))?;
           match esc {
             'n' => buf.push('\n'),
             't' => buf.push('\t'),
@@ -42,7 +42,7 @@ impl<'src> Lexer<'src> {
             '{' => buf.push('{'),
             '0' => buf.push('\0'),
             other => {
-              return Err(LxError::parse(format!("unknown escape: \\{other}"), SourceSpan::new(SourceOffset::from(self.pos - 2), 2), None));
+              return Err(ParseError::new(format!("unknown escape: \\{other}"), SourceSpan::new(SourceOffset::from(self.pos - 2), 2), None));
             },
           }
         },
@@ -65,7 +65,7 @@ impl<'src> Lexer<'src> {
     }
   }
 
-  pub(crate) fn lex_interpolation(&mut self, str_start: usize) -> Result<(), LxError> {
+  pub(crate) fn lex_interpolation(&mut self, str_start: usize) -> Result<(), ParseError> {
     let mut brace_depth = 1i32;
     'restart: loop {
       let base = self.pos;
@@ -77,7 +77,7 @@ impl<'src> Lexer<'src> {
         self.pos = end;
         let Ok(raw) = &result else {
           let c = self.source[start..].chars().next().unwrap_or('?');
-          return Err(LxError::parse(format!("unexpected character: {c}"), self.sp(start, start + c.len_utf8()), None));
+          return Err(ParseError::new(format!("unexpected character: {c}"), self.sp(start, start + c.len_utf8()), None));
         };
         if matches!(raw, RawToken::RBrace) {
           brace_depth -= 1;
@@ -93,16 +93,16 @@ impl<'src> Lexer<'src> {
           continue 'restart;
         }
       }
-      return Err(LxError::parse("unterminated string interpolation", self.sp(str_start, self.pos), None));
+      return Err(ParseError::new("unterminated string interpolation", self.sp(str_start, self.pos), None));
     }
   }
 
-  pub(super) fn read_raw_string(&mut self, start: usize) -> Result<Token, LxError> {
+  pub(super) fn read_raw_string(&mut self, start: usize) -> Result<Token, ParseError> {
     let mut buf = String::new();
     loop {
       match self.peek() {
         None => {
-          return Err(LxError::parse("unterminated raw string", self.sp(start, self.pos), None));
+          return Err(ParseError::new("unterminated raw string", self.sp(start, self.pos), None));
         },
         Some('`') => {
           self.advance();

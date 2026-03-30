@@ -3,9 +3,9 @@ use chumsky::prelude::*;
 
 use super::expr::{ident, type_name};
 use super::{ArenaRef, Span, TypeExprId, ss};
-use crate::ast::{TypeExpr, TypeField};
 use crate::lexer::token::TokenKind;
-use crate::sym::{Sym, intern};
+use lx_ast::ast::{TypeExpr, TypeField};
+use lx_span::sym::{Sym, intern};
 
 pub(super) fn type_parser<'a, I>(arena: ArenaRef) -> impl Parser<'a, I, TypeExprId, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
 where

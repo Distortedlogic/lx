@@ -3,12 +3,12 @@ use chumsky::prelude::*;
 
 use super::expr::{ident, name_or_type, type_name};
 use super::{ArenaRef, ExprId, Span, StmtId, ss};
-use crate::ast::{
+use crate::lexer::token::TokenKind;
+use lx_ast::ast::{
   AgentMethod, AstArena, BindTarget, Binding, Expr, ExprFieldAccess, FieldDecl, FieldKind, Stmt, StmtFieldUpdate, StmtTypeDef, TraitDeclData, TraitEntry,
   TraitUnionDef, UseKind, UseStmt,
 };
-use crate::lexer::token::TokenKind;
-use crate::sym::{Sym, intern};
+use lx_span::sym::{Sym, intern};
 
 pub(super) fn program_parser<'a, I>(arena: ArenaRef) -> impl Parser<'a, I, Vec<StmtId>, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
 where

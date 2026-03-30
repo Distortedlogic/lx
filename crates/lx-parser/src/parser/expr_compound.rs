@@ -4,9 +4,9 @@ use chumsky::prelude::*;
 use super::expr::ident;
 use super::expr_pratt::{section_op, tok_to_op};
 use super::{ArenaRef, ExprId, Span, ss};
-use crate::ast::{Expr, ExprBlock, ExprFunc, ExprTuple, ExprWith, Literal, Section, WithKind};
 use crate::lexer::token::TokenKind;
-use crate::sym::intern;
+use lx_ast::ast::{Expr, ExprBlock, ExprFunc, ExprTuple, ExprWith, Literal, Section, WithKind};
+use lx_span::sym::intern;
 
 pub(super) fn with_parser<'a, I>(
   expr: impl Parser<'a, I, ExprId, extra::Err<Rich<'a, TokenKind, Span>>> + Clone,

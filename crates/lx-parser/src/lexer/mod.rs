@@ -3,9 +3,9 @@ mod raw_token;
 mod strings;
 pub mod token;
 
-use crate::error::LxError;
 use helpers::{ident_or_keyword, type_name_or_keyword};
 use logos::Logos;
+use lx_span::error::ParseError;
 use miette::{SourceOffset, SourceSpan};
 use num_bigint::BigInt;
 use raw_token::RawToken;
@@ -15,17 +15,17 @@ pub(crate) struct Lexer<'src> {
   source: &'src str,
   pos: usize,
   tokens: Vec<Token>,
-  comments: Vec<crate::source::Comment>,
+  comments: Vec<lx_span::source::Comment>,
   paren_bracket_depth: i32,
   last_was_semi: bool,
   brace_stack: Vec<i32>,
 }
 
-pub fn lex(source: &str) -> Result<(Vec<Token>, crate::source::CommentStore), LxError> {
+pub fn lex(source: &str) -> Result<(Vec<Token>, lx_span::source::CommentStore), ParseError> {
   let mut lexer = Lexer { source, pos: 0, tokens: Vec::new(), comments: Vec::new(), paren_bracket_depth: 0, last_was_semi: true, brace_stack: Vec::new() };
   lexer.run()?;
   lexer.tokens.push(Token::new(TokenKind::Eof, SourceSpan::new(SourceOffset::from(source.len()), 0)));
-  Ok((lexer.tokens, crate::source::CommentStore::from_vec(lexer.comments)))
+  Ok((lexer.tokens, lx_span::source::CommentStore::from_vec(lexer.comments)))
 }
 
 impl<'src> Lexer<'src> {
@@ -74,7 +74,7 @@ impl<'src> Lexer<'src> {
     s.chars().filter(|c| *c != '_').collect()
   }
 
-  fn run(&mut self) -> Result<(), LxError> {
+  fn run(&mut self) -> Result<(), ParseError> {
     let mut base: usize = 0;
     'outer: loop {
       let mut logos_lex = RawToken::lexer(&self.source[base..]);
@@ -93,10 +93,10 @@ impl<'src> Lexer<'src> {
     Ok(())
   }
 
-  fn dispatch(&mut self, start: usize, end: usize, slice: &str, result: Result<RawToken, ()>) -> Result<bool, LxError> {
+  fn dispatch(&mut self, start: usize, end: usize, slice: &str, result: Result<RawToken, ()>) -> Result<bool, ParseError> {
     let raw = result.map_err(|()| {
       let c = self.source[start..].chars().next().unwrap_or('?');
-      LxError::parse(format!("unexpected character: {c}"), self.sp(start, start + c.len_utf8()), None)
+      ParseError::new(format!("unexpected character: {c}"), self.sp(start, start + c.len_utf8()), None)
     })?;
     let span = self.sp(start, end);
     match raw {
@@ -107,7 +107,7 @@ impl<'src> Lexer<'src> {
       },
       RawToken::Comment => {
         let text = self.source[start..end].to_string();
-        self.comments.push(crate::source::Comment { span: self.sp(start, end), text });
+        self.comments.push(lx_span::source::Comment { span: self.sp(start, end), text });
       },
       RawToken::LParen => {
         self.paren_bracket_depth += 1;
@@ -142,7 +142,7 @@ impl<'src> Lexer<'src> {
       },
       RawToken::Semi => self.emit(Token::new(TokenKind::Semi, span)),
       RawToken::Comma => self.emit(Token::new(TokenKind::Comma, span)),
-      RawToken::Hash => return Err(LxError::parse("unexpected character: #", span, None)),
+      RawToken::Hash => return Err(ParseError::new("unexpected character: #", span, None)),
       RawToken::Quote => {
         self.read_string(start)?;
         return Ok(true);
@@ -154,7 +154,7 @@ impl<'src> Lexer<'src> {
       },
       RawToken::Ident if slice == "_" => self.emit(Token::new(TokenKind::Underscore, span)),
       RawToken::Ident => self.emit(Token::new(ident_or_keyword(slice), span)),
-      RawToken::ScreamingCase => self.emit(Token::new(TokenKind::Ident(crate::sym::intern(slice)), span)),
+      RawToken::ScreamingCase => self.emit(Token::new(TokenKind::Ident(lx_span::sym::intern(slice)), span)),
       RawToken::TypeName => self.emit(Token::new(type_name_or_keyword(slice), span)),
       RawToken::Plus => {
         let kind = if self.at_line_start(start) && self.source[end..].starts_with(|c: char| c.is_ascii_alphabetic() || c == '_') {
@@ -179,11 +179,11 @@ impl<'src> Lexer<'src> {
         self.emit_int(slice, 2, 8, span)?;
       },
       RawToken::FloatLit | RawToken::FloatExp => {
-        let v: f64 = Self::strip_underscores(slice).parse().map_err(|_| LxError::parse("invalid float literal", span, None))?;
+        let v: f64 = Self::strip_underscores(slice).parse().map_err(|_| ParseError::new("invalid float literal", span, None))?;
         self.emit(Token::new(TokenKind::Float(v), span));
       },
       RawToken::DecInt => {
-        let v: BigInt = Self::strip_underscores(slice).parse().map_err(|_| LxError::parse("invalid integer literal", span, None))?;
+        let v: BigInt = Self::strip_underscores(slice).parse().map_err(|_| ParseError::new("invalid integer literal", span, None))?;
         self.emit(Token::new(TokenKind::Int(v), span));
       },
       RawToken::TildeArrow => self.emit(Token::new(TokenKind::TildeArrow, span)),

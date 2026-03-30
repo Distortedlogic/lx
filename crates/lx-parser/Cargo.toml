@@ -1,0 +1,16 @@
+[package]
+edition.workspace = true
+license.workspace = true
+name = "lx-parser"
+version = "0.1.0"
+
+[dependencies]
+lx-span = { path = "../lx-span" }
+lx-ast = { path = "../lx-ast" }
+chumsky.workspace = true
+logos.workspace = true
+miette.workspace = true
+num-bigint.workspace = true
+
+[lints]
+workspace = true

@@ -7,11 +7,12 @@ use lx::error::LxError;
 use lx::runtime::RuntimeCtx;
 
 pub fn run(source: &str, filename: &str, ctx: &Arc<RuntimeCtx>, control_spec: Option<&str>) -> Result<(), Vec<LxError>> {
-  let (tokens, comments) = lx::lexer::lex(source).map_err(|e| vec![e])?;
+  let (tokens, comments) = lx::lexer::lex(source).map_err(|e| vec![LxError::from(e)])?;
   let result = lx::parser::parse(tokens, lx::source::FileId::new(0), comments, source);
-  let surface = result.program.ok_or(result.errors.clone())?;
-  if !result.errors.is_empty() {
-    for e in &result.errors {
+  let lx_errors: Vec<LxError> = result.errors.iter().cloned().map(LxError::from).collect();
+  let surface = result.program.ok_or(lx_errors.clone())?;
+  if !lx_errors.is_empty() {
+    for e in &lx_errors {
       eprintln!("parse warning: {e}");
     }
   }
