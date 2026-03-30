@@ -10,7 +10,7 @@ pub fn MetricCard(
   #[props(optional)] onclick: Option<EventHandler<()>>,
 ) -> Element {
   let clickable = to.is_some() || onclick.is_some();
-  let hover_class = if clickable { "hover:bg-white/5 cursor-pointer" } else { "" };
+  let hover_class = if clickable { "hover:bg-[var(--on-surface)]/5 cursor-pointer" } else { "" };
 
   let desc_text = description.as_deref().unwrap_or("");
   let has_desc = description.is_some();
@@ -22,12 +22,14 @@ pub fn MetricCard(
           p { class: "text-3xl font-semibold tracking-tight tabular-nums",
             "{value}"
           }
-          p { class: "text-sm font-medium text-gray-400 mt-1", "{label}" }
+          p { class: "text-sm font-medium text-[var(--on-surface-variant)] mt-1",
+            "{label}"
+          }
           if has_desc {
-            div { class: "text-xs text-gray-500 mt-1.5", "{desc_text}" }
+            div { class: "text-xs text-[var(--outline)] mt-1.5", "{desc_text}" }
           }
         }
-        span { class: "material-symbols-outlined text-base text-gray-500 shrink-0 mt-1.5",
+        span { class: "material-symbols-outlined text-base text-[var(--outline)] shrink-0 mt-1.5",
           "{icon}"
         }
       }

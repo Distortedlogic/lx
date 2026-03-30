@@ -26,12 +26,12 @@ pub fn InlineEntitySelector(
   rsx! {
     div { class: "relative inline-block",
       button {
-        class: "inline-flex min-w-0 items-center gap-1 rounded-md border border-gray-600 bg-gray-800/40 px-2 py-1 text-sm font-medium transition-colors hover:bg-white/5 {extra}",
+        class: "inline-flex min-w-0 items-center gap-1 rounded-md border border-[var(--outline-variant)] bg-[var(--surface-container)]/40 px-2 py-1 text-sm font-medium transition-colors hover:bg-[var(--on-surface)]/5 {extra}",
         onclick: move |_| open.set(!open()),
         if let Some(opt) = current_option {
           "{opt.label}"
         } else {
-          span { class: "text-gray-400", "{placeholder}" }
+          span { class: "text-[var(--on-surface-variant)]", "{placeholder}" }
         }
       }
       if open() {
@@ -42,9 +42,9 @@ pub fn InlineEntitySelector(
               query.set(String::new());
           },
         }
-        div { class: "absolute z-50 mt-1 w-[min(20rem,calc(100vw-2rem))] rounded-md border border-gray-600 bg-gray-800 shadow-lg",
+        div { class: "absolute z-50 mt-1 w-[min(20rem,calc(100vw-2rem))] rounded-md border border-[var(--outline-variant)] bg-[var(--surface-container-high)] shadow-lg",
           input {
-            class: "w-full border-b border-gray-600 bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-gray-500",
+            class: "w-full border-b border-[var(--outline-variant)] bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-[var(--outline)]",
             placeholder: "Search...",
             oninput: move |evt: Event<FormData>| query.set(evt.value()),
           }
@@ -56,7 +56,7 @@ pub fn InlineEntitySelector(
                   let is_selected = option.id == value;
                   rsx! {
                     button {
-                      class: "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-white/5",
+                      class: "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-[var(--on-surface)]/5",
                       onclick: move |_| {
                           on_change.call(opt_id.clone());
                           open.set(false);
@@ -64,14 +64,18 @@ pub fn InlineEntitySelector(
                       },
                       span { class: "truncate", "{opt_label}" }
                       if is_selected {
-                        span { class: "material-symbols-outlined text-sm text-gray-400 ml-auto", "check" }
+                        span { class: "material-symbols-outlined text-sm text-[var(--on-surface-variant)] ml-auto",
+                          "check"
+                        }
                       }
                     }
                   }
               }
             }
             if filtered.is_empty() {
-              p { class: "px-2 py-2 text-xs text-gray-400", "No results." }
+              p { class: "px-2 py-2 text-xs text-[var(--on-surface-variant)]",
+                "No results."
+              }
             }
           }
         }

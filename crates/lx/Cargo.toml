@@ -13,6 +13,7 @@ lx-fmt = { path = "../lx-fmt" }
 lx-macros = { path = "../lx-macros" }
 lx-parser = { path = "../lx-parser" }
 lx-span = { path = "../lx-span" }
+lx-eval = { path = "../lx-eval" }
 lx-value = { path = "../lx-value" }
 async-recursion.workspace = true
 chrono.workspace = true

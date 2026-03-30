@@ -68,20 +68,22 @@ pub fn Dashboard() -> Element {
       }
 
       div { class: "min-w-0",
-        h3 { class: "text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3",
+        h3 { class: "text-sm font-semibold text-[var(--on-surface-variant)] uppercase tracking-wide mb-3",
           "Recent Activity"
         }
-        div { class: "border border-gray-700 divide-y divide-gray-700 overflow-hidden",
+        div { class: "border border-[var(--outline-variant)] divide-y divide-[var(--outline-variant)] overflow-hidden",
           for event in events.iter().take(10) {
-            div { class: "px-4 py-2.5 text-sm hover:bg-white/5 transition-colors",
+            div { class: "px-4 py-2.5 text-sm hover:bg-[var(--on-surface)]/5 transition-colors",
               div { class: "flex gap-3",
                 p { class: "flex-1 min-w-0 truncate",
-                  span { class: "text-gray-400 font-mono text-xs",
+                  span { class: "text-[var(--on-surface-variant)] font-mono text-xs",
                     "{event.kind}"
                   }
                   span { class: "ml-2", "{event.message}" }
                 }
-                span { class: "text-xs text-gray-500 shrink-0", "{event.timestamp}" }
+                span { class: "text-xs text-[var(--outline)] shrink-0",
+                  "{event.timestamp}"
+                }
               }
             }
           }

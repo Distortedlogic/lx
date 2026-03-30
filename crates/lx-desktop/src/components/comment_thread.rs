@@ -32,17 +32,19 @@ pub fn CommentThread(comments: Vec<Comment>, on_add: EventHandler<String>) -> El
     div { class: "space-y-4",
       h3 { class: "text-sm font-semibold", "Comments ({count})" }
       if comments.is_empty() {
-        p { class: "text-sm text-gray-400", "No comments yet." }
+        p { class: "text-sm text-[var(--on-surface-variant)]", "No comments yet." }
       }
       div { class: "space-y-3",
         for comment in comments.iter() {
-          div { class: "border border-gray-700 p-3 overflow-hidden min-w-0 rounded-sm",
+          div { class: "border border-[var(--outline-variant)] p-3 overflow-hidden min-w-0 rounded-sm",
             div { class: "flex items-center justify-between mb-1",
               Identity {
                 name: comment.author_name.clone(),
                 size: "sm".to_string(),
               }
-              span { class: "text-xs text-gray-400", "{comment.created_at}" }
+              span { class: "text-xs text-[var(--on-surface-variant)]",
+                "{comment.created_at}"
+              }
             }
             MarkdownBody {
               content: comment.body.clone(),
@@ -53,14 +55,14 @@ pub fn CommentThread(comments: Vec<Comment>, on_add: EventHandler<String>) -> El
       }
       div { class: "space-y-2",
         textarea {
-          class: "w-full bg-gray-800 border border-gray-600 rounded p-2 text-sm outline-none resize-none min-h-[60px] placeholder:text-gray-500",
+          class: "w-full bg-[var(--surface-container)] border border-[var(--outline-variant)] rounded p-2 text-sm outline-none resize-none min-h-[60px] placeholder:text-[var(--outline)]",
           placeholder: "Leave a comment...",
           value: "{body}",
           oninput: move |evt: Event<FormData>| body.set(evt.value()),
         }
         div { class: "flex items-center justify-end",
           button {
-            class: "px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded transition-colors disabled:opacity-50",
+            class: "px-3 py-1.5 bg-[var(--primary)] hover:brightness-110 text-[var(--on-primary)] text-sm rounded transition-colors disabled:opacity-50",
             disabled: body().trim().is_empty() || submitting(),
             onclick: handle_submit,
             if submitting() {

@@ -7,11 +7,13 @@ fn pseudo_random_height(i: usize) -> usize {
 #[component]
 pub fn ChartCard(title: String, #[props(optional)] subtitle: Option<String>, children: Element) -> Element {
   rsx! {
-    div { class: "border border-gray-700 rounded-lg p-4 space-y-3",
+    div { class: "border border-[var(--outline-variant)] rounded-lg p-4 space-y-3",
       div {
-        h3 { class: "text-xs font-medium text-gray-400", "{title}" }
+        h3 { class: "text-xs font-medium text-[var(--on-surface-variant)]",
+          "{title}"
+        }
         if let Some(ref sub) = subtitle {
-          span { class: "text-[10px] text-gray-500", "{sub}" }
+          span { class: "text-[10px] text-[var(--outline)]", "{sub}" }
         }
       }
       {children}
@@ -25,7 +27,7 @@ pub fn ActivitySummaryChart() -> Element {
     div { class: "flex items-end gap-[3px] h-20",
       for i in 0..14 {
         div {
-          class: "flex-1 bg-gray-700/30 rounded-sm",
+          class: "flex-1 bg-[var(--outline-variant)]/30 rounded-sm",
           style: "height: {pseudo_random_height(i)}%",
         }
       }
@@ -39,7 +41,7 @@ pub fn EventBreakdownChart() -> Element {
     div { class: "flex items-end gap-[3px] h-20",
       for i in 0..14 {
         div {
-          class: "flex-1 bg-emerald-700/30 rounded-sm",
+          class: "flex-1 bg-[var(--primary)]/30 rounded-sm",
           style: "height: {pseudo_random_height(i)}%",
         }
       }

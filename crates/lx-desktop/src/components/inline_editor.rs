@@ -61,10 +61,10 @@ pub fn InlineEditor(
     let is_empty = value.is_empty();
     rsx! {
       span {
-        class: "cursor-pointer rounded hover:bg-white/5 transition-colors px-1 -mx-1 {extra}",
+        class: "cursor-pointer rounded hover:bg-[var(--on-surface)]/5 transition-colors px-1 -mx-1 {extra}",
         onclick: move |_| editing.set(true),
         if is_empty {
-          span { class: "text-gray-400 italic", "{placeholder}" }
+          span { class: "text-[var(--on-surface-variant)] italic", "{placeholder}" }
         } else {
           "{value}"
         }

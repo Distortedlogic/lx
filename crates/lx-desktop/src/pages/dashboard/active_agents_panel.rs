@@ -31,12 +31,12 @@ pub fn ActiveAgentsPanel() -> Element {
 
   rsx! {
     div {
-      h3 { class: "mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400",
+      h3 { class: "mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--on-surface-variant)]",
         "Agents"
       }
       if no_agents {
-        div { class: "rounded-xl border border-gray-700 p-4",
-          p { class: "text-sm text-gray-400", "No recent agent runs." }
+        div { class: "rounded-xl border border-[var(--outline-variant)] p-4",
+          p { class: "text-sm text-[var(--on-surface-variant)]", "No recent agent runs." }
         }
       } else {
         div { class: "grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4",
@@ -56,23 +56,23 @@ pub fn ActiveAgentsPanel() -> Element {
 #[component]
 fn AgentRunCard(name: String, status: String, last_seen: String) -> Element {
   rsx! {
-    div { class: "flex h-[200px] flex-col overflow-hidden rounded-xl border border-gray-700 shadow-sm bg-[var(--surface-container)]",
-      div { class: "border-b border-gray-700/60 px-3 py-3",
+    div { class: "flex h-[200px] flex-col overflow-hidden rounded-xl border border-[var(--outline-variant)] shadow-sm bg-[var(--surface-container)]",
+      div { class: "border-b border-[var(--outline-variant)]/60 px-3 py-3",
         div { class: "flex items-center gap-2",
           if status == "running" {
             span { class: "relative flex h-2.5 w-2.5 shrink-0",
-              span { class: "absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-70" }
-              span { class: "relative inline-flex h-2.5 w-2.5 rounded-full bg-cyan-500" }
+              span { class: "absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--tertiary)] opacity-70" }
+              span { class: "relative inline-flex h-2.5 w-2.5 rounded-full bg-[var(--tertiary)]" }
             }
           } else {
-            span { class: "inline-flex h-2.5 w-2.5 rounded-full bg-gray-500" }
+            span { class: "inline-flex h-2.5 w-2.5 rounded-full bg-[var(--outline)]" }
           }
           Identity { name: name.clone(), size: "sm".to_string() }
         }
-        div { class: "mt-2 text-[11px] text-gray-400", "{last_seen}" }
+        div { class: "mt-2 text-[11px] text-[var(--on-surface-variant)]", "{last_seen}" }
       }
       div { class: "min-h-0 flex-1 overflow-y-auto p-3",
-        p { class: "text-xs text-gray-500", "No transcript available." }
+        p { class: "text-xs text-[var(--outline)]", "No transcript available." }
       }
     }
   }

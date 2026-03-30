@@ -26,7 +26,7 @@ pub fn Activity() -> Element {
     div { class: "space-y-4",
       div { class: "flex items-center justify-end",
         select {
-          class: "h-8 rounded-md border border-gray-600 bg-gray-800 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500",
+          class: "h-8 rounded-md border border-[var(--outline-variant)] bg-[var(--surface-container)] px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--primary)]",
           value: "{current_filter}",
           onchange: move |evt: Event<FormData>| filter.set(evt.value()),
           option { value: "all", "All types" }
@@ -39,16 +39,18 @@ pub fn Activity() -> Element {
       if filtered.is_empty() {
         EmptyState { icon: "history", message: "No activity recorded yet." }
       } else {
-        div { class: "border border-gray-700 divide-y divide-gray-700 overflow-hidden",
+        div { class: "border border-[var(--outline-variant)] divide-y divide-[var(--outline-variant)] overflow-hidden",
           for event in filtered.iter() {
-            div { class: "flex items-center px-4 py-2.5 hover:bg-white/5 transition-colors text-sm",
-              span { class: "w-40 shrink-0 text-gray-500 font-mono text-xs",
+            div { class: "flex items-center px-4 py-2.5 hover:bg-[var(--on-surface)]/5 transition-colors text-sm",
+              span { class: "w-40 shrink-0 text-[var(--outline)] font-mono text-xs",
                 "{event.timestamp}"
               }
               span { class: "w-28 shrink-0 text-[var(--primary)] uppercase font-semibold text-xs",
                 "{event.kind}"
               }
-              span { class: "flex-1 text-gray-300 truncate", "{event.message}" }
+              span { class: "flex-1 text-[var(--on-surface)] truncate",
+                "{event.message}"
+              }
             }
           }
         }

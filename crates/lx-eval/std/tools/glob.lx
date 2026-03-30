@@ -1,0 +1,11 @@
+-- default tool: find files matching a pattern via Bash + find
+
+Tool Glob = {
+  name: "glob"
+  description: "Find files matching a pattern"
+  params: {pattern: Str, path: Str}
+  run = (args) {
+    r = Bash.run {command: "find {args.path} -name '{args.pattern}' -type f 2>/dev/null"} ^
+    Ok (r.stdout | trim | split "\n" | filter (s) { (s | len) > 0 })
+  }
+}

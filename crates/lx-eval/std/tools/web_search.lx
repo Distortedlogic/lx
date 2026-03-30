@@ -1,0 +1,12 @@
+-- default tool: search the web via Bash + curl + DuckDuckGo lite
+
+Tool WebSearch = {
+  name: "web_search"
+  description: "Search the web"
+  params: {query: Str}
+  run = (args) {
+    encoded = args.query | replace " " "+"
+    r = Bash.run {command: "curl -sL 'https://lite.duckduckgo.com/lite?q={encoded}'"} ^
+    Ok r.stdout
+  }
+}

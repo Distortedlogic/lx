@@ -15,13 +15,13 @@ pub fn PageTabBar(
   let current_value = value.unwrap_or_default();
 
   rsx! {
-    div { class: "flex border-b border-gray-700/50",
+    div { class: "flex border-b border-[var(--outline-variant)]/50",
       for item in items.iter() {
         {
             let active_class = if item.value == current_value {
-                "border-white text-white"
+                "border-[var(--on-surface)] text-[var(--on-surface)]"
             } else {
-                "border-transparent text-gray-400 hover:text-white hover:border-gray-500"
+                "border-transparent text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] hover:border-[var(--outline)]"
             };
             let item_value = item.value.clone();
             let handler = on_value_change;

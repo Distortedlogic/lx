@@ -45,7 +45,7 @@ fn GoalNode(goal: Goal, all_goals: Vec<Goal>, depth: u32) -> Element {
       to: Route::GoalDetail {
           goal_id: goal.id.clone(),
       },
-      class: "flex items-center gap-2 px-2 py-2 hover:bg-white/5 transition-colors border-b border-[var(--outline-variant)]/20 last:border-b-0",
+      class: "flex items-center gap-2 px-2 py-2 hover:bg-[var(--on-surface)]/5 transition-colors border-b border-[var(--outline-variant)]/20 last:border-b-0",
       style: "padding-left: {pad}px",
       if has_children {
         button {

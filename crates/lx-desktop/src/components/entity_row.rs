@@ -14,9 +14,9 @@ pub fn EntityRow(
 ) -> Element {
   let interactive = to.is_some() || onclick.is_some();
   let extra = class.as_deref().unwrap_or("");
-  let base = "flex items-center gap-3 px-4 py-2 text-sm border-b border-gray-700/50 last:border-b-0 transition-colors";
-  let hover = if interactive { " cursor-pointer hover:bg-white/5" } else { "" };
-  let sel = if selected { " bg-white/[0.03]" } else { "" };
+  let base = "flex items-center gap-3 px-4 py-2 text-sm border-b border-[var(--outline-variant)]/50 last:border-b-0 transition-colors";
+  let hover = if interactive { " cursor-pointer hover:bg-[var(--on-surface)]/5" } else { "" };
+  let sel = if selected { " bg-[var(--on-surface)]/[0.03]" } else { "" };
   let cls = format!("{base}{hover}{sel} {extra}");
 
   let inner = rsx! {
@@ -26,12 +26,16 @@ pub fn EntityRow(
     div { class: "flex-1 min-w-0",
       div { class: "flex items-center gap-2",
         if let Some(ref id) = identifier {
-          span { class: "text-xs text-gray-400 font-mono shrink-0", "{id}" }
+          span { class: "text-xs text-[var(--on-surface-variant)] font-mono shrink-0",
+            "{id}"
+          }
         }
         span { class: "truncate", "{title}" }
       }
       if let Some(ref sub) = subtitle {
-        p { class: "text-xs text-gray-400 truncate mt-0.5", "{sub}" }
+        p { class: "text-xs text-[var(--on-surface-variant)] truncate mt-0.5",
+          "{sub}"
+        }
       }
     }
     if let Some(trail) = trailing {

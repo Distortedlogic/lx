@@ -1,0 +1,10 @@
+-- default tool: read file contents via std/fs
+
+use std/fs
+
+Tool Read = {
+  name: "read"
+  description: "Read file contents"
+  params: {path: Str}
+  run = (args) { fs.read (args.path) }
+}
