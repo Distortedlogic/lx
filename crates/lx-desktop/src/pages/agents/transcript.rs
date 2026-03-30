@@ -3,6 +3,18 @@ use crate::components::scroll_to_bottom::ScrollToBottom;
 use dioxus::prelude::*;
 use lx_api::types::ActivityEvent;
 
+#[derive(Clone, Debug, PartialEq, Copy)]
+pub enum TranscriptMode {
+  Nice,
+  Raw,
+}
+
+#[derive(Clone, Debug, PartialEq, Copy)]
+pub enum TranscriptDensity {
+  Comfortable,
+  Compact,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum ToolStatus {
   Running,
@@ -112,8 +124,23 @@ fn event_to_block(event: &ActivityEvent) -> TranscriptBlock {
   }
 }
 
+pub fn summarize_tool_input(input: &str, max_len: usize) -> String {
+  let trimmed = input.trim();
+  if trimmed.len() <= max_len {
+    return trimmed.to_string();
+  }
+  let mut end = max_len;
+  while !trimmed.is_char_boundary(end) {
+    end -= 1;
+  }
+  format!("{}...", &trimmed[..end])
+}
+
 #[component]
 pub fn TranscriptView(run_id: String, #[props(optional)] events: Option<Vec<ActivityEvent>>) -> Element {
+  let mut mode = use_signal(|| TranscriptMode::Nice);
+  let mut density = use_signal(|| TranscriptDensity::Comfortable);
+
   let entries: Vec<TranscriptBlock> = match events {
     Some(evts) => evts.iter().map(event_to_block).collect(),
     None => vec![],
@@ -129,11 +156,42 @@ pub fn TranscriptView(run_id: String, #[props(optional)] events: Option<Vec<Acti
     };
   }
 
+  let active_btn = "text-xs px-2 py-1 rounded transition-colors bg-[var(--primary)] text-[var(--on-primary)]";
+  let inactive_btn = "text-xs px-2 py-1 rounded transition-colors bg-[var(--surface-container)] text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]";
+  let cur_mode = mode();
+  let cur_density = density();
+
   rsx! {
+    div { class: "flex items-center gap-3 mb-2",
+      div { class: "flex gap-0.5 rounded-md bg-[var(--surface-container)]/50 p-0.5",
+        button {
+          class: if cur_mode == TranscriptMode::Nice { active_btn } else { inactive_btn },
+          onclick: move |_| mode.set(TranscriptMode::Nice),
+          "Nice"
+        }
+        button {
+          class: if cur_mode == TranscriptMode::Raw { active_btn } else { inactive_btn },
+          onclick: move |_| mode.set(TranscriptMode::Raw),
+          "Raw"
+        }
+      }
+      div { class: "flex gap-0.5 rounded-md bg-[var(--surface-container)]/50 p-0.5",
+        button {
+          class: if cur_density == TranscriptDensity::Comfortable { active_btn } else { inactive_btn },
+          onclick: move |_| density.set(TranscriptDensity::Comfortable),
+          "Comfortable"
+        }
+        button {
+          class: if cur_density == TranscriptDensity::Compact { active_btn } else { inactive_btn },
+          onclick: move |_| density.set(TranscriptDensity::Compact),
+          "Compact"
+        }
+      }
+    }
     ScrollToBottom { class: "max-h-[60vh]".to_string(),
-      div { class: "space-y-2",
+      div { class: if cur_density == TranscriptDensity::Compact { "space-y-1" } else { "space-y-2" },
         for entry in entries.iter() {
-          transcript_blocks::TranscriptBlockView { block: entry.clone() }
+          transcript_blocks::TranscriptBlockView { block: entry.clone(), mode: cur_mode, density: cur_density }
         }
       }
     }

@@ -1,10 +1,10 @@
-use super::transcript::{ToolStatus, TranscriptBlock};
+use super::transcript::{TranscriptDensity, TranscriptMode, ToolStatus, TranscriptBlock, summarize_tool_input};
 use super::transcript_groups::{render_command_group, render_stderr_group, render_tool_group};
 use crate::components::markdown_body::MarkdownBody;
 use dioxus::prelude::*;
 
 #[component]
-pub fn TranscriptBlockView(block: TranscriptBlock) -> Element {
+pub fn TranscriptBlockView(block: TranscriptBlock, mode: TranscriptMode, density: TranscriptDensity) -> Element {
   let mut tool_open = use_signal(|| false);
   let cmd_group_open = use_signal(|| false);
   let tool_group_open = use_signal(|| false);
@@ -23,7 +23,7 @@ pub fn TranscriptBlockView(block: TranscriptBlock) -> Element {
       let icon = if role == "assistant" { "smart_toy" } else { "person" };
       let bg = if role == "assistant" { "bg-[var(--surface-container)]" } else { "bg-[var(--surface-container-high)]" };
       rsx! {
-        div { class: "flex gap-3 p-3 rounded-lg {bg} animate-transcript-enter",
+        div { class: if density == TranscriptDensity::Compact { "flex gap-3 p-2 rounded {bg} animate-transcript-enter" } else { "flex gap-3 p-3 rounded-lg {bg} animate-transcript-enter" },
           span { class: "material-symbols-outlined text-sm text-[var(--outline)] shrink-0 mt-0.5", "{icon}" }
           div { class: "flex-1 min-w-0",
             MarkdownBody { content: text }
@@ -57,7 +57,7 @@ pub fn TranscriptBlockView(block: TranscriptBlock) -> Element {
       };
       let border = if is_error { "border-[var(--error)]/20 bg-[var(--error)]/[0.04]" } else { "border-[var(--outline-variant)]/20" };
       rsx! {
-        div { class: "border {border} rounded-lg p-3 space-y-2 animate-transcript-enter",
+        div { class: if density == TranscriptDensity::Compact { "border {border} rounded p-2 space-y-1 animate-transcript-enter" } else { "border {border} rounded-lg p-3 space-y-2 animate-transcript-enter" },
           div { class: "flex items-center gap-2",
             span { class: "material-symbols-outlined text-sm {status_color}", "{icon}" }
             span { class: "text-[11px] font-semibold uppercase tracking-widest text-[var(--on-surface-variant)]", "{name}" }
@@ -71,7 +71,9 @@ pub fn TranscriptBlockView(block: TranscriptBlock) -> Element {
             }
           }
           if !input.is_empty() && !tool_open() {
-            p { class: "text-xs text-[var(--outline)] font-mono truncate", "{input}" }
+            p { class: "text-xs text-[var(--outline)] font-mono truncate",
+              {if mode == TranscriptMode::Nice { summarize_tool_input(&input, 120) } else { input.clone() }}
+            }
           }
           if tool_open() {
             div { class: "grid gap-3 lg:grid-cols-2",
