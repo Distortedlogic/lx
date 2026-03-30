@@ -1,5 +1,5 @@
 use super::budget_tab::BudgetTab;
-use super::config_form::AgentConfigPanel;
+use super::config_form::{AgentConfigPanel, ConfigUpdate};
 use super::list::StatusBadge;
 use super::overview::AgentOverview;
 use super::run_types::{BudgetSummary, HeartbeatRun, SkillSnapshot};
@@ -118,7 +118,11 @@ pub fn AgentDetailShell(
             AgentOverview { agent: agent.clone() }
           },
           AgentDetailTab::Config => rsx! {
-            AgentConfigPanel { agent: agent.clone() }
+            AgentConfigPanel {
+              agent: agent.clone(),
+              on_save: move |_update: ConfigUpdate| {},
+              on_cancel: move |_| {},
+            }
           },
           AgentDetailTab::Runs => rsx! {
             RunsTab { runs: runs.clone(), agent_route_id: agent.id.clone() }
