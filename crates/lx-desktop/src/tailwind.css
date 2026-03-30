@@ -179,3 +179,18 @@ body {
 .animate-dialog-content-in {
   animation: dialog-content-in 200ms ease-out both;
 }
+
+@keyframes transcript-block-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-transcript-enter {
+  animation: transcript-block-enter 300ms ease-out both;
+}

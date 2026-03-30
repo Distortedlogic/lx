@@ -35,16 +35,15 @@ pub fn NewIssueDialog(open: bool, agents: Vec<AgentRef>, on_close: EventHandler<
                   "#,
         )
         .await;
-        if let Ok(val) = result {
-          if let Some(s) = val.as_str() {
-            if let Ok(draft) = serde_json::from_str::<IssueDraft>(s) {
-              title.set(draft.title);
-              description.set(draft.description);
-              status.set(draft.status);
-              priority.set(draft.priority);
-              assignee.set(draft.assignee);
-            }
-          }
+        if let Ok(val) = result
+          && let Some(s) = val.as_str()
+          && let Ok(draft) = serde_json::from_str::<IssueDraft>(s)
+        {
+          title.set(draft.title);
+          description.set(draft.description);
+          status.set(draft.status);
+          priority.set(draft.priority);
+          assignee.set(draft.assignee);
         }
       });
     }

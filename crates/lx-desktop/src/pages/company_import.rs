@@ -24,7 +24,7 @@ pub fn CompanyImport() -> Element {
   rsx! {
     div { class: "flex flex-col h-full",
       div { class: "flex items-center gap-2 px-4 py-3 border-b border-[var(--outline-variant)]",
-        span { class: "material-symbols-outlined text-[var(--outline)]", "upload" }
+        span { class: "material-symbols-outlined text-base text-[var(--outline)]", "upload" }
         h1 { class: "text-lg font-semibold text-[var(--on-surface)]", "Import Company Package" }
       }
       div { class: "flex-1 overflow-auto p-6",
@@ -50,7 +50,7 @@ pub fn CompanyImport() -> Element {
                           button {
                             class: "flex flex-col items-center gap-2 p-4 rounded-lg border cursor-pointer {border}",
                             onclick: move |_| source_kind.set(kind),
-                            span { class: "material-symbols-outlined text-2xl text-[var(--outline)]", "{icon}" }
+                            span { class: "material-symbols-outlined text-lg text-[var(--outline)]", "{icon}" }
                             span { class: "text-sm font-medium text-[var(--on-surface)]", "{label}" }
                           }
                         }

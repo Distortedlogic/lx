@@ -178,7 +178,7 @@ fn AgentIconDisplay(icon: Option<String>) -> Element {
   let icon_char = icon.as_deref().unwrap_or("smart_toy");
   rsx! {
     div { class: "shrink-0 flex items-center justify-center h-12 w-12 rounded-lg bg-[var(--surface-container-high)]",
-      span { class: "material-symbols-outlined text-xl", "{icon_char}" }
+      span { class: "material-symbols-outlined text-lg", "{icon_char}" }
     }
   }
 }

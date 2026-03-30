@@ -45,15 +45,13 @@ pub fn KanbanBoardView(
           }
       },
       onmouseup: {
-          let on_status_change = on_status_change.clone();
+          let on_status_change = on_status_change;
           move |_| {
-              if *drag_active.read() {
-                  if let Some(issue_id) = dragging_issue_id.read().clone() {
-                      if let Some(target_status) = drag_over_column.read().clone() {
+              if *drag_active.read()
+                  && let Some(issue_id) = dragging_issue_id.read().clone()
+                      && let Some(target_status) = drag_over_column.read().clone() {
                           on_status_change.call((issue_id, target_status));
                       }
-                  }
-              }
               drag_active.set(false);
               dragging_issue_id.set(None);
               pending_drag_id.set(None);

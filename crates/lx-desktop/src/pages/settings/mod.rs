@@ -55,7 +55,7 @@ pub fn Settings() -> Element {
             div { class: "flex items-center gap-4 mb-4",
               div { class: "w-12 h-12 border-2 border-[var(--outline)] p-1",
                 div { class: "w-full h-full bg-[var(--warning)] flex items-center justify-center",
-                  span { class: "material-symbols-outlined text-black font-bold",
+                  span { class: "material-symbols-outlined text-base text-black font-bold",
                     "smart_toy"
                   }
                 }
@@ -85,7 +85,7 @@ pub fn Settings() -> Element {
           }
           div { class: "bg-[var(--surface-container)] p-4 border-l-4 border-[var(--tertiary)]",
             div { class: "flex items-start gap-3",
-              span { class: "material-symbols-outlined text-[var(--tertiary)] text-lg",
+              span { class: "material-symbols-outlined text-[var(--tertiary)] text-base",
                 "info"
               }
               p { class: "text-[10px] text-[var(--on-surface-variant)] leading-relaxed",

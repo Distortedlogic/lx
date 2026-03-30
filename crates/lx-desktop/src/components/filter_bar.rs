@@ -1,6 +1,7 @@
 use dioxus::prelude::*;
 
 use super::ui::badge::{Badge, BadgeVariant};
+use super::ui::button::{ButtonSize, ButtonVariant, button_variant_class};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct FilterValue {
@@ -34,7 +35,7 @@ pub fn FilterBar(filters: Vec<FilterValue>, on_remove: EventHandler<String>, on_
         }
       }
       button {
-        class: "text-xs text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] px-2 py-1 transition-colors",
+        class: button_variant_class(ButtonVariant::Ghost, ButtonSize::Xs),
         onclick: move |_| on_clear.call(()),
         "Clear all"
       }

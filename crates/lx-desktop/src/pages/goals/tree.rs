@@ -1,17 +1,7 @@
-use dioxus::prelude::*;
-
+use crate::components::status_badge::StatusBadge;
 use crate::pages::projects::types::Goal;
 use crate::routes::Route;
-
-fn status_color(status: &str) -> &'static str {
-  match status {
-    "in_progress" => "text-[var(--primary)]",
-    "completed" => "text-[var(--success)]",
-    "cancelled" => "text-[var(--error)]",
-    "planned" => "text-[var(--warning)]",
-    _ => "text-[var(--outline)]",
-  }
-}
+use dioxus::prelude::*;
 
 #[component]
 pub fn GoalTree(goals: Vec<Goal>) -> Element {
@@ -66,9 +56,7 @@ fn GoalNode(goal: Goal, all_goals: Vec<Goal>, depth: u32) -> Element {
         "{goal.level}"
       }
       span { class: "flex-1 text-sm text-[var(--on-surface)] truncate", "{goal.title}" }
-      span { class: "text-[10px] uppercase font-semibold tracking-wider shrink-0 {status_color(&goal.status)}",
-        "{goal.status}"
-      }
+      StatusBadge { status: goal.status.clone() }
     }
     if expanded() && has_children {
       for child in children.iter() {

@@ -31,7 +31,7 @@ pub fn render_command_group(items: &[ToolItem], mut cmd_group_open: Signal<bool>
   let err_cls = "overflow-x-auto whitespace-pre-wrap break-words font-mono text-[11px] text-[var(--error)]";
   let ok_cls = "overflow-x-auto whitespace-pre-wrap break-words font-mono text-[11px] text-[var(--on-surface)]/80";
   rsx! {
-    div { class: "{wrapper}",
+    div { class: "{wrapper} animate-transcript-enter",
       div {
         class: "flex items-center gap-2 cursor-pointer",
         onclick: move |_| cmd_group_open.set(!cmd_group_open()),
@@ -70,7 +70,7 @@ pub fn render_tool_group(items: &[ToolItem], mut tool_group_open: Signal<bool>) 
   let err_cls = "overflow-x-auto whitespace-pre-wrap break-words font-mono text-[11px] text-[var(--error)]";
   let ok_cls = "overflow-x-auto whitespace-pre-wrap break-words font-mono text-[11px] text-[var(--on-surface)]/80";
   rsx! {
-    div { class: "rounded-lg border border-[var(--outline-variant)]/40 bg-[var(--surface-container)]/25",
+    div { class: "rounded-lg border border-[var(--outline-variant)]/40 bg-[var(--surface-container)]/25 animate-transcript-enter",
       div {
         class: "flex items-center gap-2 px-3 py-2.5 cursor-pointer",
         onclick: move |_| tool_group_open.set(!tool_group_open()),
@@ -117,7 +117,7 @@ pub fn render_stderr_group(lines: &[StderrLine], mut stderr_open: Signal<bool>) 
   let count = lines.len();
   let noun = if count == 1 { "line" } else { "lines" };
   rsx! {
-    div { class: "rounded-lg border border-[var(--warning)]/20 bg-[var(--warning)]/[0.06] p-2 text-[var(--warning)]",
+    div { class: "rounded-lg border border-[var(--warning)]/20 bg-[var(--warning)]/[0.06] p-2 text-[var(--warning)] animate-transcript-enter",
       div {
         class: "flex items-center gap-2 cursor-pointer",
         onclick: move |_| stderr_open.set(!stderr_open()),

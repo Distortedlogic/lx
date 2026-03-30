@@ -45,7 +45,7 @@ pub fn AgentIconPicker(value: Option<String>, on_change: EventHandler<String>) -
             let was_open = *open.read();
             open.set(!was_open);
         },
-        span { class: "material-symbols-outlined text-xl", "{current}" }
+        span { class: "material-symbols-outlined text-lg", "{current}" }
       }
       if *open.read() {
         div { class: "absolute top-full left-0 mt-1 z-50 w-72 border border-[var(--outline-variant)] bg-[var(--surface-container)] shadow-lg rounded-lg p-3",

@@ -23,7 +23,7 @@ pub fn TranscriptBlockView(block: TranscriptBlock) -> Element {
       let icon = if role == "assistant" { "smart_toy" } else { "person" };
       let bg = if role == "assistant" { "bg-[var(--surface-container)]" } else { "bg-[var(--surface-container-high)]" };
       rsx! {
-        div { class: "flex gap-3 p-3 rounded-lg {bg}",
+        div { class: "flex gap-3 p-3 rounded-lg {bg} animate-transcript-enter",
           span { class: "material-symbols-outlined text-sm text-[var(--outline)] shrink-0 mt-0.5", "{icon}" }
           div { class: "flex-1 min-w-0",
             MarkdownBody { content: text }
@@ -33,7 +33,7 @@ pub fn TranscriptBlockView(block: TranscriptBlock) -> Element {
     },
     TranscriptBlock::Thinking { text, .. } => {
       rsx! {
-        div { class: "flex gap-3 p-3 rounded-lg bg-[var(--warning)]/5 border border-[var(--warning)]/10",
+        div { class: "flex gap-3 p-3 rounded-lg bg-[var(--warning)]/5 border border-[var(--warning)]/10 animate-transcript-enter",
           span { class: "material-symbols-outlined text-sm text-[var(--warning)] shrink-0 mt-0.5", "psychology" }
           div { class: "flex-1 min-w-0 text-xs text-[var(--outline)] italic whitespace-pre-wrap", "{text}" }
         }
@@ -57,7 +57,7 @@ pub fn TranscriptBlockView(block: TranscriptBlock) -> Element {
       };
       let border = if is_error { "border-[var(--error)]/20 bg-[var(--error)]/[0.04]" } else { "border-[var(--outline-variant)]/20" };
       rsx! {
-        div { class: "border {border} rounded-lg p-3 space-y-2",
+        div { class: "border {border} rounded-lg p-3 space-y-2 animate-transcript-enter",
           div { class: "flex items-center gap-2",
             span { class: "material-symbols-outlined text-sm {status_color}", "{icon}" }
             span { class: "text-[11px] font-semibold uppercase tracking-widest text-[var(--on-surface-variant)]", "{name}" }
@@ -98,7 +98,7 @@ pub fn TranscriptBlockView(block: TranscriptBlock) -> Element {
     },
     TranscriptBlock::Activity { name, status, .. } => {
       rsx! {
-        div { class: "flex items-start gap-2",
+        div { class: "flex items-start gap-2 animate-transcript-enter",
           match status {
             ToolStatus::Completed => rsx! {
               span { class: "material-symbols-outlined text-sm text-[var(--success)] shrink-0 mt-0.5", "check_circle" }
@@ -119,7 +119,7 @@ pub fn TranscriptBlockView(block: TranscriptBlock) -> Element {
     TranscriptBlock::StderrGroup { ref lines, .. } => render_stderr_group(lines, stderr_open),
     TranscriptBlock::Stdout { text, .. } => {
       rsx! {
-        div {
+        div { class: "animate-transcript-enter",
           div { class: "flex items-center gap-2",
             span { class: "text-[10px] font-semibold uppercase tracking-widest text-[var(--on-surface-variant)]", "stdout" }
             button {
@@ -149,7 +149,7 @@ pub fn TranscriptBlockView(block: TranscriptBlock) -> Element {
         _ => "circle",
       };
       rsx! {
-        div { class: "{wrapper_class}",
+        div { class: "{wrapper_class} animate-transcript-enter",
           div { class: "flex items-start gap-2",
             span { class: "material-symbols-outlined text-sm shrink-0 mt-0.5", "{icon}" }
             div { class: "min-w-0 flex-1",

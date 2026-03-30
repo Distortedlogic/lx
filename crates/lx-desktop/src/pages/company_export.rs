@@ -17,7 +17,7 @@ pub fn CompanyExport() -> Element {
   rsx! {
     div { class: "flex flex-col h-full",
       div { class: "flex items-center gap-2 px-4 py-3 border-b border-[var(--outline-variant)]",
-        span { class: "material-symbols-outlined text-[var(--outline)]", "inventory_2" }
+        span { class: "material-symbols-outlined text-base text-[var(--outline)]", "inventory_2" }
         h1 { class: "text-lg font-semibold text-[var(--on-surface)]", "Export Company Package" }
       }
       div { class: "flex flex-1 overflow-hidden",

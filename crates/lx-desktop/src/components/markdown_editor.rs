@@ -140,8 +140,7 @@ fn insert_at_cursor(value: &str, before: &str, after: &str, on_change: EventHand
 
     let new_cursor = start + before.len() + selected.len();
     let set_cursor_js = format!(
-      "setTimeout(function() {{ var el = document.getElementById('lx-md-editor'); if (el) {{ el.selectionStart = {pos}; el.selectionEnd = {pos}; el.focus(); }} }}, 0)",
-      pos = new_cursor
+      "setTimeout(function() {{ var el = document.getElementById('lx-md-editor'); if (el) {{ el.selectionStart = {new_cursor}; el.selectionEnd = {new_cursor}; el.focus(); }} }}, 0)"
     );
     let _ = document::eval(&set_cursor_js).await;
   });

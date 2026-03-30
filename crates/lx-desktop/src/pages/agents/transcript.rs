@@ -1,4 +1,5 @@
 use super::transcript_blocks;
+use crate::components::scroll_to_bottom::ScrollToBottom;
 use dioxus::prelude::*;
 use lx_api::types::ActivityEvent;
 
@@ -99,9 +100,11 @@ pub fn TranscriptView(run_id: String, #[props(optional)] events: Option<Vec<Acti
   }
 
   rsx! {
-    div { class: "space-y-2",
-      for entry in entries.iter() {
-        transcript_blocks::TranscriptBlockView { block: entry.clone() }
+    ScrollToBottom { class: "max-h-[60vh]".to_string(),
+      div { class: "space-y-2",
+        for entry in entries.iter() {
+          transcript_blocks::TranscriptBlockView { block: entry.clone() }
+        }
       }
     }
   }
