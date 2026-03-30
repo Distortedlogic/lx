@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 #[component]
-pub fn StepLaunch(company_name: String, agent_name: String, agent_role: String, agent_adapter: String, task_title: String) -> Element {
+pub fn StepLaunch(company_name: String, agent_name: String, agent_role: String, agent_adapter: String, agent_model_id: String, task_title: String) -> Element {
   rsx! {
     div { class: "space-y-5",
       div { class: "flex items-center gap-3 mb-1",
@@ -13,7 +13,7 @@ pub fn StepLaunch(company_name: String, agent_name: String, agent_role: String, 
         div {
           h3 { class: "text-sm font-medium text-[var(--on-surface)]", "Ready to launch" }
           p { class: "text-xs text-[var(--outline)]",
-            "Everything is set up. Launch will create the task and open it."
+            "Launch will generate an lx flow file and start execution."
           }
         }
       }
@@ -26,7 +26,8 @@ pub fn StepLaunch(company_name: String, agent_name: String, agent_role: String, 
         SummaryRow { icon: "smart_toy", label: "Agent", value: agent_name }
         SummaryRow { icon: "badge", label: "Role", value: agent_role }
         SummaryRow { icon: "memory", label: "Adapter", value: agent_adapter }
-        SummaryRow { icon: "checklist", label: "Task", value: task_title }
+        SummaryRow { icon: "model_training", label: "Model", value: agent_model_id }
+        SummaryRow { icon: "account_tree", label: "Flow", value: task_title }
       }
     }
   }

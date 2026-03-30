@@ -51,6 +51,7 @@ pub fn OnboardingWizard() -> Element {
   let mut step = use_signal(|| WizardStep::Company);
   let mut error = use_signal(|| Option::<String>::None);
   let mut loading = use_signal(|| false);
+  let mut loading_text = use_signal(|| Option::<String>::None);
 
   let mut company_name = use_signal(String::new);
   let mut company_goal = use_signal(String::new);
@@ -58,6 +59,7 @@ pub fn OnboardingWizard() -> Element {
   let mut agent_role = use_signal(|| "ceo".to_string());
   let mut agent_description = use_signal(String::new);
   let mut agent_adapter = use_signal(|| "claude_local".to_string());
+  let mut agent_model_id = use_signal(|| "claude-sonnet-4-20250514".to_string());
   let mut task_title = use_signal(|| "Create a hiring plan".to_string());
   let mut task_description = use_signal(String::new);
 
@@ -68,12 +70,14 @@ pub fn OnboardingWizard() -> Element {
       step.set(WizardStep::Company);
       error.set(None);
       loading.set(false);
+      loading_text.set(None);
       company_name.set(String::new());
       company_goal.set(String::new());
       agent_name.set("CEO".to_string());
       agent_role.set("ceo".to_string());
       agent_description.set(String::new());
       agent_adapter.set("claude_local".to_string());
+      agent_model_id.set("claude-sonnet-4-20250514".to_string());
       task_title.set("Create a hiring plan".to_string());
       task_description.set(String::new());
     }
@@ -90,6 +94,19 @@ pub fn OnboardingWizard() -> Element {
       div {
         class: "fixed top-[10%] left-1/2 -translate-x-1/2 w-full max-w-lg bg-[var(--surface-container)] border border-[var(--outline)] shadow-2xl z-50",
         onclick: move |e| e.stop_propagation(),
+        onkeydown: move |evt: KeyboardEvent| {
+            if evt.modifiers().meta() && evt.key() == Key::Enter {
+                let current = *step.read();
+                match current {
+                    WizardStep::Company => step.set(WizardStep::Agent),
+                    WizardStep::Agent => step.set(WizardStep::Task),
+                    WizardStep::Task => step.set(WizardStep::Launch),
+                    WizardStep::Launch => {
+                        onboarding.close_wizard();
+                    }
+                }
+            }
+        },
         div { class: "flex items-center justify-between px-6 pt-5 pb-3",
           h2 { class: "text-sm font-bold uppercase tracking-wider text-[var(--on-surface)]",
             "SETUP WIZARD"
@@ -107,7 +124,7 @@ pub fn OnboardingWizard() -> Element {
                 StepCompany { company_name, company_goal }
               },
               WizardStep::Agent => rsx! {
-                StepAgent { agent_name, agent_role, agent_description, agent_adapter }
+                StepAgent { agent_name, agent_role, agent_description, agent_adapter, agent_model_id }
               },
               WizardStep::Task => rsx! {
                 StepTask { task_title, task_description }
@@ -118,6 +135,7 @@ pub fn OnboardingWizard() -> Element {
                   agent_name: agent_name.read().clone(),
                   agent_role: agent_role.read().clone(),
                   agent_adapter: agent_adapter.read().clone(),
+                  agent_model_id: agent_model_id.read().clone(),
                   task_title: task_title.read().clone(),
                 }
               },
@@ -127,7 +145,7 @@ pub fn OnboardingWizard() -> Element {
               p { class: "text-xs text-[var(--error)]", "{err}" }
             }
           }
-          WizardFooter { step, loading, onboarding }
+          WizardFooter { step, loading, loading_text, onboarding }
         }
       }
     }
@@ -155,7 +173,7 @@ fn StepTabs(current: Signal<WizardStep>, on_select: EventHandler<WizardStep>) ->
 }
 
 #[component]
-fn WizardFooter(step: Signal<WizardStep>, loading: Signal<bool>, onboarding: OnboardingCtx) -> Element {
+fn WizardFooter(step: Signal<WizardStep>, loading: Signal<bool>, loading_text: Signal<Option<String>>, onboarding: OnboardingCtx) -> Element {
   let step_val = *step.read();
   rsx! {
     div { class: "flex items-center justify-between mt-6",
@@ -192,7 +210,13 @@ fn WizardFooter(step: Signal<WizardStep>, loading: Signal<bool>, onboarding: Onb
             }
         },
         if *loading.read() {
-          "Working..."
+          div { class: "flex items-center gap-2",
+              span { class: "material-symbols-outlined text-sm animate-spin", "progress_activity" }
+              {
+                  let text = loading_text.read().as_ref().cloned().unwrap_or_else(|| "Working...".into());
+                  rsx! { span { "{text}" } }
+              }
+          }
         } else if *step.read() == WizardStep::Launch {
           "Create & Launch"
         } else {

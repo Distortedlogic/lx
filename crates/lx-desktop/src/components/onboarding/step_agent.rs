@@ -7,7 +7,13 @@ const INPUT_CLS: &str = "w-full border border-[var(--outline-variant)] bg-transp
 const SELECT_CLS: &str = "w-full bg-[var(--surface-container)] px-3 py-2 text-sm text-[var(--on-surface)] outline-none focus:border-[var(--primary)]";
 
 #[component]
-pub fn StepAgent(agent_name: Signal<String>, agent_role: Signal<String>, agent_description: Signal<String>, agent_adapter: Signal<String>) -> Element {
+pub fn StepAgent(
+  agent_name: Signal<String>,
+  agent_role: Signal<String>,
+  agent_description: Signal<String>,
+  agent_adapter: Signal<String>,
+  agent_model_id: Signal<String>,
+) -> Element {
   rsx! {
     div { class: "space-y-5",
       div { class: "flex items-center gap-3 mb-1",
@@ -21,7 +27,7 @@ pub fn StepAgent(agent_name: Signal<String>, agent_role: Signal<String>, agent_d
             "Create your first agent"
           }
           p { class: "text-xs text-[var(--outline)]",
-            "Configure the agent that will handle your first task."
+            "Configure the agent that will run your first lx flow."
           }
         }
       }
@@ -53,6 +59,18 @@ pub fn StepAgent(agent_name: Signal<String>, agent_role: Signal<String>, agent_d
           value: agent_adapter.read().clone(),
           options: ADAPTER_LABELS.iter().map(|(k, l)| SelectOption::new(*k, *l)).collect::<Vec<_>>(),
           onchange: move |val: String| agent_adapter.set(val),
+        }
+      }
+      div { class: "space-y-1",
+        label { class: "text-xs text-[var(--outline)] block", "Model ID" }
+        input {
+            class: INPUT_CLS,
+            placeholder: "claude-sonnet-4-20250514",
+            value: "{agent_model_id}",
+            oninput: move |e| agent_model_id.set(e.value()),
+        }
+        p { class: "text-[10px] text-[var(--outline)]/60 mt-0.5",
+            "The model identifier your adapter will use (e.g. claude-sonnet-4-20250514, gpt-4o, gemini-2.0-flash)"
         }
       }
       div { class: "space-y-1",
