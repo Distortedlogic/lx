@@ -70,12 +70,12 @@ fn build_children_map(nodes: &[OrgNode]) -> HashMap<String, Vec<OrgNode>> {
 
 fn status_dot_color(status: &str) -> &'static str {
   match status {
-    "running" => "#22d3ee",
-    "active" => "#4ade80",
-    "paused" | "idle" => "#facc15",
-    "error" => "#f87171",
-    "terminated" => "#a3a3a3",
-    _ => "#a3a3a3",
+    "running" => "var(--tertiary)",
+    "active" => "var(--success)",
+    "paused" | "idle" => "var(--warning)",
+    "error" => "var(--error)",
+    "terminated" => "var(--outline)",
+    _ => "var(--outline)",
   }
 }
 

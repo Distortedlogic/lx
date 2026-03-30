@@ -62,6 +62,36 @@ fn event_to_block(event: &ActivityEvent) -> TranscriptBlock {
       status: ToolStatus::Completed,
       ts: event.timestamp.clone(),
     },
+    "tool_error" => TranscriptBlock::Tool {
+      name: "tool".into(),
+      input: String::new(),
+      result: Some(event.message.clone()),
+      is_error: true,
+      status: ToolStatus::Error,
+      ts: event.timestamp.clone(),
+    },
+    "command_group" => TranscriptBlock::CommandGroup {
+      items: vec![ToolItem {
+        ts: event.timestamp.clone(),
+        name: "command".into(),
+        input: event.message.clone(),
+        result: None,
+        is_error: false,
+        status: ToolStatus::Running,
+      }],
+      ts: event.timestamp.clone(),
+    },
+    "tool_group" => TranscriptBlock::ToolGroup {
+      items: vec![ToolItem {
+        ts: event.timestamp.clone(),
+        name: "tool".into(),
+        input: event.message.clone(),
+        result: None,
+        is_error: false,
+        status: ToolStatus::Running,
+      }],
+      ts: event.timestamp.clone(),
+    },
     "stderr" => {
       TranscriptBlock::StderrGroup { lines: vec![StderrLine { ts: event.timestamp.clone(), text: event.message.clone() }], ts: event.timestamp.clone() }
     },
