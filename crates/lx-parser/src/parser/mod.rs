@@ -6,6 +6,7 @@ mod pattern;
 mod stmt;
 mod stmt_class;
 pub mod stmt_keyword;
+pub(crate) mod stmt_trait;
 mod type_ann;
 
 use std::cell::RefCell;

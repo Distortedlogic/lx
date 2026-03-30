@@ -2,6 +2,7 @@ mod emit_expr;
 mod emit_expr_helpers;
 mod emit_pattern;
 mod emit_stmt;
+mod emit_stmt_keyword;
 mod emit_type;
 
 use lx_ast::ast::{AstArena, Program};

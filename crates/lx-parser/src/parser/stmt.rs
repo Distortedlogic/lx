@@ -4,10 +4,7 @@ use chumsky::prelude::*;
 use super::expr::{ident, name_or_type, type_name};
 use super::{ArenaRef, ExprId, Span, StmtId, ss};
 use crate::lexer::token::TokenKind;
-use lx_ast::ast::{
-  AgentMethod, AstArena, BindTarget, Binding, Expr, ExprFieldAccess, FieldDecl, FieldKind, Stmt, StmtFieldUpdate, StmtTypeDef, TraitDeclData, TraitEntry,
-  TraitUnionDef, UseKind, UseStmt,
-};
+use lx_ast::ast::{AstArena, BindTarget, Binding, Expr, ExprFieldAccess, FieldKind, Stmt, StmtFieldUpdate, StmtTypeDef, UseKind, UseStmt};
 use lx_span::sym::{Sym, intern};
 
 pub(super) fn program_parser<'a, I>(arena: ArenaRef) -> impl Parser<'a, I, Vec<StmtId>, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
@@ -45,7 +42,7 @@ where
   let use_stmt = use_parser(arena.clone());
   let exported = just(TokenKind::Export).or_not().map(|e| e.is_some());
   let keyword_stmt = super::stmt_keyword::keyword_parser(expr.clone());
-  let trait_stmt = trait_parser(expr.clone(), arena.clone());
+  let trait_stmt = super::stmt_trait::trait_parser(expr.clone(), arena.clone());
   let class_stmt = super::stmt_class::class_parser(expr.clone());
   let type_def = type_def_parser();
   let binding = binding_parser(expr.clone(), arena.clone());
@@ -198,87 +195,6 @@ where
     .then_ignore(super::expr::skip_semis())
     .then(variant.separated_by(super::expr::skip_semis()).at_least(1).collect::<Vec<_>>())
     .map(|((name, type_params), variants)| (name, type_params, variants))
-}
-
-fn trait_parser<'a, I>(
-  expr: impl Parser<'a, I, ExprId, extra::Err<Rich<'a, TokenKind, Span>>> + Clone,
-  _arena: ArenaRef,
-) -> impl Parser<'a, I, Stmt, extra::Err<Rich<'a, TokenKind, Span>>> + Clone
-where
-  I: ValueInput<'a, Token = TokenKind, Span = Span>,
-{
-  let trait_union = just(TokenKind::Trait)
-    .ignore_then(just(TokenKind::Export).or_not())
-    .ignore_then(type_name())
-    .then(super::type_ann::generic_params())
-    .then_ignore(just(TokenKind::Assign))
-    .then(type_name().separated_by(just(TokenKind::Pipe)).at_least(1).collect::<Vec<_>>())
-    .map(|((name, type_params), variants)| Stmt::TraitUnion(TraitUnionDef { name, type_params, variants, exported: false }));
-
-  let trait_decl = just(TokenKind::Trait)
-    .ignore_then(just(TokenKind::Export).or_not())
-    .ignore_then(type_name())
-    .then(super::type_ann::generic_params())
-    .then_ignore(just(TokenKind::Assign))
-    .then_ignore(just(TokenKind::LBrace))
-    .then(trait_body(expr))
-    .then_ignore(just(TokenKind::RBrace))
-    .map(|((name, type_params), (entries, defaults))| {
-      Stmt::TraitDecl(TraitDeclData {
-        name,
-        type_params,
-        entries,
-        methods: vec![],
-        defaults,
-        requires: vec![],
-        description: None,
-        tags: vec![],
-        exported: false,
-      })
-    });
-
-  trait_union.or(trait_decl)
-}
-
-pub(super) fn trait_body<'a, I>(
-  expr: impl Parser<'a, I, ExprId, extra::Err<Rich<'a, TokenKind, Span>>> + Clone,
-) -> impl Parser<'a, I, (Vec<TraitEntry>, Vec<AgentMethod>), extra::Err<Rich<'a, TokenKind, Span>>> + Clone
-where
-  I: ValueInput<'a, Token = TokenKind, Span = Span>,
-{
-  let spread_entry = just(TokenKind::DotDot).ignore_then(type_name()).map(TraitEntry::Spread);
-
-  let default_method =
-    ident().then_ignore(just(TokenKind::Assign)).then(expr.clone()).map(|(name, handler)| TraitBodyItem::Default(AgentMethod { name, handler }));
-
-  let field_entry = ident()
-    .then_ignore(just(TokenKind::Colon))
-    .then(type_name())
-    .then(just(TokenKind::Assign).ignore_then(expr.clone()).or_not())
-    .then(just(TokenKind::Ident(intern("where"))).ignore_then(expr).or_not())
-    .map(|(((name, typ), default), constraint)| TraitBodyItem::Field(FieldDecl { name, type_name: typ, default, constraint }));
-
-  let item = spread_entry.map(TraitBodyItem::Entry).or(default_method).or(field_entry);
-
-  super::expr::skip_semis().ignore_then(item.separated_by(super::expr::skip_semis()).collect::<Vec<_>>()).then_ignore(super::expr::skip_semis()).map(|items| {
-    let mut entries = Vec::new();
-    let mut defaults = Vec::new();
-    for item in items {
-      match item {
-        TraitBodyItem::Entry(e) => entries.push(e),
-        TraitBodyItem::Default(m) => defaults.push(m),
-        TraitBodyItem::Field(f) => entries.push(TraitEntry::Field(Box::new(f))),
-      }
-    }
-    (entries, defaults)
-  })
-}
-
-#[derive(Clone)]
-enum TraitBodyItem {
-  Entry(TraitEntry),
-  Default(AgentMethod),
-  Field(FieldDecl),
 }
 
 fn expr_to_field_chain(id: ExprId, arena: &AstArena) -> (Sym, Vec<Sym>) {

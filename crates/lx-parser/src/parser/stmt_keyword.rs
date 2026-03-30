@@ -3,8 +3,8 @@ use chumsky::prelude::*;
 
 use super::Span;
 use super::expr::type_name;
-use super::stmt::trait_body;
 use super::stmt_class::class_body;
+use super::stmt_trait::trait_body;
 use crate::lexer::token::TokenKind;
 use lx_ast::ast::{AgentMethod, ClassField, ExprId, KeywordDeclData, KeywordKind, TraitEntry};
 use lx_span::sym::Sym;
