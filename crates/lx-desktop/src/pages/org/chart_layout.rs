@@ -100,3 +100,28 @@ pub fn collect_edges(nodes: &[LayoutNode]) -> Vec<(&LayoutNode, &LayoutNode)> {
   }
   edges
 }
+
+#[derive(Clone, Copy)]
+pub struct BoundingBox {
+  pub min_x: f64,
+  pub min_y: f64,
+  pub max_x: f64,
+  pub max_y: f64,
+}
+
+pub fn compute_bounding_box(nodes: &[&LayoutNode]) -> Option<BoundingBox> {
+  if nodes.is_empty() {
+    return None;
+  }
+  let mut min_x = f64::MAX;
+  let mut min_y = f64::MAX;
+  let mut max_x = f64::MIN;
+  let mut max_y = f64::MIN;
+  for n in nodes {
+    min_x = min_x.min(n.x);
+    min_y = min_y.min(n.y);
+    max_x = max_x.max(n.x + CARD_W);
+    max_y = max_y.max(n.y + CARD_H);
+  }
+  Some(BoundingBox { min_x, min_y, max_x, max_y })
+}

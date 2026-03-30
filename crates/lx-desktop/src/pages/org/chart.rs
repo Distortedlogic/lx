@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
+use dioxus::html::geometry::WheelDelta;
 use dioxus::prelude::*;
 
-use super::chart_layout::{CARD_H, CARD_W, collect_edges, flatten_layout, layout_forest};
+use super::chart_layout::{CARD_H, CARD_W, collect_edges, compute_bounding_box, flatten_layout, layout_forest};
 use crate::contexts::activity_log::ActivityLog;
 use crate::pages::routines::types::OrgNode;
 
@@ -89,6 +90,7 @@ pub fn OrgChart() -> Element {
   let layout = layout_forest(&roots, &children_map);
   let flat = flatten_layout(&layout);
   let edges = collect_edges(&layout);
+  let bbox = compute_bounding_box(&flat);
 
   let mut pan_x = use_signal(|| 0.0f64);
   let mut pan_y = use_signal(|| 0.0f64);
@@ -98,6 +100,28 @@ pub fn OrgChart() -> Element {
   let mut drag_start_y = use_signal(|| 0.0f64);
   let mut drag_start_pan_x = use_signal(|| 0.0f64);
   let mut drag_start_pan_y = use_signal(|| 0.0f64);
+  let mut mounted = use_signal(|| false);
+
+  use_effect(move || {
+    if !mounted() {
+      if let Some(ref bb) = bbox {
+        let content_w = bb.max_x - bb.min_x;
+        let content_h = bb.max_y - bb.min_y;
+        let vw = 800.0_f64;
+        let vh = 600.0_f64;
+        let margin = 40.0;
+        let scale_x = (vw - margin * 2.0) / content_w;
+        let scale_y = (vh - margin * 2.0) / content_h;
+        let fit_z = scale_x.min(scale_y).clamp(0.2, 1.5);
+        let cx = bb.min_x + content_w / 2.0;
+        let cy = bb.min_y + content_h / 2.0;
+        pan_x.set(vw / 2.0 - cx * fit_z);
+        pan_y.set(vh / 2.0 - cy * fit_z);
+        zoom.set(fit_z);
+      }
+      mounted.set(true);
+    }
+  });
 
   let px = pan_x();
   let py = pan_y();
@@ -140,6 +164,25 @@ pub fn OrgChart() -> Element {
       },
       onmouseup: move |_| dragging.set(false),
       onmouseleave: move |_| dragging.set(false),
+      onwheel: move |evt| {
+          let old_z = zoom();
+          let delta = evt.delta();
+          let dy = match delta {
+              WheelDelta::Pixels(p) => p.y,
+              WheelDelta::Lines(l) => l.y * 40.0,
+              WheelDelta::Pages(p) => p.y * 400.0,
+          };
+          let factor = if dy < 0.0 { 1.1 } else { 1.0 / 1.1 };
+          let new_z = (old_z * factor).clamp(0.1, 3.0);
+          let coords = evt.client_coordinates();
+          let mouse_x = coords.x;
+          let mouse_y = coords.y;
+          let world_x = (mouse_x - pan_x()) / old_z;
+          let world_y = (mouse_y - pan_y()) / old_z;
+          pan_x.set(mouse_x - world_x * new_z);
+          pan_y.set(mouse_y - world_y * new_z);
+          zoom.set(new_z);
+      },
       div { class: "absolute top-3 right-3 z-10 flex flex-col gap-1",
         button {
           class: "w-7 h-7 flex items-center justify-center bg-[var(--surface-container)] border border-[var(--outline-variant)] rounded text-sm hover:brightness-110 transition-colors",
@@ -160,9 +203,25 @@ pub fn OrgChart() -> Element {
         button {
           class: "w-7 h-7 flex items-center justify-center bg-[var(--surface-container)] border border-[var(--outline-variant)] rounded text-[10px] hover:brightness-110 transition-colors",
           onclick: move |_| {
-              zoom.set(1.0);
-              pan_x.set(0.0);
-              pan_y.set(0.0);
+              if let Some(ref bb) = bbox {
+                  let content_w = bb.max_x - bb.min_x;
+                  let content_h = bb.max_y - bb.min_y;
+                  let vw = 800.0_f64;
+                  let vh = 600.0_f64;
+                  let margin = 40.0;
+                  let scale_x = (vw - margin * 2.0) / content_w;
+                  let scale_y = (vh - margin * 2.0) / content_h;
+                  let fit_z = scale_x.min(scale_y).clamp(0.2, 1.5);
+                  let cx = bb.min_x + content_w / 2.0;
+                  let cy = bb.min_y + content_h / 2.0;
+                  pan_x.set(vw / 2.0 - cx * fit_z);
+                  pan_y.set(vh / 2.0 - cy * fit_z);
+                  zoom.set(fit_z);
+              } else {
+                  zoom.set(1.0);
+                  pan_x.set(0.0);
+                  pan_y.set(0.0);
+              }
           },
           "Fit"
         }
@@ -204,7 +263,7 @@ pub fn OrgChart() -> Element {
               rsx! {
                 div {
                   key: "{node.id}",
-                  class: "absolute bg-[var(--surface-container)] border border-[var(--outline-variant)] rounded-lg shadow-sm select-none",
+                  class: "absolute bg-[var(--surface-container)] border border-[var(--outline-variant)] rounded-lg shadow-sm select-none transition-shadow hover:shadow-md hover:border-[var(--on-surface)]/20",
                   style: "left: {node.x}px; top: {node.y}px; width: {card_w}px; min-height: {card_h}px",
                   div { class: "flex items-center px-4 py-3 gap-3",
                     span {
