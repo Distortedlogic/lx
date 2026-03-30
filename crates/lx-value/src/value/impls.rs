@@ -127,7 +127,7 @@ impl LxVal {
       LxVal::Stream { id } => id.hash(state),
       LxVal::Channel { name } => name.hash(state),
       LxVal::Type(s) => s.hash(state),
-      LxVal::Func(_) | LxVal::MultiFunc(_) | LxVal::BuiltinFunc(_) | LxVal::TaggedCtor { .. } | LxVal::ToolModule(_) => {},
+      LxVal::Func(_) | LxVal::MultiFunc(_) | LxVal::BuiltinFunc(_) | LxVal::TaggedCtor { .. } => {},
     }
   }
 }

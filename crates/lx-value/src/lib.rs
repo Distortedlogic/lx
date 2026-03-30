@@ -4,7 +4,6 @@ pub mod error;
 mod event_stream;
 mod external_sink;
 mod module_exports;
-mod tool_module_handle;
 mod value;
 
 pub use builtin_ctx::BuiltinCtx;
@@ -13,5 +12,4 @@ pub use error::{AssertError, EvalResult, EvalSignal, LxError, LxResult};
 pub use event_stream::{EventStream, SpanInfo, StreamEntry, entry_to_lxval};
 pub use external_sink::ExternalStreamSink;
 pub use module_exports::ModuleExports;
-pub use tool_module_handle::ToolModuleHandle;
 pub use value::*;

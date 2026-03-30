@@ -116,8 +116,6 @@ pub enum LxVal {
   Channel {
     name: Sym,
   },
-  #[strum(serialize = "ToolModule")]
-  ToolModule(Arc<dyn crate::ToolModuleHandle>),
 }
 
 #[derive(Debug, Clone)]
