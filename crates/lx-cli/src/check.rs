@@ -10,10 +10,19 @@ use lx::checker::{CheckResult, DiagLevel, Diagnostic, check};
 use lx::error::LxError;
 use lx::folder::desugar;
 use lx::lexer::lex;
+use lx::linter::{RuleRegistry, lint};
 use lx::parser::parse;
 use miette::{NamedSource, Report};
 
 use crate::{manifest, run};
+
+fn lint_after_check(result: CheckResult, program: &lx::ast::Program<lx::ast::Core>) -> CheckResult {
+  let mut diagnostics = result.diagnostics;
+  let mut registry = RuleRegistry::default_rules();
+  let lint_diags = lint(program, &result.semantic, &mut registry);
+  diagnostics.extend(lint_diags);
+  CheckResult { diagnostics, source: result.source, semantic: result.semantic }
+}
 
 enum FixOutcome {
   Applied(Box<CheckResult>, String),
@@ -28,7 +37,7 @@ pub fn check_file(path: &str, strict: bool, fix: bool) -> ExitCode {
     Err(code) => return code,
   };
   let source_arc: Arc<str> = Arc::from(source.as_str());
-  let result = check(&program, source_arc);
+  let result = lint_after_check(check(&program, source_arc), &program);
 
   if fix && let Some(fixed_source) = apply_fixes(&source, &result.diagnostics) {
     if let Err(e) = fs::write(path, &fixed_source) {
@@ -65,7 +74,7 @@ fn recheck_source(fixed_source: &str) -> Result<CheckResult, String> {
   })?;
   let program = desugar(surface);
   let fixed_arc: Arc<str> = Arc::from(fixed_source);
-  Ok(check(&program, fixed_arc))
+  Ok(lint_after_check(check(&program, fixed_arc), &program))
 }
 
 fn print_and_exit(result: &CheckResult, path: &str, source: &str, strict: bool) -> ExitCode {
@@ -138,7 +147,7 @@ pub fn check_workspace(member_filter: Option<&str>, strict: bool, fix: bool) -> 
       match run::read_and_parse(&path_str) {
         Ok((source, program)) => {
           let source_arc: Arc<str> = Arc::from(source.as_str());
-          let result = check(&program, source_arc);
+          let result = lint_after_check(check(&program, source_arc), &program);
           let (final_result, final_source) = if fix {
             match try_apply_fixes(&path_str, &source, &result) {
               FixOutcome::Applied(r, s) => {
@@ -272,16 +281,8 @@ pub fn collect_lx_files(dir: &Path) -> Vec<PathBuf> {
 }
 
 fn collect_lx_files_rec(dir: &Path, files: &mut Vec<PathBuf>) {
-  let Ok(read_dir) = fs::read_dir(dir) else {
-    return;
-  };
-  for entry in read_dir.filter_map(|e| match e {
-    Ok(entry) => Some(entry),
-    Err(err) => {
-      eprintln!("warning: failed to read directory entry in {}: {err}", dir.display());
-      None
-    },
-  }) {
+  let Ok(read_dir) = fs::read_dir(dir) else { return };
+  for entry in read_dir.flatten() {
     let path = entry.path();
     if path.is_dir() {
       collect_lx_files_rec(&path, files);

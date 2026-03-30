@@ -1,6 +1,8 @@
 pub mod active_agents_panel;
 pub mod activity_charts;
 
+use std::collections::HashMap;
+
 use dioxus::prelude::*;
 
 use crate::components::empty_state::EmptyState;
@@ -25,6 +27,38 @@ pub fn Dashboard() -> Element {
   let agent_events = events.iter().filter(|e| e.kind.contains("agent")).count();
   let tool_events = events.iter().filter(|e| e.kind.contains("tool")).count();
   let error_events = events.iter().filter(|e| e.kind.to_lowercase().contains("error") || e.message.to_lowercase().contains("error")).count();
+
+  let activity_buckets: Vec<usize> = {
+    let bucket_count = 14usize;
+    let total = events.len();
+    if total == 0 {
+      vec![0; bucket_count]
+    } else {
+      let per_bucket = total.div_ceil(bucket_count);
+      let mut buckets = Vec::with_capacity(bucket_count);
+      for chunk in events.iter().collect::<Vec<_>>().chunks(per_bucket.max(1)) {
+        buckets.push(chunk.len());
+      }
+      while buckets.len() < bucket_count {
+        buckets.push(0);
+      }
+      buckets.truncate(bucket_count);
+      buckets.reverse();
+      buckets
+    }
+  };
+
+  let breakdown_segments: Vec<(String, usize)> = {
+    let mut counts: HashMap<String, usize> = HashMap::new();
+    for event in events.iter() {
+      let key = event.kind.split('_').next().unwrap_or(&event.kind).to_string();
+      *counts.entry(key).or_default() += 1;
+    }
+    let mut segments: Vec<(String, usize)> = counts.into_iter().collect();
+    segments.sort_by(|a, b| b.1.cmp(&a.1));
+    segments.truncate(8);
+    segments
+  };
 
   if total_events == 0 {
     return rsx! {
@@ -59,11 +93,13 @@ pub fn Dashboard() -> Element {
       }
 
       div { class: "grid grid-cols-2 lg:grid-cols-4 gap-4",
-        ChartCard { title: "Activity", subtitle: "Last 14 events".to_string(),
-          ActivitySummaryChart {}
+        ChartCard {
+          title: "Activity",
+          subtitle: format!("Last {} buckets", activity_buckets.len()),
+          ActivitySummaryChart { buckets: activity_buckets.clone() }
         }
         ChartCard { title: "Event Breakdown", subtitle: "By type".to_string(),
-          EventBreakdownChart {}
+          EventBreakdownChart { segments: breakdown_segments.clone() }
         }
       }
 
