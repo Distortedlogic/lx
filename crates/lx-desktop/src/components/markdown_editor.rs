@@ -18,6 +18,7 @@ pub fn MarkdownEditor(
   #[props(optional)] placeholder: Option<String>,
   #[props(optional)] class: Option<String>,
 ) -> Element {
+  let editor_id = use_hook(|| format!("lx-md-editor-{}", Uuid::new_v4().simple()));
   let mut mode = use_signal(|| EditorMode::Edit);
   let current_mode = *mode.read();
   let extra_class = class.as_deref().unwrap_or("");
@@ -26,7 +27,7 @@ pub fn MarkdownEditor(
   rsx! {
     div { class: "flex flex-col border border-[var(--outline-variant)]/30 rounded-lg overflow-hidden {extra_class}",
       div { class: "flex items-center justify-between border-b border-[var(--outline-variant)]/30 px-2 py-1 bg-[var(--surface-container)]",
-        ToolbarButtons { value: value.clone(), on_change: on_change }
+        ToolbarButtons { editor_id: editor_id.clone(), value: value.clone(), on_change: on_change }
         div { class: "flex gap-0.5",
           ModeButton { label: "Edit", active: current_mode == EditorMode::Edit, on_click: move |_| mode.set(EditorMode::Edit) }
           ModeButton { label: "Preview", active: current_mode == EditorMode::Preview, on_click: move |_| mode.set(EditorMode::Preview) }
@@ -36,6 +37,7 @@ pub fn MarkdownEditor(
       match current_mode {
           EditorMode::Edit => rsx! {
             EditorTextarea {
+              editor_id: editor_id.clone(),
               value: value.clone(),
               placeholder: placeholder_text.to_string(),
               on_change: on_change,
@@ -54,6 +56,7 @@ pub fn MarkdownEditor(
           EditorMode::Split => rsx! {
             div { class: "grid grid-cols-2 divide-x divide-[var(--outline-variant)]/30",
               EditorTextarea {
+                editor_id: editor_id.clone(),
                 value: value.clone(),
                 placeholder: placeholder_text.to_string(),
                 on_change: on_change,
@@ -74,14 +77,32 @@ pub fn MarkdownEditor(
 }
 
 #[component]
-fn EditorTextarea(value: String, placeholder: String, on_change: EventHandler<String>, #[props(optional)] on_submit: Option<EventHandler<String>>) -> Element {
+fn EditorTextarea(
+  editor_id: String,
+  value: String,
+  placeholder: String,
+  on_change: EventHandler<String>,
+  #[props(optional)] on_submit: Option<EventHandler<String>>,
+) -> Element {
   rsx! {
     textarea {
-      id: "lx-md-editor",
-      class: "w-full min-h-[8rem] max-h-80 p-3 bg-transparent outline-none text-sm font-mono text-[var(--on-surface)] placeholder:text-[var(--outline)]/40 resize-y",
+      id: "{editor_id}",
+      class: "w-full min-h-[8rem] p-3 bg-transparent outline-none text-sm font-mono text-[var(--on-surface)] placeholder:text-[var(--outline)]/40 resize-none overflow-hidden",
       value: "{value}",
       placeholder: "{placeholder}",
-      oninput: move |evt| on_change.call(evt.value().to_string()),
+      oninput: {
+          let eid = editor_id.clone();
+          move |evt: FormEvent| {
+              on_change.call(evt.value().to_string());
+              let eid = eid.clone();
+              spawn(async move {
+                  let js = format!(
+                      "var el = document.getElementById('{eid}'); if (el) {{ el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }}"
+                  );
+                  let _ = document::eval(&js).await;
+              });
+          }
+      },
       onkeydown: move |evt| {
           if evt.modifiers().meta() && evt.key() == Key::Enter
             && let Some(ref handler) = on_submit
@@ -105,19 +126,16 @@ fn ModeButton(label: &'static str, active: bool, on_click: EventHandler<()>) -> 
   }
 }
 
-fn insert_at_cursor(value: &str, before: &str, after: &str, on_change: EventHandler<String>) {
+fn insert_at_cursor(editor_id: &str, value: &str, before: &str, after: &str, on_change: EventHandler<String>) {
   let val = value.to_string();
+  let editor_id = editor_id.to_string();
   let before = before.to_string();
   let after = after.to_string();
   spawn(async move {
-    let js = r#"
-      (function() {
-        var el = document.getElementById('lx-md-editor');
-        if (!el) return JSON.stringify({start: -1, end: -1});
-        return JSON.stringify({start: el.selectionStart, end: el.selectionEnd});
-      })()
-    "#;
-    let (start, end) = match document::eval(js).await {
+    let js = format!(
+      "(function() {{ var el = document.getElementById('{editor_id}'); if (!el) return JSON.stringify({{start: -1, end: -1}}); return JSON.stringify({{start: el.selectionStart, end: el.selectionEnd}}); }})()"
+    );
+    let (start, end) = match document::eval(&js).await {
       Ok(result) => {
         let s = result.to_string();
         let s = s.trim_matches('"');
@@ -141,49 +159,54 @@ fn insert_at_cursor(value: &str, before: &str, after: &str, on_change: EventHand
 
     let new_cursor = start + before.len() + selected.len();
     let set_cursor_js = format!(
-      "setTimeout(function() {{ var el = document.getElementById('lx-md-editor'); if (el) {{ el.selectionStart = {new_cursor}; el.selectionEnd = {new_cursor}; el.focus(); }} }}, 0)"
+      "setTimeout(function() {{ var el = document.getElementById('{editor_id}'); if (el) {{ el.selectionStart = {new_cursor}; el.selectionEnd = {new_cursor}; el.focus(); }} }}, 0)"
     );
     let _ = document::eval(&set_cursor_js).await;
   });
 }
 
 #[component]
-fn ToolbarButtons(value: String, on_change: EventHandler<String>) -> Element {
+fn ToolbarButtons(editor_id: String, value: String, on_change: EventHandler<String>) -> Element {
   rsx! {
     div { class: "flex gap-0.5",
       ToolbarBtn {
         icon: "format_bold",
         on_click: {
+          let eid = editor_id.clone();
           let v = value.clone();
-          move |_| insert_at_cursor(&v, "**", "**", on_change)
+          move |_| insert_at_cursor(&eid, &v, "**", "**", on_change)
         },
       }
       ToolbarBtn {
         icon: "format_italic",
         on_click: {
+          let eid = editor_id.clone();
           let v = value.clone();
-          move |_| insert_at_cursor(&v, "*", "*", on_change)
+          move |_| insert_at_cursor(&eid, &v, "*", "*", on_change)
         },
       }
       ToolbarBtn {
         icon: "code",
         on_click: {
+          let eid = editor_id.clone();
           let v = value.clone();
-          move |_| insert_at_cursor(&v, "\n```\n", "\n```", on_change)
+          move |_| insert_at_cursor(&eid, &v, "\n```\n", "\n```", on_change)
         },
       }
       ToolbarBtn {
         icon: "link",
         on_click: {
+          let eid = editor_id.clone();
           let v = value.clone();
-          move |_| insert_at_cursor(&v, "[", "](url)", on_change)
+          move |_| insert_at_cursor(&eid, &v, "[", "](url)", on_change)
         },
       }
       ToolbarBtn {
         icon: "title",
         on_click: {
+          let eid = editor_id.clone();
           let v = value.clone();
-          move |_| insert_at_cursor(&v, "\n## ", "", on_change)
+          move |_| insert_at_cursor(&eid, &v, "\n## ", "", on_change)
         },
       }
     }
