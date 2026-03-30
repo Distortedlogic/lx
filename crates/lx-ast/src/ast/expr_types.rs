@@ -2,7 +2,7 @@ use lx_macros::AstWalk;
 use num_bigint::BigInt;
 
 use super::{BinOp, ExprId, PatternId, StmtId, TypeExprId, UnaryOp, WithKind};
-use crate::sym::Sym;
+use lx_span::sym::Sym;
 
 #[derive(Debug, Clone, AstWalk)]
 pub enum Literal {

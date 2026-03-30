@@ -1,7 +1,9 @@
 use std::cmp::Reverse;
 use std::collections::HashMap;
 
-use crate::source::{AttachedComment, CommentMap, CommentPlacement, CommentStore};
+use lx_span::source::{CommentPlacement, CommentStore};
+
+use crate::source::{AttachedComment, CommentMap};
 
 use super::{AstArena, NodeId, StmtId};
 

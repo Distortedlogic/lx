@@ -1,0 +1,17 @@
+[package]
+edition.workspace = true
+license.workspace = true
+name = "lx-ast"
+version = "0.1.0"
+
+[dependencies]
+lx-span = { path = "../lx-span" }
+lx-macros = { path = "../lx-macros" }
+la-arena.workspace = true
+miette.workspace = true
+num-bigint.workspace = true
+smallvec.workspace = true
+strum.workspace = true
+
+[lints]
+workspace = true

@@ -9,8 +9,10 @@ use std::marker::PhantomData;
 
 use lx_macros::AstWalk;
 
-use crate::source::{Comment, CommentMap, CommentPlacement, CommentStore, FileId};
-use crate::sym::Sym;
+use lx_span::source::{Comment, CommentPlacement, CommentStore, FileId};
+use lx_span::sym::Sym;
+
+use crate::source::CommentMap;
 
 pub use arena::{AstArena, AstNode, ExprId, NodeId, PatternId, Spanned, StmtId, TypeExprId};
 pub use comment_attach::attach_comments;

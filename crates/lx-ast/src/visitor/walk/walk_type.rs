@@ -1,7 +1,7 @@
 use std::ops::ControlFlow;
 
 use crate::ast::{AstArena, TypeExpr, TypeExprId, TypeField};
-use crate::sym::Sym;
+use lx_span::sym::Sym;
 use miette::SourceSpan;
 
 use crate::visitor::{AstVisitor, VisitAction};

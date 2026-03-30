@@ -4,7 +4,7 @@ use crate::ast::{
   ExprYield, FieldPattern, ListElem, Literal, MapEntry, Pattern, PatternId, Program, RecordField, Section, SelArm, Stmt, StmtFieldUpdate, StmtId, StmtTypeDef,
   TraitDeclData, TraitUnionDef, TypeExpr, TypeExprId, TypeField, UseStmt,
 };
-use crate::sym::Sym;
+use lx_span::sym::Sym;
 use miette::SourceSpan;
 
 use super::VisitAction;

@@ -2,7 +2,7 @@ use lx_macros::AstWalk;
 use strum::Display;
 
 use super::{ExprId, Literal, PatternId, TypeExprId};
-use crate::sym::Sym;
+use lx_span::sym::Sym;
 
 pub const ANY_TYPE_NAME: &str = "Any";
 
