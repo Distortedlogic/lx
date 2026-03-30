@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use lx::runtime::RuntimeCtx;
+use lx::prelude::RuntimeCtx;
 
 use clap::{Parser, Subcommand};
 
@@ -181,9 +181,9 @@ fn run_file(path: &str, _json: bool, control_spec: Option<&str>) -> ExitCode {
   if let Some(spec) = control_spec
     && spec == "stdin"
   {
-    let (inject_tx, inject_rx) = tokio::sync::mpsc::channel::<lx::value::LxVal>(1);
+    let (inject_tx, inject_rx) = tokio::sync::mpsc::channel::<lx_value::LxVal>(1);
     ctx_val.inject_tx = Some(inject_tx);
-    ctx_val.yield_ = Arc::new(lx::runtime::ControlYieldBackend { inject_rx: Arc::new(tokio::sync::Mutex::new(inject_rx)) });
+    ctx_val.yield_ = Arc::new(lx_eval::runtime::ControlYieldBackend { inject_rx: Arc::new(tokio::sync::Mutex::new(inject_rx)) });
   }
   let ctx = Arc::new(ctx_val);
   ctx.tokio_runtime.block_on(setup_external_stream(&ctx, path));
@@ -192,7 +192,7 @@ fn run_file(path: &str, _json: bool, control_spec: Option<&str>) -> ExitCode {
     Err(errors) => {
       let named = miette::NamedSource::new(path, source.clone());
       for err in errors {
-        if let lx::error::LxError::Sourced { source_name, source_text, inner } = err {
+        if let lx_value::error::LxError::Sourced { source_name, source_text, inner } = err {
           let src = miette::NamedSource::new(source_name, source_text.to_string());
           let report = miette::Report::new(*inner).with_source_code(src);
           eprintln!("{report:?}");
@@ -235,9 +235,9 @@ async fn setup_external_stream(ctx: &Arc<RuntimeCtx>, file_path: &str) {
     return;
   };
   let command = stream_config.command;
-  match lx::mcp_client::McpClient::spawn(&command).await {
+  match lx_eval::mcp_client::McpClient::spawn(&command).await {
     Ok(client) => {
-      let sink = Arc::new(lx::mcp_stream_sink::McpStreamSink::new(client));
+      let sink = Arc::new(lx_eval::mcp_stream_sink::McpStreamSink::new(client));
       ctx.event_stream.set_external_client(sink);
     },
     Err(e) => {
@@ -251,7 +251,7 @@ fn run_diagram(path: &str, output: Option<&str>) -> ExitCode {
     Ok(sp) => sp,
     Err(code) => return code,
   };
-  let mermaid = lx::stdlib::diag::extract_mermaid(&program);
+  let mermaid = lx_eval::stdlib::diag::extract_mermaid(&program);
   match output {
     Some(out_path) => {
       if let Err(e) = fs::write(out_path, &mermaid) {

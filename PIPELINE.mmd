@@ -1,0 +1,279 @@
+graph TD
+    wg_start(["0.0.1 Start\n——————\nraw concept from conversation\n——————\ncontrol: strictly sequential\nno parallel execution\neach step completes before\nthe next begins"]):::teal
+
+    wg_start --> wg_validate["`**1.0.0 Validate (Spawn Subagent)**
+——— input ———
+concept · full techstack context
+———
+is this the best practice,
+highly standard, most idiomatic
+long term solution?
+———
+⟳ for each proposed change {
+→ performant?
+→ optimal?
+→ elegant?
+→ simple and concise?
+→ minimally knotted?
+}
+——— rejection rules ———
+may ONLY reject by citing a
+verifiable factual blocker
+(e.g. struct X has no field Y,
+function Z does not exist)
+———
+rejections based on judgment,
+opinion, or preference are
+NOT valid rejections
+——— returns ———
+validated solution(s)
+or rejected with factual blockers`"]:::orange
+    wg_validate --> wg_val_check{{"1.1.0 validated?"}}:::teal
+
+    wg_val_check -- "no" --> wg_verify_reject["`**1.1.1 Verify Rejection (Spawn Subagent)**
+——— input ———
+rejection with factual claims
+———
+→ independently read the codebase
+→ confirm every factual claim
+———
+if a factual claim is false
+→ discard rejection → validated
+if alternative contradicts source
+authority (research, user instructions)
+→ discard alternative → validated
+———
+only rejections with verified
+factual blockers proceed`"]:::yellow
+    wg_verify_reject -- "verified" --> wg_rethink["`**1.2.0 Rethink (Spawn Subagent)**
+——— input ———
+verified rejection · factual blockers
+———
+→ revise approach
+→ re-evaluate tradeoffs
+→ produce new candidate`"]:::orange
+    wg_verify_reject -- "discarded" --> wg_val_pass
+    wg_val_check -- "yes" --> wg_val_pass((" ")):::teal
+    wg_rethink --> wg_validate
+
+    wg_val_pass --> wg_organize["`**2.0.0 Organize (Spawn Subagent)**
+——— input ———
+validated solution(s)
+———
+→ group into units of work
+→ each unit = one agent scope
+→ order by dependency
+→ minimize cross-unit coupling
+——— returns ———
+ordered list of work units`"]:::orange
+
+    wg_organize --> wg_spec["`**3.0.0 Spec (Spawn Subagent)**
+——— input ———
+work units · codebase context
+———
+⟳ for each unit of work {
+→ create mechanical task list
+→ fully detailed steps
+→ specify exact files affected
+→ specify exact functions/structs
+→ include verified preconditions
+→ one work item MD per unit
+}
+——— output ———
+work_items/*.md written`"]:::orange
+
+    wg_spec --> wg_audit["`**4.0.0 Audit (Spawn Subagent)**
+——— read ———
+every work item MD just written
+———
+⟳ for each work item {
+→ everything needed is present?
+→ no potential issues or gotchas?
+→ no deferred work?
+→ no postponed investigation?
+→ no vagueness or ambiguity?
+→ no useless convo context?
+→ no deferral language?
+→ executable by a separate agent
+  with zero additional context?
+}
+——— returns ———
+pass / fail with findings`"]:::yellow
+    wg_audit --> wg_audit_check{{"4.1.0 pass?"}}:::teal
+
+    wg_audit_check -- "no" --> wg_stuck{{"4.2.0 stuck?\n——————\n3+ attempts ·\nsame findings repeating"}}:::red
+    wg_audit_check -- "yes" --> wg_done(["4.0.1 Work Items Ready"]):::teal
+
+    wg_stuck -- "no" --> wg_fix["`**4.3.0 Fix (Spawn Subagent)**
+——— input ———
+findings list from auditor
+———
+⟳ for each finding {
+→ open the flagged work item
+→ fix exactly the issue described
+→ add missing detail
+→ remove vague language
+→ resolve deferred items now
+}`"]:::orange
+    wg_fix --> wg_audit
+
+    wg_stuck -- "yes" --> wg_bail["`**4.0.2 Bail**
+——— log ———
+which work items failed
+every unresolved finding`"]:::red
+    wg_bail --> wg_done_fail(["4.0.3 Failed"]):::red
+
+    wg_done --> wf_guardrail["5.0.0 Commit Baseline\n——————\ngit add -A && git commit\n--allow-empty -m baseline\ngit push"]:::cyan
+    wf_guardrail --> wf_loop_start["5.1.0 For each group"]:::purple
+
+    wf_loop_start --> wf_implement["`**6.0.0 Implement (Spawn Subagent)**
+——— read ———
+every task in the work item
+———
+⟳ for each task {
+→ do it fully, in order
+→ do not skip or mark done early
+→ do not combine with other tasks
+→ do not add work not in the task
+→ do not substitute a different approach
+→ do not touch files outside the task scope
+→ do not add infrastructure not in the spec
+}
+———
+⟳ if your change creates a new problem {
+→ fix the root cause in this task
+→ do not restructure other code to avoid it
+}
+⟳ if you must deviate from the spec {
+→ stop · document why · before proceeding
+}`"]:::orange
+    wf_implement --> wf_audit["`**7.0.0 Audit (Spawn Subagent)**
+——— read ———
+work item spec · diff via: git diff
+(commit has not happened yet — only git diff works here)
+———
+⟳ for each task in work item {
+→ read what the task says to do
+→ read what the diff actually did
+→ did it do what was asked?
+→ did it do anything not asked?
+→ did it leave anything incomplete?
+}
+——— check all touched files ———
+empty function bodies
+functions returning placeholders
+match arms discarding with _ => {}
+new struct/trait/enum with no users
+TODO/FIXME/unimplemented left behind
+unused imports · dead functions · orphaned consts
+pub items nothing outside the module uses
+code compiles with 0 warnings
+all tests pass
+——— check for failure modes ———
+workarounds: restructured code to dodge a bug?
+regressions: new ambiguities or edge cases?
+scope creep: files outside the work item touched?
+deviations: spec vs actual — justified?
+——— scope ———
+grade ONLY current file state on disk
+do not grade commit history or staging
+the commit step happens AFTER audit passes
+——— grade 0 if ———
+any pre-existing test regresses
+implementer worked around own bug
+——— returns ———
+grade 0–100
+list of {file, issue, severity}`"]:::yellow
+    wf_audit --> wf_check{{"7.1.0 grade >= 93?"}}:::teal
+
+    wf_check -- "no" --> wf_stuck{{"7.2.0 stuck?\n——————\n3+ attempts ·\ngrade not improving ·\nsame findings repeating"}}:::red
+    wf_check -- "yes" --> wf_diagnose["7.0.1 just diagnose"]:::cyan
+    wf_diagnose --> wf_diag_check{{"7.3.0 errors or\nwarnings?"}}:::teal
+    wf_diag_check -- "no" --> wf_fmtcommit["8.0.0 fmt + commit + push"]:::teal
+    wf_diag_check -- "yes" --> wf_fix
+    wf_fmtcommit --> wf_more{{"8.1.0 more groups?"}}:::purple
+
+    wf_stuck -- "no" --> wf_fix["`**7.4.0 Fix (Spawn Subagent)**
+——— input ———
+findings list from auditor
+———
+⟳ for each finding {
+→ open the flagged file
+→ fix exactly the issue described
+→ fix root causes, not symptoms
+→ if finding is a workaround, fix the
+  underlying problem
+→ do not introduce new workarounds
+→ do not add features
+→ do not refactor nearby code
+→ do not touch files not in findings
+}`"]:::orange
+    wf_fix --> wf_audit
+
+    wf_stuck -- "yes" --> wf_bail["`**8.0.1 Bail**
+——— log ———
+which group failed (if applicable)
+final grade
+every unresolved finding`"]:::red
+    wf_bail --> wf_done
+
+    wf_more -- "yes" --> wf_loop_start
+    wf_more -- "no" --> wf_sys_audit["`**9.0.0 System Audit (Spawn Subagent)**
+——— phase 1: code quality ———
+⟳ for each file in codebase {
+→ empty function bodies
+→ functions returning placeholders
+→ match arms discarding with _ => {}
+→ pub items with no external users
+→ TODO/FIXME/unimplemented left behind
+}
+code compiles with 0 warnings
+all tests pass
+——— phase 2: spec compliance ———
+⟳ for each work item that was executed {
+→ read the work item spec
+→ read the committed diff for that group
+→ for each task in the work item {
+→→ did the diff do what the task asked?
+→→ did it leave anything incomplete?
+→→ did it add anything not in the task?
+  }
+}
+——— phase 3: cross-item integrity ———
+⟳ for each pair of work items {
+→ did a later item work around a problem
+  introduced by an earlier item?
+→ if so: fix at the source, not downstream
+}
+⟳ for each behavioral change {
+→ is it tested?
+→ undocumented edge cases = finding
+}
+——— returns ———
+grade 0–100
+list of {file, issue, severity}
+(includes code quality, spec compliance,
+and cross-item findings)`"]:::cyan
+    wf_sys_audit --> wf_sys_check{{"9.1.0 grade >= 93?"}}:::teal
+
+    wf_sys_check -- "no" --> wf_sys_stuck{{"9.2.0 stuck?\n——————\n3+ attempts ·\ngrade not improving ·\nsame findings repeating"}}:::red
+    wf_sys_check -- "yes" --> wf_sys_fmtcommit["9.0.1 fmt + commit + push"]:::teal
+    wf_sys_fmtcommit --> wf_done(["9.0.2 Done"]):::teal
+
+    wf_sys_stuck -- "no" --> wf_sys_fix["`**9.3.0 Fix (Spawn Subagent)**
+——— input ———
+findings list from auditor
+———
+⟳ for each finding {
+→ open the flagged file
+→ fix exactly the issue described
+→ fix root causes, not symptoms
+→ if finding is a workaround, fix the
+  underlying problem
+→ do not introduce new workarounds
+→ do not add features
+→ do not refactor nearby code
+→ do not touch files not in findings
+}`"]:::orange
+    wf_sys_fix --> wf_sys_audit
+    wf_sys_stuck -- "yes" --> wf_bail

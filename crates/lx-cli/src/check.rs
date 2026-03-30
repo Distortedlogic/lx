@@ -5,18 +5,13 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use lx::checker::diagnostics::Applicability;
-use lx::checker::{CheckResult, DiagLevel, Diagnostic, check};
-use lx::error::LxError;
-use lx::folder::desugar;
-use lx::lexer::lex;
-use lx::linter::{RuleRegistry, lint};
-use lx::parser::parse;
+use lx::prelude::*;
+use lx_checker::diagnostics::Applicability;
 use miette::{NamedSource, Report};
 
 use crate::{manifest, run};
 
-fn lint_after_check(result: CheckResult, program: &lx::ast::Program<lx::ast::Core>) -> CheckResult {
+fn lint_after_check(result: CheckResult, program: &lx_ast::ast::Program<lx_ast::ast::Core>) -> CheckResult {
   let mut diagnostics = result.diagnostics;
   let mut registry = RuleRegistry::default_rules();
   let lint_diags = lint(program, &result.semantic, &mut registry);
@@ -67,7 +62,7 @@ pub fn check_file(path: &str, strict: bool, fix: bool) -> ExitCode {
 
 fn recheck_source(fixed_source: &str) -> Result<CheckResult, String> {
   let (tokens, comments) = lex(fixed_source).map_err(|e| format!("lex error: {e}"))?;
-  let parse_result = parse(tokens, lx::source::FileId::new(0), comments, fixed_source);
+  let parse_result = parse(tokens, FileId::new(0), comments, fixed_source);
   let surface = parse_result.program.ok_or_else(|| {
     let msgs: Vec<String> = parse_result.errors.iter().map(|e| format!("{e}")).collect();
     format!("parse errors: {}", msgs.join("; "))

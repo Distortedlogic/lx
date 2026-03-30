@@ -1,9 +1,6 @@
 use std::fs;
 
-use lx::formatter::format;
-use lx::lexer::lex;
-use lx::parser::parse;
-use lx::source::FileId;
+use lx::prelude::*;
 
 fn roundtrip_check(path: &str) {
   let source = fs::read_to_string(path).expect("failed to read test file");

@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use lx::runtime::RuntimeCtx;
+use lx::prelude::RuntimeCtx;
 
 use crate::manifest::{self, Member};
 
@@ -124,7 +124,7 @@ fn discover_tests_with_pattern(dir: &str, pattern: &str) -> Vec<TestEntry> {
 struct TestResults {
   passed: u32,
   failed: u32,
-  fail_details: Vec<(String, Vec<lx::error::LxError>, miette::NamedSource<String>)>,
+  fail_details: Vec<(String, Vec<lx_value::error::LxError>, miette::NamedSource<String>)>,
 }
 
 fn execute_tests(entries: &[TestEntry], workspace_members: &HashMap<String, PathBuf>, threshold: Option<f64>, runs: Option<u32>) -> TestResults {

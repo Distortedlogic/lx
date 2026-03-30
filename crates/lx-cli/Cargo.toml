@@ -10,6 +10,11 @@ path = "src/main.rs"
 
 [dependencies]
 lx = { path = "../lx" }
+lx-ast = { path = "../lx-ast" }
+lx-checker = { path = "../lx-checker" }
+lx-eval = { path = "../lx-eval" }
+lx-span = { path = "../lx-span" }
+lx-value = { path = "../lx-value" }
 clap.workspace = true
 miette.workspace = true
 serde_json.workspace = true
