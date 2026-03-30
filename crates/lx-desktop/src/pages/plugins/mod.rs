@@ -22,7 +22,7 @@ pub fn PluginManager() -> Element {
     div { class: "space-y-6 max-w-5xl p-4 overflow-auto",
       div { class: "flex items-center justify-between",
         div { class: "flex items-center gap-2",
-          span { class: "material-symbols-outlined text-[var(--outline)]",
+          span { class: "material-symbols-outlined text-base text-[var(--outline)]",
             "extension"
           }
           h1 { class: "text-xl font-semibold text-[var(--on-surface)]", "Plugin Manager" }
@@ -51,7 +51,7 @@ pub fn PluginManager() -> Element {
 
       div { class: "space-y-3",
         div { class: "flex items-center gap-2",
-          span { class: "material-symbols-outlined text-[var(--outline)]",
+          span { class: "material-symbols-outlined text-base text-[var(--outline)]",
             "extension"
           }
           h2 { class: "text-base font-semibold text-[var(--on-surface)]",

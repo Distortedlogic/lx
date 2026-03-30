@@ -30,7 +30,7 @@ pub fn CompanySkills() -> Element {
       div { class: "w-72 border-r border-[var(--outline-variant)] flex flex-col",
         div { class: "flex items-center justify-between px-3 py-2 border-b border-[var(--outline-variant)]",
           div { class: "flex items-center gap-2",
-            span { class: "material-symbols-outlined text-[var(--outline)]",
+            span { class: "material-symbols-outlined text-base text-[var(--outline)]",
               "widgets"
             }
             h1 { class: "text-base font-semibold text-[var(--on-surface)]",

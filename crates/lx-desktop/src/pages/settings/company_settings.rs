@@ -13,7 +13,7 @@ pub fn CompanySettings() -> Element {
   rsx! {
     div { class: "max-w-2xl space-y-6 p-4 overflow-auto",
       div { class: "flex items-center gap-2",
-        span { class: "material-symbols-outlined text-[var(--outline)]", "settings" }
+        span { class: "material-symbols-outlined text-base text-[var(--outline)]", "settings" }
         h1 { class: "text-lg font-semibold text-[var(--on-surface)]", "Company Settings" }
       }
 

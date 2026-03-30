@@ -39,7 +39,7 @@ pub fn PluginSettingsPage(plugin_id: String) -> Element {
           span { class: "material-symbols-outlined text-base", "arrow_back" }
         }
         div { class: "flex items-center gap-2",
-          span { class: "material-symbols-outlined text-[var(--outline)]",
+          span { class: "material-symbols-outlined text-base text-[var(--outline)]",
             "extension"
           }
           h1 { class: "text-xl font-semibold text-[var(--on-surface)]",

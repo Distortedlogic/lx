@@ -39,7 +39,7 @@ pub fn InstanceHeartbeats() -> Element {
     div { class: "max-w-5xl space-y-6 p-4 overflow-auto",
       div { class: "space-y-2",
         div { class: "flex items-center gap-2",
-          span { class: "material-symbols-outlined text-[var(--outline)]",
+          span { class: "material-symbols-outlined text-base text-[var(--outline)]",
             "settings"
           }
           h1 { class: "text-lg font-semibold text-[var(--on-surface)]",
