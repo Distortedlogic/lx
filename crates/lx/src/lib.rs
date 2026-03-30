@@ -6,8 +6,7 @@ pub use lx_parser::lexer;
 pub use lx_parser::parser;
 pub use lx_span::sym;
 
-pub const PLUGIN_MANIFEST: &str = lx_span::PLUGIN_MANIFEST;
-pub const LX_MANIFEST: &str = lx_span::LX_MANIFEST;
+pub use lx_eval::{LX_MANIFEST, PLUGIN_MANIFEST};
 
 pub use lx_value::{BuiltinCtx, ExternalStreamSink, ModuleExports, ToolModuleHandle, record};
 
@@ -19,6 +18,7 @@ pub mod event_stream;
 pub mod interpreter;
 pub mod linter;
 pub mod mcp_client;
+pub mod mcp_stream_sink;
 pub mod runtime;
 pub mod source;
 pub mod stdlib;

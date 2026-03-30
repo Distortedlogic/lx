@@ -1,5 +1,7 @@
 use dioxus::prelude::*;
 
+use super::ui::badge::{Badge, BadgeVariant};
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct FilterValue {
   pub key: String,
@@ -16,7 +18,9 @@ pub fn FilterBar(filters: Vec<FilterValue>, on_remove: EventHandler<String>, on_
   rsx! {
     div { class: "flex items-center gap-2 flex-wrap",
       for filter in filters.iter() {
-        span { class: "inline-flex items-center gap-1 rounded-full bg-[var(--surface-container-high)] px-2.5 py-0.5 text-xs pr-1",
+        Badge {
+          variant: BadgeVariant::Secondary,
+          class: "pr-1 gap-1".to_string(),
           span { class: "text-[var(--on-surface-variant)]", "{filter.label}:" }
           span { "{filter.value}" }
           button {

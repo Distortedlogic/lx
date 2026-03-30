@@ -31,7 +31,9 @@ pub fn App() -> Element {
       },
       SuspenseBoundary {
         fallback: |_| rsx! {
-          div { class: "flex items-center justify-center h-screen text-[var(--outline)]", "Loading..." }
+          div { class: "flex items-center justify-center h-screen p-6",
+            crate::components::page_skeleton::PageSkeleton {}
+          }
         },
         Router::<Route> {}
       }

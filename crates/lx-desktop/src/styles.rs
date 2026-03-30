@@ -1,9 +1,10 @@
 pub const PAGE_HEADING: &str = "text-2xl font-bold uppercase tracking-wider text-[var(--on-surface)] font-[var(--font-display)]";
 pub const FLEX_BETWEEN: &str = "flex items-center justify-between";
-pub const STATUS_DOT_ACTIVE: &str = "inline-flex h-2.5 w-2.5 rounded-full bg-green-500";
-pub const STATUS_DOT_PAUSED: &str = "inline-flex h-2.5 w-2.5 rounded-full bg-yellow-500";
-pub const STATUS_DOT_ERROR: &str = "inline-flex h-2.5 w-2.5 rounded-full bg-red-500";
-pub const STATUS_DOT_DEFAULT: &str = "inline-flex h-2.5 w-2.5 rounded-full bg-neutral-400";
+pub const STATUS_DOT_ACTIVE: &str = "inline-flex h-2.5 w-2.5 rounded-full bg-[var(--success)]";
+pub const STATUS_DOT_PAUSED: &str = "inline-flex h-2.5 w-2.5 rounded-full bg-[var(--warning)]";
+pub const STATUS_DOT_ERROR: &str = "inline-flex h-2.5 w-2.5 rounded-full bg-[var(--error)]";
+pub const STATUS_DOT_RUNNING: &str = "inline-flex h-2.5 w-2.5 rounded-full bg-[var(--tertiary)] animate-pulse";
+pub const STATUS_DOT_DEFAULT: &str = "inline-flex h-2.5 w-2.5 rounded-full bg-[var(--outline)]";
 pub const CARD_BORDER: &str = "border border-[var(--outline-variant)]/30";
 pub const TAB_ACTIVE: &str = "text-sm font-medium text-[var(--on-surface)] border-b-2 border-[var(--primary)] pb-2 px-3";
 pub const TAB_INACTIVE: &str = "text-sm text-[var(--outline)] pb-2 px-3 hover:text-[var(--on-surface)] transition-colors";

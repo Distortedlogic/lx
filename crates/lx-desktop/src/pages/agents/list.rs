@@ -1,5 +1,5 @@
 use super::types::{AgentSummary, FilterTab, adapter_label, role_label, status_dot_class};
-use crate::styles::{BTN_OUTLINE_SM, FLEX_BETWEEN, TAB_ACTIVE, TAB_INACTIVE};
+use crate::styles::{BTN_OUTLINE_SM, FLEX_BETWEEN, STATUS_DOT_RUNNING, TAB_ACTIVE, TAB_INACTIVE};
 use dioxus::prelude::*;
 
 #[component]
@@ -81,12 +81,13 @@ fn AgentRow(agent: AgentSummary, on_click: EventHandler<()>) -> Element {
 #[component]
 pub fn StatusBadge(status: String) -> Element {
   let (bg, text) = match status.as_str() {
-    "active" | "running" | "idle" => ("bg-green-500/10 text-green-600", "Active"),
-    "paused" => ("bg-yellow-500/10 text-yellow-600", "Paused"),
-    "error" => ("bg-red-500/10 text-red-600", "Error"),
-    "terminated" => ("bg-neutral-500/10 text-neutral-500", "Terminated"),
-    "pending_approval" => ("bg-amber-500/10 text-amber-600", "Pending"),
-    other => ("bg-neutral-500/10 text-neutral-400", other),
+    "running" => ("bg-[var(--tertiary)]/10 text-[var(--tertiary)]", "Running"),
+    "active" | "idle" => ("bg-[var(--success)]/10 text-[var(--success)]", "Active"),
+    "paused" => ("bg-[var(--warning)]/10 text-[var(--warning)]", "Paused"),
+    "error" => ("bg-[var(--error)]/10 text-[var(--error)]", "Error"),
+    "terminated" => ("bg-[var(--outline)]/10 text-[var(--outline)]", "Terminated"),
+    "pending_approval" => ("bg-[var(--warning)]/10 text-[var(--warning)]", "Pending"),
+    other => ("bg-[var(--outline)]/10 text-[var(--outline)]", other),
   };
   let label = text.to_string();
   rsx! {

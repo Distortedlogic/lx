@@ -89,7 +89,7 @@ pub fn Shell() -> Element {
                   },
                   SuspenseBoundary {
                     fallback: |_| rsx! {
-                      div { class: "flex items-center justify-center h-full text-[var(--outline)]", "Loading..." }
+                      div { class: "p-6", crate::components::page_skeleton::PageSkeleton {} }
                     },
                     LiveUpdatesProvider {}
                   }
