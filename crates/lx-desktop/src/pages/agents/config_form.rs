@@ -139,7 +139,7 @@ fn ConfigSection(title: &'static str, children: Element) -> Element {
 
 #[component]
 fn ToggleSwitch(checked: bool, on_toggle: EventHandler<bool>) -> Element {
-  let bg = if checked { "bg-green-600" } else { "bg-[var(--outline-variant)]" };
+  let bg = if checked { "bg-[var(--success)]" } else { "bg-[var(--outline-variant)]" };
   let translate = if checked { "translate-x-4" } else { "translate-x-0.5" };
   rsx! {
     button {

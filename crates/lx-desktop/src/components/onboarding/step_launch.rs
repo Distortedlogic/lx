@@ -45,7 +45,7 @@ fn SummaryRow(icon: &'static str, label: &'static str, value: String) -> Element
         }
         p { class: "text-xs text-[var(--outline)]", "{label}" }
       }
-      span { class: "material-symbols-outlined text-base text-green-500 shrink-0",
+      span { class: "material-symbols-outlined text-base text-[var(--success)] shrink-0",
         "check_circle"
       }
     }

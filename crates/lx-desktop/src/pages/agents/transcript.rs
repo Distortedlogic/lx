@@ -68,8 +68,8 @@ fn TranscriptBlockView(block: TranscriptBlock) -> Element {
     },
     TranscriptBlock::Thinking { text, .. } => {
       rsx! {
-        div { class: "flex gap-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/10",
-          span { class: "material-symbols-outlined text-sm text-amber-600 shrink-0 mt-0.5",
+        div { class: "flex gap-3 p-3 rounded-lg bg-[var(--warning)]/5 border border-[var(--warning)]/10",
+          span { class: "material-symbols-outlined text-sm text-[var(--warning)] shrink-0 mt-0.5",
             "psychology"
           }
           div { class: "flex-1 min-w-0 text-xs text-[var(--outline)] italic whitespace-pre-wrap",
@@ -79,7 +79,7 @@ fn TranscriptBlockView(block: TranscriptBlock) -> Element {
       }
     },
     TranscriptBlock::ToolUse { name, input_summary, result, is_error, .. } => {
-      let border = if is_error { "border-red-500/20" } else { "border-[var(--outline-variant)]/20" };
+      let border = if is_error { "border-[var(--error)]/20" } else { "border-[var(--outline-variant)]/20" };
       rsx! {
         div { class: "border {border} rounded-lg p-3 space-y-2",
           div { class: "flex items-center gap-2",
@@ -105,9 +105,9 @@ fn TranscriptBlockView(block: TranscriptBlock) -> Element {
     },
     TranscriptBlock::Event { label, text, tone, .. } => {
       let color = match tone.as_str() {
-        "error" => "text-red-600",
-        "warn" => "text-amber-600",
-        "info" => "text-cyan-600",
+        "error" => "text-[var(--error)]",
+        "warn" => "text-[var(--warning)]",
+        "info" => "text-[var(--tertiary)]",
         _ => "text-[var(--outline)]",
       };
       rsx! {
