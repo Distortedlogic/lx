@@ -1,6 +1,19 @@
 use super::types::{ADAPTER_LABELS, LxAgentConfig};
+use crate::components::ui::select::{Select, SelectOption};
 use crate::styles::{BTN_OUTLINE_SM, BTN_PRIMARY_SM, INPUT_FIELD};
 use dioxus::prelude::*;
+
+const MODEL_OPTIONS: &[(&str, &str)] = &[
+  ("claude-sonnet-4-20250514", "Claude Sonnet 4"),
+  ("claude-opus-4-20250514", "Claude Opus 4"),
+  ("claude-haiku-3-5-20241022", "Claude Haiku 3.5"),
+  ("o4-mini", "o4-mini"),
+  ("o3", "o3"),
+  ("gemini-2.5-pro", "Gemini 2.5 Pro"),
+  ("gemini-2.5-flash", "Gemini 2.5 Flash"),
+  ("gpt-4.1", "GPT-4.1"),
+  ("gpt-4.1-mini", "GPT-4.1 Mini"),
+];
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct AgentConfigUpdate {
@@ -53,12 +66,24 @@ pub fn AgentConfigPanel(config: LxAgentConfig, #[props(optional)] on_save: Optio
             }
           }
           label { class: "text-xs text-[var(--outline)] block", "Model" }
-          input {
-            class: INPUT_FIELD,
-            value: "{model}",
-            placeholder: "e.g. claude-sonnet-4-20250514",
-            oninput: move |evt| {
-              model.set(evt.value().to_string());
+          Select {
+            class: "w-full".to_string(),
+            value: model.read().clone(),
+            searchable: true,
+            placeholder: "Select a model...".to_string(),
+            options: {
+              let cur = model.read().clone();
+              let mut opts: Vec<SelectOption> = MODEL_OPTIONS
+                .iter()
+                .map(|(v, l)| SelectOption::new(*v, *l))
+                .collect();
+              if !cur.is_empty() && !opts.iter().any(|o| o.value == cur) {
+                opts.insert(0, SelectOption::new(cur.clone(), cur));
+              }
+              opts
+            },
+            onchange: move |val: String| {
+              model.set(val);
               dirty.set(true);
             },
           }
