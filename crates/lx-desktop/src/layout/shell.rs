@@ -17,7 +17,7 @@ use crate::contexts::activity_log::ActivityLog;
 use crate::contexts::live_updates::LiveUpdatesProvider;
 use crate::contexts::onboarding::OnboardingCtx;
 use crate::contexts::status_bar::{StatusBarState, StatusBarStateStoreExt};
-use crate::hooks::keyboard_shortcuts::use_keyboard_shortcuts;
+use crate::hooks::keyboard_shortcuts::{ShortcutPriority, ShortcutRegistry, escape_match, key_match, use_keyboard_shortcuts};
 use crate::panes::DesktopPane;
 use crate::terminal::{add_tab, use_provide_tabs};
 
@@ -68,7 +68,43 @@ pub fn Shell() -> Element {
   });
   use_context_provider(|| spawn_channel.0.clone());
   spawn_terminal_listener(tabs_state, &spawn_channel.1);
-  let key_handler = use_keyboard_shortcuts();
+  let _shortcut_registry = ShortcutRegistry::provide();
+  let (_registry, key_handler) = use_keyboard_shortcuts();
+  let mut palette_open_sig = use_context::<CommandPaletteOpen>();
+  let dialog = use_context::<crate::contexts::dialog::DialogState>();
+
+  use_hook(move || {
+    let registry = _shortcut_registry;
+
+    registry.register(
+      "global_cmd_k",
+      ShortcutPriority::Global,
+      key_match(Key::Character("k".into()), true),
+      Callback::new(move |evt: KeyboardEvent| {
+        evt.prevent_default();
+        let current = *palette_open_sig.0.read();
+        palette_open_sig.0.set(!current);
+      }),
+    );
+
+    registry.register(
+      "global_escape",
+      ShortcutPriority::Global,
+      escape_match(),
+      Callback::new(move |_evt: KeyboardEvent| {
+        if *dialog.onboarding_open.read() {
+          dialog.close_onboarding();
+        } else if *dialog.new_agent_open.read() {
+          dialog.close_new_agent();
+        } else if *dialog.new_project_open.read() {
+          dialog.close_new_project();
+        } else if *dialog.new_issue_open.read() {
+          dialog.close_new_issue();
+        }
+      }),
+    );
+  });
+
   rsx! {
     div {
       class: "relative h-screen overflow-hidden bg-[var(--surface)] text-[var(--on-surface)] flex flex-col",

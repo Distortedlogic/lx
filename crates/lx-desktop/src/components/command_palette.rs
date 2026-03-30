@@ -1,5 +1,6 @@
 use dioxus::prelude::*;
 
+use crate::hooks::keyboard_shortcuts::{ShortcutPriority, ShortcutRegistry, escape_match};
 use crate::routes::Route;
 
 #[derive(Clone)]
@@ -35,9 +36,20 @@ pub fn CommandPalette() -> Element {
   let palette = use_context::<CommandPaletteOpen>();
   let mut open = palette.0;
   let mut query = use_signal(String::new);
+  let registry = use_context::<ShortcutRegistry>();
 
   use_effect(move || {
-    if !open() {
+    if open() {
+      registry.register(
+        "cmd_palette_escape",
+        ShortcutPriority::Modal,
+        escape_match(),
+        Callback::new(move |_: KeyboardEvent| {
+          open.set(false);
+        }),
+      );
+    } else {
+      registry.unregister("cmd_palette_escape");
       query.set(String::new());
     }
   });
