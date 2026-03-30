@@ -4,19 +4,19 @@ use crate::contexts::toast::{ToastItem, ToastState, ToastTone};
 
 fn tone_class(tone: ToastTone) -> &'static str {
   match tone {
-    ToastTone::Info => "border-sky-500/25 bg-sky-950/60 text-sky-100",
-    ToastTone::Success => "border-emerald-500/25 bg-emerald-950/60 text-emerald-100",
-    ToastTone::Warn => "border-amber-500/25 bg-amber-950/60 text-amber-100",
-    ToastTone::Error => "border-red-500/30 bg-red-950/60 text-red-100",
+    ToastTone::Info => "border-[var(--tertiary)]/25 bg-[var(--tertiary)]/10 text-[var(--tertiary)]",
+    ToastTone::Success => "border-[var(--success)]/25 bg-[var(--success)]/10 text-[var(--success)]",
+    ToastTone::Warn => "border-[var(--warning)]/25 bg-[var(--warning)]/10 text-[var(--warning)]",
+    ToastTone::Error => "border-[var(--error)]/30 bg-[var(--error)]/10 text-[var(--error)]",
   }
 }
 
 fn dot_class(tone: ToastTone) -> &'static str {
   match tone {
-    ToastTone::Info => "bg-sky-400",
-    ToastTone::Success => "bg-emerald-400",
-    ToastTone::Warn => "bg-amber-400",
-    ToastTone::Error => "bg-red-400",
+    ToastTone::Info => "bg-[var(--tertiary)]",
+    ToastTone::Success => "bg-[var(--success)]",
+    ToastTone::Warn => "bg-[var(--warning)]",
+    ToastTone::Error => "bg-[var(--error)]",
   }
 }
 
