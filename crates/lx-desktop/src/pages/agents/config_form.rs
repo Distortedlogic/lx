@@ -1,4 +1,5 @@
 use super::types::{ADAPTER_LABELS, AgentDetail};
+use crate::components::ui::select::{Select, SelectOption};
 use crate::styles::{BTN_OUTLINE_SM, BTN_PRIMARY_SM, INPUT_FIELD};
 use dioxus::prelude::*;
 
@@ -32,16 +33,13 @@ pub fn AgentConfigPanel(
       ConfigSection { title: "Adapter",
         div { class: "space-y-3",
           label { class: "text-xs text-[var(--outline)] block", "Adapter type" }
-          select {
-            class: INPUT_FIELD,
-            value: "{adapter_type}",
-            onchange: move |evt| {
-                adapter_type.set(evt.value().to_string());
+          Select {
+            value: adapter_type.read().clone(),
+            options: ADAPTER_LABELS.iter().map(|(k, l)| SelectOption::new(*k, *l)).collect::<Vec<_>>(),
+            onchange: move |val: String| {
+                adapter_type.set(val);
                 dirty.set(true);
             },
-            for (key , label) in ADAPTER_LABELS {
-              option { value: *key, "{label}" }
-            }
           }
           label { class: "text-xs text-[var(--outline)] block", "Model" }
           input {

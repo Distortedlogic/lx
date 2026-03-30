@@ -1,9 +1,10 @@
 use dioxus::prelude::*;
 
+use crate::components::ui::select::{Select, SelectOption};
 use crate::pages::agents::types::{ADAPTER_LABELS, ROLE_LABELS};
 
 const INPUT_CLS: &str = "w-full border border-[var(--outline-variant)] bg-transparent px-3 py-2 text-sm text-[var(--on-surface)] outline-none focus:border-[var(--primary)] placeholder:text-[var(--outline)]";
-const SELECT_CLS: &str = "w-full border border-[var(--outline-variant)] bg-[var(--surface-container)] px-3 py-2 text-sm text-[var(--on-surface)] outline-none focus:border-[var(--primary)]";
+const SELECT_CLS: &str = "w-full bg-[var(--surface-container)] px-3 py-2 text-sm text-[var(--on-surface)] outline-none focus:border-[var(--primary)]";
 
 #[component]
 pub fn StepAgent(agent_name: Signal<String>, agent_role: Signal<String>, agent_description: Signal<String>, agent_adapter: Signal<String>) -> Element {
@@ -37,25 +38,21 @@ pub fn StepAgent(agent_name: Signal<String>, agent_role: Signal<String>, agent_d
         }
         div { class: "space-y-1",
           label { class: "text-xs text-[var(--outline)] block", "Role" }
-          select {
-            class: SELECT_CLS,
-            value: "{agent_role}",
-            onchange: move |e| agent_role.set(e.value()),
-            for (key , label) in ROLE_LABELS {
-              option { value: *key, "{label}" }
-            }
+          Select {
+            class: SELECT_CLS.to_string(),
+            value: agent_role.read().clone(),
+            options: ROLE_LABELS.iter().map(|(k, l)| SelectOption::new(*k, *l)).collect::<Vec<_>>(),
+            onchange: move |val: String| agent_role.set(val),
           }
         }
       }
       div { class: "space-y-1",
         label { class: "text-xs text-[var(--outline)] block", "Adapter" }
-        select {
-          class: SELECT_CLS,
-          value: "{agent_adapter}",
-          onchange: move |e| agent_adapter.set(e.value()),
-          for (key , label) in ADAPTER_LABELS {
-            option { value: *key, "{label}" }
-          }
+        Select {
+          class: SELECT_CLS.to_string(),
+          value: agent_adapter.read().clone(),
+          options: ADAPTER_LABELS.iter().map(|(k, l)| SelectOption::new(*k, *l)).collect::<Vec<_>>(),
+          onchange: move |val: String| agent_adapter.set(val),
         }
       }
       div { class: "space-y-1",

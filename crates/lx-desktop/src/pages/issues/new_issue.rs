@@ -1,7 +1,8 @@
 use dioxus::prelude::*;
 
 use super::types::{AgentRef, PRIORITY_ORDER, STATUS_ORDER};
-use crate::styles::{BTN_OUTLINE_SM, BTN_PRIMARY_SM, INPUT_FIELD};
+use crate::components::ui::select::{Select, SelectOption};
+use crate::styles::{BTN_OUTLINE_SM, BTN_PRIMARY_SM};
 
 #[derive(Clone, Debug)]
 pub struct NewIssuePayload;
@@ -51,43 +52,36 @@ pub fn NewIssueDialog(open: bool, agents: Vec<AgentRef>, on_close: EventHandler<
               label { class: "text-xs text-[var(--outline)] block mb-1",
                 "Status"
               }
-              select {
-                class: INPUT_FIELD,
-                value: "{status}",
-                onchange: move |evt| status.set(evt.value().to_string()),
-                for s in STATUS_ORDER {
-                  option { value: *s, "{s}" }
-                }
+              Select {
+                value: status.read().clone(),
+                options: STATUS_ORDER.iter().map(|s| SelectOption::new(*s, *s)).collect::<Vec<_>>(),
+                onchange: move |val: String| status.set(val),
               }
             }
             div {
               label { class: "text-xs text-[var(--outline)] block mb-1",
                 "Priority"
               }
-              select {
-                class: INPUT_FIELD,
-                value: "{priority}",
-                onchange: move |evt| priority.set(evt.value().to_string()),
-                for p in PRIORITY_ORDER {
-                  option { value: *p, "{p}" }
-                }
+              Select {
+                value: priority.read().clone(),
+                options: PRIORITY_ORDER.iter().map(|p| SelectOption::new(*p, *p)).collect::<Vec<_>>(),
+                onchange: move |val: String| priority.set(val),
               }
             }
             div {
               label { class: "text-xs text-[var(--outline)] block mb-1",
                 "Assignee"
               }
-              select {
-                class: INPUT_FIELD,
-                value: assignee.read().as_deref().unwrap_or(""),
-                onchange: move |evt| {
-                    let v = evt.value().to_string();
-                    assignee.set(if v.is_empty() { None } else { Some(v) });
+              Select {
+                value: assignee.read().as_deref().unwrap_or("").to_string(),
+                options: {
+                    let mut opts = vec![SelectOption::new("", "Unassigned")];
+                    opts.extend(agents.iter().map(|a| SelectOption::new(&a.id, &a.name)));
+                    opts
                 },
-                option { value: "", "Unassigned" }
-                for agent in agents.iter() {
-                  option { value: "{agent.id}", "{agent.name}" }
-                }
+                onchange: move |val: String| {
+                    assignee.set(if val.is_empty() { None } else { Some(val) });
+                },
               }
             }
           }

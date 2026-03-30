@@ -1,6 +1,7 @@
 use dioxus::prelude::*;
 
 use super::cron_utils::{build_cron, describe_schedule, parse_cron_to_preset};
+use crate::components::ui::select::{Select, SelectOption};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SchedulePreset {
@@ -86,7 +87,7 @@ pub fn ScheduleEditor(value: String, on_change: EventHandler<String>) -> Element
   let cur_dow = day_of_week();
   let cur_dom = day_of_month();
 
-  let select_cls = "bg-[var(--surface-container)] border border-[var(--outline-variant)] \
+  let select_cls = "bg-[var(--surface-container)] \
                       text-xs px-2 py-1.5 rounded outline-none text-[var(--on-surface)]";
 
   rsx! {
@@ -94,11 +95,12 @@ pub fn ScheduleEditor(value: String, on_change: EventHandler<String>) -> Element
       p { class: "text-xs text-[var(--outline)] italic",
         "{describe_schedule(&value)}"
       }
-      select {
+      Select {
         class: "{select_cls} w-full",
-        value: "{cur_preset.to_value()}",
-        onchange: move |evt| {
-            let new_preset = SchedulePreset::from_value(&evt.value());
+        value: cur_preset.to_value().to_string(),
+        options: PRESETS.iter().map(|(v, l)| SelectOption::new(*v, *l)).collect::<Vec<_>>(),
+        onchange: move |val: String| {
+            let new_preset = SchedulePreset::from_value(&val);
             preset.set(new_preset.clone());
             if new_preset == SchedulePreset::Custom {
                 custom_cron.set(value.clone());
@@ -113,9 +115,6 @@ pub fn ScheduleEditor(value: String, on_change: EventHandler<String>) -> Element
                 );
             }
         },
-        for (val , label) in PRESETS {
-          option { value: *val, "{label}" }
-        }
       }
       if cur_preset == SchedulePreset::Custom {
         div { class: "flex flex-col gap-1.5",
@@ -242,13 +241,11 @@ fn render_pickers(
       span { class: "text-xs text-[var(--outline)]", ":" }
       {minute_select(cur_minute, select_cls, on_minute2)}
       span { class: "text-xs text-[var(--outline)] uppercase", "on day" }
-      select {
+      Select {
         class: "{select_cls} w-[80px]",
-        value: "{cur_dom}",
-        onchange: move |evt| on_dom(evt.value()),
-        for d in 1..=31u32 {
-          option { value: "{d}", "{d}" }
-        }
+        value: cur_dom.to_string(),
+        options: (1..=31u32).map(|d| SelectOption::new(d.to_string(), d.to_string())).collect::<Vec<_>>(),
+        onchange: move |val: String| on_dom(val),
       }
     },
     SchedulePreset::Custom => rsx! {},
@@ -256,27 +253,27 @@ fn render_pickers(
 }
 
 fn hour_select(cur: &str, cls: &str, mut on_change: impl FnMut(String) + 'static) -> Element {
+  let cur = cur.to_string();
+  let cls = cls.to_string();
   rsx! {
-    select {
+    Select {
       class: "{cls} w-[120px]",
-      value: "{cur}",
-      onchange: move |evt| on_change(evt.value()),
-      for h in 0..24u32 {
-        option { value: "{h}", "{hour_label(h as usize)}" }
-      }
+      value: cur,
+      options: (0..24u32).map(|h| SelectOption::new(h.to_string(), hour_label(h as usize))).collect::<Vec<_>>(),
+      onchange: move |val: String| on_change(val),
     }
   }
 }
 
 fn minute_select(cur: &str, cls: &str, mut on_change: impl FnMut(String) + 'static) -> Element {
+  let cur = cur.to_string();
+  let cls = cls.to_string();
   rsx! {
-    select {
+    Select {
       class: "{cls} w-[80px]",
-      value: "{cur}",
-      onchange: move |evt| on_change(evt.value()),
-      for m in MINUTES {
-        option { value: "{m}", "{m:02}" }
-      }
+      value: cur,
+      options: MINUTES.iter().map(|m| SelectOption::new(m.to_string(), format!("{m:02}"))).collect::<Vec<_>>(),
+      onchange: move |val: String| on_change(val),
     }
   }
 }

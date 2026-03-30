@@ -1,6 +1,7 @@
 use dioxus::prelude::*;
 
 use crate::components::empty_state::EmptyState;
+use crate::components::ui::select::{Select, SelectOption};
 use crate::contexts::activity_log::ActivityLog;
 use crate::contexts::breadcrumb::BreadcrumbEntry;
 
@@ -25,14 +26,15 @@ pub fn Activity() -> Element {
   rsx! {
     div { class: "space-y-4",
       div { class: "flex items-center justify-end",
-        select {
-          class: "h-8 rounded-md border border-[var(--outline-variant)] bg-[var(--surface-container)] px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--primary)]",
-          value: "{current_filter}",
-          onchange: move |evt: Event<FormData>| filter.set(evt.value()),
-          option { value: "all", "All types" }
-          for kind in entity_types.iter() {
-            option { value: "{kind}", "{kind}" }
-          }
+        Select {
+          class: "h-8 bg-[var(--surface-container)] px-2 py-1 text-xs".to_string(),
+          value: current_filter.clone(),
+          options: {
+              let mut opts = vec![SelectOption::new("all", "All types")];
+              opts.extend(entity_types.iter().map(|k| SelectOption::new(k.as_str(), k.as_str())));
+              opts
+          },
+          onchange: move |val: String| filter.set(val),
         }
       }
 
