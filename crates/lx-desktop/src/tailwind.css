@@ -243,6 +243,11 @@ body {
   animation: transcript-block-enter 300ms ease-out both;
 }
 
+.drag-active {
+  border-color: var(--primary) !important;
+  background-color: color-mix(in srgb, var(--primary) 4%, transparent);
+}
+
 .collapsible-open {
   grid-template-rows: 1fr;
   transition: grid-template-rows 200ms ease-out;

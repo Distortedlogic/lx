@@ -3,6 +3,8 @@ pub mod ui;
 pub mod command_palette;
 pub mod comment_thread;
 pub mod company_pattern_icon;
+pub mod drag_drop;
+pub mod editor_textarea;
 pub mod company_switcher;
 pub mod copy_text;
 pub mod empty_state;
