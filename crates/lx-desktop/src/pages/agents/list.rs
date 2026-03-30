@@ -1,5 +1,5 @@
 use super::types::{AgentSummary, FilterTab, adapter_label, role_label, status_dot_class};
-use crate::styles::{BTN_OUTLINE_SM, FLEX_BETWEEN, STATUS_DOT_RUNNING, TAB_ACTIVE, TAB_INACTIVE};
+use crate::styles::{BTN_OUTLINE_SM, FLEX_BETWEEN, TAB_ACTIVE, TAB_INACTIVE};
 use dioxus::prelude::*;
 
 #[component]

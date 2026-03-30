@@ -1,3 +1,4 @@
+use crate::styles::{STATUS_DOT_ACTIVE, STATUS_DOT_DEFAULT, STATUS_DOT_ERROR, STATUS_DOT_PAUSED, STATUS_DOT_RUNNING};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -111,9 +112,10 @@ pub fn role_label(role: &str) -> &str {
 
 pub fn status_dot_class(status: &str) -> &'static str {
   match status {
-    "active" | "running" | "idle" => "inline-flex h-2.5 w-2.5 rounded-full bg-green-500",
-    "paused" => "inline-flex h-2.5 w-2.5 rounded-full bg-yellow-500",
-    "error" => "inline-flex h-2.5 w-2.5 rounded-full bg-red-500",
-    _ => "inline-flex h-2.5 w-2.5 rounded-full bg-neutral-400",
+    "running" => STATUS_DOT_RUNNING,
+    "active" | "idle" => STATUS_DOT_ACTIVE,
+    "paused" => STATUS_DOT_PAUSED,
+    "error" => STATUS_DOT_ERROR,
+    _ => STATUS_DOT_DEFAULT,
   }
 }
