@@ -19,20 +19,20 @@ pub fn AccountingModelCard() -> Element {
         title: "Finance ledger",
         description: "Account-level charges not tied to a single request",
         bullets: vec![
-                                                                                                                                  "top-ups, refunds, fees",
-                                                                                                                                  "provisioned charges",
-                                                                                                                                  "credit expiries",
-                                                                                                                              ],
+                                                                                                                                          "top-ups, refunds, fees",
+                                                                                                                                          "provisioned charges",
+                                                                                                                                          "credit expiries",
+                                                                                                                                      ],
       }
       LedgerSection {
         icon: "speed",
         title: "Live quotas",
         description: "Provider windows that can stop traffic in real time",
         bullets: vec![
-                                                                                                                                  "provider quota windows",
-                                                                                                                                  "biller credit systems",
-                                                                                                                                  "errors surfaced directly",
-                                                                                                                              ],
+                                                                                                                                          "provider quota windows",
+                                                                                                                                          "biller credit systems",
+                                                                                                                                          "errors surfaced directly",
+                                                                                                                                      ],
       }
     }
   }
