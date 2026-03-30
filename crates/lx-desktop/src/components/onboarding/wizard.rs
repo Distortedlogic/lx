@@ -55,6 +55,9 @@ pub fn OnboardingWizard() -> Element {
   let mut company_name = use_signal(String::new);
   let mut company_goal = use_signal(String::new);
   let mut agent_name = use_signal(|| "CEO".to_string());
+  let mut agent_role = use_signal(|| "ceo".to_string());
+  let mut agent_description = use_signal(String::new);
+  let mut agent_adapter = use_signal(|| "claude_local".to_string());
   let mut task_title = use_signal(|| "Create a hiring plan".to_string());
   let mut task_description = use_signal(String::new);
 
@@ -68,6 +71,9 @@ pub fn OnboardingWizard() -> Element {
       company_name.set(String::new());
       company_goal.set(String::new());
       agent_name.set("CEO".to_string());
+      agent_role.set("ceo".to_string());
+      agent_description.set(String::new());
+      agent_adapter.set("claude_local".to_string());
       task_title.set("Create a hiring plan".to_string());
       task_description.set(String::new());
     }
@@ -101,7 +107,7 @@ pub fn OnboardingWizard() -> Element {
                 StepCompany { company_name, company_goal }
               },
               WizardStep::Agent => rsx! {
-                StepAgent { agent_name }
+                StepAgent { agent_name, agent_role, agent_description, agent_adapter }
               },
               WizardStep::Task => rsx! {
                 StepTask { task_title, task_description }
@@ -110,6 +116,8 @@ pub fn OnboardingWizard() -> Element {
                 StepLaunch {
                   company_name: company_name.read().clone(),
                   agent_name: agent_name.read().clone(),
+                  agent_role: agent_role.read().clone(),
+                  agent_adapter: agent_adapter.read().clone(),
                   task_title: task_title.read().clone(),
                 }
               },

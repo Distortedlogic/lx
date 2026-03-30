@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 #[component]
-pub fn StepLaunch(company_name: String, agent_name: String, task_title: String) -> Element {
+pub fn StepLaunch(company_name: String, agent_name: String, agent_role: String, agent_adapter: String, task_title: String) -> Element {
   rsx! {
     div { class: "space-y-5",
       div { class: "flex items-center gap-3 mb-1",
@@ -24,6 +24,8 @@ pub fn StepLaunch(company_name: String, agent_name: String, task_title: String) 
           value: company_name,
         }
         SummaryRow { icon: "smart_toy", label: "Agent", value: agent_name }
+        SummaryRow { icon: "badge", label: "Role", value: agent_role }
+        SummaryRow { icon: "memory", label: "Adapter", value: agent_adapter }
         SummaryRow { icon: "checklist", label: "Task", value: task_title }
       }
     }
