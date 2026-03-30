@@ -140,3 +140,30 @@ impl McpClient {
     matches!(self.child.try_wait(), Ok(None))
   }
 }
+
+pub struct McpStreamSink {
+  client: std::sync::Arc<tokio::sync::Mutex<McpClient>>,
+}
+
+impl McpStreamSink {
+  pub fn new(client: McpClient) -> Self {
+    Self { client: std::sync::Arc::new(tokio::sync::Mutex::new(client)) }
+  }
+}
+
+impl crate::ExternalStreamSink for McpStreamSink {
+  fn xadd(&self, entry_json: serde_json::Value) {
+    let client = std::sync::Arc::clone(&self.client);
+    tokio::task::spawn(async move {
+      if let Err(e) = client.lock().await.tools_call("xadd", entry_json).await {
+        eprintln!("[stream:external] xadd failed: {e}");
+      }
+    });
+  }
+
+  fn shutdown(&self) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + '_>> {
+    Box::pin(async {
+      self.client.lock().await.shutdown().await;
+    })
+  }
+}

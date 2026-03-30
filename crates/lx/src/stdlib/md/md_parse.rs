@@ -2,14 +2,14 @@ use std::sync::Arc;
 
 use pulldown_cmark::{Event, Parser, Tag, TagEnd};
 
+use crate::BuiltinCtx;
 use crate::error::LxError;
-use crate::runtime::RuntimeCtx;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
 use super::{field_str, get_nodes, node_rec, nodes_by_type};
 
-pub(super) fn bi_sections(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_sections(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let nodes = get_nodes(&args[0], span)?;
   let mut sections = Vec::new();
   let mut cur: Option<(i64, String, String)> = None;
@@ -64,15 +64,15 @@ pub(super) fn bi_sections(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCt
   Ok(LxVal::list(sections))
 }
 
-pub(super) fn bi_code_blocks(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_code_blocks(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   Ok(LxVal::list(nodes_by_type(get_nodes(&args[0], span)?, "code")))
 }
 
-pub(super) fn bi_headings(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_headings(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   Ok(LxVal::list(nodes_by_type(get_nodes(&args[0], span)?, "heading")))
 }
 
-pub(super) fn bi_links(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_links(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let input = args[0].require_str("md.links", span)?;
   let parser = Parser::new(input);
   let mut links = Vec::new();
@@ -97,7 +97,7 @@ pub(super) fn bi_links(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>)
   Ok(LxVal::list(links))
 }
 
-pub(super) fn bi_to_text(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_to_text(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let input = args[0].require_str("md.to_text", span)?;
   let parser = Parser::new(input);
   let mut out = String::new();

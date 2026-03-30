@@ -13,9 +13,9 @@ use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use strum::IntoStaticStr;
 
-use crate::ast::{AstArena, ExprId, Field, MethodSpec};
 use crate::error::LxError;
-use crate::sym::Sym;
+use lx_ast::ast::{AstArena, ExprId, Field, MethodSpec};
+use lx_span::sym::Sym;
 use miette::SourceSpan;
 
 pub type FieldDef = Field<LxVal, ConstraintExpr>;
@@ -117,7 +117,7 @@ pub enum LxVal {
     name: Sym,
   },
   #[strum(serialize = "ToolModule")]
-  ToolModule(Arc<crate::tool_module::ToolModule>),
+  ToolModule(Arc<dyn crate::ToolModuleHandle>),
 }
 
 #[derive(Debug, Clone)]
@@ -144,7 +144,7 @@ macro_rules! typed_field_methods {
     $(
       pub fn $name(&self, key: &str) -> Option<$ret> {
         match self {
-          LxVal::Record(fields) => fields.get(&crate::sym::intern(key)).and_then(|v| v.$as_method()),
+          LxVal::Record(fields) => fields.get(&lx_span::sym::intern(key)).and_then(|v| v.$as_method()),
           _ => ::std::option::Option::None,
         }
       }
@@ -184,7 +184,7 @@ impl LxVal {
     LxVal::Err(Box::new(LxVal::str(s)))
   }
   pub fn typ(name: &str) -> Self {
-    LxVal::Type(crate::sym::intern(name))
+    LxVal::Type(lx_span::sym::intern(name))
   }
 
   pub fn as_int(&self) -> Option<&BigInt> {
@@ -262,14 +262,14 @@ impl LxVal {
 
   pub fn list_field(&self, key: &str) -> Option<&[LxVal]> {
     match self {
-      LxVal::Record(fields) => fields.get(&crate::sym::intern(key)).and_then(|v| v.as_list()).map(|l| l.as_slice()),
+      LxVal::Record(fields) => fields.get(&lx_span::sym::intern(key)).and_then(|v| v.as_list()).map(|l| l.as_slice()),
       _ => ::std::option::Option::None,
     }
   }
 
   pub fn record_field(&self, key: &str) -> Option<&IndexMap<Sym, LxVal>> {
     match self {
-      LxVal::Record(fields) => fields.get(&crate::sym::intern(key)).and_then(|v| match v {
+      LxVal::Record(fields) => fields.get(&lx_span::sym::intern(key)).and_then(|v| match v {
         LxVal::Record(inner) => Some(inner.as_ref()),
         _ => ::std::option::Option::None,
       }),
@@ -279,7 +279,7 @@ impl LxVal {
 
   pub fn get_field(&self, key: &str) -> Option<&LxVal> {
     match self {
-      LxVal::Record(fields) => fields.get(&crate::sym::intern(key)),
+      LxVal::Record(fields) => fields.get(&lx_span::sym::intern(key)),
       _ => ::std::option::Option::None,
     }
   }

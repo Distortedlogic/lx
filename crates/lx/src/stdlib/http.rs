@@ -4,9 +4,9 @@ use indexmap::IndexMap;
 use reqwest::Client;
 use reqwest::header::CONTENT_TYPE;
 
+use crate::BuiltinCtx;
 use crate::error::LxError;
 use crate::record;
-use crate::runtime::RuntimeCtx;
 use crate::std_module;
 use crate::sym::{Sym, intern};
 use crate::value::LxVal;
@@ -19,8 +19,8 @@ struct HttpOpts {
   body: Option<serde_json::Value>,
 }
 
-fn do_request(method: &str, url: &str, opts: &HttpOpts, span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  if ctx.network_denied {
+fn do_request(method: &str, url: &str, opts: &HttpOpts, span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+  if ctx.network_denied() {
     return Ok(LxVal::err_str("network access denied by sandbox policy"));
   }
   tokio::task::block_in_place(|| {
@@ -81,31 +81,31 @@ pub fn build() -> IndexMap<Sym, LxVal> {
   }
 }
 
-fn bi_get(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_get(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let url = args[0].require_str("http.get", span)?;
   do_request("GET", url, &HttpOpts::default(), span, ctx)
 }
 
-fn bi_post(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_post(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let url = args[0].require_str("http.post", span)?;
   let body: serde_json::Value = (&args[1]).into();
   let opts = HttpOpts { body: Some(body), ..Default::default() };
   do_request("POST", url, &opts, span, ctx)
 }
 
-fn bi_put(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_put(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let url = args[0].require_str("http.put", span)?;
   let body: serde_json::Value = (&args[1]).into();
   let opts = HttpOpts { body: Some(body), ..Default::default() };
   do_request("PUT", url, &opts, span, ctx)
 }
 
-fn bi_delete(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_delete(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let url = args[0].require_str("http.delete", span)?;
   do_request("DELETE", url, &HttpOpts::default(), span, ctx)
 }
 
-fn bi_request(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_request(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let rec = args[0].require_record("http.request", span)?;
   let method = rec.get(&intern("method")).and_then(|v| v.as_str()).unwrap_or("GET");
   let url = rec.get(&intern("url")).and_then(|v| v.as_str()).ok_or_else(|| LxError::type_err("http.request: 'url' field required", span, None))?;

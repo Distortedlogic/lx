@@ -1,0 +1,26 @@
+[package]
+edition.workspace = true
+license.workspace = true
+name = "lx-value"
+version = "0.1.0"
+
+[dependencies]
+lx-span = { path = "../lx-span" }
+lx-ast = { path = "../lx-ast" }
+chrono.workspace = true
+dashmap.workspace = true
+derive_more.workspace = true
+indexmap.workspace = true
+itertools.workspace = true
+miette.workspace = true
+num-bigint.workspace = true
+num-traits.workspace = true
+parking_lot.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+strum.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

@@ -44,3 +44,29 @@ pub struct RuntimeCtx {
 pub trait YieldBackend: Send + Sync {
   fn yield_value(&self, value: LxVal, span: SourceSpan) -> Result<LxVal, LxError>;
 }
+
+impl crate::BuiltinCtx for RuntimeCtx {
+  fn event_stream(&self) -> &Arc<crate::event_stream::EventStream> {
+    &self.event_stream
+  }
+
+  fn source_dir(&self) -> Option<PathBuf> {
+    self.source_dir.lock().clone()
+  }
+
+  fn network_denied(&self) -> bool {
+    self.network_denied
+  }
+
+  fn test_threshold(&self) -> Option<f64> {
+    self.test_threshold
+  }
+
+  fn test_runs(&self) -> Option<u32> {
+    self.test_runs
+  }
+
+  fn as_any(&self) -> &dyn std::any::Any {
+    self
+  }
+}

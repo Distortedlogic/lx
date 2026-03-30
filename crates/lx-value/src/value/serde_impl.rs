@@ -88,7 +88,7 @@ impl From<serde_json::Value> for LxVal {
       serde_json::Value::Object(obj) => {
         let mut rec = IndexMap::new();
         for (k, v) in obj {
-          rec.insert(crate::sym::intern(&k), LxVal::from(v));
+          rec.insert(lx_span::sym::intern(&k), LxVal::from(v));
         }
         LxVal::Record(Arc::new(rec))
       },

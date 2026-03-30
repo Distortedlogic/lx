@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
+use crate::BuiltinCtx;
 use crate::error::LxError;
-use crate::runtime::RuntimeCtx;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
 use super::BoxFut;
 use super::hof::{call, get_list};
 
-async fn parallel_map_batch(items: &[LxVal], func: &LxVal, sp: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<Vec<LxVal>, LxError> {
+async fn parallel_map_batch(items: &[LxVal], func: &LxVal, sp: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<Vec<LxVal>, LxError> {
   let mut futures = Vec::with_capacity(items.len());
   for v in items.iter() {
     let f = func.clone();
@@ -21,7 +21,7 @@ async fn parallel_map_batch(items: &[LxVal], func: &LxVal, sp: SourceSpan, ctx: 
   Ok(out)
 }
 
-pub(super) fn bi_pmap(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
+pub(super) fn bi_pmap(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<dyn BuiltinCtx>) -> BoxFut {
   Box::pin(async move {
     let items = get_list(&args[1], "pmap", sp)?;
     let out = parallel_map_batch(&items, &args[0], sp, &ctx).await?;
@@ -29,7 +29,7 @@ pub(super) fn bi_pmap(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) ->
   })
 }
 
-pub(super) fn bi_pmap_n(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
+pub(super) fn bi_pmap_n(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<dyn BuiltinCtx>) -> BoxFut {
   Box::pin(async move {
     let items = get_list(&args[2], "pmap_n", sp)?;
     let n = args[0].as_int().and_then(|i| usize::try_from(i.clone()).ok()).ok_or_else(|| LxError::runtime("pmap_n: first arg must be a positive Int", sp))?;

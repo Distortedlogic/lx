@@ -1,3 +1,5 @@
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use indexmap::IndexMap;
@@ -83,5 +85,29 @@ impl ToolModule {
   pub async fn shutdown(&self) {
     let mut client = self.client.lock().await;
     client.shutdown().await;
+  }
+}
+
+impl crate::ToolModuleHandle for ToolModule {
+  fn call_tool<'a>(
+    &'a self,
+    method: &'a str,
+    args: LxVal,
+    event_stream: &'a EventStream,
+    agent_name: &'a str,
+  ) -> Pin<Box<dyn Future<Output = Result<LxVal, LxError>> + 'a>> {
+    Box::pin(self.call_tool(method, args, event_stream, agent_name))
+  }
+
+  fn shutdown(&self) -> Pin<Box<dyn Future<Output = ()> + '_>> {
+    Box::pin(self.shutdown())
+  }
+
+  fn command(&self) -> &str {
+    &self.command
+  }
+
+  fn alias(&self) -> &str {
+    &self.alias
   }
 }

@@ -31,7 +31,7 @@ mod trait_ops;
 pub(crate) mod wasm;
 pub(crate) mod wasm_marshal;
 
-use crate::interpreter::ModuleExports;
+use crate::value::ModuleExports;
 
 pub const STDLIB_ROOT: &str = "std";
 

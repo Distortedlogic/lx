@@ -1,7 +1,8 @@
 use std::cell::RefCell;
 use std::sync::Arc;
 
-use crate::builtins::call_value_sync;
+use crate::BuiltinCtx;
+use crate::builtins::{call_value_sync, extract_runtime_ctx};
 use crate::error::LxError;
 use crate::runtime::RuntimeCtx;
 use crate::value::LxVal;
@@ -13,26 +14,27 @@ thread_local! {
     static POLICY_STACK: RefCell<Vec<u64>> = const { RefCell::new(Vec::new()) };
 }
 
-fn build_restricted_ctx(base: &Arc<RuntimeCtx>, policy: &Policy) -> Arc<RuntimeCtx> {
+fn build_restricted_ctx(base: &Arc<dyn BuiltinCtx>, policy: &Policy) -> Arc<dyn BuiltinCtx> {
   let network_denied = policy.net_allow.is_empty();
+  let rtx = extract_runtime_ctx(base.as_ref());
 
   Arc::new(RuntimeCtx {
-    yield_: base.yield_.clone(),
-    source_dir: parking_lot::Mutex::new(base.source_dir.lock().clone()),
-    workspace_members: base.workspace_members.clone(),
-    dep_dirs: base.dep_dirs.clone(),
-    tokio_runtime: base.tokio_runtime.clone(),
-    test_threshold: base.test_threshold,
-    test_runs: base.test_runs,
-    event_stream: base.event_stream.clone(),
+    yield_: rtx.yield_.clone(),
+    source_dir: parking_lot::Mutex::new(base.source_dir()),
+    workspace_members: rtx.workspace_members.clone(),
+    dep_dirs: rtx.dep_dirs.clone(),
+    tokio_runtime: rtx.tokio_runtime.clone(),
+    test_threshold: base.test_threshold(),
+    test_runs: base.test_runs(),
+    event_stream: Arc::clone(base.event_stream()),
     network_denied,
-    global_pause: base.global_pause.clone(),
-    cancel_flag: base.cancel_flag.clone(),
-    inject_tx: base.inject_tx.clone(),
+    global_pause: rtx.global_pause.clone(),
+    cancel_flag: rtx.cancel_flag.clone(),
+    inject_tx: rtx.inject_tx.clone(),
   })
 }
 
-pub fn bi_scope(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub fn bi_scope(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let pid = policy_id(&args[0], span)?;
   let policy = get_policy(pid, span)?.clone();
 

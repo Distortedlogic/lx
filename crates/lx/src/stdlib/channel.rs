@@ -8,9 +8,9 @@ use indexmap::IndexMap;
 use tokio::sync::Mutex as TokioMutex;
 use tokio::sync::mpsc;
 
+use crate::BuiltinCtx;
 use crate::error::LxError;
 use crate::record;
-use crate::runtime::RuntimeCtx;
 use crate::stdlib::helpers::extract_handle_id;
 use crate::value::LxVal;
 use miette::SourceSpan;
@@ -37,7 +37,7 @@ fn chan_id(val: &LxVal, fn_name: &str, span: SourceSpan) -> Result<u64, LxError>
   extract_handle_id(val, "__chan_id", fn_name, span)
 }
 
-fn bi_create(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_create(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let cap = args[0].require_usize("channel.create", span)?;
   let capacity = if cap == 0 { 1_000_000 } else { cap };
   let (tx, rx) = mpsc::channel(capacity);
@@ -54,7 +54,7 @@ fn bi_create(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result
   Ok(LxVal::tuple(vec![sender, receiver]))
 }
 
-fn bi_send(args: Vec<LxVal>, span: SourceSpan, _ctx: Arc<RuntimeCtx>) -> Pin<Box<dyn Future<Output = Result<LxVal, LxError>>>> {
+fn bi_send(args: Vec<LxVal>, span: SourceSpan, _ctx: Arc<dyn BuiltinCtx>) -> Pin<Box<dyn Future<Output = Result<LxVal, LxError>>>> {
   Box::pin(async move {
     let id = chan_id(&args[0], "channel.send", span)?;
     let value = args[1].clone();
@@ -72,7 +72,7 @@ fn bi_send(args: Vec<LxVal>, span: SourceSpan, _ctx: Arc<RuntimeCtx>) -> Pin<Box
   })
 }
 
-fn bi_recv(args: Vec<LxVal>, span: SourceSpan, _ctx: Arc<RuntimeCtx>) -> Pin<Box<dyn Future<Output = Result<LxVal, LxError>>>> {
+fn bi_recv(args: Vec<LxVal>, span: SourceSpan, _ctx: Arc<dyn BuiltinCtx>) -> Pin<Box<dyn Future<Output = Result<LxVal, LxError>>>> {
   Box::pin(async move {
     let id = chan_id(&args[0], "channel.recv", span)?;
     let receiver = {
@@ -87,7 +87,7 @@ fn bi_recv(args: Vec<LxVal>, span: SourceSpan, _ctx: Arc<RuntimeCtx>) -> Pin<Box
   })
 }
 
-fn bi_try_recv(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_try_recv(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let id = chan_id(&args[0], "channel.try_recv", span)?;
   let receiver = {
     let entry = CHANNELS.get(&id).ok_or_else(|| LxError::runtime("channel.try_recv: channel not found", span))?;
@@ -105,7 +105,7 @@ fn bi_try_recv(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resu
   }
 }
 
-fn bi_close(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_close(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let id = chan_id(&args[0], "channel.close", span)?;
   if let Some(mut entry) = CHANNELS.get_mut(&id) {
     entry.sender = None;

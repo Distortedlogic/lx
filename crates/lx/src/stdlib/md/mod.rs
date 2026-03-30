@@ -8,8 +8,8 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 
+use crate::BuiltinCtx;
 use crate::error::LxError;
-use crate::runtime::RuntimeCtx;
 use crate::std_module;
 use crate::value::LxVal;
 use miette::SourceSpan;
@@ -148,7 +148,7 @@ fn parse_to_nodes(input: &str) -> Vec<LxVal> {
   nodes
 }
 
-fn bi_parse(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_parse(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let input = args[0].require_str("md.parse", span)?;
   Ok(LxVal::list(parse_to_nodes(input)))
 }
@@ -165,47 +165,47 @@ pub(super) fn nodes_by_type(nodes: &[LxVal], type_name: &str) -> Vec<LxVal> {
   nodes.iter().filter(|n| if let LxVal::Record(r) = n { field_str(r, "type").as_deref() == Some(type_name) } else { false }).cloned().collect()
 }
 
-fn bi_h1(args: &[LxVal], span: SourceSpan, _: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_h1(args: &[LxVal], span: SourceSpan, _: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   Ok(node_rec("heading", vec![("level", LxVal::int(1)), ("text", LxVal::str(args[0].require_str("md.h1", span)?))]))
 }
-fn bi_h2(args: &[LxVal], span: SourceSpan, _: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_h2(args: &[LxVal], span: SourceSpan, _: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   Ok(node_rec("heading", vec![("level", LxVal::int(2)), ("text", LxVal::str(args[0].require_str("md.h2", span)?))]))
 }
-fn bi_h3(args: &[LxVal], span: SourceSpan, _: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_h3(args: &[LxVal], span: SourceSpan, _: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   Ok(node_rec("heading", vec![("level", LxVal::int(3)), ("text", LxVal::str(args[0].require_str("md.h3", span)?))]))
 }
-fn bi_para(args: &[LxVal], span: SourceSpan, _: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_para(args: &[LxVal], span: SourceSpan, _: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   Ok(node_rec("para", vec![("text", LxVal::str(args[0].require_str("md.para", span)?))]))
 }
-fn bi_code(args: &[LxVal], span: SourceSpan, _: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_code(args: &[LxVal], span: SourceSpan, _: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let lang = args[0].require_str("md.code", span)?;
   let body = args[1].require_str("md.code", span)?;
   Ok(node_rec("code", vec![("lang", LxVal::some(LxVal::str(lang))), ("code", LxVal::str(body))]))
 }
-fn bi_list(args: &[LxVal], span: SourceSpan, _: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_list(args: &[LxVal], span: SourceSpan, _: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let items = args[0].as_list().ok_or_else(|| LxError::type_err("md.list: expected List", span, None))?;
   Ok(node_rec("list", vec![("items", LxVal::list(items.to_vec()))]))
 }
-fn bi_ordered(args: &[LxVal], span: SourceSpan, _: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_ordered(args: &[LxVal], span: SourceSpan, _: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let items = args[0].as_list().ok_or_else(|| LxError::type_err("md.ordered: expected List", span, None))?;
   Ok(node_rec("ordered", vec![("items", LxVal::list(items.to_vec()))]))
 }
-fn bi_table(args: &[LxVal], span: SourceSpan, _: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_table(args: &[LxVal], span: SourceSpan, _: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let headers = args[0].as_list().ok_or_else(|| LxError::type_err("md.table: expected List for headers", span, None))?;
   let rows = args[1].as_list().ok_or_else(|| LxError::type_err("md.table: expected List for rows", span, None))?;
   Ok(node_rec("table", vec![("headers", LxVal::list(headers.to_vec())), ("rows", LxVal::list(rows.to_vec()))]))
 }
-fn bi_link(args: &[LxVal], span: SourceSpan, _: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_link(args: &[LxVal], span: SourceSpan, _: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let text = args[0].require_str("md.link", span)?;
   let url = args[1].require_str("md.link", span)?;
   Ok(node_rec("link", vec![("text", LxVal::str(text)), ("url", LxVal::str(url))]))
 }
-fn bi_blockquote(args: &[LxVal], span: SourceSpan, _: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_blockquote(args: &[LxVal], span: SourceSpan, _: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   Ok(node_rec("blockquote", vec![("text", LxVal::str(args[0].require_str("md.blockquote", span)?))]))
 }
-fn bi_hr(_: &[LxVal], _: SourceSpan, _: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_hr(_: &[LxVal], _: SourceSpan, _: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   Ok(node_rec("hr", vec![]))
 }
-fn bi_raw(args: &[LxVal], span: SourceSpan, _: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_raw(args: &[LxVal], span: SourceSpan, _: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   Ok(node_rec("raw", vec![("text", LxVal::str(args[0].require_str("md.raw", span)?))]))
 }

@@ -5,27 +5,27 @@ use num_traits::ToPrimitive;
 
 use indexmap::IndexMap;
 
+use crate::BuiltinCtx;
 use crate::env::Env;
 use crate::error::LxError;
-use crate::runtime::RuntimeCtx;
 use crate::value::{LxVal, ValueKey};
 use miette::SourceSpan;
 
 use super::coll::cmp_values;
 
-fn bi_sort(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_sort(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let l = args[0].require_list("sort", span)?;
   let mut items = l.to_vec();
   items.sort_by(cmp_values);
   Ok(LxVal::list(items))
 }
 
-fn bi_sorted_q(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_sorted_q(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let l = args[0].require_list("sorted?", span)?;
   Ok(LxVal::Bool(l.windows(2).all(|w| cmp_values(&w[0], &w[1]).is_le())))
 }
 
-fn bi_rev(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_rev(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let l = args[0].require_list("rev", span)?;
   let mut items = l.to_vec();
   items.reverse();
@@ -64,27 +64,27 @@ fn num_fold(
   if has_float { Ok(LxVal::Float(fa)) } else { Ok(LxVal::Int(ia)) }
 }
 
-fn bi_sum(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_sum(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let l = args[0].require_list("sum", span)?;
   num_fold("sum", l, BigInt::from(0), 0.0, |a, b| a + b, |a, b| a + b, span)
 }
 
-fn bi_product(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_product(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let l = args[0].require_list("product", span)?;
   num_fold("product", l, BigInt::from(1), 1.0, |a, b| a * b, |a, b| a * b, span)
 }
 
-fn bi_min(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_min(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let l = args[0].require_list("min", span)?;
   l.iter().min_by(|a, b| cmp_values(a, b)).cloned().ok_or_else(|| LxError::runtime("min: empty list", span))
 }
 
-fn bi_max(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_max(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let l = args[0].require_list("max", span)?;
   l.iter().max_by(|a, b| cmp_values(a, b)).cloned().ok_or_else(|| LxError::runtime("max: empty list", span))
 }
 
-fn bi_uniq(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_uniq(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let l = args[0].require_list("uniq", span)?;
   let mut out: Vec<LxVal> = Vec::with_capacity(l.len());
   for v in l.iter() {
@@ -95,7 +95,7 @@ fn bi_uniq(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<L
   Ok(LxVal::list(out))
 }
 
-fn bi_flatten(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_flatten(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let l = args[0].require_list("flatten", span)?;
   let mut out = Vec::new();
   for v in l.iter() {
@@ -107,7 +107,7 @@ fn bi_flatten(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resul
   Ok(LxVal::list(out))
 }
 
-fn bi_has_key(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_has_key(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   match &args[1] {
     LxVal::Map(m) => Ok(LxVal::Bool(m.contains_key(&ValueKey(args[0].clone())))),
     LxVal::Record(r) => {
@@ -118,7 +118,7 @@ fn bi_has_key(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resul
   }
 }
 
-fn bi_remove(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_remove(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let m = match &args[1] {
     LxVal::Map(m) => m,
     other => {
@@ -130,7 +130,7 @@ fn bi_remove(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result
   Ok(LxVal::Map(Arc::new(out)))
 }
 
-fn bi_merge(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_merge(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   match (&args[0], &args[1]) {
     (LxVal::Map(m1), LxVal::Map(m2)) => {
       let mut merged: IndexMap<ValueKey, LxVal> = m1.as_ref().clone();

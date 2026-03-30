@@ -8,9 +8,9 @@ use std::time::Duration;
 use cron::Schedule;
 use dashmap::DashMap;
 
+use crate::BuiltinCtx;
 use crate::builtins::call_value;
 use crate::error::LxError;
-use crate::runtime::RuntimeCtx;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
@@ -72,7 +72,7 @@ pub(super) fn sleep_cancellable(dur: Duration, cancel: &AtomicBool) -> bool {
   cancel.load(Ordering::Relaxed)
 }
 
-pub(super) fn spawn_oneshot(dur: Duration, callback: LxVal, span: SourceSpan, ctx: Arc<RuntimeCtx>, label: &'static str) -> LxVal {
+pub(super) fn spawn_oneshot(dur: Duration, callback: LxVal, span: SourceSpan, ctx: Arc<dyn BuiltinCtx>, label: &'static str) -> LxVal {
   let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
   let cancel = Arc::new(AtomicBool::new(false));
   let flag = cancel.clone();

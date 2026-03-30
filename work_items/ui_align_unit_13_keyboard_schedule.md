@@ -11,7 +11,8 @@ B) Add a `describe_schedule` function that produces human-readable cron descript
 | File | Action |
 |------|--------|
 | `crates/lx-desktop/src/hooks/keyboard_shortcuts.rs` | Rewrite |
-| `crates/lx-desktop/src/layout/shell.rs` | Edit (add keyboard listener) |
+| `crates/lx-desktop/src/layout/shell.rs` | Edit (add keyboard listener, provide CommandPaletteOpen context) |
+| `crates/lx-desktop/src/components/command_palette.rs` | Edit (consume context instead of providing it) |
 | `crates/lx-desktop/src/pages/routines/cron_utils.rs` | Edit (add describe_schedule) |
 | `crates/lx-desktop/src/pages/routines/schedule_editor.rs` | Edit (display description) |
 
@@ -22,6 +23,56 @@ B) Add a `describe_schedule` function that produces human-readable cron descript
 `keyboard_shortcuts.rs` (45 lines) defines a `ShortcutHandlers` struct and `use_keyboard_shortcuts` function that returns an `EventHandler<KeyboardEvent>`. It is never called anywhere. The `CommandPalette` component in `command_palette.rs` (110 lines) provides `CommandPaletteOpen(Signal<bool>)` via context on line 38.
 
 `shell.rs` (229 lines) does not reference keyboard_shortcuts at all. `DialogState` in `contexts/dialog.rs` has boolean signals: `new_issue_open`, `new_project_open`, `new_agent_open`, `onboarding_open`.
+
+`CommandPaletteOpen` is currently provided inside `CommandPalette`, which is a child of `Shell` (rendered at shell.rs line 105). Since `use_context` requires the context to come from an ancestor, calling `use_context::<CommandPaletteOpen>()` in Shell would panic at runtime. Step A0 fixes this by moving the context provision into Shell before the keyboard hook call.
+
+### Step A0: Move `CommandPaletteOpen` context provision from `CommandPalette` into `Shell`
+
+`CommandPaletteOpen` is currently provided inside `CommandPalette` (a child of `Shell`). The keyboard hook runs in `Shell` and calls `use_context::<CommandPaletteOpen>()`, which requires the context to come from an ancestor. Move the provision into `Shell` so the context exists before the hook runs, and have `CommandPalette` consume it instead.
+
+In `crates/lx-desktop/src/layout/shell.rs`, add the import:
+
+Find:
+```rust
+use crate::components::command_palette::CommandPalette;
+```
+
+Replace with:
+```rust
+use crate::components::command_palette::{CommandPalette, CommandPaletteOpen};
+```
+
+In `crates/lx-desktop/src/layout/shell.rs`, add the context provision inside `Shell()`, after the `_onboarding` line and before the `use_effect`:
+
+Find:
+```rust
+  let _onboarding = OnboardingCtx::provide();
+  use_effect(move || {
+```
+
+Replace with:
+```rust
+  let _onboarding = OnboardingCtx::provide();
+  use_context_provider(|| CommandPaletteOpen(Signal::new(false)));
+  use_effect(move || {
+```
+
+In `crates/lx-desktop/src/components/command_palette.rs`, change `CommandPalette` to consume the context instead of providing it:
+
+Find:
+```rust
+  let mut open = use_signal(|| false);
+  let mut query = use_signal(String::new);
+
+  use_context_provider(|| CommandPaletteOpen(open));
+```
+
+Replace with:
+```rust
+  let palette = use_context::<CommandPaletteOpen>();
+  let mut open = palette.0;
+  let mut query = use_signal(String::new);
+```
 
 ### Step A1: Replace `crates/lx-desktop/src/hooks/keyboard_shortcuts.rs`
 
@@ -74,9 +125,7 @@ pub fn use_keyboard_shortcuts() -> EventHandler<KeyboardEvent> {
 }
 ```
 
-And in `shell.rs`:
-
-Add import at top of file, after existing use statements (after line 20):
+In `crates/lx-desktop/src/layout/shell.rs`, add the keyboard shortcuts import:
 
 Find:
 ```rust

@@ -9,6 +9,8 @@ pub use lx_span::sym;
 pub const PLUGIN_MANIFEST: &str = lx_span::PLUGIN_MANIFEST;
 pub const LX_MANIFEST: &str = lx_span::LX_MANIFEST;
 
+pub use lx_value::{BuiltinCtx, ExternalStreamSink, ModuleExports, ToolModuleHandle, record};
+
 pub mod builtins;
 pub mod checker;
 pub mod env;

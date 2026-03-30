@@ -3,6 +3,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 
+use crate::BuiltinCtx;
 use crate::error::LxError;
 use crate::interpreter::Interpreter;
 use crate::runtime::RuntimeCtx;
@@ -11,7 +12,7 @@ use crate::sym::intern;
 use crate::value::{LxClass, LxVal};
 use miette::SourceSpan;
 
-pub fn bi_agent_spawn(args: Vec<LxVal>, span: SourceSpan, ctx: Arc<RuntimeCtx>) -> Pin<Box<dyn Future<Output = Result<LxVal, LxError>>>> {
+pub fn bi_agent_spawn(args: Vec<LxVal>, span: SourceSpan, ctx: Arc<dyn BuiltinCtx>) -> Pin<Box<dyn Future<Output = Result<LxVal, LxError>>>> {
   Box::pin(async move {
     let class: Box<LxClass> = match args.into_iter().next() {
       Some(LxVal::Class(c)) => c,
@@ -30,12 +31,18 @@ pub fn bi_agent_spawn(args: Vec<LxVal>, span: SourceSpan, ctx: Arc<RuntimeCtx>) 
     let pause_flag = Arc::new(AtomicBool::new(false));
     let rx = Arc::new(tokio::sync::Mutex::new(rx));
 
-    let task_ctx = Arc::clone(&ctx);
+    let rtx: Arc<RuntimeCtx> = Arc::new(RuntimeCtx {
+      event_stream: Arc::clone(ctx.event_stream()),
+      network_denied: ctx.network_denied(),
+      test_threshold: ctx.test_threshold(),
+      test_runs: ctx.test_runs(),
+      ..RuntimeCtx::default()
+    });
     let task_name = name.clone();
     let task_rx = Arc::clone(&rx);
 
     let join_handle = tokio::task::spawn_local(async move {
-      let mut interp = Interpreter::new("", None, task_ctx);
+      let mut interp = Interpreter::new("", None, Arc::clone(&rtx));
       interp.agent_name = Some(task_name.clone());
 
       let has_handle = handle_method.is_some();
@@ -46,8 +53,9 @@ pub fn bi_agent_spawn(args: Vec<LxVal>, span: SourceSpan, ctx: Arc<RuntimeCtx>) 
           return;
         };
         let mut rx_guard = task_rx.lock().await;
+        let bctx = interp.builtin_ctx();
         while let Some(msg) = rx_guard.recv().await {
-          let result = crate::builtins::call_value(&handle_fn, msg.payload.clone(), miette::SourceSpan::new(0.into(), 0), &interp.ctx)
+          let result = crate::builtins::call_value(&handle_fn, msg.payload.clone(), miette::SourceSpan::new(0.into(), 0), &bctx)
             .await
             .unwrap_or_else(|e| LxVal::err_str(e.to_string()));
           if let Some(reply) = msg.reply {
@@ -57,13 +65,15 @@ pub fn bi_agent_spawn(args: Vec<LxVal>, span: SourceSpan, ctx: Arc<RuntimeCtx>) 
       } else if has_run && !has_handle {
         drop(task_rx);
         if let Some(run_fn) = run_method {
-          let _ = crate::builtins::call_value(&run_fn, LxVal::Unit, miette::SourceSpan::new(0.into(), 0), &interp.ctx).await;
+          let bctx = interp.builtin_ctx();
+          let _ = crate::builtins::call_value(&run_fn, LxVal::Unit, miette::SourceSpan::new(0.into(), 0), &bctx).await;
         }
       } else {
         interp.agent_mailbox_rx = Some(task_rx);
         interp.agent_handle_fn = handle_method;
         if let Some(run_fn) = run_method {
-          let _ = crate::builtins::call_value(&run_fn, LxVal::Unit, miette::SourceSpan::new(0.into(), 0), &interp.ctx).await;
+          let bctx = interp.builtin_ctx();
+          let _ = crate::builtins::call_value(&run_fn, LxVal::Unit, miette::SourceSpan::new(0.into(), 0), &bctx).await;
         }
       }
     });
@@ -86,7 +96,7 @@ pub fn bi_agent_spawn(args: Vec<LxVal>, span: SourceSpan, ctx: Arc<RuntimeCtx>) 
 
     let mut fields = indexmap::IndexMap::new();
     fields.insert(intern("agent"), LxVal::str(&name));
-    ctx.event_stream.xadd("agent/spawn", &name, None, fields);
+    ctx.event_stream().xadd("agent/spawn", &name, None, fields);
 
     Ok(LxVal::ok(LxVal::str(name)))
   })

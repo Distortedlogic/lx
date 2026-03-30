@@ -8,8 +8,8 @@ use indexmap::IndexMap;
 use miette::SourceSpan;
 
 use crate::error::LxError;
-use crate::interpreter::ModuleExports;
 use crate::sym::{Sym, intern};
+use crate::value::ModuleExports;
 use crate::value::{DynAsyncBuiltinFn, LxVal, mk_dyn_async};
 
 use super::wasm_marshal::{json_to_lxval, lxval_to_json};

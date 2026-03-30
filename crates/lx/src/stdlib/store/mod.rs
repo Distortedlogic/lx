@@ -6,10 +6,10 @@ use std::sync::{Arc, LazyLock};
 use dashmap::DashMap;
 use indexmap::IndexMap;
 
+use crate::BuiltinCtx;
 use crate::builtins::call_value_sync;
 use crate::error::LxError;
 use crate::record;
-use crate::runtime::RuntimeCtx;
 use crate::std_module;
 use crate::value::LxVal;
 use miette::SourceSpan;
@@ -76,7 +76,7 @@ fn load_from_disk(path: &Path) -> IndexMap<crate::sym::Sym, LxVal> {
   }
 }
 
-pub(super) fn bi_create(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_create(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let path = match &args[0] {
     LxVal::Record(r) => r.get(&crate::sym::intern("persist")).and_then(|v| v.as_str()).map(PathBuf::from),
     LxVal::Unit => None,
@@ -90,7 +90,7 @@ pub(super) fn bi_create(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>
   Ok(LxVal::Store { id })
 }
 
-pub(super) fn bi_set(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_set(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let key = args[1].require_str("store.set", span)?;
   let mut s = get_store_mut(id, span)?;
@@ -99,14 +99,14 @@ pub(super) fn bi_set(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -
   Ok(LxVal::Unit)
 }
 
-pub(super) fn bi_get(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_get(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let key = args[1].require_str("store.get", span)?;
   let s = get_store(id, span)?;
   Ok(s.data.get(&crate::sym::intern(key)).cloned().unwrap_or(LxVal::None))
 }
 
-pub(super) fn bi_update(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_update(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let key = args[1].require_str("store.update", span)?;
   let f = &args[2];
@@ -121,7 +121,7 @@ pub(super) fn bi_update(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>)
   Ok(new_val)
 }
 
-pub(super) fn bi_remove(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_remove(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let key = args[1].require_str("store.remove", span)?;
   let mut s = get_store_mut(id, span)?;
@@ -130,14 +130,14 @@ pub(super) fn bi_remove(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>
   Ok(removed)
 }
 
-pub(super) fn bi_keys(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_keys(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let s = get_store(id, span)?;
   let keys: Vec<LxVal> = s.data.keys().map(|k| LxVal::str(k.as_str())).collect();
   Ok(LxVal::list(keys))
 }
 
-pub(super) fn bi_entries(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_entries(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let s = get_store(id, span)?;
   let entries: Vec<LxVal> = s
@@ -153,7 +153,7 @@ pub(super) fn bi_entries(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx
   Ok(LxVal::list(entries))
 }
 
-pub(super) fn bi_query(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_query(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let pred = &args[1];
   let s = get_store(id, span)?;
@@ -173,13 +173,13 @@ pub(super) fn bi_query(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) 
   Ok(LxVal::list(matched))
 }
 
-pub(super) fn bi_count(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_count(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let s = get_store(id, span)?;
   Ok(LxVal::int(s.data.len()))
 }
 
-pub(super) fn bi_clear(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_clear(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let mut s = get_store_mut(id, span)?;
   s.data.clear();
@@ -187,14 +187,14 @@ pub(super) fn bi_clear(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>)
   Ok(LxVal::Unit)
 }
 
-pub(super) fn bi_persist(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_persist(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let s = get_store(id, span)?;
   persist(&s, span)?;
   Ok(LxVal::Unit)
 }
 
-pub(super) fn bi_load(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_load(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let mut s = get_store_mut(id, span)?;
   if let Some(ref path) = s.path {

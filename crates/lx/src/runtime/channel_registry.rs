@@ -3,8 +3,8 @@ use std::sync::{Arc, LazyLock};
 use dashmap::DashMap;
 use miette::SourceSpan;
 
+use crate::BuiltinCtx;
 use crate::error::LxError;
-use crate::runtime::RuntimeCtx;
 use crate::value::{BuiltinFunc, BuiltinKind, LxVal};
 
 static CHANNEL_REGISTRY: LazyLock<DashMap<String, Vec<String>>> = LazyLock::new(DashMap::new);
@@ -48,7 +48,7 @@ pub fn channel_dispatch(channel_name: &str, method: &str, span: SourceSpan) -> R
   }
 }
 
-fn bi_channel_subscribe_impl(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_channel_subscribe_impl(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let channel_name = args[0].require_str("channel.subscribe", span)?;
   let agent_name = args[1].require_str("channel.subscribe", span)?;
   channel_subscribe(channel_name, agent_name).map_err(|e| LxError::runtime(e, span))?;

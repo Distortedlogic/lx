@@ -6,12 +6,12 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
+use crate::BuiltinCtx;
 use crate::ast::Program;
 use crate::error::LxError;
 use crate::lexer::lex;
 use crate::parser::parse;
 use crate::record;
-use crate::runtime::RuntimeCtx;
 use crate::source::FileId;
 use crate::std_module;
 use crate::stdlib::helpers::require_str_field;
@@ -32,25 +32,25 @@ pub fn build() -> IndexMap<Sym, LxVal> {
   }
 }
 
-fn bi_extract(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_extract(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let src = args[0].require_str("diag.extract", span)?;
   let graph = extract_graph(src, span)?;
   Ok(graph_to_value(&graph))
 }
 
-fn bi_extract_file(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_extract_file(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let path = args[0].require_str("diag.extract_file", span)?;
   let src = std::fs::read_to_string(path).map_err(|e| LxError::runtime(format!("diag.extract_file: {e}"), span))?;
   let graph = extract_graph(&src, span)?;
   Ok(graph_to_value(&graph))
 }
 
-fn bi_to_mermaid(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_to_mermaid(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let graph = value_to_graph(&args[0], span)?;
   Ok(LxVal::str(to_mermaid(&graph).as_str()))
 }
 
-fn bi_to_graph_chart(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_to_graph_chart(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let graph = value_to_graph(&args[0], span)?;
   Ok(LxVal::str(graph_to_echart_json(&graph).as_str()))
 }

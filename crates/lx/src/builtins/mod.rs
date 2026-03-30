@@ -16,13 +16,15 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
+use crate::BuiltinCtx;
 use crate::env::Env;
 use crate::error::LxError;
-use crate::runtime::RuntimeCtx;
 use crate::value::{AsyncBuiltinFn, BuiltinFunc, BuiltinKind, LxVal, SyncBuiltinFn};
 use miette::SourceSpan;
 
 pub(crate) type BoxFut = Pin<Box<dyn Future<Output = Result<LxVal, LxError>>>>;
+
+pub(crate) use call::{extract_runtime_ctx, wrap_runtime_ctx};
 
 macro_rules! register_builtins {
   ($env:expr, { $( $name:literal / $arity:literal => $func:expr ),* $(,)? }) => {{
@@ -46,10 +48,10 @@ pub fn register(env: &Env) {
   register::register(env);
 }
 
-pub(crate) async fn call_value(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(crate) async fn call_value(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   call::call_value(f, arg, span, ctx).await
 }
 
-pub(crate) fn call_value_sync(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(crate) fn call_value_sync(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(call::call_value(f, arg, span, ctx)))
 }

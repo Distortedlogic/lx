@@ -4,9 +4,9 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
+use crate::BuiltinCtx;
 use crate::builtins::call_value_sync;
 use crate::error::LxError;
-use crate::runtime::RuntimeCtx;
 use crate::std_module;
 use crate::value::{BuiltinFunc, BuiltinKind, LxVal};
 use miette::SourceSpan;
@@ -60,14 +60,14 @@ fn contains_func(val: &LxVal) -> bool {
   }
 }
 
-fn bi_clear(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_clear(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let name = args[0].require_str("checkpoint.clear", span)?;
   let dir = checkpoint_dir(".lx-checkpoints", name);
   clear_checkpoints(&dir)?;
   Ok(LxVal::Unit)
 }
 
-fn bi_step_outside(_args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_step_outside(_args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   Err(LxError::runtime("checkpoint.step: must be called inside checkpoint.scope", span))
 }
 
@@ -75,7 +75,7 @@ fn is_callable(val: &LxVal) -> bool {
   matches!(val, LxVal::Func(_) | LxVal::BuiltinFunc(_) | LxVal::MultiFunc(_))
 }
 
-fn bi_step(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_step(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let dir_str = args[0].require_str("checkpoint.step", span)?;
   let step_name = args[1].require_str("checkpoint.step", span)?;
   let body = &args[2];
@@ -91,7 +91,7 @@ fn bi_step(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<Lx
   Ok(result)
 }
 
-fn bi_scope(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_scope(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let name = args[0].require_str("checkpoint.scope", span)?;
   let opts = &args[1];
   let body = &args[2];

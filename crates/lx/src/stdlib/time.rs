@@ -5,8 +5,8 @@ use std::time::Duration;
 use chrono::{DateTime, TimeZone, Utc};
 use indexmap::IndexMap;
 
+use crate::BuiltinCtx;
 use crate::error::LxError;
-use crate::runtime::RuntimeCtx;
 use crate::std_module;
 use crate::stdlib::helpers::datetime_to_record;
 use crate::value::LxVal;
@@ -21,12 +21,12 @@ pub fn build() -> IndexMap<crate::sym::Sym, LxVal> {
   }
 }
 
-fn bi_now(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_now(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let _ = &args[0];
   Ok(datetime_to_record(Utc::now()))
 }
 
-fn bi_sleep(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_sleep(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let ms = match &args[0] {
     LxVal::Int(n) => {
       let v: i64 = n.try_into().map_err(|_| LxError::type_err("time.sleep: ms too large", span, None))?;
@@ -49,14 +49,14 @@ fn bi_sleep(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<
   Ok(LxVal::Unit)
 }
 
-fn bi_format(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_format(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let fmt = args[0].require_str("time.format", span)?;
   let ts = record_to_datetime(&args[1], span)?;
   let formatted = ts.format(fmt).to_string();
   Ok(LxVal::str(formatted))
 }
 
-fn bi_parse(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_parse(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let fmt = args[0].require_str("time.parse", span)?;
   let input = args[1].require_str("time.parse", span)?;
   match DateTime::parse_from_str(input, fmt) {

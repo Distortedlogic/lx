@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use num_traits::ToPrimitive;
 
+use crate::BuiltinCtx;
 use crate::error::LxError;
-use crate::runtime::RuntimeCtx;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
@@ -39,11 +39,11 @@ pub(super) fn register(env: &crate::env::Env) {
   });
 }
 
-pub(super) async fn call(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(super) async fn call(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   crate::builtins::call_value(f, arg, span, ctx).await
 }
 
-pub(super) async fn call_predicate(f: &LxVal, arg: LxVal, sp: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<bool, LxError> {
+pub(super) async fn call_predicate(f: &LxVal, arg: LxVal, sp: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<bool, LxError> {
   Ok(call(f, arg, sp, ctx).await?.as_bool() == Some(true))
 }
 
@@ -74,7 +74,7 @@ pub(super) fn get_list<'a>(v: &'a LxVal, name: &str, sp: SourceSpan) -> Result<L
   }
 }
 
-fn bi_map(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
+fn bi_map(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<dyn BuiltinCtx>) -> BoxFut {
   Box::pin(async move {
     let items = get_list(&args[1], "map", sp)?;
     let mut out = Vec::with_capacity(items.len());
@@ -85,7 +85,7 @@ fn bi_map(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
   })
 }
 
-fn bi_filter(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
+fn bi_filter(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<dyn BuiltinCtx>) -> BoxFut {
   Box::pin(async move {
     let items = get_list(&args[1], "filter", sp)?;
     let mut out = Vec::new();
@@ -103,7 +103,7 @@ fn bi_filter(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
   })
 }
 
-fn bi_fold(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
+fn bi_fold(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<dyn BuiltinCtx>) -> BoxFut {
   Box::pin(async move {
     let items = get_list(&args[2], "fold", sp)?;
     let mut acc = args[0].clone();
@@ -116,7 +116,7 @@ fn bi_fold(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
   })
 }
 
-fn bi_flat_map(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
+fn bi_flat_map(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<dyn BuiltinCtx>) -> BoxFut {
   Box::pin(async move {
     let items = get_list(&args[1], "flat_map", sp)?;
     let mut out = Vec::new();
@@ -131,7 +131,7 @@ fn bi_flat_map(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut
   })
 }
 
-fn bi_each(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
+fn bi_each(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<dyn BuiltinCtx>) -> BoxFut {
   Box::pin(async move {
     let items = get_list(&args[1], "each", sp)?;
     for v in items.iter() {
@@ -141,34 +141,34 @@ fn bi_each(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
   })
 }
 
-fn bi_take(args: &[LxVal], sp: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_take(args: &[LxVal], sp: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let n = args[0].require_int("take", sp)?;
   let n = n.to_usize().ok_or_else(|| LxError::runtime("take: count out of range", sp))?;
   let items = get_list(&args[1], "take", sp)?;
   Ok(LxVal::list(items.iter().take(n).cloned().collect()))
 }
 
-fn bi_drop(args: &[LxVal], sp: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_drop(args: &[LxVal], sp: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let n = args[0].require_int("drop", sp)?;
   let n = n.to_usize().ok_or_else(|| LxError::runtime("drop: count out of range", sp))?;
   let items = get_list(&args[1], "drop", sp)?;
   Ok(LxVal::list(items.iter().skip(n).cloned().collect()))
 }
 
-fn bi_zip(args: &[LxVal], sp: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_zip(args: &[LxVal], sp: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let a = get_list(&args[0], "zip", sp)?;
   let b = get_list(&args[1], "zip", sp)?;
   let out: Vec<LxVal> = a.iter().zip(b.iter()).map(|(x, y)| LxVal::tuple(vec![y.clone(), x.clone()])).collect();
   Ok(LxVal::list(out))
 }
 
-fn bi_enumerate(args: &[LxVal], sp: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_enumerate(args: &[LxVal], sp: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let items = get_list(&args[0], "enumerate", sp)?;
   let out: Vec<LxVal> = items.iter().enumerate().map(|(i, v)| LxVal::tuple(vec![LxVal::int(i), v.clone()])).collect();
   Ok(LxVal::list(out))
 }
 
-fn bi_find(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
+fn bi_find(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<dyn BuiltinCtx>) -> BoxFut {
   Box::pin(async move {
     let items = get_list(&args[1], "find", sp)?;
     for v in items.iter() {
@@ -180,7 +180,7 @@ fn bi_find(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
   })
 }
 
-fn bi_any(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
+fn bi_any(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<dyn BuiltinCtx>) -> BoxFut {
   Box::pin(async move {
     let items = get_list(&args[1], "any?", sp)?;
     for v in items.iter() {
@@ -192,7 +192,7 @@ fn bi_any(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
   })
 }
 
-fn bi_all(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
+fn bi_all(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<dyn BuiltinCtx>) -> BoxFut {
   Box::pin(async move {
     let items = get_list(&args[1], "all?", sp)?;
     for v in items.iter() {
@@ -204,7 +204,7 @@ fn bi_all(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
   })
 }
 
-fn bi_none_q(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<RuntimeCtx>) -> BoxFut {
+fn bi_none_q(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<dyn BuiltinCtx>) -> BoxFut {
   Box::pin(async move {
     let items = get_list(&args[1], "none?", sp)?;
     for v in items.iter() {

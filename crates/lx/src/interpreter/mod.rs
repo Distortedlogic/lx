@@ -1,4 +1,4 @@
-use crate::sym::{Sym, intern};
+use crate::sym::intern;
 pub(crate) mod ambient;
 mod apply;
 mod apply_helpers;
@@ -17,15 +17,6 @@ mod trait_apply;
 mod traits;
 mod type_apply;
 
-use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
-use std::sync::Arc;
-
-use async_recursion::async_recursion;
-use parking_lot::Mutex;
-
-use indexmap::IndexMap;
-
 use crate::ast::{
   AstArena, BindTarget, Core, Expr, ExprApply, ExprAssert, ExprBinary, ExprBlock, ExprBreak, ExprEmit, ExprFieldAccess, ExprFunc, ExprId, ExprLoop, ExprMatch,
   ExprNamedArg, ExprPar, ExprPropagate, ExprSlice, ExprTimeout, ExprTuple, ExprUnary, ExprWith, ExprYield, Program, Stmt, WithKind,
@@ -34,13 +25,13 @@ use crate::env::Env;
 use crate::error::{EvalResult, EvalSignal, LxError};
 use crate::runtime::RuntimeCtx;
 use crate::value::LxVal;
-
-#[derive(Debug, Clone)]
-pub(crate) struct ModuleExports {
-  pub(crate) bindings: IndexMap<Sym, LxVal>,
-  pub(crate) variant_ctors: Vec<Sym>,
-}
-
+pub(crate) use crate::value::ModuleExports;
+use async_recursion::async_recursion;
+use indexmap::IndexMap;
+use parking_lot::Mutex;
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
+use std::sync::Arc;
 pub struct Interpreter {
   pub(crate) env: Arc<Env>,
   source: String,
@@ -104,6 +95,10 @@ impl Interpreter {
 
   pub fn set_env(&mut self, env: Env) {
     self.env = Arc::new(env);
+  }
+
+  pub(crate) fn builtin_ctx(&self) -> Arc<dyn crate::BuiltinCtx> {
+    crate::builtins::wrap_runtime_ctx(&self.ctx)
   }
 
   pub async fn eval_expr(&mut self, eid: ExprId) -> Result<LxVal, LxError> {
@@ -179,7 +174,8 @@ impl Interpreter {
     if let (Some(rx_arc), Some(handle_fn)) = (&self.agent_mailbox_rx, &self.agent_handle_fn) {
       let mut rx = rx_arc.lock().await;
       while let Ok(msg) = rx.try_recv() {
-        let result = crate::builtins::call_value(handle_fn, msg.payload.clone(), span, &self.ctx).await.unwrap_or_else(|e| LxVal::err_str(e.to_string()));
+        let bctx = self.builtin_ctx();
+        let result = crate::builtins::call_value(handle_fn, msg.payload.clone(), span, &bctx).await.unwrap_or_else(|e| LxVal::err_str(e.to_string()));
         if let Some(reply) = msg.reply {
           let _ = reply.send(result);
         }
@@ -262,7 +258,7 @@ impl Interpreter {
       Expr::Timeout(ExprTimeout { ms, body }) => self.eval_timeout(ms, body, span).await,
       Expr::Spawn(class_expr) => {
         let class_val = self.eval(class_expr).await?;
-        let result = crate::builtins::agent::bi_agent_spawn(vec![class_val], span, Arc::clone(&self.ctx)).await;
+        let result = crate::builtins::agent::bi_agent_spawn(vec![class_val], span, self.builtin_ctx()).await;
         result.map_err(EvalSignal::Error)
       },
       Expr::Stop => {
@@ -278,7 +274,7 @@ impl Interpreter {
         let v = self.eval(value).await?;
         println!("{v}");
         let mut fields = indexmap::IndexMap::new();
-        fields.insert(crate::sym::intern("value"), v);
+        fields.insert(intern("value"), v);
         let agent = self.agent_name.as_deref().unwrap_or("main");
         self.ctx.event_stream.xadd("runtime/emit", agent, None, fields);
         Ok(LxVal::Unit)

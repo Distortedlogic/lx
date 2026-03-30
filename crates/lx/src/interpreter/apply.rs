@@ -72,10 +72,11 @@ impl Interpreter {
         if bf.applied.len() < bf.arity {
           return Ok(LxVal::BuiltinFunc(bf));
         }
+        let bctx = self.builtin_ctx();
         match bf.kind {
-          BuiltinKind::Sync(f) => Ok(f(&bf.applied, span, &self.ctx)?),
-          BuiltinKind::Async(f) => Ok(f(bf.applied, span, Arc::clone(&self.ctx)).await?),
-          BuiltinKind::DynAsync(ref f) => Ok(f(bf.applied.clone(), span, Arc::clone(&self.ctx)).await?),
+          BuiltinKind::Sync(f) => Ok(f(&bf.applied, span, &bctx)?),
+          BuiltinKind::Async(f) => Ok(f(bf.applied, span, bctx).await?),
+          BuiltinKind::DynAsync(ref f) => Ok(f(bf.applied.clone(), span, bctx).await?),
         }
       },
       LxVal::TaggedCtor { tag, arity, mut applied } => {

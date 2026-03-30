@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
+use crate::BuiltinCtx;
 use crate::error::LxError;
-use crate::runtime::RuntimeCtx;
 use crate::std_module;
 use crate::value::LxVal;
 use miette::SourceSpan;
@@ -19,7 +19,7 @@ pub fn build() -> IndexMap<crate::sym::Sym, LxVal> {
   }
 }
 
-fn bi_get(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_get(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let key = args[0].require_str("env.get", span)?;
   match env::var(key) {
     Ok(val) => Ok(LxVal::some(LxVal::str(val))),
@@ -27,7 +27,7 @@ fn bi_get(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<Lx
   }
 }
 
-fn bi_vars(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_vars(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let _ = &args[0];
   let mut fields = IndexMap::new();
   for (k, v) in env::vars() {
@@ -36,13 +36,13 @@ fn bi_vars(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<
   Ok(LxVal::record(fields))
 }
 
-fn bi_args(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_args(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let _ = &args[0];
   let items: Vec<LxVal> = env::args().map(LxVal::str).collect();
   Ok(LxVal::list(items))
 }
 
-fn bi_cwd(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_cwd(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let _ = &args[0];
   match env::current_dir() {
     Ok(p) => Ok(LxVal::str(p.to_string_lossy())),
@@ -50,7 +50,7 @@ fn bi_cwd(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<Lx
   }
 }
 
-fn bi_home(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_home(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let _ = &args[0];
   match env::var("HOME") {
     Ok(h) => Ok(LxVal::some(LxVal::str(h))),

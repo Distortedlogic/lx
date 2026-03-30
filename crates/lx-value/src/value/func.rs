@@ -2,12 +2,11 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use crate::ast::{AstArena, ExprId};
 use crate::env::Env;
 use crate::error::LxError;
-use crate::runtime::RuntimeCtx;
-use crate::sym::Sym;
 use crate::value::LxVal;
+use lx_ast::ast::{AstArena, ExprId};
+use lx_span::sym::Sym;
 use miette::SourceSpan;
 
 #[derive(Debug, Clone)]
@@ -24,11 +23,12 @@ pub struct LxFunc {
   pub source_name: Arc<str>,
 }
 
-pub type SyncBuiltinFn = fn(&[LxVal], SourceSpan, &Arc<RuntimeCtx>) -> Result<LxVal, LxError>;
+pub type SyncBuiltinFn = fn(&[LxVal], SourceSpan, &Arc<dyn crate::BuiltinCtx>) -> Result<LxVal, LxError>;
 
-pub type AsyncBuiltinFn = fn(Vec<LxVal>, SourceSpan, Arc<RuntimeCtx>) -> Pin<Box<dyn Future<Output = Result<LxVal, LxError>>>>;
+pub type AsyncBuiltinFn = fn(Vec<LxVal>, SourceSpan, Arc<dyn crate::BuiltinCtx>) -> Pin<Box<dyn Future<Output = Result<LxVal, LxError>>>>;
 
-pub type DynAsyncBuiltinFn = Arc<dyn Fn(Vec<LxVal>, SourceSpan, Arc<RuntimeCtx>) -> Pin<Box<dyn Future<Output = Result<LxVal, LxError>>>> + Send + Sync>;
+pub type DynAsyncBuiltinFn =
+  Arc<dyn Fn(Vec<LxVal>, SourceSpan, Arc<dyn crate::BuiltinCtx>) -> Pin<Box<dyn Future<Output = Result<LxVal, LxError>>>> + Send + Sync>;
 
 #[derive(Clone)]
 pub enum BuiltinKind {

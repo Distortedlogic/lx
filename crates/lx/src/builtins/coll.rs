@@ -4,9 +4,9 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 use num_traits::ToPrimitive;
 
+use crate::BuiltinCtx;
 use crate::env::Env;
 use crate::error::LxError;
-use crate::runtime::RuntimeCtx;
 use crate::value::{LxVal, ValueKey};
 use miette::SourceSpan;
 
@@ -22,15 +22,15 @@ pub(crate) fn cmp_values(a: &LxVal, b: &LxVal) -> Ordering {
   }
 }
 
-fn bi_first(args: &[LxVal], sp: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_first(args: &[LxVal], sp: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   Ok(args[0].require_list("first", sp)?.first().cloned().unwrap_or(LxVal::None))
 }
 
-fn bi_last(args: &[LxVal], sp: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_last(args: &[LxVal], sp: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   Ok(args[0].require_list("last", sp)?.last().cloned().unwrap_or(LxVal::None))
 }
 
-fn bi_contains(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_contains(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   match &args[1] {
     LxVal::Str(s) => {
       let needle = args[0].require_str("contains?", span)?;
@@ -41,7 +41,7 @@ fn bi_contains(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resu
   }
 }
 
-fn bi_get(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_get(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   match &args[1] {
     LxVal::List(l) => {
       let n = args[0].require_int("get", span)?;
@@ -65,14 +65,14 @@ fn kv_tuple(k: LxVal, v: LxVal) -> LxVal {
   LxVal::tuple(vec![k, v])
 }
 
-fn bi_to_list(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_to_list(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Map(m) => Ok(LxVal::list(m.iter().map(|(k, v)| kv_tuple(k.0.clone(), v.clone())).collect())),
     other => Err(LxError::type_err(format!("to_list expects Map, got {}", other.type_name()), span, None)),
   }
 }
 
-fn bi_to_map(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_to_map(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Record(r) => Ok(LxVal::Map(Arc::new(r.iter().map(|(k, v)| (ValueKey(LxVal::str(k)), v.clone())).collect()))),
     LxVal::List(l) => {
@@ -93,7 +93,7 @@ fn bi_to_map(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result
   }
 }
 
-fn bi_to_record(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_to_record(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let m = match &args[0] {
     LxVal::Map(m) => m,
     other => {
@@ -108,7 +108,7 @@ fn bi_to_record(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Res
   Ok(LxVal::record(r))
 }
 
-fn bi_keys(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_keys(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Map(m) => Ok(LxVal::list(m.keys().map(|k| k.0.clone()).collect())),
     LxVal::Record(r) => Ok(LxVal::list(r.keys().map(LxVal::str).collect())),
@@ -116,7 +116,7 @@ fn bi_keys(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<L
   }
 }
 
-fn bi_values(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_values(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Map(m) => Ok(LxVal::list(m.values().cloned().collect())),
     LxVal::Record(r) => Ok(LxVal::list(r.values().cloned().collect())),
@@ -124,7 +124,7 @@ fn bi_values(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result
   }
 }
 
-fn bi_entries(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_entries(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Map(m) => Ok(LxVal::list(m.iter().map(|(k, v)| kv_tuple(k.0.clone(), v.clone())).collect())),
     LxVal::Record(r) => Ok(LxVal::list(r.iter().map(|(k, v)| kv_tuple(LxVal::str(k), v.clone())).collect())),

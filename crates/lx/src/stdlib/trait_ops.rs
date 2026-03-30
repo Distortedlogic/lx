@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
+use crate::BuiltinCtx;
 use crate::error::LxError;
 use crate::record;
-use crate::runtime::RuntimeCtx;
 use crate::std_module;
 use crate::value::{LxVal, TraitMethodDef};
 use miette::SourceSpan;
@@ -31,7 +31,7 @@ fn method_to_record(m: &TraitMethodDef) -> LxVal {
   }
 }
 
-fn bi_methods(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_methods(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let LxVal::Trait(t) = &args[0] else {
     return Err(LxError::type_err(format!("trait.methods: expected Trait, got {} `{}`", args[0].type_name(), args[0].short_display()), span, None));
   };
@@ -39,7 +39,7 @@ fn bi_methods(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Resul
   Ok(LxVal::list(records))
 }
 
-fn bi_match(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_match(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let LxVal::Trait(t) = &args[0] else {
     return Err(LxError::type_err(format!("trait.match: expected Trait, got {} `{}`", args[0].type_name(), args[0].short_display()), span, None));
   };

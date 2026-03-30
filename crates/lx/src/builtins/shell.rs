@@ -1,14 +1,14 @@
 use std::process::Command;
 use std::sync::Arc;
 
+use crate::BuiltinCtx;
 use crate::env::Env;
 use crate::error::LxError;
 use crate::record;
-use crate::runtime::RuntimeCtx;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
-fn bi_bash(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_bash(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let cmd = args[0].require_str("bash", span)?;
   match Command::new("bash").arg("-c").arg(cmd).output() {
     Ok(output) => {

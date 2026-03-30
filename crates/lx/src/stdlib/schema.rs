@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
+use crate::BuiltinCtx;
 use crate::error::LxError;
 use crate::record;
-use crate::runtime::RuntimeCtx;
 use crate::std_module;
 use crate::sym::{Sym, intern};
 use crate::value::LxVal;
@@ -49,7 +49,7 @@ fn parse_constraint(_field_name: Sym, val: &LxVal, span: SourceSpan) -> Result<L
   }
 }
 
-fn bi_define(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_define(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let name = args[0].require_str("schema.define", span)?;
   let spec = args[1].require_record("schema.define", span)?;
   let mut constraints = IndexMap::new();
@@ -77,7 +77,7 @@ fn validate_field(
   constraint: &IndexMap<Sym, LxVal>,
   data: &IndexMap<Sym, LxVal>,
   span: SourceSpan,
-  ctx: &Arc<RuntimeCtx>,
+  ctx: &Arc<dyn BuiltinCtx>,
 ) -> Result<Option<LxVal>, ValidationError> {
   let required = constraint.get(&intern("required")).and_then(|v| v.as_bool()).unwrap_or(false);
   let val = match data.get(&field_name) {
@@ -129,7 +129,7 @@ fn do_validate(
   data: &IndexMap<Sym, LxVal>,
   collect_all: bool,
   span: SourceSpan,
-  ctx: &Arc<RuntimeCtx>,
+  ctx: &Arc<dyn BuiltinCtx>,
 ) -> Result<LxVal, LxError> {
   let mut result = IndexMap::new();
   let mut errors: Vec<ValidationError> = Vec::new();
@@ -165,19 +165,19 @@ fn do_validate(
   Ok(LxVal::ok(LxVal::record(result)))
 }
 
-fn bi_validate(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_validate(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let constraints = extract_schema(args, "schema.validate", span)?;
   let data = args[1].require_record("schema.validate", span)?;
   do_validate(constraints, data, false, span, ctx)
 }
 
-fn bi_validate_all(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_validate_all(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let constraints = extract_schema(args, "schema.validate_all", span)?;
   let data = args[1].require_record("schema.validate_all", span)?;
   do_validate(constraints, data, true, span, ctx)
 }
 
-fn bi_check(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_check(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let constraints = extract_schema(args, "schema.check", span)?;
   let data = args[1].require_record("schema.check", span)?;
   Ok(LxVal::Bool(matches!(do_validate(constraints, data, false, span, ctx)?, LxVal::Ok(_))))

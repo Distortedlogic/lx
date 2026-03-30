@@ -36,7 +36,7 @@ impl super::Interpreter {
       let dispatch = mk_dyn_async(
         "lx_tool.call",
         1,
-        Arc::new(move |args: Vec<LxVal>, call_span: SourceSpan, _ctx: Arc<crate::runtime::RuntimeCtx>| {
+        Arc::new(move |args: Vec<LxVal>, call_span: SourceSpan, _ctx: Arc<dyn crate::BuiltinCtx>| {
           let func_val = func_val.clone();
           let method_name = Arc::clone(&method_name);
           let module = Arc::clone(&module);
@@ -55,7 +55,8 @@ impl super::Interpreter {
             call_fields.insert(intern("args"), arg.clone());
             event_stream.xadd("tool/call", &agent, None, call_fields);
 
-            let result = crate::builtins::call_value(&func_val, arg, call_span, &ctx_ref).await;
+            let bctx: Arc<dyn crate::BuiltinCtx> = crate::builtins::wrap_runtime_ctx(&ctx_ref);
+            let result = crate::builtins::call_value(&func_val, arg, call_span, &bctx).await;
 
             match result {
               Ok(val) => {

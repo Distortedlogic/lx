@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::BuiltinCtx;
 use crate::ast::{BindTarget, Program, Stmt};
 use crate::error::{EvalSignal, LxError};
 use crate::folder::desugar;
@@ -15,9 +16,9 @@ use miette::SourceSpan;
 const ENTRY_RUN: &str = "run";
 const ENTRY_MAIN: &str = "main";
 
-pub(super) fn invoke_flow(flow_path: &str, input: &LxVal, ctx: &Arc<RuntimeCtx>, span: SourceSpan) -> Result<LxVal, LxError> {
+pub(super) fn invoke_flow(flow_path: &str, input: &LxVal, ctx: &Arc<dyn BuiltinCtx>, span: SourceSpan) -> Result<LxVal, LxError> {
   let path = if flow_path.starts_with("./") || flow_path.starts_with("../") {
-    if let Some(ref dir) = *ctx.source_dir.lock() { dir.join(flow_path) } else { std::path::PathBuf::from(flow_path) }
+    if let Some(ref dir) = ctx.source_dir() { dir.join(flow_path) } else { std::path::PathBuf::from(flow_path) }
   } else {
     std::path::PathBuf::from(flow_path)
   };
@@ -34,7 +35,19 @@ pub(super) fn invoke_flow(flow_path: &str, input: &LxVal, ctx: &Arc<RuntimeCtx>,
   }
   let program = desugar(surface);
   let module_dir = path.parent().map(|p| p.to_path_buf());
-  let mut interp = Interpreter::new(&source, module_dir, Arc::clone(ctx));
+  let rtx = crate::builtins::extract_runtime_ctx(ctx.as_ref());
+  let rtx_arc = Arc::new(RuntimeCtx {
+    event_stream: Arc::clone(ctx.event_stream()),
+    source_dir: parking_lot::Mutex::new(ctx.source_dir()),
+    network_denied: ctx.network_denied(),
+    test_threshold: ctx.test_threshold(),
+    test_runs: ctx.test_runs(),
+    workspace_members: rtx.workspace_members.clone(),
+    dep_dirs: rtx.dep_dirs.clone(),
+    tokio_runtime: Arc::clone(&rtx.tokio_runtime),
+    ..RuntimeCtx::default()
+  });
+  let mut interp = Interpreter::new(&source, module_dir, rtx_arc);
   tokio::task::block_in_place(|| {
     tokio::runtime::Handle::current().block_on(async {
       interp.load_default_tools().await.map_err(|e| LxError::runtime(format!("test.run: tool init error in '{flow_path}': {e}"), span))?;

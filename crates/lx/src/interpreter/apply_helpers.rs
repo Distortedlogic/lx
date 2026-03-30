@@ -6,7 +6,6 @@ use num_traits::ToPrimitive;
 
 use crate::ast::{ExprId, FieldKind};
 use crate::error::{EvalResult, LxError};
-use crate::runtime::RuntimeCtx;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
@@ -110,13 +109,13 @@ impl Interpreter {
   }
 }
 
-fn bi_tool_dispatch(args: Vec<LxVal>, span: SourceSpan, ctx: Arc<RuntimeCtx>) -> Pin<Box<dyn Future<Output = Result<LxVal, LxError>>>> {
+fn bi_tool_dispatch(args: Vec<LxVal>, span: SourceSpan, ctx: Arc<dyn crate::BuiltinCtx>) -> Pin<Box<dyn Future<Output = Result<LxVal, LxError>>>> {
   Box::pin(async move {
     let LxVal::ToolModule(tm) = &args[0] else {
       return Err(LxError::runtime("tool.call: invalid tool module", span));
     };
     let method = args[1].as_str().ok_or_else(|| LxError::runtime("tool.call: invalid method name", span))?;
     let arg = args[2].clone();
-    tm.call_tool(method, arg, &ctx.event_stream, "main").await
+    tm.call_tool(method, arg, ctx.event_stream(), "main").await
   })
 }

@@ -5,9 +5,9 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 use num_traits::ToPrimitive;
 
+use crate::BuiltinCtx;
 use crate::error::LxError;
 use crate::event_stream::entry_to_lxval;
-use crate::runtime::RuntimeCtx;
 use crate::sym::{Sym, intern};
 use crate::value::LxVal;
 use miette::SourceSpan;
@@ -22,7 +22,7 @@ pub fn build() -> IndexMap<Sym, LxVal> {
   m
 }
 
-fn bi_xadd(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_xadd(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let rec = args[0].require_record("events.xadd", span)?;
   let kind = rec.get(&intern("kind")).and_then(|v| v.as_str()).ok_or_else(|| LxError::type_err("events.xadd: 'kind' field required as Str", span, None))?;
   let agent = rec.get(&intern("agent")).and_then(|v| v.as_str()).unwrap_or("main");
@@ -33,19 +33,19 @@ fn bi_xadd(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<Lx
       fields.insert(*k, v.clone());
     }
   }
-  let id = ctx.event_stream.xadd(kind, agent, None, fields);
+  let id = ctx.event_stream().xadd(kind, agent, None, fields);
   Ok(LxVal::str(id))
 }
 
-fn bi_xrange(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_xrange(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let start = args[0].require_str("events.xrange", span)?;
   let end = args[1].require_str("events.xrange", span)?;
-  let entries = ctx.event_stream.xrange(start, end, None);
+  let entries = ctx.event_stream().xrange(start, end, None);
   let items: Vec<LxVal> = entries.iter().map(entry_to_lxval).collect();
   Ok(LxVal::list(items))
 }
 
-fn bi_xread(args: Vec<LxVal>, span: SourceSpan, ctx: Arc<RuntimeCtx>) -> Pin<Box<dyn Future<Output = Result<LxVal, LxError>>>> {
+fn bi_xread(args: Vec<LxVal>, span: SourceSpan, ctx: Arc<dyn BuiltinCtx>) -> Pin<Box<dyn Future<Output = Result<LxVal, LxError>>>> {
   Box::pin(async move {
     let last_id = match &args[0] {
       LxVal::Str(s) => s.to_string(),
@@ -54,24 +54,24 @@ fn bi_xread(args: Vec<LxVal>, span: SourceSpan, ctx: Arc<RuntimeCtx>) -> Pin<Box
       },
     };
     let timeout_ms = args[1].int_field("timeout_ms").and_then(|n| n.to_u64());
-    match ctx.event_stream.xread(&last_id, timeout_ms).await {
+    match ctx.event_stream().xread(&last_id, timeout_ms).await {
       Some(entry) => Ok(entry_to_lxval(&entry)),
       None => Ok(LxVal::None),
     }
   })
 }
 
-fn bi_xlen(_args: &[LxVal], _span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
-  Ok(LxVal::int(ctx.event_stream.xlen() as i64))
+fn bi_xlen(_args: &[LxVal], _span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+  Ok(LxVal::int(ctx.event_stream().xlen() as i64))
 }
 
-fn bi_xtrim(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_xtrim(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let rec = args[0].require_record("events.xtrim", span)?;
   let maxlen = rec
     .get(&intern("maxlen"))
     .and_then(|v| v.as_int())
     .and_then(|n| n.to_usize())
     .ok_or_else(|| LxError::type_err("events.xtrim: 'maxlen' field required as Int", span, None))?;
-  ctx.event_stream.xtrim(maxlen);
+  ctx.event_stream().xtrim(maxlen);
   Ok(LxVal::Unit)
 }

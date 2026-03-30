@@ -4,9 +4,9 @@ use std::sync::{Arc, LazyLock};
 use dashmap::DashMap;
 use indexmap::IndexMap;
 
+use crate::BuiltinCtx;
 use crate::builtins::call_value_sync;
 use crate::error::LxError;
-use crate::runtime::RuntimeCtx;
 use crate::std_module;
 use crate::value::LxVal;
 use miette::SourceSpan;
@@ -49,7 +49,7 @@ fn alloc_stream(state: StreamState) -> u64 {
   id
 }
 
-fn pull_next(id: u64, span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn pull_next(id: u64, span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let entry = STREAMS.get(&id).ok_or_else(|| LxError::runtime("stream: not found", span))?;
   match entry.value() {
     StreamState::FromList { items, index } => {
@@ -123,7 +123,7 @@ fn pull_next(id: u64, span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, 
   }
 }
 
-fn bi_from(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_from(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let source = &args[0];
   match source {
     LxVal::List(items) => {
@@ -138,7 +138,7 @@ fn bi_from(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<L
   }
 }
 
-fn bi_collect(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_collect(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let id = stream_id(&args[0], span)?;
   let mut result = Vec::new();
   while let LxVal::Some(val) = pull_next(id, span, ctx)? {
@@ -147,33 +147,33 @@ fn bi_collect(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result
   Ok(LxVal::list(result))
 }
 
-fn bi_map(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_map(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let inner_id = stream_id(&args[1], span)?;
   let id = alloc_stream(StreamState::Map { inner_id, func: args[0].clone() });
   Ok(LxVal::Stream { id })
 }
 
-fn bi_filter(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_filter(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let inner_id = stream_id(&args[1], span)?;
   let id = alloc_stream(StreamState::Filter { inner_id, pred: args[0].clone() });
   Ok(LxVal::Stream { id })
 }
 
-fn bi_take(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_take(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let n = args[0].require_usize("stream.take", span)?;
   let inner_id = stream_id(&args[1], span)?;
   let id = alloc_stream(StreamState::Take { inner_id, remaining: AtomicUsize::new(n) });
   Ok(LxVal::Stream { id })
 }
 
-fn bi_batch(args: &[LxVal], span: SourceSpan, _ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_batch(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let size = args[0].require_usize("stream.batch", span)?;
   let inner_id = stream_id(&args[1], span)?;
   let id = alloc_stream(StreamState::Batch { inner_id, size });
   Ok(LxVal::Stream { id })
 }
 
-fn bi_each(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_each(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let f = &args[0];
   let id = stream_id(&args[1], span)?;
   while let LxVal::Some(val) = pull_next(id, span, ctx)? {
@@ -182,7 +182,7 @@ fn bi_each(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<Lx
   Ok(LxVal::Unit)
 }
 
-fn bi_fold(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+fn bi_fold(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let mut acc = args[0].clone();
   let f = &args[1];
   let id = stream_id(&args[2], span)?;

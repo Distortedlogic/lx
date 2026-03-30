@@ -237,8 +237,8 @@ async fn setup_external_stream(ctx: &Arc<RuntimeCtx>, file_path: &str) {
   let command = stream_config.command;
   match lx::mcp_client::McpClient::spawn(&command).await {
     Ok(client) => {
-      let client_arc = Arc::new(tokio::sync::Mutex::new(client));
-      ctx.event_stream.set_external_client(client_arc);
+      let sink = Arc::new(lx::mcp_client::McpStreamSink::new(client));
+      ctx.event_stream.set_external_client(sink);
     },
     Err(e) => {
       eprintln!("[stream:external] failed to connect to '{command}': {e}");

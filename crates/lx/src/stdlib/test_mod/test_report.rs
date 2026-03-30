@@ -2,14 +2,14 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
+use crate::BuiltinCtx;
 use crate::error::LxError;
-use crate::runtime::RuntimeCtx;
 use crate::value::LxVal;
 use miette::SourceSpan;
 
 use super::{extract_record, score_to_f64};
 
-pub(crate) fn bi_report(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>) -> Result<LxVal, LxError> {
+pub(crate) fn bi_report(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
   let results = extract_record(&args[0], "test.report", span)?;
   let spec_name = results.get(&crate::sym::intern("spec")).and_then(|v| v.as_str()).unwrap_or("unnamed");
   let threshold = results.get(&crate::sym::intern("threshold")).and_then(|v| v.as_float()).unwrap_or(0.75);
@@ -34,7 +34,7 @@ pub(crate) fn bi_report(args: &[LxVal], span: SourceSpan, ctx: &Arc<RuntimeCtx>)
   println!("{out}");
   let mut fields = indexmap::IndexMap::new();
   fields.insert(crate::sym::intern("value"), LxVal::str(&out));
-  ctx.event_stream.xadd("runtime/emit", "main", None, fields);
+  ctx.event_stream().xadd("runtime/emit", "main", None, fields);
   Ok(LxVal::Unit)
 }
 
