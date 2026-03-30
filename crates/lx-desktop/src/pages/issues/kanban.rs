@@ -12,6 +12,7 @@ pub fn KanbanBoardView(
   on_select: EventHandler<String>,
   on_status_change: EventHandler<(String, String)>,
   #[props(optional)] on_reorder: Option<EventHandler<(String, String, usize)>>,
+  #[props(default)] active_issue_ids: Vec<String>,
 ) -> Element {
   let mut dragging_issue_id = use_signal(|| Option::<String>::None);
   let mut drag_over_column = use_signal(|| Option::<String>::None);
@@ -98,6 +99,7 @@ pub fn KanbanBoardView(
             pointer_start,
             pointer_pos,
             drag_over_index,
+            active_issue_ids: active_issue_ids.clone(),
           }
         }
       }
@@ -117,6 +119,7 @@ fn KanbanColumn(
   status: String,
   issues: Vec<Issue>,
   agents: Vec<AgentRef>,
+  active_issue_ids: Vec<String>,
   on_select: EventHandler<String>,
   on_status_change: EventHandler<(String, String)>,
   dragging_issue_id: Signal<Option<String>>,
@@ -185,6 +188,7 @@ fn KanbanColumn(
               drag_active,
               pending_drag_id,
               pointer_start,
+              is_active: active_issue_ids.contains(&issue.id),
               on_click: {
                   let id = issue.identifier.clone().unwrap_or_else(|| issue.id.clone());
                   move |_| on_select.call(id.clone())
