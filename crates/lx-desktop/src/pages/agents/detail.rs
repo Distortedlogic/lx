@@ -1,11 +1,11 @@
 use super::budget_tab::BudgetTab;
-use super::config_form::{AgentConfigPanel, ConfigUpdate};
+use super::config_form::{AgentConfigPanel, AgentConfigUpdate};
 use super::list::StatusBadge;
 use super::overview::AgentOverview;
 use super::run_types::{BudgetSummary, HeartbeatRun, SkillSnapshot};
 use super::runs_tab::RunsTab;
 use super::skills_tab::SkillsTab;
-use super::types::{AgentDetail as AgentDetailData, AgentDetailTab, role_label};
+use super::types::{AgentDetail as AgentDetailData, AgentDetailTab, LxAgentConfig, role_label};
 use crate::contexts::activity_log::ActivityLog;
 use crate::styles::{BTN_OUTLINE_SM, TAB_ACTIVE, TAB_INACTIVE};
 use dioxus::prelude::*;
@@ -117,11 +117,24 @@ pub fn AgentDetailShell(
           AgentDetailTab::Overview => rsx! {
             AgentOverview { agent: agent.clone() }
           },
-          AgentDetailTab::Config => rsx! {
-            AgentConfigPanel {
-              agent: agent.clone(),
-              on_save: move |_update: ConfigUpdate| {},
-              on_cancel: move |_| {},
+          AgentDetailTab::Config => {
+            let config = LxAgentConfig {
+              name: agent.name.clone(),
+              source_text: format!("agent {} {{\n  -- source not yet loaded\n}}", agent.name),
+              adapter_type: agent.adapter_type.clone(),
+              model: agent.adapter_config.get("model")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+              tools: vec![],
+              channels: vec![],
+              fields: vec![],
+            };
+            rsx! {
+              AgentConfigPanel {
+                config: config,
+                on_save: move |_update: AgentConfigUpdate| {},
+              }
             }
           },
           AgentDetailTab::Runs => rsx! {

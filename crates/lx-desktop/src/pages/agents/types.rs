@@ -119,3 +119,26 @@ pub fn status_dot_class(status: &str) -> &'static str {
     _ => STATUS_DOT_DEFAULT,
   }
 }
+
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct LxAgentConfig {
+  pub name: String,
+  pub source_text: String,
+  pub adapter_type: String,
+  pub model: String,
+  pub tools: Vec<LxToolDecl>,
+  pub channels: Vec<String>,
+  pub fields: Vec<LxAgentField>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LxToolDecl {
+  pub path: String,
+  pub alias: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LxAgentField {
+  pub name: String,
+  pub value: String,
+}

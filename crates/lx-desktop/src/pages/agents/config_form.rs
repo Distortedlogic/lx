@@ -1,45 +1,56 @@
-use super::types::{ADAPTER_LABELS, AgentDetail};
-use crate::components::ui::select::{Select, SelectOption};
+use super::types::{ADAPTER_LABELS, LxAgentConfig};
 use crate::styles::{BTN_OUTLINE_SM, BTN_PRIMARY_SM, INPUT_FIELD};
 use dioxus::prelude::*;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct ConfigUpdate {
+pub struct AgentConfigUpdate {
   pub adapter_type: String,
   pub model: String,
-  pub heartbeat_enabled: bool,
-  pub heartbeat_interval_sec: u32,
 }
 
 #[component]
-pub fn AgentConfigPanel(
-  agent: AgentDetail,
-  #[props(optional)] on_save: Option<EventHandler<ConfigUpdate>>,
-  #[props(optional)] on_cancel: Option<EventHandler<()>>,
-) -> Element {
-  let original_adapter = agent.adapter_type.clone();
-  let original_model = agent.adapter_config.get("model").and_then(|v| v.as_str()).unwrap_or("").to_string();
-  let original_hb_enabled = agent.runtime_config.get("heartbeat").and_then(|v| v.get("enabled")).and_then(|v| v.as_bool()).unwrap_or(false);
-  let original_interval = agent.runtime_config.get("heartbeat").and_then(|v| v.get("intervalSec")).and_then(|v| v.as_u64()).unwrap_or(300) as u32;
-
-  let mut adapter_type = use_signal(|| original_adapter.clone());
-  let mut model = use_signal(|| original_model.clone());
-  let mut heartbeat_enabled = use_signal(|| original_hb_enabled);
-  let mut interval_sec = use_signal(|| original_interval);
+pub fn AgentConfigPanel(config: LxAgentConfig, #[props(optional)] on_save: Option<EventHandler<AgentConfigUpdate>>) -> Element {
+  let mut adapter_type = use_signal(|| config.adapter_type.clone());
+  let mut model = use_signal(|| config.model.clone());
   let mut dirty = use_signal(|| false);
 
   rsx! {
     div { class: "max-w-3xl space-y-6",
-      ConfigSection { title: "Adapter",
-        div { class: "space-y-3",
-          label { class: "text-xs text-[var(--outline)] block", "Adapter type" }
-          Select {
-            value: adapter_type.read().clone(),
-            options: ADAPTER_LABELS.iter().map(|(k, l)| SelectOption::new(*k, *l)).collect::<Vec<_>>(),
-            onchange: move |val: String| {
-                adapter_type.set(val);
-                dirty.set(true);
+      ConfigSection { title: "Source Definition",
+        div { class: "relative",
+          pre {
+            class: "text-xs font-mono leading-relaxed text-[var(--on-surface)] bg-[var(--surface)] border border-[var(--outline-variant)]/30 rounded p-4 overflow-x-auto max-h-80 overflow-y-auto whitespace-pre",
+            "{config.source_text}"
+          }
+          button {
+            class: "absolute top-2 right-2 text-xs text-[var(--outline)] hover:text-[var(--on-surface)] transition-colors",
+            title: "Copy source",
+            onclick: {
+              let source = config.source_text.clone();
+              move |_| {
+                let escaped = source.replace('\\', "\\\\").replace('\'', "\\'").replace('\n', "\\n");
+                spawn(async move {
+                  let _ = document::eval(&format!("navigator.clipboard.writeText('{escaped}')")).await;
+                });
+              }
             },
+            span { class: "material-symbols-outlined text-sm", "content_copy" }
+          }
+        }
+      }
+      ConfigSection { title: "Model & Backend",
+        div { class: "space-y-3",
+          label { class: "text-xs text-[var(--outline)] block", "Adapter" }
+          select {
+            class: INPUT_FIELD,
+            value: "{adapter_type}",
+            onchange: move |evt| {
+              adapter_type.set(evt.value().to_string());
+              dirty.set(true);
+            },
+            for (key, label) in ADAPTER_LABELS {
+              option { value: *key, "{label}" }
+            }
           }
           label { class: "text-xs text-[var(--outline)] block", "Model" }
           input {
@@ -47,39 +58,52 @@ pub fn AgentConfigPanel(
             value: "{model}",
             placeholder: "e.g. claude-sonnet-4-20250514",
             oninput: move |evt| {
-                model.set(evt.value().to_string());
-                dirty.set(true);
+              model.set(evt.value().to_string());
+              dirty.set(true);
             },
           }
         }
       }
-      ConfigSection { title: "Heartbeat",
-        div { class: "space-y-3",
-          div { class: "flex items-center justify-between",
-            span { class: "text-sm text-[var(--on-surface)]", "Enabled" }
-            ToggleSwitch {
-              checked: *heartbeat_enabled.read(),
-              on_toggle: move |v: bool| {
-                  heartbeat_enabled.set(v);
-                  dirty.set(true);
-              },
+      ConfigSection { title: "Tools",
+        if config.tools.is_empty() {
+          div { class: "text-sm text-[var(--outline)] italic", "No tools declared" }
+        } else {
+          div { class: "space-y-1",
+            for tool in config.tools.iter() {
+              div { class: "flex items-center gap-3 py-1.5 border-b border-[var(--outline-variant)]/20 last:border-b-0",
+                span { class: "material-symbols-outlined text-sm text-[var(--outline)]", "build" }
+                span { class: "text-sm font-mono text-[var(--on-surface)]", "{tool.path}" }
+                if tool.alias != tool.path {
+                  span { class: "text-xs text-[var(--outline)]", "as" }
+                  span { class: "text-sm font-mono text-[var(--primary)]", "{tool.alias}" }
+                }
+              }
             }
           }
-          if *heartbeat_enabled.read() {
-            div {
-              label { class: "text-xs text-[var(--outline)] block mb-1",
-                "Interval (seconds)"
+        }
+      }
+      ConfigSection { title: "Channels",
+        if config.channels.is_empty() {
+          div { class: "text-sm text-[var(--outline)] italic", "No channel subscriptions" }
+        } else {
+          div { class: "flex flex-wrap gap-2",
+            for ch in config.channels.iter() {
+              span {
+                class: "inline-flex items-center gap-1.5 rounded border border-[var(--outline-variant)]/30 bg-[var(--surface)] px-2.5 py-1 text-xs font-mono text-[var(--on-surface)]",
+                span { class: "material-symbols-outlined text-xs text-[var(--outline)]", "tag" }
+                "{ch}"
               }
-              input {
-                class: INPUT_FIELD,
-                r#type: "number",
-                value: "{interval_sec}",
-                oninput: move |evt| {
-                    if let Ok(v) = evt.value().parse::<u32>() {
-                        interval_sec.set(v);
-                        dirty.set(true);
-                    }
-                },
+            }
+          }
+        }
+      }
+      if !config.fields.is_empty() {
+        ConfigSection { title: "Fields",
+          div { class: "space-y-2",
+            for field in config.fields.iter() {
+              div { class: "flex items-baseline gap-3",
+                span { class: "text-xs font-mono text-[var(--outline)] w-28 shrink-0", "{field.name}" }
+                span { class: "text-sm font-mono text-[var(--on-surface)]", "{field.value}" }
               }
             }
           }
@@ -90,30 +114,23 @@ pub fn AgentConfigPanel(
           button {
             class: BTN_OUTLINE_SM,
             onclick: move |_| {
-                adapter_type.set(original_adapter.clone());
-                model.set(original_model.clone());
-                heartbeat_enabled.set(original_hb_enabled);
-                interval_sec.set(original_interval);
-                dirty.set(false);
-                if let Some(ref handler) = on_cancel {
-                    handler.call(());
-                }
+              adapter_type.set(config.adapter_type.clone());
+              model.set(config.model.clone());
+              dirty.set(false);
             },
             "Cancel"
           }
           button {
             class: BTN_PRIMARY_SM,
             onclick: move |_| {
-                let update = ConfigUpdate {
-                    adapter_type: adapter_type.read().clone(),
-                    model: model.read().clone(),
-                    heartbeat_enabled: *heartbeat_enabled.read(),
-                    heartbeat_interval_sec: *interval_sec.read(),
-                };
-                dirty.set(false);
-                if let Some(ref handler) = on_save {
-                    handler.call(update);
-                }
+              let update = AgentConfigUpdate {
+                adapter_type: adapter_type.read().clone(),
+                model: model.read().clone(),
+              };
+              dirty.set(false);
+              if let Some(ref handler) = on_save {
+                handler.call(update);
+              }
             },
             "Save"
           }
@@ -131,19 +148,6 @@ fn ConfigSection(title: &'static str, children: Element) -> Element {
         h3 { class: "text-sm font-medium text-[var(--on-surface)]", "{title}" }
       }
       div { class: "px-4 py-4", {children} }
-    }
-  }
-}
-
-#[component]
-fn ToggleSwitch(checked: bool, on_toggle: EventHandler<bool>) -> Element {
-  let bg = if checked { "bg-[var(--success)]" } else { "bg-[var(--outline-variant)]" };
-  let translate = if checked { "translate-x-4" } else { "translate-x-0.5" };
-  rsx! {
-    button {
-      class: "relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 {bg}",
-      onclick: move |_| on_toggle.call(!checked),
-      span { class: "inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform {translate}" }
     }
   }
 }
