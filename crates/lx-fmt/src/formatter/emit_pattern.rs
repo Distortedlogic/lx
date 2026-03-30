@@ -1,4 +1,4 @@
-use crate::ast::{Pattern, PatternId};
+use lx_ast::ast::{Pattern, PatternId};
 
 use super::Formatter;
 

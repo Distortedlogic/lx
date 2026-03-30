@@ -1,0 +1,12 @@
+[package]
+edition.workspace = true
+license.workspace = true
+name = "lx-fmt"
+version = "0.1.0"
+
+[dependencies]
+lx-span = { path = "../lx-span" }
+lx-ast = { path = "../lx-ast" }
+
+[lints]
+workspace = true

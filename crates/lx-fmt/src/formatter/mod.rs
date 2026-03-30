@@ -4,7 +4,7 @@ mod emit_pattern;
 mod emit_stmt;
 mod emit_type;
 
-use crate::ast::{AstArena, Program};
+use lx_ast::ast::{AstArena, Program};
 
 pub struct Formatter<'a> {
   arena: &'a AstArena,

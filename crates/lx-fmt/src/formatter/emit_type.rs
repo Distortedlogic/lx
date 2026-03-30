@@ -1,4 +1,4 @@
-use crate::ast::{TypeExpr, TypeExprId};
+use lx_ast::ast::{TypeExpr, TypeExprId};
 
 use super::Formatter;
 

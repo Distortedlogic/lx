@@ -1,4 +1,7 @@
-use crate::ast::{BinOp, Expr, ExprBlock, ExprBreak, ExprId, ExprLoop, ExprPar, ExprPropagate, ExprTuple, FieldKind, ListElem, MapEntry, RecordField};
+use lx_ast::ast::{
+  BinOp, Expr, ExprAssert, ExprBlock, ExprBreak, ExprFieldAccess, ExprFunc, ExprId, ExprLoop, ExprMatch, ExprPar, ExprPropagate, ExprTimeout, ExprTuple,
+  FieldKind, ListElem, MapEntry, RecordField, SelArm, StmtId,
+};
 
 use super::Formatter;
 
@@ -95,7 +98,7 @@ impl Formatter<'_> {
     }
   }
 
-  fn emit_field_access(&mut self, fa: &crate::ast::ExprFieldAccess) {
+  fn emit_field_access(&mut self, fa: &ExprFieldAccess) {
     self.emit_expr_prec(fa.expr, PREC_APPLY + 1);
     self.write(".");
     match &fa.field {
@@ -109,7 +112,7 @@ impl Formatter<'_> {
     }
   }
 
-  fn emit_block(&mut self, stmts: &[crate::ast::StmtId]) {
+  fn emit_block(&mut self, stmts: &[StmtId]) {
     self.write("{");
     self.indent();
     for &sid in stmts {
@@ -194,7 +197,7 @@ impl Formatter<'_> {
     self.write("}");
   }
 
-  fn emit_func(&mut self, func: &crate::ast::ExprFunc) {
+  fn emit_func(&mut self, func: &ExprFunc) {
     self.write("(");
     for (i, p) in func.params.iter().enumerate() {
       if i > 0 {
@@ -224,7 +227,7 @@ impl Formatter<'_> {
     self.emit_expr(func.body);
   }
 
-  fn emit_match(&mut self, m: &crate::ast::ExprMatch) {
+  fn emit_match(&mut self, m: &ExprMatch) {
     self.emit_expr_prec(m.scrutinee, PREC_TERNARY + 1);
     self.write(" ? {");
     self.indent();
@@ -251,7 +254,7 @@ impl Formatter<'_> {
     }
   }
 
-  fn emit_assert(&mut self, a: &crate::ast::ExprAssert) {
+  fn emit_assert(&mut self, a: &ExprAssert) {
     self.write("assert ");
     self.emit_expr(a.expr);
     if let Some(msg) = a.msg {
@@ -260,7 +263,7 @@ impl Formatter<'_> {
     }
   }
 
-  fn emit_sel(&mut self, arms: &[crate::ast::SelArm]) {
+  fn emit_sel(&mut self, arms: &[SelArm]) {
     self.write("sel {");
     self.indent();
     for arm in arms {
@@ -274,7 +277,7 @@ impl Formatter<'_> {
     self.write("}");
   }
 
-  fn emit_timeout(&mut self, t: &crate::ast::ExprTimeout) {
+  fn emit_timeout(&mut self, t: &ExprTimeout) {
     self.write("timeout ");
     self.emit_expr(t.ms);
     self.space();

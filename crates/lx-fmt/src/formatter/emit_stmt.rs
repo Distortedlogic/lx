@@ -1,4 +1,4 @@
-use crate::ast::{
+use lx_ast::ast::{
   BindTarget, Binding, ClassDeclData, KeywordDeclData, KeywordKind, Stmt, StmtFieldUpdate, StmtId, StmtTypeDef, TraitDeclData, TraitEntry, TraitUnionDef,
   UseKind, UseStmt,
 };
@@ -287,7 +287,7 @@ impl Formatter<'_> {
     }
   }
 
-  pub(super) fn emit_type_params(&mut self, params: &[crate::sym::Sym]) {
+  pub(super) fn emit_type_params(&mut self, params: &[lx_span::sym::Sym]) {
     if params.is_empty() {
       return;
     }

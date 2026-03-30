@@ -1,5 +1,5 @@
-use crate::ast::{
-  ExprApply, ExprBinary, ExprCoalesce, ExprId, ExprNamedArg, ExprPipe, ExprSlice, ExprTernary, ExprUnary, ExprWith, Literal, Section, StrPart, WithKind,
+use lx_ast::ast::{
+  ExprApply, ExprBinary, ExprCoalesce, ExprId, ExprNamedArg, ExprPipe, ExprSlice, ExprTernary, ExprUnary, ExprWith, Literal, Section, StmtId, StrPart, WithKind,
 };
 
 use super::Formatter;
@@ -223,7 +223,7 @@ impl Formatter<'_> {
     self.write("}");
   }
 
-  pub(super) fn emit_block_keyword(&mut self, keyword: &str, stmts: &[crate::ast::StmtId]) {
+  pub(super) fn emit_block_keyword(&mut self, keyword: &str, stmts: &[StmtId]) {
     self.write(keyword);
     self.write(" {");
     self.indent();

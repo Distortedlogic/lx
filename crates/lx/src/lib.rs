@@ -1,5 +1,7 @@
 pub use lx_ast::ast;
 pub use lx_ast::visitor;
+pub use lx_desugar::folder;
+pub use lx_fmt::formatter;
 pub use lx_parser::lexer;
 pub use lx_parser::parser;
 pub use lx_span::sym;
@@ -12,8 +14,6 @@ pub mod checker;
 pub mod env;
 pub mod error;
 pub mod event_stream;
-pub use lx_desugar::folder;
-pub mod formatter;
 pub mod interpreter;
 pub mod linter;
 pub mod mcp_client;
