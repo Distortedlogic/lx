@@ -41,7 +41,10 @@ pub fn bi_agent_spawn(args: Vec<LxVal>, span: SourceSpan, ctx: Arc<dyn BuiltinCt
     let task_name = name.clone();
     let task_rx = Arc::clone(&rx);
 
-    let join_handle = tokio::task::spawn_local(async move {
+    let join_handle = std::thread::spawn(move || {
+      let local = tokio::task::LocalSet::new();
+      let rt = Arc::clone(&rtx.tokio_runtime);
+      rt.block_on(local.run_until(async move {
       let mut interp = Interpreter::new("", None, Arc::clone(&rtx));
       interp.agent_name = Some(task_name.clone());
 
@@ -76,7 +79,7 @@ pub fn bi_agent_spawn(args: Vec<LxVal>, span: SourceSpan, ctx: Arc<dyn BuiltinCt
           let _ = crate::builtins::call_value(&run_fn, LxVal::Unit, miette::SourceSpan::new(0.into(), 0), &bctx).await;
         }
       }
-    });
+    }))});
 
     let handle = AgentHandle { name: name.clone(), mailbox: tx, task: join_handle, pause_flag };
 

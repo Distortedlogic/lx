@@ -13,7 +13,7 @@ pub struct AgentMessage {
 pub struct AgentHandle {
   pub name: String,
   pub mailbox: mpsc::Sender<AgentMessage>,
-  pub task: tokio::task::JoinHandle<()>,
+  pub task: std::thread::JoinHandle<()>,
   pub pause_flag: Arc<std::sync::atomic::AtomicBool>,
 }
 
