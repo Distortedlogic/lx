@@ -93,13 +93,10 @@ fn bi_try_recv(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> 
     let entry = CHANNELS.get(&id).ok_or_else(|| LxError::runtime("channel.try_recv: channel not found", span))?;
     Arc::clone(&entry.receiver)
   };
-  let result = tokio::task::block_in_place(|| {
-    tokio::runtime::Handle::current().block_on(async {
-      let mut guard = receiver.lock().await;
-      guard.try_recv()
-    })
-  });
-  match result {
+  let Ok(mut guard) = receiver.try_lock() else {
+    return Ok(LxVal::None);
+  };
+  match guard.try_recv() {
     Ok(value) => Ok(LxVal::some(value)),
     Err(_) => Ok(LxVal::None),
   }

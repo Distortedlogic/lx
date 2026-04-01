@@ -126,7 +126,7 @@ where
     .map_with(move |lit, e| a.borrow_mut().alloc_expr(Expr::Literal(lit), ss(e.span())));
 
     let string_lit = super::expr_pratt::string_parser(expr.clone(), a2.clone());
-    let ident_expr = ident().map_with(move |n, e| a3.borrow_mut().alloc_expr(Expr::Ident(n), ss(e.span())));
+    let ident_expr = ident().or(just(TokenKind::ChannelKw).to(intern("channel"))).map_with(move |n, e| a3.borrow_mut().alloc_expr(Expr::Ident(n), ss(e.span())));
     let type_ctor = type_name().map_with(move |n, e| a4.borrow_mut().alloc_expr(Expr::TypeConstructor(n), ss(e.span())));
     let list = list_parser(expr.clone(), a5.clone());
     let block_or_record = block_or_record_parser(expr.clone(), a6.clone());
