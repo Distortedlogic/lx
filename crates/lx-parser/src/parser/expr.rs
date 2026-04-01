@@ -33,6 +33,7 @@ where
       TokenKind::Spawn => intern("spawn"),
       TokenKind::Stop => intern("stop"),
       TokenKind::As => intern("as"),
+      TokenKind::ChannelKw => intern("channel"),
   }
 }
 
