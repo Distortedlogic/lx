@@ -18,7 +18,8 @@ pub fn run(source: &str, filename: &str, ctx: &Arc<RuntimeCtx>, control_spec: Op
   let program = desugar(surface);
   let source_dir = Path::new(filename).parent().map(|p| p.to_path_buf());
   let mut interp = Interpreter::new(source, source_dir, Arc::clone(ctx));
-  ctx.tokio_runtime.block_on(async {
+  let local = tokio::task::LocalSet::new();
+  ctx.tokio_runtime.block_on(local.run_until(async {
     if let Some(spec) = control_spec {
       let state = std::sync::Arc::new(lx_eval::runtime::ControlChannelState {
         global_pause: std::sync::Arc::clone(&ctx.global_pause),
@@ -52,7 +53,7 @@ pub fn run(source: &str, filename: &str, ctx: &Arc<RuntimeCtx>, control_spec: Op
       },
       Err(e) => Err(vec![e]),
     }
-  })
+  }))
 }
 
 pub fn read_and_parse(path: &str) -> Result<(String, lx_ast::ast::Program<lx_ast::ast::Core>), ExitCode> {
