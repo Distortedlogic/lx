@@ -27,3 +27,10 @@
 {"id":"1775066762321-0","kind":"runtime/emit","agent":"main","ts":1775066762321,"span":null,"value":"gotcha_fixed_verify: all passed"}
 {"id":"1775066762355-0","kind":"runtime/emit","agent":"main","ts":1775066762355,"span":null,"value":"gotchas_parser: all checks passed"}
 {"id":"1775066762394-0","kind":"runtime/emit","agent":"main","ts":1775066762394,"span":null,"value":"gotchas_runtime: all checks passed"}
+{"id":"1775243948524-0","kind":"runtime/emit","agent":"main","ts":1775243948524,"span":null,"value":"agent_trait: all checks passed"}
+{"id":"1775243948603-0","kind":"runtime/emit","agent":"main","ts":1775243948603,"span":null,"value":"bugs_active: all checks passed"}
+{"id":"1775243948640-0","kind":"agent/spawn","agent":"Fast","ts":1775243948640,"span":null,"agent":"Fast"}
+{"id":"1775243948646-0","kind":"agent/spawn","agent":"Slow","ts":1775243948646,"span":null,"agent":"Slow"}
+{"id":"1775243949079-0","kind":"runtime/emit","agent":"main","ts":1775243949079,"span":null,"value":"gotcha_fixed_verify: all passed"}
+{"id":"1775243949113-0","kind":"runtime/emit","agent":"main","ts":1775243949113,"span":null,"value":"gotchas_parser: all checks passed"}
+{"id":"1775243949153-0","kind":"runtime/emit","agent":"main","ts":1775243949153,"span":null,"value":"gotchas_runtime: all checks passed"}

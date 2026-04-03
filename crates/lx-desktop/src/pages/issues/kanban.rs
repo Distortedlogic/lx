@@ -30,6 +30,32 @@ pub fn KanbanBoardView(
     })
     .collect();
 
+  let finish_drag = {
+    let issues = issues.clone();
+    move || {
+      if *drag_active.read()
+        && let Some(issue_id) = dragging_issue_id.read().clone()
+        && let Some(target_status) = drag_over_column.read().clone()
+      {
+        let source_status = issues.iter().find(|i| i.id == issue_id).map(|i| i.status.clone());
+        if source_status.as_deref() == Some(target_status.as_str()) {
+          if let Some(idx) = *drag_over_index.read()
+            && let Some(ref handler) = on_reorder
+          {
+            handler.call((issue_id, target_status, idx));
+          }
+        } else {
+          on_status_change.call((issue_id, target_status));
+        }
+      }
+      drag_active.set(false);
+      dragging_issue_id.set(None);
+      pending_drag_id.set(None);
+      drag_over_column.set(None);
+      drag_over_index.set(None);
+    }
+  };
+
   rsx! {
     div {
       class: "relative",
@@ -68,63 +94,12 @@ pub fn KanbanBoardView(
           }
       },
       onmouseup: {
-          let issues = issues.clone();
-          let on_status_change = on_status_change;
-          let on_reorder = on_reorder;
-          move |_| {
-              if *drag_active.read()
-                  && let Some(issue_id) = dragging_issue_id.read().clone()
-                  && let Some(target_status) = drag_over_column.read().clone()
-              {
-                  let source_status = issues
-                      .iter()
-                      .find(|i| i.id == issue_id)
-                      .map(|i| i.status.clone());
-                  if source_status.as_deref() == Some(target_status.as_str()) {
-                      if let Some(idx) = *drag_over_index.read()
-                          && let Some(ref handler) = on_reorder
-                      {
-                          handler.call((issue_id, target_status, idx));
-                      }
-                  } else {
-                      on_status_change.call((issue_id, target_status));
-                  }
-              }
-              drag_active.set(false);
-              dragging_issue_id.set(None);
-              pending_drag_id.set(None);
-              drag_over_column.set(None);
-              drag_over_index.set(None);
-          }
+          let mut finish_drag = finish_drag.clone();
+          move |_| finish_drag()
       },
       ontouchend: {
-          let on_status_change = on_status_change;
-          let on_reorder = on_reorder;
-          move |_: TouchEvent| {
-              if *drag_active.read()
-                  && let Some(issue_id) = dragging_issue_id.read().clone()
-                  && let Some(target_status) = drag_over_column.read().clone()
-              {
-                  let source_status = issues
-                      .iter()
-                      .find(|i| i.id == issue_id)
-                      .map(|i| i.status.clone());
-                  if source_status.as_deref() == Some(target_status.as_str()) {
-                      if let Some(idx) = *drag_over_index.read()
-                          && let Some(ref handler) = on_reorder
-                      {
-                          handler.call((issue_id, target_status, idx));
-                      }
-                  } else {
-                      on_status_change.call((issue_id, target_status));
-                  }
-              }
-              drag_active.set(false);
-              dragging_issue_id.set(None);
-              pending_drag_id.set(None);
-              drag_over_column.set(None);
-              drag_over_index.set(None);
-          }
+          let mut finish_drag = finish_drag.clone();
+          move |_: TouchEvent| finish_drag()
       },
       onmouseleave: move |_| {
           drag_active.set(false);

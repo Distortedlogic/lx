@@ -154,10 +154,7 @@ pub fn NewIssueDialog(open: bool, agents: Vec<AgentRef>, on_close: EventHandler<
             placeholder: "Description (optional, drag files here)".to_string(),
             class: "min-h-[120px]".to_string(),
             on_files: move |files: Vec<crate::components::drag_drop::DroppedFile>| {
-                dioxus::logger::tracing::info!(
-                    "Files dropped in new issue: {:?}", files.iter().map(| f | & f.name)
-                    .collect::< Vec < _ >> ()
-                );
+                staged_files.write().extend(files);
             },
           }
           div { class: "grid grid-cols-3 gap-3",

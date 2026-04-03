@@ -21,7 +21,6 @@ pub fn AdapterTestButton(adapter: Signal<String>, test_state: Signal<AdapterTest
             let adapter_key = adapter_val.clone();
             test_state.set(AdapterTestState::Testing);
             spawn(async move {
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                 let result = test_adapter_env(&adapter_key);
                 test_state.set(result);
             });
