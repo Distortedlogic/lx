@@ -1,3 +1,29 @@
 {"id":"1774881187553-0","kind":"runtime/emit","agent":"main","ts":1774881187553,"span":null,"value":"agent_trait: all checks passed"}
 {"id":"1774881187629-0","kind":"runtime/emit","agent":"main","ts":1774881187629,"span":null,"value":"bugs_active: all checks passed"}
 {"id":"1774881208447-0","kind":"runtime/emit","agent":"main","ts":1774881208447,"span":null,"value":"agent_trait: all checks passed"}
+{"id":"1775052659347-0","kind":"runtime/emit","agent":"main","ts":1775052659347,"span":null,"value":"agent_trait: all checks passed"}
+{"id":"1775052659422-0","kind":"runtime/emit","agent":"main","ts":1775052659422,"span":null,"value":"bugs_active: all checks passed"}
+{"id":"1775052719852-0","kind":"runtime/emit","agent":"main","ts":1775052719852,"span":null,"value":"agent_trait: all checks passed"}
+{"id":"1775052720088-0","kind":"runtime/emit","agent":"main","ts":1775052720088,"span":null,"value":"bugs_active: all checks passed"}
+{"id":"1775052721127-0","kind":"runtime/emit","agent":"main","ts":1775052721127,"span":null,"value":"gotchas_runtime: all checks passed"}
+{"id":"1775066480875-0","kind":"agent/spawn","agent":"Fast","ts":1775066480875,"span":null,"agent":"Fast"}
+{"id":"1775066480879-0","kind":"agent/spawn","agent":"Slow","ts":1775066480879,"span":null,"agent":"Slow"}
+{"id":"1775066538423-0","kind":"agent/spawn","agent":"Fast","ts":1775066538423,"span":null,"agent":"Fast"}
+{"id":"1775066538427-0","kind":"agent/spawn","agent":"Slow","ts":1775066538427,"span":null,"agent":"Slow"}
+{"id":"1775066564084-0","kind":"agent/spawn","agent":"Fast","ts":1775066564084,"span":null,"agent":"Fast"}
+{"id":"1775066564088-0","kind":"agent/spawn","agent":"Slow","ts":1775066564088,"span":null,"agent":"Slow"}
+{"id":"1775066581791-0","kind":"runtime/emit","agent":"main","ts":1775066581791,"span":null,"value":"agent_trait: all checks passed"}
+{"id":"1775066581870-0","kind":"runtime/emit","agent":"main","ts":1775066581870,"span":null,"value":"bugs_active: all checks passed"}
+{"id":"1775066581909-0","kind":"agent/spawn","agent":"Fast","ts":1775066581909,"span":null,"agent":"Fast"}
+{"id":"1775066581914-0","kind":"agent/spawn","agent":"Slow","ts":1775066581914,"span":null,"agent":"Slow"}
+{"id":"1775066735326-0","kind":"runtime/emit","agent":"main","ts":1775066735326,"span":null,"value":"agent_trait: all checks passed"}
+{"id":"1775066735402-0","kind":"runtime/emit","agent":"main","ts":1775066735402,"span":null,"value":"bugs_active: all checks passed"}
+{"id":"1775066735441-0","kind":"agent/spawn","agent":"Fast","ts":1775066735441,"span":null,"agent":"Fast"}
+{"id":"1775066735446-0","kind":"agent/spawn","agent":"Slow","ts":1775066735446,"span":null,"agent":"Slow"}
+{"id":"1775066761765-0","kind":"runtime/emit","agent":"main","ts":1775066761765,"span":null,"value":"agent_trait: all checks passed"}
+{"id":"1775066761847-0","kind":"runtime/emit","agent":"main","ts":1775066761847,"span":null,"value":"bugs_active: all checks passed"}
+{"id":"1775066761884-0","kind":"agent/spawn","agent":"Fast","ts":1775066761884,"span":null,"agent":"Fast"}
+{"id":"1775066761890-0","kind":"agent/spawn","agent":"Slow","ts":1775066761890,"span":null,"agent":"Slow"}
+{"id":"1775066762321-0","kind":"runtime/emit","agent":"main","ts":1775066762321,"span":null,"value":"gotcha_fixed_verify: all passed"}
+{"id":"1775066762355-0","kind":"runtime/emit","agent":"main","ts":1775066762355,"span":null,"value":"gotchas_parser: all checks passed"}
+{"id":"1775066762394-0","kind":"runtime/emit","agent":"main","ts":1775066762394,"span":null,"value":"gotchas_runtime: all checks passed"}

@@ -1,0 +1,18 @@
+{"id":"1775066764135-0","kind":"runtime/emit","agent":"main","ts":1775066764135,"span":null,"value":"[18:06:04] loading context files..."}
+{"id":"1775066764138-0","kind":"runtime/emit","agent":"main","ts":1775066764138,"span":null,"value":"[18:06:04] context loaded (0 chars)"}
+{"id":"1775066764138-1","kind":"runtime/log","agent":"main","ts":1775066764138,"span":null,"level":"info","msg":"context: all passed"}
+{"id":"1775066764221-0","kind":"runtime/log","agent":"main","ts":1775066764221,"span":null,"level":"info","msg":"grader_unit: all passed"}
+{"id":"1775066764319-0","kind":"runtime/log","agent":"main","ts":1775066764319,"span":null,"level":"info","msg":"grader_assemble: all passed"}
+{"id":"1775066764506-0","kind":"runtime/log","agent":"main","ts":1775066764506,"span":null,"level":"info","msg":"grader_parse: all passed"}
+{"id":"1775066764540-0","kind":"runtime/emit","agent":"main","ts":1775066764540,"span":null,"value":"[18:06:04] test message from log module"}
+{"id":"1775066764540-1","kind":"runtime/log","agent":"main","ts":1775066764540,"span":null,"level":"info","msg":"log: all passed"}
+{"id":"1775066764716-0","kind":"runtime/emit","agent":"main","ts":1775066764716,"span":null,"value":"[18:06:04] orchestrator test: parsing OK"}
+{"id":"1775066764717-0","kind":"runtime/emit","agent":"main","ts":1775066764717,"span":null,"value":"[18:06:04] loading context files..."}
+{"id":"1775066764718-0","kind":"runtime/emit","agent":"main","ts":1775066764718,"span":null,"value":"[18:06:04] context loaded (0 chars)"}
+{"id":"1775066764718-1","kind":"runtime/emit","agent":"main","ts":1775066764718,"span":null,"value":"[18:06:04] orchestrator test: running work item..."}
+{"id":"1775066764719-0","kind":"runtime/emit","agent":"main","ts":1775066764719,"span":null,"value":"[18:06:04] "}
+{"id":"1775066764719-1","kind":"runtime/emit","agent":"main","ts":1775066764719,"span":null,"value":"[18:06:04] === [1/1] programs/workrunner/tests/fixtures/tiny_work_item.md ==="}
+{"id":"1775066764733-0","kind":"runtime/emit","agent":"main","ts":1775066764733,"span":null,"value":"[18:06:04]   parsed: 1 tasks"}
+{"id":"1775066764733-1","kind":"runtime/emit","agent":"main","ts":1775066764733,"span":null,"value":"[18:06:04]     Task 1: Task 1: Create the file"}
+{"id":"1775066764734-0","kind":"runtime/emit","agent":"main","ts":1775066764734,"span":null,"value":"[18:06:04]   --- task 1/1: Task 1: Create the file ---"}
+{"id":"1775066764877-0","kind":"runtime/log","agent":"main","ts":1775066764877,"span":null,"level":"info","msg":"111_work_item: all passed"}
