@@ -56,7 +56,8 @@ pub fn KanbanBoardView(
                   && let Some(issue_id) = dragging_issue_id.read().clone()
                   && let Some(target_status) = drag_over_column.read().clone()
               {
-                  let source_status = issues.iter()
+                  let source_status = issues
+                      .iter()
                       .find(|i| i.id == issue_id)
                       .map(|i| i.status.clone());
                   if source_status.as_deref() == Some(target_status.as_str()) {
@@ -104,9 +105,9 @@ pub fn KanbanBoardView(
       }
       if *drag_active.read() {
         if let Some(ref active_id) = *dragging_issue_id.read() {
-            if let Some(issue) = issues.iter().find(|i| &i.id == active_id) {
-                {render_drag_overlay(issue, &agents, *pointer_pos.read())}
-            }
+          if let Some(issue) = issues.iter().find(|i| &i.id == active_id) {
+            {render_drag_overlay(issue, &agents, *pointer_pos.read())}
+          }
         }
       }
     }
@@ -173,12 +174,14 @@ fn KanbanColumn(
           }
           div {
             onmouseenter: {
-              let status_for_enter = status.clone();
-              move |_| {
-                if *drag_active.read() && drag_over_column.read().as_deref() == Some(status_for_enter.as_str()) {
-                  drag_over_index.set(Some(idx));
+                let status_for_enter = status.clone();
+                move |_| {
+                    if *drag_active.read()
+                        && drag_over_column.read().as_deref() == Some(status_for_enter.as_str())
+                    {
+                        drag_over_index.set(Some(idx));
+                    }
                 }
-              }
             },
             KanbanCard {
               issue: issue.clone(),
@@ -195,7 +198,9 @@ fn KanbanColumn(
             }
           }
         }
-        if *drag_active.read() && is_drag_over && drag_over_index.read().as_ref() == Some(&issues.len()) {
+        if *drag_active.read() && is_drag_over
+            && drag_over_index.read().as_ref() == Some(&issues.len())
+        {
           div { class: "h-0.5 rounded bg-[var(--primary)] mx-1 my-0.5" }
         }
       }

@@ -1,5 +1,18 @@
+use crate::components::ui::select::{Select, SelectOption};
 use dioxus::prelude::*;
 use std::collections::HashMap;
+
+const MODEL_OPTIONS: &[(&str, &str)] = &[
+  ("claude-sonnet-4-20250514", "Claude Sonnet 4"),
+  ("claude-opus-4-20250514", "Claude Opus 4"),
+  ("claude-haiku-3-5-20241022", "Claude Haiku 3.5"),
+  ("o4-mini", "o4-mini"),
+  ("o3", "o3"),
+  ("gemini-2.5-pro", "Gemini 2.5 Pro"),
+  ("gemini-2.5-flash", "Gemini 2.5 Flash"),
+  ("gpt-4.1", "GPT-4.1"),
+  ("gpt-4.1-mini", "GPT-4.1 Mini"),
+];
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ConfigSchemaField {
@@ -73,6 +86,32 @@ pub fn PluginConfigForm(
                         },
                       }
                     },
+                    "model" => {
+                        let cv = current_value.clone();
+                        rsx! {
+                          Select {
+                            class: "w-full".to_string(),
+                            value: cv.clone(),
+                            searchable: true,
+                            placeholder: "Select a model...".to_string(),
+                            options: {
+                                let mut opts: Vec<SelectOption> = MODEL_OPTIONS
+                                    .iter()
+                                    .map(|(v, l)| SelectOption::new(*v, *l))
+                                    .collect();
+                                if !cv.is_empty() && !opts.iter().any(|o| o.value == cv) {
+                                    opts.insert(0, SelectOption::new(cv.clone(), cv));
+                                }
+                                opts
+                            },
+                            onchange: move |val: String| {
+                                let mut vals = form_values();
+                                vals.insert(key.clone(), val);
+                                form_values.set(vals);
+                            },
+                          }
+                        }
+                    }
                     _ => rsx! {
                       input {
                         class: "w-full rounded-md border border-[var(--outline-variant)] bg-transparent px-3 py-2 text-sm outline-none text-[var(--on-surface)]",

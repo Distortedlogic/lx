@@ -118,25 +118,27 @@ pub fn AgentDetailShell(
             AgentOverview { agent: agent.clone() }
           },
           AgentDetailTab::Config => {
-            let config = LxAgentConfig {
-              name: agent.name.clone(),
-              source_text: format!("agent {} {{\n  -- source not yet loaded\n}}", agent.name),
-              adapter_type: agent.adapter_type.clone(),
-              model: agent.adapter_config.get("model")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string(),
-              tools: vec![],
-              channels: vec![],
-              fields: vec![],
-            };
-            rsx! {
-              AgentConfigPanel {
-                config: config,
-                on_save: move |_update: AgentConfigUpdate| {},
+              let config = LxAgentConfig {
+                  name: agent.name.clone(),
+                  source_text: format!(
+                      "agent {} {{\n  -- source not yet loaded\n}}",
+                      agent.name,
+                  ),
+                  adapter_type: agent.adapter_type.clone(),
+                  model: agent
+                      .adapter_config
+                      .get("model")
+                      .and_then(|v| v.as_str())
+                      .unwrap_or("")
+                      .to_string(),
+                  tools: vec![],
+                  channels: vec![],
+                  fields: vec![],
+              };
+              rsx! {
+                AgentConfigPanel { config, on_save: move |_update: AgentConfigUpdate| {} }
               }
-            }
-          },
+          }
           AgentDetailTab::Runs => rsx! {
             RunsTab { runs: runs.clone(), agent_route_id: agent.id.clone() }
           },

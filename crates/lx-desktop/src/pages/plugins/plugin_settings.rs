@@ -30,7 +30,14 @@ pub fn PluginSettingsPage(plugin_id: String) -> Element {
     _ => "bg-[var(--surface-container)] text-[var(--outline)]",
   };
 
-  let config_fields: Vec<ConfigSchemaField> = vec![];
+  let config_fields: Vec<ConfigSchemaField> = vec![ConfigSchemaField {
+    key: "model".into(),
+    label: "Model".into(),
+    field_type: "model".into(),
+    description: Some("The LLM model to use for this plugin.".into()),
+    required: true,
+    default_value: None,
+  }];
 
   rsx! {
     div { class: "space-y-6 max-w-5xl p-4 overflow-auto",

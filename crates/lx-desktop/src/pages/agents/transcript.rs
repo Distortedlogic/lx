@@ -131,8 +131,37 @@ fn event_to_block(event: &ActivityEvent) -> TranscriptBlock {
   }
 }
 
+fn strip_shell_wrapper(input: &str) -> &str {
+  let s = input.trim();
+  for prefix in ["bash -lc ", "sh -c ", "bash -c "] {
+    if let Some(rest) = s.strip_prefix(prefix) {
+      let rest = rest.trim();
+      if (rest.starts_with('"') && rest.ends_with('"')) || (rest.starts_with('\'') && rest.ends_with('\'')) {
+        if rest.len() <= 2 {
+          return "";
+        }
+        return &rest[1..rest.len() - 1];
+      }
+      return rest;
+    }
+  }
+  s
+}
+
+fn extract_file_paths(input: &str) -> Vec<&str> {
+  input.split_whitespace().filter(|w| w.starts_with('/') || w.starts_with("./") || w.starts_with("~/")).collect()
+}
+
 pub fn summarize_tool_input(input: &str, max_len: usize) -> String {
-  let trimmed = input.trim();
+  let stripped = strip_shell_wrapper(input);
+  let paths = extract_file_paths(stripped);
+  if !paths.is_empty() {
+    let summary = paths.join(", ");
+    if summary.len() <= max_len {
+      return summary;
+    }
+  }
+  let trimmed = stripped.trim();
   if trimmed.len() <= max_len {
     return trimmed.to_string();
   }
@@ -144,13 +173,20 @@ pub fn summarize_tool_input(input: &str, max_len: usize) -> String {
 }
 
 #[component]
-pub fn TranscriptView(run_id: String, #[props(optional)] events: Option<Vec<ActivityEvent>>) -> Element {
+pub fn TranscriptView(run_id: String, #[props(optional)] events: Option<Vec<ActivityEvent>>, #[props(optional)] limit: Option<usize>) -> Element {
   let mut mode = use_signal(|| TranscriptMode::Nice);
   let mut density = use_signal(|| TranscriptDensity::Comfortable);
 
-  let entries: Vec<TranscriptBlock> = match events {
+  let all_entries: Vec<TranscriptBlock> = match events {
     Some(evts) => evts.iter().map(event_to_block).collect(),
     None => vec![],
+  };
+  let entries: Vec<TranscriptBlock> = match limit {
+    Some(n) if n < all_entries.len() => {
+      let skip = all_entries.len().saturating_sub(n);
+      all_entries.into_iter().skip(skip).collect()
+    },
+    _ => all_entries,
   };
 
   if entries.is_empty() {
@@ -199,7 +235,11 @@ pub fn TranscriptView(run_id: String, #[props(optional)] events: Option<Vec<Acti
     ScrollToBottom { class: "max-h-[60vh]".to_string(),
       div { class: if cur_density == TranscriptDensity::Compact { "space-y-1" } else { "space-y-2" },
         for entry in entries.iter() {
-          transcript_blocks::TranscriptBlockView { block: entry.clone(), mode: cur_mode, density: cur_density }
+          transcript_blocks::TranscriptBlockView {
+            block: entry.clone(),
+            mode: cur_mode,
+            density: cur_density,
+          }
         }
       }
     }

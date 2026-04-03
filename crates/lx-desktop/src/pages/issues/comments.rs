@@ -3,11 +3,14 @@ use dioxus::prelude::*;
 use super::types::{AgentRef, IssueComment};
 use crate::components::markdown_body::MarkdownBody;
 use crate::components::markdown_editor::MarkdownEditor;
+use crate::components::mention_popup::MentionCandidate;
 use crate::styles::BTN_PRIMARY_SM;
 
 #[component]
 pub fn CommentThread(comments: Vec<IssueComment>, agents: Vec<AgentRef>, on_add: EventHandler<String>) -> Element {
   let mut draft = dioxus_storage::use_persistent("lx_issue_comment_draft", String::new);
+
+  let mention_candidates: Vec<MentionCandidate> = agents.iter().map(|a| MentionCandidate { id: a.id.clone(), name: a.name.clone() }).collect();
 
   let mut submit = move |text: String| {
     let body = text.trim().to_string();
@@ -31,12 +34,11 @@ pub fn CommentThread(comments: Vec<IssueComment>, agents: Vec<AgentRef>, on_add:
           value: draft(),
           on_change: move |v: String| draft.set(v),
           on_submit: move |v: String| submit(v),
-          placeholder: "Write a comment...".to_string(),
+          placeholder: "Leave a comment (drag files here)...".to_string(),
+          mention_candidates: mention_candidates.clone(),
         }
         div { class: "flex items-center justify-between",
-          span { class: "text-[11px] text-[var(--outline)]",
-            "Cmd+Enter to submit"
-          }
+          span { class: "text-[11px] text-[var(--outline)]", "Cmd+Enter to submit" }
           button {
             class: BTN_PRIMARY_SM,
             disabled: draft.read().trim().is_empty(),
