@@ -26,10 +26,15 @@ pub fn PopoverTrigger(open: Signal<bool>, children: Element) -> Element {
 
 #[component]
 pub fn PopoverContent(open: Signal<bool>, #[props(default)] class: String, children: Element) -> Element {
+  let mut open = open;
   if !open() {
     return rsx! {};
   }
   rsx! {
+    div {
+      class: "fixed inset-0 z-40",
+      onclick: move |_| open.set(false),
+    }
     div {
       "data-slot": "popover-content",
       class: cn(

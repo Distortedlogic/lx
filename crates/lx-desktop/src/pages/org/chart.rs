@@ -258,6 +258,9 @@ pub fn OrgChart() -> Element {
                         "{node.name}"
                       }
                       span { class: "text-[11px] text-[var(--outline)] leading-tight mt-0.5", "{node.role}" }
+                      if let Some(ref adapter) = node.adapter {
+                        span { class: "text-[10px] text-[var(--outline)]/60 leading-tight mt-0.5", "{adapter}" }
+                      }
                     }
                   }
                 }

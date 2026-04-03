@@ -6,6 +6,21 @@ use crate::pages::agents::types::{ADAPTER_LABELS, ROLE_LABELS};
 const INPUT_CLS: &str = "w-full border border-[var(--outline-variant)] bg-transparent px-3 py-2 text-sm text-[var(--on-surface)] outline-none focus:border-[var(--primary)] placeholder:text-[var(--outline)]";
 const SELECT_CLS: &str = "w-full bg-[var(--surface-container)] px-3 py-2 text-sm text-[var(--on-surface)] outline-none focus:border-[var(--primary)]";
 
+fn adapter_icon(key: &str) -> &'static str {
+  match key {
+    "claude_local" => "psychology",
+    "codex_local" => "code",
+    "gemini_local" => "auto_awesome",
+    "opencode_local" => "terminal",
+    "cursor" => "edit",
+    "hermes_local" => "send",
+    "openclaw_gateway" => "cloud",
+    "process" => "memory",
+    "http" => "language",
+    _ => "smart_toy",
+  }
+}
+
 #[component]
 pub fn StepAgent(
   agent_name: Signal<String>,
@@ -54,11 +69,29 @@ pub fn StepAgent(
       }
       div { class: "space-y-1",
         label { class: "text-xs text-[var(--outline)] block", "Adapter" }
-        Select {
-          class: SELECT_CLS.to_string(),
-          value: agent_adapter.read().clone(),
-          options: ADAPTER_LABELS.iter().map(|(k, l)| SelectOption::new(*k, *l)).collect::<Vec<_>>(),
-          onchange: move |val: String| agent_adapter.set(val),
+        div { class: "grid grid-cols-3 gap-2",
+          for (key , label) in ADAPTER_LABELS.iter() {
+            {
+                let k = *key;
+                let l = *label;
+                let selected = *agent_adapter.read() == k;
+                let icon = adapter_icon(k);
+                let cls = if selected {
+                    "flex flex-col items-center gap-1 px-2 py-2.5 border-2 border-[var(--primary)] bg-[var(--primary)]/10 rounded cursor-pointer transition-colors"
+                } else {
+                    "flex flex-col items-center gap-1 px-2 py-2.5 border border-[var(--outline-variant)] rounded cursor-pointer hover:border-[var(--on-surface-variant)] transition-colors"
+                };
+                rsx! {
+                  div {
+                    key: "{k}",
+                    class: cls,
+                    onclick: move |_| agent_adapter.set(k.to_string()),
+                    span { class: "material-symbols-outlined text-lg text-[var(--on-surface-variant)]", "{icon}" }
+                    span { class: "text-[11px] text-[var(--on-surface)] leading-tight text-center", "{l}" }
+                  }
+                }
+            }
+          }
         }
       }
       div { class: "space-y-1",

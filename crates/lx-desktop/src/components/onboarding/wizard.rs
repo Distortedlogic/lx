@@ -1,5 +1,6 @@
 use dioxus::prelude::*;
 
+use super::adapter_test::{AdapterTestButton, AdapterTestState};
 use super::step_agent::StepAgent;
 use super::step_company::StepCompany;
 use super::step_launch::StepLaunch;
@@ -62,6 +63,7 @@ pub fn OnboardingWizard() -> Element {
   let mut agent_model_id = use_signal(|| "claude-sonnet-4-20250514".to_string());
   let mut task_title = use_signal(|| "Create a hiring plan".to_string());
   let mut task_description = use_signal(String::new);
+  let mut adapter_test = use_signal(|| AdapterTestState::Idle);
 
   let is_open = *onboarding.open.read();
 
@@ -78,6 +80,7 @@ pub fn OnboardingWizard() -> Element {
       agent_description.set(String::new());
       agent_adapter.set("claude_local".to_string());
       agent_model_id.set("claude-sonnet-4-20250514".to_string());
+      adapter_test.set(AdapterTestState::Idle);
       task_title.set("Create a hiring plan".to_string());
       task_description.set(String::new());
     }
@@ -131,6 +134,7 @@ pub fn OnboardingWizard() -> Element {
                   agent_adapter,
                   agent_model_id,
                 }
+                AdapterTestButton { adapter: agent_adapter, test_state: adapter_test }
               },
               WizardStep::Task => rsx! {
                 StepTask { task_title, task_description }

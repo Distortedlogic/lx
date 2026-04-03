@@ -1,6 +1,7 @@
 use dioxus::prelude::*;
 
 use super::types::{AgentRef, PRIORITY_ORDER, STATUS_ORDER};
+use crate::components::drag_drop::{DroppedFile, read_dropped_files};
 use crate::components::markdown_editor::MarkdownEditor;
 use crate::components::ui::select::{Select, SelectOption};
 use crate::styles::{BTN_OUTLINE_SM, BTN_PRIMARY_SM};
@@ -24,6 +25,8 @@ pub fn NewIssueDialog(open: bool, agents: Vec<AgentRef>, on_close: EventHandler<
   let mut status = use_signal(|| "todo".to_string());
   let mut priority = use_signal(|| "medium".to_string());
   let mut assignee = use_signal(|| Option::<String>::None);
+  let mut staged_files = use_signal(Vec::<DroppedFile>::new);
+  let mut drag_hover = use_signal(|| false);
 
   use_effect(move || {
     if open {
@@ -107,8 +110,29 @@ pub fn NewIssueDialog(open: bool, agents: Vec<AgentRef>, on_close: EventHandler<
           }
       },
       div {
-        class: "bg-[var(--surface-container)] border border-[var(--outline-variant)] rounded-lg w-full max-w-lg overflow-hidden",
+        class: if drag_hover() {
+            "bg-[var(--surface-container)] border-2 border-dashed border-[var(--primary)] rounded-lg w-full max-w-lg overflow-hidden"
+        } else {
+            "bg-[var(--surface-container)] border border-[var(--outline-variant)] rounded-lg w-full max-w-lg overflow-hidden"
+        },
         onclick: move |evt| evt.stop_propagation(),
+        ondragover: move |evt: DragEvent| {
+            evt.prevent_default();
+            drag_hover.set(true);
+        },
+        ondragleave: move |_: DragEvent| {
+            drag_hover.set(false);
+        },
+        ondrop: move |evt: DragEvent| {
+            evt.prevent_default();
+            drag_hover.set(false);
+            spawn(async move {
+                let dropped = read_dropped_files().await;
+                if !dropped.is_empty() {
+                    staged_files.write().extend(dropped);
+                }
+            });
+        },
         div { class: "flex items-center justify-between px-4 py-2.5 border-b border-[var(--outline-variant)]",
           span { class: "text-sm text-[var(--outline)]", "New Issue" }
           button {
@@ -174,6 +198,25 @@ pub fn NewIssueDialog(open: bool, agents: Vec<AgentRef>, on_close: EventHandler<
               }
             }
           }
+          if !staged_files.read().is_empty() {
+            div { class: "space-y-1",
+              label { class: "text-xs text-[var(--outline)] block mb-1", "Attachments" }
+              for (fi , file) in staged_files.read().iter().enumerate() {
+                div { class: "flex items-center gap-2 px-2 py-1 bg-[var(--surface-container-highest)] rounded text-xs text-[var(--on-surface)]",
+                  span { class: "material-symbols-outlined text-sm text-[var(--outline)]", "attach_file" }
+                  span { class: "flex-1 truncate", "{file.name}" }
+                  span { class: "text-[var(--outline)]/60 tabular-nums",
+                    "{format_file_size(file.size)}"
+                  }
+                  button {
+                    class: "text-[var(--outline)] hover:text-[var(--error)] ml-1",
+                    onclick: move |_| { staged_files.write().remove(fi); },
+                    span { class: "material-symbols-outlined text-sm", "close" }
+                  }
+                }
+              }
+            }
+          }
         }
         div { class: "border-t border-[var(--outline-variant)] px-4 py-3 flex justify-end gap-2",
           button {
@@ -201,4 +244,16 @@ pub fn NewIssueDialog(open: bool, agents: Vec<AgentRef>, on_close: EventHandler<
       }
     }
   }
+}
+
+fn format_file_size(bytes: u64) -> String {
+  if bytes < 1024 {
+    return format!("{bytes} B");
+  }
+  let kb = bytes as f64 / 1024.0;
+  if kb < 1024.0 {
+    return format!("{kb:.1} KB");
+  }
+  let mb = kb / 1024.0;
+  format!("{mb:.1} MB")
 }

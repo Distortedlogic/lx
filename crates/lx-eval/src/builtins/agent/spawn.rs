@@ -100,6 +100,11 @@ pub fn bi_agent_spawn(args: Vec<LxVal>, span: SourceSpan, ctx: Arc<dyn BuiltinCt
 
     let mut fields = indexmap::IndexMap::new();
     fields.insert(intern("agent"), LxVal::str(&name));
+    if let Some(adapter_val) = class.defaults.get(&intern("adapter"))
+      && let Some(adapter_str) = adapter_val.as_str()
+    {
+      fields.insert(intern("adapter"), LxVal::str(adapter_str));
+    }
     ctx.event_stream().xadd("agent/spawn", &name, None, fields);
 
     Ok(LxVal::ok(LxVal::str(name)))

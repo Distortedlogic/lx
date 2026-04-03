@@ -14,7 +14,7 @@ pub fn nodes_from_events(log: &ActivityLog) -> Vec<OrgNode> {
       "agent_start" | "agent_running" | "agent_spawn" => {
         let name = event.message.clone();
         let id = name.to_lowercase().replace(' ', "-");
-        nodes_map.entry(id.clone()).or_insert_with(|| OrgNode {
+        let entry = nodes_map.entry(id.clone()).or_insert_with(|| OrgNode {
           id,
           name,
           role: "Agent".into(),
@@ -22,7 +22,11 @@ pub fn nodes_from_events(log: &ActivityLog) -> Vec<OrgNode> {
           reports_to: None,
           connected_to: Vec::new(),
           icon: None,
+          adapter: event.adapter.clone(),
         });
+        if entry.adapter.is_none() && event.adapter.is_some() {
+          entry.adapter.clone_from(&event.adapter);
+        }
       },
       "agent_reports_to" => {
         let parts: Vec<&str> = event.message.splitn(2, "->").collect();

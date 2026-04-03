@@ -51,6 +51,16 @@ pub fn KanbanCard(
           pointer_start.set((coords.x, coords.y));
           pending_drag_id.set(Some(drag_id.clone()));
       },
+      ontouchstart: {
+          let touch_drag_id = issue.id.clone();
+          move |evt: TouchEvent| {
+              if let Some(touch) = evt.touches().first() {
+                  let coords = touch.client_coordinates();
+                  pointer_start.set((coords.x, coords.y));
+                  pending_drag_id.set(Some(touch_drag_id.clone()));
+              }
+          }
+      },
       onclick: move |_| {
           if now_ms().saturating_sub(*drag_end_ms.read()) > 200 {
               on_click.call(());

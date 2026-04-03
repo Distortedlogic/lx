@@ -5,6 +5,8 @@ pub struct ActivityEvent {
   pub message: String,
   #[serde(default)]
   pub token_count: Option<u32>,
+  #[serde(default)]
+  pub adapter: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]

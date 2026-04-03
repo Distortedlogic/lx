@@ -25,6 +25,8 @@ pub struct StreamEvent {
   pub tool_name: Option<String>,
   #[serde(default)]
   pub message: Option<String>,
+  #[serde(default)]
+  pub adapter: Option<String>,
 }
 
 #[component]
@@ -85,7 +87,7 @@ fn s(opt: &Option<String>, fallback: &str) -> String {
 fn dispatch_event(activity_log: &ActivityLog, event: &StreamEvent) {
   match event.event_type.as_str() {
     "spawn_agent" => {
-      activity_log.push("agent_start", &s(&event.name, "unknown"));
+      activity_log.push_with_adapter("agent_start", &s(&event.name, "unknown"), event.adapter.clone());
     },
     "stop_agent" => {
       activity_log.push("agent_stop", &s(&event.name, "unknown"));

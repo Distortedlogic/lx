@@ -1,3 +1,4 @@
+pub mod adapter_test;
 pub mod helpers;
 pub mod step_agent;
 pub mod step_company;

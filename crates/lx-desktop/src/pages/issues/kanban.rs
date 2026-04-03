@@ -48,7 +48,27 @@ pub fn KanbanBoardView(
               }
           }
       },
+      ontouchmove: move |evt: TouchEvent| {
+          if *drag_active.read() || pending_drag_id.read().is_some() {
+              evt.prevent_default();
+          }
+          if let Some(touch) = evt.touches().first() {
+              let coords = touch.client_coordinates();
+              pointer_pos.set((coords.x, coords.y));
+
+              if pending_drag_id.read().is_some() && !*drag_active.read() {
+                  let (sx, sy) = *pointer_start.read();
+                  let dx = coords.x - sx;
+                  let dy = coords.y - sy;
+                  if (dx * dx + dy * dy).sqrt() >= 5.0 {
+                      drag_active.set(true);
+                      dragging_issue_id.set(pending_drag_id.read().clone());
+                  }
+              }
+          }
+      },
       onmouseup: {
+          let issues = issues.clone();
           let on_status_change = on_status_change;
           let on_reorder = on_reorder;
           move |_| {
@@ -77,7 +97,43 @@ pub fn KanbanBoardView(
               drag_over_index.set(None);
           }
       },
+      ontouchend: {
+          let on_status_change = on_status_change;
+          let on_reorder = on_reorder;
+          move |_: TouchEvent| {
+              if *drag_active.read()
+                  && let Some(issue_id) = dragging_issue_id.read().clone()
+                  && let Some(target_status) = drag_over_column.read().clone()
+              {
+                  let source_status = issues
+                      .iter()
+                      .find(|i| i.id == issue_id)
+                      .map(|i| i.status.clone());
+                  if source_status.as_deref() == Some(target_status.as_str()) {
+                      if let Some(idx) = *drag_over_index.read()
+                          && let Some(ref handler) = on_reorder
+                      {
+                          handler.call((issue_id, target_status, idx));
+                      }
+                  } else {
+                      on_status_change.call((issue_id, target_status));
+                  }
+              }
+              drag_active.set(false);
+              dragging_issue_id.set(None);
+              pending_drag_id.set(None);
+              drag_over_column.set(None);
+              drag_over_index.set(None);
+          }
+      },
       onmouseleave: move |_| {
+          drag_active.set(false);
+          dragging_issue_id.set(None);
+          pending_drag_id.set(None);
+          drag_over_column.set(None);
+          drag_over_index.set(None);
+      },
+      ontouchcancel: move |_: TouchEvent| {
           drag_active.set(false);
           dragging_issue_id.set(None);
           pending_drag_id.set(None);
