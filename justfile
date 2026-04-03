@@ -34,13 +34,19 @@ rust-diagnose:
     devdiag clippy
 
 py-diagnose:
+    #!/usr/bin/env bash
+    set -euo pipefail
     devdiag ruff
     devdiag ty
 
 py-fix:
+    #!/usr/bin/env bash
+    set -euo pipefail
     devdiag ruff
 
 ts-diagnose:
+    #!/usr/bin/env bash
+    set -euo pipefail
     devdiag tsc
 
 # run lx-tui with a .lx file
