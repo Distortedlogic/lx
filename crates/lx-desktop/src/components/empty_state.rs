@@ -5,7 +5,7 @@ pub fn EmptyState(icon: String, message: String, #[props(optional)] action: Opti
   rsx! {
     div { class: "flex flex-col items-center justify-center py-16 text-center",
       div { class: "bg-[var(--surface-container)]/50 p-4 mb-4",
-        span { class: "material-symbols-outlined text-4xl text-[var(--outline)]",
+        span { class: "material-symbols-outlined text-xl text-[var(--outline)]",
           "{icon}"
         }
       }

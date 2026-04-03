@@ -5,9 +5,9 @@ use crate::routes::Route;
 #[component]
 pub fn Sidebar() -> Element {
   rsx! {
-    aside { class: "w-60 h-full min-h-0 border-r border-[var(--outline-variant)]/50 bg-[var(--surface-container-lowest)] flex flex-col",
+    aside { class: "w-60 h-full min-h-0 border-r border-[var(--sidebar-border)]/50 bg-[var(--sidebar-background)] flex flex-col",
       div { class: "flex items-center gap-1 px-3 h-12 shrink-0",
-        span { class: "flex-1 text-sm font-bold text-[var(--on-surface)] truncate pl-1",
+        span { class: "flex-1 text-sm font-bold text-[var(--sidebar-foreground)] truncate pl-1",
           "lx workspace"
         }
       }
@@ -98,9 +98,9 @@ fn SidebarNavItem(to: Route, label: &'static str, icon: &'static str) -> Element
   rsx! {
     Link {
       to,
-      active_class: "bg-[var(--on-surface)]/10 text-[var(--on-surface)]",
-      class: "flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium transition-colors text-[var(--on-surface-variant)] hover:bg-[var(--on-surface)]/5 hover:text-[var(--on-surface)]",
-      span { class: "material-symbols-outlined text-base", "{icon}" }
+      active_class: "bg-[var(--sidebar-accent)] text-[var(--sidebar-foreground)]",
+      class: "flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium transition-colors text-[var(--sidebar-foreground)]/70 hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-foreground)]",
+      span { class: "material-symbols-outlined text-sm", "{icon}" }
       span { class: "flex-1 truncate", "{label}" }
     }
   }

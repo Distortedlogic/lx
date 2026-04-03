@@ -90,7 +90,7 @@ pub fn MarkdownEditor(
           if let Some(c) = filtered.get(mention_selected()) {
             let start = mention_start_pos();
             let at_end = value[start..].find(' ').map(|i| start + i).unwrap_or(value.len());
-            let new_value = format!("{}@{} {}", &value[..start], c.name, &value[at_end..]);
+            let new_value = format!("{}[@{}](agent:{}) {}", &value[..start], c.name, c.id, &value[at_end..]);
             on_change.call(new_value);
             mention_visible.set(false);
             mention_query.set(String::new());
@@ -109,37 +109,55 @@ pub fn MarkdownEditor(
     div {
       class: "flex flex-col border border-[var(--outline-variant)]/30 rounded-lg overflow-hidden relative {extra_class} {drag_class}",
       ondragover: move |evt: DragEvent| {
-        evt.prevent_default();
-        dragging.set(true);
+          evt.prevent_default();
+          dragging.set(true);
       },
       ondragleave: move |_: DragEvent| {
-        dragging.set(false);
+          dragging.set(false);
       },
       ondrop: {
-        let value = value.clone();
-        move |evt: DragEvent| {
-          evt.prevent_default();
-          dragging.set(false);
           let value = value.clone();
-          spawn(async move {
-            let dropped = read_dropped_files().await;
-            if !dropped.is_empty() {
-              if let Some(ref handler) = on_files {
-                handler.call(dropped.clone());
-              }
-              let links = build_markdown_links(&dropped);
-              on_change.call(format!("{value}{links}"));
-            }
-          });
-        }
+          move |evt: DragEvent| {
+              evt.prevent_default();
+              dragging.set(false);
+              let value = value.clone();
+              spawn(async move {
+                  let dropped = read_dropped_files().await;
+                  if !dropped.is_empty() {
+                      if let Some(ref handler) = on_files {
+                          handler.call(dropped.clone());
+                      }
+                      let links = build_markdown_links(&dropped);
+                      on_change.call(format!("{value}{links}"));
+                  }
+              });
+          }
       },
-      if dragging() { DragOverlay {} }
+      if dragging() {
+        DragOverlay {}
+      }
       div { class: "flex items-center justify-between border-b border-[var(--outline-variant)]/30 px-2 py-1 bg-[var(--surface-container)]",
-        ToolbarButtons { editor_id: editor_id.clone(), value: value.clone(), on_change: on_change }
+        ToolbarButtons {
+          editor_id: editor_id.clone(),
+          value: value.clone(),
+          on_change,
+        }
         div { class: "flex gap-0.5",
-          ModeButton { label: "Edit", active: current_mode == EditorMode::Edit, on_click: move |_| mode.set(EditorMode::Edit) }
-          ModeButton { label: "Preview", active: current_mode == EditorMode::Preview, on_click: move |_| mode.set(EditorMode::Preview) }
-          ModeButton { label: "Split", active: current_mode == EditorMode::Split, on_click: move |_| mode.set(EditorMode::Split) }
+          ModeButton {
+            label: "Edit",
+            active: current_mode == EditorMode::Edit,
+            on_click: move |_| mode.set(EditorMode::Edit),
+          }
+          ModeButton {
+            label: "Preview",
+            active: current_mode == EditorMode::Preview,
+            on_click: move |_| mode.set(EditorMode::Preview),
+          }
+          ModeButton {
+            label: "Split",
+            active: current_mode == EditorMode::Split,
+            on_click: move |_| mode.set(EditorMode::Split),
+          }
         }
       }
       match current_mode {
@@ -148,11 +166,11 @@ pub fn MarkdownEditor(
               editor_id: editor_id.clone(),
               value: value.clone(),
               placeholder: placeholder_text.to_string(),
-              on_change: on_change,
-              on_submit: on_submit,
-              on_mention_trigger: on_mention_trigger,
-              on_mention_dismiss: on_mention_dismiss,
-              on_mention_nav: on_mention_nav,
+              on_change,
+              on_submit,
+              on_mention_trigger,
+              on_mention_dismiss,
+              on_mention_nav,
             }
           },
           EditorMode::Preview => rsx! {
@@ -170,11 +188,11 @@ pub fn MarkdownEditor(
                 editor_id: editor_id.clone(),
                 value: value.clone(),
                 placeholder: placeholder_text.to_string(),
-                on_change: on_change,
-                on_submit: on_submit,
-                on_mention_trigger: on_mention_trigger,
-                on_mention_dismiss: on_mention_dismiss,
-                on_mention_nav: on_mention_nav,
+                on_change,
+                on_submit,
+                on_mention_trigger,
+                on_mention_dismiss,
+                on_mention_nav,
               }
               div { class: "p-3 min-h-[8rem] max-h-80 overflow-y-auto",
                 if value.is_empty() {
@@ -194,15 +212,24 @@ pub fn MarkdownEditor(
         left: mention_left(),
         selected_index: mention_selected(),
         on_select: {
-          let value = value.clone();
-          move |candidate: MentionCandidate| {
-            let start = mention_start_pos();
-            let at_end = value[start..].find(' ').map(|i| start + i).unwrap_or(value.len());
-            let new_value = format!("{}@{}{}", &value[..start], candidate.name, &value[at_end..]);
-            on_change.call(new_value);
-            mention_visible.set(false);
-            mention_query.set(String::new());
-          }
+            let value = value.clone();
+            move |candidate: MentionCandidate| {
+                let start = mention_start_pos();
+                let at_end = value[start..]
+                    .find(' ')
+                    .map(|i| start + i)
+                    .unwrap_or(value.len());
+                let new_value = format!(
+                    "{}[@{}](agent:{}) {}",
+                    &value[..start],
+                    candidate.name,
+                    candidate.id,
+                    &value[at_end..],
+                );
+                on_change.call(new_value);
+                mention_visible.set(false);
+                mention_query.set(String::new());
+            }
         },
       }
     }

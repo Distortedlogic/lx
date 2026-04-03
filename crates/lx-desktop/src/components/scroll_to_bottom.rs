@@ -24,19 +24,19 @@ pub fn ScrollToBottom(children: Element, #[props(optional)] class: Option<String
       class: "overflow-y-auto relative {extra}",
       onscroll: move |_evt| {
           spawn(async move {
-            let js = format!(
-              r#"(function() {{
-                var el = document.getElementById('{sentinel_id}');
-                if (!el || !el.parentElement) return 'false';
-                var parent = el.parentElement;
-                var diff = parent.scrollHeight - parent.scrollTop - parent.clientHeight;
-                return diff > 40 ? 'true' : 'false';
-              }})()"#
-            );
-            if let Ok(val) = document::eval(&js).await {
-              let is_up = val.to_string().contains("true");
-              user_scrolled_up.set(is_up);
-            }
+              let js = format!(
+                  r#"(function() {{
+                      var el = document.getElementById('{sentinel_id}');
+                      if (!el || !el.parentElement) return 'false';
+                      var parent = el.parentElement;
+                      var diff = parent.scrollHeight - parent.scrollTop - parent.clientHeight;
+                      return diff > 40 ? 'true' : 'false';
+                    }})()"#,
+              );
+              if let Ok(val) = document::eval(&js).await {
+                  let is_up = val.to_string().contains("true");
+                  user_scrolled_up.set(is_up);
+              }
           });
       },
       {children}

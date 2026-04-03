@@ -26,7 +26,11 @@ pub fn StepLaunch(company_name: String, agent_name: String, agent_role: String, 
         SummaryRow { icon: "smart_toy", label: "Agent", value: agent_name }
         SummaryRow { icon: "badge", label: "Role", value: agent_role }
         SummaryRow { icon: "memory", label: "Adapter", value: agent_adapter }
-        SummaryRow { icon: "model_training", label: "Model", value: agent_model_id }
+        SummaryRow {
+          icon: "model_training",
+          label: "Model",
+          value: agent_model_id,
+        }
         SummaryRow { icon: "account_tree", label: "Flow", value: task_title }
       }
     }
@@ -37,7 +41,7 @@ pub fn StepLaunch(company_name: String, agent_name: String, agent_role: String, 
 fn SummaryRow(icon: &'static str, label: &'static str, value: String) -> Element {
   rsx! {
     div { class: "flex items-center gap-3 px-3 py-2.5",
-      span { class: "material-symbols-outlined text-base text-[var(--outline)] shrink-0",
+      span { class: "material-symbols-outlined text-sm text-[var(--outline)] shrink-0",
         "{icon}"
       }
       div { class: "flex-1 min-w-0",
@@ -46,7 +50,7 @@ fn SummaryRow(icon: &'static str, label: &'static str, value: String) -> Element
         }
         p { class: "text-xs text-[var(--outline)]", "{label}" }
       }
-      span { class: "material-symbols-outlined text-base text-[var(--success)] shrink-0",
+      span { class: "material-symbols-outlined text-sm text-[var(--success)] shrink-0",
         "check_circle"
       }
     }

@@ -30,7 +30,7 @@ pub fn CompanySkills() -> Element {
       div { class: "w-72 border-r border-[var(--outline-variant)] flex flex-col",
         div { class: "flex items-center justify-between px-3 py-2 border-b border-[var(--outline-variant)]",
           div { class: "flex items-center gap-2",
-            span { class: "material-symbols-outlined text-base text-[var(--outline)]",
+            span { class: "material-symbols-outlined text-sm text-[var(--outline)]",
               "widgets"
             }
             h1 { class: "text-base font-semibold text-[var(--on-surface)]",
@@ -71,7 +71,7 @@ pub fn CompanySkills() -> Element {
         div { class: "flex-1 overflow-auto",
           if skills.is_empty() {
             div { class: "flex flex-col items-center justify-center py-12 text-[var(--outline)]",
-              span { class: "material-symbols-outlined text-3xl mb-3",
+              span { class: "material-symbols-outlined text-xl mb-3",
                 "widgets"
               }
               p { class: "text-xs", "No skills yet." }
@@ -128,7 +128,7 @@ pub fn CompanySkills() -> Element {
           }
         } else {
           div { class: "flex-1 flex flex-col items-center justify-center text-[var(--outline)]",
-            span { class: "material-symbols-outlined text-4xl mb-4", "widgets" }
+            span { class: "material-symbols-outlined text-xl mb-4", "widgets" }
             p { class: "text-sm", "Select a skill to view its files." }
           }
         }

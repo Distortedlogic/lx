@@ -6,9 +6,20 @@ use super::approval_actions::ApprovalActions;
 use super::list::default_approvals;
 use super::payload::PayloadRenderer;
 use super::types::{ApprovalComment, approval_type_icon, approval_type_label};
+use crate::components::page_skeleton::PageSkeleton;
 
 #[component]
 pub fn ApprovalDetail(approval_id: String) -> Element {
+  rsx! {
+    SuspenseBoundary {
+      fallback: |_| rsx! { PageSkeleton { variant: "detail".to_string() } },
+      ApprovalDetailInner { approval_id }
+    }
+  }
+}
+
+#[component]
+fn ApprovalDetailInner(approval_id: String) -> Element {
   let approvals = dioxus_storage::use_persistent("lx_approvals", default_approvals);
   let comments_store = dioxus_storage::use_persistent("lx_approval_comments", HashMap::<String, Vec<ApprovalComment>>::new);
   let mut comment_body = use_signal(String::new);
@@ -53,7 +64,7 @@ pub fn ApprovalDetail(approval_id: String) -> Element {
       div { class: "border border-[var(--outline-variant)] rounded-lg p-4 space-y-3",
         div { class: "flex items-center justify-between",
           div { class: "flex items-center gap-2",
-            span { class: "material-symbols-outlined text-base text-[var(--outline)]",
+            span { class: "material-symbols-outlined text-sm text-[var(--outline)]",
               "{icon}"
             }
             div {

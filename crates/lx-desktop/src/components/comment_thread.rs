@@ -88,13 +88,14 @@ pub fn CommentThread(comments: Vec<Comment>, on_add: EventHandler<String>) -> El
           on_submit: move |v: String| submit(v),
           placeholder: "Leave a comment (drag files here)...".to_string(),
           on_files: move |files: Vec<super::drag_drop::DroppedFile>| {
-            dioxus::logger::tracing::info!("Files dropped in comment: {:?}", files.iter().map(|f| &f.name).collect::<Vec<_>>());
+              dioxus::logger::tracing::info!(
+                  "Files dropped in comment: {:?}", files.iter().map(| f | & f.name).collect::<
+                  Vec < _ >> ()
+              );
           },
         }
         div { class: "flex items-center justify-between",
-          span { class: "text-[11px] text-[var(--outline)]",
-            "Cmd+Enter to submit"
-          }
+          span { class: "text-[11px] text-[var(--outline)]", "Cmd+Enter to submit" }
           button {
             class: "px-3 py-1.5 bg-[var(--primary)] hover:brightness-110 text-[var(--on-primary)] text-sm rounded transition-colors disabled:opacity-50",
             disabled: body().trim().is_empty() || submitting(),

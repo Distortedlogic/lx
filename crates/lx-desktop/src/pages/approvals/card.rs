@@ -26,7 +26,7 @@ pub fn ApprovalCard(approval: Approval, on_approve: EventHandler<()>, on_reject:
     div { class: "border border-[var(--outline-variant)] rounded-lg p-4 space-y-3",
       div { class: "flex items-center justify-between",
         div { class: "flex items-center gap-2",
-          span { class: "material-symbols-outlined text-base text-[var(--outline)]",
+          span { class: "material-symbols-outlined text-sm text-[var(--outline)]",
             "{icon}"
           }
           span { class: "text-sm font-semibold text-[var(--on-surface)]",

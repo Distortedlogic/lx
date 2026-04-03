@@ -86,13 +86,13 @@ pub fn PluginCard(
                       on_enable.call(id_enable.clone());
                   }
               },
-              span { class: "material-symbols-outlined text-base", "power_settings_new" }
+              span { class: "material-symbols-outlined text-sm", "power_settings_new" }
             }
             button {
               class: "h-8 w-8 flex items-center justify-center rounded border border-[var(--outline-variant)] text-red-500 hover:text-red-400",
               disabled: uninstall_pending,
               onclick: move |_| on_uninstall.call(id_uninstall.clone()),
-              span { class: "material-symbols-outlined text-base", "delete" }
+              span { class: "material-symbols-outlined text-sm", "delete" }
             }
           }
         }

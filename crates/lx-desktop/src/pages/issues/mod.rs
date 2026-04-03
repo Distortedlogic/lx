@@ -81,6 +81,16 @@ pub fn Issues() -> Element {
 
 #[component]
 pub fn IssueDetail(issue_id: String) -> Element {
+  rsx! {
+    SuspenseBoundary {
+      fallback: |_| rsx! { crate::components::page_skeleton::PageSkeleton { variant: "detail".to_string() } },
+      IssueDetailInner { issue_id }
+    }
+  }
+}
+
+#[component]
+fn IssueDetailInner(issue_id: String) -> Element {
   let agents: Vec<AgentRef> = Vec::new();
   let nav = navigator();
 

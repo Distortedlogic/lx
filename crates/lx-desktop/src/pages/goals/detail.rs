@@ -2,6 +2,7 @@ use dioxus::prelude::*;
 
 use super::properties::GoalProperties;
 use super::tree::GoalTree;
+use crate::components::page_skeleton::PageSkeleton;
 use crate::pages::projects::types::{Goal, Project};
 use crate::routes::Route;
 use crate::styles::PAGE_HEADING;
@@ -18,6 +19,16 @@ fn status_color(status: &str) -> &'static str {
 
 #[component]
 pub fn GoalDetail(goal_id: String) -> Element {
+  rsx! {
+    SuspenseBoundary {
+      fallback: |_| rsx! { PageSkeleton { variant: "detail".to_string() } },
+      GoalDetailInner { goal_id }
+    }
+  }
+}
+
+#[component]
+fn GoalDetailInner(goal_id: String) -> Element {
   let goals = dioxus_storage::use_persistent("lx_goals", Vec::<Goal>::new);
   let projects = dioxus_storage::use_persistent("lx_projects", Vec::<Project>::new);
   let mut active_tab = use_signal(|| "children");

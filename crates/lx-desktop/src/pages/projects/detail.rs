@@ -2,6 +2,7 @@ use dioxus::prelude::*;
 use dioxus::router::Navigator;
 
 use super::types::{PROJECT_COLORS, PROJECT_STATUSES, Project};
+use crate::components::page_skeleton::PageSkeleton;
 use crate::routes::Route;
 use crate::styles::PAGE_HEADING;
 
@@ -17,6 +18,16 @@ fn status_color(status: &str) -> &'static str {
 
 #[component]
 pub fn ProjectDetail(project_id: String) -> Element {
+  rsx! {
+    SuspenseBoundary {
+      fallback: |_| rsx! { PageSkeleton { variant: "detail".to_string() } },
+      ProjectDetailInner { project_id }
+    }
+  }
+}
+
+#[component]
+fn ProjectDetailInner(project_id: String) -> Element {
   let projects = dioxus_storage::use_persistent("lx_projects", Vec::<Project>::new);
   let mut active_tab = use_signal(|| "overview");
   let nav = use_navigator();

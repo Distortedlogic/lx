@@ -2,10 +2,21 @@ use dioxus::prelude::*;
 
 use super::schedule_editor::ScheduleEditor;
 use super::types::{CATCH_UP_POLICIES, CONCURRENCY_POLICIES, PRIORITIES, Routine};
+use crate::components::page_skeleton::PageSkeleton;
 use crate::styles::PAGE_HEADING;
 
 #[component]
 pub fn RoutineDetail(routine_id: String) -> Element {
+  rsx! {
+    SuspenseBoundary {
+      fallback: |_| rsx! { PageSkeleton { variant: "detail".to_string() } },
+      RoutineDetailInner { routine_id }
+    }
+  }
+}
+
+#[component]
+fn RoutineDetailInner(routine_id: String) -> Element {
   let mut routines = dioxus_storage::use_persistent("lx_routines", Vec::<Routine>::new);
   let mut active_tab: Signal<&'static str> = use_signal(|| "triggers");
   let mut draft_cron = use_signal(String::new);

@@ -186,7 +186,7 @@ fn create_dialog(mut routines: Signal<Vec<Routine>>, mut show_composer: Signal<b
             span { class: "text-sm font-medium text-[var(--on-surface)]",
               "Advanced settings"
             }
-            span { class: "material-symbols-outlined text-base text-[var(--outline)]",
+            span { class: "material-symbols-outlined text-sm text-[var(--outline)]",
               if show_advanced() {
                 "expand_less"
               } else {

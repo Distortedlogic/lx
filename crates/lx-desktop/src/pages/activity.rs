@@ -31,7 +31,9 @@ pub fn Activity() -> Element {
           value: current_filter.clone(),
           options: {
               let mut opts = vec![SelectOption::new("all", "All types")];
-              opts.extend(entity_types.iter().map(|k| SelectOption::new(k.as_str(), k.as_str())));
+              opts.extend(
+                  entity_types.iter().map(|k| SelectOption::new(k.as_str(), k.as_str())),
+              );
               opts
           },
           onchange: move |val: String| filter.set(val),

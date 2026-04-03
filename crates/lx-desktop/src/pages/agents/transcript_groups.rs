@@ -35,13 +35,24 @@ pub fn render_command_group(items: &[ToolItem], mut cmd_group_open: Signal<bool>
       div {
         class: "flex items-center gap-2 cursor-pointer",
         onclick: move |_| cmd_group_open.set(!cmd_group_open()),
-        span { class: "material-symbols-outlined text-sm text-[var(--outline)]", "terminal" }
-        span { class: "text-[11px] font-semibold uppercase tracking-widest text-[var(--on-surface-variant)]/70", "{title}" }
+        span { class: "material-symbols-outlined text-sm text-[var(--outline)]",
+          "terminal"
+        }
+        span { class: "text-[11px] font-semibold uppercase tracking-widest text-[var(--on-surface-variant)]/70",
+          "{title}"
+        }
         button {
           class: "ml-auto text-[var(--outline)] hover:text-[var(--on-surface)] transition-colors",
-          onclick: move |evt| { evt.stop_propagation(); cmd_group_open.set(!cmd_group_open()); },
+          onclick: move |evt| {
+              evt.stop_propagation();
+              cmd_group_open.set(!cmd_group_open());
+          },
           span { class: "material-symbols-outlined text-sm",
-            if cmd_group_open() { "expand_more" } else { "chevron_right" }
+            if cmd_group_open() {
+              "expand_more"
+            } else {
+              "chevron_right"
+            }
           }
         }
       }
@@ -50,7 +61,9 @@ pub fn render_command_group(items: &[ToolItem], mut cmd_group_open: Signal<bool>
           for (idx , item) in items.iter().enumerate() {
             div { key: "{idx}", class: "space-y-2",
               div { class: "flex items-center gap-2",
-                span { class: "material-symbols-outlined text-xs text-[var(--outline)]", "terminal" }
+                span { class: "material-symbols-outlined text-xs text-[var(--outline)]",
+                  "terminal"
+                }
                 span { class: "font-mono text-xs break-all", "{item.input}" }
               }
               if let Some(ref res) = item.result {
@@ -74,13 +87,24 @@ pub fn render_tool_group(items: &[ToolItem], mut tool_group_open: Signal<bool>) 
       div {
         class: "flex items-center gap-2 px-3 py-2.5 cursor-pointer",
         onclick: move |_| tool_group_open.set(!tool_group_open()),
-        span { class: "material-symbols-outlined text-sm text-[var(--outline)]", "build" }
-        span { class: "text-[11px] font-semibold uppercase tracking-widest text-[var(--on-surface-variant)]/70", "{title}" }
+        span { class: "material-symbols-outlined text-sm text-[var(--outline)]",
+          "build"
+        }
+        span { class: "text-[11px] font-semibold uppercase tracking-widest text-[var(--on-surface-variant)]/70",
+          "{title}"
+        }
         button {
           class: "ml-auto text-[var(--outline)] hover:text-[var(--on-surface)] transition-colors",
-          onclick: move |evt| { evt.stop_propagation(); tool_group_open.set(!tool_group_open()); },
+          onclick: move |evt| {
+              evt.stop_propagation();
+              tool_group_open.set(!tool_group_open());
+          },
           span { class: "material-symbols-outlined text-sm",
-            if tool_group_open() { "expand_more" } else { "chevron_right" }
+            if tool_group_open() {
+              "expand_more"
+            } else {
+              "chevron_right"
+            }
           }
         }
       }
@@ -89,19 +113,35 @@ pub fn render_tool_group(items: &[ToolItem], mut tool_group_open: Signal<bool>) 
           for (idx , item) in items.iter().enumerate() {
             div { key: "{idx}", class: "space-y-1.5",
               div { class: "flex items-center gap-2",
-                span { class: "material-symbols-outlined text-xs text-[var(--outline)]", "build" }
-                span { class: "text-[10px] font-semibold uppercase tracking-wider text-[var(--on-surface-variant)]", "{item.name}" }
+                span { class: "material-symbols-outlined text-xs text-[var(--outline)]",
+                  "build"
+                }
+                span { class: "text-[10px] font-semibold uppercase tracking-wider text-[var(--on-surface-variant)]",
+                  "{item.name}"
+                }
                 span { class: status_class(&item.status), {status_label(&item.status)} }
               }
               div { class: "grid gap-2 pl-7 grid-cols-1 lg:grid-cols-2",
                 div {
-                  div { class: "mb-0.5 text-[10px] font-semibold uppercase tracking-widest text-[var(--on-surface-variant)]", "Input" }
-                  pre { class: ok_cls, if item.input.is_empty() { "<empty>" } else { "{item.input}" } }
+                  div { class: "mb-0.5 text-[10px] font-semibold uppercase tracking-widest text-[var(--on-surface-variant)]",
+                    "Input"
+                  }
+                  pre { class: ok_cls,
+                    if item.input.is_empty() {
+                      "<empty>"
+                    } else {
+                      "{item.input}"
+                    }
+                  }
                 }
                 if let Some(ref res) = item.result {
                   div {
-                    div { class: "mb-0.5 text-[10px] font-semibold uppercase tracking-widest text-[var(--on-surface-variant)]", "Result" }
-                    pre { class: if item.is_error { err_cls } else { ok_cls }, "{res}" }
+                    div { class: "mb-0.5 text-[10px] font-semibold uppercase tracking-widest text-[var(--on-surface-variant)]",
+                      "Result"
+                    }
+                    pre { class: if item.is_error { err_cls } else { ok_cls },
+                      "{res}"
+                    }
                   }
                 }
               }
@@ -123,7 +163,11 @@ pub fn render_stderr_group(lines: &[StderrLine], mut stderr_open: Signal<bool>) 
         onclick: move |_| stderr_open.set(!stderr_open()),
         span { class: "text-[10px] font-semibold uppercase tracking-wider", "{count} log {noun}" }
         span { class: "material-symbols-outlined text-sm",
-          if stderr_open() { "expand_more" } else { "chevron_right" }
+          if stderr_open() {
+            "expand_more"
+          } else {
+            "chevron_right"
+          }
         }
       }
       if stderr_open() {

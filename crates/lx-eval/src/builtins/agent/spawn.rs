@@ -45,41 +45,42 @@ pub fn bi_agent_spawn(args: Vec<LxVal>, span: SourceSpan, ctx: Arc<dyn BuiltinCt
       let local = tokio::task::LocalSet::new();
       let rt = Arc::clone(&rtx.tokio_runtime);
       rt.block_on(local.run_until(async move {
-      let mut interp = Interpreter::new("", None, Arc::clone(&rtx));
-      interp.agent_name = Some(task_name.clone());
+        let mut interp = Interpreter::new("", None, Arc::clone(&rtx));
+        interp.agent_name = Some(task_name.clone());
 
-      let has_handle = handle_method.is_some();
-      let has_run = run_method.is_some();
+        let has_handle = handle_method.is_some();
+        let has_run = run_method.is_some();
 
-      if has_handle && !has_run {
-        let Some(handle_fn) = handle_method else {
-          return;
-        };
-        let mut rx_guard = task_rx.lock().await;
-        let bctx = interp.builtin_ctx();
-        while let Some(msg) = rx_guard.recv().await {
-          let result = crate::builtins::call_value(&handle_fn, msg.payload.clone(), miette::SourceSpan::new(0.into(), 0), &bctx)
-            .await
-            .unwrap_or_else(|e| LxVal::err_str(e.to_string()));
-          if let Some(reply) = msg.reply {
-            let _ = reply.send(result);
+        if has_handle && !has_run {
+          let Some(handle_fn) = handle_method else {
+            return;
+          };
+          let mut rx_guard = task_rx.lock().await;
+          let bctx = interp.builtin_ctx();
+          while let Some(msg) = rx_guard.recv().await {
+            let result = crate::builtins::call_value(&handle_fn, msg.payload.clone(), miette::SourceSpan::new(0.into(), 0), &bctx)
+              .await
+              .unwrap_or_else(|e| LxVal::err_str(e.to_string()));
+            if let Some(reply) = msg.reply {
+              let _ = reply.send(result);
+            }
+          }
+        } else if has_run && !has_handle {
+          drop(task_rx);
+          if let Some(run_fn) = run_method {
+            let bctx = interp.builtin_ctx();
+            let _ = crate::builtins::call_value(&run_fn, LxVal::Unit, miette::SourceSpan::new(0.into(), 0), &bctx).await;
+          }
+        } else {
+          interp.agent_mailbox_rx = Some(task_rx);
+          interp.agent_handle_fn = handle_method;
+          if let Some(run_fn) = run_method {
+            let bctx = interp.builtin_ctx();
+            let _ = crate::builtins::call_value(&run_fn, LxVal::Unit, miette::SourceSpan::new(0.into(), 0), &bctx).await;
           }
         }
-      } else if has_run && !has_handle {
-        drop(task_rx);
-        if let Some(run_fn) = run_method {
-          let bctx = interp.builtin_ctx();
-          let _ = crate::builtins::call_value(&run_fn, LxVal::Unit, miette::SourceSpan::new(0.into(), 0), &bctx).await;
-        }
-      } else {
-        interp.agent_mailbox_rx = Some(task_rx);
-        interp.agent_handle_fn = handle_method;
-        if let Some(run_fn) = run_method {
-          let bctx = interp.builtin_ctx();
-          let _ = crate::builtins::call_value(&run_fn, LxVal::Unit, miette::SourceSpan::new(0.into(), 0), &bctx).await;
-        }
-      }
-    }))});
+      }))
+    });
 
     let handle = AgentHandle { name: name.clone(), mailbox: tx, task: join_handle, pause_flag };
 

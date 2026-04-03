@@ -31,21 +31,26 @@ pub fn AgentConfigPanel(config: LxAgentConfig, #[props(optional)] on_save: Optio
     div { class: "max-w-3xl space-y-6",
       ConfigSection { title: "Source Definition",
         div { class: "relative",
-          pre {
-            class: "text-xs font-mono leading-relaxed text-[var(--on-surface)] bg-[var(--surface)] border border-[var(--outline-variant)]/30 rounded p-4 overflow-x-auto max-h-80 overflow-y-auto whitespace-pre",
+          pre { class: "text-xs font-mono leading-relaxed text-[var(--on-surface)] bg-[var(--surface)] border border-[var(--outline-variant)]/30 rounded p-4 overflow-x-auto max-h-80 overflow-y-auto whitespace-pre",
             "{config.source_text}"
           }
           button {
             class: "absolute top-2 right-2 text-xs text-[var(--outline)] hover:text-[var(--on-surface)] transition-colors",
             title: "Copy source",
             onclick: {
-              let source = config.source_text.clone();
-              move |_| {
-                let escaped = source.replace('\\', "\\\\").replace('\'', "\\'").replace('\n', "\\n");
-                spawn(async move {
-                  let _ = document::eval(&format!("navigator.clipboard.writeText('{escaped}')")).await;
-                });
-              }
+                let source = config.source_text.clone();
+                move |_| {
+                    let escaped = source
+                        .replace('\\', "\\\\")
+                        .replace('\'', "\\'")
+                        .replace('\n', "\\n");
+                    spawn(async move {
+                        let _ = document::eval(
+                                &format!("navigator.clipboard.writeText('{escaped}')"),
+                            )
+                            .await;
+                    });
+                }
             },
             span { class: "material-symbols-outlined text-sm", "content_copy" }
           }
@@ -58,10 +63,10 @@ pub fn AgentConfigPanel(config: LxAgentConfig, #[props(optional)] on_save: Optio
             class: INPUT_FIELD,
             value: "{adapter_type}",
             onchange: move |evt| {
-              adapter_type.set(evt.value().to_string());
-              dirty.set(true);
+                adapter_type.set(evt.value().to_string());
+                dirty.set(true);
             },
-            for (key, label) in ADAPTER_LABELS {
+            for (key , label) in ADAPTER_LABELS {
               option { value: *key, "{label}" }
             }
           }
@@ -72,19 +77,19 @@ pub fn AgentConfigPanel(config: LxAgentConfig, #[props(optional)] on_save: Optio
             searchable: true,
             placeholder: "Select a model...".to_string(),
             options: {
-              let cur = model.read().clone();
-              let mut opts: Vec<SelectOption> = MODEL_OPTIONS
-                .iter()
-                .map(|(v, l)| SelectOption::new(*v, *l))
-                .collect();
-              if !cur.is_empty() && !opts.iter().any(|o| o.value == cur) {
-                opts.insert(0, SelectOption::new(cur.clone(), cur));
-              }
-              opts
+                let cur = model.read().clone();
+                let mut opts: Vec<SelectOption> = MODEL_OPTIONS
+                    .iter()
+                    .map(|(v, l)| SelectOption::new(*v, *l))
+                    .collect();
+                if !cur.is_empty() && !opts.iter().any(|o| o.value == cur) {
+                    opts.insert(0, SelectOption::new(cur.clone(), cur));
+                }
+                opts
             },
             onchange: move |val: String| {
-              model.set(val);
-              dirty.set(true);
+                model.set(val);
+                dirty.set(true);
             },
           }
         }
@@ -96,11 +101,17 @@ pub fn AgentConfigPanel(config: LxAgentConfig, #[props(optional)] on_save: Optio
           div { class: "space-y-1",
             for tool in config.tools.iter() {
               div { class: "flex items-center gap-3 py-1.5 border-b border-[var(--outline-variant)]/20 last:border-b-0",
-                span { class: "material-symbols-outlined text-sm text-[var(--outline)]", "build" }
-                span { class: "text-sm font-mono text-[var(--on-surface)]", "{tool.path}" }
+                span { class: "material-symbols-outlined text-sm text-[var(--outline)]",
+                  "build"
+                }
+                span { class: "text-sm font-mono text-[var(--on-surface)]",
+                  "{tool.path}"
+                }
                 if tool.alias != tool.path {
                   span { class: "text-xs text-[var(--outline)]", "as" }
-                  span { class: "text-sm font-mono text-[var(--primary)]", "{tool.alias}" }
+                  span { class: "text-sm font-mono text-[var(--primary)]",
+                    "{tool.alias}"
+                  }
                 }
               }
             }
@@ -113,9 +124,10 @@ pub fn AgentConfigPanel(config: LxAgentConfig, #[props(optional)] on_save: Optio
         } else {
           div { class: "flex flex-wrap gap-2",
             for ch in config.channels.iter() {
-              span {
-                class: "inline-flex items-center gap-1.5 rounded border border-[var(--outline-variant)]/30 bg-[var(--surface)] px-2.5 py-1 text-xs font-mono text-[var(--on-surface)]",
-                span { class: "material-symbols-outlined text-xs text-[var(--outline)]", "tag" }
+              span { class: "inline-flex items-center gap-1.5 rounded border border-[var(--outline-variant)]/30 bg-[var(--surface)] px-2.5 py-1 text-xs font-mono text-[var(--on-surface)]",
+                span { class: "material-symbols-outlined text-xs text-[var(--outline)]",
+                  "tag"
+                }
                 "{ch}"
               }
             }
@@ -127,8 +139,12 @@ pub fn AgentConfigPanel(config: LxAgentConfig, #[props(optional)] on_save: Optio
           div { class: "space-y-2",
             for field in config.fields.iter() {
               div { class: "flex items-baseline gap-3",
-                span { class: "text-xs font-mono text-[var(--outline)] w-28 shrink-0", "{field.name}" }
-                span { class: "text-sm font-mono text-[var(--on-surface)]", "{field.value}" }
+                span { class: "text-xs font-mono text-[var(--outline)] w-28 shrink-0",
+                  "{field.name}"
+                }
+                span { class: "text-sm font-mono text-[var(--on-surface)]",
+                  "{field.value}"
+                }
               }
             }
           }
@@ -139,23 +155,23 @@ pub fn AgentConfigPanel(config: LxAgentConfig, #[props(optional)] on_save: Optio
           button {
             class: BTN_OUTLINE_SM,
             onclick: move |_| {
-              adapter_type.set(config.adapter_type.clone());
-              model.set(config.model.clone());
-              dirty.set(false);
+                adapter_type.set(config.adapter_type.clone());
+                model.set(config.model.clone());
+                dirty.set(false);
             },
             "Cancel"
           }
           button {
             class: BTN_PRIMARY_SM,
             onclick: move |_| {
-              let update = AgentConfigUpdate {
-                adapter_type: adapter_type.read().clone(),
-                model: model.read().clone(),
-              };
-              dirty.set(false);
-              if let Some(ref handler) = on_save {
-                handler.call(update);
-              }
+                let update = AgentConfigUpdate {
+                    adapter_type: adapter_type.read().clone(),
+                    model: model.read().clone(),
+                };
+                dirty.set(false);
+                if let Some(ref handler) = on_save {
+                    handler.call(update);
+                }
             },
             "Save"
           }

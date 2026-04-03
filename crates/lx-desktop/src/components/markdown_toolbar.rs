@@ -46,41 +46,41 @@ pub fn ToolbarButtons(editor_id: String, value: String, on_change: EventHandler<
       ToolbarBtn {
         icon: "format_bold",
         on_click: {
-          let eid = editor_id.clone();
-          let v = value.clone();
-          move |_| insert_at_cursor(&eid, &v, "**", "**", on_change)
+            let eid = editor_id.clone();
+            let v = value.clone();
+            move |_| insert_at_cursor(&eid, &v, "**", "**", on_change)
         },
       }
       ToolbarBtn {
         icon: "format_italic",
         on_click: {
-          let eid = editor_id.clone();
-          let v = value.clone();
-          move |_| insert_at_cursor(&eid, &v, "*", "*", on_change)
+            let eid = editor_id.clone();
+            let v = value.clone();
+            move |_| insert_at_cursor(&eid, &v, "*", "*", on_change)
         },
       }
       ToolbarBtn {
         icon: "code",
         on_click: {
-          let eid = editor_id.clone();
-          let v = value.clone();
-          move |_| insert_at_cursor(&eid, &v, "\n```\n", "\n```", on_change)
+            let eid = editor_id.clone();
+            let v = value.clone();
+            move |_| insert_at_cursor(&eid, &v, "\n```\n", "\n```", on_change)
         },
       }
       ToolbarBtn {
         icon: "link",
         on_click: {
-          let eid = editor_id.clone();
-          let v = value.clone();
-          move |_| insert_at_cursor(&eid, &v, "[", "](url)", on_change)
+            let eid = editor_id.clone();
+            let v = value.clone();
+            move |_| insert_at_cursor(&eid, &v, "[", "](url)", on_change)
         },
       }
       ToolbarBtn {
         icon: "title",
         on_click: {
-          let eid = editor_id.clone();
-          let v = value.clone();
-          move |_| insert_at_cursor(&eid, &v, "\n## ", "", on_change)
+            let eid = editor_id.clone();
+            let v = value.clone();
+            move |_| insert_at_cursor(&eid, &v, "\n## ", "", on_change)
         },
       }
     }

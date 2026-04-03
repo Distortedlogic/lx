@@ -4,6 +4,7 @@ use dioxus::prelude::*;
 use super::chart_helpers::{build_children_map, nodes_from_events, status_dot_color};
 use super::chart_layout::{CARD_H, CARD_W, collect_edges, collect_lateral_edges, compute_bounding_box, flatten_layout, layout_forest};
 use crate::contexts::activity_log::ActivityLog;
+use crate::routes::Route;
 
 #[component]
 pub fn OrgChart() -> Element {
@@ -178,8 +179,8 @@ pub fn OrgChart() -> Element {
                 let y1 = parent.y + CARD_H;
                 let x2 = child.x + CARD_W / 2.0;
                 let y2 = child.y;
-                let mid_y = (y1 + y2) / 2.0;
-                let d = format!("M {x1} {y1} L {x1} {mid_y} L {x2} {mid_y} L {x2} {y2}");
+                let mid = (y1 + y2) / 2.0;
+                let d = format!("M {x1} {y1} C {x1} {mid} {x2} {mid} {x2} {y2}");
                 rsx! {
                   path {
                     key: "{parent.id}-{child.id}",
@@ -191,7 +192,7 @@ pub fn OrgChart() -> Element {
                 }
             }
           }
-          for (from, to, label) in lateral_edges.iter() {
+          for (from , to , label) in lateral_edges.iter() {
             {
                 let x1 = from.x + CARD_W / 2.0;
                 let y1 = from.y + CARD_H / 2.0;
@@ -231,15 +232,19 @@ pub fn OrgChart() -> Element {
               let dot_color = status_dot_color(&node.status);
               let card_w = CARD_W;
               let card_h = CARD_H;
+              let agent_id = node.id.clone();
+              let nav = navigator();
               rsx! {
                 div {
                   key: "{node.id}",
-                  class: "absolute bg-[var(--surface-container)] border border-[var(--outline-variant)] rounded-lg shadow-sm select-none transition-shadow hover:shadow-md hover:border-[var(--on-surface)]/20",
+                  class: "absolute bg-[var(--surface-container)] border border-[var(--outline-variant)] rounded-lg shadow-sm select-none transition-shadow hover:shadow-md hover:border-[var(--on-surface)]/20 cursor-pointer",
                   style: "left: {node.x}px; top: {node.y}px; width: {card_w}px; min-height: {card_h}px",
+                  onclick: move |_| {
+                      nav.push(Route::AgentDetail { agent_id: agent_id.clone() });
+                  },
                   div { class: "flex items-center px-4 py-3 gap-3",
                     if let Some(ref icon) = node.icon {
-                      span {
-                        class: "material-symbols-outlined text-base shrink-0 text-[var(--on-surface-variant)]",
+                      span { class: "material-symbols-outlined text-sm shrink-0 text-[var(--on-surface-variant)]",
                         "{icon}"
                       }
                     } else {

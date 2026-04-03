@@ -24,7 +24,9 @@ pub fn CompanyImport() -> Element {
   rsx! {
     div { class: "flex flex-col h-full",
       div { class: "flex items-center gap-2 px-4 py-3 border-b border-[var(--outline-variant)]",
-        span { class: "material-symbols-outlined text-base text-[var(--outline)]", "upload" }
+        span { class: "material-symbols-outlined text-sm text-[var(--outline)]",
+          "upload"
+        }
         h1 { class: "text-lg font-semibold text-[var(--on-surface)]", "Import Company Package" }
       }
       div { class: "flex-1 overflow-auto p-6",
@@ -60,7 +62,7 @@ pub fn CompanyImport() -> Element {
                 match source_kind() {
                     ImportSourceKind::FileUpload => rsx! {
                       div { class: "rounded-lg border border-dashed border-[var(--outline-variant)] p-8 text-center",
-                        span { class: "material-symbols-outlined text-4xl text-[var(--outline)] mb-2", "cloud_upload" }
+                        span { class: "material-symbols-outlined text-xl text-[var(--outline)] mb-2", "cloud_upload" }
                         p { class: "text-sm text-[var(--outline)]", "Drop a .zip file here or click to browse" }
                         input { r#type: "file", accept: ".zip", class: "mt-2" }
                       }
@@ -117,7 +119,7 @@ pub fn CompanyImport() -> Element {
             },
             ImportStep::Applying => rsx! {
               div { class: "flex flex-col items-center justify-center py-16",
-                span { class: "material-symbols-outlined text-4xl text-[var(--primary)] animate-spin mb-4",
+                span { class: "material-symbols-outlined text-xl text-[var(--primary)] animate-spin mb-4",
                   "progress_activity"
                 }
                 p { class: "text-sm text-[var(--outline)]", "Importing..." }

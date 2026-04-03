@@ -124,7 +124,13 @@ pub fn OnboardingWizard() -> Element {
                 StepCompany { company_name, company_goal }
               },
               WizardStep::Agent => rsx! {
-                StepAgent { agent_name, agent_role, agent_description, agent_adapter, agent_model_id }
+                StepAgent {
+                  agent_name,
+                  agent_role,
+                  agent_description,
+                  agent_adapter,
+                  agent_model_id,
+                }
               },
               WizardStep::Task => rsx! {
                 StepTask { task_title, task_description }
@@ -145,7 +151,12 @@ pub fn OnboardingWizard() -> Element {
               p { class: "text-xs text-[var(--error)]", "{err}" }
             }
           }
-          WizardFooter { step, loading, loading_text, onboarding }
+          WizardFooter {
+            step,
+            loading,
+            loading_text,
+            onboarding,
+          }
         }
       }
     }
@@ -211,11 +222,19 @@ fn WizardFooter(step: Signal<WizardStep>, loading: Signal<bool>, loading_text: S
         },
         if *loading.read() {
           div { class: "flex items-center gap-2",
-              span { class: "material-symbols-outlined text-sm animate-spin", "progress_activity" }
-              {
-                  let text = loading_text.read().as_ref().cloned().unwrap_or_else(|| "Working...".into());
-                  rsx! { span { "{text}" } }
-              }
+            span { class: "material-symbols-outlined text-sm animate-spin",
+              "progress_activity"
+            }
+            {
+                let text = loading_text
+                    .read()
+                    .as_ref()
+                    .cloned()
+                    .unwrap_or_else(|| "Working...".into());
+                rsx! {
+                  span { "{text}" }
+                }
+            }
           }
         } else if *step.read() == WizardStep::Launch {
           "Create & Launch"

@@ -23,7 +23,7 @@ pub fn FailedRunRow(run: InboxFailedRun, on_dismiss: EventHandler<String>, on_re
     div { class: "group border-b border-[var(--outline-variant)] px-2 py-2.5 last:border-b-0",
       div { class: "flex items-start gap-2",
         div { class: "mt-0.5 shrink-0 rounded-md bg-red-500/20 p-1.5",
-          span { class: "material-symbols-outlined text-red-500 text-base",
+          span { class: "material-symbols-outlined text-red-500 text-sm",
             "cancel"
           }
         }
@@ -54,7 +54,7 @@ pub fn FailedRunRow(run: InboxFailedRun, on_dismiss: EventHandler<String>, on_re
           button {
             class: "rounded-md p-1 text-[var(--outline)] hover:bg-[var(--surface-container)] hover:text-[var(--on-surface)]",
             onclick: move |_| on_dismiss.call(run_id2.clone()),
-            span { class: "material-symbols-outlined text-base", "close" }
+            span { class: "material-symbols-outlined text-sm", "close" }
           }
         }
       }
@@ -71,7 +71,7 @@ pub fn ApprovalRow(approval: InboxApprovalItem, on_approve: EventHandler<String>
     div { class: "group border-b border-[var(--outline-variant)] px-2 py-2.5 last:border-b-0",
       div { class: "flex items-start gap-2",
         div { class: "mt-0.5 shrink-0 rounded-md bg-[var(--surface-container)] p-1.5",
-          span { class: "material-symbols-outlined text-[var(--outline)] text-base",
+          span { class: "material-symbols-outlined text-[var(--outline)] text-sm",
             "approval"
           }
         }
@@ -122,7 +122,7 @@ pub fn JoinRequestRow(join_request: InboxJoinRequest, on_approve: EventHandler<S
     div { class: "group border-b border-[var(--outline-variant)] px-2 py-2.5 last:border-b-0",
       div { class: "flex items-start gap-2",
         div { class: "mt-0.5 shrink-0 rounded-md bg-[var(--surface-container)] p-1.5",
-          span { class: "material-symbols-outlined text-[var(--outline)] text-base",
+          span { class: "material-symbols-outlined text-[var(--outline)] text-sm",
             "person_add"
           }
         }

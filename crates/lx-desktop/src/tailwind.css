@@ -49,6 +49,12 @@
   --surface-container-highest: #262626;
   --surface-container-lowest: #000000;
   --surface-bright: #2c2c2c;
+  --sidebar-background: var(--surface-container-low);
+  --sidebar-foreground: var(--on-surface);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--on-primary);
+  --sidebar-border: var(--outline-variant);
+  --sidebar-accent: var(--surface-container-high);
 
   --primary: #9cff93;
   --primary-container: #00fc40;
@@ -85,6 +91,13 @@
   --surface-container-highest: #d6d6d6;
   --surface-container-lowest: #fafafa;
   --surface-bright: #f0f0f0;
+
+  --sidebar-background: var(--surface-container-low);
+  --sidebar-foreground: var(--on-surface);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--on-primary);
+  --sidebar-border: var(--outline-variant);
+  --sidebar-accent: var(--surface-container-high);
 
   --primary: #1a7d1a;
   --primary-container: #a8f09a;

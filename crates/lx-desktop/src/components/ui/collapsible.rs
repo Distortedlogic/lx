@@ -39,9 +39,7 @@ pub fn CollapsibleContent(open: Signal<bool>, #[props(default)] class: String, c
       "data-slot": "collapsible-content",
       "data-state": data_state,
       class: "grid {anim_class} {class}",
-      div { class: "overflow-hidden",
-        {children}
-      }
+      div { class: "overflow-hidden", {children} }
     }
   }
 }

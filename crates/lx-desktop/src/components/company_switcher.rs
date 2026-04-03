@@ -77,13 +77,13 @@ pub fn CompanySwitcher(companies: Vec<CompanySwitcherEntry>, selected_id: Option
           button {
             class: "w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-[var(--surface-container)]",
             onclick: move |_| open.set(false),
-            span { class: "material-symbols-outlined text-base", "settings" }
+            span { class: "material-symbols-outlined text-sm", "settings" }
             span { class: "text-[var(--on-surface)]", "Company Settings" }
           }
           button {
             class: "w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-[var(--surface-container)]",
             onclick: move |_| open.set(false),
-            span { class: "material-symbols-outlined text-base", "add" }
+            span { class: "material-symbols-outlined text-sm", "add" }
             span { class: "text-[var(--on-surface)]", "Manage Companies" }
           }
         }

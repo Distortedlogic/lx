@@ -22,7 +22,7 @@ pub fn PluginManager() -> Element {
     div { class: "space-y-6 max-w-5xl p-4 overflow-auto",
       div { class: "flex items-center justify-between",
         div { class: "flex items-center gap-2",
-          span { class: "material-symbols-outlined text-base text-[var(--outline)]",
+          span { class: "material-symbols-outlined text-sm text-[var(--outline)]",
             "extension"
           }
           h1 { class: "text-xl font-semibold text-[var(--on-surface)]", "Plugin Manager" }
@@ -37,7 +37,7 @@ pub fn PluginManager() -> Element {
 
       div { class: "rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3",
         div { class: "flex items-start gap-3",
-          span { class: "material-symbols-outlined mt-0.5 text-amber-700 text-base shrink-0",
+          span { class: "material-symbols-outlined mt-0.5 text-amber-700 text-sm shrink-0",
             "warning"
           }
           div { class: "space-y-1 text-sm",
@@ -51,7 +51,7 @@ pub fn PluginManager() -> Element {
 
       div { class: "space-y-3",
         div { class: "flex items-center gap-2",
-          span { class: "material-symbols-outlined text-base text-[var(--outline)]",
+          span { class: "material-symbols-outlined text-sm text-[var(--outline)]",
             "extension"
           }
           h2 { class: "text-base font-semibold text-[var(--on-surface)]",
@@ -61,7 +61,7 @@ pub fn PluginManager() -> Element {
         if installed_plugins.is_empty() {
           div { class: "rounded-lg border border-[var(--outline-variant)] bg-[var(--surface-container)]/30",
             div { class: "flex flex-col items-center justify-center py-10",
-              span { class: "material-symbols-outlined text-4xl text-[var(--outline)] mb-4",
+              span { class: "material-symbols-outlined text-xl text-[var(--outline)] mb-4",
                 "extension"
               }
               p { class: "text-sm font-medium text-[var(--on-surface)]",

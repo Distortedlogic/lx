@@ -17,7 +17,9 @@ pub fn CompanyExport() -> Element {
   rsx! {
     div { class: "flex flex-col h-full",
       div { class: "flex items-center gap-2 px-4 py-3 border-b border-[var(--outline-variant)]",
-        span { class: "material-symbols-outlined text-base text-[var(--outline)]", "inventory_2" }
+        span { class: "material-symbols-outlined text-sm text-[var(--outline)]",
+          "inventory_2"
+        }
         h1 { class: "text-lg font-semibold text-[var(--on-surface)]", "Export Company Package" }
       }
       div { class: "flex flex-1 overflow-hidden",
@@ -94,7 +96,7 @@ pub fn CompanyExport() -> Element {
             }
           } else {
             div { class: "flex flex-col items-center justify-center h-full text-[var(--outline)]",
-              span { class: "material-symbols-outlined text-4xl mb-4",
+              span { class: "material-symbols-outlined text-xl mb-4",
                 "inventory_2"
               }
               p { class: "text-sm", "Select a file to preview its contents." }

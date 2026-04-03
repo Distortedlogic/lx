@@ -7,6 +7,7 @@ use dioxus::prelude::*;
 
 use crate::components::empty_state::EmptyState;
 use crate::components::metric_card::MetricCard;
+use crate::components::page_skeleton::PageSkeleton;
 use crate::contexts::activity_log::ActivityLog;
 use crate::contexts::breadcrumb::BreadcrumbEntry;
 
@@ -15,6 +16,16 @@ use self::activity_charts::{ActivitySummaryChart, ChartCard, EventBreakdownChart
 
 #[component]
 pub fn Dashboard() -> Element {
+  rsx! {
+    SuspenseBoundary {
+      fallback: |_| rsx! { PageSkeleton { variant: "dashboard".to_string() } },
+      DashboardInner {}
+    }
+  }
+}
+
+#[component]
+fn DashboardInner() -> Element {
   let breadcrumb_state = use_context::<crate::contexts::breadcrumb::BreadcrumbState>();
   use_effect(move || {
     breadcrumb_state.set(vec![BreadcrumbEntry { label: "Dashboard".into(), href: None }]);

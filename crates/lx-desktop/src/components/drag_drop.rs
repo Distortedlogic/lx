@@ -122,7 +122,7 @@ pub fn DragOverlay() -> Element {
   rsx! {
     div { class: "absolute inset-0 z-10 flex items-center justify-center bg-[var(--surface)]/80 pointer-events-none",
       div { class: "flex flex-col items-center gap-2 text-[var(--primary)]",
-        span { class: "material-symbols-outlined text-3xl", "upload_file" }
+        span { class: "material-symbols-outlined text-xl", "upload_file" }
         span { class: "text-sm font-medium", "Drop files here" }
       }
     }

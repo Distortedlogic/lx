@@ -28,7 +28,7 @@ pub fn InstanceExperimental() -> Element {
     div { class: "max-w-4xl space-y-6 p-4 overflow-auto",
       div { class: "space-y-2",
         div { class: "flex items-center gap-2",
-          span { class: "material-symbols-outlined text-base text-[var(--outline)]",
+          span { class: "material-symbols-outlined text-sm text-[var(--outline)]",
             "science"
           }
           h1 { class: "text-lg font-semibold text-[var(--on-surface)]", "Experimental" }

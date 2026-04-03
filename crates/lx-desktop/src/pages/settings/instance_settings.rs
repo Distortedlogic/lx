@@ -39,7 +39,7 @@ pub fn InstanceHeartbeats() -> Element {
     div { class: "max-w-5xl space-y-6 p-4 overflow-auto",
       div { class: "space-y-2",
         div { class: "flex items-center gap-2",
-          span { class: "material-symbols-outlined text-base text-[var(--outline)]",
+          span { class: "material-symbols-outlined text-sm text-[var(--outline)]",
             "settings"
           }
           h1 { class: "text-lg font-semibold text-[var(--on-surface)]",
@@ -75,7 +75,7 @@ pub fn InstanceHeartbeats() -> Element {
       }
       if agents.is_empty() {
         div { class: "flex flex-col items-center justify-center py-16 text-[var(--outline)]",
-          span { class: "material-symbols-outlined text-4xl mb-4", "schedule" }
+          span { class: "material-symbols-outlined text-xl mb-4", "schedule" }
           p { class: "text-sm", "No scheduler heartbeats." }
         }
       } else {

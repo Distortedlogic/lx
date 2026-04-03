@@ -76,7 +76,9 @@ pub fn Inbox() -> Element {
   rsx! {
     div { class: "flex flex-col h-full",
       div { class: "flex items-center gap-2 px-4 py-3",
-        span { class: "material-symbols-outlined text-base text-[var(--outline)]", "inbox" }
+        span { class: "material-symbols-outlined text-sm text-[var(--outline)]",
+          "inbox"
+        }
         h1 { class: "text-lg font-semibold text-[var(--on-surface)]", "Inbox" }
       }
       InboxTabBar { active: tab, on_change: move |t| active_tab.set(t) }
@@ -96,7 +98,7 @@ pub fn Inbox() -> Element {
       div { class: "flex-1 overflow-auto",
         if is_empty {
           div { class: "flex flex-col items-center justify-center py-16 text-[var(--outline)]",
-            span { class: "material-symbols-outlined text-4xl mb-4", "inbox" }
+            span { class: "material-symbols-outlined text-xl mb-4", "inbox" }
             p { class: "text-sm", "Your inbox is empty." }
           }
         } else {

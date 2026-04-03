@@ -64,13 +64,13 @@ pub fn StepAgent(
       div { class: "space-y-1",
         label { class: "text-xs text-[var(--outline)] block", "Model ID" }
         input {
-            class: INPUT_CLS,
-            placeholder: "claude-sonnet-4-20250514",
-            value: "{agent_model_id}",
-            oninput: move |e| agent_model_id.set(e.value()),
+          class: INPUT_CLS,
+          placeholder: "claude-sonnet-4-20250514",
+          value: "{agent_model_id}",
+          oninput: move |e| agent_model_id.set(e.value()),
         }
         p { class: "text-[10px] text-[var(--outline)]/60 mt-0.5",
-            "The model identifier your adapter will use (e.g. claude-sonnet-4-20250514, gpt-4o, gemini-2.0-flash)"
+          "The model identifier your adapter will use (e.g. claude-sonnet-4-20250514, gpt-4o, gemini-2.0-flash)"
         }
       }
       div { class: "space-y-1",

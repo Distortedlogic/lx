@@ -100,18 +100,18 @@ impl Interpreter {
           let mut call_fields = IndexMap::new();
           call_fields.insert(intern("call_id"), LxVal::int(call_id as i64));
           call_fields.insert(intern("tool"), LxVal::str(module.as_ref()));
-          call_fields.insert(intern("method"), LxVal::str(&method));
+          call_fields.insert(intern("method"), LxVal::str(method));
           call_fields.insert(intern("args"), arg.clone());
           es.xadd("tool/call", &agent, None, call_fields);
 
-          let result = tm.call_tool(&method, arg, &es, &agent).await;
+          let result = tm.call_tool(method, arg, &es, &agent).await;
 
           match result {
             Ok(val) => {
               let mut result_fields = IndexMap::new();
               result_fields.insert(intern("call_id"), LxVal::int(call_id as i64));
               result_fields.insert(intern("tool"), LxVal::str(module.as_ref()));
-              result_fields.insert(intern("method"), LxVal::str(&method));
+              result_fields.insert(intern("method"), LxVal::str(method));
               result_fields.insert(intern("result"), val.clone());
               es.xadd("tool/result", &agent, None, result_fields);
               Ok(val)
@@ -121,7 +121,7 @@ impl Interpreter {
               let mut error_fields = IndexMap::new();
               error_fields.insert(intern("call_id"), LxVal::int(call_id as i64));
               error_fields.insert(intern("tool"), LxVal::str(module.as_ref()));
-              error_fields.insert(intern("method"), LxVal::str(&method));
+              error_fields.insert(intern("method"), LxVal::str(method));
               error_fields.insert(intern("error"), LxVal::str(&err_msg));
               es.xadd("tool/error", &agent, None, error_fields);
               Err(LxError::runtime(format!("mcp tool '{module}' method '{method}': {err_msg}"), call_span))

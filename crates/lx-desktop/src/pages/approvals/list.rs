@@ -98,7 +98,7 @@ pub fn Approvals() -> Element {
       }
       if filtered.is_empty() {
         div { class: "flex flex-col items-center justify-center py-16 text-center",
-          span { class: "material-symbols-outlined text-3xl text-[var(--outline)]/30 mb-3",
+          span { class: "material-symbols-outlined text-xl text-[var(--outline)]/30 mb-3",
             "verified_user"
           }
           p { class: "text-sm text-[var(--outline)]",

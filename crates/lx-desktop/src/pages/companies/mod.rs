@@ -19,7 +19,7 @@ pub fn Companies() -> Element {
       }
       if companies.is_empty() {
         div { class: "flex flex-col items-center justify-center py-16 text-[var(--outline)]",
-          span { class: "material-symbols-outlined text-4xl mb-4", "business" }
+          span { class: "material-symbols-outlined text-xl mb-4", "business" }
           p { class: "text-sm", "No companies yet." }
         }
       }

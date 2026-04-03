@@ -29,7 +29,7 @@ pub fn MetricCard(
             div { class: "text-xs text-[var(--outline)] mt-1.5", "{desc_text}" }
           }
         }
-        span { class: "material-symbols-outlined text-base text-[var(--outline)] shrink-0 mt-1.5",
+        span { class: "material-symbols-outlined text-sm text-[var(--outline)] shrink-0 mt-1.5",
           "{icon}"
         }
       }

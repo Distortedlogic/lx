@@ -92,9 +92,7 @@ pub fn ScheduleEditor(value: String, on_change: EventHandler<String>) -> Element
 
   rsx! {
     div { class: "flex flex-col gap-3",
-      p { class: "text-xs text-[var(--outline)] italic",
-        "{describe_schedule(&value)}"
-      }
+      p { class: "text-xs text-[var(--outline)] italic", "{describe_schedule(&value)}" }
       Select {
         class: "{select_cls} w-full",
         value: cur_preset.to_value().to_string(),
@@ -244,7 +242,9 @@ fn render_pickers(
       Select {
         class: "{select_cls} w-[80px]",
         value: cur_dom.to_string(),
-        options: (1..=31u32).map(|d| SelectOption::new(d.to_string(), ordinal(d))).collect::<Vec<_>>(),
+        options: (1..=31u32)
+            .map(|d| SelectOption::new(d.to_string(), ordinal(d)))
+            .collect::<Vec<_>>(),
         onchange: move |val: String| on_dom(val),
       }
     },
@@ -259,7 +259,9 @@ fn hour_select(cur: &str, cls: &str, mut on_change: impl FnMut(String) + 'static
     Select {
       class: "{cls} w-[120px]",
       value: cur,
-      options: (0..24u32).map(|h| SelectOption::new(h.to_string(), hour_label(h as usize))).collect::<Vec<_>>(),
+      options: (0..24u32)
+          .map(|h| SelectOption::new(h.to_string(), hour_label(h as usize)))
+          .collect::<Vec<_>>(),
       onchange: move |val: String| on_change(val),
     }
   }
@@ -272,7 +274,10 @@ fn minute_select(cur: &str, cls: &str, mut on_change: impl FnMut(String) + 'stat
     Select {
       class: "{cls} w-[80px]",
       value: cur,
-      options: MINUTES.iter().map(|m| SelectOption::new(m.to_string(), format!("{m:02}"))).collect::<Vec<_>>(),
+      options: MINUTES
+          .iter()
+          .map(|m| SelectOption::new(m.to_string(), format!("{m:02}")))
+          .collect::<Vec<_>>(),
       onchange: move |val: String| on_change(val),
     }
   }

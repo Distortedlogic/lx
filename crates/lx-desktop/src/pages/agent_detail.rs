@@ -1,11 +1,22 @@
 use dioxus::prelude::*;
 
+use crate::components::page_skeleton::PageSkeleton;
 use crate::pages::agents::types::AgentDetail as AgentDetailData;
 
 use super::agents::detail::AgentDetailShell;
 
 #[component]
 pub fn AgentDetail(agent_id: String) -> Element {
+  rsx! {
+    SuspenseBoundary {
+      fallback: |_| rsx! { PageSkeleton { variant: "detail".to_string() } },
+      AgentDetailInner { agent_id }
+    }
+  }
+}
+
+#[component]
+fn AgentDetailInner(agent_id: String) -> Element {
   let agent = AgentDetailData {
     id: agent_id.clone(),
     name: agent_id,

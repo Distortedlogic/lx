@@ -94,8 +94,15 @@ pub fn NewIssueDialog(open: bool, agents: Vec<AgentRef>, on_close: EventHandler<
       class: "fixed inset-0 z-50 flex items-center justify-center bg-black/50",
       onclick: move |_| on_close.call(()),
       onkeydown: move |evt: KeyboardEvent| {
-          if evt.modifiers().meta() && evt.key() == Key::Enter && !title.read().trim().is_empty() {
-              spawn(async move { let _ = document::eval(r#"localStorage.removeItem("lx-new-issue-draft")"#).await; });
+          if evt.modifiers().meta() && evt.key() == Key::Enter
+              && !title.read().trim().is_empty()
+          {
+              spawn(async move {
+                  let _ = document::eval(
+                          r#"localStorage.removeItem("lx-new-issue-draft")"#,
+                      )
+                      .await;
+              });
               on_create.call(NewIssuePayload);
           }
       },
@@ -118,13 +125,16 @@ pub fn NewIssueDialog(open: bool, agents: Vec<AgentRef>, on_close: EventHandler<
             oninput: move |evt| title.set(evt.value().to_string()),
           }
           MarkdownEditor {
-              value: description.read().clone(),
-              on_change: move |val: String| description.set(val),
-              placeholder: "Description (optional, drag files here)".to_string(),
-              class: "min-h-[120px]".to_string(),
-              on_files: move |files: Vec<crate::components::drag_drop::DroppedFile>| {
-                dioxus::logger::tracing::info!("Files dropped in new issue: {:?}", files.iter().map(|f| &f.name).collect::<Vec<_>>());
-              },
+            value: description.read().clone(),
+            on_change: move |val: String| description.set(val),
+            placeholder: "Description (optional, drag files here)".to_string(),
+            class: "min-h-[120px]".to_string(),
+            on_files: move |files: Vec<crate::components::drag_drop::DroppedFile>| {
+                dioxus::logger::tracing::info!(
+                    "Files dropped in new issue: {:?}", files.iter().map(| f | & f.name)
+                    .collect::< Vec < _ >> ()
+                );
+            },
           }
           div { class: "grid grid-cols-3 gap-3",
             div {
@@ -176,7 +186,12 @@ pub fn NewIssueDialog(open: bool, agents: Vec<AgentRef>, on_close: EventHandler<
             disabled: title.read().trim().is_empty(),
             onclick: {
                 move |_| {
-                    spawn(async move { let _ = document::eval(r#"localStorage.removeItem("lx-new-issue-draft")"#).await; });
+                    spawn(async move {
+                        let _ = document::eval(
+                                r#"localStorage.removeItem("lx-new-issue-draft")"#,
+                            )
+                            .await;
+                    });
                     on_create.call(NewIssuePayload);
                 }
             },

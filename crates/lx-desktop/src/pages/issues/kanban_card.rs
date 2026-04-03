@@ -1,6 +1,12 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use dioxus::prelude::*;
 
 use super::types::{AgentRef, Issue, priority_icon_class};
+
+fn now_ms() -> u64 {
+  SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+}
 
 #[component]
 pub fn KanbanCard(
@@ -16,6 +22,18 @@ pub fn KanbanCard(
   let id_display = issue.identifier.as_deref().unwrap_or(&issue.id[..8.min(issue.id.len())]);
   let assignee_name = issue.assignee_agent_id.as_ref().and_then(|aid| agents.iter().find(|a| &a.id == aid).map(|a| a.name.clone()));
   let is_dragging = *drag_active.read() && dragging_issue_id.read().as_deref() == Some(issue.id.as_str());
+  let mut drag_end_ms = use_signal(|| 0u64);
+  let mut prev_drag_active = use_signal(|| false);
+
+  use_effect(move || {
+    let active = *drag_active.read();
+    let was_active = *prev_drag_active.read();
+    if was_active && !active {
+      drag_end_ms.set(now_ms());
+    }
+    prev_drag_active.set(active);
+  });
+
   let card_cls = if is_dragging {
     "rounded-md border border-[var(--outline-variant)]/30 bg-[var(--surface-container)] p-2.5 w-full text-left opacity-30 transition-opacity cursor-grabbing"
   } else if is_active {
@@ -33,11 +51,17 @@ pub fn KanbanCard(
           pointer_start.set((coords.x, coords.y));
           pending_drag_id.set(Some(drag_id.clone()));
       },
-      onclick: move |_| on_click.call(()),
+      onclick: move |_| {
+          if now_ms().saturating_sub(*drag_end_ms.read()) > 200 {
+              on_click.call(());
+          }
+      },
       div { class: "flex items-start gap-1.5 mb-1.5",
         span { class: "text-xs text-[var(--outline)] font-mono shrink-0", "{id_display}" }
         if is_active {
-          span { class: "material-symbols-outlined text-xs text-[var(--tertiary)] shrink-0", "bolt" }
+          span { class: "material-symbols-outlined text-xs text-[var(--tertiary)] shrink-0",
+            "bolt"
+          }
         }
       }
       p { class: "text-sm leading-snug text-[var(--on-surface)] line-clamp-2 mb-2",
@@ -67,12 +91,12 @@ pub fn render_drag_overlay(issue: &Issue, agents: &[AgentRef], pos: (f64, f64)) 
     format!("position: fixed; left: {}px; top: {}px; width: 240px; pointer-events: none; z-index: 50; transform: translate(-50%, -50%);", pos.0, pos.1);
 
   rsx! {
-    div {
-      style: "{style}",
-      div {
-        class: "rounded-md border border-[var(--outline-variant)]/30 bg-[var(--surface-container)] p-2.5 shadow-lg ring-1 ring-[var(--primary)]/20",
+    div { style: "{style}",
+      div { class: "rounded-md border border-[var(--outline-variant)]/30 bg-[var(--surface-container)] p-2.5 shadow-lg ring-1 ring-[var(--primary)]/20",
         div { class: "flex items-start gap-1.5 mb-1.5",
-          span { class: "text-xs text-[var(--outline)] font-mono shrink-0", "{id_display}" }
+          span { class: "text-xs text-[var(--outline)] font-mono shrink-0",
+            "{id_display}"
+          }
         }
         p { class: "text-sm leading-snug text-[var(--on-surface)] line-clamp-2 mb-2",
           "{issue.title}"

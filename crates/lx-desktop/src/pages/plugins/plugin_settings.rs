@@ -43,10 +43,10 @@ pub fn PluginSettingsPage(plugin_id: String) -> Element {
     div { class: "space-y-6 max-w-5xl p-4 overflow-auto",
       div { class: "flex items-center gap-4",
         button { class: "h-8 w-8 flex items-center justify-center rounded border border-[var(--outline-variant)] hover:bg-[var(--surface-container)]",
-          span { class: "material-symbols-outlined text-base", "arrow_back" }
+          span { class: "material-symbols-outlined text-sm", "arrow_back" }
         }
         div { class: "flex items-center gap-2",
-          span { class: "material-symbols-outlined text-base text-[var(--outline)]",
+          span { class: "material-symbols-outlined text-sm text-[var(--outline)]",
             "extension"
           }
           h1 { class: "text-xl font-semibold text-[var(--on-surface)]",
@@ -112,7 +112,7 @@ pub fn PluginSettingsPage(plugin_id: String) -> Element {
                 div { class: "rounded-lg border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]",
                   div { class: "px-4 py-3 border-b border-[var(--outline-variant)]",
                     h3 { class: "text-base font-semibold flex items-center gap-1.5 text-[var(--on-surface)]",
-                      span { class: "material-symbols-outlined text-base", "memory" }
+                      span { class: "material-symbols-outlined text-sm", "memory" }
                       "Runtime Dashboard"
                     }
                     p { class: "text-xs text-[var(--outline)]",
@@ -128,7 +128,7 @@ pub fn PluginSettingsPage(plugin_id: String) -> Element {
                 div { class: "rounded-lg border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]",
                   div { class: "px-4 py-3 border-b border-[var(--outline-variant)]",
                     h3 { class: "text-base font-semibold flex items-center gap-1.5 text-[var(--on-surface)]",
-                      span { class: "material-symbols-outlined text-base", "monitor_heart" }
+                      span { class: "material-symbols-outlined text-sm", "monitor_heart" }
                       "Health Status"
                     }
                   }
@@ -170,7 +170,7 @@ pub fn PluginSettingsPage(plugin_id: String) -> Element {
                 div { class: "rounded-lg border border-[var(--outline-variant)] bg-[var(--surface-container-lowest)]",
                   div { class: "px-4 py-3 border-b border-[var(--outline-variant)]",
                     h3 { class: "text-base font-semibold flex items-center gap-1.5 text-[var(--on-surface)]",
-                      span { class: "material-symbols-outlined text-base", "shield" }
+                      span { class: "material-symbols-outlined text-sm", "shield" }
                       "Permissions"
                     }
                   }
