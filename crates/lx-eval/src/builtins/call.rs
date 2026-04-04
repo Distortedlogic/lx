@@ -73,7 +73,7 @@ pub(crate) async fn call_value(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Ar
   }
 }
 
-fn call_value_get_rtx(ctx: &Arc<dyn BuiltinCtx>) -> Arc<RuntimeCtx> {
+pub(crate) fn call_value_get_rtx(ctx: &Arc<dyn BuiltinCtx>) -> Arc<RuntimeCtx> {
   if let Some(wrapper) = ctx.as_any().downcast_ref::<RuntimeCtxWrapper>() {
     Arc::clone(&wrapper.0)
   } else {

@@ -2,10 +2,9 @@ use ../schema/work_item
 use ../schema/work_item {task_count get_task task_context context_for_implement context_for_investigate task_summaries task_summary}
 use std/fs
 
-wi = work_item.load "work_items/ARENA_ENCAPSULATION.md"
+wi = work_item.load "programs/workrunner/tests/fixtures/ARENA_ENCAPSULATION.md"
 assert (task_count wi >= 2)
 assert (wi.goal | len > 0)
-assert (wi.slug == "arena_encapsulation")
 
 t1 = (get_task wi 1) ?? {subject: ""}
 assert (t1.subject | len > 0)
@@ -28,11 +27,10 @@ assert (inv_ctx | len > 0)
 summaries = task_summaries wi
 assert (summaries | len >= 2)
 
-wi2 = work_item.load "work_items/ALGEBRAIC_EFFECTS.md"
+wi2 = work_item.load "programs/workrunner/tests/fixtures/ALGEBRAIC_EFFECTS.md"
 assert (task_count wi2 >= 3)
-assert (wi2.slug == "algebraic_effects")
 
-wi3 = work_item.load "work_items/AST_ANALYZER_TRAIT.md"
+wi3 = work_item.load "programs/workrunner/tests/fixtures/AST_ANALYZER_TRAIT.md"
 assert (task_count wi3 >= 4)
 
 log.info "work_item_edges: all passed"

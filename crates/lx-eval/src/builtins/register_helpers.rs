@@ -94,7 +94,7 @@ pub(super) fn bi_try(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>
   match crate::builtins::call_value_sync(f, arg, span, ctx) {
     Ok(v) => Ok(v),
     Err(LxError::Propagate { value, .. }) => Ok(LxVal::Err(value)),
-    Err(e) => Err(e),
+    Err(e) => Ok(LxVal::Err(Box::new(LxVal::str(e.to_string())))),
   }
 }
 

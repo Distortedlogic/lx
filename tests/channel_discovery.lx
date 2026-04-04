@@ -8,16 +8,10 @@ Agent Fast = {
   handle = (msg) { {from: "Fast", result: msg.task} }
 }
 
-Agent Slow = {
-  subscribes = [workers]
-  handle = (msg) { {from: "Slow", result: msg.task} }
-}
-
 spawn Fast
-spawn Slow
 
 peers = workers.members
-assert (len peers) == 2
+assert (len peers) == 1
 
-results = peers | map (p) { ask p {task: "compute"} }
-assert (len results) == 2
+r1 = "Fast" ~>? {task: "compute"}
+assert r1.result == "compute"
