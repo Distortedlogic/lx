@@ -60,3 +60,127 @@
 {"id":"1775243950785-1","kind":"runtime/emit","agent":"main","ts":1775243950785,"span":null,"value":"[19:19:10]   bevy-ecosystem-audit: 0 FAIL"}
 {"id":"1775243950786-0","kind":"runtime/emit","agent":"main","ts":1775243950786,"span":null,"value":"[19:19:10]   primitives-audit: 0 FAIL"}
 {"id":"1775243950786-1","kind":"runtime/emit","agent":"main","ts":1775243950786,"span":null,"value":"[19:19:10] Overall: 0/12 passed (threshold: 0.75)"}
+{"id":"1775318620075-0","kind":"runtime/emit","agent":"main","ts":1775318620075,"span":null,"value":"[16:03:40] test message from workgen log"}
+{"id":"1775318620275-0","kind":"runtime/emit","agent":"main","ts":1775318620275,"span":null,"value":"[16:03:40] === workgen satisfaction tests ==="}
+{"id":"1775318620275-1","kind":"runtime/emit","agent":"main","ts":1775318620275,"span":null,"value":"[16:03:40] scenarios: 12"}
+{"id":"1775318620276-0","kind":"runtime/emit","agent":"main","ts":1775318620276,"span":null,"value":"[16:03:40] threshold: 0.75"}
+{"id":"1775318620276-1","kind":"runtime/emit","agent":"main","ts":1775318620276,"span":null,"value":"[16:03:40]   --- rust-audit ---"}
+{"id":"1775318620278-0","kind":"runtime/emit","agent":"main","ts":1775318620278,"span":null,"value":"[16:03:40]   --- python-audit ---"}
+{"id":"1775318620279-0","kind":"runtime/emit","agent":"main","ts":1775318620279,"span":null,"value":"[16:03:40]   --- performance-audit ---"}
+{"id":"1775318620281-0","kind":"runtime/emit","agent":"main","ts":1775318620281,"span":null,"value":"[16:03:40]   --- topology-audit ---"}
+{"id":"1775318620283-0","kind":"runtime/emit","agent":"main","ts":1775318620283,"span":null,"value":"[16:03:40]   --- diagram-audit ---"}
+{"id":"1775318620284-0","kind":"runtime/emit","agent":"main","ts":1775318620284,"span":null,"value":"[16:03:40]   --- diesel-audit ---"}
+{"id":"1775318620286-0","kind":"runtime/emit","agent":"main","ts":1775318620286,"span":null,"value":"[16:03:40]   --- perf-libs-audit ---"}
+{"id":"1775318620287-0","kind":"runtime/emit","agent":"main","ts":1775318620287,"span":null,"value":"[16:03:40]   --- dioxus-audit ---"}
+{"id":"1775318620289-0","kind":"runtime/emit","agent":"main","ts":1775318620289,"span":null,"value":"[16:03:40]   --- tailwind-audit ---"}
+{"id":"1775318620290-0","kind":"runtime/emit","agent":"main","ts":1775318620290,"span":null,"value":"[16:03:40]   --- bevy-audit ---"}
+{"id":"1775318620292-0","kind":"runtime/emit","agent":"main","ts":1775318620292,"span":null,"value":"[16:03:40]   --- bevy-ecosystem-audit ---"}
+{"id":"1775318620293-0","kind":"runtime/emit","agent":"main","ts":1775318620293,"span":null,"value":"[16:03:40]   --- primitives-audit ---"}
+{"id":"1775318620296-0","kind":"runtime/emit","agent":"main","ts":1775318620296,"span":null,"value":"[16:03:40] "}
+{"id":"1775318620297-0","kind":"runtime/emit","agent":"main","ts":1775318620297,"span":null,"value":"[16:03:40] === workgen ==="}
+{"id":"1775318620298-0","kind":"runtime/emit","agent":"main","ts":1775318620298,"span":null,"value":"[16:03:40]   rust-audit: 0 FAIL"}
+{"id":"1775318620298-1","kind":"runtime/emit","agent":"main","ts":1775318620298,"span":null,"value":"[16:03:40]   python-audit: 0 FAIL"}
+{"id":"1775318620299-0","kind":"runtime/emit","agent":"main","ts":1775318620299,"span":null,"value":"[16:03:40]   performance-audit: 0 FAIL"}
+{"id":"1775318620300-0","kind":"runtime/emit","agent":"main","ts":1775318620300,"span":null,"value":"[16:03:40]   topology-audit: 0 FAIL"}
+{"id":"1775318620301-0","kind":"runtime/emit","agent":"main","ts":1775318620301,"span":null,"value":"[16:03:40]   diagram-audit: 0 FAIL"}
+{"id":"1775318620301-1","kind":"runtime/emit","agent":"main","ts":1775318620301,"span":null,"value":"[16:03:40]   diesel-audit: 0 FAIL"}
+{"id":"1775318620302-0","kind":"runtime/emit","agent":"main","ts":1775318620302,"span":null,"value":"[16:03:40]   perf-libs-audit: 0 FAIL"}
+{"id":"1775318620303-0","kind":"runtime/emit","agent":"main","ts":1775318620303,"span":null,"value":"[16:03:40]   dioxus-audit: 0 FAIL"}
+{"id":"1775318620303-1","kind":"runtime/emit","agent":"main","ts":1775318620303,"span":null,"value":"[16:03:40]   tailwind-audit: 0 FAIL"}
+{"id":"1775318620304-0","kind":"runtime/emit","agent":"main","ts":1775318620304,"span":null,"value":"[16:03:40]   bevy-audit: 0 FAIL"}
+{"id":"1775318620305-0","kind":"runtime/emit","agent":"main","ts":1775318620305,"span":null,"value":"[16:03:40]   bevy-ecosystem-audit: 0 FAIL"}
+{"id":"1775318620305-1","kind":"runtime/emit","agent":"main","ts":1775318620305,"span":null,"value":"[16:03:40]   primitives-audit: 0 FAIL"}
+{"id":"1775318620305-2","kind":"runtime/emit","agent":"main","ts":1775318620305,"span":null,"value":"[16:03:40] Overall: 0/12 passed (threshold: 0.75)"}
+{"id":"1775319790448-0","kind":"runtime/emit","agent":"main","ts":1775319790448,"span":null,"value":"[16:23:10] test message from workgen log"}
+{"id":"1775319790652-0","kind":"runtime/emit","agent":"main","ts":1775319790652,"span":null,"value":"[16:23:10] === workgen satisfaction tests ==="}
+{"id":"1775319790652-1","kind":"runtime/emit","agent":"main","ts":1775319790652,"span":null,"value":"[16:23:10] scenarios: 12"}
+{"id":"1775319790653-0","kind":"runtime/emit","agent":"main","ts":1775319790653,"span":null,"value":"[16:23:10] threshold: 0.75"}
+{"id":"1775319790653-1","kind":"runtime/emit","agent":"main","ts":1775319790653,"span":null,"value":"[16:23:10]   --- rust-audit ---"}
+{"id":"1775319790655-0","kind":"runtime/emit","agent":"main","ts":1775319790655,"span":null,"value":"[16:23:10]   --- python-audit ---"}
+{"id":"1775319790656-0","kind":"runtime/emit","agent":"main","ts":1775319790656,"span":null,"value":"[16:23:10]   --- performance-audit ---"}
+{"id":"1775319790657-0","kind":"runtime/emit","agent":"main","ts":1775319790657,"span":null,"value":"[16:23:10]   --- topology-audit ---"}
+{"id":"1775319790658-0","kind":"runtime/emit","agent":"main","ts":1775319790658,"span":null,"value":"[16:23:10]   --- diagram-audit ---"}
+{"id":"1775319790659-0","kind":"runtime/emit","agent":"main","ts":1775319790659,"span":null,"value":"[16:23:10]   --- diesel-audit ---"}
+{"id":"1775319790660-0","kind":"runtime/emit","agent":"main","ts":1775319790660,"span":null,"value":"[16:23:10]   --- perf-libs-audit ---"}
+{"id":"1775319790661-0","kind":"runtime/emit","agent":"main","ts":1775319790661,"span":null,"value":"[16:23:10]   --- dioxus-audit ---"}
+{"id":"1775319790662-0","kind":"runtime/emit","agent":"main","ts":1775319790662,"span":null,"value":"[16:23:10]   --- tailwind-audit ---"}
+{"id":"1775319790663-0","kind":"runtime/emit","agent":"main","ts":1775319790663,"span":null,"value":"[16:23:10]   --- bevy-audit ---"}
+{"id":"1775319790665-0","kind":"runtime/emit","agent":"main","ts":1775319790665,"span":null,"value":"[16:23:10]   --- bevy-ecosystem-audit ---"}
+{"id":"1775319790666-0","kind":"runtime/emit","agent":"main","ts":1775319790666,"span":null,"value":"[16:23:10]   --- primitives-audit ---"}
+{"id":"1775319790668-0","kind":"runtime/emit","agent":"main","ts":1775319790668,"span":null,"value":"[16:23:10] "}
+{"id":"1775319790669-0","kind":"runtime/emit","agent":"main","ts":1775319790669,"span":null,"value":"[16:23:10] === workgen ==="}
+{"id":"1775319790670-0","kind":"runtime/emit","agent":"main","ts":1775319790670,"span":null,"value":"[16:23:10]   rust-audit: 0 FAIL"}
+{"id":"1775319790670-1","kind":"runtime/emit","agent":"main","ts":1775319790670,"span":null,"value":"[16:23:10]   python-audit: 0 FAIL"}
+{"id":"1775319790671-0","kind":"runtime/emit","agent":"main","ts":1775319790671,"span":null,"value":"[16:23:10]   performance-audit: 0 FAIL"}
+{"id":"1775319790672-0","kind":"runtime/emit","agent":"main","ts":1775319790672,"span":null,"value":"[16:23:10]   topology-audit: 0 FAIL"}
+{"id":"1775319790672-1","kind":"runtime/emit","agent":"main","ts":1775319790672,"span":null,"value":"[16:23:10]   diagram-audit: 0 FAIL"}
+{"id":"1775319790673-0","kind":"runtime/emit","agent":"main","ts":1775319790673,"span":null,"value":"[16:23:10]   diesel-audit: 0 FAIL"}
+{"id":"1775319790673-1","kind":"runtime/emit","agent":"main","ts":1775319790673,"span":null,"value":"[16:23:10]   perf-libs-audit: 0 FAIL"}
+{"id":"1775319790674-0","kind":"runtime/emit","agent":"main","ts":1775319790674,"span":null,"value":"[16:23:10]   dioxus-audit: 0 FAIL"}
+{"id":"1775319790674-1","kind":"runtime/emit","agent":"main","ts":1775319790674,"span":null,"value":"[16:23:10]   tailwind-audit: 0 FAIL"}
+{"id":"1775319790675-0","kind":"runtime/emit","agent":"main","ts":1775319790675,"span":null,"value":"[16:23:10]   bevy-audit: 0 FAIL"}
+{"id":"1775319790675-1","kind":"runtime/emit","agent":"main","ts":1775319790675,"span":null,"value":"[16:23:10]   bevy-ecosystem-audit: 0 FAIL"}
+{"id":"1775319790676-0","kind":"runtime/emit","agent":"main","ts":1775319790676,"span":null,"value":"[16:23:10]   primitives-audit: 0 FAIL"}
+{"id":"1775319790676-1","kind":"runtime/emit","agent":"main","ts":1775319790676,"span":null,"value":"[16:23:10] Overall: 0/12 passed (threshold: 0.75)"}
+{"id":"1775319907286-0","kind":"runtime/emit","agent":"main","ts":1775319907286,"span":null,"value":"[16:25:07] test message from workgen log"}
+{"id":"1775319907488-0","kind":"runtime/emit","agent":"main","ts":1775319907488,"span":null,"value":"[16:25:07] === workgen satisfaction tests ==="}
+{"id":"1775319907488-1","kind":"runtime/emit","agent":"main","ts":1775319907488,"span":null,"value":"[16:25:07] scenarios: 12"}
+{"id":"1775319907488-2","kind":"runtime/emit","agent":"main","ts":1775319907488,"span":null,"value":"[16:25:07] threshold: 0.75"}
+{"id":"1775319907489-0","kind":"runtime/emit","agent":"main","ts":1775319907489,"span":null,"value":"[16:25:07]   --- rust-audit ---"}
+{"id":"1775319907490-0","kind":"runtime/emit","agent":"main","ts":1775319907490,"span":null,"value":"[16:25:07]   --- python-audit ---"}
+{"id":"1775319907491-0","kind":"runtime/emit","agent":"main","ts":1775319907491,"span":null,"value":"[16:25:07]   --- performance-audit ---"}
+{"id":"1775319907492-0","kind":"runtime/emit","agent":"main","ts":1775319907492,"span":null,"value":"[16:25:07]   --- topology-audit ---"}
+{"id":"1775319907493-0","kind":"runtime/emit","agent":"main","ts":1775319907493,"span":null,"value":"[16:25:07]   --- diagram-audit ---"}
+{"id":"1775319907495-0","kind":"runtime/emit","agent":"main","ts":1775319907495,"span":null,"value":"[16:25:07]   --- diesel-audit ---"}
+{"id":"1775319907496-0","kind":"runtime/emit","agent":"main","ts":1775319907496,"span":null,"value":"[16:25:07]   --- perf-libs-audit ---"}
+{"id":"1775319907497-0","kind":"runtime/emit","agent":"main","ts":1775319907497,"span":null,"value":"[16:25:07]   --- dioxus-audit ---"}
+{"id":"1775319907498-0","kind":"runtime/emit","agent":"main","ts":1775319907498,"span":null,"value":"[16:25:07]   --- tailwind-audit ---"}
+{"id":"1775319907499-0","kind":"runtime/emit","agent":"main","ts":1775319907499,"span":null,"value":"[16:25:07]   --- bevy-audit ---"}
+{"id":"1775319907500-0","kind":"runtime/emit","agent":"main","ts":1775319907500,"span":null,"value":"[16:25:07]   --- bevy-ecosystem-audit ---"}
+{"id":"1775319907501-0","kind":"runtime/emit","agent":"main","ts":1775319907501,"span":null,"value":"[16:25:07]   --- primitives-audit ---"}
+{"id":"1775319907504-0","kind":"runtime/emit","agent":"main","ts":1775319907504,"span":null,"value":"[16:25:07] "}
+{"id":"1775319907504-1","kind":"runtime/emit","agent":"main","ts":1775319907504,"span":null,"value":"[16:25:07] === workgen ==="}
+{"id":"1775319907505-0","kind":"runtime/emit","agent":"main","ts":1775319907505,"span":null,"value":"[16:25:07]   rust-audit: 0 FAIL"}
+{"id":"1775319907506-0","kind":"runtime/emit","agent":"main","ts":1775319907506,"span":null,"value":"[16:25:07]   python-audit: 0 FAIL"}
+{"id":"1775319907507-0","kind":"runtime/emit","agent":"main","ts":1775319907507,"span":null,"value":"[16:25:07]   performance-audit: 0 FAIL"}
+{"id":"1775319907507-1","kind":"runtime/emit","agent":"main","ts":1775319907507,"span":null,"value":"[16:25:07]   topology-audit: 0 FAIL"}
+{"id":"1775319907508-0","kind":"runtime/emit","agent":"main","ts":1775319907508,"span":null,"value":"[16:25:07]   diagram-audit: 0 FAIL"}
+{"id":"1775319907509-0","kind":"runtime/emit","agent":"main","ts":1775319907509,"span":null,"value":"[16:25:07]   diesel-audit: 0 FAIL"}
+{"id":"1775319907509-1","kind":"runtime/emit","agent":"main","ts":1775319907509,"span":null,"value":"[16:25:07]   perf-libs-audit: 0 FAIL"}
+{"id":"1775319907510-0","kind":"runtime/emit","agent":"main","ts":1775319907510,"span":null,"value":"[16:25:07]   dioxus-audit: 0 FAIL"}
+{"id":"1775319907511-0","kind":"runtime/emit","agent":"main","ts":1775319907511,"span":null,"value":"[16:25:07]   tailwind-audit: 0 FAIL"}
+{"id":"1775319907511-1","kind":"runtime/emit","agent":"main","ts":1775319907511,"span":null,"value":"[16:25:07]   bevy-audit: 0 FAIL"}
+{"id":"1775319907512-0","kind":"runtime/emit","agent":"main","ts":1775319907512,"span":null,"value":"[16:25:07]   bevy-ecosystem-audit: 0 FAIL"}
+{"id":"1775319907513-0","kind":"runtime/emit","agent":"main","ts":1775319907513,"span":null,"value":"[16:25:07]   primitives-audit: 0 FAIL"}
+{"id":"1775319907513-1","kind":"runtime/emit","agent":"main","ts":1775319907513,"span":null,"value":"[16:25:07] Overall: 0/12 passed (threshold: 0.75)"}
+{"id":"1775320135763-0","kind":"runtime/emit","agent":"main","ts":1775320135763,"span":null,"value":"[16:28:55] test message from workgen log"}
+{"id":"1775320135965-0","kind":"runtime/emit","agent":"main","ts":1775320135965,"span":null,"value":"[16:28:55] === workgen satisfaction tests ==="}
+{"id":"1775320135966-0","kind":"runtime/emit","agent":"main","ts":1775320135966,"span":null,"value":"[16:28:55] scenarios: 12"}
+{"id":"1775320135966-1","kind":"runtime/emit","agent":"main","ts":1775320135966,"span":null,"value":"[16:28:55] threshold: 0.75"}
+{"id":"1775320135967-0","kind":"runtime/emit","agent":"main","ts":1775320135967,"span":null,"value":"[16:28:55]   --- rust-audit ---"}
+{"id":"1775320135968-0","kind":"runtime/emit","agent":"main","ts":1775320135968,"span":null,"value":"[16:28:55]   --- python-audit ---"}
+{"id":"1775320135969-0","kind":"runtime/emit","agent":"main","ts":1775320135969,"span":null,"value":"[16:28:55]   --- performance-audit ---"}
+{"id":"1775320135970-0","kind":"runtime/emit","agent":"main","ts":1775320135970,"span":null,"value":"[16:28:55]   --- topology-audit ---"}
+{"id":"1775320135971-0","kind":"runtime/emit","agent":"main","ts":1775320135971,"span":null,"value":"[16:28:55]   --- diagram-audit ---"}
+{"id":"1775320135972-0","kind":"runtime/emit","agent":"main","ts":1775320135972,"span":null,"value":"[16:28:55]   --- diesel-audit ---"}
+{"id":"1775320135973-0","kind":"runtime/emit","agent":"main","ts":1775320135973,"span":null,"value":"[16:28:55]   --- perf-libs-audit ---"}
+{"id":"1775320135974-0","kind":"runtime/emit","agent":"main","ts":1775320135974,"span":null,"value":"[16:28:55]   --- dioxus-audit ---"}
+{"id":"1775320135976-0","kind":"runtime/emit","agent":"main","ts":1775320135976,"span":null,"value":"[16:28:55]   --- tailwind-audit ---"}
+{"id":"1775320135977-0","kind":"runtime/emit","agent":"main","ts":1775320135977,"span":null,"value":"[16:28:55]   --- bevy-audit ---"}
+{"id":"1775320135978-0","kind":"runtime/emit","agent":"main","ts":1775320135978,"span":null,"value":"[16:28:55]   --- bevy-ecosystem-audit ---"}
+{"id":"1775320135979-0","kind":"runtime/emit","agent":"main","ts":1775320135979,"span":null,"value":"[16:28:55]   --- primitives-audit ---"}
+{"id":"1775320135981-0","kind":"runtime/emit","agent":"main","ts":1775320135981,"span":null,"value":"[16:28:55] "}
+{"id":"1775320135982-0","kind":"runtime/emit","agent":"main","ts":1775320135982,"span":null,"value":"[16:28:55] === workgen ==="}
+{"id":"1775320135983-0","kind":"runtime/emit","agent":"main","ts":1775320135983,"span":null,"value":"[16:28:55]   rust-audit: 0 FAIL"}
+{"id":"1775320135983-1","kind":"runtime/emit","agent":"main","ts":1775320135983,"span":null,"value":"[16:28:55]   python-audit: 0 FAIL"}
+{"id":"1775320135984-0","kind":"runtime/emit","agent":"main","ts":1775320135984,"span":null,"value":"[16:28:55]   performance-audit: 0 FAIL"}
+{"id":"1775320135985-0","kind":"runtime/emit","agent":"main","ts":1775320135985,"span":null,"value":"[16:28:55]   topology-audit: 0 FAIL"}
+{"id":"1775320135985-1","kind":"runtime/emit","agent":"main","ts":1775320135985,"span":null,"value":"[16:28:55]   diagram-audit: 0 FAIL"}
+{"id":"1775320135986-0","kind":"runtime/emit","agent":"main","ts":1775320135986,"span":null,"value":"[16:28:55]   diesel-audit: 0 FAIL"}
+{"id":"1775320135987-0","kind":"runtime/emit","agent":"main","ts":1775320135987,"span":null,"value":"[16:28:55]   perf-libs-audit: 0 FAIL"}
+{"id":"1775320135987-1","kind":"runtime/emit","agent":"main","ts":1775320135987,"span":null,"value":"[16:28:55]   dioxus-audit: 0 FAIL"}
+{"id":"1775320135988-0","kind":"runtime/emit","agent":"main","ts":1775320135988,"span":null,"value":"[16:28:55]   tailwind-audit: 0 FAIL"}
+{"id":"1775320135989-0","kind":"runtime/emit","agent":"main","ts":1775320135989,"span":null,"value":"[16:28:55]   bevy-audit: 0 FAIL"}
+{"id":"1775320135989-1","kind":"runtime/emit","agent":"main","ts":1775320135989,"span":null,"value":"[16:28:55]   bevy-ecosystem-audit: 0 FAIL"}
+{"id":"1775320135990-0","kind":"runtime/emit","agent":"main","ts":1775320135990,"span":null,"value":"[16:28:55]   primitives-audit: 0 FAIL"}
+{"id":"1775320135990-1","kind":"runtime/emit","agent":"main","ts":1775320135990,"span":null,"value":"[16:28:55] Overall: 0/12 passed (threshold: 0.75)"}

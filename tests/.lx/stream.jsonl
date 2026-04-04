@@ -34,3 +34,98 @@
 {"id":"1775243949079-0","kind":"runtime/emit","agent":"main","ts":1775243949079,"span":null,"value":"gotcha_fixed_verify: all passed"}
 {"id":"1775243949113-0","kind":"runtime/emit","agent":"main","ts":1775243949113,"span":null,"value":"gotchas_parser: all checks passed"}
 {"id":"1775243949153-0","kind":"runtime/emit","agent":"main","ts":1775243949153,"span":null,"value":"gotchas_runtime: all checks passed"}
+{"id":"1775318209786-0","kind":"runtime/emit","agent":"main","ts":1775318209786,"span":null,"value":"agent_trait: all checks passed"}
+{"id":"1775318209868-0","kind":"runtime/emit","agent":"main","ts":1775318209868,"span":null,"value":"bugs_active: all checks passed"}
+{"id":"1775318209906-0","kind":"agent/spawn","agent":"Fast","ts":1775318209906,"span":null,"agent":"Fast"}
+{"id":"1775318209912-0","kind":"agent/spawn","agent":"Slow","ts":1775318209912,"span":null,"agent":"Slow"}
+{"id":"1775318583303-0","kind":"runtime/emit","agent":"main","ts":1775318583303,"span":null,"value":"agent_trait: all checks passed"}
+{"id":"1775318583378-0","kind":"runtime/emit","agent":"main","ts":1775318583378,"span":null,"value":"bugs_active: all checks passed"}
+{"id":"1775318583416-0","kind":"agent/spawn","agent":"Fast","ts":1775318583416,"span":null,"agent":"Fast"}
+{"id":"1775318583420-0","kind":"agent/spawn","agent":"Slow","ts":1775318583420,"span":null,"agent":"Slow"}
+{"id":"1775318618012-0","kind":"runtime/emit","agent":"main","ts":1775318618012,"span":null,"value":"agent_trait: all checks passed"}
+{"id":"1775318618089-0","kind":"runtime/emit","agent":"main","ts":1775318618089,"span":null,"value":"bugs_active: all checks passed"}
+{"id":"1775318618128-0","kind":"agent/spawn","agent":"Fast","ts":1775318618128,"span":null,"agent":"Fast"}
+{"id":"1775318618132-0","kind":"agent/spawn","agent":"Slow","ts":1775318618132,"span":null,"agent":"Slow"}
+{"id":"1775318618572-0","kind":"runtime/emit","agent":"main","ts":1775318618572,"span":null,"value":"gotcha_fixed_verify: all passed"}
+{"id":"1775318618607-0","kind":"runtime/emit","agent":"main","ts":1775318618607,"span":null,"value":"gotchas_parser: all checks passed"}
+{"id":"1775318618648-0","kind":"runtime/emit","agent":"main","ts":1775318618648,"span":null,"value":"gotchas_runtime: all checks passed"}
+{"id":"1775318633922-0","kind":"agent/spawn","agent":"Fast","ts":1775318633922,"span":null,"agent":"Fast"}
+{"id":"1775318633927-0","kind":"agent/spawn","agent":"Slow","ts":1775318633927,"span":null,"agent":"Slow"}
+{"id":"1775318698746-0","kind":"agent/spawn","agent":"Fast","ts":1775318698746,"span":null,"agent":"Fast"}
+{"id":"1775318698751-0","kind":"agent/spawn","agent":"Slow","ts":1775318698751,"span":null,"agent":"Slow"}
+{"id":"1775318750860-0","kind":"agent/spawn","agent":"Fast","ts":1775318750860,"span":null,"agent":"Fast"}
+{"id":"1775318750864-0","kind":"agent/spawn","agent":"Slow","ts":1775318750864,"span":null,"agent":"Slow"}
+{"id":"1775318834792-0","kind":"agent/spawn","agent":"Fast","ts":1775318834792,"span":null,"agent":"Fast"}
+{"id":"1775318834796-0","kind":"agent/spawn","agent":"Slow","ts":1775318834796,"span":null,"agent":"Slow"}
+{"id":"1775318893000-0","kind":"agent/spawn","agent":"Fast","ts":1775318893000,"span":null,"agent":"Fast"}
+{"id":"1775318893004-0","kind":"agent/spawn","agent":"Slow","ts":1775318893004,"span":null,"agent":"Slow"}
+{"id":"1775318893005-0","kind":"agent/ask","agent":"main","ts":1775318893005,"span":null,"ask_id":1,"from":"main","to":"Fast","msg":{"task":"compute"}}
+{"id":"1775319097902-0","kind":"agent/spawn","agent":"Fast","ts":1775319097902,"span":null,"agent":"Fast"}
+{"id":"1775319097902-1","kind":"agent/spawn","agent":"Slow","ts":1775319097902,"span":null,"agent":"Slow"}
+{"id":"1775319097902-2","kind":"agent/ask","agent":"main","ts":1775319097902,"span":null,"ask_id":1,"from":"main","to":"Fast","msg":{"task":"compute"}}
+{"id":"1775319159124-0","kind":"agent/spawn","agent":"Fast","ts":1775319159124,"span":null,"agent":"Fast"}
+{"id":"1775319159124-1","kind":"agent/spawn","agent":"Slow","ts":1775319159124,"span":null,"agent":"Slow"}
+{"id":"1775319159124-2","kind":"agent/ask","agent":"main","ts":1775319159124,"span":null,"ask_id":1,"from":"main","to":"Fast","msg":{"task":"compute"}}
+{"id":"1775319178223-0","kind":"agent/spawn","agent":"Fast","ts":1775319178223,"span":null,"agent":"Fast"}
+{"id":"1775319178223-1","kind":"agent/spawn","agent":"Slow","ts":1775319178223,"span":null,"agent":"Slow"}
+{"id":"1775319197340-0","kind":"agent/spawn","agent":"Fast","ts":1775319197340,"span":null,"agent":"Fast"}
+{"id":"1775319197340-1","kind":"agent/spawn","agent":"Slow","ts":1775319197340,"span":null,"agent":"Slow"}
+{"id":"1775319197340-2","kind":"agent/ask","agent":"main","ts":1775319197340,"span":null,"ask_id":1,"from":"main","to":"Fast","msg":{"task":"compute"}}
+{"id":"1775319212993-0","kind":"agent/spawn","agent":"Fast","ts":1775319212993,"span":null,"agent":"Fast"}
+{"id":"1775319212993-1","kind":"agent/spawn","agent":"Slow","ts":1775319212993,"span":null,"agent":"Slow"}
+{"id":"1775319213094-0","kind":"agent/ask","agent":"main","ts":1775319213094,"span":null,"ask_id":1,"from":"main","to":"Fast","msg":{"task":"compute"}}
+{"id":"1775319248300-0","kind":"agent/spawn","agent":"Fast","ts":1775319248300,"span":null,"agent":"Fast"}
+{"id":"1775319248300-1","kind":"agent/spawn","agent":"Slow","ts":1775319248300,"span":null,"agent":"Slow"}
+{"id":"1775319248401-0","kind":"agent/ask","agent":"main","ts":1775319248401,"span":null,"ask_id":1,"from":"main","to":"Fast","msg":{"task":"compute"}}
+{"id":"1775319275960-0","kind":"agent/spawn","agent":"Fast","ts":1775319275960,"span":null,"agent":"Fast"}
+{"id":"1775319275960-1","kind":"agent/spawn","agent":"Slow","ts":1775319275960,"span":null,"agent":"Slow"}
+{"id":"1775319276061-0","kind":"agent/ask","agent":"main","ts":1775319276061,"span":null,"ask_id":1,"from":"main","to":"Fast","msg":{"task":"compute"}}
+{"id":"1775319315200-0","kind":"agent/spawn","agent":"Fast","ts":1775319315200,"span":null,"agent":"Fast"}
+{"id":"1775319315201-0","kind":"agent/ask","agent":"main","ts":1775319315201,"span":null,"ask_id":1,"from":"main","to":"Fast","msg":{"task":"compute"}}
+{"id":"1775319328898-0","kind":"agent/spawn","agent":"Fast","ts":1775319328898,"span":null,"agent":"Fast"}
+{"id":"1775319328898-1","kind":"agent/ask","agent":"main","ts":1775319328898,"span":null,"ask_id":1,"from":"main","to":"Fast","msg":{"task":"compute"}}
+{"id":"1775319358665-0","kind":"agent/spawn","agent":"Fast","ts":1775319358665,"span":null,"agent":"Fast"}
+{"id":"1775319358665-1","kind":"agent/ask","agent":"main","ts":1775319358665,"span":null,"ask_id":1,"from":"main","to":"Fast","msg":{"task":"compute"}}
+{"id":"1775319467191-0","kind":"agent/spawn","agent":"Fast","ts":1775319467191,"span":null,"agent":"Fast"}
+{"id":"1775319467191-1","kind":"agent/ask","agent":"main","ts":1775319467191,"span":null,"ask_id":1,"from":"main","to":"Fast","msg":{"task":"compute"}}
+{"id":"1775319493423-0","kind":"agent/spawn","agent":"Fast","ts":1775319493423,"span":null,"agent":"Fast"}
+{"id":"1775319493423-1","kind":"agent/ask","agent":"main","ts":1775319493423,"span":null,"ask_id":1,"from":"main","to":"Fast","msg":{"task":"compute"}}
+{"id":"1775319530591-0","kind":"agent/spawn","agent":"Fast","ts":1775319530591,"span":null,"agent":"Fast"}
+{"id":"1775319530591-1","kind":"agent/ask","agent":"main","ts":1775319530591,"span":null,"ask_id":1,"from":"main","to":"Fast","msg":{"task":"compute"}}
+{"id":"1775319550560-0","kind":"agent/spawn","agent":"Fast","ts":1775319550560,"span":null,"agent":"Fast"}
+{"id":"1775319550560-1","kind":"agent/ask","agent":"main","ts":1775319550560,"span":null,"ask_id":1,"from":"main","to":"Fast","msg":{"task":"compute"}}
+{"id":"1775319574232-0","kind":"agent/spawn","agent":"Fast","ts":1775319574232,"span":null,"agent":"Fast"}
+{"id":"1775319574232-1","kind":"agent/ask","agent":"main","ts":1775319574232,"span":null,"ask_id":1,"from":"main","to":"Fast","msg":{"task":"compute"}}
+{"id":"1775319592819-0","kind":"agent/spawn","agent":"Fast","ts":1775319592819,"span":null,"agent":"Fast"}
+{"id":"1775319592819-1","kind":"agent/ask","agent":"main","ts":1775319592819,"span":null,"ask_id":1,"from":"main","to":"Fast","msg":{"task":"compute"}}
+{"id":"1775319634209-0","kind":"agent/spawn","agent":"Fast","ts":1775319634209,"span":null,"agent":"Fast"}
+{"id":"1775319634260-0","kind":"agent/ask","agent":"main","ts":1775319634260,"span":null,"ask_id":1,"from":"main","to":"Fast","msg":{"task":"compute"}}
+{"id":"1775319667695-0","kind":"agent/spawn","agent":"Fast","ts":1775319667695,"span":null,"agent":"Fast"}
+{"id":"1775319667746-0","kind":"agent/ask","agent":"main","ts":1775319667746,"span":null,"ask_id":1,"from":"main","to":"Fast","msg":{"task":"compute"}}
+{"id":"1775319741535-0","kind":"agent/spawn","agent":"Fast","ts":1775319741535,"span":null,"agent":"Fast"}
+{"id":"1775319741587-0","kind":"agent/ask","agent":"main","ts":1775319741587,"span":null,"ask_id":1,"from":"main","to":"Fast","msg":{"task":"compute"}}
+{"id":"1775319741587-1","kind":"agent/reply","agent":"Fast","ts":1775319741587,"span":null,"ask_id":1,"from":"Fast","to":"main","msg":{"from":"Fast","result":"compute"}}
+{"id":"1775319788390-0","kind":"runtime/emit","agent":"main","ts":1775319788390,"span":null,"value":"agent_trait: all checks passed"}
+{"id":"1775319788469-0","kind":"runtime/emit","agent":"main","ts":1775319788469,"span":null,"value":"bugs_active: all checks passed"}
+{"id":"1775319788503-0","kind":"agent/spawn","agent":"Fast","ts":1775319788503,"span":null,"agent":"Fast"}
+{"id":"1775319788503-1","kind":"agent/ask","agent":"main","ts":1775319788503,"span":null,"ask_id":1,"from":"main","to":"Fast","msg":{"task":"compute"}}
+{"id":"1775319788504-0","kind":"agent/reply","agent":"Fast","ts":1775319788504,"span":null,"ask_id":1,"from":"Fast","to":"main","msg":{"from":"Fast","result":"compute"}}
+{"id":"1775319788938-0","kind":"runtime/emit","agent":"main","ts":1775319788938,"span":null,"value":"gotcha_fixed_verify: all passed"}
+{"id":"1775319788972-0","kind":"runtime/emit","agent":"main","ts":1775319788972,"span":null,"value":"gotchas_parser: all checks passed"}
+{"id":"1775319789013-0","kind":"runtime/emit","agent":"main","ts":1775319789013,"span":null,"value":"gotchas_runtime: all checks passed"}
+{"id":"1775319905230-0","kind":"runtime/emit","agent":"main","ts":1775319905230,"span":null,"value":"agent_trait: all checks passed"}
+{"id":"1775319905308-0","kind":"runtime/emit","agent":"main","ts":1775319905308,"span":null,"value":"bugs_active: all checks passed"}
+{"id":"1775319905342-0","kind":"agent/spawn","agent":"Fast","ts":1775319905342,"span":null,"agent":"Fast"}
+{"id":"1775319905342-1","kind":"agent/ask","agent":"main","ts":1775319905342,"span":null,"ask_id":1,"from":"main","to":"Fast","msg":{"task":"compute"}}
+{"id":"1775319905343-0","kind":"agent/reply","agent":"Fast","ts":1775319905343,"span":null,"ask_id":1,"from":"Fast","to":"main","msg":{"from":"Fast","result":"compute"}}
+{"id":"1775319905763-0","kind":"runtime/emit","agent":"main","ts":1775319905763,"span":null,"value":"gotcha_fixed_verify: all passed"}
+{"id":"1775319905798-0","kind":"runtime/emit","agent":"main","ts":1775319905798,"span":null,"value":"gotchas_parser: all checks passed"}
+{"id":"1775319905838-0","kind":"runtime/emit","agent":"main","ts":1775319905838,"span":null,"value":"gotchas_runtime: all checks passed"}
+{"id":"1775320133717-0","kind":"runtime/emit","agent":"main","ts":1775320133717,"span":null,"value":"agent_trait: all checks passed"}
+{"id":"1775320133797-0","kind":"runtime/emit","agent":"main","ts":1775320133797,"span":null,"value":"bugs_active: all checks passed"}
+{"id":"1775320133831-0","kind":"agent/spawn","agent":"Fast","ts":1775320133831,"span":null,"agent":"Fast"}
+{"id":"1775320133831-1","kind":"agent/ask","agent":"main","ts":1775320133831,"span":null,"ask_id":1,"from":"main","to":"Fast","msg":{"task":"compute"}}
+{"id":"1775320133832-0","kind":"agent/reply","agent":"Fast","ts":1775320133832,"span":null,"ask_id":1,"from":"Fast","to":"main","msg":{"from":"Fast","result":"compute"}}
+{"id":"1775320134262-0","kind":"runtime/emit","agent":"main","ts":1775320134262,"span":null,"value":"gotcha_fixed_verify: all passed"}
+{"id":"1775320134297-0","kind":"runtime/emit","agent":"main","ts":1775320134297,"span":null,"value":"gotchas_parser: all checks passed"}
+{"id":"1775320134337-0","kind":"runtime/emit","agent":"main","ts":1775320134337,"span":null,"value":"gotchas_runtime: all checks passed"}
