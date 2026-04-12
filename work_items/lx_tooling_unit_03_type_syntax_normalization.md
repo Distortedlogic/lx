@@ -1,7 +1,7 @@
 ---
 unit: 3
 title: Type Syntax Normalization
-scope: lx-ast, lx-parser, lx-checker, lx-fmt, lx-desugar
+scope: lx-ast, lx-parser, lx-checker, lx-fmt, lx-desugar, lx-value, lx-eval
 depends_on: lx_tooling_unit_02_phase_hardening
 optional: false
 ---
@@ -25,17 +25,32 @@ Assume Unit 02 is merged and the phase boundary is hardened. Do not redesign tra
   - `lx_type_to_json_type`
   - `default_for_type`
   - direct `f.type_name.as_str()` calls
+- Runtime values currently reuse the AST generics instead of owning runtime-native containers:
+  - `crates/lx-value/src/value/mod.rs` aliases `FieldDef = Field<LxVal, ConstraintExpr>`
+  - `crates/lx-value/src/value/mod.rs` aliases `TraitMethodDef = MethodSpec<FieldDef>`
+- Runtime construction and use sites currently copy AST `type_name` and `output` fields directly:
+  - `crates/lx-eval/src/interpreter/type_apply.rs::eval_field_decl`
+  - `crates/lx-eval/src/interpreter/exec_stmt.rs` trait-method construction path
+  - `crates/lx-eval/src/interpreter/trait_apply.rs` runtime trait checking
+  - `crates/lx-eval/src/stdlib/trait_ops.rs` runtime trait reflection helpers
 
 ## Files To Create Or Change
 - `crates/lx-ast/src/ast/types.rs`
 - `crates/lx-ast/src/ast/walk_impls.rs`
+- `crates/lx-ast/src/ast/display.rs`
 - `crates/lx-parser/src/parser/stmt_trait.rs`
 - `crates/lx-parser/src/parser/stmt_keyword.rs`
 - `crates/lx-parser/src/parser/type_ann.rs`
+- `crates/lx-parser/tests/surface_parse_regressions.rs`
 - `crates/lx-checker/src/visit_stmt.rs`
 - `crates/lx-fmt/src/formatter/emit_stmt.rs`
 - `crates/lx-fmt/src/formatter/emit_stmt_keyword.rs`
 - `crates/lx-desugar/src/folder/desugar_schema.rs`
+- `crates/lx-value/src/value/mod.rs`
+- `crates/lx-eval/src/interpreter/type_apply.rs`
+- `crates/lx-eval/src/interpreter/exec_stmt.rs`
+- `crates/lx-eval/src/interpreter/trait_apply.rs`
+- `crates/lx-eval/src/stdlib/trait_ops.rs`
 - `crates/lx-desugar/tests/surface_to_core_regressions.rs`
 - `crates/lx-fmt/tests/format_regressions.rs`
 - `crates/lx-checker/tests/checker_regressions.rs`
@@ -54,6 +69,12 @@ Assume Unit 02 is merged and the phase boundary is hardened. Do not redesign tra
 - `Formatter::emit_keyword_decl`
 - `lx_type_to_json_type`
 - `default_for_type`
+- `FieldDef`
+- `TraitMethodDef`
+- `render_type_expr`
+- `Interpreter::eval_field_decl`
+- `Interpreter::apply_trait_fields`
+- `method_to_record`
 
 ## Mechanical Task List
 1. In `crates/lx-ast/src/ast/types.rs`, change `Field<D, C>::type_name` from `Sym` to `TypeExprId`.
@@ -81,15 +102,36 @@ Assume Unit 02 is merged and the phase boundary is hardened. Do not redesign tra
     - fall back to `object` for all other type expressions
 15. In the same schema file, replace `default_for_type(type_name: &str, ...)` with `default_for_type(type_expr: TypeExprId, arena: &AstArena, ...)` and synthesize defaults from the `TypeExpr` variant instead of a string name.
 16. Update any now-dead raw-symbol type helper code that becomes unused after Steps 10-15. Remove it in the same unit.
-17. Extend Unit 01 tests so they cover non-trivial type syntax in trait fields and in manually constructed `TraitMethodDecl` formatter/checker cases, not only named types.
-18. Do not introduce type aliases back to raw `Sym` for user-written type syntax in this unit.
+17. In `crates/lx-value/src/value/mod.rs`, stop aliasing runtime field and method shapes to the AST generics. Define concrete runtime structs instead:
+   - `pub struct FieldDef { pub name: Sym, pub type_name: Sym, pub type_display: Arc<str>, pub default: Option<LxVal>, pub constraint: Option<ConstraintExpr> }`
+   - `pub struct TraitMethodDef { pub name: Sym, pub input: Vec<FieldDef>, pub output: Sym, pub output_display: Arc<str> }`
+   Keep the existing `LxTrait` and `LxClass` APIs otherwise unchanged.
+18. In `crates/lx-ast/src/ast/display.rs`, add `pub fn render_type_expr(type_expr: TypeExprId, arena: &AstArena) -> Arc<str>`.
+   - The helper owns all rendering for non-`Named` `TypeExpr` values.
+   - It must produce the exact display string for every `TypeExpr` variant using AST-owned formatting, not formatter-internal code.
+   - In `crates/lx-eval/src/interpreter/type_apply.rs`, add one exact conversion helper for AST syntax to runtime metadata:
+   - `fn runtime_type_spec(type_expr: TypeExprId, arena: &AstArena) -> (Sym, Arc<str>)`
+   - for `TypeExpr::Named(name)`, return `(name, Arc::from(name.as_str()))`
+   - for every other `TypeExpr` variant, return `(intern(ANY_TYPE_NAME), render_type_expr(type_expr, arena))`
+   The rendered string must be used only for diagnostics and trait reflection. The runtime matcher stays conservative by using `ANY_TYPE_NAME` for non-`Named` type syntax.
+19. Implement the runtime migration at the exact construction sites:
+   - `Interpreter::eval_field_decl` in `type_apply.rs` must call `runtime_type_spec(f.type_name, self.arena.as_ref())`
+   - the trait-method path in `exec_stmt.rs` must convert each input field and `m.output` through `runtime_type_spec(...)`
+   - `trait_apply.rs` must compare `field.type_name` to `ANY_TYPE_NAME` and keep using `field.type_display` in user-facing error text
+   - `trait_ops.rs::method_to_record` must expose `type_display` and `output_display` instead of raw `Sym`
+20. Do not store bare `TypeExprId` in `lx-value` runtime structs. No runtime value in this unit may require an external `AstArena` to remain valid after construction.
+21. Extend Unit 01 tests so they cover non-trivial type syntax in trait fields and in manually constructed `TraitMethodDecl` formatter/checker cases, not only named types.
+22. In `crates/lx-parser/tests/surface_parse_regressions.rs`, add the parser-side regression for the non-trivial trait-field type syntax that Unit 01 introduced. Keep it in the same parser regression file so the parser fixture and the later formatter/checker assertions share the same source shape and parse helper.
+23. Do not introduce type aliases back to raw `Sym` for user-written type syntax in the AST in this unit.
 
 ## Verification
 1. Run `cargo test -p lx-parser --test surface_parse_regressions`.
 2. Run `cargo test -p lx-fmt --test format_regressions`.
 3. Run `cargo test -p lx-checker --test checker_regressions`.
 4. Run `cargo test -p lx-desugar --test surface_to_core_regressions`.
-5. Run `just test`.
+5. Run `cargo test -p lx-eval`.
+6. Run `cargo test -p lx-value`.
+7. Run `just test`.
 
 ## Out Of Scope
 - New type-system features

@@ -40,6 +40,7 @@ This unit has no prerequisites. It must land before Units 02-07. Do not change p
 - `crates/lx-desugar/tests/surface_to_core_regressions.rs`
 - `crates/lx-fmt/tests/format_regressions.rs`
 - `crates/lx-checker/tests/checker_regressions.rs`
+- `crates/lx-checker/tests/semantic_signature_regressions.rs`
 - `crates/lx-linter/Cargo.toml`
 - `crates/lx-linter/tests/pipeline_regressions.rs`
 - `crates/lx-linter/tests/lint_regressions.rs`
@@ -50,6 +51,7 @@ This unit has no prerequisites. It must land before Units 02-07. Do not change p
 - `lx_desugar::desugar`
 - `lx_fmt::format`
 - `lx_checker::check`
+- `lx_checker::module_graph::extract_signature`
 - `lx_linter::lint`
 - `lx_linter::RuleRegistry`
 - `lx_ast::ast::attach_comments`
@@ -65,58 +67,100 @@ This unit has no prerequisites. It must land before Units 02-07. Do not change p
    - class declaration with fields and methods
    - binding with `type_ann`
    - nested `TypeExpr` shapes parsed by `parser/type_ann.rs`
-3. In the same parser test file, add a comment-attachment regression that parses a source string containing comments before the first statement, after a statement, and inside a node span, then asserts non-empty results from `leading_comments`, `trailing_comments`, and `dangling_comments` for concrete `NodeId` values.
-4. In `crates/lx-desugar/tests/surface_to_core_regressions.rs`, add a helper that runs `lex -> parse -> desugar` and fails the test if parse returns errors.
-5. In the desugar test file, add one regression source string for each current surface-only construct that `validate_core` rejects:
+3. In the same parser test file, add one exact parser-backed comment regression named `comment_attachments_assign_leading_and_trailing_to_first_stmt` with this source string:
+   ```lx
+   -- leading on stmt
+   x = 1 -- trailing on stmt
+   ```
+   Parse the source, define one local helper `fn first_stmt_id(program: &Program<Surface>) -> StmtId`, route the first-statement lookup through that helper, and assert all of the following on `NodeId::Stmt(first_stmt_id(&program))`:
+   - `program.leading_comments(NodeId::Stmt(first_stmt_id(&program))).len() == 1`
+   - `program.leading_comments(NodeId::Stmt(first_stmt_id(&program)))[0].text == "-- leading on stmt"`
+   - `program.trailing_comments(NodeId::Stmt(first_stmt_id(&program))).len() == 1`
+   - `program.trailing_comments(NodeId::Stmt(first_stmt_id(&program)))[0].text == "-- trailing on stmt"`
+   The helper is the only place that may touch the first statement lookup in this test file. Implement it against the current `Program` layout for Unit 01, then update only that helper body to `program.stmts()[0]` when Unit 02 lands the `Program` accessor contract.
+4. In the same parser test file, add one exact attachment-algorithm regression named `attach_comments_can_classify_dangling_for_a_synthetic_node_span`. Do not discover a dangling case from parsed LX source, because the current lexer only emits line comments. Build the fixture directly:
+   - `source = "--slot;"`
+   - allocate `expr_id = arena.alloc_expr(Expr::Ident(intern("slot")), (0, 6).into())`
+   - allocate `stmt_id = arena.alloc_stmt(Stmt::Expr(expr_id), (0, 7).into())`
+   - build `comments = CommentStore::from_vec(vec![Comment { span: (0, 2).into(), text: "--".into() }])`
+   - call `attach_comments(&[stmt_id], &arena, &comments, source)`
+   - build a `Program<Surface>` from that arena and returned `comment_map`
+   - assert `program.dangling_comments(NodeId::Expr(expr_id)).len() == 1`
+   - assert `program.leading_comments(NodeId::Expr(expr_id)).is_empty()`
+   - assert `program.trailing_comments(NodeId::Expr(expr_id)).is_empty()`
+5. In `crates/lx-desugar/tests/surface_to_core_regressions.rs`, add a helper that runs `lex -> parse -> desugar` and fails the test if parse returns errors.
+6. In the desugar test file, add one regression source string for each current surface-only construct that `validate_core` rejects:
    - `Stmt::KeywordDecl`
    - `Expr::Pipe`
    - `Expr::Section`
    - `Expr::Ternary`
    - `Expr::Coalesce`
    - `Expr::With(Binding)`
-6. In each desugar regression, walk the resulting `Program<Core>` and assert that none of the rejected surface-only nodes remain. Reuse the same visitor shape as `validate_core` so later units can compare behavior directly.
-7. In `crates/lx-fmt/tests/format_regressions.rs`, add format baselines for:
+7. In each desugar regression, walk the resulting `Program<Core>` and assert that none of the rejected surface-only nodes remain. Reuse the same visitor shape as `validate_core` so later units can compare behavior directly.
+8. In `crates/lx-fmt/tests/format_regressions.rs`, add format baselines for:
    - trait declarations with field defaults and method signatures
    - class declarations
    - keyword declarations
    - bindings with `TypeExprId` annotations
    - nested type expressions formatted through `emit_type.rs`
-8. Make the formatter tests compare exact output strings, including trailing newline behavior from `Formatter::format_program`.
-9. In `crates/lx-checker/tests/checker_regressions.rs`, add a helper that runs `lex -> parse -> desugar -> check` and returns `CheckResult`.
-10. Add checker regressions for:
-    - binding annotation mismatch
-    - function parameter annotation resolution
-    - match exhaustiveness warning
-    - imported names resolved through `check_with_imports`
-    - pattern bindings entering scope
-11. In checker tests, assert exact diagnostic codes instead of only diagnostic counts. Use the current codes from `crates/lx-checker/src/diagnostics.rs`.
-12. In `crates/lx-linter/Cargo.toml`, add the dev-dependencies needed for full-pipeline tests from the linter crate:
-    - `lx-parser = { path = "../lx-parser" }`
-    - `lx-desugar = { path = "../lx-desugar" }`
-    - `lx-fmt = { path = "../lx-fmt" }`
-13. In `crates/lx-linter/tests/pipeline_regressions.rs`, add an end-to-end helper that runs `lex -> parse -> desugar -> format -> check -> lint`.
-14. In that pipeline test file, add one smoke test that asserts:
-    - no parse errors on a valid sample
-    - formatted output is non-empty
-    - checker diagnostics are stable for the fixture
-    - linter diagnostics are stable for the fixture
-15. In `crates/lx-linter/tests/lint_regressions.rs`, add one dedicated source string per default-registered lint rule, plus one source string for the separate `mut_never_mutated` pipeline check:
-    - `break_outside_loop`
-    - `redundant_propagate`
-    - `duplicate_record_field`
-    - `unused_import`
-    - `empty_match`
-    - `single_branch_par`
-    - `mut_never_mutated`
-    - `unreachable_code`
-16. Assert exact lint codes and the presence of the expected `rule_name` text in each lint diagnostic.
-17. Do not add CST, trivia-preserving rewrite infrastructure, or any new production AST APIs in this unit.
+9. Make the formatter tests compare exact output strings, including trailing newline behavior from `Formatter::format_program`.
+10. In `crates/lx-checker/tests/checker_regressions.rs`, add a helper that runs `lex -> parse -> desugar -> check` and returns `CheckResult`.
+11. Add checker regressions for:
+   - binding annotation mismatch
+   - function parameter annotation resolution
+   - match exhaustiveness warning
+   - imported names resolved through `check_with_imports`
+   - pattern bindings entering scope
+12. In checker tests, assert exact diagnostic codes instead of only diagnostic counts. Use the current codes from `crates/lx-checker/src/diagnostics.rs`.
+13. In `crates/lx-checker/tests/semantic_signature_regressions.rs`, add one exact semantic-model baseline named `semantic_model_baseline_for_import_and_binding_resolution` with this source string:
+   ```lx
+   use std/time
+   answer = 1
+   value = answer
+   ```
+   Run `lex -> parse -> desugar -> check` and assert:
+   - `model.definitions.len() == 3`
+   - definition order is `Import(time)`, `Binding(answer)`, `Binding(value)`
+   - `model.references_to(answer_def).len() == 1`
+   - `model.display_type(model.type_of_def(answer_def).unwrap()) == "Int"`
+   - `model.display_type(model.type_of_expr(value_expr_id).unwrap()) == "Int"`
+14. In the same checker test file, add one exact module-signature baseline named `module_signature_baseline_for_exported_binding_and_trait` with this source string:
+   ```lx
+   +answer = 1
+   +Trait Pair = { left: Int; right: Int }
+   ```
+   After `check`, call `extract_signature(&program, &result.semantic)` and assert:
+   - `signature.bindings` contains only `answer`
+   - `signature.traits` contains only `Pair`
+   - `signature.types` is empty
+   - `signature.traits[Pair].len() == 2`
+15. In `crates/lx-linter/Cargo.toml`, add the dev-dependencies needed for full-pipeline tests from the linter crate:
+   - `lx-parser = { path = "../lx-parser" }`
+   - `lx-desugar = { path = "../lx-desugar" }`
+   - `lx-fmt = { path = "../lx-fmt" }`
+16. In `crates/lx-linter/tests/pipeline_regressions.rs`, add an end-to-end helper that runs `lex -> parse -> desugar -> format -> check -> lint`.
+17. In that pipeline test file, add one smoke test that asserts:
+   - no parse errors on a valid sample
+   - formatted output is non-empty
+   - checker diagnostics are stable for the fixture
+   - linter diagnostics are stable for the fixture
+18. In `crates/lx-linter/tests/lint_regressions.rs`, add one dedicated source string per default-registered lint rule, plus one source string for the separate `mut_never_mutated` pipeline check:
+   - `break_outside_loop`
+   - `redundant_propagate`
+   - `duplicate_record_field`
+   - `unused_import`
+   - `empty_match`
+   - `single_branch_par`
+   - `mut_never_mutated`
+   - `unreachable_code`
+19. Assert exact lint codes and the presence of the expected `rule_name` text in each lint diagnostic.
+20. Do not add CST, trivia-preserving rewrite infrastructure, or any new production AST APIs in this unit.
 
 ## Verification
 1. Run `cargo test -p lx-parser --test surface_parse_regressions`.
 2. Run `cargo test -p lx-desugar --test surface_to_core_regressions`.
 3. Run `cargo test -p lx-fmt --test format_regressions`.
-4. Run `cargo test -p lx-checker --test checker_regressions`.
+4. Run `cargo test -p lx-checker --test checker_regressions --test semantic_signature_regressions`.
 5. Run `cargo test -p lx-linter --test pipeline_regressions --test lint_regressions`.
 6. Run `just test`.
 7. Record any fixture strings added in the tests only. Do not leave expected output in comments or external scratch files.
