@@ -3,8 +3,6 @@ use dioxus::prelude::*;
 use super::new_dialog::NewProjectDialog;
 use super::types::Project;
 use crate::routes::Route;
-use crate::styles::{FLEX_BETWEEN, PAGE_HEADING};
-
 fn status_color(status: &str) -> &'static str {
   match status {
     "in_progress" => "text-[var(--primary)]",
@@ -24,8 +22,8 @@ pub fn Projects() -> Element {
 
   rsx! {
     div { class: "flex flex-col h-full p-4 overflow-auto gap-4",
-      div { class: FLEX_BETWEEN,
-        h1 { class: PAGE_HEADING, "PROJECTS" }
+      div { class: "flex-between",
+        h1 { class: "page-heading", "PROJECTS" }
         button {
           class: "bg-[var(--primary)] text-[var(--on-primary)] px-4 py-2 text-xs uppercase font-semibold hover:brightness-110 transition-all duration-150 rounded",
           onclick: move |_| show_dialog.set(true),

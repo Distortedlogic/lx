@@ -1,6 +1,5 @@
 use super::types::{ADAPTER_LABELS, LxAgentConfig};
 use crate::components::ui::select::{Select, SelectOption};
-use crate::styles::{BTN_OUTLINE_SM, BTN_PRIMARY_SM, INPUT_FIELD};
 use dioxus::prelude::*;
 
 const MODEL_OPTIONS: &[(&str, &str)] = &[
@@ -60,7 +59,7 @@ pub fn AgentConfigPanel(config: LxAgentConfig, #[props(optional)] on_save: Optio
         div { class: "space-y-3",
           label { class: "text-xs text-[var(--outline)] block", "Adapter" }
           select {
-            class: INPUT_FIELD,
+            class: "input-field",
             value: "{adapter_type}",
             onchange: move |evt| {
                 adapter_type.set(evt.value().to_string());
@@ -153,7 +152,7 @@ pub fn AgentConfigPanel(config: LxAgentConfig, #[props(optional)] on_save: Optio
       if *dirty.read() {
         div { class: "flex items-center justify-end gap-2 pt-4 border-t border-[var(--outline-variant)]/30",
           button {
-            class: BTN_OUTLINE_SM,
+            class: "btn-outline-sm",
             onclick: move |_| {
                 adapter_type.set(config.adapter_type.clone());
                 model.set(config.model.clone());
@@ -162,7 +161,7 @@ pub fn AgentConfigPanel(config: LxAgentConfig, #[props(optional)] on_save: Optio
             "Cancel"
           }
           button {
-            class: BTN_PRIMARY_SM,
+            class: "btn-primary-sm",
             onclick: move |_| {
                 let update = AgentConfigUpdate {
                     adapter_type: adapter_type.read().clone(),

@@ -1,4 +1,3 @@
-use crate::styles::{FLEX_BETWEEN, PAGE_HEADING};
 use dioxus::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -20,8 +19,8 @@ pub fn Accounts() -> Element {
 
   rsx! {
     div { class: "flex flex-col h-full p-4 overflow-auto gap-4",
-      div { class: FLEX_BETWEEN,
-        h1 { class: PAGE_HEADING, "ACCOUNTS" }
+      div { class: "flex-between",
+        h1 { class: "page-heading", "ACCOUNTS" }
         span { class: "text-xs text-[var(--outline)] uppercase tracking-wider",
           "{entries.len()} PROVIDERS"
         }

@@ -15,9 +15,6 @@ impl SelectOption {
   }
 }
 
-const TRIGGER_CLASS: &str = "flex w-fit items-center justify-between gap-2 rounded-md border border-[var(--outline-variant)] bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none h-9 hover:bg-[var(--surface-container-high)]";
-const TRIGGER_DISABLED: &str = "cursor-not-allowed opacity-50";
-
 #[component]
 pub fn Select(
   #[props(default)] class: String,
@@ -57,13 +54,7 @@ pub fn Select(
     div { "data-slot": "select", class: "relative inline-block",
       button {
         "data-slot": "select-trigger",
-        class: cn(
-            &[
-                TRIGGER_CLASS,
-                if disabled { TRIGGER_DISABLED } else { "cursor-pointer" },
-                &class,
-            ],
-        ),
+        class: cn(&["select-trigger", &class]),
         disabled,
         onclick: move |_| {
             if !disabled {

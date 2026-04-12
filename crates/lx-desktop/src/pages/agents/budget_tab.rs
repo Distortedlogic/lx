@@ -1,8 +1,6 @@
 use dioxus::prelude::*;
 
 use super::run_types::BudgetSummary;
-use crate::styles::{BTN_PRIMARY_SM, INPUT_FIELD};
-
 #[component]
 pub fn BudgetTab(summary: BudgetSummary, on_save: EventHandler<i64>) -> Element {
   let mut draft_dollars = use_signal(|| format!("{:.2}", summary.amount as f64 / 100.0));
@@ -66,7 +64,7 @@ pub fn BudgetTab(summary: BudgetSummary, on_save: EventHandler<i64>) -> Element 
         div { class: "flex items-center gap-2",
           span { class: "text-sm text-[var(--outline)]", "$" }
           input {
-            class: INPUT_FIELD,
+            class: "input-field",
             r#type: "number",
             step: "0.01",
             min: "0",
@@ -76,7 +74,7 @@ pub fn BudgetTab(summary: BudgetSummary, on_save: EventHandler<i64>) -> Element 
           }
           if can_save {
             button {
-              class: BTN_PRIMARY_SM,
+              class: "btn-primary-sm",
               onclick: move |_| {
                   if let Some(cents) = parse_dollar_input(&draft_dollars.read()) {
                       on_save.call(cents);

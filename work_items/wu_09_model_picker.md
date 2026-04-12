@@ -11,7 +11,7 @@
 - `crates/lx-desktop/src/pages/agents/config_form.rs` (154 lines)
 
 ## Preconditions
-- `config_form.rs` at line 56-64 has a plain `input` element for model selection with `INPUT_FIELD` class, `oninput` handler setting `model` signal and `dirty` flag
+- `config_form.rs` at line 56-64 has a plain `input` element for model selection with `"input-field"` class, `oninput` handler setting `model` signal and `dirty` flag
 - `Select` component at `crates/lx-desktop/src/components/ui/select.rs` (verified API):
   - Component props: `class: String` (default empty), `value: String`, `options: Vec<SelectOption>`, `placeholder: String` (default empty), `disabled: bool` (default false), `searchable: bool` (default false), `onchange: EventHandler<String>`
   - `SelectOption` struct has public fields: `pub value: String`, `pub label: String`, `pub disabled: bool`
@@ -51,7 +51,7 @@ const MODEL_OPTIONS: &[(&str, &str)] = &[
 ```rust
           label { class: "text-xs text-[var(--outline)] block", "Model" }
           input {
-            class: INPUT_FIELD,
+            class: "input-field",
             value: "{model}",
             placeholder: "e.g. claude-sonnet-4-20250514",
             oninput: move |evt| {

@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 use super::ui::badge::{Badge, BadgeVariant};
-use super::ui::button::{ButtonSize, ButtonVariant, button_variant_class};
+use super::ui::button::{Button, ButtonSize, ButtonVariant};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct FilterValue {
@@ -34,8 +34,9 @@ pub fn FilterBar(filters: Vec<FilterValue>, on_remove: EventHandler<String>, on_
           }
         }
       }
-      button {
-        class: button_variant_class(ButtonVariant::Ghost, ButtonSize::Xs),
+      Button {
+        variant: ButtonVariant::Ghost,
+        size: ButtonSize::Xs,
         onclick: move |_| on_clear.call(()),
         "Clear all"
       }

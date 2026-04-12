@@ -1,7 +1,5 @@
 use dioxus::prelude::*;
 
-use crate::styles::{FLEX_BETWEEN, PAGE_HEADING};
-
 use super::card::ApprovalCard;
 use super::types::{Approval, ApprovalPayload};
 
@@ -73,8 +71,8 @@ pub fn Approvals() -> Element {
 
   rsx! {
     div { class: "flex flex-col h-full p-4 overflow-auto gap-4",
-      div { class: FLEX_BETWEEN,
-        h1 { class: PAGE_HEADING, "APPROVALS" }
+      div { class: "flex-between",
+        h1 { class: "page-heading", "APPROVALS" }
       }
       div { class: "flex gap-2",
         button {

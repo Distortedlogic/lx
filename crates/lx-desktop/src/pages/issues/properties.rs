@@ -1,8 +1,6 @@
 use dioxus::prelude::*;
 
 use super::types::{AgentRef, Issue, PRIORITY_ORDER, STATUS_ORDER, status_icon_class, status_label};
-use crate::styles::PROPERTY_LABEL;
-
 #[component]
 pub fn IssuePropertiesPanel(issue: Issue, agents: Vec<AgentRef>, on_update: EventHandler<(String, String)>) -> Element {
   let assignee_name = issue.assignee_agent_id.as_ref().and_then(|aid| agents.iter().find(|a| &a.id == aid).map(|a| a.name.clone()));
@@ -71,7 +69,7 @@ pub fn IssuePropertiesPanel(issue: Issue, agents: Vec<AgentRef>, on_update: Even
 fn PropertyRow(label: &'static str, children: Element) -> Element {
   rsx! {
     div { class: "flex items-center gap-3 py-1.5",
-      span { class: PROPERTY_LABEL, "{label}" }
+      span { class: "property-label", "{label}" }
       div { class: "flex items-center gap-1.5 min-w-0 flex-1", {children} }
     }
   }

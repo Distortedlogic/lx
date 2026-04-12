@@ -63,7 +63,6 @@ Replace the existing component in `config_form.rs`:
 
 ```rust
 use super::types::{ADAPTER_LABELS, LxAgentConfig, LxToolDecl, LxAgentField};
-use crate::styles::{BTN_OUTLINE_SM, BTN_PRIMARY_SM, INPUT_FIELD};
 use dioxus::prelude::*;
 
 #[component]
@@ -141,7 +140,7 @@ This section has two editable fields: adapter dropdown and model text input. Reu
             div { class: "space-y-3",
                 label { class: "text-xs text-[var(--outline)] block", "Adapter" }
                 select {
-                    class: INPUT_FIELD,
+                    class: "input-field",
                     value: "{adapter_type}",
                     onchange: move |evt| {
                         adapter_type.set(evt.value().to_string());
@@ -153,7 +152,7 @@ This section has two editable fields: adapter dropdown and model text input. Reu
                 }
                 label { class: "text-xs text-[var(--outline)] block", "Model" }
                 input {
-                    class: INPUT_FIELD,
+                    class: "input-field",
                     value: "{model}",
                     placeholder: "e.g. claude-sonnet-4-20250514",
                     oninput: move |evt| {
@@ -248,7 +247,7 @@ Keep the dirty-tracking save bar from the original, but only for the editable fi
         if *dirty.read() {
             div { class: "flex items-center justify-end gap-2 pt-4 border-t border-[var(--outline-variant)]/30",
                 button {
-                    class: BTN_OUTLINE_SM,
+                    class: "btn-outline-sm",
                     onclick: move |_| {
                         adapter_type.set(config.adapter_type.clone());
                         model.set(config.model.clone());
@@ -257,7 +256,7 @@ Keep the dirty-tracking save bar from the original, but only for the editable fi
                     "Cancel"
                 }
                 button {
-                    class: BTN_PRIMARY_SM,
+                    class: "btn-primary-sm",
                     onclick: move |_| {
                         let update = AgentConfigUpdate {
                             adapter_type: adapter_type.read().clone(),

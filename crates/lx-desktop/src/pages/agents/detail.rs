@@ -7,7 +7,6 @@ use super::runs_tab::RunsTab;
 use super::skills_tab::SkillsTab;
 use super::types::{AgentDetail as AgentDetailData, AgentDetailTab, LxAgentConfig, role_label};
 use crate::contexts::activity_log::ActivityLog;
-use crate::styles::{BTN_OUTLINE_SM, TAB_ACTIVE, TAB_INACTIVE};
 use dioxus::prelude::*;
 
 #[component]
@@ -81,19 +80,19 @@ pub fn AgentDetailShell(
         }
         div { class: "flex items-center gap-2 shrink-0",
           button {
-            class: BTN_OUTLINE_SM,
+            class: "btn-outline-sm",
             onclick: move |_| on_run.call(()),
             "Run"
           }
           if is_paused {
             button {
-              class: BTN_OUTLINE_SM,
+              class: "btn-outline-sm",
               onclick: move |_| on_resume.call(()),
               "Resume"
             }
           } else {
             button {
-              class: BTN_OUTLINE_SM,
+              class: "btn-outline-sm",
               onclick: move |_| on_pause.call(()),
               "Pause"
             }
@@ -104,7 +103,7 @@ pub fn AgentDetailShell(
       div { class: "flex gap-1 border-b border-[var(--outline-variant)]/30",
         for tab in AgentDetailTab::all() {
           button {
-            class: if *active_tab.read() == *tab { TAB_ACTIVE } else { TAB_INACTIVE },
+            class: if *active_tab.read() == *tab { "tab-active" } else { "tab-inactive" },
             onclick: {
                 let tab = tab.clone();
                 move |_| active_tab.set(tab.clone())

@@ -2,8 +2,6 @@ use dioxus::prelude::*;
 
 use super::types::{CATCH_UP_POLICIES, CONCURRENCY_POLICIES, Routine};
 use crate::routes::Route;
-use crate::styles::{FLEX_BETWEEN, PAGE_HEADING};
-
 #[component]
 pub fn Routines() -> Element {
   let routines = dioxus_storage::use_persistent("lx_routines", Vec::<Routine>::new);
@@ -19,8 +17,8 @@ pub fn Routines() -> Element {
 
   rsx! {
     div { class: "flex flex-col h-full p-4 overflow-auto gap-4",
-      div { class: FLEX_BETWEEN,
-        h1 { class: PAGE_HEADING, "ROUTINES" }
+      div { class: "flex-between",
+        h1 { class: "page-heading", "ROUTINES" }
         button {
           class: "bg-[var(--primary)] text-[var(--on-primary)] px-4 py-2 text-xs uppercase font-semibold hover:brightness-110 transition-all duration-150 rounded",
           onclick: move |_| show_composer.set(true),

@@ -5,8 +5,6 @@ use super::tree::GoalTree;
 use crate::components::page_skeleton::PageSkeleton;
 use crate::pages::projects::types::{Goal, Project};
 use crate::routes::Route;
-use crate::styles::PAGE_HEADING;
-
 fn status_color(status: &str) -> &'static str {
   match status {
     "in_progress" => "text-[var(--primary)]",
@@ -59,7 +57,7 @@ fn GoalDetailInner(goal_id: String) -> Element {
           "{goal.status}"
         }
       }
-      h2 { class: PAGE_HEADING, "{goal.title}" }
+      h2 { class: "page-heading", "{goal.title}" }
       p { class: "text-sm text-[var(--on-surface-variant)]",
         if let Some(ref desc) = goal.description {
           "{desc}"

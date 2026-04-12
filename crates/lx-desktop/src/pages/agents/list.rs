@@ -1,5 +1,4 @@
 use super::types::{AgentSummary, FilterTab, adapter_label, role_label, status_dot_class};
-use crate::styles::{BTN_OUTLINE_SM, FLEX_BETWEEN, TAB_ACTIVE, TAB_INACTIVE};
 use dioxus::prelude::*;
 
 #[component]
@@ -10,11 +9,11 @@ pub fn AgentList(agents: Vec<AgentSummary>, on_select: EventHandler<String>, on_
 
   rsx! {
     div { class: "flex flex-col h-full p-4 overflow-auto gap-4",
-      div { class: FLEX_BETWEEN,
+      div { class: "flex-between",
         div { class: "flex gap-1",
           for tab in [FilterTab::All, FilterTab::Active, FilterTab::Paused, FilterTab::Error] {
             button {
-              class: if *active_tab.read() == tab { TAB_ACTIVE } else { TAB_INACTIVE },
+              class: if *active_tab.read() == tab { "tab-active" } else { "tab-inactive" },
               onclick: {
                   let tab = tab.clone();
                   move |_| active_tab.set(tab.clone())
@@ -24,7 +23,7 @@ pub fn AgentList(agents: Vec<AgentSummary>, on_select: EventHandler<String>, on_
           }
         }
         button {
-          class: BTN_OUTLINE_SM,
+          class: "btn-outline-sm",
           onclick: move |_| on_new_agent.call(()),
           "+ New Agent"
         }

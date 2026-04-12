@@ -8,7 +8,6 @@ pub mod pages;
 pub mod panes;
 pub mod plugins;
 pub mod routes;
-pub mod styles;
 pub mod terminal;
 pub mod voice_backend;
 #[cfg(feature = "desktop")]

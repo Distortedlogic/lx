@@ -4,8 +4,6 @@ use super::types::{AgentRef, PRIORITY_ORDER, STATUS_ORDER};
 use crate::components::drag_drop::{DroppedFile, read_dropped_files};
 use crate::components::markdown_editor::MarkdownEditor;
 use crate::components::ui::select::{Select, SelectOption};
-use crate::styles::{BTN_OUTLINE_SM, BTN_PRIMARY_SM};
-
 #[derive(serde::Serialize, serde::Deserialize, Default)]
 struct IssueDraft {
   title: String,
@@ -217,12 +215,12 @@ pub fn NewIssueDialog(open: bool, agents: Vec<AgentRef>, on_close: EventHandler<
         }
         div { class: "border-t border-[var(--outline-variant)] px-4 py-3 flex justify-end gap-2",
           button {
-            class: BTN_OUTLINE_SM,
+            class: "btn-outline-sm",
             onclick: move |_| on_close.call(()),
             "Cancel"
           }
           button {
-            class: BTN_PRIMARY_SM,
+            class: "btn-primary-sm",
             disabled: title.read().trim().is_empty(),
             onclick: {
                 move |_| {

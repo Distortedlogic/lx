@@ -1,7 +1,5 @@
 use dioxus::prelude::*;
 
-use crate::styles::{FLEX_BETWEEN, PAGE_HEADING};
-
 use super::accounting_card::AccountingModelCard;
 use super::budget_card::BudgetCard;
 use super::provider_card::ProviderCard;
@@ -76,8 +74,8 @@ pub fn Costs() -> Element {
 
   rsx! {
     div { class: "flex flex-col h-full p-4 overflow-auto gap-4",
-      div { class: FLEX_BETWEEN,
-        h1 { class: PAGE_HEADING, "COSTS" }
+      div { class: "flex-between",
+        h1 { class: "page-heading", "COSTS" }
       }
       div { class: "flex gap-2",
         TabButton {

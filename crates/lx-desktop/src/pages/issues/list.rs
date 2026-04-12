@@ -3,8 +3,6 @@ use dioxus::prelude::*;
 use super::kanban::KanbanBoardView;
 use super::types::{AgentRef, Issue, IssueViewMode, IssueViewState, QUICK_FILTER_PRESETS, filter_issues, priority_icon_class, status_icon_class};
 use crate::pages::agents::list::StatusBadge;
-use crate::styles::{BTN_OUTLINE_SM, FLEX_BETWEEN, INPUT_FIELD, TAB_ACTIVE, TAB_INACTIVE};
-
 #[component]
 pub fn IssuesList(
   issues: Vec<Issue>,
@@ -18,7 +16,7 @@ pub fn IssuesList(
 
   rsx! {
     div { class: "flex flex-col h-full p-4 overflow-auto gap-4",
-      div { class: FLEX_BETWEEN,
+      div { class: "flex-between",
         h1 { class: "text-lg font-semibold text-[var(--on-surface)]", "Issues" }
         div { class: "flex items-center gap-2",
           div { class: "flex items-center border border-[var(--outline-variant)]/30",
@@ -34,7 +32,7 @@ pub fn IssuesList(
             }
           }
           button {
-            class: BTN_OUTLINE_SM,
+            class: "btn-outline-sm",
             onclick: move |_| on_new_issue.call(()),
             "+ New Issue"
           }
@@ -47,7 +45,7 @@ pub fn IssuesList(
               let is_active = view_state.read().statuses == statuses_vec;
               rsx! {
                 button {
-                  class: if is_active { TAB_ACTIVE } else { TAB_INACTIVE },
+                  class: if is_active { "tab-active" } else { "tab-inactive" },
                   onclick: {
                       let sv = statuses_vec.clone();
                       move |_| view_state.write().statuses = sv.clone()
@@ -59,7 +57,7 @@ pub fn IssuesList(
         }
       }
       input {
-        class: INPUT_FIELD,
+        class: "input-field",
         placeholder: "Search issues...",
         value: "{view_state.read().search}",
         oninput: move |evt| view_state.write().search = evt.value().to_string(),

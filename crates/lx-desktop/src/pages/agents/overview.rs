@@ -1,5 +1,4 @@
 use super::types::{AgentDetail, adapter_label, role_label};
-use crate::styles::PROPERTY_LABEL;
 use dioxus::prelude::*;
 
 #[component]
@@ -60,7 +59,7 @@ fn AgentPropertiesPanel(agent: AgentDetail) -> Element {
 fn PropertyRow(label: &'static str, children: Element) -> Element {
   rsx! {
     div { class: "flex items-center gap-3 py-1.5",
-      span { class: PROPERTY_LABEL, "{label}" }
+      span { class: "property-label", "{label}" }
       div { class: "flex items-center gap-1.5 min-w-0", {children} }
     }
   }

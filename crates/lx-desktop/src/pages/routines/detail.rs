@@ -3,8 +3,6 @@ use dioxus::prelude::*;
 use super::schedule_editor::ScheduleEditor;
 use super::types::{CATCH_UP_POLICIES, CONCURRENCY_POLICIES, PRIORITIES, Routine};
 use crate::components::page_skeleton::PageSkeleton;
-use crate::styles::PAGE_HEADING;
-
 #[component]
 pub fn RoutineDetail(routine_id: String) -> Element {
   rsx! {
@@ -49,7 +47,7 @@ fn RoutineDetailInner(routine_id: String) -> Element {
   rsx! {
     div { class: "flex flex-col h-full p-4 overflow-auto gap-4",
       div { class: "flex items-center justify-between",
-        h2 { class: PAGE_HEADING, "{routine.title}" }
+        h2 { class: "page-heading", "{routine.title}" }
         div { class: "flex items-center gap-3",
           span { class: "text-xs uppercase tracking-wider px-2 py-1 rounded bg-[var(--surface-container)] text-[var(--outline)]",
             "{routine.status}"

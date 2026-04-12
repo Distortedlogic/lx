@@ -129,6 +129,7 @@ Comprehensive survey of how programming languages are designed and implemented �
 - [harness/agent_session_and_state_management.md](harness/agent_session_and_state_management.md) — Session persistence, state bridging, checkpoint/recovery
 - [harness/agent_observability_and_feedback_loops.md](harness/agent_observability_and_feedback_loops.md) — Observability patterns, feedback loops, debugging agent behavior
 - [harness/agent_configuration_as_code.md](harness/agent_configuration_as_code.md) — Configuration patterns, CLAUDE.md, project instructions, context files
+- [harness/caveman_compression_methods.md](harness/caveman_compression_methods.md) — Verified April 2026 survey of caveman-compression repos, prompt patterns, markdown validators, and safe use cases for agent context and memory files
 - [harness/context_engineering_deep_dive.md](harness/context_engineering_deep_dive.md) — Context window engineering, compaction, summarization, sub-agent compression
 - [harness/domain_specific_harness_patterns.md](harness/domain_specific_harness_patterns.md) — Domain-specific harness patterns for coding, research, data analysis
 - [harness/multi_agent_coordination_harness.md](harness/multi_agent_coordination_harness.md) — Multi-agent coordination, delegation, fan-out/fan-in

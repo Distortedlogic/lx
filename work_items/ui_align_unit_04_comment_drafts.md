@@ -157,8 +157,6 @@ use dioxus::prelude::*;
 use super::types::{AgentRef, IssueComment};
 use crate::components::markdown_body::MarkdownBody;
 use crate::components::markdown_editor::MarkdownEditor;
-use crate::styles::BTN_PRIMARY_SM;
-
 #[component]
 pub fn CommentThread(comments: Vec<IssueComment>, agents: Vec<AgentRef>, on_add: EventHandler<String>) -> Element {
   let mut draft = dioxus_storage::use_persistent("lx_issue_comment_draft", String::new);
@@ -192,7 +190,7 @@ pub fn CommentThread(comments: Vec<IssueComment>, agents: Vec<AgentRef>, on_add:
             "Cmd+Enter to submit"
           }
           button {
-            class: BTN_PRIMARY_SM,
+            class: "btn-primary-sm",
             disabled: draft.read().trim().is_empty(),
             onclick: move |_| submit(draft()),
             "Comment"

@@ -29,7 +29,6 @@ The existing imports are:
 use dioxus::prelude::*;
 
 use super::types::{AgentRef, PRIORITY_ORDER, STATUS_ORDER};
-use crate::styles::{BTN_OUTLINE_SM, BTN_PRIMARY_SM, INPUT_FIELD};
 ```
 
 Add the new import after the styles import.

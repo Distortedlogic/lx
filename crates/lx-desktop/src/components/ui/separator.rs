@@ -9,20 +9,14 @@ pub enum Orientation {
   Vertical,
 }
 
-const BASE_SEPARATOR_CLASS: &str = "bg-border shrink-0";
-
 #[component]
 pub fn Separator(#[props(default)] orientation: Orientation, #[props(default = true)] decorative: bool, #[props(default)] class: String) -> Element {
   let orientation_str = match orientation {
     Orientation::Horizontal => "horizontal",
     Orientation::Vertical => "vertical",
   };
-  let orientation_class = match orientation {
-    Orientation::Horizontal => "h-px w-full",
-    Orientation::Vertical => "h-full w-px",
-  };
   let role = if decorative { "none" } else { "separator" };
-  let classes = cn(&[BASE_SEPARATOR_CLASS, orientation_class, &class]);
+  let classes = cn(&["separator", &class]);
   rsx! {
     div {
       "data-slot": "separator",

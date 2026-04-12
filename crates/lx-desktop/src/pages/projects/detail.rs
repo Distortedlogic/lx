@@ -4,8 +4,6 @@ use dioxus::router::Navigator;
 use super::types::{PROJECT_COLORS, PROJECT_STATUSES, Project};
 use crate::components::page_skeleton::PageSkeleton;
 use crate::routes::Route;
-use crate::styles::PAGE_HEADING;
-
 fn status_color(status: &str) -> &'static str {
   match status {
     "in_progress" => "text-[var(--primary)]",
@@ -47,7 +45,7 @@ fn ProjectDetailInner(project_id: String) -> Element {
           class: "w-3 h-3 rounded-full shrink-0",
           style: "background-color: {project.color}",
         }
-        h2 { class: PAGE_HEADING, "{project.name}" }
+        h2 { class: "page-heading", "{project.name}" }
         span { class: "text-xs uppercase font-semibold tracking-wider {status_color(&project.status)}",
           "{project.status}"
         }

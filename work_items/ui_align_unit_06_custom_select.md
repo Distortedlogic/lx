@@ -108,12 +108,7 @@ let display_label = options.iter().find(|o| o.value == value).map(|o| o.label.as
 
 ### Step 6: Render the trigger button
 
-The trigger class should match the existing `BASE_SELECT_TRIGGER_CLASS` style. Keep that constant but modify:
-
-```rust
-const TRIGGER_CLASS: &str = "flex w-fit items-center justify-between gap-2 rounded-md border border-[var(--outline-variant)] bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none h-9 hover:bg-[var(--surface-container-high)]";
-const TRIGGER_DISABLED: &str = "cursor-not-allowed opacity-50";
-```
+The trigger uses the `.select-trigger` utility class defined in `src/tailwind.css` under `@layer components`. The disabled and not-disabled variants are handled by `:disabled` / `:not(:disabled)` pseudo-class selectors on that utility, so the Rust code only needs to set the class name and the `disabled` attribute. Do not introduce a `const TRIGGER_CLASS: &str = "..."` in source — Tailwind class strings belong in CSS via `@apply`, not in Rust constants.
 
 Render:
 
@@ -122,11 +117,7 @@ rsx! {
     div { "data-slot": "select", class: "relative inline-block",
         button {
             "data-slot": "select-trigger",
-            class: cn(&[
-                TRIGGER_CLASS,
-                if disabled { TRIGGER_DISABLED } else { "cursor-pointer" },
-                &class,
-            ]),
+            class: cn(&["select-trigger", &class]),
             disabled,
             onclick: move |_| {
                 if !disabled {

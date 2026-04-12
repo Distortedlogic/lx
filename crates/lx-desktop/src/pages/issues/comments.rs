@@ -4,8 +4,6 @@ use super::types::{AgentRef, IssueComment};
 use crate::components::markdown_body::MarkdownBody;
 use crate::components::markdown_editor::MarkdownEditor;
 use crate::components::mention_popup::MentionCandidate;
-use crate::styles::BTN_PRIMARY_SM;
-
 #[component]
 pub fn CommentThread(comments: Vec<IssueComment>, agents: Vec<AgentRef>, on_add: EventHandler<String>) -> Element {
   let mut draft = dioxus_storage::use_persistent("lx_issue_comment_draft", String::new);
@@ -40,7 +38,7 @@ pub fn CommentThread(comments: Vec<IssueComment>, agents: Vec<AgentRef>, on_add:
         div { class: "flex items-center justify-between",
           span { class: "text-[11px] text-[var(--outline)]", "Cmd+Enter to submit" }
           button {
-            class: BTN_PRIMARY_SM,
+            class: "btn-primary-sm",
             disabled: draft.read().trim().is_empty(),
             onclick: move |_| submit(draft()),
             "Comment"

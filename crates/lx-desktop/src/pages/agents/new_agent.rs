@@ -1,5 +1,4 @@
 use super::types::ADAPTER_LABELS;
-use crate::styles::{BTN_OUTLINE_SM, BTN_PRIMARY_SM, INPUT_FIELD};
 use dioxus::prelude::*;
 
 #[component]
@@ -33,13 +32,13 @@ pub fn NewAgentDialog(open: bool, on_close: EventHandler<()>, on_create: EventHa
           if !*show_advanced.read() {
             div { class: "space-y-4",
               input {
-                class: INPUT_FIELD,
+                class: "input-field",
                 placeholder: "Agent name",
                 value: "{name}",
                 oninput: move |evt| name.set(evt.value().to_string()),
               }
               input {
-                class: INPUT_FIELD,
+                class: "input-field",
                 placeholder: "Title (e.g. VP of Engineering)",
                 value: "{title}",
                 oninput: move |evt| title.set(evt.value().to_string()),
@@ -49,7 +48,7 @@ pub fn NewAgentDialog(open: bool, on_close: EventHandler<()>, on_create: EventHa
                   "Role"
                 }
                 select {
-                  class: INPUT_FIELD,
+                  class: "input-field",
                   value: "{role}",
                   onchange: move |evt| role.set(evt.value().to_string()),
                   option { value: "ceo", "CEO" }
@@ -64,7 +63,7 @@ pub fn NewAgentDialog(open: bool, on_close: EventHandler<()>, on_create: EventHa
                   "Adapter"
                 }
                 select {
-                  class: INPUT_FIELD,
+                  class: "input-field",
                   value: "{adapter_type}",
                   onchange: move |evt| adapter_type.set(evt.value().to_string()),
                   for (key , label) in ADAPTER_LABELS {
@@ -91,12 +90,12 @@ pub fn NewAgentDialog(open: bool, on_close: EventHandler<()>, on_create: EventHa
         }
         div { class: "border-t border-[var(--outline-variant)] px-4 py-3 flex justify-end gap-2",
           button {
-            class: BTN_OUTLINE_SM,
+            class: "btn-outline-sm",
             onclick: move |_| on_close.call(()),
             "Cancel"
           }
           button {
-            class: BTN_PRIMARY_SM,
+            class: "btn-primary-sm",
             disabled: name.read().trim().is_empty(),
             onclick: {
                 move |_| {
