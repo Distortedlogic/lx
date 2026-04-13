@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use indexmap::IndexMap;
 
 use lx_value::BuiltinCtx;
@@ -9,7 +7,7 @@ use miette::SourceSpan;
 
 use super::{extract_record, score_to_f64};
 
-pub(crate) fn bi_report(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+pub(crate) fn bi_report(args: &[LxVal], span: SourceSpan, ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let results = extract_record(&args[0], "test.report", span)?;
   let spec_name = results.get(&lx_span::sym::intern("spec")).and_then(|v| v.as_str()).unwrap_or("unnamed");
   let threshold = results.get(&lx_span::sym::intern("threshold")).and_then(|v| v.as_float()).unwrap_or(0.75);

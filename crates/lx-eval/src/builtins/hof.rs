@@ -141,28 +141,28 @@ fn bi_each(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<dyn BuiltinCtx>) -> BoxFut
   })
 }
 
-fn bi_take(args: &[LxVal], sp: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_take(args: &[LxVal], sp: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let n = args[0].require_int("take", sp)?;
   let n = n.to_usize().ok_or_else(|| LxError::runtime("take: count out of range", sp))?;
   let items = get_list(&args[1], "take", sp)?;
   Ok(LxVal::list(items.iter().take(n).cloned().collect()))
 }
 
-fn bi_drop(args: &[LxVal], sp: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_drop(args: &[LxVal], sp: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let n = args[0].require_int("drop", sp)?;
   let n = n.to_usize().ok_or_else(|| LxError::runtime("drop: count out of range", sp))?;
   let items = get_list(&args[1], "drop", sp)?;
   Ok(LxVal::list(items.iter().skip(n).cloned().collect()))
 }
 
-fn bi_zip(args: &[LxVal], sp: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_zip(args: &[LxVal], sp: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let a = get_list(&args[0], "zip", sp)?;
   let b = get_list(&args[1], "zip", sp)?;
   let out: Vec<LxVal> = a.iter().zip(b.iter()).map(|(x, y)| LxVal::tuple(vec![y.clone(), x.clone()])).collect();
   Ok(LxVal::list(out))
 }
 
-fn bi_enumerate(args: &[LxVal], sp: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_enumerate(args: &[LxVal], sp: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let items = get_list(&args[0], "enumerate", sp)?;
   let out: Vec<LxVal> = items.iter().enumerate().map(|(i, v)| LxVal::tuple(vec![LxVal::int(i), v.clone()])).collect();
   Ok(LxVal::list(out))

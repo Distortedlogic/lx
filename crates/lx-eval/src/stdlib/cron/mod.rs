@@ -32,7 +32,7 @@ pub fn build() -> IndexMap<lx_span::sym::Sym, LxVal> {
   }
 }
 
-fn bi_schedule(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_schedule(args: &[LxVal], span: SourceSpan, ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let expr = args[0].require_str("cron.schedule", span)?;
   let schedule = parse_schedule(expr, span)?;
   require_fn(&args[1], "cron.schedule", span)?;
@@ -41,7 +41,7 @@ fn bi_schedule(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> R
   let cancel = Arc::new(AtomicBool::new(false));
   let flag = cancel.clone();
   JOBS.insert(id, CronJob { cancel });
-  let ctx = Arc::clone(ctx);
+  let ctx = crate::builtins::own_builtin_ctx(ctx);
   tokio::task::spawn_blocking(move || {
     while !flag.load(Ordering::Relaxed) {
       let Some(next_time) = schedule.upcoming(Utc).next() else {
@@ -61,7 +61,7 @@ fn bi_schedule(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> R
   Ok(LxVal::int(id))
 }
 
-fn bi_every(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_every(args: &[LxVal], span: SourceSpan, ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let ms = positive_ms(&args[0], "cron.every", span)?;
   require_fn(&args[1], "cron.every", span)?;
   let callback = args[1].clone();
@@ -69,7 +69,7 @@ fn bi_every(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Resu
   let cancel = Arc::new(AtomicBool::new(false));
   let flag = cancel.clone();
   JOBS.insert(id, CronJob { cancel });
-  let ctx = Arc::clone(ctx);
+  let ctx = crate::builtins::own_builtin_ctx(ctx);
   tokio::task::spawn_blocking(move || {
     while !flag.load(Ordering::Relaxed) {
       std::thread::sleep(Duration::from_millis(ms));
@@ -85,13 +85,13 @@ fn bi_every(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Resu
   Ok(LxVal::int(id))
 }
 
-fn bi_after(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_after(args: &[LxVal], span: SourceSpan, ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let ms = positive_ms(&args[0], "cron.after", span)?;
   require_fn(&args[1], "cron.after", span)?;
-  Ok(spawn_oneshot(Duration::from_millis(ms), args[1].clone(), span, Arc::clone(ctx), "after"))
+  Ok(spawn_oneshot(Duration::from_millis(ms), args[1].clone(), span, crate::builtins::own_builtin_ctx(ctx), "after"))
 }
 
-fn bi_at(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_at(args: &[LxVal], span: SourceSpan, ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let time_str = args[0].require_str("cron.at", span)?;
   let target = DateTime::parse_from_rfc3339(time_str)
     .map(|dt| dt.with_timezone(&Utc))
@@ -102,10 +102,10 @@ fn bi_at(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<
   }
   let wait = (target - now).to_std().unwrap_or(Duration::ZERO);
   require_fn(&args[1], "cron.at", span)?;
-  Ok(spawn_oneshot(wait, args[1].clone(), span, Arc::clone(ctx), "at"))
+  Ok(spawn_oneshot(wait, args[1].clone(), span, crate::builtins::own_builtin_ctx(ctx), "at"))
 }
 
-fn bi_cancel(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_cancel(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let id = args[0].require_int("cron.cancel", span)?;
   let id: u64 = id.try_into().map_err(|_| LxError::type_err("cron.cancel: invalid handle", span, None))?;
   match JOBS.remove(&id) {
@@ -117,7 +117,7 @@ fn bi_cancel(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Re
   }
 }
 
-fn bi_next(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_next(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let expr = args[0].require_str("cron.next", span)?;
   let schedule = match parse_schedule(expr, span) {
     Ok(s) => s,
@@ -131,7 +131,7 @@ fn bi_next(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Resu
   }
 }
 
-fn bi_next_n(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_next_n(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let n = match &args[0] {
     LxVal::Int(n) => {
       let v: i64 = n.try_into().map_err(|_| LxError::type_err("cron.next_n: count too large", span, None))?;
@@ -155,18 +155,18 @@ fn bi_next_n(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Re
   Ok(LxVal::list(times))
 }
 
-fn bi_list(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_list(args: &[LxVal], _span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let _ = &args[0];
   let ids: Vec<LxVal> = JOBS.iter().map(|e| LxVal::int(*e.key())).collect();
   Ok(LxVal::list(ids))
 }
 
-fn bi_active(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_active(args: &[LxVal], _span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let _ = &args[0];
   Ok(LxVal::int(JOBS.len()))
 }
 
-fn bi_run(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_run(args: &[LxVal], _span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let _ = &args[0];
   loop {
     if JOBS.is_empty() {

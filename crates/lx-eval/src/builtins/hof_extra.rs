@@ -120,7 +120,7 @@ pub(super) fn bi_group_by(args: Vec<LxVal>, sp: SourceSpan, ctx: Arc<dyn Builtin
   })
 }
 
-pub(super) fn bi_chunks(args: &[LxVal], sp: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_chunks(args: &[LxVal], sp: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let n = args[0].require_int("chunks", sp)?;
   let items = get_list(&args[1], "chunks", sp)?;
   let n = usize::try_from(n.clone()).map_err(|_| LxError::runtime("chunks: invalid size", sp))?;
@@ -131,7 +131,7 @@ pub(super) fn bi_chunks(args: &[LxVal], sp: SourceSpan, _ctx: &Arc<dyn BuiltinCt
   Ok(LxVal::list(out))
 }
 
-pub(super) fn bi_windows(args: &[LxVal], sp: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_windows(args: &[LxVal], sp: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let n = args[0].require_int("windows", sp)?;
   let items = get_list(&args[1], "windows", sp)?;
   let n = usize::try_from(n.clone()).map_err(|_| LxError::runtime("windows: invalid size", sp))?;
@@ -142,7 +142,7 @@ pub(super) fn bi_windows(args: &[LxVal], sp: SourceSpan, _ctx: &Arc<dyn BuiltinC
   Ok(LxVal::list(out))
 }
 
-pub(super) fn bi_intersperse(args: &[LxVal], sp: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_intersperse(args: &[LxVal], sp: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let items = get_list(&args[1], "intersperse", sp)?;
   let out: Vec<LxVal> = Itertools::intersperse(items.iter().cloned(), args[0].clone()).collect();
   Ok(LxVal::list(out))

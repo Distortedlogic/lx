@@ -5,8 +5,6 @@ mod test_report;
 #[path = "test_run.rs"]
 mod test_run;
 
-use std::sync::Arc;
-
 use indexmap::IndexMap;
 
 use crate::std_module;
@@ -39,7 +37,7 @@ pub(super) fn score_to_f64(v: &LxVal) -> Option<f64> {
   }
 }
 
-fn bi_spec(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_spec(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let name = args[0].require_str("test.spec", span)?;
   let opts = extract_record(&args[1], "test.spec", span)?;
 
@@ -72,7 +70,7 @@ fn bi_spec(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Resu
   Ok(LxVal::record(m))
 }
 
-fn bi_scenario(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_scenario(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let spec_fields = extract_record(&args[0], "test.scenario", span)?;
   let scenario_name = args[1].require_str("test.scenario", span)?;
   let opts = extract_record(&args[2], "test.scenario", span)?;

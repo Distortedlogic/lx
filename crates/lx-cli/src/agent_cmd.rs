@@ -4,7 +4,12 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use lx::prelude::*;
+use lx_desugar::desugar;
+use lx_eval::interpreter::Interpreter;
+use lx_eval::runtime::RuntimeCtx;
+use lx_parser::lexer::lex;
+use lx_parser::parser::parse;
+use lx_span::source::FileId;
 
 pub fn run_agent(script_path: &str) -> ExitCode {
   let source = match fs::read_to_string(script_path) {

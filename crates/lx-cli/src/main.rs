@@ -17,7 +17,7 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use lx::prelude::RuntimeCtx;
+use lx_eval::runtime::{RuntimeCtx, ToolDecl};
 
 use clap::{Parser, Subcommand};
 
@@ -89,7 +89,13 @@ fn main() -> ExitCode {
   let cli = Cli::parse();
   match cli.command {
     Command::Run { file, json, control } => {
-      let resolved = resolve_run_target(&file);
+      let resolved = match resolve_run_target(&file) {
+        Ok(resolved) => resolved,
+        Err(e) => {
+          eprintln!("error: {e}");
+          return ExitCode::from(1);
+        },
+      };
       run_file(&resolved, json, control.as_deref())
     },
     Command::Check { file, member, strict, fix } => {
@@ -122,27 +128,27 @@ fn main() -> ExitCode {
   }
 }
 
-fn resolve_run_target(target: &str) -> String {
+fn resolve_run_target(target: &str) -> Result<String, String> {
   let path = Path::new(target);
   if path.exists() && path.is_file() {
-    return target.to_string();
+    return Ok(target.to_string());
   }
-  let Ok(cwd) = env::current_dir() else {
-    return target.to_string();
+  let cwd = env::current_dir().map_err(|e| format!("cannot determine cwd: {e}"))?;
+  let root = match manifest::find_workspace_root_detailed(&cwd) {
+    Ok(root) => root,
+    Err(manifest::WorkspaceRootLookupError::NotFound { .. }) | Err(manifest::WorkspaceRootLookupError::NotWorkspace { .. }) => {
+      return Ok(target.to_string());
+    },
+    Err(e) => return Err(e.to_string()),
   };
-  let Some(root) = manifest::find_workspace_root(&cwd) else {
-    return target.to_string();
-  };
-  let Ok(ws) = manifest::load_workspace(&root) else {
-    return target.to_string();
-  };
+  let ws = manifest::load_workspace(&root)?;
   for member in &ws.members {
     if member.pkg.name == target {
       let entry = member.pkg.entry.as_deref().unwrap_or("main.lx");
-      return member.dir.join(entry).to_string_lossy().to_string();
+      return Ok(member.dir.join(entry).to_string_lossy().to_string());
     }
   }
-  target.to_string()
+  Ok(target.to_string())
 }
 
 fn run_file(path: &str, _json: bool, control_spec: Option<&str>) -> ExitCode {
@@ -153,13 +159,40 @@ fn run_file(path: &str, _json: bool, control_spec: Option<&str>) -> ExitCode {
       return ExitCode::from(1);
     },
   };
-  let ws_members = manifest::try_load_workspace_members();
-  let dep_dirs = manifest::try_load_dep_dirs_no_dev();
+  let cwd = match env::current_dir() {
+    Ok(cwd) => cwd,
+    Err(e) => {
+      eprintln!("error: cannot determine cwd: {e}");
+      return ExitCode::from(1);
+    },
+  };
+  let ws_members = match manifest::load_workspace_members_detailed(&cwd) {
+    Ok(ws_members) => ws_members,
+    Err(e) => {
+      eprintln!("error: {e}");
+      return ExitCode::from(1);
+    },
+  };
+  let dep_dirs = match manifest::load_dep_dirs_no_dev_detailed(&cwd) {
+    Ok(dep_dirs) => dep_dirs,
+    Err(e) => {
+      eprintln!("error: {e}");
+      return ExitCode::from(1);
+    },
+  };
+  let file_dir = Path::new(path).parent().unwrap_or(Path::new("."));
+  let manifest_ctx = match manifest::load_nearest_manifest(file_dir) {
+    Ok(manifest_ctx) => manifest_ctx,
+    Err(e) => {
+      eprintln!("error: {e}");
+      return ExitCode::from(1);
+    },
+  };
   let mut ctx_val = if std::io::stdin().is_terminal() { RuntimeCtx { ..RuntimeCtx::default() } } else { RuntimeCtx::default() };
   ctx_val.workspace_members = ws_members;
   ctx_val.dep_dirs = dep_dirs;
-  apply_manifest_tools(&mut ctx_val, path);
-  apply_manifest_backends(&mut ctx_val, path);
+  apply_manifest_tools(&mut ctx_val, manifest_ctx.as_ref());
+  apply_manifest_backends(&mut ctx_val, manifest_ctx.as_ref());
   if let Some(spec) = control_spec
     && spec == "stdin"
   {
@@ -168,7 +201,7 @@ fn run_file(path: &str, _json: bool, control_spec: Option<&str>) -> ExitCode {
     ctx_val.yield_ = Arc::new(lx_eval::runtime::ControlYieldBackend { inject_rx: Arc::new(tokio::sync::Mutex::new(inject_rx)) });
   }
   let ctx = Arc::new(ctx_val);
-  ctx.tokio_runtime.block_on(setup_external_stream(&ctx, path));
+  ctx.tokio_runtime.block_on(setup_external_stream(&ctx, manifest_ctx.as_ref()));
   match run::run(&source, path, &ctx, control_spec) {
     Ok(()) => ExitCode::SUCCESS,
     Err(errors) => {
@@ -188,35 +221,29 @@ fn run_file(path: &str, _json: bool, control_spec: Option<&str>) -> ExitCode {
   }
 }
 
-fn apply_manifest_tools(ctx: &mut RuntimeCtx, file_path: &str) {
-  let file_dir = Path::new(file_path).parent().unwrap_or(Path::new("."));
-  let Some(root) = manifest::find_manifest_root(file_dir) else {
+type LoadedManifest = (std::path::PathBuf, manifest::RootManifest);
+
+fn apply_manifest_tools(ctx: &mut RuntimeCtx, manifest_ctx: Option<&LoadedManifest>) {
+  let Some((root, manifest)) = manifest_ctx else {
     return;
   };
-  let Ok(m) = manifest::load_manifest(&root) else {
-    return;
-  };
-  let Some(tools) = m.tools else {
+  let Some(tools) = manifest.tools.as_ref() else {
     return;
   };
   for (name, spec) in tools {
     let decl = match spec {
-      manifest::ToolSpec::Lx { path } => lx::prelude::ToolDecl::Lx { path: root.join(path) },
-      manifest::ToolSpec::Mcp { command } => lx::prelude::ToolDecl::Mcp { command },
+      manifest::ToolSpec::Lx { path } => ToolDecl::Lx { path: root.join(path) },
+      manifest::ToolSpec::Mcp { command } => ToolDecl::Mcp { command: command.clone() },
     };
-    ctx.tools.insert(name, decl);
+    ctx.tools.insert(name.clone(), decl);
   }
 }
 
-fn apply_manifest_backends(_ctx: &mut RuntimeCtx, file_path: &str) {
-  let file_dir = Path::new(file_path).parent().unwrap_or(Path::new("."));
-  let Some(root) = manifest::find_manifest_root(file_dir) else {
+fn apply_manifest_backends(_ctx: &mut RuntimeCtx, manifest_ctx: Option<&LoadedManifest>) {
+  let Some((_root, manifest)) = manifest_ctx else {
     return;
   };
-  let Ok(m) = manifest::load_manifest(&root) else {
-    return;
-  };
-  if let Some(ref backends) = m.backends
+  if let Some(ref backends) = manifest.backends
     && let Some(ref backend) = backends.yield_backend
   {
     match backend {
@@ -225,18 +252,14 @@ fn apply_manifest_backends(_ctx: &mut RuntimeCtx, file_path: &str) {
   }
 }
 
-async fn setup_external_stream(ctx: &Arc<RuntimeCtx>, file_path: &str) {
-  let file_dir = Path::new(file_path).parent().unwrap_or(Path::new("."));
-  let Some(root) = manifest::find_manifest_root(file_dir) else {
+async fn setup_external_stream(ctx: &Arc<RuntimeCtx>, manifest_ctx: Option<&LoadedManifest>) {
+  let Some((_root, manifest)) = manifest_ctx else {
     return;
   };
-  let Ok(m) = manifest::load_manifest(&root) else {
+  let Some(stream_config) = manifest.stream.as_ref() else {
     return;
   };
-  let Some(stream_config) = m.stream else {
-    return;
-  };
-  let command = stream_config.command;
+  let command = stream_config.command.clone();
   match lx_eval::mcp_client::McpClient::spawn(&command).await {
     Ok(client) => {
       let sink = Arc::new(lx_eval::mcp_stream_sink::McpStreamSink::new(client));

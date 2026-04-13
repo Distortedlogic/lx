@@ -25,7 +25,7 @@ impl McpClient {
       .stdout(Stdio::piped())
       .stderr(Stdio::null())
       .spawn()
-      .map_err(|_| format!("command '{command}' not found"))?;
+      .map_err(|e| format!("failed to spawn MCP command '{command}': {e}"))?;
 
     let stdin = child.stdin.take().ok_or_else(|| "failed to capture stdin".to_string())?;
     let stdout = child.stdout.take().ok_or_else(|| "failed to capture stdout".to_string())?;
@@ -91,14 +91,24 @@ impl McpClient {
   }
 
   pub async fn shutdown(&mut self) {
-    let _ = self.send_request("shutdown", json!({})).await;
+    if let Err(e) = self.send_request("shutdown", json!({})).await {
+      eprintln!("[mcp] shutdown RPC failed for '{}': {e}", self.command);
+    }
 
     drop(self.stdin.take());
 
     let wait_result = tokio::time::timeout(Duration::from_secs(2), self.child.wait()).await;
 
-    if wait_result.is_err() {
-      let _ = self.child.kill().await;
+    match wait_result {
+      Ok(Ok(_)) => {},
+      Ok(Err(e)) => {
+        eprintln!("[mcp] wait failed for '{}': {e}", self.command);
+      },
+      Err(_) => {
+        if let Err(e) = self.child.kill().await {
+          eprintln!("[mcp] forced kill failed for '{}': {e}", self.command);
+        }
+      },
     }
   }
 

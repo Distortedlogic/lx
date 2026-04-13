@@ -49,14 +49,24 @@ pub struct SpanInfo {
 }
 
 impl EventStream {
-  pub fn new(jsonl_path: Option<std::path::PathBuf>) -> Self {
-    let writer = jsonl_path.and_then(|p| {
-      if let Some(parent) = p.parent() {
-        let _ = std::fs::create_dir_all(parent);
-      }
-      let file = std::fs::OpenOptions::new().create(true).append(true).open(p).ok()?;
-      Some(std::io::BufWriter::new(file))
-    });
+  fn open_jsonl_writer(path: &std::path::Path) -> Option<std::io::BufWriter<std::fs::File>> {
+    if let Some(parent) = path.parent()
+      && let Err(e) = std::fs::create_dir_all(parent)
+    {
+      eprintln!("event_stream: failed to create JSONL dir '{}': {e}", parent.display());
+      return None;
+    }
+    match std::fs::OpenOptions::new().create(true).append(true).open(path) {
+      Ok(file) => Some(std::io::BufWriter::new(file)),
+      Err(e) => {
+        eprintln!("event_stream: failed to open JSONL file '{}': {e}", path.display());
+        None
+      },
+    }
+  }
+
+  pub fn new(jsonl_path: Option<&std::path::Path>) -> Self {
+    let writer = jsonl_path.and_then(Self::open_jsonl_writer);
     Self {
       entries: RwLock::new(Vec::new()),
       last_ms: Mutex::new((0, 0)),
@@ -70,12 +80,9 @@ impl EventStream {
     self.jsonl_writer.lock().is_some()
   }
 
-  pub fn enable_jsonl(&self, path: std::path::PathBuf) {
-    if let Some(parent) = path.parent() {
-      let _ = std::fs::create_dir_all(parent);
-    }
-    if let Ok(file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
-      *self.jsonl_writer.lock() = Some(std::io::BufWriter::new(file));
+  pub fn enable_jsonl(&self, path: &std::path::Path) {
+    if let Some(writer) = Self::open_jsonl_writer(path) {
+      *self.jsonl_writer.lock() = Some(writer);
     }
   }
 
@@ -115,10 +122,16 @@ impl EventStream {
     self.notify.notify_waiters();
 
     if let Some(client) = self.external_client.lock().clone() {
-      let entry_json = serde_json::to_value(&entry).unwrap_or(serde_json::Value::Null);
-      tokio::task::spawn(async move {
-        client.xadd(entry_json);
-      });
+      match serde_json::to_value(&entry) {
+        Ok(entry_json) => {
+          tokio::task::spawn(async move {
+            client.xadd(entry_json);
+          });
+        },
+        Err(e) => {
+          eprintln!("event_stream: external sink serialization failed: {e}");
+        },
+      }
     }
 
     id

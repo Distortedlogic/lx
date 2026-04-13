@@ -1,5 +1,4 @@
 use std::fs;
-use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
 use indexmap::IndexMap;
@@ -107,27 +106,27 @@ pub fn build_constructor() -> LxVal {
   mk("Store", 1, bi_create)
 }
 
-fn bi_values(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_values(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let s = get_store(id, span)?;
   let vals: Vec<LxVal> = s.data.values().cloned().collect();
   Ok(LxVal::list(vals))
 }
 
-fn bi_to_record(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_to_record(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let s = get_store(id, span)?;
   Ok(LxVal::record(s.data.clone()))
 }
 
-fn bi_has(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_has(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let key = args[1].require_str("store.has", span)?;
   let s = get_store(id, span)?;
   Ok(LxVal::Bool(s.data.contains_key(&intern(key))))
 }
 
-fn bi_save_to(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_save_to(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let path = args[1].require_str("store.save", span)?;
   let s = get_store(id, span)?;
@@ -138,7 +137,7 @@ fn bi_save_to(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> R
   Ok(LxVal::Unit)
 }
 
-fn bi_load_from(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_load_from(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let path = args[1].require_str("store.load", span)?;
   let content = fs::read_to_string(path).map_err(|e| LxError::runtime(format!("store.load: {e}"), span))?;
@@ -153,7 +152,7 @@ fn bi_load_from(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) ->
   Ok(LxVal::Unit)
 }
 
-fn bi_merge(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_merge(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let source_data: IndexMap<Sym, LxVal> = match &args[1] {
     LxVal::Store { id: src_id } => {
@@ -171,7 +170,7 @@ fn bi_merge(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Res
   Ok(LxVal::Unit)
 }
 
-fn bi_map(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_map(args: &[LxVal], span: SourceSpan, ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let id = store_id(&args[0], span)?;
   let f = &args[1];
   let s = get_store(id, span)?;

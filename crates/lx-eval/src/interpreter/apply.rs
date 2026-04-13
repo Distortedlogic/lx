@@ -74,7 +74,7 @@ impl Interpreter {
         }
         let bctx = self.builtin_ctx();
         match bf.kind {
-          BuiltinKind::Sync(f) => Ok(f(&bf.applied, span, &bctx)?),
+          BuiltinKind::Sync(f) => Ok(f(&bf.applied, span, bctx.as_ref())?),
           BuiltinKind::Async(f) => Ok(f(bf.applied, span, bctx).await?),
           BuiltinKind::DynAsync(ref f) => Ok(f(bf.applied.clone(), span, bctx).await?),
         }

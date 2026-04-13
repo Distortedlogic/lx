@@ -7,6 +7,13 @@ use tokio_tungstenite::tungstenite::Message;
 
 use super::control::{ControlChannelState, ControlCommand, ControlResponse, handle_command};
 
+fn render_response(resp: &ControlResponse) -> String {
+  serde_json::to_string(resp).unwrap_or_else(|e| {
+    serde_json::to_string(&ControlResponse::err(format!("response serialization failed: {e}")))
+      .unwrap_or_else(|_| "{\"ok\":false,\"error\":\"response serialization failed\"}".to_string())
+  })
+}
+
 pub async fn run_ws_control(addr: String, state: Arc<ControlChannelState>) {
   let listener = match TcpListener::bind(&addr).await {
     Ok(l) => l,
@@ -35,7 +42,15 @@ pub async fn run_ws_control(addr: String, state: Arc<ControlChannelState>) {
   };
   let (mut write, mut read) = ws.split();
 
-  while let Some(Ok(msg)) = read.next().await {
+  loop {
+    let msg = match read.next().await {
+      Some(Ok(msg)) => msg,
+      Some(Err(e)) => {
+        eprintln!("[control] ws receive failed: {e}");
+        break;
+      },
+      None => break,
+    };
     let text = match msg {
       Message::Text(t) => t.to_string(),
       Message::Close(_) => break,
@@ -49,12 +64,18 @@ pub async fn run_ws_control(addr: String, state: Arc<ControlChannelState>) {
       Ok(cmd) => cmd,
       Err(e) => {
         let resp = ControlResponse::err(format!("invalid command: {e}"));
-        let _ = write.send(Message::Text(serde_json::to_string(&resp).unwrap_or_default().into())).await;
+        if let Err(send_err) = write.send(Message::Text(render_response(&resp).into())).await {
+          eprintln!("[control] ws send failed: {send_err}");
+          break;
+        }
         continue;
       },
     };
     let resp = handle_command(cmd, &state);
-    let _ = write.send(Message::Text(serde_json::to_string(&resp).unwrap_or_default().into())).await;
+    if let Err(send_err) = write.send(Message::Text(render_response(&resp).into())).await {
+      eprintln!("[control] ws send failed: {send_err}");
+      break;
+    }
 
     if state.cancel_flag.load(std::sync::atomic::Ordering::Relaxed) {
       break;

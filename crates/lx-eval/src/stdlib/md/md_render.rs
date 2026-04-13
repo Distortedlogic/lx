@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use indexmap::IndexMap;
 
 use lx_span::sym::Sym;
@@ -10,7 +8,7 @@ use miette::SourceSpan;
 
 use super::{field_str, get_nodes};
 
-pub(super) fn bi_render(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+pub(super) fn bi_render(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let nodes = get_nodes(&args[0], span)?;
   let parts: Vec<String> = nodes.iter().filter_map(render_node).collect();
   Ok(LxVal::str(parts.join("\n\n")))

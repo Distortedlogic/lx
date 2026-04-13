@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use lx_ast::ast::{Core, Program};
-use lx_checker::{check, Diagnostic};
+use lx_checker::{Diagnostic, check};
 use lx_desugar::desugar;
 use lx_fmt::format;
 use lx_linter::{RuleRegistry, lint};

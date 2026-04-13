@@ -16,7 +16,7 @@ use miette::SourceSpan;
 const ENTRY_RUN: &str = "run";
 const ENTRY_MAIN: &str = "main";
 
-pub(super) fn invoke_flow(flow_path: &str, input: &LxVal, ctx: &Arc<dyn BuiltinCtx>, span: SourceSpan) -> Result<LxVal, LxError> {
+pub(super) fn invoke_flow(flow_path: &str, input: &LxVal, ctx: &dyn BuiltinCtx, span: SourceSpan) -> Result<LxVal, LxError> {
   let path = if flow_path.starts_with("./") || flow_path.starts_with("../") {
     if let Some(ref dir) = ctx.source_dir() { dir.join(flow_path) } else { std::path::PathBuf::from(flow_path) }
   } else {
@@ -35,9 +35,9 @@ pub(super) fn invoke_flow(flow_path: &str, input: &LxVal, ctx: &Arc<dyn BuiltinC
   }
   let program = desugar(surface);
   let module_dir = path.parent().map(|p| p.to_path_buf());
-  let rtx = crate::builtins::extract_runtime_ctx(ctx.as_ref());
+  let rtx = crate::builtins::extract_runtime_ctx(ctx);
   let rtx_arc = Arc::new(RuntimeCtx {
-    event_stream: Arc::clone(ctx.event_stream()),
+    event_stream: Arc::clone(&rtx.event_stream),
     source_dir: parking_lot::Mutex::new(ctx.source_dir()),
     network_denied: ctx.network_denied(),
     test_threshold: ctx.test_threshold(),

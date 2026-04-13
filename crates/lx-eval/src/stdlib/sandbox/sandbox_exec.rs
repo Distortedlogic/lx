@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use lx_value::BuiltinCtx;
 use lx_value::LxError;
 use lx_value::LxVal;
@@ -7,7 +5,7 @@ use miette::SourceSpan;
 
 use super::sandbox::{get_policy, policy_id};
 
-pub fn bi_exec(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+pub fn bi_exec(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let _pid = policy_id(&args[0], span)?;
   let _cmd = match &args[1] {
     LxVal::Str(s) => s.to_string(),
@@ -17,7 +15,7 @@ pub fn bi_exec(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> 
   Ok(LxVal::err_str("shell commands have been removed from lx"))
 }
 
-pub fn bi_spawn(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+pub fn bi_spawn(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let pid = policy_id(&args[0], span)?;
   let policy = get_policy(pid, span)?;
 

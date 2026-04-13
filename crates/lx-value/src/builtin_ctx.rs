@@ -1,10 +1,9 @@
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use crate::EventStream;
 
 pub trait BuiltinCtx: Send + Sync {
-  fn event_stream(&self) -> &Arc<EventStream>;
+  fn event_stream(&self) -> &EventStream;
   fn source_dir(&self) -> Option<PathBuf>;
   fn network_denied(&self) -> bool;
   fn test_threshold(&self) -> Option<f64>;

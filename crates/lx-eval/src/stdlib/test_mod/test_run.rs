@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use std::time::Instant;
 
 use indexmap::IndexMap;
@@ -56,7 +55,7 @@ struct RunCtx<'a> {
   setup: Option<&'a LxVal>,
   teardown: Option<&'a LxVal>,
   span: SourceSpan,
-  ctx: &'a Arc<dyn BuiltinCtx>,
+  ctx: &'a dyn BuiltinCtx,
 }
 
 fn run_one_scenario(scenario_val: &LxVal, rc: &RunCtx<'_>) -> Result<LxVal, LxError> {
@@ -113,7 +112,7 @@ fn run_one_scenario(scenario_val: &LxVal, rc: &RunCtx<'_>) -> Result<LxVal, LxEr
   })
 }
 
-fn run_scenarios(spec_fields: &IndexMap<lx_span::sym::Sym, LxVal>, scenarios: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn run_scenarios(spec_fields: &IndexMap<lx_span::sym::Sym, LxVal>, scenarios: &[LxVal], span: SourceSpan, ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let flow_path = require_str_field(spec_fields, "flow", "test.run", span)?.to_string();
   let grader = spec_fields.get(&lx_span::sym::intern("grader")).ok_or_else(|| LxError::runtime("test.run: spec missing 'grader'", span))?;
   let threshold = spec_fields.get(&lx_span::sym::intern("threshold")).and_then(|v| v.as_float()).unwrap_or(0.75);
@@ -156,13 +155,13 @@ fn run_scenarios(spec_fields: &IndexMap<lx_span::sym::Sym, LxVal>, scenarios: &[
   }))
 }
 
-pub(crate) fn bi_run(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+pub(crate) fn bi_run(args: &[LxVal], span: SourceSpan, ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let spec_fields = extract_record(&args[0], "test.run", span)?;
   let scenarios = if let Some(LxVal::List(list)) = spec_fields.get(&lx_span::sym::intern("scenarios")) { list.as_ref().clone() } else { Vec::new() };
   run_scenarios(spec_fields, &scenarios, span, ctx)
 }
 
-pub(crate) fn bi_run_scenario(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+pub(crate) fn bi_run_scenario(args: &[LxVal], span: SourceSpan, ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let spec_fields = extract_record(&args[0], "test.run_scenario", span)?;
   let target_name = args[1].require_str("test.run_scenario", span)?;
   let scenarios = if let Some(LxVal::List(list)) = spec_fields.get(&lx_span::sym::intern("scenarios")) { list.as_ref().clone() } else { Vec::new() };

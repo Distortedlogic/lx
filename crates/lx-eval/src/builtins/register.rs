@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use indexmap::IndexMap;
 use num_bigint::BigInt;
 
@@ -15,7 +13,7 @@ use super::register_helpers::{
   bi_resolve_handler, bi_source_dir, bi_try,
 };
 
-fn log_at(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>, level: &str) -> Result<LxVal, LxError> {
+fn log_at(args: &[LxVal], span: SourceSpan, ctx: &dyn BuiltinCtx, level: &str) -> Result<LxVal, LxError> {
   let s = args[0].require_str(&format!("log.{level}"), span)?;
   eprintln!("[{}] {}", level.to_uppercase(), s);
   let mut fields = indexmap::IndexMap::new();
@@ -25,27 +23,27 @@ fn log_at(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>, level: &s
   Ok(LxVal::Unit)
 }
 
-fn bi_log_info(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_log_info(args: &[LxVal], span: SourceSpan, ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   log_at(args, span, ctx, "info")
 }
-fn bi_log_warn(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_log_warn(args: &[LxVal], span: SourceSpan, ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   log_at(args, span, ctx, "warn")
 }
-fn bi_log_err(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_log_err(args: &[LxVal], span: SourceSpan, ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   log_at(args, span, ctx, "err")
 }
-fn bi_log_debug(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_log_debug(args: &[LxVal], span: SourceSpan, ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   log_at(args, span, ctx, "debug")
 }
 
-fn bi_not(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_not(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Bool(b) => Ok(LxVal::Bool(!b)),
     other => Err(LxError::type_err(format!("not expects Bool, got {}", other.type_name()), span, None)),
   }
 }
 
-fn bi_len(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_len(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let n = match &args[0] {
     LxVal::Str(s) => s.chars().count(),
     LxVal::List(l) => l.len(),
@@ -60,7 +58,7 @@ fn bi_len(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Resul
   Ok(LxVal::int(n))
 }
 
-fn bi_empty(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_empty(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let empty = match &args[0] {
     LxVal::Str(s) => s.is_empty(),
     LxVal::List(l) => l.is_empty(),
@@ -75,46 +73,46 @@ fn bi_empty(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Res
   Ok(LxVal::Bool(empty))
 }
 
-fn bi_to_str(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_to_str(args: &[LxVal], _span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   Ok(LxVal::str(args[0].to_string()))
 }
 
-fn bi_identity(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_identity(args: &[LxVal], _span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   Ok(args[0].clone())
 }
 
-fn bi_dbg(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_dbg(args: &[LxVal], _span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   eprintln!("[dbg] {}", args[0]);
   Ok(args[0].clone())
 }
 
-fn bi_ok_q(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_ok_q(args: &[LxVal], _span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   Ok(LxVal::Bool(matches!(&args[0], LxVal::Ok(_))))
 }
 
-fn bi_err_q(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_err_q(args: &[LxVal], _span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   Ok(LxVal::Bool(matches!(&args[0], LxVal::Err(_))))
 }
 
-fn bi_some_q(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_some_q(args: &[LxVal], _span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   Ok(LxVal::Bool(matches!(&args[0], LxVal::Some(_))))
 }
 
-fn bi_even(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_even(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Int(n) => Ok(LxVal::Bool(n % BigInt::from(2) == BigInt::from(0))),
     other => Err(LxError::type_err(format!("even? expects Int, got {}", other.type_name()), span, None)),
   }
 }
 
-fn bi_odd(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_odd(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Int(n) => Ok(LxVal::Bool(n % BigInt::from(2) != BigInt::from(0))),
     other => Err(LxError::type_err(format!("odd? expects Int, got {}", other.type_name()), span, None)),
   }
 }
 
-fn bi_type_of(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_type_of(args: &[LxVal], _span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let name = match &args[0] {
     LxVal::BuiltinFunc(_) => "Func",
     LxVal::MultiFunc(_) => "Func",
@@ -123,7 +121,7 @@ fn bi_type_of(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> 
   Ok(LxVal::typ(name))
 }
 
-fn bi_print(args: &[LxVal], _span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_print(args: &[LxVal], _span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   println!("{}", args[0]);
   Ok(LxVal::Unit)
 }

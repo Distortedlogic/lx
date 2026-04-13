@@ -72,10 +72,7 @@ fn imported_names_resolve_through_check_with_imports_regression() {
   let type_arena = TypeArena::new();
   let mut bindings = HashMap::new();
   bindings.insert(intern("answer"), type_arena.int());
-  let imports = HashMap::from([(
-    intern("math"),
-    ModuleSignature { file: None, bindings, types: HashMap::new(), traits: HashMap::new(), type_arena },
-  )]);
+  let imports = HashMap::from([(intern("math"), ModuleSignature { file: None, bindings, types: HashMap::new(), traits: HashMap::new(), type_arena })]);
 
   let (program, result) = check_source_with_imports("use dep/math { answer }\nvalue = answer", imports);
   assert!(result.diagnostics.is_empty(), "unexpected diagnostics: {:?}", diagnostic_codes(&result));

@@ -1,6 +1,5 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use indexmap::IndexMap;
 
@@ -23,27 +22,32 @@ fn checkpoint_dir(store_path: &str, scope_name: &str) -> PathBuf {
   PathBuf::from(store_path).join(scope_name)
 }
 
-fn write_checkpoint(dir: &Path, step_name: &str, value: &LxVal) -> Result<(), LxError> {
-  fs::create_dir_all(dir).map_err(|e| LxError::runtime(format!("checkpoint: failed to create dir: {e}"), (0, 0).into()))?;
+fn write_checkpoint(dir: &Path, step_name: &str, value: &LxVal, span: SourceSpan) -> Result<(), LxError> {
+  fs::create_dir_all(dir).map_err(|e| LxError::runtime(format!("checkpoint: failed to create dir: {e}"), span))?;
   let json_val = serde_json::Value::from(value);
-  let pretty = serde_json::to_string_pretty(&json_val).map_err(|e| LxError::runtime(format!("checkpoint: serialize failed: {e}"), (0, 0).into()))?;
+  let pretty = serde_json::to_string_pretty(&json_val).map_err(|e| LxError::runtime(format!("checkpoint: serialize failed: {e}"), span))?;
   let target = dir.join(format!("{step_name}.json"));
   let tmp = dir.join(format!(".{step_name}.tmp"));
-  fs::write(&tmp, &pretty).map_err(|e| LxError::runtime(format!("checkpoint: write failed: {e}"), (0, 0).into()))?;
-  fs::rename(&tmp, &target).map_err(|e| LxError::runtime(format!("checkpoint: rename failed: {e}"), (0, 0).into()))?;
+  fs::write(&tmp, &pretty).map_err(|e| LxError::runtime(format!("checkpoint: write failed: {e}"), span))?;
+  fs::rename(&tmp, &target).map_err(|e| LxError::runtime(format!("checkpoint: rename failed: {e}"), span))?;
   Ok(())
 }
 
-fn read_checkpoint(dir: &Path, step_name: &str) -> Option<LxVal> {
+fn read_checkpoint(dir: &Path, step_name: &str, span: SourceSpan) -> Result<Option<LxVal>, LxError> {
   let path = dir.join(format!("{step_name}.json"));
-  let content = fs::read_to_string(path).ok()?;
-  let json_val: serde_json::Value = serde_json::from_str(&content).ok()?;
-  Some(LxVal::from(json_val))
+  let content = match fs::read_to_string(&path) {
+    Ok(content) => content,
+    Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+    Err(e) => return Err(LxError::runtime(format!("checkpoint.step: failed to read {}: {e}", path.display()), span)),
+  };
+  let json_val: serde_json::Value =
+    serde_json::from_str(&content).map_err(|e| LxError::runtime(format!("checkpoint.step: failed to parse {}: {e}", path.display()), span))?;
+  Ok(Some(LxVal::from(json_val)))
 }
 
-fn clear_checkpoints(dir: &Path) -> Result<(), LxError> {
+fn clear_checkpoints(dir: &Path, span: SourceSpan) -> Result<(), LxError> {
   if dir.exists() {
-    fs::remove_dir_all(dir).map_err(|e| LxError::runtime(format!("checkpoint.clear: {e}"), (0, 0).into()))?;
+    fs::remove_dir_all(dir).map_err(|e| LxError::runtime(format!("checkpoint.clear: {e}"), span))?;
   }
   Ok(())
 }
@@ -60,14 +64,14 @@ fn contains_func(val: &LxVal) -> bool {
   }
 }
 
-fn bi_clear(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_clear(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let name = args[0].require_str("checkpoint.clear", span)?;
   let dir = checkpoint_dir(".lx-checkpoints", name);
-  clear_checkpoints(&dir)?;
+  clear_checkpoints(&dir, span)?;
   Ok(LxVal::Unit)
 }
 
-fn bi_step_outside(_args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_step_outside(_args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   Err(LxError::runtime("checkpoint.step: must be called inside checkpoint.scope", span))
 }
 
@@ -75,23 +79,23 @@ fn is_callable(val: &LxVal) -> bool {
   matches!(val, LxVal::Func(_) | LxVal::BuiltinFunc(_) | LxVal::MultiFunc(_))
 }
 
-fn bi_step(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_step(args: &[LxVal], span: SourceSpan, ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let dir_str = args[0].require_str("checkpoint.step", span)?;
   let step_name = args[1].require_str("checkpoint.step", span)?;
   let body = &args[2];
   let dir = PathBuf::from(dir_str);
-  if let Some(cached) = read_checkpoint(&dir, step_name) {
+  if let Some(cached) = read_checkpoint(&dir, step_name, span)? {
     return Ok(cached);
   }
   let result = if is_callable(body) { call_value_sync(body, LxVal::Unit, span, ctx)? } else { body.clone() };
   if contains_func(&result) {
     return Ok(LxVal::err_str("checkpoint.step: cannot checkpoint a value containing Func"));
   }
-  write_checkpoint(&dir, step_name, &result)?;
+  write_checkpoint(&dir, step_name, &result, span)?;
   Ok(result)
 }
 
-fn bi_scope(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_scope(args: &[LxVal], span: SourceSpan, ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let name = args[0].require_str("checkpoint.scope", span)?;
   let opts = &args[1];
   let body = &args[2];

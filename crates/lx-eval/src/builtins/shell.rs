@@ -1,5 +1,4 @@
 use std::process::Command;
-use std::sync::Arc;
 
 use lx_value::BuiltinCtx;
 use lx_value::Env;
@@ -8,7 +7,7 @@ use lx_value::LxVal;
 use lx_value::record;
 use miette::SourceSpan;
 
-fn bi_bash(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_bash(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let cmd = args[0].require_str("bash", span)?;
   match Command::new("bash").arg("-c").arg(cmd).output() {
     Ok(output) => {

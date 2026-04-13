@@ -13,13 +13,19 @@ pub fn list_workspace() -> ExitCode {
       return ExitCode::from(1);
     },
   };
-  let Some(root) = manifest::find_workspace_root(&cwd) else {
-    eprintln!("error: no workspace lx.toml found");
-    return ExitCode::from(1);
+  let root = match manifest::find_workspace_root_detailed(&cwd) {
+    Ok(root) => root,
+    Err(e) => {
+      eprintln!("error: {e}");
+      return ExitCode::from(1);
+    },
   };
-  let Ok(ws) = manifest::load_workspace(&root) else {
-    eprintln!("error: failed to load workspace");
-    return ExitCode::from(1);
+  let ws = match manifest::load_workspace(&root) {
+    Ok(ws) => ws,
+    Err(e) => {
+      eprintln!("error: {e}");
+      return ExitCode::from(1);
+    },
   };
 
   for member in &ws.members {

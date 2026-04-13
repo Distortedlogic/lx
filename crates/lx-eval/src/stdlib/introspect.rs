@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use indexmap::IndexMap;
 
 use crate::std_module;
@@ -19,7 +17,7 @@ pub fn build() -> IndexMap<lx_span::sym::Sym, LxVal> {
   }
 }
 
-fn bi_system(_args: &[LxVal], _span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_system(_args: &[LxVal], _span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   Ok(LxVal::ok(record! {
       "agents" => LxVal::list(Vec::new()),
       "messages_in_flight" => LxVal::int(0),
@@ -28,18 +26,18 @@ fn bi_system(_args: &[LxVal], _span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> 
   }))
 }
 
-fn bi_agents(_args: &[LxVal], _span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_agents(_args: &[LxVal], _span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   Ok(LxVal::ok(LxVal::list(Vec::new())))
 }
 
-fn bi_agent(_args: &[LxVal], _span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_agent(_args: &[LxVal], _span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   Ok(LxVal::err_str("agent introspection unavailable (agent runtime removed)"))
 }
 
-fn bi_messages(_args: &[LxVal], _span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_messages(_args: &[LxVal], _span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   Ok(LxVal::ok(LxVal::list(Vec::new())))
 }
 
-fn bi_bottleneck(_args: &[LxVal], _span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_bottleneck(_args: &[LxVal], _span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   Ok(LxVal::None)
 }

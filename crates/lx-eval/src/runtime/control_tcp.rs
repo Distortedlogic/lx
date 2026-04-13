@@ -5,6 +5,13 @@ use tokio::net::TcpListener;
 
 use super::control::{ControlChannelState, ControlCommand, ControlResponse, handle_command};
 
+fn render_response(resp: &ControlResponse) -> String {
+  serde_json::to_string(resp).unwrap_or_else(|e| {
+    serde_json::to_string(&ControlResponse::err(format!("response serialization failed: {e}")))
+      .unwrap_or_else(|_| "{\"ok\":false,\"error\":\"response serialization failed\"}".to_string())
+  })
+}
+
 pub async fn run_tcp_control(addr: String, state: Arc<ControlChannelState>) {
   let listener = match TcpListener::bind(&addr).await {
     Ok(l) => l,
@@ -27,7 +34,15 @@ pub async fn run_tcp_control(addr: String, state: Arc<ControlChannelState>) {
   let (reader, mut writer) = stream.into_split();
   let mut lines = BufReader::new(reader).lines();
 
-  while let Ok(Some(line)) = lines.next_line().await {
+  loop {
+    let line = match lines.next_line().await {
+      Ok(Some(line)) => line,
+      Ok(None) => break,
+      Err(e) => {
+        eprintln!("[control] tcp read failed: {e}");
+        break;
+      },
+    };
     let line = line.trim().to_string();
     if line.is_empty() {
       continue;
@@ -36,16 +51,22 @@ pub async fn run_tcp_control(addr: String, state: Arc<ControlChannelState>) {
       Ok(cmd) => cmd,
       Err(e) => {
         let resp = ControlResponse::err(format!("invalid command: {e}"));
-        let mut out = serde_json::to_string(&resp).unwrap_or_default();
+        let mut out = render_response(&resp);
         out.push('\n');
-        let _ = writer.write_all(out.as_bytes()).await;
+        if let Err(write_err) = writer.write_all(out.as_bytes()).await {
+          eprintln!("[control] tcp write failed: {write_err}");
+          break;
+        }
         continue;
       },
     };
     let resp = handle_command(cmd, &state);
-    let mut out = serde_json::to_string(&resp).unwrap_or_default();
+    let mut out = render_response(&resp);
     out.push('\n');
-    let _ = writer.write_all(out.as_bytes()).await;
+    if let Err(write_err) = writer.write_all(out.as_bytes()).await {
+      eprintln!("[control] tcp write failed: {write_err}");
+      break;
+    }
 
     if state.cancel_flag.load(std::sync::atomic::Ordering::Relaxed) {
       break;

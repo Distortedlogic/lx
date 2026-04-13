@@ -22,7 +22,7 @@ pub fn build() -> IndexMap<Sym, LxVal> {
   m
 }
 
-fn bi_xadd(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_xadd(args: &[LxVal], span: SourceSpan, ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let rec = args[0].require_record("events.xadd", span)?;
   let kind = rec.get(&intern("kind")).and_then(|v| v.as_str()).ok_or_else(|| LxError::type_err("events.xadd: 'kind' field required as Str", span, None))?;
   let agent = rec.get(&intern("agent")).and_then(|v| v.as_str()).unwrap_or("main");
@@ -37,7 +37,7 @@ fn bi_xadd(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Resul
   Ok(LxVal::str(id))
 }
 
-fn bi_xrange(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_xrange(args: &[LxVal], span: SourceSpan, ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let start = args[0].require_str("events.xrange", span)?;
   let end = args[1].require_str("events.xrange", span)?;
   let entries = ctx.event_stream().xrange(start, end, None);
@@ -61,11 +61,11 @@ fn bi_xread(args: Vec<LxVal>, span: SourceSpan, ctx: Arc<dyn BuiltinCtx>) -> Pin
   })
 }
 
-fn bi_xlen(_args: &[LxVal], _span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_xlen(_args: &[LxVal], _span: SourceSpan, ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   Ok(LxVal::int(ctx.event_stream().xlen() as i64))
 }
 
-fn bi_xtrim(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_xtrim(args: &[LxVal], span: SourceSpan, ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let rec = args[0].require_record("events.xtrim", span)?;
   let maxlen = rec
     .get(&intern("maxlen"))

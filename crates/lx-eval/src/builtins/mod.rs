@@ -21,7 +21,7 @@ use miette::SourceSpan;
 
 pub(crate) type BoxFut = Pin<Box<dyn Future<Output = Result<LxVal, LxError>>>>;
 
-pub(crate) use call::{extract_runtime_ctx, wrap_runtime_ctx};
+pub(crate) use call::{extract_runtime_ctx, own_builtin_ctx, wrap_runtime_ctx};
 
 macro_rules! register_builtins {
   ($env:expr, { $( $name:literal / $arity:literal => $func:expr ),* $(,)? }) => {{
@@ -49,6 +49,7 @@ pub(crate) async fn call_value(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Ar
   call::call_value(f, arg, span, ctx).await
 }
 
-pub(crate) fn call_value_sync(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
-  tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(call::call_value(f, arg, span, ctx)))
+pub(crate) fn call_value_sync(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
+  let ctx = own_builtin_ctx(ctx);
+  tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(call::call_value(f, arg, span, &ctx)))
 }

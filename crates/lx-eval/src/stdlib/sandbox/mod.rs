@@ -1,5 +1,5 @@
+use std::sync::LazyLock;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, LazyLock};
 
 use dashmap::DashMap;
 use indexmap::IndexMap;
@@ -57,7 +57,7 @@ pub fn build() -> IndexMap<lx_span::sym::Sym, LxVal> {
   }
 }
 
-fn bi_policy(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_policy(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let policy = match &args[0] {
     LxVal::Str(name) => make_preset(name),
     LxVal::Record(config) => parse_policy(config, span)?,
@@ -70,13 +70,13 @@ fn bi_policy(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Re
   Ok(make_handle(id))
 }
 
-fn bi_describe(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_describe(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let id = policy_id(&args[0], span)?;
   let p = get_policy(id, span)?;
   Ok(policy_to_describe(&p))
 }
 
-fn bi_permits(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_permits(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let id = policy_id(&args[0], span)?;
   let capability = match &args[1] {
     LxVal::Str(s) => s.to_string(),
@@ -94,7 +94,7 @@ fn bi_permits(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> R
   Ok(LxVal::Bool(permits_check(&p, &capability, &target)))
 }
 
-fn bi_merge(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_merge(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let LxVal::List(handles) = &args[0] else {
     return Err(LxError::type_err("sandbox.merge expects List of policy handles", span, None));
   };
@@ -110,7 +110,7 @@ fn bi_merge(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Res
   Ok(make_handle(id))
 }
 
-fn bi_attenuate(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_attenuate(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let parent_id = policy_id(&args[0], span)?;
   let LxVal::Record(overrides) = &args[1] else {
     return Err(LxError::type_err("sandbox.attenuate expects Record overrides", span, None));

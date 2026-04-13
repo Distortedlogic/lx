@@ -1,5 +1,3 @@
-pub use lx_span::LX_MANIFEST;
-
 pub mod builtins;
 pub mod interpreter;
 pub mod mcp_client;

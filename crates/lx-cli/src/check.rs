@@ -5,8 +5,14 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use lx::prelude::*;
 use lx_checker::diagnostics::Applicability;
+use lx_checker::{CheckResult, DiagLevel, Diagnostic, check};
+use lx_desugar::desugar;
+use lx_linter::{RuleRegistry, lint};
+use lx_parser::lexer::lex;
+use lx_parser::parser::parse;
+use lx_span::source::FileId;
+use lx_value::error::LxError;
 use miette::{NamedSource, Report};
 
 use crate::{manifest, run};
@@ -105,13 +111,19 @@ pub fn check_workspace(member_filter: Option<&str>, strict: bool, fix: bool) -> 
       return ExitCode::from(1);
     },
   };
-  let Some(root) = manifest::find_workspace_root(&cwd) else {
-    eprintln!("error: no workspace lx.toml found");
-    return ExitCode::from(1);
+  let root = match manifest::find_workspace_root_detailed(&cwd) {
+    Ok(root) => root,
+    Err(e) => {
+      eprintln!("error: {e}");
+      return ExitCode::from(1);
+    },
   };
-  let Ok(ws) = manifest::load_workspace(&root) else {
-    eprintln!("error: failed to load workspace");
-    return ExitCode::from(1);
+  let ws = match manifest::load_workspace(&root) {
+    Ok(ws) => ws,
+    Err(e) => {
+      eprintln!("error: {e}");
+      return ExitCode::from(1);
+    },
   };
   let members: Vec<&manifest::Member> = if let Some(filter) = member_filter {
     let found: Vec<_> = ws.members.iter().filter(|m| m.pkg.name == filter).collect();

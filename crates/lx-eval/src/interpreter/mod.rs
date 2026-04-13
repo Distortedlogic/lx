@@ -56,7 +56,7 @@ impl Interpreter {
       && let Some(ref dir) = source_dir
     {
       let jsonl_path = dir.join(".lx").join("stream.jsonl");
-      ctx.event_stream.enable_jsonl(jsonl_path);
+      ctx.event_stream.enable_jsonl(&jsonl_path);
     }
 
     Self {

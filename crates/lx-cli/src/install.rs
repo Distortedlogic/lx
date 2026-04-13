@@ -12,12 +12,12 @@ pub fn run_install(package: Option<&str>) -> ExitCode {
     eprintln!("error: cannot determine cwd");
     return ExitCode::from(1);
   };
-  let Some(root) = manifest::find_manifest_root(&cwd) else {
-    eprintln!("error: no lx.toml found");
-    return ExitCode::from(1);
-  };
-  let mut manifest = match manifest::load_manifest(&root) {
-    Ok(m) => m,
+  let (root, mut manifest) = match manifest::load_nearest_manifest(&cwd) {
+    Ok(Some((root, manifest))) => (root, manifest),
+    Ok(None) => {
+      eprintln!("error: no lx.toml found");
+      return ExitCode::from(1);
+    },
     Err(e) => {
       eprintln!("error: {e}");
       return ExitCode::from(1);
@@ -92,12 +92,12 @@ pub fn run_update(package: Option<&str>) -> ExitCode {
     eprintln!("error: cannot determine cwd");
     return ExitCode::from(1);
   };
-  let Some(root) = manifest::find_manifest_root(&cwd) else {
-    eprintln!("error: no lx.toml found");
-    return ExitCode::from(1);
-  };
-  let manifest = match manifest::load_manifest(&root) {
-    Ok(m) => m,
+  let (root, manifest) = match manifest::load_nearest_manifest(&cwd) {
+    Ok(Some((root, manifest))) => (root, manifest),
+    Ok(None) => {
+      eprintln!("error: no lx.toml found");
+      return ExitCode::from(1);
+    },
     Err(e) => {
       eprintln!("error: {e}");
       return ExitCode::from(1);

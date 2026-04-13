@@ -124,10 +124,16 @@ pub fn NewIssueDialog(open: bool, agents: Vec<AgentRef>, on_close: EventHandler<
         ondrop: move |evt: DragEvent| {
             evt.prevent_default();
             drag_hover.set(false);
+            let mut description = description;
             spawn(async move {
-                let dropped = read_dropped_files().await;
-                if !dropped.is_empty() {
-                    staged_files.write().extend(dropped);
+                match read_dropped_files().await {
+                    Ok(dropped) if !dropped.is_empty() => {
+                        staged_files.write().extend(dropped);
+                    }
+                    Ok(_) => {}
+                    Err(err) => {
+                        description.write().push_str(&format!("\n[drop failed: {err}]()"));
+                    }
                 }
             });
         },

@@ -121,10 +121,7 @@ fn formats_nested_type_expressions_through_emit_type_regression() {
   let str_ty = named_type(&mut arena, "Str");
   let list_int_ty = arena.alloc_type_expr(TypeExpr::List(int_ty), (0, 0).into());
   let record_ty = arena.alloc_type_expr(
-    TypeExpr::Record(vec![
-      lx_ast::ast::TypeField { name: intern("left"), ty: int_ty },
-      lx_ast::ast::TypeField { name: intern("right"), ty: str_ty },
-    ]),
+    TypeExpr::Record(vec![lx_ast::ast::TypeField { name: intern("left"), ty: int_ty }, lx_ast::ast::TypeField { name: intern("right"), ty: str_ty }]),
     (0, 0).into(),
   );
   let result_ty = arena.alloc_type_expr(TypeExpr::Applied(intern("Result"), vec![list_int_ty]), (0, 0).into());

@@ -8,7 +8,13 @@ use crate::interpreter::Interpreter;
 use crate::runtime::RuntimeCtx;
 
 pub(crate) fn extract_runtime_ctx(ctx: &dyn BuiltinCtx) -> &RuntimeCtx {
-  ctx.as_any().downcast_ref::<RuntimeCtx>().expect("BuiltinCtx must be RuntimeCtx")
+  if let Some(rtx) = ctx.as_any().downcast_ref::<RuntimeCtx>() {
+    rtx
+  } else if let Some(wrapper) = ctx.as_any().downcast_ref::<RuntimeCtxWrapper>() {
+    &wrapper.0
+  } else {
+    panic!("BuiltinCtx must be RuntimeCtx-backed")
+  }
 }
 
 pub(crate) async fn call_value(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
@@ -27,7 +33,7 @@ pub(crate) async fn call_value(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Ar
       if lf.applied.len() < lf.arity {
         return Ok(LxVal::Func(lf));
       }
-      let rtx = call_value_get_rtx(ctx);
+      let rtx = call_value_get_rtx(ctx.as_ref());
       let mut interp = Interpreter::with_env(&lf.closure, Arc::clone(&lf.arena), rtx);
       let call_env = lf.closure.child();
       call_env.bind_params(&lf.params, &lf.applied, &lf.defaults);
@@ -45,14 +51,14 @@ pub(crate) async fn call_value(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Ar
         return Ok(LxVal::BuiltinFunc(bf));
       }
       match bf.kind {
-        BuiltinKind::Sync(f) => f(&bf.applied, span, ctx),
+        BuiltinKind::Sync(f) => f(&bf.applied, span, ctx.as_ref()),
         BuiltinKind::Async(f) => f(bf.applied, span, Arc::clone(ctx)).await,
         BuiltinKind::DynAsync(ref f) => f(bf.applied.clone(), span, Arc::clone(ctx)).await,
       }
     },
     LxVal::MultiFunc(clauses) => {
       let arena = clauses.first().map(|c| Arc::clone(&c.arena)).unwrap_or_else(|| Arc::new(AstArena::new()));
-      let rtx = call_value_get_rtx(ctx);
+      let rtx = call_value_get_rtx(ctx.as_ref());
       let mut interp = Interpreter::with_env(&Env::default(), arena, rtx);
       interp.apply_func(LxVal::MultiFunc(clauses.clone()), arg, span).await.map_err(|e| match e {
         EvalSignal::Error(e) => e,
@@ -73,9 +79,39 @@ pub(crate) async fn call_value(f: &LxVal, arg: LxVal, span: SourceSpan, ctx: &Ar
   }
 }
 
-pub(crate) fn call_value_get_rtx(ctx: &Arc<dyn BuiltinCtx>) -> Arc<RuntimeCtx> {
+fn clone_runtime_ctx(rtx: &RuntimeCtx) -> Arc<RuntimeCtx> {
+  Arc::new(RuntimeCtx {
+    yield_: Arc::clone(&rtx.yield_),
+    source_dir: parking_lot::Mutex::new(rtx.source_dir()),
+    workspace_members: rtx.workspace_members.clone(),
+    dep_dirs: rtx.dep_dirs.clone(),
+    tools: rtx.tools.clone(),
+    tokio_runtime: Arc::clone(&rtx.tokio_runtime),
+    test_threshold: rtx.test_threshold(),
+    test_runs: rtx.test_runs(),
+    event_stream: Arc::clone(&rtx.event_stream),
+    network_denied: rtx.network_denied(),
+    global_pause: Arc::clone(&rtx.global_pause),
+    cancel_flag: Arc::clone(&rtx.cancel_flag),
+    inject_tx: rtx.inject_tx.clone(),
+  })
+}
+
+pub(crate) fn own_builtin_ctx(ctx: &dyn BuiltinCtx) -> Arc<dyn BuiltinCtx> {
+  if let Some(wrapper) = ctx.as_any().downcast_ref::<RuntimeCtxWrapper>() {
+    wrap_runtime_ctx(&wrapper.0)
+  } else if let Some(rtx) = ctx.as_any().downcast_ref::<RuntimeCtx>() {
+    clone_runtime_ctx(rtx)
+  } else {
+    panic!("call_value requires RuntimeCtx-backed BuiltinCtx")
+  }
+}
+
+pub(crate) fn call_value_get_rtx(ctx: &dyn BuiltinCtx) -> Arc<RuntimeCtx> {
   if let Some(wrapper) = ctx.as_any().downcast_ref::<RuntimeCtxWrapper>() {
     Arc::clone(&wrapper.0)
+  } else if let Some(rtx) = ctx.as_any().downcast_ref::<RuntimeCtx>() {
+    clone_runtime_ctx(rtx)
   } else {
     panic!("call_value requires RuntimeCtx-backed BuiltinCtx")
   }
@@ -84,7 +120,7 @@ pub(crate) fn call_value_get_rtx(ctx: &Arc<dyn BuiltinCtx>) -> Arc<RuntimeCtx> {
 pub(crate) struct RuntimeCtxWrapper(pub Arc<RuntimeCtx>);
 
 impl BuiltinCtx for RuntimeCtxWrapper {
-  fn event_stream(&self) -> &Arc<lx_value::EventStream> {
+  fn event_stream(&self) -> &lx_value::EventStream {
     self.0.event_stream()
   }
   fn source_dir(&self) -> Option<std::path::PathBuf> {

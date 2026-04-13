@@ -38,7 +38,7 @@ dioxus-storage = { path = "../../../dioxus-common/crates/dioxus-storage" }
 dioxus-widget-bridge = { path = "../../../dioxus-common/crates/dioxus-widget-bridge" }
 
 futures = { workspace = true }
-pulldown-cmark = { version = "0.12", default-features = false, features = ["html"] }
+pulldown-cmark.workspace = true
 reqwest = { workspace = true }
 thiserror = { workspace = true }
 rodio = { workspace = true }

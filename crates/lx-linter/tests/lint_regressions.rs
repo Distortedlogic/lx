@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use lx_ast::ast::{Core, Program};
 use lx_checker::diagnostics::DiagnosticKind;
-use lx_checker::{check, Diagnostic};
+use lx_checker::{Diagnostic, check};
 use lx_desugar::desugar;
 use lx_linter::{RuleRegistry, lint};
 use lx_parser::{lexer::lex, parser::parse};
@@ -26,8 +26,7 @@ fn assert_has_lint(source: &str, expected_code: &str, expected_rule_name: &str) 
   let diagnostics = lint_source(source);
   assert!(
     diagnostics.iter().any(|diag| {
-      diag.code == expected_code
-        && matches!(&diag.kind, DiagnosticKind::LintWarning { rule_name, .. } if rule_name.contains(expected_rule_name))
+      diag.code == expected_code && matches!(&diag.kind, DiagnosticKind::LintWarning { rule_name, .. } if rule_name.contains(expected_rule_name))
     }),
     "missing lint {expected_code} / {expected_rule_name} for fixture:\n{source}\nactual codes: {:?}",
     diagnostics.iter().map(|diag| diag.code).collect::<Vec<_>>()

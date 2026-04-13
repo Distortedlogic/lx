@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use lx::prelude::RuntimeCtx;
+use lx_eval::runtime::RuntimeCtx;
 
 use crate::manifest::{self, Member};
 
@@ -15,16 +15,6 @@ struct TestEntry {
 }
 
 pub fn run_tests_dir(dir: &str) -> ExitCode {
-  let (threshold, runs) = load_test_config();
-  let entries = discover_tests(dir);
-  let ws_members = manifest::try_load_workspace_members();
-  let result = execute_tests(&entries, &ws_members, threshold, runs);
-  print_results(&result);
-  if result.failed > 0 { ExitCode::from(1) } else { ExitCode::SUCCESS }
-}
-
-pub fn run_workspace_tests(member_filter: Option<&str>) -> ExitCode {
-  let (threshold, runs) = load_test_config();
   let cwd = match env::current_dir() {
     Ok(d) => d,
     Err(e) => {
@@ -32,13 +22,61 @@ pub fn run_workspace_tests(member_filter: Option<&str>) -> ExitCode {
       return ExitCode::from(1);
     },
   };
-  let Some(root) = manifest::find_workspace_root(&cwd) else {
-    eprintln!("error: no workspace lx.toml found");
-    return ExitCode::from(1);
+  let (threshold, runs) = match load_test_config(&cwd) {
+    Ok(config) => config,
+    Err(e) => {
+      eprintln!("error: {e}");
+      return ExitCode::from(1);
+    },
   };
-  let Ok(ws) = manifest::load_workspace(&root) else {
-    eprintln!("error: failed to load workspace");
-    return ExitCode::from(1);
+  let entries = discover_tests(dir);
+  let ws_members = match manifest::load_workspace_members_detailed(&cwd) {
+    Ok(ws_members) => ws_members,
+    Err(e) => {
+      eprintln!("error: {e}");
+      return ExitCode::from(1);
+    },
+  };
+  let dep_dirs = match manifest::load_dep_dirs_detailed(true, &cwd) {
+    Ok(dep_dirs) => dep_dirs,
+    Err(e) => {
+      eprintln!("error: {e}");
+      return ExitCode::from(1);
+    },
+  };
+  let result = execute_tests(&entries, &ws_members, &dep_dirs, threshold, runs);
+  print_results(&result);
+  if result.failed > 0 { ExitCode::from(1) } else { ExitCode::SUCCESS }
+}
+
+pub fn run_workspace_tests(member_filter: Option<&str>) -> ExitCode {
+  let cwd = match env::current_dir() {
+    Ok(d) => d,
+    Err(e) => {
+      eprintln!("error: cannot determine cwd: {e}");
+      return ExitCode::from(1);
+    },
+  };
+  let (threshold, runs) = match load_test_config(&cwd) {
+    Ok(config) => config,
+    Err(e) => {
+      eprintln!("error: {e}");
+      return ExitCode::from(1);
+    },
+  };
+  let root = match manifest::find_workspace_root_detailed(&cwd) {
+    Ok(root) => root,
+    Err(e) => {
+      eprintln!("error: {e}");
+      return ExitCode::from(1);
+    },
+  };
+  let ws = match manifest::load_workspace(&root) {
+    Ok(ws) => ws,
+    Err(e) => {
+      eprintln!("error: {e}");
+      return ExitCode::from(1);
+    },
   };
 
   let members: Vec<&Member> = if let Some(filter) = member_filter {
@@ -54,6 +92,13 @@ pub fn run_workspace_tests(member_filter: Option<&str>) -> ExitCode {
   };
 
   let ws_members = ws.member_map();
+  let dep_dirs = match manifest::load_dep_dirs_detailed(true, &cwd) {
+    Ok(dep_dirs) => dep_dirs,
+    Err(e) => {
+      eprintln!("error: {e}");
+      return ExitCode::from(1);
+    },
+  };
   let mut total_passed = 0u32;
   let mut total_failed = 0u32;
   let mut member_results = Vec::new();
@@ -66,7 +111,7 @@ pub fn run_workspace_tests(member_filter: Option<&str>) -> ExitCode {
       continue;
     }
     let entries = discover_tests_with_pattern(test_base.to_str().unwrap_or("."), &member.test_pattern);
-    let result = execute_tests(&entries, &ws_members, threshold, runs);
+    let result = execute_tests(&entries, &ws_members, &dep_dirs, threshold, runs);
     total_passed += result.passed;
     total_failed += result.failed;
     if result.failed > 0 {
@@ -127,8 +172,13 @@ struct TestResults {
   fail_details: Vec<(String, Vec<lx_value::error::LxError>, miette::NamedSource<String>)>,
 }
 
-fn execute_tests(entries: &[TestEntry], workspace_members: &HashMap<String, PathBuf>, threshold: Option<f64>, runs: Option<u32>) -> TestResults {
-  let dep_dirs = crate::manifest::try_load_dep_dirs();
+fn execute_tests(
+  entries: &[TestEntry],
+  workspace_members: &HashMap<String, PathBuf>,
+  dep_dirs: &HashMap<String, PathBuf>,
+  threshold: Option<f64>,
+  runs: Option<u32>,
+) -> TestResults {
   let mut passed = 0;
   let mut failed = 0;
   let mut fail_details = Vec::new();
@@ -180,20 +230,14 @@ fn print_results(results: &TestResults) {
   }
 }
 
-fn load_test_config() -> (Option<f64>, Option<u32>) {
-  let Ok(cwd) = env::current_dir() else {
-    return (None, None);
+fn load_test_config(cwd: &std::path::Path) -> Result<(Option<f64>, Option<u32>), String> {
+  let Some((_root, manifest)) = manifest::load_nearest_manifest(cwd)? else {
+    return Ok((None, None));
   };
-  let Some(root) = manifest::find_manifest_root(&cwd) else {
-    return (None, None);
-  };
-  let Ok(m) = manifest::load_manifest(&root) else {
-    return (None, None);
-  };
-  match m.test {
+  Ok(match manifest.test {
     Some(test) => (test.threshold, test.runs),
     None => (None, None),
-  }
+  })
 }
 
 fn glob_matches(pattern: &str, name: &str) -> bool {

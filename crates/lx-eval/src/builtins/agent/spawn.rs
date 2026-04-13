@@ -32,7 +32,7 @@ pub fn bi_agent_spawn(args: Vec<LxVal>, span: SourceSpan, ctx: Arc<dyn BuiltinCt
     let pause_flag = Arc::new(AtomicBool::new(false));
     let rx = Arc::new(tokio::sync::Mutex::new(rx));
 
-    let parent_rtx = crate::builtins::call::call_value_get_rtx(&ctx);
+    let parent_rtx = crate::builtins::call::call_value_get_rtx(ctx.as_ref());
     let rtx: Arc<RuntimeCtx> = Arc::new(RuntimeCtx {
       yield_: Arc::new(crate::runtime::StdinStdoutYieldBackend),
       source_dir: parking_lot::Mutex::new(None),
@@ -42,7 +42,7 @@ pub fn bi_agent_spawn(args: Vec<LxVal>, span: SourceSpan, ctx: Arc<dyn BuiltinCt
       tokio_runtime: Arc::clone(&parent_rtx.tokio_runtime),
       test_threshold: ctx.test_threshold(),
       test_runs: ctx.test_runs(),
-      event_stream: Arc::clone(ctx.event_stream()),
+      event_stream: Arc::clone(&parent_rtx.event_stream),
       network_denied: ctx.network_denied(),
       global_pause: Arc::new(std::sync::atomic::AtomicBool::new(false)),
       cancel_flag: Arc::new(std::sync::atomic::AtomicBool::new(false)),
@@ -51,44 +51,22 @@ pub fn bi_agent_spawn(args: Vec<LxVal>, span: SourceSpan, ctx: Arc<dyn BuiltinCt
     let task_name = name.clone();
     let task_rx = Arc::clone(&rx);
 
-    let join_handle = std::thread::spawn(move || {
-      let rt = Arc::clone(&rtx.tokio_runtime);
-      let _guard = rt.enter();
-      rt.handle().block_on(async move {
-        let mut interp = Interpreter::new("", None, Arc::clone(&rtx));
-        interp.agent_name = Some(task_name.clone());
+    let join_handle = std::thread::Builder::new()
+      .name(format!("lx-agent-{task_name}"))
+      .spawn(move || {
+        let rt = Arc::clone(&rtx.tokio_runtime);
+        let _guard = rt.enter();
+        rt.handle().block_on(async move {
+          let mut interp = Interpreter::new("", None, Arc::clone(&rtx));
+          interp.agent_name = Some(task_name.clone());
 
-        let has_handle = handle_method.is_some();
-        let has_run = run_method.is_some();
+          let has_handle = handle_method.is_some();
+          let has_run = run_method.is_some();
 
-        if has_handle && !has_run {
-          let Some(handle_fn) = handle_method else {
-            return;
-          };
-          let mut rx_guard = task_rx.lock().await;
-          let bctx = interp.builtin_ctx();
-          while let Some(msg) = rx_guard.recv().await {
-            let result = crate::builtins::call_value(&handle_fn, msg.payload.clone(), miette::SourceSpan::new(0.into(), 0), &bctx)
-              .await
-              .unwrap_or_else(|e| LxVal::err_str(e.to_string()));
-            if let Some(reply) = msg.reply {
-              let _ = reply.send(result);
-            }
-          }
-        } else if has_run && !has_handle {
-          drop(task_rx);
-          if let Some(run_fn) = run_method {
-            let bctx = interp.builtin_ctx();
-            let _ = crate::builtins::call_value(&run_fn, LxVal::Unit, miette::SourceSpan::new(0.into(), 0), &bctx).await;
-          }
-        } else {
-          interp.agent_mailbox_rx = Some(task_rx.clone());
-          interp.agent_handle_fn = handle_method.clone();
-          if let Some(run_fn) = run_method {
-            let bctx = interp.builtin_ctx();
-            let _ = crate::builtins::call_value(&run_fn, LxVal::Unit, miette::SourceSpan::new(0.into(), 0), &bctx).await;
-          }
-          if let Some(handle_fn) = handle_method {
+          if has_handle && !has_run {
+            let Some(handle_fn) = handle_method else {
+              return;
+            };
             let mut rx_guard = task_rx.lock().await;
             let bctx = interp.builtin_ctx();
             while let Some(msg) = rx_guard.recv().await {
@@ -99,9 +77,35 @@ pub fn bi_agent_spawn(args: Vec<LxVal>, span: SourceSpan, ctx: Arc<dyn BuiltinCt
                 let _ = reply.send(result);
               }
             }
+          } else if has_run && !has_handle {
+            drop(task_rx);
+            if let Some(run_fn) = run_method {
+              let bctx = interp.builtin_ctx();
+              let _ = crate::builtins::call_value(&run_fn, LxVal::Unit, miette::SourceSpan::new(0.into(), 0), &bctx).await;
+            }
+          } else {
+            interp.agent_mailbox_rx = Some(task_rx.clone());
+            interp.agent_handle_fn = handle_method.clone();
+            if let Some(run_fn) = run_method {
+              let bctx = interp.builtin_ctx();
+              let _ = crate::builtins::call_value(&run_fn, LxVal::Unit, miette::SourceSpan::new(0.into(), 0), &bctx).await;
+            }
+            if let Some(handle_fn) = handle_method {
+              let mut rx_guard = task_rx.lock().await;
+              let bctx = interp.builtin_ctx();
+              while let Some(msg) = rx_guard.recv().await {
+                let result = crate::builtins::call_value(&handle_fn, msg.payload.clone(), miette::SourceSpan::new(0.into(), 0), &bctx)
+                  .await
+                  .unwrap_or_else(|e| LxVal::err_str(e.to_string()));
+                if let Some(reply) = msg.reply {
+                  let _ = reply.send(result);
+                }
+              }
+            }
           }
-        }
-    })});
+        })
+      })
+      .map_err(|e| LxError::runtime(format!("spawn: failed to start agent thread '{name}': {e}"), span))?;
 
     let handle = AgentHandle { name: name.clone(), mailbox: tx, task: join_handle, pause_flag };
 

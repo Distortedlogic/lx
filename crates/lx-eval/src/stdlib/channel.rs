@@ -37,7 +37,7 @@ fn chan_id(val: &LxVal, fn_name: &str, span: SourceSpan) -> Result<u64, LxError>
   extract_handle_id(val, "__chan_id", fn_name, span)
 }
 
-fn bi_create(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_create(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let cap = args[0].require_usize("channel.create", span)?;
   let capacity = if cap == 0 { 1_000_000 } else { cap };
   let (tx, rx) = mpsc::channel(capacity);
@@ -87,7 +87,7 @@ fn bi_recv(args: Vec<LxVal>, span: SourceSpan, _ctx: Arc<dyn BuiltinCtx>) -> Pin
   })
 }
 
-fn bi_try_recv(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_try_recv(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let id = chan_id(&args[0], "channel.try_recv", span)?;
   let receiver = {
     let entry = CHANNELS.get(&id).ok_or_else(|| LxError::runtime("channel.try_recv: channel not found", span))?;
@@ -102,7 +102,7 @@ fn bi_try_recv(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> 
   }
 }
 
-fn bi_close(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_close(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let id = chan_id(&args[0], "channel.close", span)?;
   if let Some(mut entry) = CHANNELS.get_mut(&id) {
     entry.sender = None;

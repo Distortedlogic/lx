@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use lx_ast::ast::{attach_comments, AstArena, Expr, NodeId, Program, Stmt, StmtId, Surface, TraitEntry, TypeExpr};
+use lx_ast::ast::{AstArena, Expr, NodeId, Program, Stmt, StmtId, Surface, TraitEntry, TypeExpr, attach_comments};
 use lx_parser::{lexer::lex, parser::parse};
 use lx_span::source::{Comment, CommentStore, FileId};
 use lx_span::sym::intern;
@@ -91,14 +91,7 @@ fn attach_comments_can_classify_dangling_for_a_synthetic_node_span() {
   let stmt_id = arena.alloc_stmt(Stmt::Expr(expr_id), (0, 7).into());
   let comments = CommentStore::from_vec(vec![Comment { span: (0, 2).into(), text: "--".into() }]);
   let comment_map = attach_comments(&[stmt_id], &arena, &comments, source);
-  let program: Program<Surface> = Program {
-    stmts: vec![stmt_id],
-    arena,
-    comments,
-    comment_map,
-    file: FileId::new(0),
-    _phase: PhantomData,
-  };
+  let program: Program<Surface> = Program { stmts: vec![stmt_id], arena, comments, comment_map, file: FileId::new(0), _phase: PhantomData };
 
   assert_eq!(program.dangling_comments(NodeId::Expr(expr_id)).len(), 1);
   assert!(program.leading_comments(NodeId::Expr(expr_id)).is_empty());

@@ -38,11 +38,27 @@ impl ToolModule {
 
     let call_id = self.call_counter.fetch_add(1, Ordering::Relaxed);
 
-    let arguments: serde_json::Value = match &args {
-      LxVal::Record(_) => serde_json::to_value(&args).unwrap_or(serde_json::json!({})),
-      LxVal::Str(s) => serde_json::json!({"input": s.as_ref()}),
-      LxVal::Unit => serde_json::json!({}),
-      other => serde_json::to_value(other).unwrap_or(serde_json::json!({})),
+    let emit_tool_error = |error_msg: &str| {
+      let mut error_fields = IndexMap::new();
+      error_fields.insert(intern("call_id"), LxVal::int(call_id as i64));
+      error_fields.insert(intern("tool"), LxVal::str(&self.alias));
+      error_fields.insert(intern("method"), LxVal::str(method));
+      error_fields.insert(intern("error"), LxVal::str(error_msg));
+      event_stream.xadd("tool/error", agent_name, None, error_fields);
+    };
+
+    let arguments = match &args {
+      LxVal::Record(_) => serde_json::to_value(&args).map_err(|e| format!("failed to serialize args: {e}")),
+      LxVal::Str(s) => Ok(serde_json::json!({"input": s.as_ref()})),
+      LxVal::Unit => Ok(serde_json::json!({})),
+      other => serde_json::to_value(other).map_err(|e| format!("failed to serialize args: {e}")),
+    };
+    let arguments: serde_json::Value = match arguments {
+      Ok(arguments) => arguments,
+      Err(error_msg) => {
+        emit_tool_error(&error_msg);
+        return Err(LxError::runtime(format!("tool '{}' method '{}': {error_msg}", self.alias, method), span));
+      },
     };
 
     let mut call_fields = IndexMap::new();
@@ -67,12 +83,7 @@ impl ToolModule {
         Ok(result_lxval)
       },
       Err(error_msg) => {
-        let mut error_fields = IndexMap::new();
-        error_fields.insert(intern("call_id"), LxVal::int(call_id as i64));
-        error_fields.insert(intern("tool"), LxVal::str(&self.alias));
-        error_fields.insert(intern("method"), LxVal::str(method));
-        error_fields.insert(intern("error"), LxVal::str(&error_msg));
-        event_stream.xadd("tool/error", agent_name, None, error_fields);
+        emit_tool_error(&error_msg);
 
         Err(LxError::runtime(format!("tool '{}' method '{}': {}", self.alias, method, error_msg), span))
       },

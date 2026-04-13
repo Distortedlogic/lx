@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -95,6 +94,27 @@ pub enum ToolSpec {
   Mcp { command: String },
 }
 
+#[derive(Debug)]
+pub enum WorkspaceRootLookupError {
+  NotFound { start: PathBuf },
+  Read { path: PathBuf, error: std::io::Error },
+  Parse { path: PathBuf, error: toml::de::Error },
+  NotWorkspace { path: PathBuf },
+}
+
+impl std::fmt::Display for WorkspaceRootLookupError {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      WorkspaceRootLookupError::NotFound { start } => write!(f, "no workspace {} found starting from {}", lx_span::LX_MANIFEST, start.display()),
+      WorkspaceRootLookupError::Read { path, error } => write!(f, "cannot read {}: {error}", path.display()),
+      WorkspaceRootLookupError::Parse { path, error } => write!(f, "invalid {}: {error}", path.display()),
+      WorkspaceRootLookupError::NotWorkspace { path } => write!(f, "{} exists but is not a workspace root", path.display()),
+    }
+  }
+}
+
+impl std::error::Error for WorkspaceRootLookupError {}
+
 pub fn find_manifest_root(start: &Path) -> Option<PathBuf> {
   let mut dir = start.to_path_buf();
   loop {
@@ -120,47 +140,57 @@ pub fn deps_dir(root: &Path) -> PathBuf {
   root.join(".lx").join("deps")
 }
 
-pub fn try_load_dep_dirs() -> HashMap<String, PathBuf> {
-  load_dep_dirs_filtered(true)
-}
-
-pub fn try_load_dep_dirs_no_dev() -> HashMap<String, PathBuf> {
-  load_dep_dirs_filtered(false)
-}
-
-fn load_dep_dirs_filtered(include_dev: bool) -> HashMap<String, PathBuf> {
-  let Ok(cwd) = env::current_dir() else {
-    return HashMap::new();
+pub fn load_nearest_manifest(start: &Path) -> Result<Option<(PathBuf, RootManifest)>, String> {
+  let Some(root) = find_manifest_root(start) else {
+    return Ok(None);
   };
-  let Some(root) = find_manifest_root(&cwd) else {
-    return HashMap::new();
+  let manifest = load_manifest(&root)?;
+  Ok(Some((root, manifest)))
+}
+
+pub fn load_dep_dirs_detailed(include_dev: bool, start: &Path) -> Result<HashMap<String, PathBuf>, String> {
+  let Some((root, _manifest)) = load_nearest_manifest(start)? else {
+    return Ok(HashMap::new());
   };
   let deps = deps_dir(&root);
   if !deps.exists() {
-    return HashMap::new();
+    return Ok(HashMap::new());
   }
   let dev_names: Vec<String> = if !include_dev {
     let marker = deps.join(".dev-deps");
-    fs::read_to_string(marker).unwrap_or_default().lines().filter(|l| !l.is_empty()).map(|l| l.to_string()).collect()
+    if marker.exists() {
+      fs::read_to_string(&marker)
+        .map_err(|e| format!("cannot read {}: {e}", marker.display()))?
+        .lines()
+        .filter(|l| !l.is_empty())
+        .map(|l| l.to_string())
+        .collect()
+    } else {
+      Vec::new()
+    }
   } else {
     Vec::new()
   };
-  let Ok(entries) = fs::read_dir(&deps) else {
-    return HashMap::new();
-  };
+  let entries = fs::read_dir(&deps).map_err(|e| format!("cannot read {}: {e}", deps.display()))?;
   let mut map = HashMap::new();
-  for entry in entries.filter_map(|e| e.ok()) {
+  for entry in entries {
+    let entry = entry.map_err(|e| format!("cannot read entry in {}: {e}", deps.display()))?;
     let path = entry.path();
-    if path.is_dir()
-      && let Some(name) = path.file_name().and_then(|n| n.to_str())
-    {
+    if path.is_dir() {
+      let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+        return Err(format!("non-UTF-8 dependency entry in {}", deps.display()));
+      };
       if !include_dev && dev_names.iter().any(|d| d == name) {
         continue;
       }
       map.insert(name.to_string(), path);
     }
   }
-  map
+  Ok(map)
+}
+
+pub fn load_dep_dirs_no_dev_detailed(start: &Path) -> Result<HashMap<String, PathBuf>, String> {
+  load_dep_dirs_detailed(false, start)
 }
 
 pub struct Workspace {
@@ -185,8 +215,21 @@ pub fn find_workspace_root(start: &Path) -> Option<PathBuf> {
   loop {
     let candidate = dir.join(lx_span::LX_MANIFEST);
     if candidate.exists() {
-      let content = fs::read_to_string(&candidate).ok()?;
-      let manifest: RootManifest = toml::from_str(&content).ok()?;
+      let Ok(content) = fs::read_to_string(&candidate) else {
+        if !dir.pop() {
+          return None;
+        }
+        continue;
+      };
+      let manifest: RootManifest = match toml::from_str(&content) {
+        Ok(manifest) => manifest,
+        Err(_) => {
+          if !dir.pop() {
+            return None;
+          }
+          continue;
+        },
+      };
       if manifest.workspace.is_some() {
         return Some(dir);
       }
@@ -195,6 +238,31 @@ pub fn find_workspace_root(start: &Path) -> Option<PathBuf> {
       return None;
     }
   }
+}
+
+pub fn find_workspace_root_detailed(start: &Path) -> Result<PathBuf, WorkspaceRootLookupError> {
+  let mut dir = start.to_path_buf();
+  let mut first_non_workspace = None;
+  loop {
+    let candidate = dir.join(lx_span::LX_MANIFEST);
+    if candidate.exists() {
+      let content = fs::read_to_string(&candidate).map_err(|error| WorkspaceRootLookupError::Read { path: candidate.clone(), error })?;
+      let manifest: RootManifest = toml::from_str(&content).map_err(|error| WorkspaceRootLookupError::Parse { path: candidate.clone(), error })?;
+      if manifest.workspace.is_some() {
+        return Ok(dir);
+      }
+      if first_non_workspace.is_none() {
+        first_non_workspace = Some(candidate);
+      }
+    }
+    if !dir.pop() {
+      break;
+    }
+  }
+  Err(match first_non_workspace {
+    Some(path) => WorkspaceRootLookupError::NotWorkspace { path },
+    None => WorkspaceRootLookupError::NotFound { start: start.to_path_buf() },
+  })
 }
 
 pub fn load_workspace(root: &Path) -> Result<Workspace, String> {
@@ -226,15 +294,10 @@ pub fn load_workspace(root: &Path) -> Result<Workspace, String> {
   Ok(Workspace { members })
 }
 
-pub fn try_load_workspace_members() -> HashMap<String, PathBuf> {
-  let Ok(cwd) = env::current_dir() else {
-    return HashMap::new();
-  };
-  let Some(root) = find_workspace_root(&cwd) else {
-    return HashMap::new();
-  };
-  let Ok(ws) = load_workspace(&root) else {
-    return HashMap::new();
-  };
-  ws.member_map()
+pub fn load_workspace_members_detailed(start: &Path) -> Result<HashMap<String, PathBuf>, String> {
+  match find_workspace_root_detailed(start) {
+    Ok(root) => load_workspace(&root).map(|ws| ws.member_map()),
+    Err(WorkspaceRootLookupError::NotFound { .. }) | Err(WorkspaceRootLookupError::NotWorkspace { .. }) => Ok(HashMap::new()),
+    Err(e) => Err(e.to_string()),
+  }
 }

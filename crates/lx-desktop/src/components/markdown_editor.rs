@@ -122,13 +122,18 @@ pub fn MarkdownEditor(
               dragging.set(false);
               let value = value.clone();
               spawn(async move {
-                  let dropped = read_dropped_files().await;
-                  if !dropped.is_empty() {
-                      if let Some(ref handler) = on_files {
-                          handler.call(dropped.clone());
+                  match read_dropped_files().await {
+                      Ok(dropped) if !dropped.is_empty() => {
+                          if let Some(ref handler) = on_files {
+                              handler.call(dropped.clone());
+                          }
+                          let links = build_markdown_links(&dropped);
+                          on_change.call(format!("{value}{links}"));
                       }
-                      let links = build_markdown_links(&dropped);
-                      on_change.call(format!("{value}{links}"));
+                      Ok(_) => {}
+                      Err(err) => {
+                          on_change.call(format!("{value}\n[drop failed: {err}]()"));
+                      }
                   }
               });
           }

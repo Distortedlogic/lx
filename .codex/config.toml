@@ -1,0 +1,87 @@
+[mcp_servers.postgresql]
+url = "http://localhost:9090/postgresql/mcp"
+
+[mcp_servers.valkey]
+url = "http://localhost:9090/valkey/mcp"
+
+[mcp_servers.influxdb]
+url = "http://localhost:9090/influxdb/mcp"
+
+[mcp_servers.clickhouse]
+url = "http://localhost:9090/clickhouse/mcp"
+
+[mcp_servers.rabbitmq]
+url = "http://localhost:9090/rabbitmq/mcp"
+
+[mcp_servers.minio]
+url = "http://localhost:9090/minio/mcp"
+
+[mcp_servers.forgejo]
+url = "http://localhost:9090/forgejo/mcp"
+
+[mcp_servers.traefik]
+url = "http://localhost:9090/traefik/mcp"
+
+[mcp_servers.docker-registry]
+url = "http://localhost:9090/docker-registry/mcp"
+
+[mcp_servers.uptime-kuma]
+url = "http://localhost:9090/uptime-kuma/mcp"
+
+[mcp_servers.mattermost]
+url = "http://localhost:9090/mattermost/mcp"
+
+[mcp_servers.vaultwarden]
+url = "http://localhost:9090/vaultwarden/mcp"
+
+[mcp_servers.langfuse]
+url = "http://localhost:9090/langfuse/mcp"
+
+[mcp_servers.signoz]
+url = "http://localhost:9090/signoz/mcp"
+
+[mcp_servers.plane]
+url = "http://localhost:9090/plane/mcp"
+
+[mcp_servers.bytestash]
+url = "http://localhost:9090/bytestash/mcp"
+
+[mcp_servers.pictshare]
+url = "http://localhost:9090/pictshare/mcp"
+
+[mcp_servers.infisical]
+url = "http://localhost:9090/infisical/mcp"
+
+[mcp_servers.gritql]
+url = "http://localhost:9090/gritql/mcp"
+
+[mcp_servers.whisper-inference]
+url = "http://localhost:9090/whisper-inference/mcp"
+
+[mcp_servers.kokoro-inference]
+url = "http://localhost:9090/kokoro-inference/mcp"
+
+[mcp_servers.embedding-inference]
+url = "http://localhost:9090/embedding-inference/mcp"
+
+[mcp_servers.musicgen-inference]
+url = "http://localhost:9090/musicgen-inference/mcp"
+
+[mcp_servers.audioldm2-inference]
+url = "http://localhost:9090/audioldm2-inference/mcp"
+
+[mcp_servers.flux-inference]
+url = "http://localhost:9090/flux-inference/mcp"
+
+[mcp_servers.llm-inference]
+url = "http://localhost:9090/llm-inference/mcp"
+
+[mcp_servers.context-engine]
+url = "http://localhost:9090/context-engine/mcp"
+
+[mcp_servers.workflow]
+url = "http://localhost:9090/workflow/mcp"
+
+[mcp_servers.openviking]
+url = "http://localhost:9090/openviking/mcp"
+

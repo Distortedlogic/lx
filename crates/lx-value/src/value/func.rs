@@ -23,7 +23,7 @@ pub struct LxFunc {
   pub source_name: Arc<str>,
 }
 
-pub type SyncBuiltinFn = fn(&[LxVal], SourceSpan, &Arc<dyn crate::BuiltinCtx>) -> Result<LxVal, LxError>;
+pub type SyncBuiltinFn = fn(&[LxVal], SourceSpan, &dyn crate::BuiltinCtx) -> Result<LxVal, LxError>;
 
 pub type AsyncBuiltinFn = fn(Vec<LxVal>, SourceSpan, Arc<dyn crate::BuiltinCtx>) -> Pin<Box<dyn Future<Output = Result<LxVal, LxError>>>>;
 

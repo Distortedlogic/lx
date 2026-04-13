@@ -1,4 +1,4 @@
-use std::sync::{Arc, LazyLock};
+use std::sync::LazyLock;
 
 use dashmap::DashMap;
 use miette::SourceSpan;
@@ -46,7 +46,7 @@ pub fn channel_dispatch(channel_name: &str, method: &str, span: SourceSpan) -> R
   }
 }
 
-fn bi_channel_subscribe_impl(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_channel_subscribe_impl(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let channel_name = args[0].require_str("channel.subscribe", span)?;
   let agent_name = args[1].require_str("channel.subscribe", span)?;
   channel_subscribe(channel_name, agent_name).map_err(|e| LxError::runtime(e, span))?;

@@ -1,6 +1,6 @@
 [workspace]
 exclude = ["reference/chumsky"]
-members = ["crates/lx", "crates/lx-api", "crates/lx-ast", "crates/lx-checker", "crates/lx-cli", "crates/lx-desktop", "crates/lx-desugar", "crates/lx-eval", "crates/lx-fmt", "crates/lx-linter", "crates/lx-macros", "crates/lx-mobile", "crates/lx-parser", "crates/lx-span", "crates/lx-value"]
+members = ["crates/lx-api", "crates/lx-ast", "crates/lx-checker", "crates/lx-cli", "crates/lx-desktop", "crates/lx-desugar", "crates/lx-eval", "crates/lx-fmt", "crates/lx-linter", "crates/lx-macros", "crates/lx-mobile", "crates/lx-parser", "crates/lx-span", "crates/lx-value"]
 resolver = "2"
 
 [workspace.package]
@@ -50,7 +50,7 @@ num-integer = { version = "0.1.46" }
 num-traits = { version = "0.2.19" }
 parking_lot = { version = "0.12.5" }
 proc-macro2 = { version = "1" }
-pulldown-cmark = { version = "0.13.2" }
+pulldown-cmark = { version = "0.13.2", default-features = false, features = ["html"] }
 quote = { version = "1" }
 reqwest = { version = "0.13.2", features = ["json", "query"] }
 rodio = { version = "0.22.2", default-features = false, features = ["playback", "symphonia-pcm", "symphonia-wav"] }

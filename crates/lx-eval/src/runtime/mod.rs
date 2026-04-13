@@ -52,7 +52,7 @@ pub trait YieldBackend: Send + Sync {
 }
 
 impl lx_value::BuiltinCtx for RuntimeCtx {
-  fn event_stream(&self) -> &Arc<EventStream> {
+  fn event_stream(&self) -> &EventStream {
     &self.event_stream
   }
 

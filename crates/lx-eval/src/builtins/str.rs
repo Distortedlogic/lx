@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use lx_value::BuiltinCtx;
 use lx_value::Env;
 use lx_value::LxError;
@@ -16,27 +14,27 @@ fn str_transform(args: &[LxVal], span: SourceSpan, name: &str, f: fn(&str) -> St
   }
 }
 
-fn bi_trim(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_trim(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   str_transform(args, span, "trim", |s| s.trim().to_string())
 }
 
-fn bi_trim_start(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_trim_start(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   str_transform(args, span, "trim_start", |s| s.trim_start().to_string())
 }
 
-fn bi_trim_end(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_trim_end(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   str_transform(args, span, "trim_end", |s| s.trim_end().to_string())
 }
 
-fn bi_upper(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_upper(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   str_transform(args, span, "upper", |s| s.to_uppercase())
 }
 
-fn bi_lower(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_lower(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   str_transform(args, span, "lower", |s| s.to_lowercase())
 }
 
-fn bi_lines(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_lines(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Str(s) => {
       let items: Vec<LxVal> = s.lines().map(LxVal::str).collect();
@@ -46,7 +44,7 @@ fn bi_lines(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Res
   }
 }
 
-fn bi_chars(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_chars(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Str(s) => {
       let items: Vec<LxVal> = s.chars().map(|c| LxVal::str(c.to_string())).collect();
@@ -56,21 +54,21 @@ fn bi_chars(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Res
   }
 }
 
-fn bi_byte_len(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_byte_len(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   match &args[0] {
     LxVal::Str(s) => Ok(LxVal::int(s.len())),
     other => Err(LxError::type_err(format!("byte_len expects Str, got {}", other.type_name()), span, None)),
   }
 }
 
-fn bi_split(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_split(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let sep = args[0].require_str("split", span)?;
   let s = args[1].require_str("split", span)?;
   let items: Vec<LxVal> = s.split(sep).map(LxVal::str).collect();
   Ok(LxVal::list(items))
 }
 
-fn bi_join(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_join(args: &[LxVal], span: SourceSpan, _ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let sep = args[0].require_str("join", span)?;
   let list = args[1].require_list("join", span)?;
   let parts: Result<Vec<&str>, LxError> = list.iter().map(|v| v.require_str("join", span)).collect();

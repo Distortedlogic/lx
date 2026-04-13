@@ -3,7 +3,13 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use lx::prelude::*;
+use lx_desugar::desugar;
+use lx_eval::interpreter::Interpreter;
+use lx_eval::runtime::RuntimeCtx;
+use lx_parser::lexer::lex;
+use lx_parser::parser::parse;
+use lx_span::source::FileId;
+use lx_value::error::LxError;
 
 pub fn run(source: &str, filename: &str, ctx: &Arc<RuntimeCtx>, control_spec: Option<&str>) -> Result<(), Vec<LxError>> {
   let (tokens, comments) = lex(source).map_err(|e| vec![LxError::from(e)])?;

@@ -103,9 +103,6 @@ fn desugars_coalesce_regression() {
 fn with_binding_source_syntax_is_currently_parser_blocked() {
   for source in ["value = with x = 1 { x }", "value = (with x = 1 { x })", "value = with mut x = 1 { x }"] {
     let errors = parse_source_errors(source);
-    assert!(
-      !errors.is_empty(),
-      "source unexpectedly parsed end-to-end and should replace this blocker test:\n{source}"
-    );
+    assert!(!errors.is_empty(), "source unexpectedly parsed end-to-end and should replace this blocker test:\n{source}");
   }
 }

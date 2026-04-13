@@ -14,9 +14,9 @@ thread_local! {
     static POLICY_STACK: RefCell<Vec<u64>> = const { RefCell::new(Vec::new()) };
 }
 
-fn build_restricted_ctx(base: &Arc<dyn BuiltinCtx>, policy: &Policy) -> Arc<dyn BuiltinCtx> {
+fn build_restricted_ctx(base: &dyn BuiltinCtx, policy: &Policy) -> Arc<dyn BuiltinCtx> {
   let network_denied = policy.net_allow.is_empty();
-  let rtx = extract_runtime_ctx(base.as_ref());
+  let rtx = extract_runtime_ctx(base);
 
   Arc::new(RuntimeCtx {
     yield_: rtx.yield_.clone(),
@@ -27,7 +27,7 @@ fn build_restricted_ctx(base: &Arc<dyn BuiltinCtx>, policy: &Policy) -> Arc<dyn 
     tokio_runtime: rtx.tokio_runtime.clone(),
     test_threshold: base.test_threshold(),
     test_runs: base.test_runs(),
-    event_stream: Arc::clone(base.event_stream()),
+    event_stream: Arc::clone(&rtx.event_stream),
     network_denied,
     global_pause: rtx.global_pause.clone(),
     cancel_flag: rtx.cancel_flag.clone(),
@@ -35,14 +35,14 @@ fn build_restricted_ctx(base: &Arc<dyn BuiltinCtx>, policy: &Policy) -> Arc<dyn 
   })
 }
 
-pub fn bi_scope(args: &[LxVal], span: SourceSpan, ctx: &Arc<dyn BuiltinCtx>) -> Result<LxVal, LxError> {
+pub fn bi_scope(args: &[LxVal], span: SourceSpan, ctx: &dyn BuiltinCtx) -> Result<LxVal, LxError> {
   let pid = policy_id(&args[0], span)?;
   let policy = get_policy(pid, span)?.clone();
 
   let restricted_ctx = build_restricted_ctx(ctx, &policy);
 
   POLICY_STACK.with(|stack| stack.borrow_mut().push(pid));
-  let result = call_value_sync(&args[1], LxVal::Unit, span, &restricted_ctx);
+  let result = call_value_sync(&args[1], LxVal::Unit, span, restricted_ctx.as_ref());
   POLICY_STACK.with(|stack| stack.borrow_mut().pop());
 
   result

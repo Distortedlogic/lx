@@ -27,12 +27,12 @@ fn build_context_record(fields: &IndexMap<lx_span::sym::Sym, LxVal>) -> LxVal {
   LxVal::record(rec)
 }
 
-fn bi_context_current(_args: &[LxVal], _span: SourceSpan, _ctx: &Arc<dyn lx_value::BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_context_current(_args: &[LxVal], _span: SourceSpan, _ctx: &dyn lx_value::BuiltinCtx) -> Result<LxVal, LxError> {
   let fields = AMBIENT_SNAPSHOT.with(|s| s.borrow().clone());
   Ok(LxVal::record(fields))
 }
 
-fn bi_context_get(args: &[LxVal], span: SourceSpan, _ctx: &Arc<dyn lx_value::BuiltinCtx>) -> Result<LxVal, LxError> {
+fn bi_context_get(args: &[LxVal], span: SourceSpan, _ctx: &dyn lx_value::BuiltinCtx) -> Result<LxVal, LxError> {
   global_context_get(&args[0], span)
 }
 

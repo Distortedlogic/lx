@@ -2,7 +2,10 @@ use std::env::current_dir;
 use std::fs::{read_to_string, write};
 use std::process::ExitCode;
 
-use lx::prelude::*;
+use lx_fmt::format;
+use lx_parser::lexer::lex;
+use lx_parser::parser::parse;
+use lx_span::source::FileId;
 use miette::{NamedSource, Report};
 
 use crate::check::collect_lx_files;
