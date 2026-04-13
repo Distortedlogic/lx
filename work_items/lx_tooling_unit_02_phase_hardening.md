@@ -10,13 +10,17 @@ optional: false
 Make the `Surface` to `Core` boundary enforced by construction instead of by convention. `Program<Core>` must only be produced after validation, validation must run in all builds, and core consumers must stop depending on `unreachable!()` branches for surface-only syntax.
 
 ## Dependency Contract
-Assume Unit 01 is merged and green. Use the new regression tests to hold behavior steady while tightening the phase boundary.
+Assume Unit 01 is merged and green. Unit 01 intentionally leaves binding-form `with` covered only by a parser blocker regression because the current grammar does not expose a valid `lex -> parse -> desugar` source path for `Expr::With(Binding)`. This unit must remove that blocker first, then use the regression suite to hold behavior steady while tightening the phase boundary.
 
 ## Verified Preconditions
 - `Program<Phase>` in `crates/lx-ast/src/ast/mod.rs` currently exposes public fields and uses `PhantomData<Phase>` only.
 - `crates/lx-parser/src/parser/mod.rs` currently constructs `Program { stmts, arena, comments, comment_map, file, _phase: PhantomData }` directly.
 - `crates/lx-desugar/src/folder/desugar.rs` currently returns `Program<Core>` by reusing the transformed arena and only calls `validate_core` behind `if cfg!(debug_assertions)`.
 - `crates/lx-desugar/src/folder/validate_core.rs` currently panics on invalid core nodes instead of returning structured failures.
+- Binding-form `with` currently fails to parse from representative source strings because:
+  - `with_binding` in `crates/lx-parser/src/parser/expr_compound.rs` parses the bound value as `expr.clone()` before it expects the body-opening `{`
+  - `pratt_expr` in `crates/lx-parser/src/parser/expr_pratt.rs` still has empty-token application, so the following `{ ... }` can be greedily consumed as an argument to the bound value expression
+  - Unit 01 therefore leaves only a parser blocker regression for `value = with x = 1 { x }` and `value = with mut x = 1 { x }`
 - The checker still assumes desugaring succeeded:
   - `Expr::Pipe`, `Expr::Section`, `Expr::Ternary`, and `Expr::Coalesce` are treated as impossible in `crates/lx-checker/src/check_expr.rs` and `crates/lx-checker/src/type_ops.rs`
   - `Expr::Tell` and `Expr::Ask` are also `unreachable!()` there even though `crates/lx-desugar/src/folder/desugar.rs` preserves them and `crates/lx-eval/src/interpreter/mod.rs` evaluates them
@@ -61,6 +65,10 @@ Assume Unit 01 is merged and green. Use the new regression tests to hold behavio
 - `crates/lx-ast/src/visitor/walk/mod.rs`
 - `crates/lx-ast/src/visitor/walk_transform/mod.rs`
 - `crates/lx-parser/src/parser/mod.rs`
+- `crates/lx-parser/src/parser/expr.rs`
+- `crates/lx-parser/src/parser/expr_compound.rs`
+- `crates/lx-parser/src/parser/expr_pratt.rs`
+- `crates/lx-parser/tests/surface_parse_regressions.rs`
 - `crates/lx-desugar/src/lib.rs`
 - `crates/lx-desugar/src/folder/desugar.rs`
 - `crates/lx-desugar/src/folder/validate_core.rs`
@@ -92,6 +100,8 @@ Assume Unit 01 is merged and green. Use the new regression tests to hold behavio
 - `validate_core_parts`
 - `lx_ast::visitor::walk_program`
 - `lx_ast::visitor::walk_transform_program`
+- `with_parser`
+- `pratt_expr`
 - `lx_desugar::desugar`
 - `Checker::check_program`
 - `Checker::check_expr`
@@ -111,36 +121,42 @@ Assume Unit 01 is merged and green. Use the new regression tests to hold behavio
    `walk_transform_program` must use these crate-visible mutators instead of public field writes.
 4. Keep the existing `leading_comments`, `trailing_comments`, and `dangling_comments` helpers working through the new accessors. Do not remove them.
 5. Update `crates/lx-parser/src/parser/mod.rs` to construct `Program<Surface>` only through `Program::new_surface(...)`.
-6. In `crates/lx-ast/src/ast/validate_core.rs`, move the core validator out of `lx-desugar` and replace panic-based validation with `CoreValidationError` plus `validate_core_parts(...)` as defined in the boundary contract above.
-7. Cover every currently invalid core case in `validate_core_parts(...)`:
+6. In `crates/lx-parser/src/parser/expr_compound.rs` and `crates/lx-parser/src/parser/expr_pratt.rs`, fix binding-form `with` parsing so the body-opening `{` is not consumed by empty-token application on the bound value expression. After this change:
+   - `value = with x = 1 { x }` must parse as `Expr::With(WithKind::Binding { name: x, value: 1, mutable: false, ... })`
+   - `value = with mut x = 1 { x }` must parse as `Expr::With(WithKind::Binding { name: x, value: 1, mutable: true, ... })`
+   - the fix must preserve existing parse behavior for `with context ... { ... }` and `with resource as name { ... }`
+7. In `crates/lx-parser/tests/surface_parse_regressions.rs`, replace Unit 01's temporary blocker regression with successful parse regressions for binding-form `with`. Assert that the parsed expression node is `Expr::With` with `WithKind::Binding`, and assert the bound value span stops before the body-opening `{`.
+8. In `crates/lx-ast/src/ast/validate_core.rs`, move the core validator out of `lx-desugar` and replace panic-based validation with `CoreValidationError` plus `validate_core_parts(...)` as defined in the boundary contract above.
+9. Cover every currently invalid core case in `validate_core_parts(...)`:
    - `Stmt::KeywordDecl`
    - `Expr::Pipe`
    - `Expr::Section`
    - `Expr::Ternary`
    - `Expr::Coalesce`
    - `Expr::With(Binding)`
-8. In `crates/lx-desugar/src/folder/validate_core.rs`, keep only the `DesugarError` wrapper and any formatting helpers needed to surface `CoreValidationError` values from `lx-ast`.
-9. In `crates/lx-desugar/src/folder/desugar.rs`, remove the `cfg!(debug_assertions)` gate. Validation must execute in all builds.
-10. Implement `desugar(...) -> Result<Program<Core>, DesugarError>` with this exact flow:
+10. In `crates/lx-desugar/src/folder/validate_core.rs`, keep only the `DesugarError` wrapper and any formatting helpers needed to surface `CoreValidationError` values from `lx-ast`.
+11. In `crates/lx-desugar/src/folder/desugar.rs`, remove the `cfg!(debug_assertions)` gate. Validation must execute in all builds.
+12. Implement `desugar(...) -> Result<Program<Core>, DesugarError>` with this exact flow:
    - lower surface syntax into transformed parts
    - call `Program::try_new_core(...)`
    - return `Ok(core)` on success
    - return `Err(DesugarError::InvalidCore(errors))` on failure
-11. Update `crates/lx-desugar/src/lib.rs` to re-export the new `Result`-returning `desugar`.
-12. Update `crates/lx-ast/src/visitor/walk/mod.rs` and `crates/lx-ast/src/visitor/walk_transform/mod.rs` to use the new `Program` accessors plus `arena_mut()` and `replace_stmts(...)` instead of public field access.
-13. Update every direct `program.stmts`, `program.arena`, `program.comments`, `program.comment_map`, and `program.file` access in the files listed above to call the new accessors.
-14. Update every actual `desugar(...)` caller listed in `Verified Preconditions` to handle `Result` explicitly. Do not leave any implicit `.unwrap()` or panic path in command or evaluator code.
-15. In `crates/lx-checker/src/check_expr.rs` and `crates/lx-checker/src/type_ops.rs`, remove `unreachable!()` branches for surface-only nodes.
-16. Replace those `unreachable!()` branches with one internal helper that records an explicit diagnostic and returns `type_arena.error()` if a surface-only node still reaches the checker.
-17. In the same checker files, replace `Expr::Tell` and `Expr::Ask` `unreachable!()` branches with real checking logic:
+13. Update `crates/lx-desugar/src/lib.rs` to re-export the new `Result`-returning `desugar`.
+14. Update `crates/lx-ast/src/visitor/walk/mod.rs` and `crates/lx-ast/src/visitor/walk_transform/mod.rs` to use the new `Program` accessors plus `arena_mut()` and `replace_stmts(...)` instead of public field access.
+15. Update every direct `program.stmts`, `program.arena`, `program.comments`, `program.comment_map`, and `program.file` access in the files listed above to call the new accessors.
+16. Update every actual `desugar(...)` caller listed in `Verified Preconditions` to handle `Result` explicitly. Do not leave any implicit `.unwrap()` or panic path in command or evaluator code.
+17. In `crates/lx-checker/src/check_expr.rs` and `crates/lx-checker/src/type_ops.rs`, remove `unreachable!()` branches for surface-only nodes.
+18. Replace those `unreachable!()` branches with one internal helper that records an explicit diagnostic and returns `type_arena.error()` if a surface-only node still reaches the checker.
+19. In the same checker files, replace `Expr::Tell` and `Expr::Ask` `unreachable!()` branches with real checking logic:
    - `Tell`: check the target and message expressions and return `Unit`
    - `Ask`: check the target and message expressions and return `Unknown` until LX has a stronger protocol-level type
-18. If `DiagnosticKind` needs a dedicated internal-invariant case to support Step 16, add it in `crates/lx-checker/src/diagnostics.rs` and give it a stable code.
-19. Update `crates/lx-checker/src/lib.rs`, `crates/lx-linter/src/runner.rs`, and `crates/lx-checker/src/module_graph.rs` to work against the hardened `Program<Core>` accessor API by calling `program.stmts()`, `program.arena()`, `program.comments()`, `program.comment_map()`, and `program.file()` instead of direct field access.
-20. Update the `lx-eval` files listed above only as compile fixes for the new `Program` accessor API and the `desugar(...) -> Result<...>` contract. Do not change evaluator behavior in this unit.
-21. In `crates/lx-desugar/tests/surface_to_core_regressions.rs`, add one regression that builds invalid would-be core parts, calls `Program::try_new_core(...)`, and asserts it returns `Err(Vec<CoreValidationError>)` in normal test builds. The test must not construct `Program<Core>` through any unchecked external API.
-22. Do not split the arena into separate surface/core node types in this unit. The hardening target here is validated construction and unconditional enforcement, not a generic arena rewrite.
-23. Do not introduce a CST or trivia-preserving syntax layer in this unit.
+20. If `DiagnosticKind` needs a dedicated internal-invariant case to support Step 18, add it in `crates/lx-checker/src/diagnostics.rs` and give it a stable code.
+21. Update `crates/lx-checker/src/lib.rs`, `crates/lx-linter/src/runner.rs`, and `crates/lx-checker/src/module_graph.rs` to work against the hardened `Program<Core>` accessor API by calling `program.stmts()`, `program.arena()`, `program.comments()`, `program.comment_map()`, and `program.file()` instead of direct field access.
+22. Update the `lx-eval` files listed above only as compile fixes for the new `Program` accessor API and the `desugar(...) -> Result<...>` contract. Do not change evaluator behavior in this unit.
+23. In `crates/lx-desugar/tests/surface_to_core_regressions.rs`, replace Unit 01's temporary `with` binding blocker gap with one actual `lex -> parse -> desugar` regression for binding-form `with` source. Walk the resulting `Program<Core>` and assert that `Expr::With(Binding)` no longer remains.
+24. In the same desugar test file, add one regression that builds invalid would-be core parts, calls `Program::try_new_core(...)`, and asserts it returns `Err(Vec<CoreValidationError>)` in normal test builds. The test must not construct `Program<Core>` through any unchecked external API.
+25. Do not split the arena into separate surface/core node types in this unit. The hardening target here is validated construction, parser-path repair for binding-form `with`, and unconditional enforcement, not a generic arena rewrite.
+26. Do not introduce a CST or trivia-preserving syntax layer in this unit.
 
 ## Verification
 1. Run the Unit 01 tests added for parser, desugar, formatter, checker, and linter.

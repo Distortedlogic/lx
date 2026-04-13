@@ -8,5 +8,8 @@ version = "0.1.0"
 lx-span = { path = "../lx-span" }
 lx-ast = { path = "../lx-ast" }
 
+[dev-dependencies]
+lx-parser = { path = "../lx-parser" }
+
 [lints]
 workspace = true

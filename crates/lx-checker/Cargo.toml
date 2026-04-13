@@ -14,5 +14,9 @@ miette.workspace = true
 num-bigint.workspace = true
 similar.workspace = true
 
+[dev-dependencies]
+lx-desugar = { path = "../lx-desugar" }
+lx-parser = { path = "../lx-parser" }
+
 [lints]
 workspace = true

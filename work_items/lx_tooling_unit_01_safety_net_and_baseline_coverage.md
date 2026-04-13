@@ -25,6 +25,10 @@ This unit has no prerequisites. It must land before Units 02-07. Do not change p
 - The current surface-only/core-only boundary is still behaviorally important:
   - `Stmt::KeywordDecl` still parses in `crates/lx-parser/src/parser/stmt.rs`
   - `validate_core` still checks for `KeywordDecl`, `Pipe`, `Section`, `Ternary`, `Coalesce`, and `With(Binding)` in `crates/lx-desugar/src/folder/validate_core.rs`
+- Binding-form `with` does not currently have a valid `lex -> parse` source-string path:
+  - `with_binding` in `crates/lx-parser/src/parser/expr_compound.rs` parses the bound value as `expr.clone()` before it expects the body-opening `{`
+  - `pratt_expr` in `crates/lx-parser/src/parser/expr_pratt.rs` still has empty-token application, so the following `{ ... }` can be greedily parsed as an argument to the binding value expression
+  - representative fixtures such as `value = with x = 1 { x }` and `value = with mut x = 1 { x }` currently fail parse
 - `RuleRegistry::default_rules()` in `crates/lx-linter/src/registry.rs` currently registers:
   - `empty_match`
   - `redundant_propagate`
@@ -36,6 +40,9 @@ This unit has no prerequisites. It must land before Units 02-07. Do not change p
 - `mut_never_mutated` currently runs outside the registry through `check_unused_mut(...)` in `crates/lx-linter/src/runner.rs`.
 
 ## Files To Create Or Change
+- `crates/lx-desugar/Cargo.toml`
+- `crates/lx-fmt/Cargo.toml`
+- `crates/lx-checker/Cargo.toml`
 - `crates/lx-parser/tests/surface_parse_regressions.rs`
 - `crates/lx-desugar/tests/surface_to_core_regressions.rs`
 - `crates/lx-fmt/tests/format_regressions.rs`
@@ -88,31 +95,35 @@ This unit has no prerequisites. It must land before Units 02-07. Do not change p
    - assert `program.dangling_comments(NodeId::Expr(expr_id)).len() == 1`
    - assert `program.leading_comments(NodeId::Expr(expr_id)).is_empty()`
    - assert `program.trailing_comments(NodeId::Expr(expr_id)).is_empty()`
-5. In `crates/lx-desugar/tests/surface_to_core_regressions.rs`, add a helper that runs `lex -> parse -> desugar` and fails the test if parse returns errors.
-6. In the desugar test file, add one regression source string for each current surface-only construct that `validate_core` rejects:
+5. In `crates/lx-parser/tests/surface_parse_regressions.rs`, add one exact current-behavior blocker regression named `with_binding_source_forms_currently_fail_to_parse`. It must run `lex -> parse` on all of these representative fixtures and assert that each one returns at least one parse error:
+   - `value = with x = 1 { x }`
+   - `value = (with x = 1 { x })`
+   - `value = with mut x = 1 { x }`
+   This regression documents the current parser limitation only. Do not work around it in this unit by constructing a manual `Program<Surface>` fixture for `Expr::With(Binding)`.
+6. In `crates/lx-desugar/tests/surface_to_core_regressions.rs`, add a helper that runs `lex -> parse -> desugar` and fails the test if parse returns errors.
+7. In the desugar test file, add one regression source string for each current surface-only construct that `validate_core` rejects and that the current parser can actually construct from source:
    - `Stmt::KeywordDecl`
    - `Expr::Pipe`
    - `Expr::Section`
    - `Expr::Ternary`
    - `Expr::Coalesce`
-   - `Expr::With(Binding)`
-7. In each desugar regression, walk the resulting `Program<Core>` and assert that none of the rejected surface-only nodes remain. Reuse the same visitor shape as `validate_core` so later units can compare behavior directly.
-8. In `crates/lx-fmt/tests/format_regressions.rs`, add format baselines for:
+8. In each desugar regression, walk the resulting `Program<Core>` and assert that none of the rejected surface-only nodes remain. Reuse the same visitor shape as `validate_core` so later units can compare behavior directly.
+9. In `crates/lx-fmt/tests/format_regressions.rs`, add format baselines for:
    - trait declarations with field defaults and method signatures
    - class declarations
    - keyword declarations
    - bindings with `TypeExprId` annotations
    - nested type expressions formatted through `emit_type.rs`
-9. Make the formatter tests compare exact output strings, including trailing newline behavior from `Formatter::format_program`.
-10. In `crates/lx-checker/tests/checker_regressions.rs`, add a helper that runs `lex -> parse -> desugar -> check` and returns `CheckResult`.
-11. Add checker regressions for:
+10. Make the formatter tests compare exact output strings, including trailing newline behavior from `Formatter::format_program`.
+11. In `crates/lx-checker/tests/checker_regressions.rs`, add a helper that runs `lex -> parse -> desugar -> check` and returns `CheckResult`.
+12. Add checker regressions for:
    - binding annotation mismatch
    - function parameter annotation resolution
    - match exhaustiveness warning
    - imported names resolved through `check_with_imports`
    - pattern bindings entering scope
-12. In checker tests, assert exact diagnostic codes instead of only diagnostic counts. Use the current codes from `crates/lx-checker/src/diagnostics.rs`.
-13. In `crates/lx-checker/tests/semantic_signature_regressions.rs`, add one exact semantic-model baseline named `semantic_model_baseline_for_import_and_binding_resolution` with this source string:
+13. In checker tests, assert exact diagnostic codes instead of only diagnostic counts. Use the current codes from `crates/lx-checker/src/diagnostics.rs`.
+14. In `crates/lx-checker/tests/semantic_signature_regressions.rs`, add one exact semantic-model baseline named `semantic_model_baseline_for_import_and_binding_resolution` with this source string:
    ```lx
    use std/time
    answer = 1
@@ -124,7 +135,7 @@ This unit has no prerequisites. It must land before Units 02-07. Do not change p
    - `model.references_to(answer_def).len() == 1`
    - `model.display_type(model.type_of_def(answer_def).unwrap()) == "Int"`
    - `model.display_type(model.type_of_expr(value_expr_id).unwrap()) == "Int"`
-14. In the same checker test file, add one exact module-signature baseline named `module_signature_baseline_for_exported_binding_and_trait` with this source string:
+15. In the same checker test file, add one exact module-signature baseline named `module_signature_baseline_for_exported_binding_and_trait` with this source string:
    ```lx
    +answer = 1
    +Trait Pair = { left: Int; right: Int }
@@ -134,17 +145,21 @@ This unit has no prerequisites. It must land before Units 02-07. Do not change p
    - `signature.traits` contains only `Pair`
    - `signature.types` is empty
    - `signature.traits[Pair].len() == 2`
-15. In `crates/lx-linter/Cargo.toml`, add the dev-dependencies needed for full-pipeline tests from the linter crate:
+16. In `crates/lx-linter/Cargo.toml`, add the dev-dependencies needed for full-pipeline tests from the linter crate:
    - `lx-parser = { path = "../lx-parser" }`
    - `lx-desugar = { path = "../lx-desugar" }`
    - `lx-fmt = { path = "../lx-fmt" }`
-16. In `crates/lx-linter/tests/pipeline_regressions.rs`, add an end-to-end helper that runs `lex -> parse -> desugar -> format -> check -> lint`.
-17. In that pipeline test file, add one smoke test that asserts:
+17. In `crates/lx-desugar/Cargo.toml`, `crates/lx-fmt/Cargo.toml`, and `crates/lx-checker/Cargo.toml`, add the exact dev-dependencies needed for the new integration tests in this unit:
+   - `crates/lx-desugar/Cargo.toml` must add `lx-parser = { path = "../lx-parser" }` under `[dev-dependencies]`
+   - `crates/lx-fmt/Cargo.toml` must add `lx-parser = { path = "../lx-parser" }` and `lx-desugar = { path = "../lx-desugar" }` under `[dev-dependencies]`
+   - `crates/lx-checker/Cargo.toml` must add `lx-parser = { path = "../lx-parser" }` and `lx-desugar = { path = "../lx-desugar" }` under `[dev-dependencies]`
+18. In `crates/lx-linter/tests/pipeline_regressions.rs`, add an end-to-end helper that runs `lex -> parse -> desugar -> format -> check -> lint`.
+19. In that pipeline test file, add one smoke test that asserts:
    - no parse errors on a valid sample
    - formatted output is non-empty
    - checker diagnostics are stable for the fixture
    - linter diagnostics are stable for the fixture
-18. In `crates/lx-linter/tests/lint_regressions.rs`, add one dedicated source string per default-registered lint rule, plus one source string for the separate `mut_never_mutated` pipeline check:
+20. In `crates/lx-linter/tests/lint_regressions.rs`, add one dedicated source string per default-registered lint rule, plus one source string for the separate `mut_never_mutated` pipeline check:
    - `break_outside_loop`
    - `redundant_propagate`
    - `duplicate_record_field`
@@ -153,8 +168,8 @@ This unit has no prerequisites. It must land before Units 02-07. Do not change p
    - `single_branch_par`
    - `mut_never_mutated`
    - `unreachable_code`
-19. Assert exact lint codes and the presence of the expected `rule_name` text in each lint diagnostic.
-20. Do not add CST, trivia-preserving rewrite infrastructure, or any new production AST APIs in this unit.
+21. Assert exact lint codes and the presence of the expected `rule_name` text in each lint diagnostic.
+22. Do not add CST, trivia-preserving rewrite infrastructure, any new production AST APIs, or any parser grammar changes in this unit.
 
 ## Verification
 1. Run `cargo test -p lx-parser --test surface_parse_regressions`.
@@ -169,4 +184,5 @@ This unit has no prerequisites. It must land before Units 02-07. Do not change p
 - Any AST shape changes
 - Any visitor or transformer API changes
 - Any semantic-model expansion
+- Fixing the parser grammar so binding-form `with` parses from source
 - Any CST or lossless syntax work

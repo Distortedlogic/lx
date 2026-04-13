@@ -9,5 +9,8 @@ lx-span = { path = "../lx-span" }
 lx-ast = { path = "../lx-ast" }
 miette.workspace = true
 
+[dev-dependencies]
+lx-parser = { path = "../lx-parser" }
+
 [lints]
 workspace = true
