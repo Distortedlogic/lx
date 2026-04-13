@@ -16,7 +16,9 @@ pub fn MetricCard(
   let has_desc = description.is_some();
 
   let inner = rsx! {
-    div { class: "h-full px-5 py-5 rounded-lg transition-colors {hover_class}",
+    div {
+      class: "h-full px-5 py-5 rounded-lg transition-colors",
+      class: "{hover_class}",
       div { class: "flex items-start justify-between gap-3",
         div { class: "flex-1 min-w-0",
           p { class: "text-3xl font-semibold tracking-tight tabular-nums",

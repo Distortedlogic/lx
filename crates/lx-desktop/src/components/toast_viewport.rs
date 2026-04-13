@@ -30,13 +30,14 @@ fn render_toast(toast: &ToastItem, state: ToastState) -> Element {
 
   rsx! {
     li {
-      class: format!(
-          "pointer-events-auto rounded-sm border shadow-lg backdrop-blur-xl {} {}",
-          tc,
-          if toast.dismissing { "animate-toast-exit" } else { "animate-toast-enter" },
-      ),
+      class: "pointer-events-auto rounded-sm border shadow-lg backdrop-blur-xl",
+      class: "{tc}",
+      class: if toast.dismissing { "animate-toast-exit" } else { "animate-toast-enter" },
       div { class: "flex items-start gap-3 px-3 py-2.5",
-        span { class: "mt-1 h-2 w-2 shrink-0 rounded-full {dc}" }
+        span {
+          class: "mt-1 h-2 w-2 shrink-0 rounded-full",
+          class: "{dc}",
+        }
         div { class: "min-w-0 flex-1",
           p { class: "text-sm font-semibold leading-5", "{title}" }
           if let Some(ref b) = body {

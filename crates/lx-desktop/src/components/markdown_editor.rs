@@ -107,7 +107,9 @@ pub fn MarkdownEditor(
 
   rsx! {
     div {
-      class: "flex flex-col border border-[var(--outline-variant)]/30 rounded-lg overflow-hidden relative {extra_class} {drag_class}",
+      class: "flex flex-col border border-[var(--outline-variant)]/30 rounded-lg overflow-hidden relative",
+      class: "{extra_class}",
+      class: "{drag_class}",
       ondragover: move |evt: DragEvent| {
           evt.prevent_default();
           dragging.set(true);
@@ -246,7 +248,8 @@ fn ModeButton(label: &'static str, active: bool, on_click: EventHandler<()>) -> 
   let bg = if active { "bg-[var(--surface-container-high)] text-[var(--on-surface)]" } else { "text-[var(--outline)] hover:text-[var(--on-surface)]" };
   rsx! {
     button {
-      class: "px-2 py-0.5 text-[11px] font-medium rounded transition-colors {bg}",
+      class: "px-2 py-0.5 text-[11px] font-medium rounded transition-colors",
+      class: "{bg}",
       onclick: move |_| on_click.call(()),
       "{label}"
     }

@@ -188,14 +188,15 @@ pub fn FileTree(
                 let file_path2 = node.path.clone();
                 let icon_name = file_icon(&node.name);
                 let sel_class = if is_selected {
-                    " text-[var(--on-surface)] bg-[var(--surface-container)]/20"
+                    "text-[var(--on-surface)] bg-[var(--surface-container)]/20"
                 } else {
                     ""
                 };
                 rsx! {
                   div { key: "{node.path}",
                     div {
-                      class: "flex w-full items-center gap-1 pr-3 text-left text-sm text-[var(--outline)] hover:bg-[var(--surface-container)]/30 hover:text-[var(--on-surface)] cursor-pointer min-h-9{sel_class}",
+                      class: "flex w-full items-center gap-1 pr-3 text-left text-sm text-[var(--outline)] hover:bg-[var(--surface-container)]/30 hover:text-[var(--on-surface)] cursor-pointer min-h-9",
+                      class: "{sel_class}",
                       style: "padding-left: {indent}px",
                       onclick: move |_| on_select_file.call(file_path.clone()),
                       if show_cb {

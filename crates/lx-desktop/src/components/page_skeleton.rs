@@ -3,7 +3,10 @@ use dioxus::prelude::*;
 #[component]
 fn Skeleton(class: String) -> Element {
   rsx! {
-    div { class: "animate-pulse bg-[var(--outline-variant)]/50 rounded {class}" }
+    div {
+      class: "animate-pulse bg-[var(--outline-variant)]/50 rounded",
+      class: "{class}",
+    }
   }
 }
 

@@ -39,8 +39,10 @@ pub fn Identity(props: IdentityProps) -> Element {
   let extra = props.class.as_deref().unwrap_or("");
 
   rsx! {
-    span { class: "inline-flex items-center gap-1.5 {extra}",
-      span { class: "inline-flex items-center justify-center rounded-full bg-[var(--surface-container-high)] text-[var(--on-surface-variant)] shrink-0 {avatar_size}",
+    span { class: "inline-flex items-center gap-1.5", class: "{extra}",
+      span {
+        class: "inline-flex items-center justify-center rounded-full bg-[var(--surface-container-high)] text-[var(--on-surface-variant)] shrink-0",
+        class: "{avatar_size}",
         if let Some(ref url) = props.avatar_url {
           img {
             src: "{url}",
@@ -51,7 +53,7 @@ pub fn Identity(props: IdentityProps) -> Element {
           "{initials}"
         }
       }
-      span { class: "truncate {text_size}", "{props.name}" }
+      span { class: "truncate", class: "{text_size}", "{props.name}" }
     }
   }
 }

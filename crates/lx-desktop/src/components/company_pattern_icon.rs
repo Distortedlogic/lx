@@ -52,7 +52,8 @@ pub fn CompanyPatternIcon(company_name: String, brand_color: Option<String>, cla
 
   rsx! {
     div {
-      class: "relative flex items-center justify-center w-11 h-11 text-base font-semibold text-white overflow-hidden {extra_class}",
+      class: "relative flex items-center justify-center w-11 h-11 text-base font-semibold text-white overflow-hidden",
+      class: "{extra_class}",
       style: "{bg_style}",
       span { class: "relative z-10 drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]", "{initial}" }
     }

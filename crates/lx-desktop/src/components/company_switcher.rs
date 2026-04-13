@@ -32,7 +32,10 @@ pub fn CompanySwitcher(companies: Vec<CompanySwitcherEntry>, selected_id: Option
         },
         div { class: "flex items-center gap-2 min-w-0",
           if let Some(company) = selected {
-            span { class: "h-2 w-2 rounded-full shrink-0 {status_dot_color(&company.status)}" }
+            span {
+              class: "h-2 w-2 rounded-full shrink-0",
+              class: "{status_dot_color(&company.status)}",
+            }
           }
           span { class: "text-sm font-medium truncate text-[var(--on-surface)]",
             if let Some(company) = selected {
@@ -56,15 +59,19 @@ pub fn CompanySwitcher(companies: Vec<CompanySwitcherEntry>, selected_id: Option
             {
                 let id = company.id.clone();
                 let is_selected = Some(&company.id) == selected_id.as_ref();
-                let bg = if is_selected { " bg-[var(--surface-container)]" } else { "" };
+                let bg = if is_selected { "bg-[var(--surface-container)]" } else { "" };
                 rsx! {
                   button {
-                    class: "w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-[var(--surface-container)]{bg}",
+                    class: "w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-[var(--surface-container)]",
+                    class: "{bg}",
                     onclick: move |_| {
                         on_select.call(id.clone());
                         open.set(false);
                     },
-                    span { class: "h-2 w-2 rounded-full shrink-0 {status_dot_color(&company.status)}" }
+                    span {
+                      class: "h-2 w-2 rounded-full shrink-0",
+                      class: "{status_dot_color(&company.status)}",
+                    }
                     span { class: "truncate text-[var(--on-surface)]", "{company.name}" }
                   }
                 }

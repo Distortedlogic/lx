@@ -45,7 +45,8 @@ pub fn DialogContent(open: Signal<bool>, #[props(default)] class: String, #[prop
   rsx! {
     div {
       "data-slot": "dialog-overlay",
-      class: "fixed inset-0 z-50 bg-black/50 {overlay_anim}",
+      class: "fixed inset-0 z-50 bg-black/50",
+      class: "{overlay_anim}",
       onclick: move |_| open.set(false),
     }
     div {
@@ -53,14 +54,9 @@ pub fn DialogContent(open: Signal<bool>, #[props(default)] class: String, #[prop
       role: "dialog",
       "aria-modal": "true",
       tabindex: "0",
-      class: cn(
-          &[
-              &format!(
-                  "bg-background fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] gap-4 rounded-lg border p-6 shadow-lg sm:max-w-lg {content_anim} outline-none",
-              ),
-              &class,
-          ],
-      ),
+      class: "bg-background fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] gap-4 rounded-lg border p-6 shadow-lg sm:max-w-lg outline-none",
+      class: "{content_anim}",
+      class: "{class}",
       onmounted: move |evt| {
           let el = evt.data();
           spawn(async move {
@@ -80,22 +76,22 @@ pub fn DialogContent(open: Signal<bool>, #[props(default)] class: String, #[prop
                   let direction = if shift { "backward" } else { "forward" };
                   let js = format!(
                       r#"(function() {{
-                                var dialog = document.querySelector('[data-slot="dialog-content"]');
-                                if (!dialog) return;
-                                var focusable = dialog.querySelectorAll(
-                                    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-                                );
-                                if (focusable.length === 0) return;
-                                var arr = Array.from(focusable);
-                                var idx = arr.indexOf(document.activeElement);
-                                if ('{direction}' === 'forward') {{
-                                    var next = (idx + 1) % arr.length;
-                                    arr[next].focus();
-                                }} else {{
-                                    var prev = (idx - 1 + arr.length) % arr.length;
-                                    arr[prev].focus();
-                                }}
-                            }})()"#,
+                                    var dialog = document.querySelector('[data-slot="dialog-content"]');
+                                    if (!dialog) return;
+                                    var focusable = dialog.querySelectorAll(
+                                        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+                                    );
+                                    if (focusable.length === 0) return;
+                                    var arr = Array.from(focusable);
+                                    var idx = arr.indexOf(document.activeElement);
+                                    if ('{direction}' === 'forward') {{
+                                        var next = (idx + 1) % arr.length;
+                                        arr[next].focus();
+                                    }} else {{
+                                        var prev = (idx - 1 + arr.length) % arr.length;
+                                        arr[prev].focus();
+                                    }}
+                                }})()"#,
                   );
                   let _ = document::eval(&js).await;
               });

@@ -22,7 +22,8 @@ pub fn InlineEditor(
     let original = value.clone();
     rsx! {
       input {
-        class: "w-full bg-transparent rounded outline-none px-1 -mx-1 {extra}",
+        class: "w-full bg-transparent rounded outline-none px-1 -mx-1",
+        class: "{extra}",
         value: "{draft}",
         oninput: move |evt: Event<FormData>| draft.set(evt.value()),
         onblur: {
@@ -61,7 +62,8 @@ pub fn InlineEditor(
     let is_empty = value.is_empty();
     rsx! {
       span {
-        class: "cursor-pointer rounded hover:bg-[var(--on-surface)]/5 transition-colors px-1 -mx-1 {extra}",
+        class: "cursor-pointer rounded hover:bg-[var(--on-surface)]/5 transition-colors px-1 -mx-1",
+        class: "{extra}",
         onclick: move |_| editing.set(true),
         if is_empty {
           span { class: "text-[var(--on-surface-variant)] italic", "{placeholder}" }

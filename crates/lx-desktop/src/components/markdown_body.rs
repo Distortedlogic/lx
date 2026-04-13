@@ -10,7 +10,8 @@ pub fn MarkdownBody(content: String, #[props(optional)] class: Option<String>) -
 
   rsx! {
     div {
-      class: "prose prose-sm prose-invert max-w-none break-words overflow-hidden {extra}",
+      class: "prose prose-sm prose-invert max-w-none break-words overflow-hidden",
+      class: "{extra}",
       dangerous_inner_html: "{html_output}",
     }
   }

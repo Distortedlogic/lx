@@ -23,7 +23,8 @@ pub fn CopyText(text: String, #[props(optional)] children: Option<Element>, #[pr
   rsx! {
     span { class: "relative inline-flex",
       button {
-        class: "cursor-copy hover:text-white transition-colors {extra}",
+        class: "cursor-copy hover:text-white transition-colors",
+        class: "{extra}",
         onclick: handle_click,
         if let Some(ch) = children {
           {ch}
@@ -31,7 +32,9 @@ pub fn CopyText(text: String, #[props(optional)] children: Option<Element>, #[pr
           "{text}"
         }
       }
-      span { class: "pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 rounded-md bg-white text-black px-2 py-1 text-xs whitespace-nowrap transition-opacity duration-300 {opacity_class}",
+      span {
+        class: "pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 rounded-md bg-white text-black px-2 py-1 text-xs whitespace-nowrap transition-opacity duration-300",
+        class: "{opacity_class}",
         if copied() {
           "Copied!"
         } else {

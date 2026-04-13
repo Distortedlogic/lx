@@ -26,7 +26,8 @@ pub fn InlineEntitySelector(
   rsx! {
     div { class: "relative inline-block",
       button {
-        class: "inline-flex min-w-0 items-center gap-1 rounded-md border border-[var(--outline-variant)] bg-[var(--surface-container)]/40 px-2 py-1 text-sm font-medium transition-colors hover:bg-[var(--on-surface)]/5 {extra}",
+        class: "inline-flex min-w-0 items-center gap-1 rounded-md border border-[var(--outline-variant)] bg-[var(--surface-container)]/40 px-2 py-1 text-sm font-medium transition-colors hover:bg-[var(--on-surface)]/5",
+        class: "{extra}",
         onclick: move |_| open.set(!open()),
         if let Some(opt) = current_option {
           "{opt.label}"

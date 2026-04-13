@@ -8,7 +8,10 @@ pub fn PriorityIcon(priority: String, #[props(optional)] class: Option<String>, 
   let extra = class.as_deref().unwrap_or("");
 
   let icon_span = rsx! {
-    span { class: "inline-flex items-center justify-center shrink-0 {color} {extra}",
+    span {
+      class: "inline-flex items-center justify-center shrink-0",
+      class: "{color}",
+      class: "{extra}",
       {render_svg(&priority)}
     }
   };
