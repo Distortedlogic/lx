@@ -47,6 +47,7 @@ pub fn Sidebar() -> Element {
         }
         SidebarSection { label: "System",
           SidebarNavItem { to: Route::Tools {}, label: "Tools", icon: "build" }
+          SidebarNavItem { to: Route::Flows {}, label: "Flows", icon: "schema" }
           SidebarNavItem {
             to: Route::Projects {},
             label: "Projects",

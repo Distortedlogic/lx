@@ -12,6 +12,7 @@ use crate::pages::company_import::CompanyImport;
 use crate::pages::company_skills::CompanySkills;
 use crate::pages::costs::Costs;
 use crate::pages::dashboard::{Dashboard, DashboardAlt};
+use crate::pages::flows::{FlowDetail, Flows};
 use crate::pages::goals::{GoalDetail, Goals};
 use crate::pages::inbox::Inbox;
 use crate::pages::issues::{IssueDetail, Issues};
@@ -62,6 +63,10 @@ pub enum Route {
         Activity {},
         #[route("/inbox")]
         Inbox {},
+        #[route("/flows")]
+        Flows {},
+        #[route("/flows/:flow_id")]
+        FlowDetail { flow_id: String },
         #[route("/org")]
         OrgChart {},
         #[route("/tools")]

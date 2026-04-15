@@ -9,6 +9,7 @@ pub mod company_import;
 pub mod company_skills;
 pub mod costs;
 pub mod dashboard;
+pub mod flows;
 pub mod goals;
 pub mod inbox;
 pub mod issues;

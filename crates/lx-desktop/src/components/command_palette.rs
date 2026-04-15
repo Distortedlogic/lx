@@ -18,6 +18,7 @@ fn page_items() -> Vec<PaletteItem> {
   vec![
     PaletteItem { label: "Agents", icon: "smart_toy", route: Some(Route::Agents {}) },
     PaletteItem { label: "Activity", icon: "pulse_alert", route: Some(Route::Activity {}) },
+    PaletteItem { label: "Flows", icon: "schema", route: Some(Route::Flows {}) },
     PaletteItem { label: "Tools", icon: "build", route: Some(Route::Tools {}) },
     PaletteItem { label: "Settings", icon: "settings", route: Some(Route::Settings {}) },
     PaletteItem { label: "Accounts", icon: "account_circle", route: Some(Route::Accounts {}) },
