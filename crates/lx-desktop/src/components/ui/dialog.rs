@@ -76,22 +76,22 @@ pub fn DialogContent(open: Signal<bool>, #[props(default)] class: String, #[prop
                   let direction = if shift { "backward" } else { "forward" };
                   let js = format!(
                       r#"(function() {{
-                                            var dialog = document.querySelector('[data-slot="dialog-content"]');
-                                            if (!dialog) return;
-                                            var focusable = dialog.querySelectorAll(
-                                                'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-                                            );
-                                            if (focusable.length === 0) return;
-                                            var arr = Array.from(focusable);
-                                            var idx = arr.indexOf(document.activeElement);
-                                            if ('{direction}' === 'forward') {{
-                                                var next = (idx + 1) % arr.length;
-                                                arr[next].focus();
-                                            }} else {{
-                                                var prev = (idx - 1 + arr.length) % arr.length;
-                                                arr[prev].focus();
-                                            }}
-                                        }})()"#,
+                                                          var dialog = document.querySelector('[data-slot="dialog-content"]');
+                                                          if (!dialog) return;
+                                                          var focusable = dialog.querySelectorAll(
+                                                              'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+                                                          );
+                                                          if (focusable.length === 0) return;
+                                                          var arr = Array.from(focusable);
+                                                          var idx = arr.indexOf(document.activeElement);
+                                                          if ('{direction}' === 'forward') {{
+                                                              var next = (idx + 1) % arr.length;
+                                                              arr[next].focus();
+                                                          }} else {{
+                                                              var prev = (idx - 1 + arr.length) % arr.length;
+                                                              arr[prev].focus();
+                                                          }}
+                                                      }})()"#,
                   );
                   let _ = document::eval(&js).await;
               });

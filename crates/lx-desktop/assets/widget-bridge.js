@@ -36714,7 +36714,7 @@ var WidgetBridge = (function(exports) {
 	});
 	//#endregion
 	//#region widgets/agent.ts
-	var states$2 = /* @__PURE__ */ new Map();
+	var states$3 = /* @__PURE__ */ new Map();
 	function createBubble(messagesDiv, role) {
 		const bubble = document.createElement("div");
 		bubble.style.padding = "8px 12px";
@@ -36800,7 +36800,7 @@ var WidgetBridge = (function(exports) {
 				userScrolled: false,
 				dx
 			};
-			states$2.set(elementId, state);
+			states$3.set(elementId, state);
 			messagesDiv.addEventListener("scroll", () => {
 				state.userScrolled = !(messagesDiv.scrollHeight - messagesDiv.scrollTop - messagesDiv.clientHeight < 30);
 			});
@@ -36826,7 +36826,7 @@ var WidgetBridge = (function(exports) {
 			});
 		},
 		update(elementId, data) {
-			const state = states$2.get(elementId);
+			const state = states$3.get(elementId);
 			if (!state) return;
 			const msg = data;
 			switch (msg.type) {
@@ -36920,14 +36920,14 @@ var WidgetBridge = (function(exports) {
 		},
 		resize(_elementId) {},
 		dispose(elementId) {
-			states$2.delete(elementId);
+			states$3.delete(elementId);
 			const el = document.getElementById(elementId);
 			if (el) el.innerHTML = "";
 		}
 	});
 	//#endregion
 	//#region widgets/log-viewer.ts
-	var states$1 = /* @__PURE__ */ new Map();
+	var states$2 = /* @__PURE__ */ new Map();
 	var levelColors = {
 		info: "#4fc3f7",
 		warn: "#ffb74d",
@@ -37069,10 +37069,10 @@ var WidgetBridge = (function(exports) {
 			container.addEventListener("scroll", () => {
 				state.userScrolled = !(container.scrollHeight - container.scrollTop - container.clientHeight < 30);
 			});
-			states$1.set(elementId, state);
+			states$2.set(elementId, state);
 		},
 		update(elementId, data) {
-			const state = states$1.get(elementId);
+			const state = states$2.get(elementId);
 			if (!state) return;
 			if (state.placeholder) {
 				state.placeholder.remove();
@@ -37083,7 +37083,7 @@ var WidgetBridge = (function(exports) {
 			updateLineCount(state);
 		},
 		dispose(elementId) {
-			states$1.delete(elementId);
+			states$2.delete(elementId);
 			const el = document.getElementById(elementId);
 			if (el) el.innerHTML = "";
 		}
@@ -38978,7 +38978,7 @@ registerProcessor('capture', Capture);
 	};
 	//#endregion
 	//#region widgets/voice.ts
-	var states = /* @__PURE__ */ new Map();
+	var states$1 = /* @__PURE__ */ new Map();
 	function transition(state, status) {
 		state.status = status;
 		state.dx.send({
@@ -38994,7 +38994,7 @@ registerProcessor('capture', Capture);
 				status: "idle",
 				dx
 			};
-			states.set(elementId, state);
+			states$1.set(elementId, state);
 			capture.onChunk = (b64pcm) => {
 				if (state.status !== "idle") dx.send({
 					type: "audio_chunk",
@@ -39016,7 +39016,7 @@ registerProcessor('capture', Capture);
 			};
 		},
 		update(elementId, data) {
-			const state = states.get(elementId);
+			const state = states$1.get(elementId);
 			if (!state) return;
 			switch (data.type) {
 				case "start_capture":
@@ -39056,11 +39056,775 @@ registerProcessor('capture', Capture);
 		},
 		resize(_elementId) {},
 		dispose(elementId) {
-			const state = states.get(elementId);
+			const state = states$1.get(elementId);
 			if (state) {
 				state.capture.dispose();
-				states.delete(elementId);
+				states$1.delete(elementId);
 			}
+		}
+	});
+	function emptySelection() {
+		return {
+			anchor: null,
+			node_ids: [],
+			edge_ids: []
+		};
+	}
+	function isGraphWidgetSnapshot(value) {
+		if (!value || typeof value !== "object") return false;
+		const candidate = value;
+		return Boolean(candidate.document && candidate.templates && candidate.diagnostics);
+	}
+	function selectionIncludesNode(selection, nodeId) {
+		return selection.node_ids.includes(nodeId);
+	}
+	function selectionIncludesEdge(selection, edgeId) {
+		return selection.edge_ids.includes(edgeId);
+	}
+	function templateForNode(snapshot, node) {
+		return snapshot.templates.find((template) => template.id === node.template_id);
+	}
+	function portsByDirection(template, direction) {
+		return template?.ports.filter((port) => port.direction === direction) ?? [];
+	}
+	function nodeHeight(template) {
+		return 86 + Math.max(portsByDirection(template, "input").length, portsByDirection(template, "output").length, 1) * 28;
+	}
+	function displayedViewport(snapshot, preview) {
+		return preview ?? snapshot.document.viewport;
+	}
+	function edgePath(from, to) {
+		const dx = Math.max(90, Math.abs(to.x - from.x) * .45);
+		return `M ${from.x} ${from.y} C ${from.x + dx} ${from.y} ${to.x - dx} ${to.y} ${to.x} ${to.y}`;
+	}
+	function scenePointFromClient(scene, clientX, clientY) {
+		const rect = scene.getBoundingClientRect();
+		return {
+			x: clientX - rect.left,
+			y: clientY - rect.top
+		};
+	}
+	function worldPointFromScene(viewport, point) {
+		return {
+			x: (point.x - viewport.pan_x) / viewport.zoom,
+			y: (point.y - viewport.pan_y) / viewport.zoom
+		};
+	}
+	function portWorldPoint$1(snapshot, node, portId) {
+		const template = templateForNode(snapshot, node);
+		const inputs = portsByDirection(template, "input");
+		const outputs = portsByDirection(template, "output");
+		const inputIndex = inputs.findIndex((port) => port.id === portId);
+		if (inputIndex >= 0) return {
+			x: node.position.x,
+			y: node.position.y + 58 + 14 + inputIndex * 28 + 28 / 2
+		};
+		const outputIndex = outputs.findIndex((port) => port.id === portId);
+		if (outputIndex >= 0) return {
+			x: node.position.x + 272,
+			y: node.position.y + 58 + 14 + outputIndex * 28 + 28 / 2
+		};
+		return null;
+	}
+	function portScreenPoint(snapshot, node, portId, viewport) {
+		const worldPoint = portWorldPoint$1(snapshot, node, portId);
+		if (!worldPoint) return null;
+		return {
+			x: worldPoint.x * viewport.zoom + viewport.pan_x,
+			y: worldPoint.y * viewport.zoom + viewport.pan_y
+		};
+	}
+	function statusText(snapshot, selection) {
+		if (selection.node_ids.length === 1 && selection.edge_ids.length === 0) return `Selected node ${selection.node_ids[0]}`;
+		if (selection.edge_ids.length === 1 && selection.node_ids.length === 0) return `Selected edge ${selection.edge_ids[0]}`;
+		if (selection.node_ids.length || selection.edge_ids.length) return `Selected ${selection.node_ids.length} nodes and ${selection.edge_ids.length} edges`;
+		return `${snapshot.document.nodes.length} nodes / ${snapshot.document.edges.length} edges`;
+	}
+	//#endregion
+	//#region widgets/dag-editor/render.ts
+	function renderDagEditor(state) {
+		if (!state.snapshot) {
+			state.header.innerHTML = "<strong>DAG Editor</strong><span class=\"lx-dag-editor-meta\"><span class=\"lx-dag-editor-chip\">Awaiting snapshot</span></span>";
+			state.scene.classList.remove("is-panning");
+			state.scene.style.backgroundImage = "none";
+			state.world.style.width = "100%";
+			state.world.style.height = "100%";
+			state.world.style.transform = "none";
+			state.edgeLayer.replaceChildren();
+			state.nodeLayer.replaceChildren();
+			state.overlayLayer.replaceChildren();
+			state.nodeLayer.innerHTML = "<div class=\"lx-dag-editor-empty\">Mount the widget with a graph snapshot to begin.</div>";
+			state.footer.innerHTML = "<span>Rust remains the source of truth. This widget only stages local interaction state.</span>";
+			return;
+		}
+		const snapshot = state.snapshot;
+		const viewport = displayedViewport(snapshot, state.viewportPreview);
+		const selection = state.selectionPreview ?? snapshot.document.selection;
+		const diagnostics = snapshot.diagnostics;
+		const width = Math.max(1600, ...snapshot.document.nodes.map((node) => displayedNodePosition(state, node).x + 272 + 160));
+		const height = Math.max(960, ...snapshot.document.nodes.map((node) => displayedNodePosition(state, node).y + nodeHeight(templateForNode(snapshot, node)) + 160));
+		state.scene.classList.toggle("is-panning", Boolean(state.panState));
+		const gridSize = Math.max(18, 26 * viewport.zoom);
+		state.scene.style.backgroundImage = "radial-gradient(circle at 1px 1px, rgba(158, 173, 190, 0.22) 1px, transparent 0)";
+		state.scene.style.backgroundSize = `${gridSize}px ${gridSize}px`;
+		state.scene.style.backgroundPosition = `${viewport.pan_x}px ${viewport.pan_y}px`;
+		state.world.style.width = `${width}px`;
+		state.world.style.height = `${height}px`;
+		state.world.style.transform = `translate(${viewport.pan_x}px, ${viewport.pan_y}px) scale(${viewport.zoom})`;
+		state.overlayLayer.setAttribute("width", `${state.scene.clientWidth || 1}`);
+		state.overlayLayer.setAttribute("height", `${state.scene.clientHeight || 1}`);
+		renderHeader(state, diagnostics, selection);
+		renderFooter(state, selection, diagnostics.length);
+		renderEdges(state, width, height, diagnostics, selection);
+		renderNodes(state, diagnostics, selection);
+		renderOverlay(state, viewport);
+	}
+	function renderHeader(state, diagnostics, selection) {
+		const snapshot = state.snapshot;
+		if (!snapshot) return;
+		const errors = diagnostics.filter((item) => item.severity === "error").length;
+		const warnings = diagnostics.filter((item) => item.severity === "warning").length;
+		state.header.innerHTML = `
+    <strong>${escapeHtml(snapshot.document.title)}</strong>
+    <span class="lx-dag-editor-meta">
+      <span class="lx-dag-editor-chip">${snapshot.document.nodes.length} nodes</span>
+      <span class="lx-dag-editor-chip">${snapshot.document.edges.length} edges</span>
+      <span class="lx-dag-editor-chip">${errors} errors / ${warnings} warnings</span>
+      <span class="lx-dag-editor-chip">${escapeHtml(statusText(snapshot, selection))}</span>
+    </span>
+  `;
+	}
+	function renderFooter(state, selection, diagnosticCount) {
+		const snapshot = state.snapshot;
+		if (!snapshot) return;
+		const viewport = displayedViewport(snapshot, state.viewportPreview);
+		state.footer.innerHTML = `
+    <span>Viewport x=${viewport.pan_x.toFixed(0)} y=${viewport.pan_y.toFixed(0)} zoom=${viewport.zoom.toFixed(2)}</span>
+    <span>${selection.node_ids.length} selected nodes / ${selection.edge_ids.length} selected edges / ${diagnosticCount} diagnostics</span>
+  `;
+	}
+	function renderEdges(state, width, height, diagnostics, selection) {
+		const snapshot = state.snapshot;
+		if (!snapshot) return;
+		state.edgeLayer.replaceChildren();
+		state.edgeLayer.setAttribute("width", `${width}`);
+		state.edgeLayer.setAttribute("height", `${height}`);
+		state.edgeLayer.setAttribute("viewBox", `0 0 ${width} ${height}`);
+		for (const edge of snapshot.document.edges) {
+			const fromNode = snapshot.document.nodes.find((node) => node.id === edge.from.node_id);
+			const toNode = snapshot.document.nodes.find((node) => node.id === edge.to.node_id);
+			if (!fromNode || !toNode) continue;
+			const fromPoint = portWorldPointForDisplayedNode(state, fromNode, edge.from.port_id);
+			const toPoint = portWorldPointForDisplayedNode(state, toNode, edge.to.port_id);
+			if (!fromPoint || !toPoint) continue;
+			const edgeDiagnostics = diagnostics.filter((diagnostic) => diagnostic.target?.kind === "edge" && diagnostic.target.id === edge.id);
+			const isSelected = selectionIncludesEdge(selection, edge.id);
+			const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+			path.setAttribute("d", edgePath(fromPoint, toPoint));
+			path.setAttribute("fill", "none");
+			path.setAttribute("stroke", edgeDiagnostics.some((diagnostic) => diagnostic.severity === "error") ? "#f87171" : isSelected ? "#60a5fa" : "#8ca0b6");
+			path.setAttribute("stroke-width", isSelected ? "3" : "2");
+			path.setAttribute("stroke-linecap", "round");
+			path.setAttribute("stroke-linejoin", "round");
+			path.dataset.edgeId = edge.id;
+			state.edgeLayer.appendChild(path);
+			if (edge.label) {
+				const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+				label.setAttribute("x", `${(fromPoint.x + toPoint.x) / 2}`);
+				label.setAttribute("y", `${(fromPoint.y + toPoint.y) / 2 - 8}`);
+				label.setAttribute("fill", "#9cb0c5");
+				label.setAttribute("font-size", "11");
+				label.setAttribute("text-anchor", "middle");
+				label.textContent = edge.label;
+				state.edgeLayer.appendChild(label);
+			}
+		}
+	}
+	function renderNodes(state, diagnostics, selection) {
+		const snapshot = state.snapshot;
+		if (!snapshot) return;
+		state.nodeLayer.replaceChildren();
+		for (const node of snapshot.document.nodes) {
+			const template = templateForNode(snapshot, node);
+			const nodeElement = document.createElement("div");
+			const position = displayedNodePosition(state, node);
+			nodeElement.dataset.nodeId = node.id;
+			nodeElement.style.position = "absolute";
+			nodeElement.style.left = `${position.x}px`;
+			nodeElement.style.top = `${position.y}px`;
+			nodeElement.style.width = `272px`;
+			nodeElement.style.minHeight = `${nodeHeight(template)}px`;
+			nodeElement.style.borderRadius = "18px";
+			nodeElement.style.border = selectionIncludesNode(selection, node.id) ? "1px solid rgba(96, 165, 250, 0.95)" : "1px solid rgba(255, 255, 255, 0.09)";
+			nodeElement.style.boxShadow = selectionIncludesNode(selection, node.id) ? "0 0 0 2px rgba(96, 165, 250, 0.25), 0 14px 35px rgba(0, 0, 0, 0.28)" : "0 10px 30px rgba(0, 0, 0, 0.24)";
+			nodeElement.style.background = "linear-gradient(180deg, rgba(20, 29, 40, 0.98) 0%, rgba(10, 16, 24, 0.98) 100%)";
+			nodeElement.style.userSelect = "none";
+			const header = document.createElement("div");
+			header.style.padding = "12px 14px 10px";
+			header.style.borderBottom = "1px solid rgba(255, 255, 255, 0.06)";
+			const meta = document.createElement("div");
+			meta.style.display = "flex";
+			meta.style.alignItems = "center";
+			meta.style.justifyContent = "space-between";
+			meta.style.gap = "8px";
+			const labelBlock = document.createElement("div");
+			labelBlock.style.minWidth = "0";
+			const templateLabel = document.createElement("div");
+			templateLabel.textContent = template?.label ?? node.template_id;
+			templateLabel.style.fontSize = "10px";
+			templateLabel.style.fontWeight = "700";
+			templateLabel.style.letterSpacing = "0.18em";
+			templateLabel.style.textTransform = "uppercase";
+			templateLabel.style.color = "#7f95ab";
+			const nodeLabel = document.createElement("div");
+			nodeLabel.textContent = node.label ?? node.id;
+			nodeLabel.style.marginTop = "6px";
+			nodeLabel.style.fontSize = "15px";
+			nodeLabel.style.fontWeight = "650";
+			nodeLabel.style.whiteSpace = "nowrap";
+			nodeLabel.style.overflow = "hidden";
+			nodeLabel.style.textOverflow = "ellipsis";
+			labelBlock.appendChild(templateLabel);
+			labelBlock.appendChild(nodeLabel);
+			const nodeDiagnostics = diagnostics.filter((diagnostic) => diagnostic.target?.kind === "node" && diagnostic.target.id === node.id);
+			if (nodeDiagnostics.length > 0) {
+				const badge = document.createElement("span");
+				badge.textContent = `${nodeDiagnostics.length}`;
+				badge.style.display = "inline-flex";
+				badge.style.alignItems = "center";
+				badge.style.justifyContent = "center";
+				badge.style.minWidth = "24px";
+				badge.style.height = "24px";
+				badge.style.padding = "0 8px";
+				badge.style.borderRadius = "999px";
+				badge.style.background = nodeDiagnostics.some((diagnostic) => diagnostic.severity === "error") ? "rgba(248, 113, 113, 0.16)" : "rgba(251, 191, 36, 0.16)";
+				badge.style.color = nodeDiagnostics.some((diagnostic) => diagnostic.severity === "error") ? "#fca5a5" : "#fcd34d";
+				badge.style.fontSize = "11px";
+				badge.style.fontWeight = "700";
+				meta.appendChild(labelBlock);
+				meta.appendChild(badge);
+			} else meta.appendChild(labelBlock);
+			header.appendChild(meta);
+			nodeElement.appendChild(header);
+			const body = document.createElement("div");
+			body.style.display = "grid";
+			body.style.gridTemplateColumns = "1fr 1fr";
+			body.style.gap = "12px";
+			body.style.padding = `14px`;
+			const inputs = document.createElement("div");
+			const outputs = document.createElement("div");
+			inputs.style.display = "flex";
+			inputs.style.flexDirection = "column";
+			outputs.style.display = "flex";
+			outputs.style.flexDirection = "column";
+			outputs.style.alignItems = "flex-end";
+			for (const port of portsByDirection(template, "input")) inputs.appendChild(renderPort(node, port.id, port.label, "input"));
+			for (const port of portsByDirection(template, "output")) outputs.appendChild(renderPort(node, port.id, port.label, "output"));
+			body.appendChild(inputs);
+			body.appendChild(outputs);
+			nodeElement.appendChild(body);
+			state.nodeLayer.appendChild(nodeElement);
+		}
+	}
+	function renderPort(node, portId, label, direction) {
+		const port = document.createElement("div");
+		port.dataset.role = "port";
+		port.dataset.nodeId = node.id;
+		port.dataset.portId = portId;
+		port.dataset.direction = direction;
+		port.style.display = "inline-flex";
+		port.style.alignItems = "center";
+		port.style.gap = "8px";
+		port.style.height = `28px`;
+		port.style.padding = "0 10px";
+		port.style.borderRadius = "999px";
+		port.style.background = direction === "input" ? "rgba(96, 165, 250, 0.08)" : "rgba(34, 197, 94, 0.08)";
+		port.style.border = direction === "input" ? "1px solid rgba(96, 165, 250, 0.24)" : "1px solid rgba(34, 197, 94, 0.24)";
+		port.style.marginBottom = "8px";
+		port.style.cursor = direction === "output" ? "crosshair" : "pointer";
+		const dot = document.createElement("span");
+		dot.style.width = "8px";
+		dot.style.height = "8px";
+		dot.style.borderRadius = "999px";
+		dot.style.background = direction === "input" ? "#60a5fa" : "#22c55e";
+		const text = document.createElement("span");
+		text.textContent = label;
+		text.style.fontSize = "11px";
+		text.style.fontWeight = "600";
+		text.style.color = direction === "input" ? "#bfdbfe" : "#bbf7d0";
+		if (direction === "input") {
+			port.appendChild(dot);
+			port.appendChild(text);
+		} else {
+			port.appendChild(text);
+			port.appendChild(dot);
+		}
+		return port;
+	}
+	function renderOverlay(state, viewport) {
+		state.overlayLayer.replaceChildren();
+		const snapshot = state.snapshot;
+		const connection = state.connectionState;
+		if (!snapshot || !connection) return;
+		const fromNode = snapshot.document.nodes.find((node) => node.id === connection.from.node_id);
+		if (!fromNode) return;
+		const startPoint = portScreenPoint(snapshot, displayedNode(state, fromNode), connection.from.port_id, viewport);
+		if (!startPoint) return;
+		const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+		path.setAttribute("d", edgePath(startPoint, connection.pointer));
+		path.setAttribute("fill", "none");
+		path.setAttribute("stroke", "#34d399");
+		path.setAttribute("stroke-width", "2.5");
+		path.setAttribute("stroke-dasharray", "8 6");
+		state.overlayLayer.appendChild(path);
+	}
+	function displayedNodePosition(state, node) {
+		return state.nodePreviewPositions.get(node.id) ?? node.position;
+	}
+	function displayedNode(state, node) {
+		return {
+			...node,
+			position: displayedNodePosition(state, node)
+		};
+	}
+	function portWorldPointForDisplayedNode(state, node, portId) {
+		const snapshot = state.snapshot;
+		if (!snapshot) return null;
+		return portWorldPoint(snapshot, displayedNode(state, node), portId);
+	}
+	function portWorldPoint(snapshot, node, portId) {
+		if (!snapshot) return null;
+		const template = templateForNode(snapshot, node);
+		const inputs = portsByDirection(template, "input");
+		const outputs = portsByDirection(template, "output");
+		const inputIndex = inputs.findIndex((port) => port.id === portId);
+		if (inputIndex >= 0) return {
+			x: node.position.x,
+			y: node.position.y + 58 + 14 + inputIndex * 28 + 28 / 2
+		};
+		const outputIndex = outputs.findIndex((port) => port.id === portId);
+		if (outputIndex >= 0) return {
+			x: node.position.x + 272,
+			y: node.position.y + 58 + 14 + outputIndex * 28 + 28 / 2
+		};
+		return null;
+	}
+	function escapeHtml(text) {
+		return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\"", "&quot;").replaceAll("'", "&#39;");
+	}
+	//#endregion
+	//#region widgets/dag-editor/events.ts
+	function attachDagEditorEvents(state) {
+		const onPointerDown = (event) => {
+			const snapshot = state.snapshot;
+			if (!snapshot) return;
+			state.scene.focus();
+			const target = event.target instanceof HTMLElement ? event.target : null;
+			const portTarget = portFromTarget(target);
+			if (portTarget) {
+				event.preventDefault();
+				if (portTarget.direction !== "output") return;
+				state.connectionState = {
+					from: {
+						node_id: portTarget.nodeId,
+						port_id: portTarget.portId
+					},
+					pointer: scenePointFromClient(state.scene, event.clientX, event.clientY)
+				};
+				state.scene.setPointerCapture(event.pointerId);
+				renderDagEditor(state);
+				return;
+			}
+			const nodeId = nodeIdFromTarget(target);
+			if (nodeId) {
+				event.preventDefault();
+				const node = snapshot.document.nodes.find((entry) => entry.id === nodeId);
+				if (!node) return;
+				const selection = {
+					anchor: {
+						kind: "node",
+						id: nodeId
+					},
+					node_ids: [nodeId],
+					edge_ids: []
+				};
+				state.selectionPreview = selection;
+				state.dx.send({
+					type: "selection_changed",
+					selection
+				});
+				state.dragState = {
+					nodeId,
+					startClientX: event.clientX,
+					startClientY: event.clientY,
+					origin: state.nodePreviewPositions.get(nodeId) ?? node.position,
+					moved: false
+				};
+				state.scene.setPointerCapture(event.pointerId);
+				renderDagEditor(state);
+				return;
+			}
+			event.preventDefault();
+			const viewport = state.viewportPreview ?? snapshot.document.viewport;
+			state.panState = {
+				startClientX: event.clientX,
+				startClientY: event.clientY,
+				origin: viewport,
+				moved: false
+			};
+			state.scene.setPointerCapture(event.pointerId);
+		};
+		const onPointerMove = (event) => {
+			const snapshot = state.snapshot;
+			if (!snapshot) return;
+			if (state.connectionState) {
+				state.connectionState.pointer = scenePointFromClient(state.scene, event.clientX, event.clientY);
+				renderDagEditor(state);
+				return;
+			}
+			const viewport = state.viewportPreview ?? snapshot.document.viewport;
+			if (state.dragState) {
+				const dx = (event.clientX - state.dragState.startClientX) / viewport.zoom;
+				const dy = (event.clientY - state.dragState.startClientY) / viewport.zoom;
+				state.dragState.moved = state.dragState.moved || Math.abs(dx) > 1 || Math.abs(dy) > 1;
+				state.nodePreviewPositions.set(state.dragState.nodeId, {
+					x: state.dragState.origin.x + dx,
+					y: state.dragState.origin.y + dy
+				});
+				renderDagEditor(state);
+				return;
+			}
+			if (state.panState) {
+				const dx = event.clientX - state.panState.startClientX;
+				const dy = event.clientY - state.panState.startClientY;
+				state.panState.moved = state.panState.moved || Math.abs(dx) > 1 || Math.abs(dy) > 1;
+				state.viewportPreview = {
+					pan_x: state.panState.origin.pan_x + dx,
+					pan_y: state.panState.origin.pan_y + dy,
+					zoom: state.panState.origin.zoom
+				};
+				renderDagEditor(state);
+			}
+		};
+		const onPointerUp = (event) => {
+			const snapshot = state.snapshot;
+			if (!snapshot) return;
+			if (state.connectionState) {
+				const portTarget = portFromTarget(event.target instanceof HTMLElement ? event.target : null);
+				if (portTarget && portTarget.direction === "input") {
+					const payload = {
+						type: "edge_created",
+						edge_id: nextEdgeId(),
+						from: state.connectionState.from,
+						to: {
+							node_id: portTarget.nodeId,
+							port_id: portTarget.portId
+						},
+						label: null
+					};
+					state.dx.send(payload);
+				}
+				state.connectionState = null;
+				renderDagEditor(state);
+				return;
+			}
+			if (state.dragState) {
+				const finalPosition = state.nodePreviewPositions.get(state.dragState.nodeId) ?? snapshot.document.nodes.find((node) => node.id === state.dragState?.nodeId)?.position;
+				if (finalPosition && state.dragState.moved) state.dx.send({
+					type: "node_moved",
+					node_id: state.dragState.nodeId,
+					position: finalPosition
+				});
+				state.dragState = null;
+				renderDagEditor(state);
+				return;
+			}
+			if (state.panState) {
+				if (state.panState.moved && state.viewportPreview) state.dx.send({
+					type: "viewport_changed",
+					viewport: state.viewportPreview
+				});
+				else {
+					const selection = emptySelection();
+					state.selectionPreview = selection;
+					state.dx.send({
+						type: "selection_changed",
+						selection
+					});
+				}
+				state.panState = null;
+				renderDagEditor(state);
+			}
+		};
+		const onWheel = (event) => {
+			const snapshot = state.snapshot;
+			if (!snapshot) return;
+			event.preventDefault();
+			const currentViewport = state.viewportPreview ?? snapshot.document.viewport;
+			const scenePoint = scenePointFromClient(state.scene, event.clientX, event.clientY);
+			const worldPoint = worldPointFromScene(currentViewport, scenePoint);
+			const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+			const nextZoom = Math.min(2.4, Math.max(.3, currentViewport.zoom * factor));
+			state.viewportPreview = {
+				pan_x: scenePoint.x - worldPoint.x * nextZoom,
+				pan_y: scenePoint.y - worldPoint.y * nextZoom,
+				zoom: nextZoom
+			};
+			if (state.wheelCommitTimer !== null) window.clearTimeout(state.wheelCommitTimer);
+			state.wheelCommitTimer = window.setTimeout(() => {
+				if (state.viewportPreview) state.dx.send({
+					type: "viewport_changed",
+					viewport: state.viewportPreview
+				});
+				state.wheelCommitTimer = null;
+			}, 140);
+			renderDagEditor(state);
+		};
+		const onKeyDown = (event) => {
+			const selection = state.selectionPreview ?? state.snapshot?.document.selection;
+			if (!selection) return;
+			if ((event.key === "Delete" || event.key === "Backspace") && (selection.node_ids.length > 0 || selection.edge_ids.length > 0)) {
+				event.preventDefault();
+				state.selectionPreview = emptySelection();
+				state.dx.send({ type: "selection_deleted" });
+				renderDagEditor(state);
+			}
+		};
+		state.scene.addEventListener("pointerdown", onPointerDown);
+		state.scene.addEventListener("pointermove", onPointerMove);
+		state.scene.addEventListener("pointerup", onPointerUp);
+		state.scene.addEventListener("pointercancel", onPointerUp);
+		state.scene.addEventListener("wheel", onWheel, { passive: false });
+		state.scene.addEventListener("keydown", onKeyDown);
+		state.cleanup.push(() => state.scene.removeEventListener("pointerdown", onPointerDown));
+		state.cleanup.push(() => state.scene.removeEventListener("pointermove", onPointerMove));
+		state.cleanup.push(() => state.scene.removeEventListener("pointerup", onPointerUp));
+		state.cleanup.push(() => state.scene.removeEventListener("pointercancel", onPointerUp));
+		state.cleanup.push(() => state.scene.removeEventListener("wheel", onWheel));
+		state.cleanup.push(() => state.scene.removeEventListener("keydown", onKeyDown));
+	}
+	function nodeIdFromTarget(target) {
+		return target?.closest("[data-node-id]")?.dataset.nodeId ?? null;
+	}
+	function portFromTarget(target) {
+		const port = target?.closest("[data-role='port']");
+		if (!port?.dataset.nodeId || !port.dataset.portId) return null;
+		const direction = port.dataset.direction === "input" ? "input" : port.dataset.direction === "output" ? "output" : null;
+		if (!direction) return null;
+		return {
+			nodeId: port.dataset.nodeId,
+			portId: port.dataset.portId,
+			direction
+		};
+	}
+	function nextEdgeId() {
+		if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+		return `edge-${Date.now()}-${Math.floor(Math.random() * 1e3)}`;
+	}
+	//#endregion
+	//#region widgets/dag-editor/state.ts
+	var BASE_CSS = `
+.lx-dag-editor-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: linear-gradient(180deg, #0f1620 0%, #0b1017 100%);
+  color: #e8edf2;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.lx-dag-editor-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(9, 14, 21, 0.88);
+  backdrop-filter: blur(10px);
+}
+
+.lx-dag-editor-bar strong {
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.lx-dag-editor-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+  color: #8ea0b5;
+}
+
+.lx-dag-editor-chip {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+  padding: 4px 8px;
+}
+
+.lx-dag-editor-scene {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  cursor: grab;
+  outline: none;
+}
+
+.lx-dag-editor-scene.is-panning {
+  cursor: grabbing;
+}
+
+.lx-dag-editor-world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+
+.lx-dag-editor-edge-layer,
+.lx-dag-editor-overlay-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+}
+
+.lx-dag-editor-node-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.lx-dag-editor-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(9, 14, 21, 0.88);
+  color: #8ea0b5;
+  font-size: 11px;
+}
+
+.lx-dag-editor-empty {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: #6f8094;
+  font-size: 13px;
+}
+`;
+	var states = /* @__PURE__ */ new Map();
+	function createDagEditorState(elementId, dx) {
+		const host = document.getElementById(elementId);
+		if (!host) return null;
+		host.innerHTML = "";
+		const root = document.createElement("div");
+		root.className = "lx-dag-editor-root";
+		const style = document.createElement("style");
+		style.textContent = BASE_CSS;
+		root.appendChild(style);
+		const header = document.createElement("div");
+		header.className = "lx-dag-editor-bar";
+		const scene = document.createElement("div");
+		scene.className = "lx-dag-editor-scene";
+		scene.tabIndex = 0;
+		const world = document.createElement("div");
+		world.className = "lx-dag-editor-world";
+		const edgeLayer = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+		edgeLayer.classList.add("lx-dag-editor-edge-layer");
+		const nodeLayer = document.createElement("div");
+		nodeLayer.className = "lx-dag-editor-node-layer";
+		const overlayLayer = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+		overlayLayer.classList.add("lx-dag-editor-overlay-layer");
+		overlayLayer.style.pointerEvents = "none";
+		const footer = document.createElement("div");
+		footer.className = "lx-dag-editor-footer";
+		world.appendChild(edgeLayer);
+		world.appendChild(nodeLayer);
+		scene.appendChild(world);
+		scene.appendChild(overlayLayer);
+		root.appendChild(header);
+		root.appendChild(scene);
+		root.appendChild(footer);
+		host.appendChild(root);
+		const state = {
+			elementId,
+			dx,
+			host,
+			root,
+			header,
+			scene,
+			world,
+			edgeLayer,
+			nodeLayer,
+			overlayLayer,
+			footer,
+			snapshot: null,
+			selectionPreview: null,
+			viewportPreview: null,
+			nodePreviewPositions: /* @__PURE__ */ new Map(),
+			dragState: null,
+			panState: null,
+			connectionState: null,
+			wheelCommitTimer: null,
+			cleanup: []
+		};
+		states.set(elementId, state);
+		return state;
+	}
+	function getDagEditorState(elementId) {
+		return states.get(elementId);
+	}
+	function destroyDagEditorState(elementId) {
+		const state = states.get(elementId);
+		if (!state) return;
+		if (state.wheelCommitTimer !== null) window.clearTimeout(state.wheelCommitTimer);
+		for (const cleanup of state.cleanup) cleanup();
+		states.delete(elementId);
+		state.host.innerHTML = "";
+	}
+	function commitSnapshot(state, snapshot) {
+		state.snapshot = snapshot;
+		state.selectionPreview = null;
+		state.viewportPreview = null;
+		state.nodePreviewPositions.clear();
+		state.dragState = null;
+		state.panState = null;
+		state.connectionState = null;
+		if (state.wheelCommitTimer !== null) {
+			window.clearTimeout(state.wheelCommitTimer);
+			state.wheelCommitTimer = null;
+		}
+	}
+	//#endregion
+	//#region widgets/dag-editor/index.ts
+	registerWidget("dag-editor", {
+		mount(elementId, config, dx) {
+			const state = createDagEditorState(elementId, dx);
+			if (!state) return;
+			attachDagEditorEvents(state);
+			if (isGraphWidgetSnapshot(config)) commitSnapshot(state, config);
+			renderDagEditor(state);
+		},
+		update(elementId, data) {
+			const state = getDagEditorState(elementId);
+			if (!state) return;
+			if (isGraphWidgetSnapshot(data)) commitSnapshot(state, data);
+			renderDagEditor(state);
+		},
+		resize(elementId) {
+			const state = getDagEditorState(elementId);
+			if (!state) return;
+			renderDagEditor(state);
+		},
+		dispose(elementId) {
+			destroyDagEditorState(elementId);
 		}
 	});
 	//#endregion

@@ -1,14 +1,15 @@
 use dioxus::prelude::*;
 
-use crate::contexts::panel::PanelState;
+use crate::contexts::panel::{PanelContent, PanelState};
+use crate::pages::flows::inspector::FlowInspector;
 
 #[component]
 pub fn PropertiesPanel() -> Element {
   let panel = use_context::<PanelState>();
-  let content_id = (panel.content_id)();
+  let content = (panel.content)();
   let visible = (panel.visible)();
 
-  if content_id.is_none() {
+  if content.is_none() {
     return rsx! {};
   }
 
@@ -30,8 +31,15 @@ pub fn PropertiesPanel() -> Element {
           }
         }
         div { class: "flex-1 overflow-y-auto p-4",
-          if let Some(ref id) = content_id {
-            span { class: "text-sm text-gray-400", "Panel: {id}" }
+          if let Some(content) = content {
+            match content {
+                PanelContent::FlowNode { node_id } => rsx! {
+                  FlowInspector { content: PanelContent::FlowNode { node_id } }
+                },
+                PanelContent::FlowEdge { edge_id } => rsx! {
+                  FlowInspector { content: PanelContent::FlowEdge { edge_id } }
+                },
+            }
           }
         }
       }

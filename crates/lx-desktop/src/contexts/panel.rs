@@ -1,26 +1,33 @@
 use dioxus::prelude::*;
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum PanelContent {
+  FlowNode { node_id: String },
+  FlowEdge { edge_id: String },
+}
+
 #[derive(Clone, Copy)]
 pub struct PanelState {
   pub visible: Signal<bool>,
-  pub content_id: Signal<Option<String>>,
+  pub content: Signal<Option<PanelContent>>,
 }
 
 impl PanelState {
   pub fn provide() -> Self {
-    let state = Self { visible: Signal::new(true), content_id: Signal::new(None) };
+    let state = Self { visible: Signal::new(true), content: Signal::new(None) };
     use_context_provider(|| state);
     state
   }
 
-  pub fn open(&self, id: String) {
-    let mut c = self.content_id;
-    c.set(Some(id));
+  pub fn open(&self, content: PanelContent) {
+    let mut current = self.content;
+    current.set(Some(content));
+    self.set_visible(true);
   }
 
   pub fn close(&self) {
-    let mut c = self.content_id;
-    c.set(None);
+    let mut current = self.content;
+    current.set(None);
   }
 
   pub fn set_visible(&self, v: bool) {
@@ -39,6 +46,6 @@ impl PanelState {
   }
 
   pub fn has_content(&self) -> bool {
-    self.content_id.read().is_some()
+    self.content.read().is_some()
   }
 }
