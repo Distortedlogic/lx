@@ -19,7 +19,9 @@ fn status_color(status: &str) -> &'static str {
 pub fn GoalDetail(goal_id: String) -> Element {
   rsx! {
     SuspenseBoundary {
-      fallback: |_| rsx! { PageSkeleton { variant: "detail".to_string() } },
+      fallback: |_| rsx! {
+        PageSkeleton { variant: "detail".to_string() }
+      },
       GoalDetailInner { goal_id }
     }
   }
@@ -53,7 +55,9 @@ fn GoalDetailInner(goal_id: String) -> Element {
         span { class: "text-[10px] uppercase tracking-wider text-[var(--outline)] font-semibold",
           "{goal.level}"
         }
-        span { class: "text-xs uppercase font-semibold tracking-wider {status_color(&goal.status)}",
+        span {
+          class: "text-xs uppercase font-semibold tracking-wider",
+          class: "{status_color(&goal.status)}",
           "{goal.status}"
         }
       }
@@ -103,7 +107,9 @@ fn GoalDetailInner(goal_id: String) -> Element {
                     "{desc}"
                   }
                 }
-                span { class: "text-[10px] uppercase font-semibold tracking-wider shrink-0 {status_color(&proj.status)}",
+                span {
+                  class: "text-[10px] uppercase font-semibold tracking-wider shrink-0",
+                  class: "{status_color(&proj.status)}",
                   "{proj.status}"
                 }
               }

@@ -95,7 +95,8 @@ pub fn SkillTree(
                 rsx! {
                   div { key: "{node.name}",
                     button {
-                      class: "flex w-full min-w-0 items-center gap-2 py-1 text-left text-sm text-[var(--outline)] hover:bg-[var(--surface-container)]/30 hover:text-[var(--on-surface)] min-h-9{sel_class}",
+                      class: "flex w-full min-w-0 items-center gap-2 py-1 text-left text-sm text-[var(--outline)] hover:bg-[var(--surface-container)]/30 hover:text-[var(--on-surface)] min-h-9",
+                      class: "{sel_class}",
                       style: "padding-left: {indent}px",
                       onclick: move |_| on_select_path.call(file_path.clone()),
                       span { class: "material-symbols-outlined text-sm", "{icon}" }

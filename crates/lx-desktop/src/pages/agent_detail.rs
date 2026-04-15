@@ -9,7 +9,9 @@ use super::agents::detail::AgentDetailShell;
 pub fn AgentDetail(agent_id: String) -> Element {
   rsx! {
     SuspenseBoundary {
-      fallback: |_| rsx! { PageSkeleton { variant: "detail".to_string() } },
+      fallback: |_| rsx! {
+        PageSkeleton { variant: "detail".to_string() }
+      },
       AgentDetailInner { agent_id }
     }
   }

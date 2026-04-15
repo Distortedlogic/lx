@@ -96,9 +96,7 @@ pub fn CompanyExport() -> Element {
             }
           } else {
             div { class: "flex flex-col items-center justify-center h-full text-[var(--outline)]",
-              span { class: "material-symbols-outlined text-xl mb-4",
-                "inventory_2"
-              }
+              span { class: "material-symbols-outlined text-xl mb-4", "inventory_2" }
               p { class: "text-sm", "Select a file to preview its contents." }
             }
           }

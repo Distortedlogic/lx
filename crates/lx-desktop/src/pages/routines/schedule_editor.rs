@@ -1,6 +1,7 @@
 use dioxus::prelude::*;
 
 use super::cron_utils::{build_cron, describe_schedule, ordinal, parse_cron_to_preset};
+use crate::components::ui::cn;
 use crate::components::ui::select::{Select, SelectOption};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -89,12 +90,14 @@ pub fn ScheduleEditor(value: String, on_change: EventHandler<String>) -> Element
 
   let select_cls = "bg-[var(--surface-container)] \
                       text-xs px-2 py-1.5 rounded outline-none text-[var(--on-surface)]";
+  let full_width_select_cls = cn(&[select_cls, "w-full"]);
+  let full_width_mono_select_cls = cn(&[select_cls, "w-full", "font-mono"]);
 
   rsx! {
     div { class: "flex flex-col gap-3",
       p { class: "text-xs text-[var(--outline)] italic", "{describe_schedule(&value)}" }
       Select {
-        class: "{select_cls} w-full",
+        class: full_width_select_cls.clone(),
         value: cur_preset.to_value().to_string(),
         options: PRESETS.iter().map(|(v, l)| SelectOption::new(*v, *l)).collect::<Vec<_>>(),
         onchange: move |val: String| {
@@ -117,7 +120,7 @@ pub fn ScheduleEditor(value: String, on_change: EventHandler<String>) -> Element
       if cur_preset == SchedulePreset::Custom {
         div { class: "flex flex-col gap-1.5",
           input {
-            class: "{select_cls} w-full font-mono",
+            class: full_width_mono_select_cls,
             placeholder: "0 10 * * *",
             value: "{custom_cron}",
             oninput: move |evt| {
@@ -216,7 +219,7 @@ fn render_pickers(
       {minute_select(cur_minute, select_cls, on_minute2)}
       span { class: "text-xs text-[var(--outline)] uppercase", "on" }
       div { class: "flex gap-1",
-        for (val , label) in DAYS_OF_WEEK {
+        for (val, label) in DAYS_OF_WEEK {
           {
               let active = cur_dow == *val;
               let val_owned = val.to_string();
@@ -240,7 +243,7 @@ fn render_pickers(
       {minute_select(cur_minute, select_cls, on_minute2)}
       span { class: "text-xs text-[var(--outline)] uppercase", "on day" }
       Select {
-        class: "{select_cls} w-[80px]",
+        class: cn(&[select_cls, "w-[80px]"]),
         value: cur_dom.to_string(),
         options: (1..=31u32)
             .map(|d| SelectOption::new(d.to_string(), ordinal(d)))
@@ -254,10 +257,10 @@ fn render_pickers(
 
 fn hour_select(cur: &str, cls: &str, mut on_change: impl FnMut(String) + 'static) -> Element {
   let cur = cur.to_string();
-  let cls = cls.to_string();
+  let cls = cn(&[cls, "w-[120px]"]);
   rsx! {
     Select {
-      class: "{cls} w-[120px]",
+      class: cls,
       value: cur,
       options: (0..24u32)
           .map(|h| SelectOption::new(h.to_string(), hour_label(h as usize)))
@@ -269,10 +272,10 @@ fn hour_select(cur: &str, cls: &str, mut on_change: impl FnMut(String) + 'static
 
 fn minute_select(cur: &str, cls: &str, mut on_change: impl FnMut(String) + 'static) -> Element {
   let cur = cur.to_string();
-  let cls = cls.to_string();
+  let cls = cn(&[cls, "w-[80px]"]);
   rsx! {
     Select {
-      class: "{cls} w-[80px]",
+      class: cls,
       value: cur,
       options: MINUTES
           .iter()

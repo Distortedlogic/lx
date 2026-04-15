@@ -12,7 +12,9 @@ use crate::components::page_skeleton::PageSkeleton;
 pub fn ApprovalDetail(approval_id: String) -> Element {
   rsx! {
     SuspenseBoundary {
-      fallback: |_| rsx! { PageSkeleton { variant: "detail".to_string() } },
+      fallback: |_| rsx! {
+        PageSkeleton { variant: "detail".to_string() }
+      },
       ApprovalDetailInner { approval_id }
     }
   }
@@ -77,10 +79,16 @@ fn ApprovalDetailInner(approval_id: String) -> Element {
             }
           }
           div { class: "flex items-center gap-1.5",
-            span { class: "material-symbols-outlined text-sm {status_color}",
+            span {
+              class: "material-symbols-outlined text-sm",
+              class: "{status_color}",
               "{status_icon}"
             }
-            span { class: "text-xs font-semibold {status_color}", "{status_text}" }
+            span {
+              class: "text-xs font-semibold",
+              class: "{status_color}",
+              "{status_text}"
+            }
           }
         }
         p { class: "text-xs text-[var(--outline)]", "Requested by {requester}" }

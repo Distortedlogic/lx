@@ -59,7 +59,9 @@ pub fn Projects() -> Element {
                   "{date}"
                 }
               }
-              span { class: "text-[10px] uppercase font-semibold tracking-wider shrink-0 {status_color(&project.status)}",
+              span {
+                class: "text-[10px] uppercase font-semibold tracking-wider shrink-0",
+                class: "{status_color(&project.status)}",
                 "{project.status}"
               }
             }

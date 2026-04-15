@@ -82,7 +82,8 @@ fn SkillRow(skill: SkillEntry, checked: bool, read_only: bool, on_toggle: EventH
   let opacity = if read_only { "opacity-60" } else { "" };
   rsx! {
     button {
-      class: "flex items-start gap-3 w-full px-4 py-3 text-left hover:bg-[var(--surface-container)] transition-colors {opacity}",
+      class: "flex items-start gap-3 w-full px-4 py-3 text-left hover:bg-[var(--surface-container)] transition-colors",
+      class: "{opacity}",
       disabled: read_only,
       onclick: move |_| on_toggle.call(()),
       div {

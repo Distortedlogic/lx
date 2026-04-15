@@ -78,7 +78,7 @@ pub fn CommandPalette() -> Element {
           autofocus: true,
         }
         div { class: "max-h-64 overflow-y-auto py-1",
-          for (label , icon) in filtered_actions {
+          for (label, icon) in filtered_actions {
             div {
               class: "flex items-center gap-3 px-4 py-2 text-sm cursor-pointer hover:bg-[var(--surface-container-highest)] text-[var(--on-surface)]",
               onclick: move |_| open.set(false),

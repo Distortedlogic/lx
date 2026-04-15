@@ -78,7 +78,8 @@ pub fn BudgetCard(policy: BudgetPolicy, on_save: Option<EventHandler<u64>>) -> E
         }
         div { class: "h-2 rounded-full bg-[var(--outline-variant)] overflow-hidden",
           div {
-            class: "h-full rounded-full {fill_color}",
+            class: "h-full rounded-full",
+            class: "{fill_color}",
             style: "width: {util}%",
           }
         }

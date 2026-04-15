@@ -31,7 +31,7 @@ pub fn render_command_group(items: &[ToolItem], mut cmd_group_open: Signal<bool>
   let err_cls = "overflow-x-auto whitespace-pre-wrap break-words font-mono text-[11px] text-[var(--error)]";
   let ok_cls = "overflow-x-auto whitespace-pre-wrap break-words font-mono text-[11px] text-[var(--on-surface)]/80";
   rsx! {
-    div { class: "{wrapper} animate-transcript-enter",
+    div { class: "animate-transcript-enter", class: "{wrapper}",
       div {
         class: "flex items-center gap-2 cursor-pointer",
         onclick: move |_| cmd_group_open.set(!cmd_group_open()),
@@ -58,7 +58,7 @@ pub fn render_command_group(items: &[ToolItem], mut cmd_group_open: Signal<bool>
       }
       if cmd_group_open() {
         div { class: "mt-3 space-y-3",
-          for (idx , item) in items.iter().enumerate() {
+          for (idx, item) in items.iter().enumerate() {
             div { key: "{idx}", class: "space-y-2",
               div { class: "flex items-center gap-2",
                 span { class: "material-symbols-outlined text-xs text-[var(--outline)]",
@@ -110,7 +110,7 @@ pub fn render_tool_group(items: &[ToolItem], mut tool_group_open: Signal<bool>) 
       }
       if tool_group_open() {
         div { class: "space-y-2 border-t border-[var(--outline-variant)]/30 px-3 py-3",
-          for (idx , item) in items.iter().enumerate() {
+          for (idx, item) in items.iter().enumerate() {
             div { key: "{idx}", class: "space-y-1.5",
               div { class: "flex items-center gap-2",
                 span { class: "material-symbols-outlined text-xs text-[var(--outline)]",

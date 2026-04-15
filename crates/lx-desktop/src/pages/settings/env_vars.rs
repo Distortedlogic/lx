@@ -25,7 +25,7 @@ pub fn EnvVarsPanel() -> Element {
         span { class: "flex-[1] text-right", "ACTIONS" }
       }
       div { class: "flex flex-col gap-1",
-        for (i , entry) in env_vars.iter().enumerate() {
+        for (i, entry) in env_vars.iter().enumerate() {
           {
               let key = entry.key.clone();
               let value = entry.value.clone();

@@ -114,7 +114,7 @@ pub fn MenuBar() -> Element {
       div {
         class: "flex items-center gap-0.5",
         onmousedown: |evt| evt.stop_propagation(),
-        for (idx , menu) in menus.into_iter().enumerate() {
+        for (idx, menu) in menus.into_iter().enumerate() {
           {render_menu_dropdown(open_menu, idx, menu)}
         }
       }

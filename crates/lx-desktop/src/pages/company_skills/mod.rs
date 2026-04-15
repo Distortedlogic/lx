@@ -71,9 +71,7 @@ pub fn CompanySkills() -> Element {
         div { class: "flex-1 overflow-auto",
           if skills.is_empty() {
             div { class: "flex flex-col items-center justify-center py-12 text-[var(--outline)]",
-              span { class: "material-symbols-outlined text-xl mb-3",
-                "widgets"
-              }
+              span { class: "material-symbols-outlined text-xl mb-3", "widgets" }
               p { class: "text-xs", "No skills yet." }
             }
           }
@@ -84,7 +82,8 @@ pub fn CompanySkills() -> Element {
                 let bg = if is_selected { " bg-[var(--surface-container)]" } else { "" };
                 rsx! {
                   button {
-                    class: "w-full text-left px-3 py-2 border-b border-[var(--outline-variant)]/30 hover:bg-[var(--surface-container)]{bg}",
+                    class: "w-full text-left px-3 py-2 border-b border-[var(--outline-variant)]/30 hover:bg-[var(--surface-container)]",
+                    class: "{bg}",
                     onclick: move |_| selected_skill_id.set(Some(skill_id.clone())),
                     div { class: "text-sm font-medium text-[var(--on-surface)]", "{skill.name}" }
                     if let Some(ref desc) = skill.description {

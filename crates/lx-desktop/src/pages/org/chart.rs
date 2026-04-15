@@ -59,6 +59,7 @@ pub fn OrgChart() -> Element {
   let is_dragging = dragging();
 
   let cursor = if is_dragging { "grabbing" } else { "grab" };
+  let nav = navigator();
 
   if !has_nodes {
     return rsx! {
@@ -173,7 +174,7 @@ pub fn OrgChart() -> Element {
         width: "100%",
         height: "100%",
         g { transform: "translate({px}, {py}) scale({z})",
-          for (parent , child) in edges.iter() {
+          for (parent, child) in edges.iter() {
             {
                 let x1 = parent.x + CARD_W / 2.0;
                 let y1 = parent.y + CARD_H;
@@ -192,7 +193,7 @@ pub fn OrgChart() -> Element {
                 }
             }
           }
-          for (from , to , label) in lateral_edges.iter() {
+          for (from, to, label) in lateral_edges.iter() {
             {
                 let x1 = from.x + CARD_W / 2.0;
                 let y1 = from.y + CARD_H / 2.0;
@@ -233,17 +234,20 @@ pub fn OrgChart() -> Element {
               let card_w = CARD_W;
               let card_h = CARD_H;
               let agent_id = node.id.clone();
-              let nav = navigator();
+              let has_icon = node.icon.is_some();
+              let icon = node.icon.as_deref().unwrap_or("");
               rsx! {
                 div {
                   key: "{node.id}",
                   class: "absolute bg-[var(--surface-container)] border border-[var(--outline-variant)] rounded-lg shadow-sm select-none transition-shadow hover:shadow-md hover:border-[var(--on-surface)]/20 cursor-pointer",
                   style: "left: {node.x}px; top: {node.y}px; width: {card_w}px; min-height: {card_h}px",
                   onclick: move |_| {
-                      nav.push(Route::AgentDetail { agent_id: agent_id.clone() });
+                      nav.push(Route::AgentDetail {
+                          agent_id: agent_id.clone(),
+                      });
                   },
                   div { class: "flex items-center px-4 py-3 gap-3",
-                    if let Some(ref icon) = node.icon {
+                    if has_icon {
                       span { class: "material-symbols-outlined text-sm shrink-0 text-[var(--on-surface-variant)]",
                         "{icon}"
                       }
@@ -258,8 +262,10 @@ pub fn OrgChart() -> Element {
                         "{node.name}"
                       }
                       span { class: "text-[11px] text-[var(--outline)] leading-tight mt-0.5", "{node.role}" }
-                      if let Some(ref adapter) = node.adapter {
-                        span { class: "text-[10px] text-[var(--outline)]/60 leading-tight mt-0.5", "{adapter}" }
+                      for adapter in node.adapter.iter() {
+                        span { class: "text-[10px] text-[var(--outline)]/60 leading-tight mt-0.5",
+                          "{adapter}"
+                        }
                       }
                     }
                   }

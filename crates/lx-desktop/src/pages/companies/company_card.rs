@@ -42,7 +42,8 @@ pub fn CompanyCard(
 
   rsx! {
     div {
-      class: "group text-left bg-[var(--surface-container-lowest)] border rounded-lg p-5 cursor-pointer {border}",
+      class: "group text-left bg-[var(--surface-container-lowest)] border rounded-lg p-5 cursor-pointer",
+      class: "{border}",
       onclick: move |_| on_select.call(id.clone()),
       div { class: "flex items-start justify-between gap-3",
         div { class: "flex-1 min-w-0",
@@ -74,7 +75,9 @@ pub fn CompanyCard(
               h3 { class: "font-semibold text-base text-[var(--on-surface)]",
                 "{company.name}"
               }
-              span { class: "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium {status_class}",
+              span {
+                class: "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium",
+                class: "{status_class}",
                 "{company.status}"
               }
             }

@@ -78,7 +78,9 @@ pub fn KanbanCard(
         "{issue.title}"
       }
       div { class: "flex items-center gap-2",
-        span { class: "material-symbols-outlined text-xs {priority_icon_class(&issue.priority)}",
+        span {
+          class: "material-symbols-outlined text-xs",
+          class: "{priority_icon_class(&issue.priority)}",
           match issue.priority.as_str() {
               "critical" => "priority_high",
               "high" => "arrow_upward",
@@ -112,7 +114,9 @@ pub fn render_drag_overlay(issue: &Issue, agents: &[AgentRef], pos: (f64, f64)) 
           "{issue.title}"
         }
         div { class: "flex items-center gap-2",
-          span { class: "material-symbols-outlined text-xs {priority_icon_class(&issue.priority)}",
+          span {
+            class: "material-symbols-outlined text-xs",
+            class: "{priority_icon_class(&issue.priority)}",
             match issue.priority.as_str() {
                 "critical" => "priority_high",
                 "high" => "arrow_upward",

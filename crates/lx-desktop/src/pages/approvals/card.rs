@@ -34,10 +34,12 @@ pub fn ApprovalCard(approval: Approval, on_approve: EventHandler<()>, on_reject:
           }
         }
         div { class: "flex items-center gap-1.5",
-          span { class: "material-symbols-outlined text-sm {status_color}",
+          span {
+            class: "material-symbols-outlined text-sm",
+            class: "{status_color}",
             "{status_icon}"
           }
-          span { class: "text-xs {status_color}", "{status_text}" }
+          span { class: "text-xs", class: "{status_color}", "{status_text}" }
           span { class: "text-xs text-[var(--outline)] ml-2", "{approval.created_at}" }
         }
       }

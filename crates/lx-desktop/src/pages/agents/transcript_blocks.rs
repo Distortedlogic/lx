@@ -23,7 +23,9 @@ pub fn TranscriptBlockView(block: TranscriptBlock, mode: TranscriptMode, density
       let icon = if role == "assistant" { "smart_toy" } else { "person" };
       let bg = if role == "assistant" { "bg-[var(--surface-container)]" } else { "bg-[var(--surface-container-high)]" };
       rsx! {
-        div { class: if density == TranscriptDensity::Compact { "flex gap-3 p-2 rounded {bg} animate-transcript-enter" } else { "flex gap-3 p-3 rounded-lg {bg} animate-transcript-enter" },
+        div {
+          class: if density == TranscriptDensity::Compact { "flex gap-3 p-2 rounded animate-transcript-enter" } else { "flex gap-3 p-3 rounded-lg animate-transcript-enter" },
+          class: "{bg}",
           span { class: "material-symbols-outlined text-sm text-[var(--outline)] shrink-0 mt-0.5",
             "{icon}"
           }
@@ -63,15 +65,21 @@ pub fn TranscriptBlockView(block: TranscriptBlock, mode: TranscriptMode, density
       };
       let border = if is_error { "border-[var(--error)]/20 bg-[var(--error)]/[0.04]" } else { "border-[var(--outline-variant)]/20" };
       rsx! {
-        div { class: if density == TranscriptDensity::Compact { "border {border} rounded p-2 space-y-1 animate-transcript-enter" } else { "border {border} rounded-lg p-3 space-y-2 animate-transcript-enter" },
+        div {
+          class: if density == TranscriptDensity::Compact { "border rounded p-2 space-y-1 animate-transcript-enter" } else { "border rounded-lg p-3 space-y-2 animate-transcript-enter" },
+          class: "{border}",
           div { class: "flex items-center gap-2",
-            span { class: "material-symbols-outlined text-sm {status_color}",
+            span {
+              class: "material-symbols-outlined text-sm",
+              class: "{status_color}",
               "{icon}"
             }
             span { class: "text-[11px] font-semibold uppercase tracking-widest text-[var(--on-surface-variant)]",
               "{name}"
             }
-            span { class: "text-[10px] font-semibold uppercase tracking-wider {status_color}",
+            span {
+              class: "text-[10px] font-semibold uppercase tracking-wider",
+              class: "{status_color}",
               "{status_label}"
             }
             if let Some(tokens) = token_count {
@@ -197,7 +205,9 @@ pub fn TranscriptBlockView(block: TranscriptBlock, mode: TranscriptMode, density
         _ => "circle",
       };
       rsx! {
-        div { class: "{wrapper_class} animate-transcript-enter",
+        div {
+          class: "animate-transcript-enter",
+          class: "{wrapper_class}",
           div { class: "flex items-start gap-2",
             span { class: "material-symbols-outlined text-sm shrink-0 mt-0.5",
               "{icon}"

@@ -26,7 +26,9 @@ pub fn AdapterTestButton(adapter: Signal<String>, test_state: Signal<AdapterTest
             });
         },
         if matches!(state, AdapterTestState::Testing) {
-          span { class: "material-symbols-outlined text-sm animate-spin mr-1", "progress_activity" }
+          span { class: "material-symbols-outlined text-sm animate-spin mr-1",
+            "progress_activity"
+          }
           "Testing..."
         } else {
           span { class: "material-symbols-outlined text-sm mr-1", "science" }

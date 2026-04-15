@@ -26,7 +26,7 @@ pub fn Accounts() -> Element {
         }
       }
       div { class: "flex flex-col gap-3",
-        for (i , cred) in entries.iter().enumerate() {
+        for (i, cred) in entries.iter().enumerate() {
           {
               let provider = cred.provider.clone();
               let key_display = if reveal() == Some(i) {

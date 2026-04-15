@@ -21,7 +21,7 @@ pub fn GoalProperties(goal: Goal) -> Element {
         span { class: "w-20 text-[10px] uppercase tracking-wider text-[var(--outline)] font-semibold shrink-0",
           "Status"
         }
-        span { class: "text-sm {status_color(&goal.status)}", "{goal.status}" }
+        span { class: "text-sm", class: "{status_color(&goal.status)}", "{goal.status}" }
       }
       div { class: "flex items-center gap-3",
         span { class: "w-20 text-[10px] uppercase tracking-wider text-[var(--outline)] font-semibold shrink-0",

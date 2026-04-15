@@ -86,7 +86,9 @@ fn StatusPicker(current: String, on_change: EventHandler<String>) -> Element {
             let v = *open.read();
             open.set(!v)
         },
-        span { class: "material-symbols-outlined text-sm {status_icon_class(&current)}",
+        span {
+          class: "material-symbols-outlined text-sm",
+          class: "{status_icon_class(&current)}",
           "circle"
         }
         span { class: "text-sm text-[var(--on-surface)]", "{status_label(&current)}" }
@@ -103,7 +105,9 @@ fn StatusPicker(current: String, on_change: EventHandler<String>) -> Element {
                       open.set(false);
                   }
               },
-              span { class: "material-symbols-outlined text-xs {status_icon_class(status)}",
+              span {
+                class: "material-symbols-outlined text-xs",
+                class: "{status_icon_class(status)}",
                 "circle"
               }
               "{status_label(status)}"

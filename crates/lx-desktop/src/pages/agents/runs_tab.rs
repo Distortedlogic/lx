@@ -53,7 +53,8 @@ fn RunListItem(run: HeartbeatRun, is_selected: bool, on_select: EventHandler<()>
 
   rsx! {
     button {
-      class: "flex items-center gap-2 w-full px-3 py-2.5 text-left border-b border-[var(--outline-variant)]/15 hover:bg-[var(--surface-container)] transition-colors {bg}",
+      class: "flex items-center gap-2 w-full px-3 py-2.5 text-left border-b border-[var(--outline-variant)]/15 hover:bg-[var(--surface-container)] transition-colors",
+      class: "{bg}",
       onclick: move |_| on_select.call(()),
       if is_live {
         span { class: "relative flex h-2 w-2 shrink-0",

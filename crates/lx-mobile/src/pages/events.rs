@@ -104,7 +104,7 @@ pub fn Events() -> Element {
         }
       }
       div { class: "space-y-1",
-        for (idx , event) in visible.iter().enumerate().rev().take(100) {
+        for (idx, event) in visible.iter().enumerate().rev().take(100) {
           {render_mobile_event(idx, event, &expanded)}
         }
         if visible.is_empty() {

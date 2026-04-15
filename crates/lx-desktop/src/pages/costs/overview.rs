@@ -104,7 +104,7 @@ pub fn Costs() -> Element {
       }
       if active_tab() == "budgets" {
         div { class: "flex flex-col gap-4",
-          for (idx , policy) in budgets().iter().enumerate() {
+          for (idx, policy) in budgets().iter().enumerate() {
             BudgetCard {
               key: "{policy.id}",
               policy: policy.clone(),

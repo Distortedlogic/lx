@@ -66,7 +66,7 @@ pub fn NewAgentDialog(open: bool, on_close: EventHandler<()>, on_create: EventHa
                   class: "input-field",
                   value: "{adapter_type}",
                   onchange: move |evt| adapter_type.set(evt.value().to_string()),
-                  for (key , label) in ADAPTER_LABELS {
+                  for (key, label) in ADAPTER_LABELS {
                     option { value: *key, "{label}" }
                   }
                 }

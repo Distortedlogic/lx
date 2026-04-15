@@ -83,7 +83,9 @@ pub fn Issues() -> Element {
 pub fn IssueDetail(issue_id: String) -> Element {
   rsx! {
     SuspenseBoundary {
-      fallback: |_| rsx! { crate::components::page_skeleton::PageSkeleton { variant: "detail".to_string() } },
+      fallback: |_| rsx! {
+        crate::components::page_skeleton::PageSkeleton { variant: "detail".to_string() }
+      },
       IssueDetailInner { issue_id }
     }
   }

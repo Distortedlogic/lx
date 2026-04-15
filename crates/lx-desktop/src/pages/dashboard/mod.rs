@@ -18,7 +18,9 @@ use self::activity_charts::{ActivitySummaryChart, ChartCard, EventBreakdownChart
 pub fn Dashboard() -> Element {
   rsx! {
     SuspenseBoundary {
-      fallback: |_| rsx! { PageSkeleton { variant: "dashboard".to_string() } },
+      fallback: |_| rsx! {
+        PageSkeleton { variant: "dashboard".to_string() }
+      },
       DashboardInner {}
     }
   }

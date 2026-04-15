@@ -116,7 +116,7 @@ pub fn KanbanBoardView(
           drag_over_index.set(None);
       },
       div { class: "flex gap-3 overflow-x-auto pb-4 -mx-2 px-2",
-        for (status , col_issues) in columns.iter() {
+        for (status, col_issues) in columns.iter() {
           KanbanColumn {
             status: status.to_string(),
             issues: col_issues.iter().map(|i| (*i).clone()).collect(),
@@ -176,7 +176,9 @@ fn KanbanColumn(
   rsx! {
     div { class: "flex flex-col min-w-[260px] w-[260px] shrink-0",
       div { class: "flex items-center gap-2 px-2 py-2 mb-1",
-        span { class: "material-symbols-outlined text-sm {status_icon_class(&status)}",
+        span {
+          class: "material-symbols-outlined text-sm",
+          class: "{status_icon_class(&status)}",
           "circle"
         }
         span { class: "text-xs font-semibold uppercase tracking-wide text-[var(--outline)]",
@@ -199,7 +201,7 @@ fn KanbanColumn(
                 drag_over_index.set(None);
             }
         },
-        for (idx , issue) in issues.iter().enumerate() {
+        for (idx, issue) in issues.iter().enumerate() {
           if *drag_active.read() && is_drag_over && drag_over_index.read().as_ref() == Some(&idx) {
             div { class: "h-0.5 rounded bg-[var(--primary)] mx-1 my-0.5" }
           }

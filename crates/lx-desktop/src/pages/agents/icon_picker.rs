@@ -74,9 +74,7 @@ pub fn AgentIconPicker(value: Option<String>, on_change: EventHandler<String>) -
                         search.set(String::new());
                     }
                 },
-                span { class: "material-symbols-outlined text-sm",
-                  "{icon_name}"
-                }
+                span { class: "material-symbols-outlined text-sm", "{icon_name}" }
               }
             }
             if filtered.is_empty() {

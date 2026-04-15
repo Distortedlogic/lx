@@ -7,7 +7,9 @@ use crate::components::page_skeleton::PageSkeleton;
 pub fn RoutineDetail(routine_id: String) -> Element {
   rsx! {
     SuspenseBoundary {
-      fallback: |_| rsx! { PageSkeleton { variant: "detail".to_string() } },
+      fallback: |_| rsx! {
+        PageSkeleton { variant: "detail".to_string() }
+      },
       RoutineDetailInner { routine_id }
     }
   }
@@ -206,7 +208,7 @@ fn settings_tab(routine: &Routine, id: &str, mut routines: Signal<Vec<Routine>>,
                   item.concurrency_policy = evt.value();
               }
           },
-          for (val , desc) in CONCURRENCY_POLICIES {
+          for (val, desc) in CONCURRENCY_POLICIES {
             option { value: *val, "{val} - {desc}" }
           }
         }
@@ -223,7 +225,7 @@ fn settings_tab(routine: &Routine, id: &str, mut routines: Signal<Vec<Routine>>,
                   item.catch_up_policy = evt.value();
               }
           },
-          for (val , desc) in CATCH_UP_POLICIES {
+          for (val, desc) in CATCH_UP_POLICIES {
             option { value: *val, "{val} - {desc}" }
           }
         }

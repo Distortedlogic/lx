@@ -74,7 +74,7 @@ fn ChoosePrompt(prompt_id: u64, message: String, options: Vec<String>) -> Elemen
   rsx! {
     div { class: "p-3 bg-[var(--surface-container)] rounded space-y-2",
       p { class: "text-sm", "{message}" }
-      for (i , opt) in options.iter().enumerate() {
+      for (i, opt) in options.iter().enumerate() {
         button {
           class: "block w-full text-left px-3 py-1 bg-[var(--surface-container-high)] rounded text-sm hover:bg-[var(--surface-bright)]",
           onclick: move |_| {

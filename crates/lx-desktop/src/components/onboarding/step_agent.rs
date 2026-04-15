@@ -67,7 +67,7 @@ pub fn StepAgent(
       div { class: "space-y-1",
         label { class: "text-xs text-[var(--outline)] block", "Adapter" }
         div { class: "grid grid-cols-3 gap-2",
-          for (key , label) in ADAPTER_LABELS.iter() {
+          for (key, label) in ADAPTER_LABELS.iter() {
             {
                 let k = *key;
                 let l = *label;
@@ -83,7 +83,9 @@ pub fn StepAgent(
                     key: "{k}",
                     class: cls,
                     onclick: move |_| agent_adapter.set(k.to_string()),
-                    span { class: "material-symbols-outlined text-lg text-[var(--on-surface-variant)]", "{icon}" }
+                    span { class: "material-symbols-outlined text-lg text-[var(--on-surface-variant)]",
+                      "{icon}"
+                    }
                     span { class: "text-[11px] text-[var(--on-surface)] leading-tight text-center", "{l}" }
                   }
                 }

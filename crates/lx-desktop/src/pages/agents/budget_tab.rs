@@ -16,7 +16,9 @@ pub fn BudgetTab(summary: BudgetSummary, on_save: EventHandler<i64>) -> Element 
 
   rsx! {
     div { class: "max-w-3xl space-y-6",
-      div { class: "inline-flex items-center gap-2 border rounded-full px-3 py-1 text-xs font-medium {status_tone}",
+      div {
+        class: "inline-flex items-center gap-2 border rounded-full px-3 py-1 text-xs font-medium",
+        class: "{status_tone}",
         "{summary.status}"
       }
       div { class: "grid gap-6 sm:grid-cols-2",

@@ -23,9 +23,7 @@ pub fn FailedRunRow(run: InboxFailedRun, on_dismiss: EventHandler<String>, on_re
     div { class: "group border-b border-[var(--outline-variant)] px-2 py-2.5 last:border-b-0",
       div { class: "flex items-start gap-2",
         div { class: "mt-0.5 shrink-0 rounded-md bg-red-500/20 p-1.5",
-          span { class: "material-symbols-outlined text-red-500 text-sm",
-            "cancel"
-          }
+          span { class: "material-symbols-outlined text-red-500 text-sm", "cancel" }
         }
         div { class: "min-w-0 flex-1",
           div { class: "text-sm font-medium truncate", {issue_display} }

@@ -35,7 +35,7 @@ pub fn CompanyImport() -> Element {
               div { class: "max-w-2xl mx-auto space-y-6",
                 h2 { class: "text-base font-semibold text-[var(--on-surface)]", "Select Import Source" }
                 div { class: "grid grid-cols-3 gap-4",
-                  for (kind , label , icon) in [
+                  for (kind, label, icon) in [
                       (ImportSourceKind::FileUpload, "Upload File", "upload_file"),
                       (ImportSourceKind::Url, "From URL", "link"),
                       (ImportSourceKind::GitHub, "From GitHub", "code"),
@@ -50,7 +50,8 @@ pub fn CompanyImport() -> Element {
                         };
                         rsx! {
                           button {
-                            class: "flex flex-col items-center gap-2 p-4 rounded-lg border cursor-pointer {border}",
+                            class: "flex flex-col items-center gap-2 p-4 rounded-lg border cursor-pointer",
+                            class: "{border}",
                             onclick: move |_| source_kind.set(kind),
                             span { class: "material-symbols-outlined text-lg text-[var(--outline)]", "{icon}" }
                             span { class: "text-sm font-medium text-[var(--on-surface)]", "{label}" }

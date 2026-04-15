@@ -202,7 +202,7 @@ fn create_dialog(mut routines: Signal<Vec<Routine>>, mut show_composer: Signal<b
                   class: select_cls,
                   value: "{draft_concurrency}",
                   onchange: move |evt| draft_concurrency.set(evt.value()),
-                  for (val , _desc) in CONCURRENCY_POLICIES {
+                  for (val, _desc) in CONCURRENCY_POLICIES {
                     option { value: *val, "{val}" }
                   }
                 }
@@ -216,7 +216,7 @@ fn create_dialog(mut routines: Signal<Vec<Routine>>, mut show_composer: Signal<b
                   class: select_cls,
                   value: "{draft_catch_up}",
                   onchange: move |evt| draft_catch_up.set(evt.value()),
-                  for (val , _desc) in CATCH_UP_POLICIES {
+                  for (val, _desc) in CATCH_UP_POLICIES {
                     option { value: *val, "{val}" }
                   }
                 }

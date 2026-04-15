@@ -90,7 +90,9 @@ pub fn StatusBadge(status: String) -> Element {
   };
   let label = text.to_string();
   rsx! {
-    span { class: "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium {bg}",
+    span {
+      class: "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium",
+      class: "{bg}",
       "{label}"
     }
   }

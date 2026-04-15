@@ -39,7 +39,7 @@ pub fn IssuesList(
         }
       }
       div { class: "flex gap-1",
-        for (label , statuses) in QUICK_FILTER_PRESETS {
+        for (label, statuses) in QUICK_FILTER_PRESETS {
           {
               let statuses_vec: Vec<String> = statuses.iter().map(|s| s.to_string()).collect();
               let is_active = view_state.read().statuses == statuses_vec;
@@ -123,7 +123,9 @@ fn IssueRow(issue: Issue, agents: Vec<AgentRef>, on_click: EventHandler<()>) -> 
     button {
       class: "flex items-center gap-3 px-3 py-2.5 w-full text-left border-b border-[var(--outline-variant)]/15 hover:bg-[var(--surface-container)] transition-colors",
       onclick: move |_| on_click.call(()),
-      span { class: "material-symbols-outlined text-sm {status_icon_class(&issue.status)}",
+      span {
+        class: "material-symbols-outlined text-sm",
+        class: "{status_icon_class(&issue.status)}",
         match issue.status.as_str() {
             "done" => "check_circle",
             "cancelled" => "cancel",
@@ -133,7 +135,9 @@ fn IssueRow(issue: Issue, agents: Vec<AgentRef>, on_click: EventHandler<()>) -> 
             _ => "circle",
         }
       }
-      span { class: "material-symbols-outlined text-sm {priority_icon_class(&issue.priority)}",
+      span {
+        class: "material-symbols-outlined text-sm",
+        class: "{priority_icon_class(&issue.priority)}",
         match issue.priority.as_str() {
             "critical" => "priority_high",
             "high" => "arrow_upward",

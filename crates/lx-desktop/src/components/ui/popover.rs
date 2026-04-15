@@ -31,10 +31,7 @@ pub fn PopoverContent(open: Signal<bool>, #[props(default)] class: String, child
     return rsx! {};
   }
   rsx! {
-    div {
-      class: "fixed inset-0 z-40",
-      onclick: move |_| open.set(false),
-    }
+    div { class: "fixed inset-0 z-40", onclick: move |_| open.set(false) }
     div {
       "data-slot": "popover-content",
       class: cn(

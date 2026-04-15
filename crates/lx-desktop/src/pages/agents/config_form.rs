@@ -65,7 +65,7 @@ pub fn AgentConfigPanel(config: LxAgentConfig, #[props(optional)] on_save: Optio
                 adapter_type.set(evt.value().to_string());
                 dirty.set(true);
             },
-            for (key , label) in ADAPTER_LABELS {
+            for (key, label) in ADAPTER_LABELS {
               option { value: *key, "{label}" }
             }
           }

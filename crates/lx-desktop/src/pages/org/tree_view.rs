@@ -71,7 +71,10 @@ fn OrgTreeNode(node: OrgNode, children_map: HashMap<String, Vec<OrgNode>>, all_n
         } else {
           span { class: "w-4" }
         }
-        span { class: "h-2 w-2 rounded-full shrink-0 {dot_cls}" }
+        span {
+          class: "h-2 w-2 rounded-full shrink-0",
+          class: "{dot_cls}",
+        }
         span { class: "font-medium text-[var(--on-surface)] flex-1", "{node.name}" }
         span { class: "text-xs text-[var(--outline)]", "{node.role}" }
       }

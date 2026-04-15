@@ -109,7 +109,7 @@ pub fn Select(
             }
           }
 
-          for (idx , opt) in filtered.iter().enumerate() {
+          for (idx, opt) in filtered.iter().enumerate() {
             {
                 render_select_item(opt, idx, &value, focused_index, open, search_query, onchange)
             }

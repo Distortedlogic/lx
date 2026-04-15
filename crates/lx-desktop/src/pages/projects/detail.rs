@@ -18,7 +18,9 @@ fn status_color(status: &str) -> &'static str {
 pub fn ProjectDetail(project_id: String) -> Element {
   rsx! {
     SuspenseBoundary {
-      fallback: |_| rsx! { PageSkeleton { variant: "detail".to_string() } },
+      fallback: |_| rsx! {
+        PageSkeleton { variant: "detail".to_string() }
+      },
       ProjectDetailInner { project_id }
     }
   }
@@ -46,7 +48,9 @@ fn ProjectDetailInner(project_id: String) -> Element {
           style: "background-color: {project.color}",
         }
         h2 { class: "page-heading", "{project.name}" }
-        span { class: "text-xs uppercase font-semibold tracking-wider {status_color(&project.status)}",
+        span {
+          class: "text-xs uppercase font-semibold tracking-wider",
+          class: "{status_color(&project.status)}",
           "{project.status}"
         }
       }
@@ -76,7 +80,9 @@ fn ProjectDetailInner(project_id: String) -> Element {
               span { class: "text-[10px] uppercase tracking-wider text-[var(--outline)] font-semibold",
                 "STATUS"
               }
-              span { class: "text-sm {status_color(&project.status)}",
+              span {
+                class: "text-sm",
+                class: "{status_color(&project.status)}",
                 "{project.status}"
               }
             }
@@ -142,7 +148,8 @@ fn render_configuration(mut projects: Signal<Vec<Project>>, idx: usize, project:
                 let ring = if active { "ring-2 ring-white" } else { "" };
                 rsx! {
                   button {
-                    class: "w-6 h-6 rounded {ring}",
+                    class: "w-6 h-6 rounded",
+                    class: "{ring}",
                     style: "background-color: {c}",
                     onclick: move |_| {
                         projects.write()[idx].color = c_val.clone();

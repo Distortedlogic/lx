@@ -52,7 +52,9 @@ pub fn PluginSettingsPage(plugin_id: String) -> Element {
           h1 { class: "text-xl font-semibold text-[var(--on-surface)]",
             "{plugin.display_name}"
           }
-          span { class: "px-2 py-0.5 rounded text-xs font-medium ml-2 {status_class}",
+          span {
+            class: "px-2 py-0.5 rounded text-xs font-medium ml-2",
+            class: "{status_class}",
             "{plugin.status}"
           }
           span { class: "px-2 py-0.5 rounded text-xs border border-[var(--outline-variant)] text-[var(--outline)] ml-1",
@@ -135,7 +137,9 @@ pub fn PluginSettingsPage(plugin_id: String) -> Element {
                   div { class: "p-4",
                     div { class: "flex items-center justify-between text-sm",
                       span { class: "text-[var(--outline)]", "Lifecycle" }
-                      span { class: "px-2 py-0.5 rounded text-xs font-medium {status_class}",
+                      span {
+                        class: "px-2 py-0.5 rounded text-xs font-medium",
+                        class: "{status_class}",
                         "{plugin.status}"
                       }
                     }

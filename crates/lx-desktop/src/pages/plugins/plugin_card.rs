@@ -73,7 +73,9 @@ pub fn PluginCard(
       div { class: "flex shrink-0 self-center",
         div { class: "flex flex-col items-end gap-2",
           div { class: "flex items-center gap-2",
-            span { class: "shrink-0 px-2 py-0.5 rounded text-xs font-medium {status_class}",
+            span {
+              class: "shrink-0 px-2 py-0.5 rounded text-xs font-medium",
+              class: "{status_class}",
               "{plugin.status}"
             }
             button {

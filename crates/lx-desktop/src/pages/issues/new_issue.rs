@@ -108,11 +108,7 @@ pub fn NewIssueDialog(open: bool, agents: Vec<AgentRef>, on_close: EventHandler<
           }
       },
       div {
-        class: if drag_hover() {
-            "bg-[var(--surface-container)] border-2 border-dashed border-[var(--primary)] rounded-lg w-full max-w-lg overflow-hidden"
-        } else {
-            "bg-[var(--surface-container)] border border-[var(--outline-variant)] rounded-lg w-full max-w-lg overflow-hidden"
-        },
+        class: if drag_hover() { "bg-[var(--surface-container)] border-2 border-dashed border-[var(--primary)] rounded-lg w-full max-w-lg overflow-hidden" } else { "bg-[var(--surface-container)] border border-[var(--outline-variant)] rounded-lg w-full max-w-lg overflow-hidden" },
         onclick: move |evt| evt.stop_propagation(),
         ondragover: move |evt: DragEvent| {
             evt.prevent_default();
@@ -201,18 +197,26 @@ pub fn NewIssueDialog(open: bool, agents: Vec<AgentRef>, on_close: EventHandler<
           }
           if !staged_files.read().is_empty() {
             div { class: "space-y-1",
-              label { class: "text-xs text-[var(--outline)] block mb-1", "Attachments" }
-              for (fi , file) in staged_files.read().iter().enumerate() {
+              label { class: "text-xs text-[var(--outline)] block mb-1",
+                "Attachments"
+              }
+              for (fi, file) in staged_files.read().iter().enumerate() {
                 div { class: "flex items-center gap-2 px-2 py-1 bg-[var(--surface-container-highest)] rounded text-xs text-[var(--on-surface)]",
-                  span { class: "material-symbols-outlined text-sm text-[var(--outline)]", "attach_file" }
+                  span { class: "material-symbols-outlined text-sm text-[var(--outline)]",
+                    "attach_file"
+                  }
                   span { class: "flex-1 truncate", "{file.name}" }
                   span { class: "text-[var(--outline)]/60 tabular-nums",
                     "{format_file_size(file.size)}"
                   }
                   button {
                     class: "text-[var(--outline)] hover:text-[var(--error)] ml-1",
-                    onclick: move |_| { staged_files.write().remove(fi); },
-                    span { class: "material-symbols-outlined text-sm", "close" }
+                    onclick: move |_| {
+                        staged_files.write().remove(fi);
+                    },
+                    span { class: "material-symbols-outlined text-sm",
+                      "close"
+                    }
                   }
                 }
               }

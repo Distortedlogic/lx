@@ -73,7 +73,8 @@ pub fn NewProjectDialog(open: Signal<bool>, projects: Signal<Vec<Project>>) -> E
                     let ring = if active { "ring-2 ring-white" } else { "" };
                     rsx! {
                       button {
-                        class: "w-6 h-6 rounded {ring}",
+                        class: "w-6 h-6 rounded",
+                        class: "{ring}",
                         style: "background-color: {c}",
                         onclick: move |_| color.set(c_val.clone()),
                       }
