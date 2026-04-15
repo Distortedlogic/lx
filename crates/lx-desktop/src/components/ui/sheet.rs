@@ -31,12 +31,12 @@ pub fn SheetContent(
   if !open() {
     return rsx! {};
   }
-  let mut open = open;
+  let mut open_signal = open;
   rsx! {
     div {
       "data-slot": "sheet-overlay",
       class: "fixed inset-0 z-50 bg-black/50",
-      onclick: move |_| open.set(false),
+      onclick: move |_| open_signal.set(false),
     }
     div {
       "data-slot": "sheet-content",
@@ -51,7 +51,7 @@ pub fn SheetContent(
         button {
           "data-slot": "sheet-close",
           class: "ring-offset-background focus:ring-ring absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none",
-          onclick: move |_| open.set(false),
+          onclick: move |_| open_signal.set(false),
           svg { view_box: "0 0 24 24", class: "size-4",
             line {
               x1: "18",

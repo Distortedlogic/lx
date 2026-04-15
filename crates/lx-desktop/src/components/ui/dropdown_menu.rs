@@ -11,13 +11,13 @@ pub fn DropdownMenu(open: Signal<bool>, children: Element) -> Element {
 
 #[component]
 pub fn DropdownMenuTrigger(open: Signal<bool>, children: Element) -> Element {
-  let mut open = open;
+  let mut open_signal = open;
   rsx! {
     button {
       "data-slot": "dropdown-menu-trigger",
       onclick: move |_| {
-          let v = open();
-          open.set(!v);
+          let v = open_signal();
+          open_signal.set(!v);
       },
       {children}
     }

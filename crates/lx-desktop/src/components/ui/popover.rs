@@ -11,13 +11,13 @@ pub fn Popover(open: Signal<bool>, children: Element) -> Element {
 
 #[component]
 pub fn PopoverTrigger(open: Signal<bool>, children: Element) -> Element {
-  let mut open = open;
+  let mut open_signal = open;
   rsx! {
     button {
       "data-slot": "popover-trigger",
       onclick: move |_| {
-          let v = open();
-          open.set(!v);
+          let v = open_signal();
+          open_signal.set(!v);
       },
       {children}
     }
@@ -26,12 +26,15 @@ pub fn PopoverTrigger(open: Signal<bool>, children: Element) -> Element {
 
 #[component]
 pub fn PopoverContent(open: Signal<bool>, #[props(default)] class: String, children: Element) -> Element {
-  let mut open = open;
-  if !open() {
+  let mut open_signal = open;
+  if !open_signal() {
     return rsx! {};
   }
   rsx! {
-    div { class: "fixed inset-0 z-40", onclick: move |_| open.set(false) }
+    div {
+      class: "fixed inset-0 z-40",
+      onclick: move |_| open_signal.set(false),
+    }
     div {
       "data-slot": "popover-content",
       class: cn(

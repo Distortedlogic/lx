@@ -17,13 +17,13 @@ pub fn Collapsible(open: Signal<bool>, #[props(default)] class: String, children
 
 #[component]
 pub fn CollapsibleTrigger(open: Signal<bool>, children: Element) -> Element {
-  let mut open = open;
+  let mut open_signal = open;
   rsx! {
     button {
       "data-slot": "collapsible-trigger",
       onclick: move |_| {
-          let v = open();
-          open.set(!v);
+          let v = open_signal();
+          open_signal.set(!v);
       },
       {children}
     }

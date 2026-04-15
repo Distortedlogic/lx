@@ -19,14 +19,14 @@ pub fn EditorTextarea(
       placeholder: "{placeholder}",
       oninput: {
           let eid = editor_id.clone();
-          let on_mention_trigger = on_mention_trigger;
-          let on_mention_dismiss = on_mention_dismiss;
+          let mention_trigger = on_mention_trigger;
+          let mention_dismiss = on_mention_dismiss;
           move |evt: FormEvent| {
               let new_val = evt.value().to_string();
               on_change.call(new_val.clone());
               let eid = eid.clone();
-              let on_mention_trigger = on_mention_trigger;
-              let on_mention_dismiss = on_mention_dismiss;
+              let trigger_handler = mention_trigger;
+              let dismiss_handler = mention_dismiss;
               spawn(async move {
                   let grow_js = format!(
                       "var el = document.getElementById('{eid}'); if (el) {{ el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }}",
@@ -61,13 +61,13 @@ pub fn EditorTextarea(
                                   .get(at_pos - 1)
                                   .is_some_and(|b| *b == b' ' || *b == b'\n');
                           if valid && preceded_by_space_or_start {
-                              if let Some(ref handler) = on_mention_trigger {
+                              if let Some(ref handler) = trigger_handler {
                                   handler.call((between.to_string(), at_pos));
                               }
                               return;
                           }
                       }
-                      if let Some(ref handler) = on_mention_dismiss {
+                      if let Some(ref handler) = dismiss_handler {
                           handler.call(());
                       }
                   }
@@ -75,7 +75,7 @@ pub fn EditorTextarea(
           }
       },
       onkeydown: {
-          let on_mention_nav = on_mention_nav;
+          let mention_nav = on_mention_nav;
           move |evt: KeyboardEvent| {
               if evt.modifiers().meta() && evt.key() == Key::Enter {
                   if let Some(ref handler) = on_submit {
@@ -85,7 +85,7 @@ pub fn EditorTextarea(
               }
               match evt.key() {
                   Key::ArrowDown | Key::ArrowUp | Key::Enter | Key::Escape => {
-                      if let Some(ref handler) = on_mention_nav {
+                      if let Some(ref handler) = mention_nav {
                           let dir = match evt.key() {
                               Key::ArrowDown => "down",
                               Key::ArrowUp => "up",

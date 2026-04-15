@@ -119,11 +119,11 @@ pub fn run_update(package: Option<&str>) -> ExitCode {
     },
   };
   let mut failed = false;
-  let targets: Vec<(&String, &DepSpec)> = if let Some(name) = package {
+  let targets: Vec<(&str, &DepSpec)> = if let Some(name) = package {
     match deps.get(name) {
       Some(spec) => {
         let key = deps.keys().find(|k| k.as_str() == name).expect("just matched");
-        vec![(key, spec)]
+        vec![(key.as_str(), spec)]
       },
       None => {
         eprintln!("error: '{name}' not found in [dependencies]");
@@ -131,7 +131,7 @@ pub fn run_update(package: Option<&str>) -> ExitCode {
       },
     }
   } else {
-    deps.iter().collect()
+    deps.iter().map(|(name, spec)| (name.as_str(), spec)).collect()
   };
   for (name, spec) in targets {
     match update_dep(&deps_dir, name, spec) {

@@ -39,7 +39,7 @@ pub fn DialogContent(open: Signal<bool>, #[props(default)] class: String, #[prop
     return rsx! {};
   }
 
-  let mut open = open;
+  let mut open_signal = open;
   let overlay_anim = if closing() { "animate-dialog-overlay-out" } else { "animate-dialog-overlay-in" };
   let content_anim = if closing() { "animate-dialog-content-out" } else { "animate-dialog-content-in" };
   rsx! {
@@ -47,7 +47,7 @@ pub fn DialogContent(open: Signal<bool>, #[props(default)] class: String, #[prop
       "data-slot": "dialog-overlay",
       class: "fixed inset-0 z-50 bg-black/50",
       class: "{overlay_anim}",
-      onclick: move |_| open.set(false),
+      onclick: move |_| open_signal.set(false),
     }
     div {
       "data-slot": "dialog-content",
@@ -66,7 +66,7 @@ pub fn DialogContent(open: Signal<bool>, #[props(default)] class: String, #[prop
       onkeydown: move |evt: KeyboardEvent| {
           if evt.key() == Key::Escape {
               evt.stop_propagation();
-              open.set(false);
+              open_signal.set(false);
               return;
           }
           if evt.key() == Key::Tab {
@@ -76,22 +76,22 @@ pub fn DialogContent(open: Signal<bool>, #[props(default)] class: String, #[prop
                   let direction = if shift { "backward" } else { "forward" };
                   let js = format!(
                       r#"(function() {{
-                                        var dialog = document.querySelector('[data-slot="dialog-content"]');
-                                        if (!dialog) return;
-                                        var focusable = dialog.querySelectorAll(
-                                            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-                                        );
-                                        if (focusable.length === 0) return;
-                                        var arr = Array.from(focusable);
-                                        var idx = arr.indexOf(document.activeElement);
-                                        if ('{direction}' === 'forward') {{
-                                            var next = (idx + 1) % arr.length;
-                                            arr[next].focus();
-                                        }} else {{
-                                            var prev = (idx - 1 + arr.length) % arr.length;
-                                            arr[prev].focus();
-                                        }}
-                                    }})()"#,
+                                            var dialog = document.querySelector('[data-slot="dialog-content"]');
+                                            if (!dialog) return;
+                                            var focusable = dialog.querySelectorAll(
+                                                'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+                                            );
+                                            if (focusable.length === 0) return;
+                                            var arr = Array.from(focusable);
+                                            var idx = arr.indexOf(document.activeElement);
+                                            if ('{direction}' === 'forward') {{
+                                                var next = (idx + 1) % arr.length;
+                                                arr[next].focus();
+                                            }} else {{
+                                                var prev = (idx - 1 + arr.length) % arr.length;
+                                                arr[prev].focus();
+                                            }}
+                                        }})()"#,
                   );
                   let _ = document::eval(&js).await;
               });
@@ -101,7 +101,7 @@ pub fn DialogContent(open: Signal<bool>, #[props(default)] class: String, #[prop
         button {
           "data-slot": "dialog-close",
           class: "ring-offset-background focus:ring-ring absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-          onclick: move |_| open.set(false),
+          onclick: move |_| open_signal.set(false),
           svg { view_box: "0 0 24 24", class: "size-4",
             line {
               x1: "18",

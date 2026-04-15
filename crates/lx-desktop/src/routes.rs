@@ -9,13 +9,11 @@ use crate::pages::approvals::{ApprovalDetail, Approvals};
 use crate::pages::companies::Companies;
 use crate::pages::company_export::CompanyExport;
 use crate::pages::company_import::CompanyImport;
-use crate::pages::company_settings::CompanySettings;
 use crate::pages::company_skills::CompanySkills;
 use crate::pages::costs::Costs;
 use crate::pages::dashboard::{Dashboard, DashboardAlt};
 use crate::pages::goals::{GoalDetail, Goals};
 use crate::pages::inbox::Inbox;
-use crate::pages::instance_settings::InstanceSettings;
 use crate::pages::issues::{IssueDetail, Issues};
 use crate::pages::not_found::NotFound;
 use crate::pages::onboarding::Onboarding;
@@ -23,7 +21,7 @@ use crate::pages::org::OrgChart;
 use crate::pages::plugins::{PluginManager, PluginPage, PluginSettingsPage};
 use crate::pages::projects::{ProjectDetail, Projects};
 use crate::pages::routines::{RoutineDetail, Routines};
-use crate::pages::settings::Settings;
+use crate::pages::settings::{CompanySettings, InstanceHeartbeats as InstanceSettings, Settings};
 use crate::pages::tools::Tools;
 
 #[derive(Clone, Routable, Debug, PartialEq, Eq)]
