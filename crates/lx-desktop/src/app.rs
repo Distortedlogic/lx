@@ -1,6 +1,7 @@
 use dioxus::prelude::*;
 
 use crate::routes::Route;
+use crate::runtime::DesktopRuntimeProvider;
 
 static TAILWIND_CSS: Asset = asset!("/assets/tailwind.css", AssetOptions::css().with_static_head(true));
 static FONTS_CSS: Asset = asset!("/assets/fonts.css", AssetOptions::css().with_static_head(true));
@@ -35,7 +36,7 @@ pub fn App() -> Element {
             crate::components::page_skeleton::PageSkeleton {}
           }
         },
-        Router::<Route> {}
+        DesktopRuntimeProvider { Router::<Route> {} }
       }
     }
   }

@@ -1,6 +1,8 @@
 pub mod catalog;
 pub mod commands;
 pub mod dioxus;
+pub mod history;
+pub mod inspector;
 pub mod model;
 pub mod protocol;
 

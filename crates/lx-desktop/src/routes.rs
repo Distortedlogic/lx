@@ -23,7 +23,7 @@ use crate::pages::plugins::{PluginManager, PluginPage, PluginSettingsPage};
 use crate::pages::projects::{ProjectDetail, Projects};
 use crate::pages::routines::{RoutineDetail, Routines};
 use crate::pages::settings::{CompanySettings, InstanceHeartbeats as InstanceSettings, Settings};
-use crate::pages::tools::Tools;
+use crate::pages::tools::{PiAgentPage, PiPage, Tools};
 
 #[derive(Clone, Routable, Debug, PartialEq, Eq)]
 #[rustfmt::skip]
@@ -71,6 +71,10 @@ pub enum Route {
         OrgChart {},
         #[route("/tools")]
         Tools {},
+        #[route("/tools/pi")]
+        PiPage {},
+        #[route("/tools/pi/:agent_id")]
+        PiAgentPage { agent_id: String },
         #[route("/settings")]
         Settings {},
         #[route("/accounts")]

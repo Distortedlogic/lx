@@ -96,6 +96,7 @@ pub const ADAPTER_LABELS: &[(&str, &str)] = &[
   ("openclaw_gateway", "OpenClaw Gateway"),
   ("process", "Process"),
   ("http", "HTTP"),
+  ("pi_rpc", "Pi RPC"),
 ];
 
 pub fn adapter_label(adapter_type: &str) -> &str {

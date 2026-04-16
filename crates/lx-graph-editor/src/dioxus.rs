@@ -8,6 +8,7 @@ use tokio::time::sleep;
 
 use crate::catalog::{GraphNodeTemplate, GraphPortTemplate, PortDirection, node_template};
 use crate::commands::GraphCommand;
+use crate::history::GraphEditorAction;
 use crate::model::{GraphDocument, GraphEntityRef, GraphNode, GraphPoint, GraphPortRef, GraphSelection, GraphViewport};
 use crate::protocol::{GraphWidgetDiagnostic, GraphWidgetDiagnosticSeverity};
 
@@ -18,6 +19,7 @@ pub fn GraphCanvas(
   diagnostics: Vec<GraphWidgetDiagnostic>,
   canvas_size: (f64, f64),
   on_command: EventHandler<GraphCommand>,
+  on_editor_action: EventHandler<GraphEditorAction>,
   on_canvas_size: EventHandler<(f64, f64)>,
   empty_title: String,
   empty_message: String,
@@ -30,6 +32,7 @@ pub fn GraphCanvas(
   let mut node_preview_positions = use_signal(HashMap::<String, GraphPoint>::new);
   let mut drag_state = use_signal(|| Option::<DragState>::None);
   let mut pan_state = use_signal(|| Option::<PanState>::None);
+  let mut marquee_state = use_signal(|| Option::<MarqueeState>::None);
   let mut connection_state = use_signal(|| Option::<ConnectionState>::None);
   let wheel_revision = use_signal(|| 0u64);
   let auto_framed_flow = use_signal(|| Option::<String>::None);
@@ -41,6 +44,7 @@ pub fn GraphCanvas(
   let preview_positions = node_preview_positions.read().clone();
   let is_dragging_node = drag_state.read().is_some();
   let is_panning = pan_state.read().is_some();
+  let is_marquee_selecting = marquee_state.read().is_some();
   let connection_preview = connection_state.read().clone();
   let (scene_width, scene_height) = canvas_size;
   let (world_width, world_height) = canvas_world_size(&document, &templates, &preview_positions);
@@ -56,7 +60,7 @@ pub fn GraphCanvas(
   };
   let selection_badge = selection_summary(&selection);
   let zoom_label = format!("{:.0}% zoom", displayed_viewport.zoom * 100.0);
-  let scene_class = if connection_preview.is_some() {
+  let scene_class = if connection_preview.is_some() || is_marquee_selecting {
     "relative flex-1 min-h-0 overflow-hidden outline-none cursor-crosshair"
   } else if is_panning || is_dragging_node {
     "relative flex-1 min-h-0 overflow-hidden outline-none cursor-grabbing"
@@ -102,11 +106,16 @@ pub fn GraphCanvas(
   let can_delete_selection = !selection.node_ids.is_empty() || !selection.edge_ids.is_empty();
   let interaction_document = document.clone();
   let interaction_selection = selection.clone();
+  let interaction_templates = templates.clone();
+  let interaction_preview_positions = preview_positions.clone();
+  let marquee_overlay = marquee_state.read().as_ref().map(marquee_bounds);
+  let marquee_base_selection = selection.clone();
 
   let finish_interaction = EventHandler::new({
     let on_command = on_command;
     let mut drag_state = drag_state;
     let mut pan_state = pan_state;
+    let mut marquee_state = marquee_state;
     let mut connection_state = connection_state;
     let mut viewport_preview = viewport_preview;
     let mut node_preview_positions = node_preview_positions;
@@ -124,6 +133,19 @@ pub fn GraphCanvas(
         }
         node_preview_positions.write().remove(&drag.node_id);
         drag_state.set(None);
+        return;
+      }
+
+      let current_marquee = marquee_state.peek().clone();
+      if let Some(marquee) = current_marquee {
+        if marquee.moved {
+          let scene_bounds = marquee_bounds(&marquee);
+          let world_bounds = world_bounds_from_scene(scene_bounds, displayed_viewport);
+          let next_selection =
+            selection_for_marquee(&interaction_document, &interaction_templates, &interaction_preview_positions, world_bounds, &marquee.base_selection);
+          on_command.call(GraphCommand::Select { selection: next_selection });
+        }
+        marquee_state.set(None);
         return;
       }
 
@@ -171,15 +193,22 @@ pub fn GraphCanvas(
       style: "background: linear-gradient(180deg, var(--graph-canvas-bg-start) 0%, var(--graph-canvas-bg-end) 100%); color: var(--graph-overlay-text);",
       div {
         class: "pointer-events-none absolute inset-0",
-        style: "background: radial-gradient(circle at top left, var(--graph-canvas-tint-primary) 0%, transparent 34%), radial-gradient(circle at bottom right, var(--graph-canvas-tint-secondary) 0%, transparent 28%);"
+        style: "background: radial-gradient(circle at top left, var(--graph-canvas-tint-primary) 0%, transparent 34%), radial-gradient(circle at bottom right, var(--graph-canvas-tint-secondary) 0%, transparent 28%);",
       }
-      div {
-        class: "pointer-events-none absolute right-4 top-4 z-10 flex max-w-[45%] flex-wrap items-center justify-end gap-2",
+      div { class: "pointer-events-none absolute right-4 top-4 z-10 flex max-w-[45%] flex-wrap items-center justify-end gap-2",
         if !diagnostics.is_empty() {
-          span { class: "{canvas_badge_class}", style: "{issue_badge_style}", "{issue_summary}" }
+          span {
+            class: "{canvas_badge_class}",
+            style: "{issue_badge_style}",
+            "{issue_summary}"
+          }
         }
         if !selection.is_empty() {
-          span { class: "{canvas_badge_class}", style: "{canvas_badge_style}", "{selection_badge}" }
+          span {
+            class: "{canvas_badge_class}",
+            style: "{canvas_badge_style}",
+            "{selection_badge}"
+          }
         }
       }
 
@@ -198,15 +227,32 @@ pub fn GraphCanvas(
             refresh_scene_metrics(scene_element, scene_rect, on_canvas_size);
             let _ = bump_revision(wheel_revision);
             let coords = evt.client_coordinates();
-            pan_state
-                .set(
-                    Some(PanState {
-                        start_client_x: coords.x,
-                        start_client_y: coords.y,
-                        origin: displayed_viewport,
-                        moved: false,
-                    }),
-                );
+            let scene_point = scene_point_from_client(
+                *scene_rect.read(),
+                coords.x,
+                coords.y,
+            );
+            if evt.modifiers().shift() {
+                marquee_state
+                    .set(
+                        Some(MarqueeState {
+                            start_scene: scene_point,
+                            current_scene: scene_point,
+                            base_selection: marquee_base_selection.clone(),
+                            moved: false,
+                        }),
+                    );
+            } else {
+                pan_state
+                    .set(
+                        Some(PanState {
+                            start_client_x: coords.x,
+                            start_client_y: coords.y,
+                            origin: displayed_viewport,
+                            moved: false,
+                        }),
+                    );
+            }
         },
         onpointermove: move |evt| {
             let coords = evt.client_coordinates();
@@ -220,6 +266,20 @@ pub fn GraphCanvas(
                 if let Some(connection) = connection_state.write().as_mut() {
                     connection.pointer = scene_point;
                 }
+                return;
+            }
+            let current_marquee = marquee_state.peek().clone();
+            if let Some(marquee) = current_marquee {
+                marquee_state
+                    .set(
+                        Some(MarqueeState {
+                            current_scene: scene_point,
+                            moved: marquee.moved
+                                || (scene_point.x - marquee.start_scene.x).abs() > 3.0
+                                || (scene_point.y - marquee.start_scene.y).abs() > 3.0,
+                            ..marquee
+                        }),
+                    );
                 return;
             }
             let current_drag = drag_state.peek().clone();
@@ -302,12 +362,51 @@ pub fn GraphCanvas(
                 sleep(Duration::from_millis(140)).await;
                 let next_viewport = *viewport_preview.peek();
                 if *wheel_revision.peek() == revision && let Some(viewport) = next_viewport {
-                    on_command.call(GraphCommand::SetViewport { viewport });
+                    on_command
+                        .call(GraphCommand::SetViewport {
+                            viewport,
+                        });
                     viewport_preview.set(None);
                 }
             });
         },
         onkeydown: move |evt: KeyboardEvent| {
+            let modifiers = evt.modifiers();
+            let command_key = modifiers.meta() || modifiers.ctrl();
+            if command_key && evt.key() == Key::Character("z".into()) {
+                evt.prevent_default();
+                if modifiers.shift() {
+                    on_editor_action.call(GraphEditorAction::Redo);
+                } else {
+                    on_editor_action.call(GraphEditorAction::Undo);
+                }
+                return;
+            }
+            if command_key && evt.key() == Key::Character("y".into()) {
+                evt.prevent_default();
+                on_editor_action.call(GraphEditorAction::Redo);
+                return;
+            }
+            if command_key && evt.key() == Key::Character("c".into()) {
+                evt.prevent_default();
+                on_editor_action.call(GraphEditorAction::CopySelection);
+                return;
+            }
+            if command_key && evt.key() == Key::Character("v".into()) {
+                evt.prevent_default();
+                on_editor_action.call(GraphEditorAction::PasteClipboard);
+                return;
+            }
+            if command_key && evt.key() == Key::Character("d".into()) {
+                evt.prevent_default();
+                on_editor_action.call(GraphEditorAction::DuplicateSelection);
+                return;
+            }
+            if command_key && evt.key() == Key::Character("a".into()) {
+                evt.prevent_default();
+                on_editor_action.call(GraphEditorAction::SelectAll);
+                return;
+            }
             if (evt.key() == Key::Delete || evt.key() == Key::Backspace)
                 && can_delete_selection
             {
@@ -317,11 +416,17 @@ pub fn GraphCanvas(
         },
         div {
           class: "pointer-events-none absolute inset-0",
-          style: "{grid_overlay_style}"
+          style: "{grid_overlay_style}",
+        }
+        if let Some(marquee_overlay) = marquee_overlay {
+          div {
+            class: "pointer-events-none absolute rounded-lg border",
+            style: "left: {marquee_overlay.min_x}px; top: {marquee_overlay.min_y}px; width: {marquee_overlay.max_x - marquee_overlay.min_x}px; height: {marquee_overlay.max_y - marquee_overlay.min_y}px; border-color: var(--graph-selection-border); background: color-mix(in srgb, var(--graph-selection-surface) 74%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--graph-selection-border) 45%, transparent);",
+          }
         }
         div {
           class: "pointer-events-none absolute inset-x-0 top-0 h-24",
-          style: "background: linear-gradient(180deg, var(--graph-canvas-top-fade) 0%, transparent 100%);"
+          style: "background: linear-gradient(180deg, var(--graph-canvas-top-fade) 0%, transparent 100%);",
         }
         div {
           class: "absolute left-0 top-0",
@@ -349,8 +454,7 @@ pub fn GraphCanvas(
                   };
                   let path_data = edge_path(from_point, to_point);
                   rsx! {
-                    g {
-                      key: "{edge.id}",
+                    g { key: "{edge.id}",
                       path {
                         d: "{path_data}",
                         fill: "none",
@@ -386,7 +490,10 @@ pub fn GraphCanvas(
                             focus_scene(scene_element);
                             let _ = bump_revision(wheel_revision);
                             if should_select_edge {
-                                on_command.call(GraphCommand::Select { selection: edge_selection.clone() });
+                                on_command
+                                    .call(GraphCommand::Select {
+                                        selection: edge_selection.clone(),
+                                    });
                             }
                         },
                       }
@@ -396,9 +503,7 @@ pub fn GraphCanvas(
                             let label_y = (from_point.y + to_point.y) / 2.0 - 10.0;
                             let label_width = edge_label.chars().count() as f64 * 6.6 + 18.0;
                             rsx! {
-                              g {
-                                transform: "translate({label_x} {label_y})",
-                                pointer_events: "none",
+                              g { transform: "translate({label_x} {label_y})", pointer_events: "none",
                                 rect {
                                   x: "{-label_width / 2.0}",
                                   y: "-11",
@@ -432,16 +537,19 @@ pub fn GraphCanvas(
               div {
                 class: "grid place-items-center",
                 style: "width: {world_width}px; height: {world_height}px;",
-                div { class: "rounded-2xl px-6 py-5 text-center",
+                div {
+                  class: "rounded-2xl px-6 py-5 text-center",
                   style: "border: 1px solid var(--graph-overlay-border); background: var(--graph-overlay-bg); backdrop-filter: blur(16px);",
-                  div { class: "text-[10px] font-semibold uppercase tracking-[0.22em]",
+                  div {
+                    class: "text-[10px] font-semibold uppercase tracking-[0.22em]",
                     style: "color: var(--graph-overlay-muted);",
                     "{empty_title}"
                   }
                   div { class: "mt-2 text-base font-semibold text-[var(--on-surface)]",
                     "Add a node to begin shaping this graph."
                   }
-                  p { class: "mt-2 max-w-sm text-sm leading-6",
+                  p {
+                    class: "mt-2 max-w-sm text-sm leading-6",
                     style: "color: var(--graph-overlay-muted);",
                     "{empty_message}"
                   }
@@ -458,7 +566,9 @@ pub fn GraphCanvas(
                     let node_label = node.label.clone().unwrap_or_else(|| node_id.clone());
                     let node_template_label =
                         template.as_ref().map_or(node_template_id.clone(), |template| template.label.clone());
-                    let node_category = template.as_ref().and_then(|template| template.category.as_deref().map(category_label));
+                    let node_category = template
+                        .as_ref()
+                        .and_then(|template| template.category.as_deref().map(category_label));
                     let node_selection = GraphSelection::single_node(node_id.clone());
                     let should_select_node = selection != node_selection;
                     let node_diagnostics: Vec<_> = diagnostics
@@ -492,7 +602,9 @@ pub fn GraphCanvas(
                             let _ = bump_revision(wheel_revision);
                             let coords = evt.client_coordinates();
                             if should_select_node {
-                                on_command.call(GraphCommand::Select { selection: node_selection.clone() });
+                                on_command.call(GraphCommand::Select {
+                                    selection: node_selection.clone(),
+                                });
                             }
                             drag_state
                                 .set(
@@ -507,17 +619,14 @@ pub fn GraphCanvas(
                         },
                         div {
                           class: "absolute inset-x-5 top-0 h-px",
-                          style: if is_selected {
-                              "background: linear-gradient(90deg, transparent, var(--graph-node-topline-selected), transparent);"
-                          } else {
-                              "background: linear-gradient(90deg, transparent, var(--graph-node-topline), transparent);"
-                          },
+                          style: if is_selected { "background: linear-gradient(90deg, transparent, var(--graph-node-topline-selected), transparent);" } else { "background: linear-gradient(90deg, transparent, var(--graph-node-topline), transparent);" },
                         }
                         div { style: "padding: 15px 16px 13px; border-bottom: 1px solid var(--graph-node-border); background: linear-gradient(180deg, var(--graph-node-header-start) 0%, var(--graph-node-header-end) 100%);",
                           div { class: "flex items-start justify-between gap-3",
                             div { class: "min-w-0",
                               if let Some(node_category) = node_category {
-                                div { class: "inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em]",
+                                div {
+                                  class: "inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em]",
                                   style: "background: var(--graph-node-category-bg); border-color: var(--graph-node-category-border); color: var(--graph-node-category-text);",
                                   "{node_category}"
                                 }
@@ -525,7 +634,8 @@ pub fn GraphCanvas(
                               div { class: "mt-3 truncate text-[17px] font-semibold text-[var(--on-surface)]",
                                 "{node_label}"
                               }
-                              div { class: "mt-1 truncate text-[12px]",
+                              div {
+                                class: "mt-1 truncate text-[12px]",
                                 style: "color: var(--graph-node-subtitle);",
                                 "{node_template_label}"
                               }
@@ -567,16 +677,16 @@ pub fn GraphCanvas(
                                           let current_connection = connection_state.peek().clone();
                                           if let Some(connection) = current_connection {
                                               let edge_id = uuid::Uuid::new_v4().to_string();
-                                          let command = GraphCommand::ConnectPorts {
-                                              edge_id,
-                                              from: connection.from,
-                                              to: GraphPortRef {
-                                                  node_id: target_node_id.clone(),
-                                                  port_id: target_port_id.clone(),
-                                              },
-                                              label: None,
-                                          };
-                                          on_command.call(command);
+                                              let command = GraphCommand::ConnectPorts {
+                                                  edge_id,
+                                                  from: connection.from,
+                                                  to: GraphPortRef {
+                                                      node_id: target_node_id.clone(),
+                                                      port_id: target_port_id.clone(),
+                                                  },
+                                                  label: None,
+                                              };
+                                              on_command.call(command);
                                               connection_state.set(None);
                                           }
                                       },
@@ -664,15 +774,26 @@ pub fn GraphCanvas(
         }
       }
       if has_nodes {
-        div {
-          class: "pointer-events-none absolute bottom-4 right-4 z-10 flex items-center gap-2",
-          span { class: "{canvas_badge_class}", style: "{canvas_badge_style}", "{zoom_label}" }
+        div { class: "pointer-events-none absolute bottom-4 right-4 z-10 flex items-center gap-2",
+          span {
+            class: "{canvas_badge_class}",
+            style: "{canvas_badge_style}",
+            "{zoom_label}"
+          }
           button {
             class: "pointer-events-auto {canvas_control_class}",
             style: "{canvas_control_style}",
             onclick: move |_| {
-                if let Some(viewport) = fit_viewport(&document, &templates, scene_width, scene_height) {
-                    on_command.call(GraphCommand::SetViewport { viewport });
+                if let Some(viewport) = fit_viewport(
+                    &document,
+                    &templates,
+                    scene_width,
+                    scene_height,
+                ) {
+                    on_command
+                        .call(GraphCommand::SetViewport {
+                            viewport,
+                        });
                 }
             },
             "Fit View"
@@ -705,6 +826,14 @@ struct PanState {
   start_client_x: f64,
   start_client_y: f64,
   origin: GraphViewport,
+  moved: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct MarqueeState {
+  start_scene: GraphPoint,
+  current_scene: GraphPoint,
+  base_selection: GraphSelection,
   moved: bool,
 }
 
@@ -816,6 +945,24 @@ fn world_point_from_scene(viewport: GraphViewport, point: GraphPoint) -> GraphPo
   GraphPoint { x: (point.x - viewport.pan_x) / viewport.zoom, y: (point.y - viewport.pan_y) / viewport.zoom }
 }
 
+fn marquee_bounds(marquee: &MarqueeState) -> GraphBounds {
+  GraphBounds {
+    min_x: marquee.start_scene.x.min(marquee.current_scene.x),
+    min_y: marquee.start_scene.y.min(marquee.current_scene.y),
+    max_x: marquee.start_scene.x.max(marquee.current_scene.x),
+    max_y: marquee.start_scene.y.max(marquee.current_scene.y),
+  }
+}
+
+fn world_bounds_from_scene(bounds: GraphBounds, viewport: GraphViewport) -> GraphBounds {
+  GraphBounds {
+    min_x: (bounds.min_x - viewport.pan_x) / viewport.zoom,
+    min_y: (bounds.min_y - viewport.pan_y) / viewport.zoom,
+    max_x: (bounds.max_x - viewport.pan_x) / viewport.zoom,
+    max_y: (bounds.max_y - viewport.pan_y) / viewport.zoom,
+  }
+}
+
 fn canvas_world_size(document: &GraphDocument, templates: &[GraphNodeTemplate], preview_positions: &HashMap<String, GraphPoint>) -> (f64, f64) {
   let width = document.nodes.iter().map(|node| displayed_node_position(node, preview_positions).x + NODE_WIDTH + 180.0).fold(1280.0, f64::max);
   let height = document
@@ -886,6 +1033,45 @@ fn world_bounds_to_screen(bounds: GraphBounds, viewport: GraphViewport) -> Graph
     max_x: bounds.max_x * viewport.zoom + viewport.pan_x,
     max_y: bounds.max_y * viewport.zoom + viewport.pan_y,
   }
+}
+
+fn selection_for_marquee(
+  document: &GraphDocument,
+  templates: &[GraphNodeTemplate],
+  preview_positions: &HashMap<String, GraphPoint>,
+  world_bounds: GraphBounds,
+  base_selection: &GraphSelection,
+) -> GraphSelection {
+  let mut node_ids = base_selection.node_ids.clone();
+
+  for node in &document.nodes {
+    let position = displayed_node_position(node, preview_positions);
+    let node_bounds = GraphBounds {
+      min_x: position.x,
+      min_y: position.y,
+      max_x: position.x + NODE_WIDTH,
+      max_y: position.y + node_height(node_template(templates, &node.template_id)),
+    };
+    if bounds_intersect(world_bounds, node_bounds) && !node_ids.iter().any(|selected| selected == &node.id) {
+      node_ids.push(node.id.clone());
+    }
+  }
+
+  let node_id_set = node_ids.iter().cloned().collect::<std::collections::HashSet<_>>();
+  let mut edge_ids = base_selection.edge_ids.clone();
+  for edge in &document.edges {
+    if node_id_set.contains(&edge.from.node_id) && node_id_set.contains(&edge.to.node_id) && !edge_ids.iter().any(|selected| selected == &edge.id) {
+      edge_ids.push(edge.id.clone());
+    }
+  }
+
+  let anchor = node_ids.first().cloned().map(GraphEntityRef::Node).or_else(|| edge_ids.first().cloned().map(GraphEntityRef::Edge));
+
+  GraphSelection { anchor, node_ids, edge_ids }
+}
+
+fn bounds_intersect(a: GraphBounds, b: GraphBounds) -> bool {
+  a.min_x <= b.max_x && a.max_x >= b.min_x && a.min_y <= b.max_y && a.max_y >= b.min_y
 }
 
 const FIT_VIEW_PADDING_X: f64 = 56.0;

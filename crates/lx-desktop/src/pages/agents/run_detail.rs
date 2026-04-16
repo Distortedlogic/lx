@@ -3,9 +3,12 @@ use dioxus::prelude::*;
 use super::list::StatusBadge;
 use super::run_types::{HeartbeatRun, RunMetrics, format_tokens, run_metrics, source_label};
 use super::transcript::TranscriptView;
+use crate::runtime::use_desktop_runtime;
+use crate::widgets::{PiToolActivity, PiTranscript};
 
 #[component]
 pub fn RunDetailPanel(run: HeartbeatRun) -> Element {
+  let runtime = use_desktop_runtime();
   let metrics = run_metrics(&run);
   let short_id = &run.id[..8.min(run.id.len())];
   let is_live = run.status == "running" || run.status == "queued";
@@ -34,7 +37,14 @@ pub fn RunDetailPanel(run: HeartbeatRun) -> Element {
           p { class: "text-xs text-red-600", "{err}" }
         }
       }
-      TranscriptView { run_id: run.id.clone() }
+      if runtime.registry.find_agent(&run.agent_id).is_some() {
+        div { class: "space-y-4",
+          PiTranscript { agent_id: run.agent_id.clone() }
+          PiToolActivity { agent_id: run.agent_id.clone() }
+        }
+      } else {
+        TranscriptView { run_id: run.id.clone() }
+      }
     }
   }
 }

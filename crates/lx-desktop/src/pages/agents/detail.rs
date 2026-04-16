@@ -7,6 +7,8 @@ use super::runs_tab::RunsTab;
 use super::skills_tab::SkillsTab;
 use super::types::{AgentDetail as AgentDetailData, AgentDetailTab, LxAgentConfig, role_label};
 use crate::contexts::activity_log::ActivityLog;
+use crate::routes::Route;
+use crate::runtime::use_desktop_runtime;
 use dioxus::prelude::*;
 
 #[component]
@@ -19,13 +21,17 @@ pub fn AgentDetailShell(
   on_terminate: EventHandler<()>,
 ) -> Element {
   let mut active_tab = use_signal(|| AgentDetailTab::Overview);
+  let runtime = use_desktop_runtime();
+  let navigator = use_navigator();
 
   let log = use_context::<ActivityLog>();
   let all_events = log.events.read();
 
   let agent_events: Vec<_> = all_events.iter().filter(|e| e.message.contains(&agent.name) || e.kind.contains("agent")).cloned().collect();
 
-  let runs: Vec<HeartbeatRun> = {
+  let runs: Vec<HeartbeatRun> = if runtime.registry.find_agent(&agent.id).is_some() {
+    runtime.registry.runs_for_agent(&agent.id)
+  } else {
     let mut run_list = Vec::new();
     for event in agent_events.iter() {
       if event.kind == "agent_start" || event.kind == "agent_running" {
@@ -79,6 +85,21 @@ pub fn AgentDetailShell(
           }
         }
         div { class: "flex items-center gap-2 shrink-0",
+          if agent.adapter_type == "pi_rpc" {
+            button {
+              class: "btn-outline-sm",
+              onclick: {
+                  let agent_id = agent.id.clone();
+                  move |_| {
+                      navigator
+                          .push(Route::PiAgentPage {
+                              agent_id: agent_id.clone(),
+                          });
+                  }
+              },
+              "Open Widget"
+            }
+          }
           button {
             class: "btn-outline-sm",
             onclick: move |_| on_run.call(()),

@@ -1,6 +1,7 @@
 pub mod catalog;
 mod controller;
 pub mod inspector;
+mod runtime_bar;
 mod sample;
 pub mod storage;
 pub mod validation;
@@ -9,13 +10,17 @@ mod workspace;
 use dioxus::prelude::*;
 
 use self::controller::FlowEditorState;
+use self::runtime_bar::FlowRuntimeBar;
 use self::storage::provide_flow_persistence;
 use self::workspace::FlowWorkspace;
 
 #[component]
 pub fn Flows() -> Element {
   rsx! {
-    FlowWorkspace {}
+    div { class: "flex flex-col h-full min-h-0",
+      FlowRuntimeBar {}
+      FlowWorkspace {}
+    }
   }
 }
 
@@ -23,7 +28,10 @@ pub fn Flows() -> Element {
 pub fn FlowDetail(flow_id: String) -> Element {
   let _ = flow_id;
   rsx! {
-    FlowWorkspace {}
+    div { class: "flex flex-col h-full min-h-0",
+      FlowRuntimeBar {}
+      FlowWorkspace {}
+    }
   }
 }
 

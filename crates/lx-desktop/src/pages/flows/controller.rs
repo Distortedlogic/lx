@@ -5,6 +5,7 @@ use anyhow::Result as AnyhowResult;
 use crate::contexts::panel::{PanelContent, PanelState};
 use lx_graph_editor::catalog::GraphNodeTemplate;
 use lx_graph_editor::commands::{GraphCommand, GraphCommandError, apply_graph_command};
+use lx_graph_editor::history::{GraphEditorAction, GraphHistoryState};
 use lx_graph_editor::model::{GraphDocument, GraphPoint, GraphSelection};
 use lx_graph_editor::protocol::GraphWidgetDiagnostic;
 
@@ -22,6 +23,7 @@ pub struct FlowEditorState {
   pub canvas_size: Signal<(f64, f64)>,
   pub selection: Signal<GraphSelection>,
   pub validation_count: Signal<usize>,
+  pub history: Signal<GraphHistoryState>,
   pub status_message: Signal<Option<String>>,
   pub panel: PanelState,
 }
@@ -43,6 +45,7 @@ impl FlowEditorState {
       canvas_size: use_signal(|| (1200.0, 760.0)),
       selection: use_signal(|| initial_selection),
       validation_count: use_signal(|| 0usize),
+      history: use_signal(GraphHistoryState::default),
       status_message: use_signal(|| initial_status),
       panel,
     };
@@ -53,11 +56,18 @@ impl FlowEditorState {
   }
 
   pub fn dispatch(&mut self, command: GraphCommand) -> std::result::Result<(), GraphCommandError> {
+    let before = self.document.read().clone();
     let templates = self.templates.read().clone();
+    let history_command = command.clone();
     let status = describe_command(&command);
     {
       let mut document = self.document.write();
       apply_graph_command(&mut document, &templates, command)?;
+    }
+    let after = self.document.read().clone();
+    if before != after {
+      let mut history = self.history;
+      history.write().record_command(&before, &history_command);
     }
     self.recompute_diagnostics();
     self.sync_shell_state();
@@ -110,6 +120,83 @@ impl FlowEditorState {
     Ok(())
   }
 
+  pub fn apply_editor_action(&mut self, action: &GraphEditorAction) {
+    match action {
+      GraphEditorAction::Undo => {
+        let current = self.document.read().clone();
+        let next = {
+          let mut history = self.history;
+          history.write().undo(&current)
+        };
+        if let Some(document) = next {
+          self.apply_document(document);
+          self.set_status_message("Undid graph edit".to_string());
+        }
+      },
+      GraphEditorAction::Redo => {
+        let current = self.document.read().clone();
+        let next = {
+          let mut history = self.history;
+          history.write().redo(&current)
+        };
+        if let Some(document) = next {
+          self.apply_document(document);
+          self.set_status_message("Redid graph edit".to_string());
+        }
+      },
+      GraphEditorAction::CopySelection => {
+        let current = self.document.read().clone();
+        let copied = {
+          let mut history = self.history;
+          history.write().copy_selection(&current)
+        };
+        if copied {
+          self.set_status_message("Copied selection".to_string());
+        }
+      },
+      GraphEditorAction::PasteClipboard => {
+        let current = self.document.read().clone();
+        let next = {
+          let mut history = self.history;
+          let mut history_state = history.write();
+          let next = history_state.paste_clipboard(&current);
+          if next.is_some() {
+            history_state.record_snapshot_change(&current);
+          }
+          next
+        };
+        if let Some(document) = next {
+          self.apply_document(document);
+          self.set_status_message("Pasted selection".to_string());
+        }
+      },
+      GraphEditorAction::DuplicateSelection => {
+        let current = self.document.read().clone();
+        let next = {
+          let mut history = self.history;
+          let mut history_state = history.write();
+          let next = history_state.duplicate_selection(&current);
+          if next.is_some() {
+            history_state.record_snapshot_change(&current);
+          }
+          next
+        };
+        if let Some(document) = next {
+          self.apply_document(document);
+          self.set_status_message("Duplicated selection".to_string());
+        }
+      },
+      GraphEditorAction::SelectAll => {
+        let current = self.document.read().clone();
+        let selection = {
+          let history = self.history;
+          history.read().select_all(&current)
+        };
+        let _ = self.dispatch(GraphCommand::Select { selection });
+      },
+    }
+  }
+
   fn sync_shell_state(&self) {
     let selection = self.document.read().selection.clone();
     let validation_count = self.diagnostics.read().len();
@@ -131,20 +218,26 @@ impl FlowEditorState {
   }
 
   fn replace_document(&self, flow_id: String, document: GraphDocument) {
-    let selection = document.selection.clone();
     let mut flow_id_signal = self.flow_id;
     flow_id_signal.set(flow_id);
+    self.apply_document(document);
+    let mut history = self.history;
+    history.write().clear();
+  }
+
+  fn set_status_message(&self, message: String) {
+    let mut status_message = self.status_message;
+    status_message.set(Some(message));
+  }
+
+  fn apply_document(&self, document: GraphDocument) {
+    let selection = document.selection.clone();
     let mut document_signal = self.document;
     document_signal.set(document);
     let mut selection_signal = self.selection;
     selection_signal.set(selection);
     self.recompute_diagnostics();
     self.sync_shell_state();
-  }
-
-  fn set_status_message(&self, message: String) {
-    let mut status_message = self.status_message;
-    status_message.set(Some(message));
   }
 }
 

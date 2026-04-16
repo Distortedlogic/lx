@@ -5,6 +5,7 @@ use crate::routes::Route;
 use lx_graph_editor::catalog::GraphNodeTemplate;
 use lx_graph_editor::commands::GraphCommand;
 use lx_graph_editor::dioxus::GraphCanvas;
+use lx_graph_editor::history::GraphEditorAction;
 use lx_graph_editor::model::{GraphEntityRef, GraphSelection};
 use lx_graph_editor::protocol::{GraphWidgetDiagnostic, GraphWidgetDiagnosticSeverity};
 
@@ -128,10 +129,14 @@ pub fn FlowWorkspace() -> Element {
           if !selection.is_empty() || status_message.is_some() {
             div { class: "max-w-md text-right text-sm text-[var(--on-surface-variant)]",
               if !selection.is_empty() {
-                div { class: "font-medium text-[var(--on-surface)]", "{selection_summary}" }
+                div { class: "font-medium text-[var(--on-surface)]",
+                  "{selection_summary}"
+                }
               }
               if let Some(message) = status_message {
-                div { class: if selection.is_empty() { "text-xs text-[var(--outline)]" } else { "mt-1 text-xs text-[var(--outline)]" }, "{message}" }
+                div { class: if selection.is_empty() { "text-xs text-[var(--outline)]" } else { "mt-1 text-xs text-[var(--outline)]" },
+                  "{message}"
+                }
               }
             }
           }
@@ -147,17 +152,15 @@ pub fn FlowWorkspace() -> Element {
               diagnostics: diagnostics.clone(),
               canvas_size: state.current_canvas_size(),
               on_command: move |command: GraphCommand| dispatch_canvas_command(&mut state, command),
+              on_editor_action: move |action: GraphEditorAction| state.apply_editor_action(&action),
               on_canvas_size: move |size: (f64, f64)| state.register_canvas_size(size.0, size.1),
               empty_title: "Canvas".to_string(),
-              empty_message: "Use the node palette to drop the first step into the graph. New nodes land in the current viewport center.".to_string(),
+              empty_message: "Use the node palette to drop the first step into the graph. New nodes land in the current viewport center."
+                  .to_string(),
             }
             button {
               class: "absolute left-4 top-4 z-30 rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] transition-all hover:brightness-105",
-              style: if *palette_open.read() {
-                  "border: 1px solid var(--graph-selection-border); background: var(--graph-selection-surface); color: var(--graph-selection-text); backdrop-filter: blur(14px);"
-              } else {
-                  "border: 1px solid var(--graph-overlay-border); background: var(--graph-overlay-bg); color: var(--graph-overlay-text); backdrop-filter: blur(14px);"
-              },
+              style: if *palette_open.read() { "border: 1px solid var(--graph-selection-border); background: var(--graph-selection-surface); color: var(--graph-selection-text); backdrop-filter: blur(14px);" } else { "border: 1px solid var(--graph-overlay-border); background: var(--graph-overlay-bg); color: var(--graph-overlay-text); backdrop-filter: blur(14px);" },
               onclick: move |_| {
                   let next_open = !*palette_open.peek();
                   palette_open.set(next_open);
@@ -174,15 +177,18 @@ pub fn FlowWorkspace() -> Element {
                 style: "background: var(--graph-overlay-scrim);",
                 onclick: move |_| palette_open.set(false),
               }
-              aside { class: "absolute left-4 top-16 bottom-4 z-30 flex w-[19rem] flex-col rounded-2xl p-4",
+              aside {
+                class: "absolute left-4 top-16 bottom-4 z-30 flex w-[19rem] flex-col rounded-2xl p-4",
                 style: "border: 1px solid var(--graph-overlay-border); background: var(--graph-overlay-bg-strong); box-shadow: var(--graph-overlay-shadow); backdrop-filter: blur(18px);",
                 div { class: "flex items-start justify-between gap-3",
                   div {
-                    div { class: "text-[11px] font-mono uppercase tracking-[0.2em]",
+                    div {
+                      class: "text-[11px] font-mono uppercase tracking-[0.2em]",
                       style: "color: var(--graph-overlay-muted);",
                       "Node Palette"
                     }
-                    p { class: "mt-1.5 max-w-xs text-[13px] leading-5",
+                    p {
+                      class: "mt-1.5 max-w-xs text-[13px] leading-5",
                       style: "color: var(--graph-overlay-muted);",
                       "Insert steps into the graph. New nodes appear at the current viewport center."
                     }
@@ -204,7 +210,8 @@ pub fn FlowWorkspace() -> Element {
                 }
                 div { class: "mt-3 flex-1 overflow-y-auto pr-1",
                   if filtered_templates.is_empty() {
-                    div { class: "rounded-xl border border-dashed px-3 py-4 text-sm",
+                    div {
+                      class: "rounded-xl border border-dashed px-3 py-4 text-sm",
                       style: "border-color: var(--graph-overlay-border); color: var(--graph-overlay-muted);",
                       "No nodes match this query."
                     }
@@ -245,7 +252,8 @@ pub fn FlowWorkspace() -> Element {
 #[component]
 fn StatusPill(label: String) -> Element {
   rsx! {
-    span { class: "rounded-full border border-[var(--outline-variant)] bg-[var(--surface-container-high)] px-2.5 py-1 text-[11px] font-medium text-[var(--on-surface-variant)]",
+    span {
+      class: "rounded-full border border-[var(--outline-variant)] bg-[var(--surface-container-high)] px-2.5 py-1 text-[11px] font-medium text-[var(--on-surface-variant)]",
       style: "box-shadow: inset 0 1px 0 color-mix(in srgb, var(--on-surface) 3%, transparent);",
       "{label}"
     }
@@ -267,7 +275,9 @@ fn PaletteTemplateCard(template: GraphNodeTemplate, on_add: EventHandler<String>
               "{category}"
             }
           }
-          div { class: "mt-2 text-[13px] font-semibold text-[var(--on-surface)] truncate", "{template.label}" }
+          div { class: "mt-2 text-[13px] font-semibold text-[var(--on-surface)] truncate",
+            "{template.label}"
+          }
         }
         button {
           class: "rounded-lg border border-[var(--outline-variant)] bg-[var(--surface-container-high)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)]",
@@ -276,7 +286,8 @@ fn PaletteTemplateCard(template: GraphNodeTemplate, on_add: EventHandler<String>
         }
       }
       if let Some(description) = description {
-        p { class: "mt-2 text-[11px] leading-5 text-[var(--on-surface-variant)]",
+        p {
+          class: "mt-2 text-[11px] leading-5 text-[var(--on-surface-variant)]",
           style: "display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;",
           "{description}"
         }
@@ -342,7 +353,8 @@ fn ValidationDiagnosticRow(diagnostic: GraphWidgetDiagnostic) -> Element {
       div { class: "flex items-center justify-between gap-3",
         span { class: "font-medium", "{diagnostic.message}" }
         if let Some(target_chip) = target_chip {
-          span { class: "rounded-full border px-2 py-1 text-[11px] font-mono",
+          span {
+            class: "rounded-full border px-2 py-1 text-[11px] font-mono",
             style: "border-color: var(--graph-overlay-border); color: var(--graph-overlay-text);",
             "{target_chip}"
           }

@@ -121,28 +121,28 @@ pub fn Shell() -> Element {
         div { class: "flex min-w-0 flex-col flex-1 h-full",
           BreadcrumbBar {}
           match route.clone() {
-            Route::Flows {} => rsx! {
-              FlowRouteScope { flow_id: None,
+              Route::Flows {} => rsx! {
+                FlowRouteScope { flow_id: None,
+                  div { class: "flex flex-1 min-h-0",
+                    ShellPageOutlet {}
+                    PropertiesPanel {}
+                  }
+                }
+              },
+              Route::FlowDetail { flow_id } => rsx! {
+                FlowRouteScope { key: "{flow_id}", flow_id: Some(flow_id),
+                  div { class: "flex flex-1 min-h-0",
+                    ShellPageOutlet {}
+                    PropertiesPanel {}
+                  }
+                }
+              },
+              _ => rsx! {
                 div { class: "flex flex-1 min-h-0",
                   ShellPageOutlet {}
                   PropertiesPanel {}
                 }
-              }
-            },
-            Route::FlowDetail { flow_id } => rsx! {
-              FlowRouteScope { key: "{flow_id}", flow_id: Some(flow_id),
-                div { class: "flex flex-1 min-h-0",
-                  ShellPageOutlet {}
-                  PropertiesPanel {}
-                }
-              }
-            },
-            _ => rsx! {
-              div { class: "flex flex-1 min-h-0",
-                ShellPageOutlet {}
-                PropertiesPanel {}
-              }
-            },
+              },
           }
         }
       }

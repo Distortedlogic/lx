@@ -8,7 +8,9 @@ pub mod pages;
 pub mod panes;
 pub mod plugins;
 pub mod routes;
+pub mod runtime;
 pub mod terminal;
 pub mod voice_backend;
 #[cfg(feature = "desktop")]
 pub mod webview_permissions;
+pub mod widgets;
