@@ -2,9 +2,9 @@ use dioxus::prelude::*;
 use serde_json::{Value, json};
 
 use crate::contexts::panel::PanelContent;
-use crate::graph_editor::catalog::{GraphFieldKind, GraphFieldSchema, GraphNodeTemplate, node_template};
-use crate::graph_editor::commands::GraphCommand;
-use crate::graph_editor::protocol::{GraphWidgetDiagnostic, GraphWidgetDiagnosticSeverity};
+use lx_graph_editor::catalog::{GraphFieldKind, GraphFieldSchema, GraphNodeTemplate, node_template};
+use lx_graph_editor::commands::GraphCommand;
+use lx_graph_editor::protocol::{GraphWidgetDiagnostic, GraphWidgetDiagnosticSeverity};
 
 use super::controller::try_flow_editor_state;
 
@@ -38,7 +38,7 @@ fn FlowNodeInspector(node_id: String) -> Element {
   let template = node_template(&templates, &node.template_id).cloned();
   let node_diagnostics: Vec<_> = diagnostics
     .into_iter()
-    .filter(|diagnostic| matches!(diagnostic.target, Some(crate::graph_editor::model::GraphEntityRef::Node(ref id)) if id == &node_id))
+    .filter(|diagnostic| matches!(diagnostic.target, Some(lx_graph_editor::model::GraphEntityRef::Node(ref id)) if id == &node_id))
     .collect();
 
   rsx! {
@@ -109,7 +109,7 @@ fn FlowEdgeInspector(edge_id: String) -> Element {
   let target_label = format!("{}:{}", edge.to.node_id, edge.to.port_id);
   let edge_diagnostics: Vec<_> = diagnostics
     .into_iter()
-    .filter(|diagnostic| matches!(diagnostic.target, Some(crate::graph_editor::model::GraphEntityRef::Edge(ref id)) if id == &edge_id))
+    .filter(|diagnostic| matches!(diagnostic.target, Some(lx_graph_editor::model::GraphEntityRef::Edge(ref id)) if id == &edge_id))
     .collect();
 
   rsx! {

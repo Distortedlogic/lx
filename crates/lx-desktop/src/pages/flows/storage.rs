@@ -5,7 +5,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use dioxus::prelude::*;
 
-use crate::graph_editor::model::GraphDocument;
+use lx_graph_editor::model::GraphDocument;
 
 use super::sample::{DEFAULT_FLOW_ID, sample_document};
 

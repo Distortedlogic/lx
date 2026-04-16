@@ -2,9 +2,9 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use serde_json::Value;
 
-use crate::graph_editor::catalog::{GraphFieldKind, GraphNodeTemplate, PortDirection, node_template, port_template};
-use crate::graph_editor::model::{GraphDocument, GraphEntityRef};
-use crate::graph_editor::protocol::{GraphWidgetDiagnostic, GraphWidgetDiagnosticSeverity};
+use lx_graph_editor::catalog::{GraphFieldKind, GraphNodeTemplate, PortDirection, node_template, port_template};
+use lx_graph_editor::model::{GraphDocument, GraphEntityRef};
+use lx_graph_editor::protocol::{GraphWidgetDiagnostic, GraphWidgetDiagnosticSeverity};
 
 pub fn validate_workflow(document: &GraphDocument, templates: &[GraphNodeTemplate]) -> Vec<GraphWidgetDiagnostic> {
   let mut diagnostics = Vec::new();
@@ -216,12 +216,12 @@ mod tests {
     let templates = workflow_node_templates();
     let mut document = sample_document("newsfeed-research");
     document.edges.retain(|edge| edge.id != "edge-sources-fetch");
-    document.edges.push(crate::graph_editor::model::GraphEdge {
+    document.edges.push(lx_graph_editor::model::GraphEdge {
       id: "edge-score-fetch".to_string(),
       label: None,
       metadata: Default::default(),
-      from: crate::graph_editor::model::GraphPortRef { node_id: "score".to_string(), port_id: "ranked".to_string() },
-      to: crate::graph_editor::model::GraphPortRef { node_id: "fetch".to_string(), port_id: "topics".to_string() },
+      from: lx_graph_editor::model::GraphPortRef { node_id: "score".to_string(), port_id: "ranked".to_string() },
+      to: lx_graph_editor::model::GraphPortRef { node_id: "fetch".to_string(), port_id: "topics".to_string() },
     });
 
     let diagnostics = validate_workflow(&document, &templates);

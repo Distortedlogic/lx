@@ -1,4 +1,4 @@
-use crate::graph_editor::model::GraphDocument;
+use lx_graph_editor::model::GraphDocument;
 
 pub const DEFAULT_FLOW_ID: &str = "newsfeed-research";
 

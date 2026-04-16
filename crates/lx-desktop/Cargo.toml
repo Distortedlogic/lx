@@ -28,6 +28,7 @@ common-voice = { path = "../../../dioxus-common/crates/common-voice" }
 common-whisper = { path = "../../../dioxus-common/crates/common-whisper" }
 
 lx-api = { path = "../lx-api", features = ["server"] }
+lx-graph-editor = { path = "../lx-graph-editor" }
 
 anyhow = { workspace = true }
 async-trait = { workspace = true }

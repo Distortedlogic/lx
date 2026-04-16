@@ -3,10 +3,10 @@ use dioxus::prelude::*;
 use anyhow::Result as AnyhowResult;
 
 use crate::contexts::panel::{PanelContent, PanelState};
-use crate::graph_editor::catalog::GraphNodeTemplate;
-use crate::graph_editor::commands::{GraphCommand, GraphCommandError, apply_graph_command};
-use crate::graph_editor::model::{GraphDocument, GraphPoint, GraphSelection};
-use crate::graph_editor::protocol::GraphWidgetDiagnostic;
+use lx_graph_editor::catalog::GraphNodeTemplate;
+use lx_graph_editor::commands::{GraphCommand, GraphCommandError, apply_graph_command};
+use lx_graph_editor::model::{GraphDocument, GraphPoint, GraphSelection};
+use lx_graph_editor::protocol::GraphWidgetDiagnostic;
 
 use super::catalog::workflow_node_templates;
 use super::sample::sample_document;

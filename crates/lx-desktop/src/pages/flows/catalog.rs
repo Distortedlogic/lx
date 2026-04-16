@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use crate::graph_editor::catalog::{GraphFieldKind, GraphFieldOption, GraphFieldSchema, GraphNodeTemplate, GraphPortTemplate, PortDirection};
+use lx_graph_editor::catalog::{GraphFieldKind, GraphFieldOption, GraphFieldSchema, GraphNodeTemplate, GraphPortTemplate, PortDirection};
 
 pub fn workflow_node_templates() -> Vec<GraphNodeTemplate> {
   vec![

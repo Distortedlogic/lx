@@ -2,7 +2,6 @@ pub mod api;
 pub mod app;
 pub mod components;
 pub mod contexts;
-pub mod graph_editor;
 pub mod hooks;
 pub mod layout;
 pub mod pages;
