@@ -1,11 +1,9 @@
 use dioxus::prelude::*;
-use lx_api::types::ActivityEvent;
 
 use crate::pages::agents::run_types::HeartbeatRun;
 
 use super::types::{
   DesktopAgentRuntime, DesktopAgentStatus, DesktopFlowRun, DesktopRuntimeEvent, DesktopRuntimeEventKind, DesktopToolActivity, DesktopToolStatus, payload_text,
-  result_preview,
 };
 
 #[derive(Clone)]
@@ -117,55 +115,6 @@ impl DesktopRuntimeRegistry {
         }]
       })
       .unwrap_or_default()
-  }
-
-  pub fn transcript_events_for_agent(&self, agent_id: &str) -> Vec<ActivityEvent> {
-    self
-      .events_for_agent(agent_id)
-      .into_iter()
-      .filter_map(|event| match event.kind {
-        DesktopRuntimeEventKind::MessageComplete => Some(ActivityEvent {
-          timestamp: event.ts,
-          kind: event.payload.get("role").and_then(serde_json::Value::as_str).unwrap_or("assistant").to_string(),
-          message: payload_text(&event.payload)?,
-          token_count: None,
-          adapter: Some("pi_rpc".to_string()),
-        }),
-        DesktopRuntimeEventKind::ToolCall => Some(ActivityEvent {
-          timestamp: event.ts,
-          kind: "tool_call".to_string(),
-          message: format!(
-            "{} {}",
-            event.payload.get("tool_name").and_then(serde_json::Value::as_str).unwrap_or("tool"),
-            result_preview(&event.payload.get("args").cloned().unwrap_or_default()).unwrap_or_default()
-          ),
-          token_count: None,
-          adapter: Some("pi_rpc".to_string()),
-        }),
-        DesktopRuntimeEventKind::ToolResult => Some(ActivityEvent {
-          timestamp: event.ts,
-          kind: "tool_result".to_string(),
-          message: payload_text(&event.payload).unwrap_or_else(|| "tool completed".to_string()),
-          token_count: None,
-          adapter: Some("pi_rpc".to_string()),
-        }),
-        DesktopRuntimeEventKind::ToolError | DesktopRuntimeEventKind::BackendError => Some(ActivityEvent {
-          timestamp: event.ts,
-          kind: "tool_error".to_string(),
-          message: payload_text(&event.payload).unwrap_or_else(|| "runtime error".to_string()),
-          token_count: None,
-          adapter: Some("pi_rpc".to_string()),
-        }),
-        DesktopRuntimeEventKind::RuntimeEmit | DesktopRuntimeEventKind::ControlState => Some(ActivityEvent {
-          timestamp: event.ts,
-          kind: "activity".to_string(),
-          message: payload_text(&event.payload)?,
-          token_count: None,
-          adapter: Some("pi_rpc".to_string()),
-        }),
-        DesktopRuntimeEventKind::AgentSpawn | DesktopRuntimeEventKind::AgentStop | DesktopRuntimeEventKind::MessageDelta => None,
-      })
-      .collect()
   }
 
   pub fn agents_for_flow(&self, flow_id: &str) -> Vec<DesktopAgentRuntime> {

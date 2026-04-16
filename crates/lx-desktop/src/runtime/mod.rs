@@ -1,4 +1,5 @@
 mod controller;
+pub mod events;
 mod pi_backend;
 mod pi_event_mapper;
 mod registry;
