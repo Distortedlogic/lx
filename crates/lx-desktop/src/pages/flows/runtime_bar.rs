@@ -15,6 +15,10 @@ pub fn FlowRuntimeBar() -> Element {
   let state = use_flow_editor_state();
   let runtime = use_desktop_runtime();
 
+  if !state.supports_runtime() {
+    return rsx! {};
+  }
+
   let flow_id = state.flow_id.read().clone();
   let document = state.document.read().clone();
   let flow_agents = runtime.registry.agents_for_flow(&flow_id);

@@ -306,7 +306,7 @@ fn outgoing_for_port<'a>(
   outgoing_edges.get(node_id).into_iter().flatten().copied().filter(|edge| edge.from.port_id == port_id).collect()
 }
 
-fn reachable_from_roots<'a>(roots: &[&'a GraphNode], outgoing_edges: &HashMap<String, Vec<&lx_graph_editor::model::GraphEdge>>) -> HashSet<String> {
+fn reachable_from_roots(roots: &[&GraphNode], outgoing_edges: &HashMap<String, Vec<&lx_graph_editor::model::GraphEdge>>) -> HashSet<String> {
   let mut reachable = HashSet::new();
   let mut queue = VecDeque::from_iter(roots.iter().map(|node| node.id.clone()));
 

@@ -9,18 +9,19 @@ use lx_graph_editor::history::{GraphEditorAction, GraphHistoryState};
 use lx_graph_editor::model::{GraphDocument, GraphPoint, GraphSelection};
 use lx_graph_editor::protocol::{GraphRunSnapshot, GraphWidgetDiagnostic};
 
-use super::registry::sample_workflow_registry;
+use super::product::{FlowCompileState, FlowProductKind, evaluate_flow_document, resolve_flow_product};
 use super::sample::sample_document;
 use super::storage::FlowPersistence;
-use super::validation::validate_workflow;
 
 #[derive(Clone, Copy)]
 pub struct FlowEditorState {
   pub flow_id: Signal<String>,
   pub document: Signal<GraphDocument>,
+  pub product_kind: Signal<FlowProductKind>,
   pub templates: Signal<Vec<GraphNodeTemplate>>,
   pub credential_options: Signal<Vec<GraphCredentialOption>>,
   pub diagnostics: Signal<Vec<GraphWidgetDiagnostic>>,
+  pub compile_state: Signal<Option<FlowCompileState>>,
   pub canvas_size: Signal<(f64, f64)>,
   pub selection: Signal<GraphSelection>,
   pub validation_count: Signal<usize>,
@@ -38,16 +39,16 @@ impl FlowEditorState {
       Err(error) => (sample_document(&flow_id), Some(format!("Opened bundled sample after load failed: {error}"))),
     };
     let initial_selection = initial_document.selection.clone();
-    let registry = sample_workflow_registry();
-    let initial_templates = registry.templates();
-    let initial_credential_options = registry.credential_options();
+    let initial_product = resolve_flow_product(&initial_document, &flow_id);
     let panel = use_context::<PanelState>();
     let state = Self {
       flow_id: use_signal(|| flow_id),
       document: use_signal(|| initial_document),
-      templates: use_signal(|| initial_templates),
-      credential_options: use_signal(|| initial_credential_options),
+      product_kind: use_signal(|| initial_product.kind),
+      templates: use_signal(|| initial_product.templates),
+      credential_options: use_signal(|| initial_product.credential_options),
       diagnostics: use_signal(Vec::new),
+      compile_state: use_signal(|| Option::<FlowCompileState>::None),
       canvas_size: use_signal(|| (1200.0, 760.0)),
       selection: use_signal(|| initial_selection),
       validation_count: use_signal(|| 0usize),
@@ -220,6 +221,10 @@ impl FlowEditorState {
     self.set_active_run_surface(None, None);
   }
 
+  pub fn supports_runtime(&self) -> bool {
+    self.product_kind.read().supports_runtime()
+  }
+
   fn sync_shell_state(&self) {
     let selection = self.document.read().selection.clone();
     let validation_count = self.diagnostics.read().len();
@@ -231,13 +236,15 @@ impl FlowEditorState {
   }
 
   fn recompute_diagnostics(&self) {
-    let diagnostics = {
-      let document = self.document.read();
-      let templates = self.templates.read();
-      validate_workflow(&document, &templates)
-    };
+    self.refresh_product_state();
+    let document = self.document.read().clone();
+    let kind = *self.product_kind.read();
+    let templates = self.templates.read().clone();
+    let evaluation = evaluate_flow_document(kind, &document, &templates);
     let mut diagnostics_signal = self.diagnostics;
-    diagnostics_signal.set(diagnostics);
+    diagnostics_signal.set(evaluation.diagnostics);
+    let mut compile_state_signal = self.compile_state;
+    compile_state_signal.set(evaluation.compile_state);
   }
 
   fn replace_document(&self, flow_id: String, document: GraphDocument) {
@@ -262,6 +269,28 @@ impl FlowEditorState {
     selection_signal.set(selection);
     self.recompute_diagnostics();
     self.sync_shell_state();
+  }
+
+  fn refresh_product_state(&self) {
+    let flow_id = self.flow_id.read().clone();
+    let document = self.document.read().clone();
+    let config = resolve_flow_product(&document, &flow_id);
+
+    if *self.product_kind.read() != config.kind {
+      let mut product_kind_signal = self.product_kind;
+      product_kind_signal.set(config.kind);
+    }
+    if *self.templates.read() != config.templates {
+      let mut templates_signal = self.templates;
+      templates_signal.set(config.templates);
+    }
+    if *self.credential_options.read() != config.credential_options {
+      let mut credential_options_signal = self.credential_options;
+      credential_options_signal.set(config.credential_options);
+    }
+    if !config.kind.supports_runtime() {
+      self.clear_run_surface();
+    }
   }
 }
 

@@ -1,0 +1,262 @@
+{
+  "id": "lx-research-brief",
+  "title": "LX Research Brief Program",
+  "metadata": {
+    "notes": "Starter lx graph that turns a goal and evidence bundle into routed artifacts and executable work.",
+    "tags": [
+      "lx",
+      "program",
+      "starter"
+    ]
+  },
+  "viewport": {
+    "pan_x": 84.0,
+    "pan_y": 72.0,
+    "zoom": 0.86
+  },
+  "selection": {
+    "anchor": null,
+    "node_ids": [],
+    "edge_ids": []
+  },
+  "nodes": [
+    {
+      "id": "goal",
+      "template_id": "lx_goal_input",
+      "label": "Goal",
+      "metadata": {
+        "notes": null,
+        "tags": []
+      },
+      "position": {
+        "x": 40.0,
+        "y": 120.0
+      },
+      "properties": {
+        "mission": "Track frontier AI labs, extract durable evidence-backed claims, and produce an execution-ready research brief.",
+        "success_criteria": [
+          "Evidence-backed claims",
+          "Clear next actions",
+          "Reusable artifact"
+        ]
+      }
+    },
+    {
+      "id": "evidence",
+      "template_id": "lx_evidence_ingest",
+      "label": "Evidence",
+      "metadata": {
+        "notes": null,
+        "tags": []
+      },
+      "position": {
+        "x": 300.0,
+        "y": 300.0
+      },
+      "properties": {
+        "sources": [
+          "company filings",
+          "press releases",
+          "domain watchlist"
+        ],
+        "max_items": 24
+      }
+    },
+    {
+      "id": "sense",
+      "template_id": "lx_sensemaking_pass",
+      "label": "Sensemake",
+      "metadata": {
+        "notes": null,
+        "tags": []
+      },
+      "position": {
+        "x": 620.0,
+        "y": 180.0
+      },
+      "properties": {
+        "analysis_frame": "Surface concrete changes, implications, and unresolved uncertainty.",
+        "include_citations": true
+      }
+    },
+    {
+      "id": "route",
+      "template_id": "lx_decision_router",
+      "label": "Route",
+      "metadata": {
+        "notes": null,
+        "tags": []
+      },
+      "position": {
+        "x": 920.0,
+        "y": 180.0
+      },
+      "properties": {
+        "routing_policy": "Route items with concrete owners and immediate next actions to execution; archive the rest."
+      }
+    },
+    {
+      "id": "task",
+      "template_id": "lx_agent_task",
+      "label": "Agent Task",
+      "metadata": {
+        "notes": null,
+        "tags": []
+      },
+      "position": {
+        "x": 1220.0,
+        "y": 96.0
+      },
+      "properties": {
+        "owner": "research-agent",
+        "task_brief": "Produce a concise execution artifact with explicit next actions and evidence links."
+      }
+    },
+    {
+      "id": "publish",
+      "template_id": "lx_artifact_output",
+      "label": "Publish",
+      "metadata": {
+        "notes": null,
+        "tags": []
+      },
+      "position": {
+        "x": 1520.0,
+        "y": 96.0
+      },
+      "properties": {
+        "destination": "project-artifacts"
+      }
+    },
+    {
+      "id": "archive",
+      "template_id": "lx_artifact_output",
+      "label": "Archive",
+      "metadata": {
+        "notes": null,
+        "tags": []
+      },
+      "position": {
+        "x": 1220.0,
+        "y": 292.0
+      },
+      "properties": {
+        "destination": "research-archive"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-goal-evidence",
+      "label": "goal frame",
+      "metadata": {
+        "notes": null,
+        "tags": []
+      },
+      "from": {
+        "node_id": "goal",
+        "port_id": "goal"
+      },
+      "to": {
+        "node_id": "evidence",
+        "port_id": "goal"
+      }
+    },
+    {
+      "id": "edge-goal-sense",
+      "label": "goal context",
+      "metadata": {
+        "notes": null,
+        "tags": []
+      },
+      "from": {
+        "node_id": "goal",
+        "port_id": "goal"
+      },
+      "to": {
+        "node_id": "sense",
+        "port_id": "goal"
+      }
+    },
+    {
+      "id": "edge-evidence-sense",
+      "label": "evidence bundle",
+      "metadata": {
+        "notes": null,
+        "tags": []
+      },
+      "from": {
+        "node_id": "evidence",
+        "port_id": "evidence"
+      },
+      "to": {
+        "node_id": "sense",
+        "port_id": "evidence"
+      }
+    },
+    {
+      "id": "edge-sense-route",
+      "label": "research brief",
+      "metadata": {
+        "notes": null,
+        "tags": []
+      },
+      "from": {
+        "node_id": "sense",
+        "port_id": "artifact"
+      },
+      "to": {
+        "node_id": "route",
+        "port_id": "artifact"
+      }
+    },
+    {
+      "id": "edge-route-task",
+      "label": "action packet",
+      "metadata": {
+        "notes": null,
+        "tags": []
+      },
+      "from": {
+        "node_id": "route",
+        "port_id": "actionable"
+      },
+      "to": {
+        "node_id": "task",
+        "port_id": "actionable"
+      }
+    },
+    {
+      "id": "edge-route-archive",
+      "label": "archive brief",
+      "metadata": {
+        "notes": null,
+        "tags": []
+      },
+      "from": {
+        "node_id": "route",
+        "port_id": "archive"
+      },
+      "to": {
+        "node_id": "archive",
+        "port_id": "artifact"
+      }
+    },
+    {
+      "id": "edge-task-publish",
+      "label": "execution artifact",
+      "metadata": {
+        "notes": null,
+        "tags": []
+      },
+      "from": {
+        "node_id": "task",
+        "port_id": "artifact"
+      },
+      "to": {
+        "node_id": "publish",
+        "port_id": "artifact"
+      }
+    }
+  ]
+}

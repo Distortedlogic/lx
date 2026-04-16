@@ -3,6 +3,7 @@ mod connectors;
 mod controller;
 mod credentials;
 pub mod inspector;
+mod product;
 mod registry;
 mod runtime_bar;
 mod sample;
