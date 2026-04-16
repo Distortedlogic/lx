@@ -28,7 +28,6 @@ pub fn FlowRuntimeBar() -> Element {
   let selected_snapshot = selected_agent.as_ref().map(|agent| build_flow_run_snapshot(&document, &runtime.registry, agent));
 
   {
-    let state = state;
     let selected_agent_id = selected_agent_id.clone();
     let selected_snapshot = selected_snapshot.clone();
     use_effect(move || {

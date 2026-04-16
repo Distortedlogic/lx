@@ -10,7 +10,10 @@ pub mod protocol;
 mod tests {
   use serde_json::json;
 
-  use super::catalog::{GraphFieldKind, GraphFieldOption, GraphFieldSchema, GraphNodeTemplate, GraphPortTemplate, GraphPortType, PortDirection};
+  use super::catalog::{
+    GraphCredentialRequirement, GraphExpressionSupport, GraphFieldCapabilities, GraphFieldKind, GraphFieldOption, GraphFieldSchema, GraphNodeTemplate,
+    GraphPortTemplate, GraphPortType, PortDirection,
+  };
   use super::commands::{GraphCommand, GraphCommandError, apply_graph_command};
   use super::model::{GraphDocument, GraphPoint, GraphPortRef, GraphSelection, GraphViewport};
   use super::protocol::{GraphWidgetDiagnostic, GraphWidgetDiagnosticSeverity, GraphWidgetEvent, GraphWidgetSnapshot};
@@ -266,6 +269,99 @@ mod tests {
     .expect("qualified output should satisfy general input");
 
     assert_eq!(document.edges.len(), 1);
+  }
+
+  #[test]
+  fn accepts_expression_binding_for_expression_enabled_field() {
+    let templates = vec![GraphNodeTemplate {
+      id: "templated".to_string(),
+      label: "Templated".to_string(),
+      description: None,
+      category: Some("workflow".to_string()),
+      default_label: Some("Templated".to_string()),
+      ports: vec![],
+      fields: vec![GraphFieldSchema {
+        id: "query".to_string(),
+        label: "Query".to_string(),
+        description: None,
+        kind: GraphFieldKind::Text,
+        required: true,
+        default_value: Some(json!("")),
+        capabilities: GraphFieldCapabilities {
+          expression: Some(GraphExpressionSupport { language: Some("n8n".to_string()), placeholder: Some("{{ steps.fetch.url }}".to_string()) }),
+          credential: None,
+        },
+      }],
+    }];
+    let mut document = GraphDocument::new("flow-1", "Research Flow");
+    apply_graph_command(
+      &mut document,
+      &templates,
+      GraphCommand::AddNode { node_id: "node-1".to_string(), template_id: "templated".to_string(), position: GraphPoint { x: 0.0, y: 0.0 }, label: None },
+    )
+    .expect("add node");
+
+    apply_graph_command(
+      &mut document,
+      &templates,
+      GraphCommand::UpdateField {
+        node_id: "node-1".to_string(),
+        field_id: "query".to_string(),
+        value: json!({ "mode": "expression", "expression": "{{ steps.fetch.url }}" }),
+      },
+    )
+    .expect("expression binding should validate");
+
+    assert_eq!(document.node("node-1").expect("node exists").properties["query"]["mode"], json!("expression"));
+  }
+
+  #[test]
+  fn accepts_credential_binding_for_credential_enabled_field() {
+    let templates = vec![GraphNodeTemplate {
+      id: "credentialed".to_string(),
+      label: "Credentialed".to_string(),
+      description: None,
+      category: Some("workflow".to_string()),
+      default_label: Some("Credentialed".to_string()),
+      ports: vec![],
+      fields: vec![GraphFieldSchema {
+        id: "credential".to_string(),
+        label: "Credential".to_string(),
+        description: None,
+        kind: GraphFieldKind::Text,
+        required: true,
+        default_value: None,
+        capabilities: GraphFieldCapabilities {
+          expression: None,
+          credential: Some(GraphCredentialRequirement {
+            namespace: "workflow".to_string(),
+            kind: "http_api".to_string(),
+            label: "HTTP API credential".to_string(),
+            allow_key_selection: true,
+          }),
+        },
+      }],
+    }];
+    let mut document = GraphDocument::new("flow-1", "Research Flow");
+    apply_graph_command(
+      &mut document,
+      &templates,
+      GraphCommand::AddNode { node_id: "node-1".to_string(), template_id: "credentialed".to_string(), position: GraphPoint { x: 0.0, y: 0.0 }, label: None },
+    )
+    .expect("add node");
+
+    apply_graph_command(
+      &mut document,
+      &templates,
+      GraphCommand::UpdateField {
+        node_id: "node-1".to_string(),
+        field_id: "credential".to_string(),
+        value: json!({ "mode": "credential", "credential_id": "cred-http-news", "key": "token" }),
+      },
+    )
+    .expect("credential binding should validate");
+
+    assert_eq!(document.node("node-1").expect("node exists").properties["credential"]["credential_id"], json!("cred-http-news"));
   }
 
   #[test]

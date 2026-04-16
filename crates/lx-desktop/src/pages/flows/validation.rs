@@ -187,30 +187,23 @@ fn is_missing_required_value(value: Option<&Value>, field: &GraphFieldSchema) ->
   if let Some(bound_value) = bound_field_value(value) {
     return is_missing_bound_value(bound_value, field);
   }
-  match &field.kind {
-    GraphFieldKind::Text | GraphFieldKind::TextArea | GraphFieldKind::Select { .. } => value.as_str().is_none_or(str::is_empty),
-    GraphFieldKind::StringList => value.as_array().is_none_or(|items| items.is_empty()),
-    GraphFieldKind::Number | GraphFieldKind::Integer => !value.is_number(),
-    GraphFieldKind::Boolean => !value.is_boolean(),
-  }
+  is_missing_literal_value(value, &field.kind)
 }
 
 fn is_missing_bound_value(value: GraphBoundFieldValue, field: &GraphFieldSchema) -> bool {
   match value {
-    GraphBoundFieldValue::Literal { value } => is_missing_required_value(
-      Some(&value),
-      &GraphFieldSchema {
-        id: field.id.clone(),
-        label: field.label.clone(),
-        description: field.description.clone(),
-        kind: field.kind.clone(),
-        required: field.required,
-        default_value: field.default_value.clone(),
-        capabilities: field.capabilities.clone(),
-      },
-    ),
+    GraphBoundFieldValue::Literal { value } => is_missing_literal_value(&value, &field.kind),
     GraphBoundFieldValue::Expression { expression } => !field.capabilities.supports_expressions() || expression.trim().is_empty(),
     GraphBoundFieldValue::Credential { credential_id, .. } => !field.capabilities.supports_credentials() || credential_id.trim().is_empty(),
+  }
+}
+
+fn is_missing_literal_value(value: &Value, kind: &GraphFieldKind) -> bool {
+  match kind {
+    GraphFieldKind::Text | GraphFieldKind::TextArea | GraphFieldKind::Select { .. } => value.as_str().is_none_or(str::is_empty),
+    GraphFieldKind::StringList => value.as_array().is_none_or(|items| items.is_empty()),
+    GraphFieldKind::Number | GraphFieldKind::Integer => !value.is_number(),
+    GraphFieldKind::Boolean => !value.is_boolean(),
   }
 }
 
@@ -224,9 +217,11 @@ fn edge_error(id: String, message: String, edge_id: &str) -> GraphWidgetDiagnost
 
 #[cfg(test)]
 mod tests {
-  use super::validate_workflow;
+  use super::{is_missing_required_value, validate_workflow};
   use crate::pages::flows::catalog::workflow_node_templates;
   use crate::pages::flows::sample::sample_document;
+  use lx_graph_editor::catalog::{GraphCredentialRequirement, GraphExpressionSupport, GraphFieldCapabilities, GraphFieldKind, GraphFieldSchema};
+  use serde_json::json;
 
   #[test]
   fn sample_flow_is_initially_valid() {
@@ -251,5 +246,41 @@ mod tests {
     let diagnostics = validate_workflow(&document, &templates);
     assert!(diagnostics.iter().any(|diagnostic| diagnostic.id.starts_with("cycle-node-")));
     assert!(diagnostics.iter().any(|diagnostic| diagnostic.id == "missing-input-fetch-sources"));
+  }
+
+  #[test]
+  fn treats_expression_and_credential_bindings_as_present() {
+    let expression_field = GraphFieldSchema {
+      id: "query".to_string(),
+      label: "Query".to_string(),
+      description: None,
+      kind: GraphFieldKind::Text,
+      required: true,
+      default_value: None,
+      capabilities: GraphFieldCapabilities {
+        expression: Some(GraphExpressionSupport { language: Some("n8n".to_string()), placeholder: None }),
+        credential: None,
+      },
+    };
+    let credential_field = GraphFieldSchema {
+      id: "credential".to_string(),
+      label: "Credential".to_string(),
+      description: None,
+      kind: GraphFieldKind::Text,
+      required: true,
+      default_value: None,
+      capabilities: GraphFieldCapabilities {
+        expression: None,
+        credential: Some(GraphCredentialRequirement {
+          namespace: "workflow".to_string(),
+          kind: "http_api".to_string(),
+          label: "HTTP API credential".to_string(),
+          allow_key_selection: true,
+        }),
+      },
+    };
+
+    assert!(!is_missing_required_value(Some(&json!({ "mode": "expression", "expression": "{{ steps.fetch.url }}" })), &expression_field));
+    assert!(!is_missing_required_value(Some(&json!({ "mode": "credential", "credential_id": "cred-http-news" })), &credential_field));
   }
 }

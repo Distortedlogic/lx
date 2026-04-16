@@ -28,9 +28,10 @@ pub fn RunsTab(runs: Vec<HeartbeatRun>, agent_route_id: String) -> Element {
         button {
           class: "btn-outline-sm",
           onclick: move |_| {
-              navigator.push(Route::PiAgentPage {
-                  agent_id: agent_route_id.clone(),
-              });
+              navigator
+                  .push(Route::PiAgentPage {
+                      agent_id: agent_route_id.clone(),
+                  });
           },
           "Open Widget"
         }

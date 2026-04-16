@@ -47,7 +47,7 @@ pub fn AgentList(
                 let id = agent.id.clone();
                 move |_| on_select.call(id.clone())
             },
-            on_open_widget: on_open_widget.clone(),
+            on_open_widget,
           }
         }
       }
