@@ -16,6 +16,10 @@ pub struct GraphWidgetDiagnostic {
   pub id: String,
   pub severity: GraphWidgetDiagnosticSeverity,
   pub message: String,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub source: Option<String>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub detail: Option<String>,
   pub target: Option<super::model::GraphEntityRef>,
 }
 

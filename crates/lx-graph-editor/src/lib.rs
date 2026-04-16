@@ -427,6 +427,8 @@ mod tests {
         id: "missing-summary".to_string(),
         severity: GraphWidgetDiagnosticSeverity::Warning,
         message: "Missing summary sink".to_string(),
+        source: Some("workflow validation".to_string()),
+        detail: Some("Add a downstream node that consumes the generated summary.".to_string()),
         target: Some(super::model::GraphEntityRef::Node("node-1".to_string())),
       }],
       run_snapshot: None,

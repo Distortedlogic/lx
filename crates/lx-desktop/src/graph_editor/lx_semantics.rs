@@ -1,8 +1,9 @@
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use lx_graph_editor::catalog::{GraphFieldCapabilities, GraphFieldKind, GraphFieldSchema, GraphNodeTemplate, GraphPortTemplate, GraphPortType, PortDirection};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum LxNodeKind {
   GoalInput,
   EvidenceIngest,
@@ -274,6 +275,18 @@ pub fn lx_node_templates() -> Vec<GraphNodeTemplate> {
 }
 
 impl LxNodeKind {
+  pub fn from_template_id(template_id: &str) -> Option<Self> {
+    match template_id {
+      "lx_goal_input" => Some(Self::GoalInput),
+      "lx_evidence_ingest" => Some(Self::EvidenceIngest),
+      "lx_sensemaking_pass" => Some(Self::SensemakingPass),
+      "lx_decision_router" => Some(Self::DecisionRouter),
+      "lx_agent_task" => Some(Self::AgentTask),
+      "lx_artifact_output" => Some(Self::ArtifactOutput),
+      _ => None,
+    }
+  }
+
   pub fn template_id(self) -> &'static str {
     match self {
       LxNodeKind::GoalInput => "lx_goal_input",

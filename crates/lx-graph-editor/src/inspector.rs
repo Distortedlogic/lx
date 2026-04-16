@@ -523,20 +523,37 @@ fn DiagnosticStack(diagnostics: Vec<GraphWidgetDiagnostic>) -> Element {
   rsx! {
     div { class: "flex flex-col gap-2",
       for diagnostic in diagnostics {
-        div {
-          key: "{diagnostic.id}",
-          class: match diagnostic.severity {
-              GraphWidgetDiagnosticSeverity::Error => {
-                  "rounded-xl border border-red-500/30 bg-red-500/8 px-3 py-2 text-sm text-red-200"
+        {
+          let source = diagnostic.source.clone();
+          let detail = diagnostic.detail.clone();
+          rsx! {
+            div {
+              key: "{diagnostic.id}",
+              class: match diagnostic.severity {
+                  GraphWidgetDiagnosticSeverity::Error => {
+                      "rounded-xl border border-red-500/30 bg-red-500/8 px-3 py-2 text-sm text-red-200"
+                  }
+                  GraphWidgetDiagnosticSeverity::Warning => {
+                      "rounded-xl border border-amber-500/30 bg-amber-500/8 px-3 py-2 text-sm text-amber-100"
+                  }
+                  GraphWidgetDiagnosticSeverity::Info => {
+                      "rounded-xl border border-sky-500/30 bg-sky-500/8 px-3 py-2 text-sm text-sky-100"
+                  }
+              },
+              div { class: "flex items-start justify-between gap-3",
+                p { class: "min-w-0 flex-1 font-medium", "{diagnostic.message}" }
+                if let Some(source) = source {
+                  span {
+                    class: "shrink-0 rounded-full border border-current/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] opacity-80",
+                    "{source}"
+                  }
+                }
               }
-              GraphWidgetDiagnosticSeverity::Warning => {
-                  "rounded-xl border border-amber-500/30 bg-amber-500/8 px-3 py-2 text-sm text-amber-100"
+              if let Some(detail) = detail {
+                p { class: "mt-1 text-[12px] leading-5 opacity-80", "{detail}" }
               }
-              GraphWidgetDiagnosticSeverity::Info => {
-                  "rounded-xl border border-sky-500/30 bg-sky-500/8 px-3 py-2 text-sm text-sky-100"
-              }
-          },
-          "{diagnostic.message}"
+            }
+          }
         }
       }
     }

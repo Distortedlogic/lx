@@ -208,11 +208,25 @@ fn is_missing_literal_value(value: &Value, kind: &GraphFieldKind) -> bool {
 }
 
 fn node_error(id: String, message: String, node_id: &str) -> GraphWidgetDiagnostic {
-  GraphWidgetDiagnostic { id, severity: GraphWidgetDiagnosticSeverity::Error, message, target: Some(GraphEntityRef::Node(node_id.to_string())) }
+  GraphWidgetDiagnostic {
+    id,
+    severity: GraphWidgetDiagnosticSeverity::Error,
+    message,
+    source: Some("workflow validation".to_string()),
+    detail: None,
+    target: Some(GraphEntityRef::Node(node_id.to_string())),
+  }
 }
 
 fn edge_error(id: String, message: String, edge_id: &str) -> GraphWidgetDiagnostic {
-  GraphWidgetDiagnostic { id, severity: GraphWidgetDiagnosticSeverity::Error, message, target: Some(GraphEntityRef::Edge(edge_id.to_string())) }
+  GraphWidgetDiagnostic {
+    id,
+    severity: GraphWidgetDiagnosticSeverity::Error,
+    message,
+    source: Some("workflow validation".to_string()),
+    detail: None,
+    target: Some(GraphEntityRef::Edge(edge_id.to_string())),
+  }
 }
 
 #[cfg(test)]

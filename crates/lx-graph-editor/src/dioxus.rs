@@ -61,6 +61,7 @@ pub fn GraphCanvas(
   let major_grid_size = grid_size * 6.0;
   let error_count = diagnostics.iter().filter(|diagnostic| diagnostic.severity == GraphWidgetDiagnosticSeverity::Error).count();
   let warning_count = diagnostics.iter().filter(|diagnostic| diagnostic.severity == GraphWidgetDiagnosticSeverity::Warning).count();
+  let diagnostic_sources = diagnostic_sources(&diagnostics);
   let issue_summary = format!("{error_count} errors / {warning_count} warnings");
   let issue_badge_style = if error_count > 0 {
     "border: 1px solid var(--graph-error-border); background: var(--graph-error-surface); color: var(--graph-error-text); backdrop-filter: blur(16px);"
@@ -219,6 +220,14 @@ pub fn GraphCanvas(
             class: "{canvas_badge_class}",
             style: "{issue_badge_style}",
             "{issue_summary}"
+          }
+          for source in diagnostic_sources {
+            span {
+              key: "{source}",
+              class: "{canvas_badge_class}",
+              style: "{canvas_badge_style}",
+              "{source}"
+            }
           }
         }
         if !selection.is_empty() {
@@ -1229,6 +1238,20 @@ fn selection_summary(selection: &GraphSelection) -> String {
     return "1 edge selected".to_string();
   }
   format!("{} nodes and {} edges selected", selection.node_ids.len(), selection.edge_ids.len())
+}
+
+fn diagnostic_sources(diagnostics: &[GraphWidgetDiagnostic]) -> Vec<String> {
+  let mut sources = Vec::new();
+  for diagnostic in diagnostics {
+    let Some(source) = diagnostic.source.clone() else {
+      continue;
+    };
+    if sources.iter().any(|existing| existing == &source) {
+      continue;
+    }
+    sources.push(source);
+  }
+  sources
 }
 
 fn category_label(category: &str) -> String {

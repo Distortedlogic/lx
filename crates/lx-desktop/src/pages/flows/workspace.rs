@@ -333,6 +333,8 @@ fn ValidationDiagnosticRow(diagnostic: GraphWidgetDiagnostic) -> Element {
   let mut state = use_flow_editor_state();
   let target = diagnostic.target.clone();
   let target_chip = target.as_ref().map(target_label);
+  let source_chip = diagnostic.source.clone();
+  let detail = diagnostic.detail.clone();
   let row_style = match diagnostic.severity {
     GraphWidgetDiagnosticSeverity::Error => {
       "border: 1px solid var(--graph-error-border); background: var(--graph-error-surface); color: var(--graph-error-text);"
@@ -352,13 +354,27 @@ fn ValidationDiagnosticRow(diagnostic: GraphWidgetDiagnostic) -> Element {
               let _ = state.dispatch(GraphCommand::Select { selection });
           }
       },
-      div { class: "flex items-center justify-between gap-3",
-        span { class: "font-medium", "{diagnostic.message}" }
-        if let Some(target_chip) = target_chip {
-          span {
-            class: "rounded-full border px-2 py-1 text-[11px] font-mono",
-            style: "border-color: var(--graph-overlay-border); color: var(--graph-overlay-text);",
-            "{target_chip}"
+      div { class: "flex items-start justify-between gap-3",
+        div { class: "min-w-0 flex-1",
+          span { class: "font-medium", "{diagnostic.message}" }
+          if let Some(detail) = detail {
+            p { class: "mt-1 text-xs leading-5 opacity-80", "{detail}" }
+          }
+        }
+        div { class: "flex shrink-0 flex-wrap items-center justify-end gap-1.5",
+          if let Some(source_chip) = source_chip {
+            span {
+              class: "rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em]",
+              style: "border-color: var(--graph-overlay-border); color: var(--graph-overlay-text);",
+              "{source_chip}"
+            }
+          }
+          if let Some(target_chip) = target_chip {
+            span {
+              class: "rounded-full border px-2 py-1 text-[11px] font-mono",
+              style: "border-color: var(--graph-overlay-border); color: var(--graph-overlay-text);",
+              "{target_chip}"
+            }
           }
         }
       }
