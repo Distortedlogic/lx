@@ -3,6 +3,8 @@ use dioxus::prelude::*;
 use super::list::StatusBadge;
 use super::run_types::source_label;
 use super::transcript::TranscriptView;
+use crate::runtime::use_desktop_runtime;
+use crate::widgets::PiTranscript;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct LiveRunInfo {
@@ -50,6 +52,7 @@ pub fn LiveRunWidget(runs: Vec<LiveRunInfo>, on_cancel: EventHandler<String>, on
 
 #[component]
 fn LiveRunEntry(run: LiveRunInfo, on_cancel: EventHandler<()>, on_open: EventHandler<()>) -> Element {
+  let runtime = use_desktop_runtime();
   let is_active = run.status == "running" || run.status == "queued";
   let short_id = &run.id[..8.min(run.id.len())];
 
@@ -80,7 +83,11 @@ fn LiveRunEntry(run: LiveRunInfo, on_cancel: EventHandler<()>, on_open: EventHan
         }
       }
       div { class: "max-h-80 overflow-y-auto pr-1",
-        TranscriptView { run_id: run.id.clone() }
+        if runtime.registry.find_agent(&run.agent_id).is_some() {
+          PiTranscript { agent_id: run.agent_id.clone() }
+        } else {
+          TranscriptView { run_id: run.id.clone() }
+        }
       }
     }
   }

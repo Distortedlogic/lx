@@ -2,7 +2,12 @@ use super::types::{AgentSummary, FilterTab, adapter_label, role_label, status_do
 use dioxus::prelude::*;
 
 #[component]
-pub fn AgentList(agents: Vec<AgentSummary>, on_select: EventHandler<String>, on_new_agent: EventHandler<()>) -> Element {
+pub fn AgentList(
+  agents: Vec<AgentSummary>,
+  on_select: EventHandler<String>,
+  on_new_agent: EventHandler<()>,
+  #[props(optional)] on_open_widget: Option<EventHandler<String>>,
+) -> Element {
   let mut active_tab = use_signal(|| FilterTab::All);
   let filtered: Vec<&AgentSummary> = agents.iter().filter(|a| active_tab.read().matches(&a.status)).collect();
   let count_label = if filtered.len() == 1 { "1 agent".to_string() } else { format!("{} agents", filtered.len()) };
@@ -42,6 +47,7 @@ pub fn AgentList(agents: Vec<AgentSummary>, on_select: EventHandler<String>, on_
                 let id = agent.id.clone();
                 move |_| on_select.call(id.clone())
             },
+            on_open_widget: on_open_widget.clone(),
           }
         }
       }
@@ -50,7 +56,7 @@ pub fn AgentList(agents: Vec<AgentSummary>, on_select: EventHandler<String>, on_
 }
 
 #[component]
-fn AgentRow(agent: AgentSummary, on_click: EventHandler<()>) -> Element {
+fn AgentRow(agent: AgentSummary, on_click: EventHandler<()>, on_open_widget: Option<EventHandler<String>>) -> Element {
   let subtitle = {
     let role = role_label(&agent.role);
     match &agent.title {
@@ -61,7 +67,7 @@ fn AgentRow(agent: AgentSummary, on_click: EventHandler<()>) -> Element {
   let adapter = adapter_label(&agent.adapter_type);
 
   rsx! {
-    button {
+    div {
       class: "flex items-center gap-3 px-3 py-2.5 w-full text-left border-b border-[var(--outline-variant)]/15 hover:bg-[var(--surface-container)] transition-colors",
       onclick: move |_| on_click.call(()),
       span { class: "{status_dot_class(&agent.status)}" }
@@ -71,6 +77,21 @@ fn AgentRow(agent: AgentSummary, on_click: EventHandler<()>) -> Element {
       }
       span { class: "text-xs text-[var(--outline)] font-mono w-14 text-right",
         "{adapter}"
+      }
+      if agent.adapter_type == "pi_rpc" {
+        if let Some(on_open_widget) = on_open_widget {
+          button {
+            class: "btn-outline-sm shrink-0",
+            onclick: {
+                let id = agent.id.clone();
+                move |event| {
+                    event.stop_propagation();
+                    on_open_widget.call(id.clone())
+                }
+            },
+            "Open"
+          }
+        }
       }
       StatusBadge { status: agent.status.clone() }
     }

@@ -28,6 +28,7 @@ pub fn FlowWorkspace() -> Element {
   let document = state.document.read().clone();
   let templates = state.templates.read().clone();
   let diagnostics = state.diagnostics.read().clone();
+  let run_snapshot = state.run_snapshot.read().clone();
   let selection = state.selection.read().clone();
   let status_message = state.status_message.read().clone();
   let title = document.title.clone();
@@ -150,6 +151,7 @@ pub fn FlowWorkspace() -> Element {
               document: document.clone(),
               templates: templates.clone(),
               diagnostics: diagnostics.clone(),
+              run_snapshot: run_snapshot.clone(),
               canvas_size: state.current_canvas_size(),
               on_command: move |command: GraphCommand| dispatch_canvas_command(&mut state, command),
               on_editor_action: move |action: GraphEditorAction| state.apply_editor_action(&action),

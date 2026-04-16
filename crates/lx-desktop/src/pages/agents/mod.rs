@@ -2,7 +2,7 @@ mod budget_tab;
 mod config_form;
 pub(crate) mod detail;
 pub mod list;
-mod live_run_widget;
+pub mod live_run_widget;
 mod new_agent;
 mod overview;
 mod run_detail;
@@ -18,12 +18,14 @@ use self::detail::AgentDetailShell;
 use self::list::AgentList;
 use self::new_agent::{NewAgentDialog, NewAgentPayload};
 use self::types::{AgentDetail, AgentSummary};
+use crate::routes::Route;
 use crate::runtime::{status_label, use_desktop_runtime};
 use dioxus::prelude::*;
 
 #[component]
 pub fn Agents() -> Element {
   let runtime = use_desktop_runtime();
+  let navigator = use_navigator();
   let mut selected_agent_id = use_signal(|| Option::<String>::None);
   let mut show_new_dialog = use_signal(|| false);
   let agents: Vec<AgentSummary> = runtime
@@ -97,6 +99,9 @@ pub fn Agents() -> Element {
             agents,
             on_select: move |id: String| selected_agent_id.set(Some(id)),
             on_new_agent: move |_| show_new_dialog.set(true),
+            on_open_widget: move |agent_id: String| {
+                navigator.push(Route::PiAgentPage { agent_id });
+            },
           }
         },
     }

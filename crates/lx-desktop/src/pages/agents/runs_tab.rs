@@ -3,9 +3,11 @@ use dioxus::prelude::*;
 use super::list::StatusBadge;
 use super::run_detail::RunDetailPanel;
 use super::run_types::{HeartbeatRun, source_label};
+use crate::routes::Route;
 
 #[component]
 pub fn RunsTab(runs: Vec<HeartbeatRun>, agent_route_id: String) -> Element {
+  let navigator = use_navigator();
   let mut selected_run_id = use_signal(|| Option::<String>::None);
 
   if runs.is_empty() {
@@ -21,24 +23,37 @@ pub fn RunsTab(runs: Vec<HeartbeatRun>, agent_route_id: String) -> Element {
   let selected_run = effective_id.as_ref().and_then(|id| sorted.iter().find(|r| &r.id == id));
 
   rsx! {
-    div { class: "flex gap-0",
-      div {
-        class: "shrink-0 border border-[var(--outline-variant)]/30 rounded-lg w-72 overflow-y-auto",
-        style: "max-height: calc(100vh - 2rem);",
-        for run in sorted.iter() {
-          RunListItem {
-            run: run.clone(),
-            is_selected: effective_id.as_ref() == Some(&run.id),
-            on_select: {
-                let id = run.id.clone();
-                move |_| selected_run_id.set(Some(id.clone()))
-            },
-          }
+    div { class: "flex flex-col gap-3",
+      div { class: "flex justify-end",
+        button {
+          class: "btn-outline-sm",
+          onclick: move |_| {
+              navigator.push(Route::PiAgentPage {
+                  agent_id: agent_route_id.clone(),
+              });
+          },
+          "Open Widget"
         }
       }
-      if let Some(run) = selected_run {
-        div { class: "flex-1 min-w-0 pl-4",
-          RunDetailPanel { run: run.clone() }
+      div { class: "flex gap-0",
+        div {
+          class: "shrink-0 border border-[var(--outline-variant)]/30 rounded-lg w-72 overflow-y-auto",
+          style: "max-height: calc(100vh - 2rem);",
+          for run in sorted.iter() {
+            RunListItem {
+              run: run.clone(),
+              is_selected: effective_id.as_ref() == Some(&run.id),
+              on_select: {
+                  let id = run.id.clone();
+                  move |_| selected_run_id.set(Some(id.clone()))
+              },
+            }
+          }
+        }
+        if let Some(run) = selected_run {
+          div { class: "flex-1 min-w-0 pl-4",
+            RunDetailPanel { run: run.clone() }
+          }
         }
       }
     }

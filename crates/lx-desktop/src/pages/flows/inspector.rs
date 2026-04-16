@@ -17,6 +17,8 @@ pub fn FlowInspector(content: PanelContent) -> Element {
   let document = state.document.read().clone();
   let templates = state.templates.read().clone();
   let diagnostics = state.diagnostics.read().clone();
+  let run_snapshot = state.run_snapshot.read().clone();
+  let credential_options = state.credential_options.read().clone();
   let inspector_content = match content {
     PanelContent::FlowNode { node_id } => GraphInspectorContent::Node { node_id },
     PanelContent::FlowEdge { edge_id } => GraphInspectorContent::Edge { edge_id },
@@ -28,6 +30,8 @@ pub fn FlowInspector(content: PanelContent) -> Element {
       document,
       templates,
       diagnostics,
+      run_snapshot,
+      credential_options,
       on_command: move |command: GraphCommand| dispatch_flow_inspector_command(&mut state, command),
     }
   }

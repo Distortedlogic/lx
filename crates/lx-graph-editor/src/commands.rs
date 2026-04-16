@@ -1,6 +1,9 @@
 use serde_json::Value;
 
-use super::catalog::{GraphFieldKind, GraphNodeTemplate, PortDirection, field_schema, materialize_default_properties, node_template, port_template};
+use super::catalog::{
+  GraphBoundFieldValue, GraphFieldKind, GraphFieldSchema, GraphNodeTemplate, PortDirection, field_schema, materialize_default_properties, node_template,
+  port_template,
+};
 use super::model::{GraphDocument, GraphEdge, GraphEntityRef, GraphNode, GraphPoint, GraphPortRef, GraphSelection, GraphViewport};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -146,7 +149,7 @@ fn connect_ports(
   }
 
   if let (Some(from_type), Some(to_type)) = (&from_port.data_type, &to_port.data_type)
-    && from_type != to_type
+    && !to_type.accepts(from_type)
   {
     return Err(GraphCommandError::IncompatiblePortTypes { from_port_id: from.port_id.clone(), to_port_id: to.port_id.clone() });
   }
@@ -244,6 +247,40 @@ fn validate_selection(document: &GraphDocument, selection: &GraphSelection) -> R
 }
 
 fn validate_field_value(field: &super::catalog::GraphFieldSchema, value: &Value) -> Result<(), GraphCommandError> {
+  if let Some(bound_value) = super::catalog::bound_field_value(value) {
+    return validate_bound_field_value(field, bound_value);
+  }
+  validate_literal_field_value(field, value)
+}
+
+fn validate_bound_field_value(field: &GraphFieldSchema, value: GraphBoundFieldValue) -> Result<(), GraphCommandError> {
+  match value {
+    GraphBoundFieldValue::Literal { value } => validate_literal_field_value(field, &value),
+    GraphBoundFieldValue::Expression { expression } => {
+      if !field.capabilities.supports_expressions() {
+        return Err(GraphCommandError::InvalidFieldValue { field_id: field.id.clone(), expected: "a literal value for this field" });
+      }
+      if expression.trim().is_empty() {
+        return Err(GraphCommandError::InvalidFieldValue { field_id: field.id.clone(), expected: "a non-empty expression" });
+      }
+      Ok(())
+    },
+    GraphBoundFieldValue::Credential { credential_id, key } => {
+      let Some(requirement) = field.capabilities.credential.as_ref() else {
+        return Err(GraphCommandError::InvalidFieldValue { field_id: field.id.clone(), expected: "a literal value for this field" });
+      };
+      if credential_id.trim().is_empty() {
+        return Err(GraphCommandError::InvalidFieldValue { field_id: field.id.clone(), expected: "a credential reference" });
+      }
+      if !requirement.allow_key_selection && key.as_deref().is_some_and(|entry| !entry.trim().is_empty()) {
+        return Err(GraphCommandError::InvalidFieldValue { field_id: field.id.clone(), expected: "a credential reference without a secret key selector" });
+      }
+      Ok(())
+    },
+  }
+}
+
+fn validate_literal_field_value(field: &GraphFieldSchema, value: &Value) -> Result<(), GraphCommandError> {
   match &field.kind {
     GraphFieldKind::Text | GraphFieldKind::TextArea => {
       if !value.is_string() {

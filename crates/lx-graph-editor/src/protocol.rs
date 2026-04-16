@@ -19,6 +19,54 @@ pub struct GraphWidgetDiagnostic {
   pub target: Option<super::model::GraphEntityRef>,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GraphRunStatus {
+  #[default]
+  Idle,
+  Pending,
+  Running,
+  Succeeded,
+  Warning,
+  Failed,
+  Cancelled,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GraphNodeRunState {
+  pub node_id: String,
+  pub status: GraphRunStatus,
+  pub label: Option<String>,
+  pub detail: Option<String>,
+  pub output_summary: Option<String>,
+  pub started_at: Option<String>,
+  pub finished_at: Option<String>,
+  pub duration_ms: Option<u64>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GraphEdgeRunState {
+  pub edge_id: String,
+  pub status: GraphRunStatus,
+  pub label: Option<String>,
+  pub detail: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GraphRunSnapshot {
+  pub id: String,
+  pub status: GraphRunStatus,
+  pub label: Option<String>,
+  pub summary: Option<String>,
+  pub started_at: Option<String>,
+  pub finished_at: Option<String>,
+  pub duration_ms: Option<u64>,
+  #[serde(default)]
+  pub node_states: Vec<GraphNodeRunState>,
+  #[serde(default)]
+  pub edge_states: Vec<GraphEdgeRunState>,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GraphWidgetSnapshot {
   pub document: GraphDocument,
@@ -26,6 +74,8 @@ pub struct GraphWidgetSnapshot {
   pub templates: Vec<GraphNodeTemplate>,
   #[serde(default)]
   pub diagnostics: Vec<GraphWidgetDiagnostic>,
+  #[serde(default)]
+  pub run_snapshot: Option<GraphRunSnapshot>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

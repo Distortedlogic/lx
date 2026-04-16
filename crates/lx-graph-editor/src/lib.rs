@@ -10,7 +10,7 @@ pub mod protocol;
 mod tests {
   use serde_json::json;
 
-  use super::catalog::{GraphFieldKind, GraphFieldOption, GraphFieldSchema, GraphNodeTemplate, GraphPortTemplate, PortDirection};
+  use super::catalog::{GraphFieldKind, GraphFieldOption, GraphFieldSchema, GraphNodeTemplate, GraphPortTemplate, GraphPortType, PortDirection};
   use super::commands::{GraphCommand, GraphCommandError, apply_graph_command};
   use super::model::{GraphDocument, GraphPoint, GraphPortRef, GraphSelection, GraphViewport};
   use super::protocol::{GraphWidgetDiagnostic, GraphWidgetDiagnosticSeverity, GraphWidgetEvent, GraphWidgetSnapshot};
@@ -28,7 +28,7 @@ mod tests {
           label: "Topics".to_string(),
           description: None,
           direction: PortDirection::Output,
-          data_type: Some("topic".to_string()),
+          data_type: Some(GraphPortType::workflow("topic")),
           required: true,
           allow_multiple: true,
         }],
@@ -40,6 +40,7 @@ mod tests {
             kind: GraphFieldKind::Text,
             required: true,
             default_value: Some(json!("ai safety")),
+            capabilities: Default::default(),
           },
           GraphFieldSchema {
             id: "sources".to_string(),
@@ -48,6 +49,7 @@ mod tests {
             kind: GraphFieldKind::StringList,
             required: true,
             default_value: Some(json!(["https://example.com"])),
+            capabilities: Default::default(),
           },
         ],
       },
@@ -63,7 +65,7 @@ mod tests {
             label: "Documents".to_string(),
             description: None,
             direction: PortDirection::Input,
-            data_type: Some("topic".to_string()),
+            data_type: Some(GraphPortType::workflow("topic")),
             required: true,
             allow_multiple: false,
           },
@@ -72,7 +74,7 @@ mod tests {
             label: "Summary".to_string(),
             description: None,
             direction: PortDirection::Output,
-            data_type: Some("summary".to_string()),
+            data_type: Some(GraphPortType::workflow("summary")),
             required: true,
             allow_multiple: true,
           },
@@ -89,6 +91,7 @@ mod tests {
           },
           required: true,
           default_value: Some(json!("brief")),
+          capabilities: Default::default(),
         }],
       },
     ]
@@ -198,6 +201,74 @@ mod tests {
   }
 
   #[test]
+  fn accepts_qualified_output_for_more_general_input() {
+    let templates = vec![
+      GraphNodeTemplate {
+        id: "producer".to_string(),
+        label: "Producer".to_string(),
+        description: None,
+        category: Some("lx".to_string()),
+        default_label: Some("Producer".to_string()),
+        ports: vec![GraphPortTemplate {
+          id: "artifact".to_string(),
+          label: "Artifact".to_string(),
+          description: None,
+          direction: PortDirection::Output,
+          data_type: Some(GraphPortType::qualified("lx", "artifact", ["research_brief"])),
+          required: true,
+          allow_multiple: true,
+        }],
+        fields: vec![],
+      },
+      GraphNodeTemplate {
+        id: "consumer".to_string(),
+        label: "Consumer".to_string(),
+        description: None,
+        category: Some("lx".to_string()),
+        default_label: Some("Consumer".to_string()),
+        ports: vec![GraphPortTemplate {
+          id: "artifact".to_string(),
+          label: "Artifact".to_string(),
+          description: None,
+          direction: PortDirection::Input,
+          data_type: Some(GraphPortType::new("lx", "artifact")),
+          required: true,
+          allow_multiple: false,
+        }],
+        fields: vec![],
+      },
+    ];
+
+    let mut document = GraphDocument::new("flow-1", "LX Flow");
+    apply_graph_command(
+      &mut document,
+      &templates,
+      GraphCommand::AddNode { node_id: "producer-1".to_string(), template_id: "producer".to_string(), position: GraphPoint { x: 0.0, y: 0.0 }, label: None },
+    )
+    .expect("add producer");
+    apply_graph_command(
+      &mut document,
+      &templates,
+      GraphCommand::AddNode { node_id: "consumer-1".to_string(), template_id: "consumer".to_string(), position: GraphPoint { x: 240.0, y: 0.0 }, label: None },
+    )
+    .expect("add consumer");
+
+    apply_graph_command(
+      &mut document,
+      &templates,
+      GraphCommand::ConnectPorts {
+        edge_id: "edge-1".to_string(),
+        from: GraphPortRef { node_id: "producer-1".to_string(), port_id: "artifact".to_string() },
+        to: GraphPortRef { node_id: "consumer-1".to_string(), port_id: "artifact".to_string() },
+        label: None,
+      },
+    )
+    .expect("qualified output should satisfy general input");
+
+    assert_eq!(document.edges.len(), 1);
+  }
+
+  #[test]
   fn deletes_the_current_selection() {
     let templates = workflow_templates();
     let mut document = GraphDocument::new("flow-1", "Research Flow");
@@ -262,6 +333,7 @@ mod tests {
         message: "Missing summary sink".to_string(),
         target: Some(super::model::GraphEntityRef::Node("node-1".to_string())),
       }],
+      run_snapshot: None,
     };
     let event = GraphWidgetEvent::ViewportChanged { viewport: GraphViewport { pan_x: 0.0, pan_y: 0.0, zoom: 0.8 } };
 

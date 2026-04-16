@@ -2,7 +2,9 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use serde_json::Value;
 
-use lx_graph_editor::catalog::{GraphFieldKind, GraphNodeTemplate, PortDirection, node_template, port_template};
+use lx_graph_editor::catalog::{
+  GraphBoundFieldValue, GraphFieldKind, GraphFieldSchema, GraphNodeTemplate, PortDirection, bound_field_value, node_template, port_template,
+};
 use lx_graph_editor::model::{GraphDocument, GraphEntityRef};
 use lx_graph_editor::protocol::{GraphWidgetDiagnostic, GraphWidgetDiagnosticSeverity};
 
@@ -42,7 +44,7 @@ fn validate_required_fields(document: &GraphDocument, templates: &[GraphNodeTemp
         continue;
       }
       let value = properties.and_then(|entry| entry.get(&field.id));
-      if is_missing_required_value(value, &field.kind) {
+      if is_missing_required_value(value, field) {
         diagnostics.push(node_error(
           format!("missing-field-{}-{}", node.id, field.id),
           format!("`{}` is required for {}.", field.label, node.label.as_deref().unwrap_or(&node.id)),
@@ -113,7 +115,7 @@ fn validate_edges(document: &GraphDocument, templates: &[GraphNodeTemplate], dia
     }
 
     if let (Some(from_type), Some(to_type)) = (&from_port.data_type, &to_port.data_type)
-      && from_type != to_type
+      && !to_type.accepts(from_type)
     {
       diagnostics.push(edge_error(
         format!("incompatible-edge-types-{}", edge.id),
@@ -175,18 +177,40 @@ fn validate_cycles(document: &GraphDocument, diagnostics: &mut Vec<GraphWidgetDi
   }
 }
 
-fn is_missing_required_value(value: Option<&Value>, kind: &GraphFieldKind) -> bool {
+fn is_missing_required_value(value: Option<&Value>, field: &GraphFieldSchema) -> bool {
   let Some(value) = value else {
     return true;
   };
   if value.is_null() {
     return true;
   }
-  match kind {
+  if let Some(bound_value) = bound_field_value(value) {
+    return is_missing_bound_value(bound_value, field);
+  }
+  match &field.kind {
     GraphFieldKind::Text | GraphFieldKind::TextArea | GraphFieldKind::Select { .. } => value.as_str().is_none_or(str::is_empty),
     GraphFieldKind::StringList => value.as_array().is_none_or(|items| items.is_empty()),
     GraphFieldKind::Number | GraphFieldKind::Integer => !value.is_number(),
     GraphFieldKind::Boolean => !value.is_boolean(),
+  }
+}
+
+fn is_missing_bound_value(value: GraphBoundFieldValue, field: &GraphFieldSchema) -> bool {
+  match value {
+    GraphBoundFieldValue::Literal { value } => is_missing_required_value(
+      Some(&value),
+      &GraphFieldSchema {
+        id: field.id.clone(),
+        label: field.label.clone(),
+        description: field.description.clone(),
+        kind: field.kind.clone(),
+        required: field.required,
+        default_value: field.default_value.clone(),
+        capabilities: field.capabilities.clone(),
+      },
+    ),
+    GraphBoundFieldValue::Expression { expression } => !field.capabilities.supports_expressions() || expression.trim().is_empty(),
+    GraphBoundFieldValue::Credential { credential_id, .. } => !field.capabilities.supports_credentials() || credential_id.trim().is_empty(),
   }
 }
 

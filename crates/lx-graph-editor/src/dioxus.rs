@@ -10,13 +10,14 @@ use crate::catalog::{GraphNodeTemplate, GraphPortTemplate, PortDirection, node_t
 use crate::commands::GraphCommand;
 use crate::history::GraphEditorAction;
 use crate::model::{GraphDocument, GraphEntityRef, GraphNode, GraphPoint, GraphPortRef, GraphSelection, GraphViewport};
-use crate::protocol::{GraphWidgetDiagnostic, GraphWidgetDiagnosticSeverity};
+use crate::protocol::{GraphEdgeRunState, GraphRunSnapshot, GraphRunStatus, GraphWidgetDiagnostic, GraphWidgetDiagnosticSeverity};
 
 #[component]
 pub fn GraphCanvas(
   document: GraphDocument,
   templates: Vec<GraphNodeTemplate>,
   diagnostics: Vec<GraphWidgetDiagnostic>,
+  run_snapshot: Option<GraphRunSnapshot>,
   canvas_size: (f64, f64),
   on_command: EventHandler<GraphCommand>,
   on_editor_action: EventHandler<GraphEditorAction>,
@@ -42,6 +43,14 @@ pub fn GraphCanvas(
   let edges = document.edges.clone();
   let displayed_viewport = viewport_preview.read().unwrap_or(document.viewport);
   let preview_positions = node_preview_positions.read().clone();
+  let node_run_states = run_snapshot
+    .as_ref()
+    .map(|snapshot| snapshot.node_states.iter().cloned().map(|state| (state.node_id.clone(), state)).collect::<HashMap<_, _>>())
+    .unwrap_or_default();
+  let edge_run_states = run_snapshot
+    .as_ref()
+    .map(|snapshot| snapshot.edge_states.iter().cloned().map(|state| (state.edge_id.clone(), state)).collect::<HashMap<_, _>>())
+    .unwrap_or_default();
   let is_dragging_node = drag_state.read().is_some();
   let is_panning = pan_state.read().is_some();
   let is_marquee_selecting = marquee_state.read().is_some();
@@ -58,6 +67,7 @@ pub fn GraphCanvas(
   } else {
     "border: 1px solid var(--graph-warning-border); background: var(--graph-warning-surface); color: var(--graph-warning-text); backdrop-filter: blur(16px);"
   };
+  let run_badge = run_snapshot.as_ref().map(|snapshot| (run_snapshot_label(snapshot), run_status_badge_style(snapshot.status)));
   let selection_badge = selection_summary(&selection);
   let zoom_label = format!("{:.0}% zoom", displayed_viewport.zoom * 100.0);
   let scene_class = if connection_preview.is_some() || is_marquee_selecting {
@@ -100,6 +110,7 @@ pub fn GraphCanvas(
         has_error: diagnostics.iter().any(|diagnostic| {
           diagnostic.severity == GraphWidgetDiagnosticSeverity::Error && matches!(diagnostic.target, Some(GraphEntityRef::Edge(ref id)) if id == &edge.id)
         }),
+        run_state: edge_run_states.get(&edge.id).cloned(),
       })
     })
     .collect();
@@ -196,6 +207,13 @@ pub fn GraphCanvas(
         style: "background: radial-gradient(circle at top left, var(--graph-canvas-tint-primary) 0%, transparent 34%), radial-gradient(circle at bottom right, var(--graph-canvas-tint-secondary) 0%, transparent 28%);",
       }
       div { class: "pointer-events-none absolute right-4 top-4 z-10 flex max-w-[45%] flex-wrap items-center justify-end gap-2",
+        if let Some((run_badge_label, run_badge_style)) = run_badge.clone() {
+          span {
+            class: "{canvas_badge_class}",
+            style: "{run_badge_style}",
+            "{run_badge_label}"
+          }
+        }
         if !diagnostics.is_empty() {
           span {
             class: "{canvas_badge_class}",
@@ -444,14 +462,22 @@ pub fn GraphCanvas(
                   let edge_id = edge.id.clone();
                   let edge_selection = GraphSelection::single_edge(edge_id.clone());
                   let should_select_edge = selection != edge_selection;
-                  let edge_label = edge.label.clone();
-                  let edge_color = if edge.has_error {
-                      "var(--graph-edge-error)"
-                  } else if is_selected {
-                      "var(--graph-edge-selected)"
-                  } else {
-                      "var(--graph-edge-default)"
-                  };
+                  let edge_label = edge
+                      .label
+                      .clone()
+                      .or_else(|| {
+                          edge
+                              .run_state
+                              .as_ref()
+                              .and_then(|state| {
+                                  state.label.clone().or_else(|| state.detail.clone())
+                              })
+                      });
+                  let edge_color = edge_stroke_color(
+                      edge.run_state.as_ref(),
+                      edge.has_error,
+                      is_selected,
+                  );
                   let path_data = edge_path(from_point, to_point);
                   rsx! {
                     g { key: "{edge.id}",
@@ -564,8 +590,10 @@ pub fn GraphCanvas(
                     let node_key = node_id.clone();
                     let node_template_id = node.template_id.clone();
                     let node_label = node.label.clone().unwrap_or_else(|| node_id.clone());
-                    let node_template_label =
-                        template.as_ref().map_or(node_template_id.clone(), |template| template.label.clone());
+                    let node_template_label = match template.as_ref() {
+                        Some(template) => template.label.clone(),
+                        None => node_template_id.clone(),
+                    };
                     let node_category = template
                         .as_ref()
                         .and_then(|template| template.category.as_deref().map(category_label));
@@ -582,11 +610,13 @@ pub fn GraphCanvas(
                         })
                         .cloned()
                         .collect();
+                    let node_run_state = node_run_states.get(&node.id).cloned();
                     let is_selected = selection.node_ids.iter().any(|selected| selected == &node.id);
                     let node_style = node_style(
                         position,
                         node_height(template.as_ref()),
                         is_selected,
+                        node_run_state.as_ref().map(|state| state.status),
                     );
                     let input_ports = ports_by_direction(template.as_ref(), PortDirection::Input);
                     let output_ports = ports_by_direction(template.as_ref(), PortDirection::Output);
@@ -602,9 +632,10 @@ pub fn GraphCanvas(
                             let _ = bump_revision(wheel_revision);
                             let coords = evt.client_coordinates();
                             if should_select_node {
-                                on_command.call(GraphCommand::Select {
+                                let command = GraphCommand::Select {
                                     selection: node_selection.clone(),
-                                });
+                                };
+                                on_command.call(command);
                             }
                             drag_state
                                 .set(
@@ -647,6 +678,13 @@ pub fn GraphCanvas(
                           .iter()
                           .any(|diagnostic| diagnostic.severity == GraphWidgetDiagnosticSeverity::Error) { "background: var(--graph-error-surface); color: var(--graph-error-text); border: 1px solid var(--graph-error-border);" } else { "background: var(--graph-warning-surface); color: var(--graph-warning-text); border: 1px solid var(--graph-warning-border);" },
                                 "{node_diagnostics.len()}"
+                              }
+                            }
+                            if let Some(run_state) = node_run_state.clone() {
+                              span {
+                                class: "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+                                style: "{run_status_badge_style(run_state.status)}",
+                                "{run_state.label.clone().unwrap_or_else(|| run_status_label(run_state.status).to_string())}"
                               }
                             }
                           }
@@ -734,6 +772,35 @@ pub fn GraphCanvas(
                                       },
                                     }
                                   }
+                              }
+                            }
+                          }
+                        }
+                        if let Some(run_state) = node_run_state {
+                          if run_state.detail.is_some() || run_state.output_summary.is_some()
+                              || run_state.duration_ms.is_some()
+                          {
+                            div {
+                              class: "border-t px-4 py-3",
+                              style: "border-color: var(--graph-node-border); background: color-mix(in srgb, var(--graph-node-body-bg) 82%, var(--graph-overlay-bg) 18%);",
+                              div { class: "flex items-center justify-between gap-3",
+                                div {
+                                  class: "truncate text-[11px] font-semibold uppercase tracking-[0.14em]",
+                                  style: "color: var(--graph-overlay-muted);",
+                                  "{run_state.detail.clone().unwrap_or_else(|| run_status_label(run_state.status).to_string())}"
+                                }
+                                if let Some(duration) = run_state.duration_ms {
+                                  span {
+                                    class: "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+                                    style: "{run_status_badge_style(run_state.status)}",
+                                    "{format_duration(duration)}"
+                                  }
+                                }
+                              }
+                              if let Some(output_summary) = run_state.output_summary.clone() {
+                                p { class: "mt-2 text-[12px] leading-5 text-[var(--on-surface)]",
+                                  "{output_summary}"
+                                }
                               }
                             }
                           }
@@ -851,6 +918,7 @@ struct RenderableEdge {
   to: GraphPoint,
   is_selected: bool,
   has_error: bool,
+  run_state: Option<GraphEdgeRunState>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1081,12 +1149,13 @@ const NODE_HEADER_HEIGHT: f64 = 72.0;
 const NODE_PORT_ROW_HEIGHT: f64 = 30.0;
 const NODE_BODY_PADDING: f64 = 16.0;
 
-fn node_style(position: GraphPoint, height: f64, is_selected: bool) -> String {
-  let border = if is_selected { "1px solid var(--graph-node-border-selected)" } else { "1px solid var(--graph-node-border)" };
-  let box_shadow = if is_selected { "var(--graph-node-shadow-selected)" } else { "var(--graph-node-shadow)" };
+fn node_style(position: GraphPoint, height: f64, is_selected: bool, run_status: Option<GraphRunStatus>) -> String {
+  let border = if is_selected { "1px solid var(--graph-node-border-selected)" } else { run_status_border(run_status) };
+  let box_shadow = if is_selected { "var(--graph-node-shadow-selected)" } else { run_status_shadow(run_status) };
+  let background = run_status_background(run_status);
   format!(
-    "position: absolute; left: {}px; top: {}px; width: {}px; min-height: {}px; border-radius: 22px; border: {}; box-shadow: {}; background: linear-gradient(180deg, var(--graph-node-bg-start) 0%, var(--graph-node-bg-end) 100%); overflow: hidden; user-select: none;",
-    position.x, position.y, NODE_WIDTH, height, border, box_shadow
+    "position: absolute; left: {}px; top: {}px; width: {}px; min-height: {}px; border-radius: 22px; border: {}; box-shadow: {}; background: {}; overflow: hidden; user-select: none;",
+    position.x, position.y, NODE_WIDTH, height, border, box_shadow, background
   )
 }
 
@@ -1175,4 +1244,129 @@ fn category_label(category: &str) -> String {
     })
     .collect::<Vec<_>>()
     .join(" ")
+}
+
+fn run_snapshot_label(snapshot: &GraphRunSnapshot) -> String {
+  match snapshot.label.as_deref() {
+    Some(label) if !label.trim().is_empty() => format!("{label} • {}", run_status_label(snapshot.status)),
+    _ => format!("Run • {}", run_status_label(snapshot.status)),
+  }
+}
+
+fn run_status_label(status: GraphRunStatus) -> &'static str {
+  match status {
+    GraphRunStatus::Idle => "idle",
+    GraphRunStatus::Pending => "pending",
+    GraphRunStatus::Running => "running",
+    GraphRunStatus::Succeeded => "succeeded",
+    GraphRunStatus::Warning => "warning",
+    GraphRunStatus::Failed => "failed",
+    GraphRunStatus::Cancelled => "cancelled",
+  }
+}
+
+fn run_status_badge_style(status: GraphRunStatus) -> &'static str {
+  match status {
+    GraphRunStatus::Idle => {
+      "border: 1px solid color-mix(in srgb, var(--outline-variant) 68%, transparent); background: color-mix(in srgb, var(--surface-container-high) 72%, transparent); color: var(--graph-overlay-muted); backdrop-filter: blur(16px);"
+    },
+    GraphRunStatus::Pending => {
+      "border: 1px solid color-mix(in srgb, var(--warning) 32%, transparent); background: color-mix(in srgb, var(--warning) 14%, transparent); color: color-mix(in srgb, var(--on-surface) 82%, var(--warning) 18%); backdrop-filter: blur(16px);"
+    },
+    GraphRunStatus::Running => {
+      "border: 1px solid color-mix(in srgb, var(--primary) 34%, transparent); background: color-mix(in srgb, var(--primary) 16%, transparent); color: color-mix(in srgb, var(--on-surface) 84%, var(--primary) 16%); backdrop-filter: blur(16px);"
+    },
+    GraphRunStatus::Succeeded => {
+      "border: 1px solid color-mix(in srgb, var(--success) 34%, transparent); background: color-mix(in srgb, var(--success) 16%, transparent); color: color-mix(in srgb, var(--on-surface) 84%, var(--success) 16%); backdrop-filter: blur(16px);"
+    },
+    GraphRunStatus::Warning => {
+      "border: 1px solid color-mix(in srgb, var(--warning) 34%, transparent); background: color-mix(in srgb, var(--warning) 16%, transparent); color: color-mix(in srgb, var(--on-surface) 84%, var(--warning) 16%); backdrop-filter: blur(16px);"
+    },
+    GraphRunStatus::Failed => {
+      "border: 1px solid color-mix(in srgb, var(--error) 36%, transparent); background: color-mix(in srgb, var(--error) 16%, transparent); color: color-mix(in srgb, var(--on-surface) 82%, var(--error) 18%); backdrop-filter: blur(16px);"
+    },
+    GraphRunStatus::Cancelled => {
+      "border: 1px solid color-mix(in srgb, var(--outline) 32%, transparent); background: color-mix(in srgb, var(--surface-container-high) 78%, transparent); color: var(--graph-overlay-text); backdrop-filter: blur(16px);"
+    },
+  }
+}
+
+fn run_status_background(status: Option<GraphRunStatus>) -> &'static str {
+  match status {
+    Some(GraphRunStatus::Running) => {
+      "linear-gradient(180deg, color-mix(in srgb, var(--graph-node-bg-start) 88%, var(--primary) 12%) 0%, color-mix(in srgb, var(--graph-node-bg-end) 90%, var(--primary) 10%) 100%)"
+    },
+    Some(GraphRunStatus::Succeeded) => {
+      "linear-gradient(180deg, color-mix(in srgb, var(--graph-node-bg-start) 90%, var(--success) 10%) 0%, color-mix(in srgb, var(--graph-node-bg-end) 92%, var(--success) 8%) 100%)"
+    },
+    Some(GraphRunStatus::Warning) | Some(GraphRunStatus::Pending) => {
+      "linear-gradient(180deg, color-mix(in srgb, var(--graph-node-bg-start) 91%, var(--warning) 9%) 0%, color-mix(in srgb, var(--graph-node-bg-end) 93%, var(--warning) 7%) 100%)"
+    },
+    Some(GraphRunStatus::Failed) => {
+      "linear-gradient(180deg, color-mix(in srgb, var(--graph-node-bg-start) 90%, var(--error) 10%) 0%, color-mix(in srgb, var(--graph-node-bg-end) 92%, var(--error) 8%) 100%)"
+    },
+    Some(GraphRunStatus::Cancelled) => {
+      "linear-gradient(180deg, color-mix(in srgb, var(--graph-node-bg-start) 92%, var(--outline) 8%) 0%, color-mix(in srgb, var(--graph-node-bg-end) 94%, var(--outline) 6%) 100%)"
+    },
+    _ => "linear-gradient(180deg, var(--graph-node-bg-start) 0%, var(--graph-node-bg-end) 100%)",
+  }
+}
+
+fn run_status_border(status: Option<GraphRunStatus>) -> &'static str {
+  match status {
+    Some(GraphRunStatus::Running) => "1px solid color-mix(in srgb, var(--primary) 30%, var(--graph-node-border))",
+    Some(GraphRunStatus::Succeeded) => "1px solid color-mix(in srgb, var(--success) 30%, var(--graph-node-border))",
+    Some(GraphRunStatus::Warning) | Some(GraphRunStatus::Pending) => "1px solid color-mix(in srgb, var(--warning) 28%, var(--graph-node-border))",
+    Some(GraphRunStatus::Failed) => "1px solid color-mix(in srgb, var(--error) 30%, var(--graph-node-border))",
+    Some(GraphRunStatus::Cancelled) => "1px solid color-mix(in srgb, var(--outline) 26%, var(--graph-node-border))",
+    _ => "1px solid var(--graph-node-border)",
+  }
+}
+
+fn run_status_shadow(status: Option<GraphRunStatus>) -> &'static str {
+  match status {
+    Some(GraphRunStatus::Running) => "0 0 0 1px color-mix(in srgb, var(--primary) 16%, transparent), 0 18px 42px rgba(0, 0, 0, 0.34)",
+    Some(GraphRunStatus::Succeeded) => "0 0 0 1px color-mix(in srgb, var(--success) 14%, transparent), 0 18px 42px rgba(0, 0, 0, 0.32)",
+    Some(GraphRunStatus::Warning) | Some(GraphRunStatus::Pending) => {
+      "0 0 0 1px color-mix(in srgb, var(--warning) 14%, transparent), 0 18px 42px rgba(0, 0, 0, 0.32)"
+    },
+    Some(GraphRunStatus::Failed) => "0 0 0 1px color-mix(in srgb, var(--error) 16%, transparent), 0 18px 42px rgba(0, 0, 0, 0.34)",
+    Some(GraphRunStatus::Cancelled) => "0 0 0 1px color-mix(in srgb, var(--outline) 12%, transparent), 0 18px 42px rgba(0, 0, 0, 0.32)",
+    _ => "var(--graph-node-shadow)",
+  }
+}
+
+fn edge_stroke_color(run_state: Option<&GraphEdgeRunState>, has_error: bool, is_selected: bool) -> &'static str {
+  if has_error {
+    return "var(--graph-edge-error)";
+  }
+  if let Some(run_state) = run_state {
+    return match run_state.status {
+      GraphRunStatus::Running => "color-mix(in srgb, var(--primary) 76%, white 8%)",
+      GraphRunStatus::Succeeded => "color-mix(in srgb, var(--success) 74%, white 8%)",
+      GraphRunStatus::Warning | GraphRunStatus::Pending => "color-mix(in srgb, var(--warning) 74%, white 8%)",
+      GraphRunStatus::Failed => "color-mix(in srgb, var(--error) 82%, white 10%)",
+      GraphRunStatus::Cancelled => "color-mix(in srgb, var(--outline) 64%, white 4%)",
+      GraphRunStatus::Idle => {
+        if is_selected {
+          "var(--graph-edge-selected)"
+        } else {
+          "var(--graph-edge-default)"
+        }
+      },
+    };
+  }
+  if is_selected { "var(--graph-edge-selected)" } else { "var(--graph-edge-default)" }
+}
+
+fn format_duration(duration_ms: u64) -> String {
+  if duration_ms < 1_000 {
+    return format!("{duration_ms} ms");
+  }
+  if duration_ms < 60_000 {
+    return format!("{:.1} s", duration_ms as f64 / 1_000.0);
+  }
+  let minutes = duration_ms / 60_000;
+  let seconds = (duration_ms % 60_000) / 1_000;
+  format!("{minutes}m {seconds}s")
 }

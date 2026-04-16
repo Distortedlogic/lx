@@ -461,3 +461,95 @@
 {"id":"1776363173807-1","kind":"runtime/emit","agent":"main","ts":1776363173807,"span":null,"value":"[18:12:53] orchestrator: all passed"}
 {"id":"1776363173943-0","kind":"runtime/log","agent":"main","ts":1776363173943,"span":null,"level":"info","msg":"111_work_item: all passed"}
 {"id":"1776363174063-0","kind":"runtime/log","agent":"main","ts":1776363174063,"span":null,"level":"info","msg":"work_item_edges: all passed"}
+{"id":"1776365284375-0","kind":"runtime/emit","agent":"main","ts":1776365284375,"span":null,"value":"[18:48:04] loading context files..."}
+{"id":"1776365284378-0","kind":"runtime/emit","agent":"main","ts":1776365284378,"span":null,"value":"[18:48:04] context loaded (0 chars)"}
+{"id":"1776365284378-1","kind":"runtime/log","agent":"main","ts":1776365284378,"span":null,"level":"info","msg":"context: all passed"}
+{"id":"1776365284456-0","kind":"runtime/log","agent":"main","ts":1776365284456,"span":null,"level":"info","msg":"grader_unit: all passed"}
+{"id":"1776365284549-0","kind":"runtime/log","agent":"main","ts":1776365284549,"span":null,"level":"info","msg":"grader_assemble: all passed"}
+{"id":"1776365284634-0","kind":"runtime/emit","agent":"main","ts":1776365284634,"span":null,"value":"grader_llm: no LLM backend — testing fallback"}
+{"id":"1776365284635-0","kind":"runtime/log","agent":"main","ts":1776365284635,"span":null,"level":"info","msg":"grader_llm: all passed"}
+{"id":"1776365284730-0","kind":"runtime/log","agent":"main","ts":1776365284730,"span":null,"level":"info","msg":"grader_parse: all passed"}
+{"id":"1776365284763-0","kind":"runtime/emit","agent":"main","ts":1776365284763,"span":null,"value":"[18:48:04] test message from log module"}
+{"id":"1776365284763-1","kind":"runtime/log","agent":"main","ts":1776365284763,"span":null,"level":"info","msg":"log: all passed"}
+{"id":"1776365284940-0","kind":"runtime/emit","agent":"main","ts":1776365284940,"span":null,"value":"[18:48:04] orchestrator test: parsing OK"}
+{"id":"1776365284941-0","kind":"runtime/emit","agent":"main","ts":1776365284941,"span":null,"value":"[18:48:04] loading context files..."}
+{"id":"1776365284942-0","kind":"runtime/emit","agent":"main","ts":1776365284942,"span":null,"value":"[18:48:04] context loaded (0 chars)"}
+{"id":"1776365284942-1","kind":"runtime/emit","agent":"main","ts":1776365284942,"span":null,"value":"[18:48:04] orchestrator test: running work item..."}
+{"id":"1776365284943-0","kind":"runtime/emit","agent":"main","ts":1776365284943,"span":null,"value":"[18:48:04] "}
+{"id":"1776365284943-1","kind":"runtime/emit","agent":"main","ts":1776365284943,"span":null,"value":"[18:48:04] === [1/1] programs/workrunner/tests/fixtures/tiny_work_item.md ==="}
+{"id":"1776365284957-0","kind":"runtime/emit","agent":"main","ts":1776365284957,"span":null,"value":"[18:48:04]   parsed: 1 tasks"}
+{"id":"1776365284957-1","kind":"runtime/emit","agent":"main","ts":1776365284957,"span":null,"value":"[18:48:04]     Task 1: Task 1: Create the file"}
+{"id":"1776365284958-0","kind":"runtime/emit","agent":"main","ts":1776365284958,"span":null,"value":"[18:48:04]   --- task 1/1: Task 1: Create the file ---"}
+{"id":"1776365284962-0","kind":"runtime/emit","agent":"main","ts":1776365284962,"span":null,"value":"[18:48:04] orchestrator test: no LLM — skipped live run"}
+{"id":"1776365284962-1","kind":"runtime/emit","agent":"main","ts":1776365284962,"span":null,"value":"[18:48:04] orchestrator: all passed"}
+{"id":"1776365285098-0","kind":"runtime/log","agent":"main","ts":1776365285098,"span":null,"level":"info","msg":"111_work_item: all passed"}
+{"id":"1776365285221-0","kind":"runtime/log","agent":"main","ts":1776365285221,"span":null,"level":"info","msg":"work_item_edges: all passed"}
+{"id":"1776365288616-0","kind":"runtime/emit","agent":"main","ts":1776365288616,"span":null,"value":"[18:48:08] loading context files..."}
+{"id":"1776365288617-0","kind":"runtime/emit","agent":"main","ts":1776365288617,"span":null,"value":"[18:48:08] context loaded (0 chars)"}
+{"id":"1776365288618-0","kind":"runtime/log","agent":"main","ts":1776365288618,"span":null,"level":"info","msg":"context: all passed"}
+{"id":"1776365288698-0","kind":"runtime/log","agent":"main","ts":1776365288698,"span":null,"level":"info","msg":"grader_unit: all passed"}
+{"id":"1776365288791-0","kind":"runtime/log","agent":"main","ts":1776365288791,"span":null,"level":"info","msg":"grader_assemble: all passed"}
+{"id":"1776365288876-0","kind":"runtime/emit","agent":"main","ts":1776365288876,"span":null,"value":"grader_llm: no LLM backend — testing fallback"}
+{"id":"1776365288877-0","kind":"runtime/log","agent":"main","ts":1776365288877,"span":null,"level":"info","msg":"grader_llm: all passed"}
+{"id":"1776365288970-0","kind":"runtime/log","agent":"main","ts":1776365288970,"span":null,"level":"info","msg":"grader_parse: all passed"}
+{"id":"1776365289001-0","kind":"runtime/emit","agent":"main","ts":1776365289001,"span":null,"value":"[18:48:09] test message from log module"}
+{"id":"1776365289001-1","kind":"runtime/log","agent":"main","ts":1776365289001,"span":null,"level":"info","msg":"log: all passed"}
+{"id":"1776365289177-0","kind":"runtime/emit","agent":"main","ts":1776365289177,"span":null,"value":"[18:48:09] orchestrator test: parsing OK"}
+{"id":"1776365289178-0","kind":"runtime/emit","agent":"main","ts":1776365289178,"span":null,"value":"[18:48:09] loading context files..."}
+{"id":"1776365289179-0","kind":"runtime/emit","agent":"main","ts":1776365289179,"span":null,"value":"[18:48:09] context loaded (0 chars)"}
+{"id":"1776365289180-0","kind":"runtime/emit","agent":"main","ts":1776365289180,"span":null,"value":"[18:48:09] orchestrator test: running work item..."}
+{"id":"1776365289180-1","kind":"runtime/emit","agent":"main","ts":1776365289180,"span":null,"value":"[18:48:09] "}
+{"id":"1776365289180-2","kind":"runtime/emit","agent":"main","ts":1776365289180,"span":null,"value":"[18:48:09] === [1/1] programs/workrunner/tests/fixtures/tiny_work_item.md ==="}
+{"id":"1776365289194-0","kind":"runtime/emit","agent":"main","ts":1776365289194,"span":null,"value":"[18:48:09]   parsed: 1 tasks"}
+{"id":"1776365289194-1","kind":"runtime/emit","agent":"main","ts":1776365289194,"span":null,"value":"[18:48:09]     Task 1: Task 1: Create the file"}
+{"id":"1776365289195-0","kind":"runtime/emit","agent":"main","ts":1776365289195,"span":null,"value":"[18:48:09]   --- task 1/1: Task 1: Create the file ---"}
+{"id":"1776365289198-0","kind":"runtime/emit","agent":"main","ts":1776365289198,"span":null,"value":"[18:48:09] orchestrator test: no LLM — skipped live run"}
+{"id":"1776365289198-1","kind":"runtime/emit","agent":"main","ts":1776365289198,"span":null,"value":"[18:48:09] orchestrator: all passed"}
+{"id":"1776365289332-0","kind":"runtime/log","agent":"main","ts":1776365289332,"span":null,"level":"info","msg":"111_work_item: all passed"}
+{"id":"1776365289449-0","kind":"runtime/log","agent":"main","ts":1776365289449,"span":null,"level":"info","msg":"work_item_edges: all passed"}
+{"id":"1776365628178-0","kind":"runtime/emit","agent":"main","ts":1776365628178,"span":null,"value":"[18:53:48] loading context files..."}
+{"id":"1776365628180-0","kind":"runtime/emit","agent":"main","ts":1776365628180,"span":null,"value":"[18:53:48] context loaded (0 chars)"}
+{"id":"1776365628180-1","kind":"runtime/log","agent":"main","ts":1776365628180,"span":null,"level":"info","msg":"context: all passed"}
+{"id":"1776365628259-0","kind":"runtime/log","agent":"main","ts":1776365628259,"span":null,"level":"info","msg":"grader_unit: all passed"}
+{"id":"1776365628355-0","kind":"runtime/log","agent":"main","ts":1776365628355,"span":null,"level":"info","msg":"grader_assemble: all passed"}
+{"id":"1776365628440-0","kind":"runtime/emit","agent":"main","ts":1776365628440,"span":null,"value":"grader_llm: no LLM backend — testing fallback"}
+{"id":"1776365628441-0","kind":"runtime/log","agent":"main","ts":1776365628441,"span":null,"level":"info","msg":"grader_llm: all passed"}
+{"id":"1776365628535-0","kind":"runtime/log","agent":"main","ts":1776365628535,"span":null,"level":"info","msg":"grader_parse: all passed"}
+{"id":"1776365628566-0","kind":"runtime/emit","agent":"main","ts":1776365628566,"span":null,"value":"[18:53:48] test message from log module"}
+{"id":"1776365628566-1","kind":"runtime/log","agent":"main","ts":1776365628566,"span":null,"level":"info","msg":"log: all passed"}
+{"id":"1776365628744-0","kind":"runtime/emit","agent":"main","ts":1776365628744,"span":null,"value":"[18:53:48] orchestrator test: parsing OK"}
+{"id":"1776365628745-0","kind":"runtime/emit","agent":"main","ts":1776365628745,"span":null,"value":"[18:53:48] loading context files..."}
+{"id":"1776365628746-0","kind":"runtime/emit","agent":"main","ts":1776365628746,"span":null,"value":"[18:53:48] context loaded (0 chars)"}
+{"id":"1776365628747-0","kind":"runtime/emit","agent":"main","ts":1776365628747,"span":null,"value":"[18:53:48] orchestrator test: running work item..."}
+{"id":"1776365628747-1","kind":"runtime/emit","agent":"main","ts":1776365628747,"span":null,"value":"[18:53:48] "}
+{"id":"1776365628747-2","kind":"runtime/emit","agent":"main","ts":1776365628747,"span":null,"value":"[18:53:48] === [1/1] programs/workrunner/tests/fixtures/tiny_work_item.md ==="}
+{"id":"1776365628761-0","kind":"runtime/emit","agent":"main","ts":1776365628761,"span":null,"value":"[18:53:48]   parsed: 1 tasks"}
+{"id":"1776365628762-0","kind":"runtime/emit","agent":"main","ts":1776365628762,"span":null,"value":"[18:53:48]     Task 1: Task 1: Create the file"}
+{"id":"1776365628762-1","kind":"runtime/emit","agent":"main","ts":1776365628762,"span":null,"value":"[18:53:48]   --- task 1/1: Task 1: Create the file ---"}
+{"id":"1776365628766-0","kind":"runtime/emit","agent":"main","ts":1776365628766,"span":null,"value":"[18:53:48] orchestrator test: no LLM — skipped live run"}
+{"id":"1776365628766-1","kind":"runtime/emit","agent":"main","ts":1776365628766,"span":null,"value":"[18:53:48] orchestrator: all passed"}
+{"id":"1776365628900-0","kind":"runtime/log","agent":"main","ts":1776365628900,"span":null,"level":"info","msg":"111_work_item: all passed"}
+{"id":"1776365629018-0","kind":"runtime/log","agent":"main","ts":1776365629018,"span":null,"level":"info","msg":"work_item_edges: all passed"}
+{"id":"1776365632443-0","kind":"runtime/emit","agent":"main","ts":1776365632443,"span":null,"value":"[18:53:52] loading context files..."}
+{"id":"1776365632444-0","kind":"runtime/emit","agent":"main","ts":1776365632444,"span":null,"value":"[18:53:52] context loaded (0 chars)"}
+{"id":"1776365632444-1","kind":"runtime/log","agent":"main","ts":1776365632444,"span":null,"level":"info","msg":"context: all passed"}
+{"id":"1776365632524-0","kind":"runtime/log","agent":"main","ts":1776365632524,"span":null,"level":"info","msg":"grader_unit: all passed"}
+{"id":"1776365632618-0","kind":"runtime/log","agent":"main","ts":1776365632618,"span":null,"level":"info","msg":"grader_assemble: all passed"}
+{"id":"1776365632704-0","kind":"runtime/emit","agent":"main","ts":1776365632704,"span":null,"value":"grader_llm: no LLM backend — testing fallback"}
+{"id":"1776365632705-0","kind":"runtime/log","agent":"main","ts":1776365632705,"span":null,"level":"info","msg":"grader_llm: all passed"}
+{"id":"1776365632798-0","kind":"runtime/log","agent":"main","ts":1776365632798,"span":null,"level":"info","msg":"grader_parse: all passed"}
+{"id":"1776365632835-0","kind":"runtime/emit","agent":"main","ts":1776365632835,"span":null,"value":"[18:53:52] test message from log module"}
+{"id":"1776365632835-1","kind":"runtime/log","agent":"main","ts":1776365632835,"span":null,"level":"info","msg":"log: all passed"}
+{"id":"1776365633011-0","kind":"runtime/emit","agent":"main","ts":1776365633011,"span":null,"value":"[18:53:53] orchestrator test: parsing OK"}
+{"id":"1776365633011-1","kind":"runtime/emit","agent":"main","ts":1776365633011,"span":null,"value":"[18:53:53] loading context files..."}
+{"id":"1776365633012-0","kind":"runtime/emit","agent":"main","ts":1776365633012,"span":null,"value":"[18:53:53] context loaded (0 chars)"}
+{"id":"1776365633013-0","kind":"runtime/emit","agent":"main","ts":1776365633013,"span":null,"value":"[18:53:53] orchestrator test: running work item..."}
+{"id":"1776365633013-1","kind":"runtime/emit","agent":"main","ts":1776365633013,"span":null,"value":"[18:53:53] "}
+{"id":"1776365633013-2","kind":"runtime/emit","agent":"main","ts":1776365633013,"span":null,"value":"[18:53:53] === [1/1] programs/workrunner/tests/fixtures/tiny_work_item.md ==="}
+{"id":"1776365633027-0","kind":"runtime/emit","agent":"main","ts":1776365633027,"span":null,"value":"[18:53:53]   parsed: 1 tasks"}
+{"id":"1776365633027-1","kind":"runtime/emit","agent":"main","ts":1776365633027,"span":null,"value":"[18:53:53]     Task 1: Task 1: Create the file"}
+{"id":"1776365633028-0","kind":"runtime/emit","agent":"main","ts":1776365633028,"span":null,"value":"[18:53:53]   --- task 1/1: Task 1: Create the file ---"}
+{"id":"1776365633032-0","kind":"runtime/emit","agent":"main","ts":1776365633032,"span":null,"value":"[18:53:53] orchestrator test: no LLM — skipped live run"}
+{"id":"1776365633032-1","kind":"runtime/emit","agent":"main","ts":1776365633032,"span":null,"value":"[18:53:53] orchestrator: all passed"}
+{"id":"1776365633168-0","kind":"runtime/log","agent":"main","ts":1776365633168,"span":null,"level":"info","msg":"111_work_item: all passed"}
+{"id":"1776365633285-0","kind":"runtime/log","agent":"main","ts":1776365633285,"span":null,"level":"info","msg":"work_item_edges: all passed"}

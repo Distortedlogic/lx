@@ -3,13 +3,13 @@ use dioxus::prelude::*;
 use anyhow::Result as AnyhowResult;
 
 use crate::contexts::panel::{PanelContent, PanelState};
-use lx_graph_editor::catalog::GraphNodeTemplate;
+use lx_graph_editor::catalog::{GraphCredentialOption, GraphNodeTemplate};
 use lx_graph_editor::commands::{GraphCommand, GraphCommandError, apply_graph_command};
 use lx_graph_editor::history::{GraphEditorAction, GraphHistoryState};
 use lx_graph_editor::model::{GraphDocument, GraphPoint, GraphSelection};
-use lx_graph_editor::protocol::GraphWidgetDiagnostic;
+use lx_graph_editor::protocol::{GraphRunSnapshot, GraphWidgetDiagnostic};
 
-use super::catalog::workflow_node_templates;
+use super::registry::sample_workflow_registry;
 use super::sample::sample_document;
 use super::storage::FlowPersistence;
 use super::validation::validate_workflow;
@@ -19,11 +19,14 @@ pub struct FlowEditorState {
   pub flow_id: Signal<String>,
   pub document: Signal<GraphDocument>,
   pub templates: Signal<Vec<GraphNodeTemplate>>,
+  pub credential_options: Signal<Vec<GraphCredentialOption>>,
   pub diagnostics: Signal<Vec<GraphWidgetDiagnostic>>,
   pub canvas_size: Signal<(f64, f64)>,
   pub selection: Signal<GraphSelection>,
   pub validation_count: Signal<usize>,
   pub history: Signal<GraphHistoryState>,
+  pub active_run_agent_id: Signal<Option<String>>,
+  pub run_snapshot: Signal<Option<GraphRunSnapshot>>,
   pub status_message: Signal<Option<String>>,
   pub panel: PanelState,
 }
@@ -35,17 +38,22 @@ impl FlowEditorState {
       Err(error) => (sample_document(&flow_id), Some(format!("Opened bundled sample after load failed: {error}"))),
     };
     let initial_selection = initial_document.selection.clone();
-    let initial_templates = workflow_node_templates();
+    let registry = sample_workflow_registry();
+    let initial_templates = registry.templates();
+    let initial_credential_options = registry.credential_options();
     let panel = use_context::<PanelState>();
     let state = Self {
       flow_id: use_signal(|| flow_id),
       document: use_signal(|| initial_document),
       templates: use_signal(|| initial_templates),
+      credential_options: use_signal(|| initial_credential_options),
       diagnostics: use_signal(Vec::new),
       canvas_size: use_signal(|| (1200.0, 760.0)),
       selection: use_signal(|| initial_selection),
       validation_count: use_signal(|| 0usize),
       history: use_signal(GraphHistoryState::default),
+      active_run_agent_id: use_signal(|| Option::<String>::None),
+      run_snapshot: use_signal(|| Option::<GraphRunSnapshot>::None),
       status_message: use_signal(|| initial_status),
       panel,
     };
@@ -197,6 +205,21 @@ impl FlowEditorState {
     }
   }
 
+  pub fn set_active_run_surface(&self, agent_id: Option<String>, snapshot: Option<GraphRunSnapshot>) {
+    if self.active_run_agent_id.read().as_ref() != agent_id.as_ref() {
+      let mut active_run_agent_id = self.active_run_agent_id;
+      active_run_agent_id.set(agent_id);
+    }
+    if *self.run_snapshot.read() != snapshot {
+      let mut run_snapshot_signal = self.run_snapshot;
+      run_snapshot_signal.set(snapshot);
+    }
+  }
+
+  pub fn clear_run_surface(&self) {
+    self.set_active_run_surface(None, None);
+  }
+
   fn sync_shell_state(&self) {
     let selection = self.document.read().selection.clone();
     let validation_count = self.diagnostics.read().len();
@@ -223,6 +246,7 @@ impl FlowEditorState {
     self.apply_document(document);
     let mut history = self.history;
     history.write().clear();
+    self.clear_run_surface();
   }
 
   fn set_status_message(&self, message: String) {

@@ -1,6 +1,9 @@
 pub mod catalog;
+mod connectors;
 mod controller;
+mod credentials;
 pub mod inspector;
+mod registry;
 mod runtime_bar;
 mod sample;
 pub mod storage;
