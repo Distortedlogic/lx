@@ -1,4 +1,5 @@
 use dioxus::prelude::*;
+use dioxus_primitives::avatar::{Avatar, AvatarFallback, AvatarImage};
 
 #[derive(Clone, PartialEq, Props)]
 pub struct IdentityProps {
@@ -37,19 +38,23 @@ pub fn Identity(props: IdentityProps) -> Element {
   };
 
   let extra = props.class.as_deref().unwrap_or("");
+  let avatar_class = [
+    "inline-flex items-center justify-center rounded-full bg-[var(--surface-container-high)] text-[var(--on-surface-variant)] shrink-0 overflow-hidden",
+    avatar_size,
+  ]
+  .join(" ");
 
   rsx! {
     span { class: "inline-flex items-center gap-1.5", class: "{extra}",
-      span {
-        class: "inline-flex items-center justify-center rounded-full bg-[var(--surface-container-high)] text-[var(--on-surface-variant)] shrink-0",
-        class: "{avatar_size}",
-        if let Some(ref url) = props.avatar_url {
-          img {
-            src: "{url}",
-            alt: "{props.name}",
+      Avatar { class: avatar_class,
+        if let Some(url) = props.avatar_url.clone() {
+          AvatarImage {
+            src: url,
+            alt: Some(props.name.clone()),
             class: "h-full w-full rounded-full object-cover",
           }
-        } else {
+        }
+        AvatarFallback { class: "inline-flex h-full w-full items-center justify-center",
           "{initials}"
         }
       }

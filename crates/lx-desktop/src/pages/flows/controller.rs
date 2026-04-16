@@ -6,7 +6,7 @@ use crate::contexts::panel::{PanelContent, PanelState};
 use crate::graph_editor::catalog::GraphNodeTemplate;
 use crate::graph_editor::commands::{GraphCommand, GraphCommandError, apply_graph_command};
 use crate::graph_editor::model::{GraphDocument, GraphPoint, GraphSelection};
-use crate::graph_editor::protocol::{GraphWidgetDiagnostic, GraphWidgetEvent, GraphWidgetSnapshot};
+use crate::graph_editor::protocol::GraphWidgetDiagnostic;
 
 use super::catalog::workflow_node_templates;
 use super::sample::sample_document;
@@ -19,7 +19,7 @@ pub struct FlowEditorState {
   pub document: Signal<GraphDocument>,
   pub templates: Signal<Vec<GraphNodeTemplate>>,
   pub diagnostics: Signal<Vec<GraphWidgetDiagnostic>>,
-  pub canvas_host_id: Signal<Option<String>>,
+  pub canvas_size: Signal<(f64, f64)>,
   pub selection: Signal<GraphSelection>,
   pub validation_count: Signal<usize>,
   pub status_message: Signal<Option<String>>,
@@ -29,8 +29,8 @@ pub struct FlowEditorState {
 impl FlowEditorState {
   pub fn provide(flow_id: String, persistence: &FlowPersistence) -> Self {
     let (initial_document, initial_status) = match persistence.load_or_seed(&flow_id) {
-      Ok(document) => (document, Some(format!("Loaded flow {flow_id}"))),
-      Err(error) => (sample_document(&flow_id), Some(format!("Loaded bundled sample: {error}"))),
+      Ok(document) => (document, None),
+      Err(error) => (sample_document(&flow_id), Some(format!("Opened bundled sample after load failed: {error}"))),
     };
     let initial_selection = initial_document.selection.clone();
     let initial_templates = workflow_node_templates();
@@ -40,7 +40,7 @@ impl FlowEditorState {
       document: use_signal(|| initial_document),
       templates: use_signal(|| initial_templates),
       diagnostics: use_signal(Vec::new),
-      canvas_host_id: use_signal(|| None),
+      canvas_size: use_signal(|| (1200.0, 760.0)),
       selection: use_signal(|| initial_selection),
       validation_count: use_signal(|| 0usize),
       status_message: use_signal(|| initial_status),
@@ -61,29 +61,19 @@ impl FlowEditorState {
     }
     self.recompute_diagnostics();
     self.sync_shell_state();
-    self.status_message.set(Some(status));
+    if let Some(status) = status {
+      self.status_message.set(Some(status));
+    }
     Ok(())
   }
 
-  pub fn widget_snapshot(&self) -> GraphWidgetSnapshot {
-    GraphWidgetSnapshot { document: self.document.read().clone(), templates: self.templates.read().clone(), diagnostics: self.diagnostics.read().clone() }
+  pub fn register_canvas_size(&self, width: f64, height: f64) {
+    let mut canvas_size = self.canvas_size;
+    canvas_size.set((width, height));
   }
 
-  pub fn apply_widget_event(&mut self, event: GraphWidgetEvent) -> GraphWidgetSnapshot {
-    let command = map_widget_event(event);
-    if let Err(error) = self.dispatch(command) {
-      self.status_message.set(Some(format!("Rejected widget event: {error}")));
-    }
-    self.widget_snapshot()
-  }
-
-  pub fn register_canvas_host(&self, host_id: String) {
-    let mut canvas_host_id = self.canvas_host_id;
-    canvas_host_id.set(Some(host_id));
-  }
-
-  pub fn current_canvas_host(&self) -> Option<String> {
-    self.canvas_host_id.read().clone()
+  pub fn current_canvas_size(&self) -> (f64, f64) {
+    *self.canvas_size.read()
   }
 
   pub fn insert_template_at_viewport_center(&mut self, template_id: &str, scene_width: f64, scene_height: f64) -> std::result::Result<(), GraphCommandError> {
@@ -162,14 +152,8 @@ pub fn use_flow_editor_state() -> FlowEditorState {
   use_context()
 }
 
-fn map_widget_event(event: GraphWidgetEvent) -> GraphCommand {
-  match event {
-    GraphWidgetEvent::SelectionChanged { selection } => GraphCommand::Select { selection },
-    GraphWidgetEvent::NodeMoved { node_id, position } => GraphCommand::MoveNode { node_id, position },
-    GraphWidgetEvent::EdgeCreated { edge_id, from, to, label } => GraphCommand::ConnectPorts { edge_id, from, to, label },
-    GraphWidgetEvent::ViewportChanged { viewport } => GraphCommand::SetViewport { viewport },
-    GraphWidgetEvent::SelectionDeleted => GraphCommand::DeleteSelection,
-  }
+pub fn try_flow_editor_state() -> Option<FlowEditorState> {
+  try_consume_context()
 }
 
 fn sync_panel(panel: &PanelState, selection: &GraphSelection) {
@@ -202,16 +186,16 @@ fn next_node_id(document: &GraphDocument, template_id: &str) -> String {
   candidate
 }
 
-fn describe_command(command: &GraphCommand) -> String {
+fn describe_command(command: &GraphCommand) -> Option<String> {
   match command {
-    GraphCommand::AddNode { template_id, .. } => format!("Added {template_id} node"),
-    GraphCommand::RemoveNode { node_id } => format!("Removed node {node_id}"),
-    GraphCommand::MoveNode { node_id, .. } => format!("Moved node {node_id}"),
-    GraphCommand::Select { .. } => "Updated selection".to_string(),
-    GraphCommand::ConnectPorts { edge_id, .. } => format!("Connected edge {edge_id}"),
-    GraphCommand::DisconnectEdge { edge_id } => format!("Removed edge {edge_id}"),
-    GraphCommand::SetViewport { .. } => "Updated viewport".to_string(),
-    GraphCommand::UpdateField { field_id, .. } => format!("Updated field {field_id}"),
-    GraphCommand::DeleteSelection => "Deleted selection".to_string(),
+    GraphCommand::AddNode { template_id, .. } => Some(format!("Added {template_id} node")),
+    GraphCommand::RemoveNode { node_id } => Some(format!("Removed node {node_id}")),
+    GraphCommand::MoveNode { node_id, .. } => Some(format!("Moved node {node_id}")),
+    GraphCommand::Select { .. } => None,
+    GraphCommand::ConnectPorts { edge_id, .. } => Some(format!("Connected edge {edge_id}")),
+    GraphCommand::DisconnectEdge { edge_id } => Some(format!("Removed edge {edge_id}")),
+    GraphCommand::SetViewport { .. } => None,
+    GraphCommand::UpdateField { field_id, .. } => Some(format!("Updated field {field_id}")),
+    GraphCommand::DeleteSelection => Some("Deleted selection".to_string()),
   }
 }

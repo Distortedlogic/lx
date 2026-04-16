@@ -34,6 +34,7 @@ async-trait = { workspace = true }
 
 base64 = { workspace = true }
 dioxus = { workspace = true, features = ["fullstack", "router"] }
+dioxus-primitives = { path = "../../../dioxus-common/crates/dioxus-primitives", features = ["desktop"] }
 dioxus-storage = { path = "../../../dioxus-common/crates/dioxus-storage" }
 dioxus-widget-bridge = { path = "../../../dioxus-common/crates/dioxus-widget-bridge" }
 

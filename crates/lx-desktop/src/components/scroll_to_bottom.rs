@@ -27,12 +27,12 @@ pub fn ScrollToBottom(children: Element, #[props(optional)] class: Option<String
           spawn(async move {
               let js = format!(
                   r#"(function() {{
-                                                var el = document.getElementById('{sentinel_id}');
-                                                if (!el || !el.parentElement) return 'false';
-                                                var parent = el.parentElement;
-                                                var diff = parent.scrollHeight - parent.scrollTop - parent.clientHeight;
-                                                return diff > 40 ? 'true' : 'false';
-                                              }})()"#,
+                                                      var el = document.getElementById('{sentinel_id}');
+                                                      if (!el || !el.parentElement) return 'false';
+                                                      var parent = el.parentElement;
+                                                      var diff = parent.scrollHeight - parent.scrollTop - parent.clientHeight;
+                                                      return diff > 40 ? 'true' : 'false';
+                                                    }})()"#,
               );
               if let Ok(val) = document::eval(&js).await {
                   let is_up = val.to_string().contains("true");

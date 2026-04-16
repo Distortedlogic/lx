@@ -6,7 +6,7 @@ pub enum PanelContent {
   FlowEdge { edge_id: String },
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct PanelState {
   pub visible: Signal<bool>,
   pub content: Signal<Option<PanelContent>>,

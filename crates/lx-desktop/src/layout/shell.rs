@@ -18,7 +18,9 @@ use crate::contexts::live_updates::LiveUpdatesProvider;
 use crate::contexts::onboarding::OnboardingCtx;
 use crate::contexts::status_bar::{StatusBarState, StatusBarStateStoreExt};
 use crate::hooks::keyboard_shortcuts::{ShortcutPriority, ShortcutRegistry, escape_match, key_match, use_keyboard_shortcuts};
+use crate::pages::flows::FlowRouteScope;
 use crate::panes::DesktopPane;
+use crate::routes::Route;
 use crate::terminal::{add_tab, use_provide_tabs};
 
 #[cfg(feature = "desktop")]
@@ -72,6 +74,7 @@ pub fn Shell() -> Element {
   let (_registry, key_handler) = use_keyboard_shortcuts();
   let mut palette_open_sig = use_context::<CommandPaletteOpen>();
   let dialog = use_context::<crate::contexts::dialog::DialogState>();
+  let route: Route = use_route();
 
   use_hook(move || {
     let registry = _shortcut_registry;
@@ -117,28 +120,29 @@ pub fn Shell() -> Element {
         Sidebar {}
         div { class: "flex min-w-0 flex-col flex-1 h-full",
           BreadcrumbBar {}
-          div { class: "flex flex-1 min-h-0",
-            main { class: "flex-1 flex flex-col p-0 min-h-0",
-              div { class: "flex-1 min-h-0 overflow-auto p-6",
-                ErrorBoundary {
-                  handle_error: |errors: ErrorContext| {
-                      let msg = errors
-                          .error()
-                          .map_or_else(|| "Page error".to_owned(), |e| e.to_string());
-                      rsx! {
-                        div { class: "p-4 text-[var(--error)]", "{msg}" }
-                      }
-                  },
-                  SuspenseBoundary {
-                    fallback: |_| rsx! {
-                      div { class: "p-6", crate::components::page_skeleton::PageSkeleton {} }
-                    },
-                    LiveUpdatesProvider {}
-                  }
+          match route.clone() {
+            Route::Flows {} => rsx! {
+              FlowRouteScope { flow_id: None,
+                div { class: "flex flex-1 min-h-0",
+                  ShellPageOutlet {}
+                  PropertiesPanel {}
                 }
               }
-            }
-            PropertiesPanel {}
+            },
+            Route::FlowDetail { flow_id } => rsx! {
+              FlowRouteScope { key: "{flow_id}", flow_id: Some(flow_id),
+                div { class: "flex flex-1 min-h-0",
+                  ShellPageOutlet {}
+                  PropertiesPanel {}
+                }
+              }
+            },
+            _ => rsx! {
+              div { class: "flex flex-1 min-h-0",
+                ShellPageOutlet {}
+                PropertiesPanel {}
+              }
+            },
           }
         }
       }
@@ -146,6 +150,32 @@ pub fn Shell() -> Element {
       ToastViewport {}
       CommandPalette {}
       OnboardingWizard {}
+    }
+  }
+}
+
+#[component]
+fn ShellPageOutlet() -> Element {
+  rsx! {
+    main { class: "flex-1 flex flex-col p-0 min-h-0",
+      div { class: "flex-1 min-h-0 overflow-auto p-6",
+        ErrorBoundary {
+          handle_error: |errors: ErrorContext| {
+              let msg = errors
+                  .error()
+                  .map_or_else(|| "Page error".to_owned(), |e| e.to_string());
+              rsx! {
+                div { class: "p-4 text-[var(--error)]", "{msg}" }
+              }
+          },
+          SuspenseBoundary {
+            fallback: |_| rsx! {
+              div { class: "p-6", crate::components::page_skeleton::PageSkeleton {} }
+            },
+            LiveUpdatesProvider {}
+          }
+        }
+      }
     }
   }
 }

@@ -9,31 +9,36 @@ mod workspace;
 use dioxus::prelude::*;
 
 use self::controller::FlowEditorState;
-use self::storage::{provide_flow_persistence, use_flow_persistence};
+use self::storage::provide_flow_persistence;
 use self::workspace::FlowWorkspace;
 
 #[component]
 pub fn Flows() -> Element {
-  let persistence = provide_flow_persistence();
-  let flow_id = persistence.resolve_default_flow_id();
   rsx! {
-    FlowWorkspacePage { flow_id }
+    FlowWorkspace {}
   }
 }
 
 #[component]
 pub fn FlowDetail(flow_id: String) -> Element {
-  let _persistence = provide_flow_persistence();
+  let _ = flow_id;
   rsx! {
-    FlowWorkspacePage { flow_id }
+    FlowWorkspace {}
   }
 }
 
 #[component]
-fn FlowWorkspacePage(flow_id: String) -> Element {
-  let persistence = use_flow_persistence();
-  let _state = FlowEditorState::provide(flow_id, &persistence);
+pub fn FlowRouteScope(flow_id: Option<String>, children: Element) -> Element {
+  let persistence = provide_flow_persistence();
+  let panel = use_context::<crate::contexts::panel::PanelState>();
+  let effective_flow_id = flow_id.unwrap_or_else(|| persistence.resolve_default_flow_id());
+  let _state = FlowEditorState::provide(effective_flow_id, &persistence);
+
+  use_drop(move || {
+    panel.close();
+  });
+
   rsx! {
-    FlowWorkspace {}
+    {children}
   }
 }

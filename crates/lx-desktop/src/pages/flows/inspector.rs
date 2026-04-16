@@ -6,7 +6,7 @@ use crate::graph_editor::catalog::{GraphFieldKind, GraphFieldSchema, GraphNodeTe
 use crate::graph_editor::commands::GraphCommand;
 use crate::graph_editor::protocol::{GraphWidgetDiagnostic, GraphWidgetDiagnosticSeverity};
 
-use super::controller::use_flow_editor_state;
+use super::controller::try_flow_editor_state;
 
 #[component]
 pub fn FlowInspector(content: PanelContent) -> Element {
@@ -22,7 +22,11 @@ pub fn FlowInspector(content: PanelContent) -> Element {
 
 #[component]
 fn FlowNodeInspector(node_id: String) -> Element {
-  let mut state = use_flow_editor_state();
+  let Some(mut state) = try_flow_editor_state() else {
+    return rsx! {
+      MissingInspectorState { label: "The active flow editor is unavailable.".to_string() }
+    };
+  };
   let document = state.document.read().clone();
   let templates = state.templates.read().clone();
   let diagnostics = state.diagnostics.read().clone();
@@ -89,7 +93,11 @@ fn FlowNodeInspector(node_id: String) -> Element {
 
 #[component]
 fn FlowEdgeInspector(edge_id: String) -> Element {
-  let mut state = use_flow_editor_state();
+  let Some(mut state) = try_flow_editor_state() else {
+    return rsx! {
+      MissingInspectorState { label: "The active flow editor is unavailable.".to_string() }
+    };
+  };
   let document = state.document.read().clone();
   let diagnostics = state.diagnostics.read().clone();
   let Some(edge) = document.edge(&edge_id).cloned() else {
@@ -145,7 +153,11 @@ fn FlowEdgeInspector(edge_id: String) -> Element {
 
 #[component]
 fn FlowFieldEditor(node_id: String, template: GraphNodeTemplate, field: GraphFieldSchema, value: Option<Value>) -> Element {
-  let state = use_flow_editor_state();
+  let Some(state) = try_flow_editor_state() else {
+    return rsx! {
+      MissingInspectorState { label: "The active flow editor is unavailable.".to_string() }
+    };
+  };
   let field_id = field.id.clone();
   let current_value = value.or(field.default_value.clone()).unwrap_or(Value::Null);
   let label = field.label.clone();

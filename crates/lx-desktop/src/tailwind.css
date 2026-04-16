@@ -200,62 +200,6 @@ body {
   animation: toast-slide-out 300ms ease-in both;
 }
 
-@keyframes dialog-overlay-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.animate-dialog-overlay-in {
-  animation: dialog-overlay-in 200ms ease-out both;
-}
-
-@keyframes dialog-content-in {
-  from {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-  }
-}
-
-.animate-dialog-content-in {
-  animation: dialog-content-in 200ms ease-out both;
-}
-
-@keyframes dialog-overlay-out {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
-}
-
-.animate-dialog-overlay-out {
-  animation: dialog-overlay-out 200ms ease-in both;
-}
-
-@keyframes dialog-content-out {
-  from {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.95);
-  }
-}
-
-.animate-dialog-content-out {
-  animation: dialog-content-out 200ms ease-in both;
-}
-
 @keyframes transcript-block-enter {
   from {
     opacity: 0;
@@ -274,16 +218,6 @@ body {
 .drag-active {
   border-color: var(--primary) !important;
   background-color: color-mix(in srgb, var(--primary) 4%, transparent);
-}
-
-.collapsible-open {
-  grid-template-rows: 1fr;
-  transition: grid-template-rows 200ms ease-out;
-}
-
-.collapsible-closed {
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 200ms ease-out;
 }
 
 @layer components {
