@@ -313,3 +313,19 @@
 {"id":"1776371115365-0","kind":"runtime/emit","agent":"main","ts":1776371115365,"span":null,"value":"gotcha_fixed_verify: all passed"}
 {"id":"1776371115400-0","kind":"runtime/emit","agent":"main","ts":1776371115400,"span":null,"value":"gotchas_parser: all checks passed"}
 {"id":"1776371115439-0","kind":"runtime/emit","agent":"main","ts":1776371115439,"span":null,"value":"gotchas_runtime: all checks passed"}
+{"id":"1776371669440-0","kind":"runtime/emit","agent":"main","ts":1776371669440,"span":null,"value":"agent_trait: all checks passed"}
+{"id":"1776371669517-0","kind":"runtime/emit","agent":"main","ts":1776371669517,"span":null,"value":"bugs_active: all checks passed"}
+{"id":"1776371669550-0","kind":"agent/spawn","agent":"Fast","ts":1776371669550,"span":null,"agent":"Fast"}
+{"id":"1776371669550-1","kind":"agent/ask","agent":"main","ts":1776371669550,"span":null,"ask_id":1,"from":"main","to":"Fast","msg":{"task":"compute"}}
+{"id":"1776371669551-0","kind":"agent/reply","agent":"Fast","ts":1776371669551,"span":null,"ask_id":1,"from":"Fast","to":"main","msg":{"from":"Fast","result":"compute"}}
+{"id":"1776371669982-0","kind":"runtime/emit","agent":"main","ts":1776371669982,"span":null,"value":"gotcha_fixed_verify: all passed"}
+{"id":"1776371670017-0","kind":"runtime/emit","agent":"main","ts":1776371670017,"span":null,"value":"gotchas_parser: all checks passed"}
+{"id":"1776371670058-0","kind":"runtime/emit","agent":"main","ts":1776371670058,"span":null,"value":"gotchas_runtime: all checks passed"}
+{"id":"1776371673696-0","kind":"runtime/emit","agent":"main","ts":1776371673696,"span":null,"value":"agent_trait: all checks passed"}
+{"id":"1776371673773-0","kind":"runtime/emit","agent":"main","ts":1776371673773,"span":null,"value":"bugs_active: all checks passed"}
+{"id":"1776371673808-0","kind":"agent/spawn","agent":"Fast","ts":1776371673808,"span":null,"agent":"Fast"}
+{"id":"1776371673808-1","kind":"agent/ask","agent":"main","ts":1776371673808,"span":null,"ask_id":1,"from":"main","to":"Fast","msg":{"task":"compute"}}
+{"id":"1776371673809-0","kind":"agent/reply","agent":"Fast","ts":1776371673809,"span":null,"ask_id":1,"from":"Fast","to":"main","msg":{"from":"Fast","result":"compute"}}
+{"id":"1776371674229-0","kind":"runtime/emit","agent":"main","ts":1776371674229,"span":null,"value":"gotcha_fixed_verify: all passed"}
+{"id":"1776371674263-0","kind":"runtime/emit","agent":"main","ts":1776371674263,"span":null,"value":"gotchas_parser: all checks passed"}
+{"id":"1776371674304-0","kind":"runtime/emit","agent":"main","ts":1776371674304,"span":null,"value":"gotchas_runtime: all checks passed"}

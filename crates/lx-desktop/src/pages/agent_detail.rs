@@ -36,7 +36,7 @@ fn AgentDetailInner(agent_id: String) -> Element {
     budget_monthly_cents: 0,
     spent_monthly_cents: 0,
     adapter_config: serde_json::json!({ "model": agent.model }),
-    runtime_config: serde_json::json!({ "session_id": agent.session_id, "flow_id": agent.flow_id, "cwd": agent.cwd }),
+    runtime_config: serde_json::json!({ "session_id": agent.session_id, "flow_id": agent.flow_id, "flow_run_id": agent.flow_run_id, "cwd": agent.cwd }),
     pause_reason: None,
   });
 

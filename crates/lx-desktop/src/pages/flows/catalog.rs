@@ -98,7 +98,7 @@ pub fn workflow_node_templates() -> Vec<GraphNodeTemplate> {
 
 fn http_request_template() -> GraphNodeTemplate {
   let capabilities = GraphFieldCapabilities {
-    expression: Some(GraphExpressionSupport { language: Some("lx".to_string()), placeholder: Some("{{ steps.fetch.output }}".to_string()) }),
+    expression: Some(GraphExpressionSupport { language: Some("workflow".to_string()), placeholder: Some("{{ steps.fetch.output }}".to_string()) }),
     credential: Some(GraphCredentialRequirement {
       namespace: "workflow".to_string(),
       kind: "http_api".to_string(),
@@ -121,7 +121,7 @@ fn http_request_template() -> GraphNodeTemplate {
 
 fn slack_post_template() -> GraphNodeTemplate {
   let capabilities = GraphFieldCapabilities {
-    expression: Some(GraphExpressionSupport { language: Some("lx".to_string()), placeholder: Some("{{ steps.summarize.output }}".to_string()) }),
+    expression: Some(GraphExpressionSupport { language: Some("workflow".to_string()), placeholder: Some("{{ steps.summarize.output }}".to_string()) }),
     credential: Some(GraphCredentialRequirement {
       namespace: "workflow".to_string(),
       kind: "slack_bot".to_string(),

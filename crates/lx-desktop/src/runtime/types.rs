@@ -50,6 +50,7 @@ pub struct DesktopAgentRuntime {
   pub status: DesktopAgentStatus,
   pub parent_id: Option<String>,
   pub flow_id: Option<String>,
+  pub flow_run_id: Option<String>,
   pub session_id: String,
   pub task_summary: String,
   pub model: Option<String>,
@@ -83,7 +84,20 @@ pub struct DesktopFlowRun {
   pub id: String,
   pub flow_id: String,
   pub root_agent_id: String,
+  pub title: String,
   pub created_at: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesktopFlowRunSummary {
+  pub id: String,
+  pub flow_id: String,
+  pub title: String,
+  pub root_agent_id: String,
+  pub root_agent_name: String,
+  pub root_agent_status: DesktopAgentStatus,
+  pub created_at: String,
+  pub last_event_at: String,
 }
 
 #[derive(Clone, Debug)]
@@ -92,13 +106,14 @@ pub struct DesktopAgentLaunchSpec {
   pub task_summary: String,
   pub prompt: String,
   pub flow_id: Option<String>,
+  pub flow_run_id: Option<String>,
   pub parent_id: Option<String>,
   pub cwd: Option<PathBuf>,
 }
 
 impl DesktopAgentLaunchSpec {
   pub fn new(name: impl Into<String>, task_summary: impl Into<String>, prompt: impl Into<String>) -> Self {
-    Self { name: name.into(), task_summary: task_summary.into(), prompt: prompt.into(), flow_id: None, parent_id: None, cwd: None }
+    Self { name: name.into(), task_summary: task_summary.into(), prompt: prompt.into(), flow_id: None, flow_run_id: None, parent_id: None, cwd: None }
   }
 }
 
@@ -112,6 +127,7 @@ impl DesktopAgentRuntime {
       status: DesktopAgentStatus::Starting,
       parent_id: spec.parent_id.clone(),
       flow_id: spec.flow_id.clone(),
+      flow_run_id: spec.flow_run_id.clone(),
       session_id: String::new(),
       task_summary: spec.task_summary.clone(),
       model: None,

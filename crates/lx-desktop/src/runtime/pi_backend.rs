@@ -6,6 +6,8 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{ChildStdout, Command};
 use tokio::sync::{Mutex, mpsc};
 
+use super::backend::BackendDispatch;
+use super::commands::DesktopRuntimeCommand;
 use super::pi_event_mapper::handle_stdout_value;
 use super::registry::DesktopRuntimeRegistry;
 use super::types::{DesktopAgentRuntime, DesktopAgentStatus, DesktopRuntimeEvent, DesktopRuntimeEventKind, text_payload};
@@ -114,10 +116,41 @@ pub async fn spawn_pi_agent(
   }
 }
 
+pub async fn dispatch_pi_command(
+  processes: &Arc<Mutex<HashMap<String, PiProcessHandle>>>,
+  agent_id: &str,
+  command: DesktopRuntimeCommand,
+) -> Result<BackendDispatch, String> {
+  let Some(rpc_command) = command_to_pi_rpc(&command) else {
+    return Ok(BackendDispatch::Unsupported(unsupported_message(&command)));
+  };
+  send_command(processes, agent_id, rpc_command).await?;
+  Ok(BackendDispatch::Sent)
+}
+
 pub async fn send_command(processes: &Arc<Mutex<HashMap<String, PiProcessHandle>>>, agent_id: &str, command: serde_json::Value) -> Result<(), String> {
   let processes = processes.lock().await;
   let handle = processes.get(agent_id).ok_or_else(|| format!("No Pi process for agent {agent_id}"))?;
   handle.command_tx.send(command).map_err(|_| format!("Pi command channel is closed for {agent_id}"))
+}
+
+fn command_to_pi_rpc(command: &DesktopRuntimeCommand) -> Option<serde_json::Value> {
+  Some(match command {
+    DesktopRuntimeCommand::Prompt { message } => serde_json::json!({ "type": "prompt", "message": message }),
+    DesktopRuntimeCommand::Steer { message } => serde_json::json!({ "type": "steer", "message": message }),
+    DesktopRuntimeCommand::FollowUp { message } => serde_json::json!({ "type": "follow_up", "message": message }),
+    DesktopRuntimeCommand::Abort => serde_json::json!({ "type": "abort" }),
+    DesktopRuntimeCommand::RefreshState => serde_json::json!({ "type": "get_state" }),
+    DesktopRuntimeCommand::Pause | DesktopRuntimeCommand::Resume => return None,
+  })
+}
+
+fn unsupported_message(command: &DesktopRuntimeCommand) -> &'static str {
+  match command {
+    DesktopRuntimeCommand::Pause => "Pause is not supported by the Pi backend",
+    DesktopRuntimeCommand::Resume => "Resume is not supported by the Pi backend",
+    _ => "This command is not supported by the Pi backend",
+  }
 }
 
 async fn read_stdout(stdout: ChildStdout, registry: DesktopRuntimeRegistry, agent_id: String) {
@@ -146,5 +179,17 @@ async fn read_stderr(stderr: tokio::process::ChildStderr, registry: DesktopRunti
       continue;
     }
     registry.append_event(DesktopRuntimeEvent::new(agent_id.clone(), DesktopRuntimeEventKind::BackendError, text_payload("system", trimmed)));
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn pause_and_resume_are_marked_unsupported_for_pi() {
+    assert!(command_to_pi_rpc(&DesktopRuntimeCommand::Pause).is_none());
+    assert!(command_to_pi_rpc(&DesktopRuntimeCommand::Resume).is_none());
+    assert_eq!(unsupported_message(&DesktopRuntimeCommand::Pause), "Pause is not supported by the Pi backend");
   }
 }

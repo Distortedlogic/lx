@@ -6,7 +6,7 @@ use crate::graph_editor::lowering::lower_lx_graph;
 use crate::graph_editor::lx_semantics::LxNodeKind;
 
 use super::registry::sample_workflow_registry;
-use super::sample::{DEFAULT_FLOW_ID, DEFAULT_LX_FLOW_ID, is_lx_flow_id};
+use super::sample::is_lx_flow_id;
 use super::validation::validate_workflow;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -75,13 +75,6 @@ impl FlowProductKind {
   pub fn supports_runtime(self) -> bool {
     matches!(self, Self::Workflow)
   }
-
-  pub fn sample_flow_id(self) -> &'static str {
-    match self {
-      Self::Workflow => DEFAULT_FLOW_ID,
-      Self::Lx => DEFAULT_LX_FLOW_ID,
-    }
-  }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -116,7 +109,7 @@ pub fn resolve_flow_product(document: &GraphDocument, flow_id: &str) -> FlowProd
     FlowProductKind::Workflow => {
       let registry = sample_workflow_registry();
       FlowProductConfig { kind, templates: registry.templates(), credential_options: registry.credential_options() }
-    }
+    },
     FlowProductKind::Lx => FlowProductConfig { kind, templates: crate::graph_editor::lx_semantics::lx_node_templates(), credential_options: Vec::new() },
   }
 }
@@ -127,7 +120,7 @@ pub fn evaluate_flow_document(kind: FlowProductKind, document: &GraphDocument, t
     FlowProductKind::Lx => {
       let outcome = lower_lx_graph(document);
       FlowProductEvaluation { compile_state: Some(lx_compile_state(&outcome)), diagnostics: outcome.diagnostics }
-    }
+    },
   }
 }
 
@@ -141,11 +134,7 @@ pub fn infer_flow_product_kind(document: &GraphDocument, flow_id: &str) -> FlowP
   if !document.nodes.is_empty() {
     return FlowProductKind::Workflow;
   }
-  if is_lx_flow_id(flow_id) {
-    FlowProductKind::Lx
-  } else {
-    FlowProductKind::Workflow
-  }
+  if is_lx_flow_id(flow_id) { FlowProductKind::Lx } else { FlowProductKind::Workflow }
 }
 
 fn lx_compile_state(outcome: &crate::graph_editor::lowering::LxLoweringOutcome) -> FlowCompileState {

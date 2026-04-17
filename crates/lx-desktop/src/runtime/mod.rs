@@ -1,3 +1,5 @@
+mod backend;
+pub mod commands;
 mod controller;
 pub mod events;
 mod pi_backend;

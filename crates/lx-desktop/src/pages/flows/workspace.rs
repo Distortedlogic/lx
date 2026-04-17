@@ -10,6 +10,8 @@ use lx_graph_editor::model::{GraphEntityRef, GraphSelection};
 use lx_graph_editor::protocol::{GraphWidgetDiagnostic, GraphWidgetDiagnosticSeverity};
 
 use super::controller::use_flow_editor_state;
+use super::product::{FlowCompileState, FlowCompileStatus, FlowProductKind};
+use super::sample::{DEFAULT_FLOW_ID, DEFAULT_LX_FLOW_ID};
 use super::storage::use_flow_persistence;
 
 #[component]
@@ -26,8 +28,10 @@ pub fn FlowWorkspace() -> Element {
 
   let flow_id = state.flow_id.read().clone();
   let document = state.document.read().clone();
+  let product_kind = *state.product_kind.read();
   let templates = state.templates.read().clone();
   let diagnostics = state.diagnostics.read().clone();
+  let compile_state = state.compile_state.read().clone();
   let run_snapshot = state.run_snapshot.read().clone();
   let selection = state.selection.read().clone();
   let status_message = state.status_message.read().clone();
@@ -60,21 +64,37 @@ pub fn FlowWorkspace() -> Element {
       div { class: "flex flex-wrap items-start justify-between gap-4 rounded-2xl border border-[var(--outline-variant)] bg-[var(--surface-container)] px-4 py-3.5",
         div { class: "min-w-0 flex-1",
           div { class: "text-[11px] font-mono uppercase tracking-[0.2em] text-[var(--outline)]",
-            "Workflow"
+            "{product_kind.label()}"
           }
           div { class: "mt-1.5 flex flex-wrap items-center gap-3",
             h1 { class: "min-w-0 text-[1.85rem] font-semibold leading-none text-[var(--on-surface)] truncate",
               "{document.title}"
             }
             div { class: "flex flex-wrap items-center gap-2 text-xs text-[var(--on-surface-variant)]",
+              StatusPill { label: product_kind.badge_label().to_string() }
               StatusPill { label: format!("{node_count} nodes") }
               StatusPill { label: format!("{edge_count} edges") }
               StatusPill { label: validation_summary }
+              if let Some(compile_state) = compile_state.clone() {
+                StatusPill { label: compile_state.label }
+              }
             }
           }
           if let Some(flow_notes) = flow_notes {
             p { class: "mt-2 max-w-3xl text-[13px] leading-5 text-[var(--on-surface-variant)]",
               "{flow_notes}"
+            }
+          }
+          div { class: "mt-3 flex flex-wrap items-center gap-1.5",
+            ProductSampleButton {
+              label: "Workflow Sample".to_string(),
+              flow_id: DEFAULT_FLOW_ID.to_string(),
+              active: product_kind == FlowProductKind::Workflow,
+            }
+            ProductSampleButton {
+              label: "LX Sample".to_string(),
+              flow_id: DEFAULT_LX_FLOW_ID.to_string(),
+              active: product_kind == FlowProductKind::Lx,
             }
           }
         }
@@ -156,9 +176,8 @@ pub fn FlowWorkspace() -> Element {
               on_command: move |command: GraphCommand| dispatch_canvas_command(&mut state, command),
               on_editor_action: move |action: GraphEditorAction| state.apply_editor_action(&action),
               on_canvas_size: move |size: (f64, f64)| state.register_canvas_size(size.0, size.1),
-              empty_title: "Canvas".to_string(),
-              empty_message: "Use the node palette to drop the first step into the graph. New nodes land in the current viewport center."
-                  .to_string(),
+              empty_title: product_kind.empty_title().to_string(),
+              empty_message: product_kind.empty_message().to_string(),
             }
             button {
               class: "absolute left-4 top-4 z-30 rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] transition-all hover:brightness-105",
@@ -187,12 +206,12 @@ pub fn FlowWorkspace() -> Element {
                     div {
                       class: "text-[11px] font-mono uppercase tracking-[0.2em]",
                       style: "color: var(--graph-overlay-muted);",
-                      "Node Palette"
+                      "{product_kind.palette_title()}"
                     }
                     p {
                       class: "mt-1.5 max-w-xs text-[13px] leading-5",
                       style: "color: var(--graph-overlay-muted);",
-                      "Insert steps into the graph. New nodes appear at the current viewport center."
+                      "{product_kind.palette_description()}"
                     }
                   }
                   button {
@@ -242,8 +261,15 @@ pub fn FlowWorkspace() -> Element {
               }
             }
           }
+          if let Some(compile_state) = compile_state {
+            CompileSurface { compile_state }
+          }
           if !diagnostics.is_empty() {
-            ValidationSurface { diagnostics }
+            ValidationSurface {
+              title: product_kind.diagnostics_title().to_string(),
+              description: product_kind.diagnostics_description().to_string(),
+              diagnostics,
+            }
           }
         }
       }
@@ -257,6 +283,25 @@ fn StatusPill(label: String) -> Element {
     span {
       class: "rounded-full border border-[var(--outline-variant)] bg-[var(--surface-container-high)] px-2.5 py-1 text-[11px] font-medium text-[var(--on-surface-variant)]",
       style: "box-shadow: inset 0 1px 0 color-mix(in srgb, var(--on-surface) 3%, transparent);",
+      "{label}"
+    }
+  }
+}
+
+#[component]
+fn ProductSampleButton(label: String, flow_id: String, active: bool) -> Element {
+  let navigator = use_navigator();
+
+  rsx! {
+    button {
+      class: "rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors",
+      style: if active { "border-color: color-mix(in srgb, var(--primary) 52%, transparent); background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--on-surface);" } else { "border-color: var(--outline-variant); background: var(--surface-container-high); color: var(--on-surface-variant);" },
+      onclick: move |_| {
+          let _ = navigator
+              .push(Route::FlowDetail {
+                  flow_id: flow_id.clone(),
+              });
+      },
       "{label}"
     }
   }
@@ -299,7 +344,39 @@ fn PaletteTemplateCard(template: GraphNodeTemplate, on_add: EventHandler<String>
 }
 
 #[component]
-fn ValidationSurface(diagnostics: Vec<GraphWidgetDiagnostic>) -> Element {
+fn CompileSurface(compile_state: FlowCompileState) -> Element {
+  let (surface_style, badge_style) = match compile_state.status {
+    FlowCompileStatus::Ready => (
+      "border: 1px solid color-mix(in srgb, var(--primary) 36%, transparent); background: color-mix(in srgb, var(--primary) 10%, var(--surface-container)); color: var(--on-surface);",
+      "border: 1px solid color-mix(in srgb, var(--primary) 44%, transparent); background: color-mix(in srgb, var(--primary) 18%, transparent); color: var(--on-surface);",
+    ),
+    FlowCompileStatus::Blocked => (
+      "border: 1px solid var(--graph-error-border); background: var(--graph-error-surface); color: var(--graph-error-text);",
+      "border: 1px solid var(--graph-error-border); background: color-mix(in srgb, var(--graph-error-surface) 70%, transparent); color: var(--graph-error-text);",
+    ),
+  };
+
+  rsx! {
+    div { class: "rounded-xl p-4", style: "{surface_style}",
+      div { class: "flex items-start justify-between gap-3",
+        div {
+          div { class: "text-[11px] font-mono uppercase tracking-[0.2em] opacity-80",
+            "Compile State"
+          }
+          p { class: "mt-1 text-sm leading-6 opacity-90", "{compile_state.detail}" }
+        }
+        span {
+          class: "rounded-full px-2.5 py-1 text-[11px] font-semibold",
+          style: "{badge_style}",
+          "{compile_state.label}"
+        }
+      }
+    }
+  }
+}
+
+#[component]
+fn ValidationSurface(title: String, description: String, diagnostics: Vec<GraphWidgetDiagnostic>) -> Element {
   let error_count = diagnostics.iter().filter(|diagnostic| diagnostic.severity == GraphWidgetDiagnosticSeverity::Error).count();
   let warning_count = diagnostics.iter().filter(|diagnostic| diagnostic.severity == GraphWidgetDiagnosticSeverity::Warning).count();
 
@@ -308,11 +385,9 @@ fn ValidationSurface(diagnostics: Vec<GraphWidgetDiagnostic>) -> Element {
       div { class: "flex items-center justify-between gap-4",
         div {
           div { class: "text-[11px] font-mono uppercase tracking-[0.2em] text-[var(--outline)]",
-            "Validation"
+            "{title}"
           }
-          p { class: "mt-1 text-sm text-[var(--on-surface-variant)]",
-            "Workflow-specific graph checks run after each mutation."
-          }
+          p { class: "mt-1 text-sm text-[var(--on-surface-variant)]", "{description}" }
         }
         div { class: "flex flex-wrap gap-2",
           StatusPill { label: format!("{error_count} errors") }
