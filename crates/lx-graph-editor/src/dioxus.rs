@@ -15,7 +15,7 @@ use crate::model::{GraphDocument, GraphEntityRef, GraphNode, GraphPoint, GraphPo
 use crate::protocol::{GraphEdgeRunState, GraphRunSnapshot, GraphRunStatus, GraphWidgetDiagnostic, GraphWidgetDiagnosticSeverity};
 
 pub use layout::GraphCanvasSafeArea;
-use layout::{GraphBounds, fit_viewport, scene_frame_style, viewport_needs_fit};
+use layout::{GraphBounds, fit_viewport, viewport_needs_fit};
 
 #[component]
 pub fn GraphCanvas(
@@ -79,13 +79,12 @@ pub fn GraphCanvas(
   let selection_badge = selection_summary(&selection);
   let zoom_label = format!("{:.0}% zoom", displayed_viewport.zoom * 100.0);
   let scene_class = if connection_preview.is_some() || is_marquee_selecting {
-    "absolute min-h-0 overflow-hidden outline-none cursor-crosshair"
+    "relative flex-1 min-h-0 overflow-hidden outline-none cursor-crosshair"
   } else if is_panning || is_dragging_node {
-    "absolute min-h-0 overflow-hidden outline-none cursor-grabbing"
+    "relative flex-1 min-h-0 overflow-hidden outline-none cursor-grabbing"
   } else {
-    "absolute min-h-0 overflow-hidden outline-none cursor-grab"
+    "relative flex-1 min-h-0 overflow-hidden outline-none cursor-grab"
   };
-  let scene_frame_style = scene_frame_style(overlay_safe_area);
   let canvas_badge_class = "rounded-full px-3 py-1.5 text-[11px] font-medium";
   let canvas_badge_style =
     "border: 1px solid var(--graph-overlay-border); background: var(--graph-overlay-bg); color: var(--graph-overlay-muted); backdrop-filter: blur(16px);";
@@ -191,6 +190,7 @@ pub fn GraphCanvas(
     let flow_id = flow_id.clone();
     let document = document.clone();
     let templates = templates.clone();
+    let overlay_safe_area = overlay_safe_area;
     use_effect(move || {
       if document.nodes.is_empty() || scene_width < 10.0 || scene_height < 10.0 {
         return;
@@ -200,22 +200,11 @@ pub fn GraphCanvas(
       }
       auto_framed_flow.set(Some(flow_id.clone()));
       if let Some(bounds) = document_bounds(&document, &templates, &HashMap::new())
-        && viewport_needs_fit(bounds, document.viewport, scene_width, scene_height)
+        && viewport_needs_fit(bounds, document.viewport, scene_width, scene_height, overlay_safe_area)
       {
-        let viewport = fit_viewport(bounds, scene_width, scene_height);
+        let viewport = fit_viewport(bounds, scene_width, scene_height, overlay_safe_area);
         on_command.call(GraphCommand::SetViewport { viewport });
       }
-    });
-  }
-
-  {
-    let scene_element = scene_element;
-    let scene_rect = scene_rect;
-    let on_canvas_size = on_canvas_size;
-    let overlay_safe_area = overlay_safe_area;
-    use_effect(move || {
-      let _ = overlay_safe_area;
-      refresh_scene_metrics(scene_element, scene_rect, on_canvas_size);
     });
   }
 
@@ -261,7 +250,6 @@ pub fn GraphCanvas(
 
       div {
         class: "{scene_class}",
-        style: "{scene_frame_style}",
         tabindex: "0",
         onmounted: move |evt: MountedEvent| {
             let element = evt.data();
@@ -885,7 +873,12 @@ pub fn GraphCanvas(
             style: "{canvas_control_style}",
             onclick: move |_| {
                 if let Some(bounds) = document_bounds(&document, &templates, &HashMap::new()) {
-                    let viewport = fit_viewport(bounds, scene_width, scene_height);
+                    let viewport = fit_viewport(
+                        bounds,
+                        scene_width,
+                        scene_height,
+                        overlay_safe_area,
+                    );
                     on_command
                         .call(GraphCommand::SetViewport {
                             viewport,
