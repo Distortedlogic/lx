@@ -71,11 +71,19 @@ pub fn transcript_rows(events: &[DesktopRuntimeEvent]) -> Vec<RuntimeTranscriptR
         let entry = streaming.entry(message_id).or_insert_with(|| (event.ts.clone(), role, String::new()));
         entry.2.push_str(delta);
       },
-      DesktopRuntimeEventKind::MessageComplete => rows.push(RuntimeTranscriptRow {
-        ts: event.ts.clone(),
-        role: event.payload.get("role").and_then(serde_json::Value::as_str).unwrap_or("assistant").to_string(),
-        text: payload_text(&event.payload).unwrap_or_default(),
-      }),
+      DesktopRuntimeEventKind::MessageComplete => {
+        let message_id = event.payload.get("message_id").and_then(serde_json::Value::as_str).unwrap_or("assistant-message");
+        let streamed = streaming.remove(message_id);
+        let role = event
+          .payload
+          .get("role")
+          .and_then(serde_json::Value::as_str)
+          .map(ToOwned::to_owned)
+          .or_else(|| streamed.as_ref().map(|(_, role, _)| role.clone()))
+          .unwrap_or_else(|| "assistant".to_string());
+        let text = payload_text(&event.payload).or_else(|| streamed.map(|(_, _, text)| text)).unwrap_or_default();
+        rows.push(RuntimeTranscriptRow { ts: event.ts.clone(), role, text });
+      },
       DesktopRuntimeEventKind::ToolCall => rows.push(RuntimeTranscriptRow {
         ts: event.ts.clone(),
         role: "tool".to_string(),
@@ -97,4 +105,52 @@ pub fn transcript_rows(events: &[DesktopRuntimeEvent]) -> Vec<RuntimeTranscriptR
   rows.extend(streaming.into_values().map(|(ts, role, text)| RuntimeTranscriptRow { ts, role, text }));
   rows.sort_by(|left, right| left.ts.cmp(&right.ts));
   rows
+}
+
+#[cfg(test)]
+mod tests {
+  use super::super::types::DesktopRuntimeEvent;
+  use super::*;
+
+  #[test]
+  fn completed_messages_replace_streaming_rows() {
+    let rows = transcript_rows(&[
+      DesktopRuntimeEvent {
+        id: "event-1".to_string(),
+        agent_id: "agent-1".to_string(),
+        kind: DesktopRuntimeEventKind::MessageDelta,
+        ts: "1".to_string(),
+        payload: serde_json::json!({ "role": "assistant", "message_id": "msg-1", "delta": "Hello" }),
+      },
+      DesktopRuntimeEvent {
+        id: "event-2".to_string(),
+        agent_id: "agent-1".to_string(),
+        kind: DesktopRuntimeEventKind::MessageDelta,
+        ts: "2".to_string(),
+        payload: serde_json::json!({ "role": "assistant", "message_id": "msg-1", "delta": " world" }),
+      },
+      DesktopRuntimeEvent {
+        id: "event-3".to_string(),
+        agent_id: "agent-1".to_string(),
+        kind: DesktopRuntimeEventKind::MessageComplete,
+        ts: "3".to_string(),
+        payload: serde_json::json!({ "role": "assistant", "message_id": "msg-1", "text": "Hello world" }),
+      },
+    ]);
+
+    assert_eq!(rows, vec![RuntimeTranscriptRow { ts: "3".to_string(), role: "assistant".to_string(), text: "Hello world".to_string() }]);
+  }
+
+  #[test]
+  fn incomplete_streaming_messages_are_retained() {
+    let rows = transcript_rows(&[DesktopRuntimeEvent {
+      id: "event-1".to_string(),
+      agent_id: "agent-1".to_string(),
+      kind: DesktopRuntimeEventKind::MessageDelta,
+      ts: "1".to_string(),
+      payload: serde_json::json!({ "role": "assistant", "message_id": "msg-1", "delta": "Hello" }),
+    }]);
+
+    assert_eq!(rows, vec![RuntimeTranscriptRow { ts: "1".to_string(), role: "assistant".to_string(), text: "Hello".to_string() }]);
+  }
 }

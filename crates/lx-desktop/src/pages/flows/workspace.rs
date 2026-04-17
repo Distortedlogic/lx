@@ -4,7 +4,7 @@ use crate::contexts::breadcrumb::BreadcrumbEntry;
 use crate::routes::Route;
 use lx_graph_editor::catalog::GraphNodeTemplate;
 use lx_graph_editor::commands::GraphCommand;
-use lx_graph_editor::dioxus::GraphCanvas;
+use lx_graph_editor::dioxus::{GraphCanvas, GraphCanvasSafeArea};
 use lx_graph_editor::history::GraphEditorAction;
 use lx_graph_editor::model::{GraphEntityRef, GraphSelection};
 use lx_graph_editor::protocol::{GraphWidgetDiagnostic, GraphWidgetDiagnosticSeverity};
@@ -47,6 +47,7 @@ pub fn FlowWorkspace() -> Element {
   let validation_summary = if diagnostics.is_empty() { "Healthy graph".to_string() } else { format!("{error_count} errors / {warning_count} warnings") };
   let query = palette_query.read().trim().to_lowercase();
   let filtered_templates: Vec<_> = templates.iter().filter(|template| palette_matches(template, &query)).cloned().collect();
+  let palette_is_open = *palette_open.read();
   let primary_action_button_class = "rounded-xl border px-3 py-2 text-xs font-semibold transition-all hover:brightness-105";
   let primary_action_button_style = "border-color: color-mix(in srgb, var(--primary) 68%, transparent); background: var(--primary); color: var(--on-primary);";
   let secondary_action_button_class = "rounded-xl border border-[var(--outline-variant)] bg-[var(--surface-container-high)] px-3 py-2 text-xs font-medium text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)]";
@@ -178,81 +179,82 @@ pub fn FlowWorkspace() -> Element {
               on_canvas_size: move |size: (f64, f64)| state.register_canvas_size(size.0, size.1),
               empty_title: product_kind.empty_title().to_string(),
               empty_message: product_kind.empty_message().to_string(),
-            }
-            button {
-              class: "absolute left-4 top-4 z-30 rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] transition-all hover:brightness-105",
-              style: if *palette_open.read() { "border: 1px solid var(--graph-selection-border); background: var(--graph-selection-surface); color: var(--graph-selection-text); backdrop-filter: blur(14px);" } else { "border: 1px solid var(--graph-overlay-border); background: var(--graph-overlay-bg); color: var(--graph-overlay-text); backdrop-filter: blur(14px);" },
-              onclick: move |_| {
-                  let next_open = !*palette_open.peek();
-                  palette_open.set(next_open);
-              },
-              if *palette_open.read() {
-                "Hide Nodes"
-              } else {
-                "Nodes"
-              }
-            }
-            if *palette_open.read() {
+              overlay_safe_area: graph_palette_safe_area(palette_is_open),
               button {
-                class: "absolute inset-0 z-20",
-                style: "background: var(--graph-overlay-scrim);",
-                onclick: move |_| palette_open.set(false),
+                class: "pointer-events-auto absolute left-4 top-4 z-30 rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] transition-all hover:brightness-105",
+                style: if palette_is_open { "border: 1px solid var(--graph-selection-border); background: var(--graph-selection-surface); color: var(--graph-selection-text); backdrop-filter: blur(14px);" } else { "border: 1px solid var(--graph-overlay-border); background: var(--graph-overlay-bg); color: var(--graph-overlay-text); backdrop-filter: blur(14px);" },
+                onclick: move |_| {
+                    let next_open = !*palette_open.peek();
+                    palette_open.set(next_open);
+                },
+                if palette_is_open {
+                  "Hide Nodes"
+                } else {
+                  "Nodes"
+                }
               }
-              aside {
-                class: "absolute left-4 top-16 bottom-4 z-30 flex w-[19rem] flex-col rounded-2xl p-4",
-                style: "border: 1px solid var(--graph-overlay-border); background: var(--graph-overlay-bg-strong); box-shadow: var(--graph-overlay-shadow); backdrop-filter: blur(18px);",
-                div { class: "flex items-start justify-between gap-3",
-                  div {
+              if palette_is_open {
+                button {
+                  class: "pointer-events-auto absolute inset-0 z-20",
+                  style: "background: var(--graph-overlay-scrim);",
+                  onclick: move |_| palette_open.set(false),
+                }
+                aside {
+                  class: "pointer-events-auto absolute left-4 top-16 bottom-4 z-30 flex w-[19rem] flex-col rounded-2xl p-4",
+                  style: "border: 1px solid var(--graph-overlay-border); background: var(--graph-overlay-bg-strong); box-shadow: var(--graph-overlay-shadow); backdrop-filter: blur(18px);",
+                  div { class: "flex items-start justify-between gap-3",
                     div {
-                      class: "text-[11px] font-mono uppercase tracking-[0.2em]",
-                      style: "color: var(--graph-overlay-muted);",
-                      "{product_kind.palette_title()}"
+                      div {
+                        class: "text-[11px] font-mono uppercase tracking-[0.2em]",
+                        style: "color: var(--graph-overlay-muted);",
+                        "{product_kind.palette_title()}"
+                      }
+                      p {
+                        class: "mt-1.5 max-w-xs text-[13px] leading-5",
+                        style: "color: var(--graph-overlay-muted);",
+                        "{product_kind.palette_description()}"
+                      }
                     }
-                    p {
-                      class: "mt-1.5 max-w-xs text-[13px] leading-5",
-                      style: "color: var(--graph-overlay-muted);",
-                      "{product_kind.palette_description()}"
+                    button {
+                      class: "rounded-full px-2 py-1 text-[11px] font-semibold transition-colors hover:bg-[var(--surface-container-high)]",
+                      style: "border: 1px solid var(--graph-overlay-border); color: var(--graph-overlay-text);",
+                      onclick: move |_| palette_open.set(false),
+                      "Close"
                     }
                   }
-                  button {
-                    class: "rounded-full px-2 py-1 text-[11px] font-semibold transition-colors hover:bg-[var(--surface-container-high)]",
-                    style: "border: 1px solid var(--graph-overlay-border); color: var(--graph-overlay-text);",
-                    onclick: move |_| palette_open.set(false),
-                    "Close"
+                  input {
+                    class: "mt-3 w-full rounded-xl px-3 py-2.5 text-sm outline-none transition-colors focus:border-[var(--graph-selection-border)] focus:bg-[var(--graph-overlay-bg-strong)]",
+                    style: "border: 1px solid var(--graph-overlay-border); background: var(--graph-overlay-bg); color: var(--graph-overlay-text);",
+                    r#type: "text",
+                    value: "{palette_query}",
+                    placeholder: "Search node types",
+                    oninput: move |evt| palette_query.set(evt.value()),
                   }
-                }
-                input {
-                  class: "mt-3 w-full rounded-xl px-3 py-2.5 text-sm outline-none transition-colors focus:border-[var(--graph-selection-border)] focus:bg-[var(--graph-overlay-bg-strong)]",
-                  style: "border: 1px solid var(--graph-overlay-border); background: var(--graph-overlay-bg); color: var(--graph-overlay-text);",
-                  r#type: "text",
-                  value: "{palette_query}",
-                  placeholder: "Search node types",
-                  oninput: move |evt| palette_query.set(evt.value()),
-                }
-                div { class: "mt-3 flex-1 overflow-y-auto pr-1",
-                  if filtered_templates.is_empty() {
-                    div {
-                      class: "rounded-xl border border-dashed px-3 py-4 text-sm",
-                      style: "border-color: var(--graph-overlay-border); color: var(--graph-overlay-muted);",
-                      "No nodes match this query."
-                    }
-                  } else {
-                    div { class: "flex flex-col gap-1.5",
-                      for template in filtered_templates {
-                        PaletteTemplateCard {
-                          key: "{template.id}",
-                          template: template.clone(),
-                          on_add: move |template_id: String| {
-                              let (width, height) = state.current_canvas_size();
-                              if let Err(error) = state
-                                  .insert_template_at_viewport_center(&template_id, width, height)
-                              {
-                                  let mut status_message = state.status_message;
-                                  status_message.set(Some(format!("Failed to add node: {error}")));
-                              } else {
-                                  palette_open.set(false);
-                              }
-                          },
+                  div { class: "mt-3 flex-1 overflow-y-auto pr-1",
+                    if filtered_templates.is_empty() {
+                      div {
+                        class: "rounded-xl border border-dashed px-3 py-4 text-sm",
+                        style: "border-color: var(--graph-overlay-border); color: var(--graph-overlay-muted);",
+                        "No nodes match this query."
+                      }
+                    } else {
+                      div { class: "flex flex-col gap-1.5",
+                        for template in filtered_templates {
+                          PaletteTemplateCard {
+                            key: "{template.id}",
+                            template: template.clone(),
+                            on_add: move |template_id: String| {
+                                let (width, height) = state.current_canvas_size();
+                                if let Err(error) = state
+                                    .insert_template_at_viewport_center(&template_id, width, height)
+                                {
+                                    let mut status_message = state.status_message;
+                                    status_message.set(Some(format!("Failed to add node: {error}")));
+                                } else {
+                                    palette_open.set(false);
+                                }
+                            },
+                          }
                         }
                       }
                     }
@@ -454,6 +456,20 @@ fn ValidationDiagnosticRow(diagnostic: GraphWidgetDiagnostic) -> Element {
         }
       }
     }
+  }
+}
+
+const GRAPH_PALETTE_CHROME_TOP_SAFE_AREA: f64 = 56.0;
+const GRAPH_PALETTE_BUTTON_SAFE_AREA_LEFT: f64 = 112.0;
+const GRAPH_PALETTE_DRAWER_WIDTH: f64 = 19.0 * 16.0;
+const GRAPH_PALETTE_EDGE_INSET: f64 = 16.0;
+
+fn graph_palette_safe_area(palette_open: bool) -> GraphCanvasSafeArea {
+  GraphCanvasSafeArea {
+    top: GRAPH_PALETTE_CHROME_TOP_SAFE_AREA,
+    right: 0.0,
+    bottom: 0.0,
+    left: if palette_open { GRAPH_PALETTE_EDGE_INSET + GRAPH_PALETTE_DRAWER_WIDTH + GRAPH_PALETTE_EDGE_INSET } else { GRAPH_PALETTE_BUTTON_SAFE_AREA_LEFT },
   }
 }
 

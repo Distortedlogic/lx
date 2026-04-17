@@ -106,7 +106,9 @@ fn handle_tool_update(registry: &DesktopRuntimeRegistry, agent_id: &str, value: 
   let call_id = value.get("toolCallId").and_then(serde_json::Value::as_str).unwrap_or("tool-call").to_string();
   let partial = value.get("partialResult").cloned().unwrap_or_default();
   if let Some(mut tool) = registry.tools_for_agent(agent_id).into_iter().find(|tool| tool.call_id == call_id) {
-    tool.result_preview = result_preview(&partial);
+    if let Some(preview) = result_preview(&partial) {
+      tool.result_preview = Some(preview);
+    }
     registry.upsert_tool(tool);
   }
 }
@@ -116,13 +118,15 @@ fn handle_tool_end(registry: &DesktopRuntimeRegistry, agent_id: &str, value: &se
   let tool_name = value.get("toolName").and_then(serde_json::Value::as_str).unwrap_or("tool").to_string();
   let result = value.get("result").cloned().unwrap_or_default();
   let is_error = value.get("isError").and_then(serde_json::Value::as_bool).unwrap_or(false);
+  let existing = registry.tools_for_agent(agent_id).into_iter().find(|tool| tool.call_id == call_id);
+  let preview = result_preview(&result).or_else(|| existing.as_ref().and_then(|tool| tool.result_preview.clone()));
   registry.upsert_tool(DesktopToolActivity {
     call_id: call_id.clone(),
     agent_id: agent_id.to_string(),
-    tool_name: tool_name.clone(),
-    args: serde_json::Value::Null,
+    tool_name: existing.as_ref().map(|tool| tool.tool_name.clone()).unwrap_or(tool_name.clone()),
+    args: existing.as_ref().map(|tool| tool.args.clone()).unwrap_or(serde_json::Value::Null),
     status: if is_error { DesktopToolStatus::Error } else { DesktopToolStatus::Completed },
-    result_preview: result_preview(&result),
+    result_preview: preview.clone(),
     is_error,
   });
   registry.append_event(DesktopRuntimeEvent::new(
@@ -131,7 +135,7 @@ fn handle_tool_end(registry: &DesktopRuntimeRegistry, agent_id: &str, value: &se
     serde_json::json!({
       "tool_name": tool_name,
       "call_id": call_id,
-      "text": result_preview(&result).unwrap_or_else(|| format!("Tool finished at {}", now_ts()))
+      "text": preview.unwrap_or_else(|| format!("Tool finished at {}", now_ts()))
     }),
   ));
 }
@@ -149,4 +153,76 @@ fn extract_message_text(message: &serde_json::Value) -> String {
     .filter_map(|item| item.get("text").and_then(serde_json::Value::as_str))
     .collect::<Vec<_>>()
     .join("")
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::runtime::types::{DesktopAgentLaunchSpec, DesktopAgentRuntime};
+
+  #[test]
+  fn tool_completion_preserves_start_arguments() {
+    let registry = DesktopRuntimeRegistry::new();
+    let agent = DesktopAgentRuntime::new(&DesktopAgentLaunchSpec::new("Agent", "task", "prompt"));
+    let agent_id = agent.id.clone();
+    registry.register_agent(agent);
+
+    handle_stdout_value(
+      &registry,
+      &agent_id,
+      &serde_json::json!({
+        "type": "tool_execution_start",
+        "toolCallId": "call-1",
+        "toolName": "bash",
+        "args": { "command": "pwd" }
+      }),
+    );
+    handle_stdout_value(
+      &registry,
+      &agent_id,
+      &serde_json::json!({
+        "type": "tool_execution_end",
+        "toolCallId": "call-1",
+        "toolName": "bash",
+        "result": { "text": "ok" },
+        "isError": false
+      }),
+    );
+
+    let tools = registry.tools_for_agent(&agent_id);
+    assert_eq!(tools.len(), 1);
+    assert_eq!(tools[0].args, serde_json::json!({ "command": "pwd" }));
+    assert_eq!(tools[0].status, DesktopToolStatus::Completed);
+  }
+
+  #[test]
+  fn missing_partial_results_do_not_render_null_previews() {
+    let registry = DesktopRuntimeRegistry::new();
+    let agent = DesktopAgentRuntime::new(&DesktopAgentLaunchSpec::new("Agent", "task", "prompt"));
+    let agent_id = agent.id.clone();
+    registry.register_agent(agent);
+
+    handle_stdout_value(
+      &registry,
+      &agent_id,
+      &serde_json::json!({
+        "type": "tool_execution_start",
+        "toolCallId": "call-1",
+        "toolName": "bash",
+        "args": { "command": "pwd" }
+      }),
+    );
+    handle_stdout_value(
+      &registry,
+      &agent_id,
+      &serde_json::json!({
+        "type": "tool_execution_update",
+        "toolCallId": "call-1"
+      }),
+    );
+
+    let tools = registry.tools_for_agent(&agent_id);
+    assert_eq!(tools.len(), 1);
+    assert_eq!(tools[0].result_preview, None);
+  }
 }

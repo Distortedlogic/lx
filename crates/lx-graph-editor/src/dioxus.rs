@@ -6,11 +6,16 @@ use dioxus::html::geometry::WheelDelta;
 use dioxus::prelude::*;
 use tokio::time::sleep;
 
+mod layout;
+
 use crate::catalog::{GraphNodeTemplate, GraphPortTemplate, PortDirection, node_template};
 use crate::commands::GraphCommand;
 use crate::history::GraphEditorAction;
 use crate::model::{GraphDocument, GraphEntityRef, GraphNode, GraphPoint, GraphPortRef, GraphSelection, GraphViewport};
 use crate::protocol::{GraphEdgeRunState, GraphRunSnapshot, GraphRunStatus, GraphWidgetDiagnostic, GraphWidgetDiagnosticSeverity};
+
+pub use layout::GraphCanvasSafeArea;
+use layout::{GraphBounds, fit_viewport, scene_frame_style, viewport_needs_fit};
 
 #[component]
 pub fn GraphCanvas(
@@ -24,6 +29,8 @@ pub fn GraphCanvas(
   on_canvas_size: EventHandler<(f64, f64)>,
   empty_title: String,
   empty_message: String,
+  #[props(default)] overlay_safe_area: GraphCanvasSafeArea,
+  #[props(optional)] children: Option<Element>,
 ) -> Element {
   let flow_id = document.id.clone();
   let selection = document.selection.clone();
@@ -72,12 +79,13 @@ pub fn GraphCanvas(
   let selection_badge = selection_summary(&selection);
   let zoom_label = format!("{:.0}% zoom", displayed_viewport.zoom * 100.0);
   let scene_class = if connection_preview.is_some() || is_marquee_selecting {
-    "relative flex-1 min-h-0 overflow-hidden outline-none cursor-crosshair"
+    "absolute min-h-0 overflow-hidden outline-none cursor-crosshair"
   } else if is_panning || is_dragging_node {
-    "relative flex-1 min-h-0 overflow-hidden outline-none cursor-grabbing"
+    "absolute min-h-0 overflow-hidden outline-none cursor-grabbing"
   } else {
-    "relative flex-1 min-h-0 overflow-hidden outline-none cursor-grab"
+    "absolute min-h-0 overflow-hidden outline-none cursor-grab"
   };
+  let scene_frame_style = scene_frame_style(overlay_safe_area);
   let canvas_badge_class = "rounded-full px-3 py-1.5 text-[11px] font-medium";
   let canvas_badge_style =
     "border: 1px solid var(--graph-overlay-border); background: var(--graph-overlay-bg); color: var(--graph-overlay-muted); backdrop-filter: blur(16px);";
@@ -191,11 +199,23 @@ pub fn GraphCanvas(
         return;
       }
       auto_framed_flow.set(Some(flow_id.clone()));
-      if viewport_needs_fit(&document, &templates, scene_width, scene_height)
-        && let Some(viewport) = fit_viewport(&document, &templates, scene_width, scene_height)
+      if let Some(bounds) = document_bounds(&document, &templates, &HashMap::new())
+        && viewport_needs_fit(bounds, document.viewport, scene_width, scene_height)
       {
+        let viewport = fit_viewport(bounds, scene_width, scene_height);
         on_command.call(GraphCommand::SetViewport { viewport });
       }
+    });
+  }
+
+  {
+    let scene_element = scene_element;
+    let scene_rect = scene_rect;
+    let on_canvas_size = on_canvas_size;
+    let overlay_safe_area = overlay_safe_area;
+    use_effect(move || {
+      let _ = overlay_safe_area;
+      refresh_scene_metrics(scene_element, scene_rect, on_canvas_size);
     });
   }
 
@@ -241,6 +261,7 @@ pub fn GraphCanvas(
 
       div {
         class: "{scene_class}",
+        style: "{scene_frame_style}",
         tabindex: "0",
         onmounted: move |evt: MountedEvent| {
             let element = evt.data();
@@ -849,6 +870,9 @@ pub fn GraphCanvas(
           }
         }
       }
+      if let Some(children) = children {
+        div { class: "pointer-events-none absolute inset-0 z-20", {children} }
+      }
       if has_nodes {
         div { class: "pointer-events-none absolute bottom-4 right-4 z-10 flex items-center gap-2",
           span {
@@ -860,12 +884,8 @@ pub fn GraphCanvas(
             class: "pointer-events-auto {canvas_control_class}",
             style: "{canvas_control_style}",
             onclick: move |_| {
-                if let Some(viewport) = fit_viewport(
-                    &document,
-                    &templates,
-                    scene_width,
-                    scene_height,
-                ) {
+                if let Some(bounds) = document_bounds(&document, &templates, &HashMap::new()) {
+                    let viewport = fit_viewport(bounds, scene_width, scene_height);
                     on_command
                         .call(GraphCommand::SetViewport {
                             viewport,
@@ -928,14 +948,6 @@ struct RenderableEdge {
   is_selected: bool,
   has_error: bool,
   run_state: Option<GraphEdgeRunState>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-struct GraphBounds {
-  min_x: f64,
-  min_y: f64,
-  max_x: f64,
-  max_y: f64,
 }
 
 #[component]
@@ -1006,6 +1018,9 @@ fn refresh_scene_metrics(scene_element: Signal<Option<Rc<MountedData>>>, mut sce
       return;
     };
     let next_rect = SceneRect { left: rect.origin.x, top: rect.origin.y, width: rect.width(), height: rect.height() };
+    if *scene_rect.peek() == Some(next_rect) {
+      return;
+    }
     scene_rect.set(Some(next_rect));
     on_canvas_size.call((next_rect.width.max(1.0), next_rect.height.max(1.0)));
   });
@@ -1050,36 +1065,6 @@ fn canvas_world_size(document: &GraphDocument, templates: &[GraphNodeTemplate], 
   (width, height)
 }
 
-fn fit_viewport(document: &GraphDocument, templates: &[GraphNodeTemplate], scene_width: f64, scene_height: f64) -> Option<GraphViewport> {
-  let bounds = document_bounds(document, templates, &HashMap::new())?;
-  let width = (bounds.max_x - bounds.min_x).max(1.0);
-  let height = (bounds.max_y - bounds.min_y).max(1.0);
-  let available_width = (scene_width - FIT_VIEW_PADDING_X * 2.0).max(280.0);
-  let available_height = (scene_height - FIT_VIEW_PADDING_Y * 2.0).max(220.0);
-  let zoom = (available_width / width).min(available_height / height).clamp(0.46, 1.04);
-  let center_x = bounds.min_x + width * 0.5;
-  let center_y = bounds.min_y + height * 0.5;
-  Some(GraphViewport { pan_x: scene_width * 0.5 - center_x * zoom, pan_y: scene_height * 0.5 - center_y * zoom, zoom })
-}
-
-fn viewport_needs_fit(document: &GraphDocument, templates: &[GraphNodeTemplate], scene_width: f64, scene_height: f64) -> bool {
-  let Some(bounds) = document_bounds(document, templates, &HashMap::new()) else {
-    return false;
-  };
-  let screen_bounds = world_bounds_to_screen(bounds, document.viewport);
-  let inset = 36.0;
-  let visible_width = (screen_bounds.max_x - screen_bounds.min_x).max(1.0);
-  let visible_height = (screen_bounds.max_y - screen_bounds.min_y).max(1.0);
-  let width_fill = visible_width / scene_width.max(1.0);
-  let height_fill = visible_height / scene_height.max(1.0);
-  screen_bounds.min_x < inset
-    || screen_bounds.max_x > scene_width - inset
-    || screen_bounds.min_y < inset
-    || screen_bounds.max_y > scene_height - inset
-    || width_fill < 0.56
-    || height_fill < 0.34
-}
-
 fn document_bounds(document: &GraphDocument, templates: &[GraphNodeTemplate], preview_positions: &HashMap<String, GraphPoint>) -> Option<GraphBounds> {
   let mut bounds = None::<GraphBounds>;
   for node in &document.nodes {
@@ -1101,15 +1086,6 @@ fn document_bounds(document: &GraphDocument, templates: &[GraphNodeTemplate], pr
     });
   }
   bounds
-}
-
-fn world_bounds_to_screen(bounds: GraphBounds, viewport: GraphViewport) -> GraphBounds {
-  GraphBounds {
-    min_x: bounds.min_x * viewport.zoom + viewport.pan_x,
-    min_y: bounds.min_y * viewport.zoom + viewport.pan_y,
-    max_x: bounds.max_x * viewport.zoom + viewport.pan_x,
-    max_y: bounds.max_y * viewport.zoom + viewport.pan_y,
-  }
 }
 
 fn selection_for_marquee(
@@ -1151,8 +1127,6 @@ fn bounds_intersect(a: GraphBounds, b: GraphBounds) -> bool {
   a.min_x <= b.max_x && a.max_x >= b.min_x && a.min_y <= b.max_y && a.max_y >= b.min_y
 }
 
-const FIT_VIEW_PADDING_X: f64 = 56.0;
-const FIT_VIEW_PADDING_Y: f64 = 52.0;
 const NODE_WIDTH: f64 = 288.0;
 const NODE_HEADER_HEIGHT: f64 = 72.0;
 const NODE_PORT_ROW_HEIGHT: f64 = 30.0;

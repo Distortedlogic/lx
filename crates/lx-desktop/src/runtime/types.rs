@@ -171,6 +171,9 @@ pub fn payload_text(payload: &Value) -> Option<String> {
 }
 
 pub fn result_preview(value: &Value) -> Option<String> {
+  if value.is_null() {
+    return None;
+  }
   if let Some(text) = value.as_str() {
     return Some(truncate(text));
   }
