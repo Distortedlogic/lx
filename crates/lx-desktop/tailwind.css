@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @source "./src/**/*.rs";
+@source "../lx-graph-editor/src/**/*.rs";
 
 @theme {
   --font-display: 'Space Grotesk', sans-serif;
