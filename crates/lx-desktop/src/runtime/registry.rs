@@ -1,4 +1,6 @@
-use dioxus::prelude::*;
+use std::sync::{Arc, RwLock};
+
+use tokio::sync::watch;
 
 use crate::pages::agents::run_types::HeartbeatRun;
 
@@ -9,10 +11,16 @@ use super::types::{
 
 #[derive(Clone)]
 pub struct DesktopRuntimeRegistry {
-  pub agents: Signal<Vec<DesktopAgentRuntime>>,
-  pub events: Signal<Vec<DesktopRuntimeEvent>>,
-  pub tools: Signal<Vec<DesktopToolActivity>>,
-  pub flows: Signal<Vec<DesktopFlowRun>>,
+  state: Arc<RwLock<DesktopRuntimeState>>,
+  revisions: watch::Sender<u64>,
+}
+
+#[derive(Default)]
+struct DesktopRuntimeState {
+  agents: Vec<DesktopAgentRuntime>,
+  events: Vec<DesktopRuntimeEvent>,
+  tools: Vec<DesktopToolActivity>,
+  flows: Vec<DesktopFlowRun>,
 }
 
 impl Default for DesktopRuntimeRegistry {
@@ -23,31 +31,33 @@ impl Default for DesktopRuntimeRegistry {
 
 impl DesktopRuntimeRegistry {
   pub fn new() -> Self {
-    Self { agents: Signal::new(Vec::new()), events: Signal::new(Vec::new()), tools: Signal::new(Vec::new()), flows: Signal::new(Vec::new()) }
+    let (revisions, _) = watch::channel(0);
+    Self { state: Arc::new(RwLock::new(DesktopRuntimeState::default())), revisions }
   }
 
   pub fn register_agent(&self, agent: DesktopAgentRuntime) {
-    let mut agents = self.agents;
-    agents.write().push(agent);
+    self.write_state().agents.push(agent);
+    self.notify_change();
   }
 
   pub fn register_flow_run(&self, flow: DesktopFlowRun) {
-    let mut flows = self.flows;
-    flows.write().push(flow);
+    self.write_state().flows.push(flow);
+    self.notify_change();
   }
 
   pub fn update_agent<F>(&self, agent_id: &str, update: F)
   where
     F: FnOnce(&mut DesktopAgentRuntime),
   {
-    let mut agents = self.agents;
-    if let Some(agent) = agents.write().iter_mut().find(|agent| agent.id == agent_id) {
+    if let Some(agent) = self.write_state().agents.iter_mut().find(|agent| agent.id == agent_id) {
       update(agent);
     }
+    self.notify_change();
   }
 
   pub fn append_event(&self, event: DesktopRuntimeEvent) {
-    self.update_agent(&event.agent_id, |agent| {
+    let mut state = self.write_state();
+    if let Some(agent) = state.agents.iter_mut().find(|agent| agent.id == event.agent_id) {
       agent.last_event_at = event.ts.clone();
       match event.kind {
         DesktopRuntimeEventKind::AgentSpawn => agent.status = DesktopAgentStatus::Running,
@@ -59,37 +69,41 @@ impl DesktopRuntimeRegistry {
         DesktopRuntimeEventKind::BackendError => agent.status = DesktopAgentStatus::Error,
         _ => {},
       }
-    });
-    let mut events = self.events;
-    events.write().push(event);
+    }
+    state.events.push(event);
+    drop(state);
+    self.notify_change();
   }
 
   pub fn upsert_tool(&self, activity: DesktopToolActivity) {
-    let mut tools_signal = self.tools;
-    let mut tools = tools_signal.write();
-    if let Some(existing) = tools.iter_mut().find(|tool| tool.call_id == activity.call_id) {
+    let mut state = self.write_state();
+    if let Some(existing) = state.tools.iter_mut().find(|tool| tool.call_id == activity.call_id) {
       *existing = activity;
+      drop(state);
+      self.notify_change();
       return;
     }
-    tools.push(activity);
+    state.tools.push(activity);
+    drop(state);
+    self.notify_change();
   }
 
   pub fn all_agents(&self) -> Vec<DesktopAgentRuntime> {
-    let mut agents = self.agents.read().clone();
+    let mut agents = self.read_state().agents.clone();
     agents.sort_by(|left, right| right.last_event_at.cmp(&left.last_event_at));
     agents
   }
 
   pub fn find_agent(&self, agent_id: &str) -> Option<DesktopAgentRuntime> {
-    self.agents.read().iter().find(|agent| agent.id == agent_id).cloned()
+    self.read_state().agents.iter().find(|agent| agent.id == agent_id).cloned()
   }
 
   pub fn events_for_agent(&self, agent_id: &str) -> Vec<DesktopRuntimeEvent> {
-    self.events.read().iter().filter(|event| event.agent_id == agent_id).cloned().collect()
+    self.read_state().events.iter().filter(|event| event.agent_id == agent_id).cloned().collect()
   }
 
   pub fn tools_for_agent(&self, agent_id: &str) -> Vec<DesktopToolActivity> {
-    let mut tools: Vec<_> = self.tools.read().iter().filter(|tool| tool.agent_id == agent_id).cloned().collect();
+    let mut tools: Vec<_> = self.read_state().tools.iter().filter(|tool| tool.agent_id == agent_id).cloned().collect();
     tools.sort_by(|left, right| right.call_id.cmp(&left.call_id));
     tools
   }
@@ -120,8 +134,8 @@ impl DesktopRuntimeRegistry {
 
   pub fn flow_runs_for_flow(&self, flow_id: &str) -> Vec<DesktopFlowRunSummary> {
     let mut runs: Vec<_> = self
+      .read_state()
       .flows
-      .read()
       .iter()
       .filter(|run| run.flow_id == flow_id)
       .filter_map(|run| {
@@ -150,6 +164,14 @@ impl DesktopRuntimeRegistry {
     self.all_agents().into_iter().filter(|agent| agent.flow_run_id.as_deref() == Some(flow_run_id)).collect()
   }
 
+  pub fn revision(&self) -> u64 {
+    *self.revisions.borrow()
+  }
+
+  pub fn subscribe(&self) -> watch::Receiver<u64> {
+    self.revisions.subscribe()
+  }
+
   fn last_error_for_agent(&self, agent_id: &str) -> Option<String> {
     self
       .events_for_agent(agent_id)
@@ -157,6 +179,19 @@ impl DesktopRuntimeRegistry {
       .rev()
       .find(|event| matches!(event.kind, DesktopRuntimeEventKind::ToolError | DesktopRuntimeEventKind::BackendError))
       .and_then(|event| payload_text(&event.payload))
+  }
+
+  fn notify_change(&self) {
+    let next = self.revision().saturating_add(1);
+    let _ = self.revisions.send(next);
+  }
+
+  fn read_state(&self) -> std::sync::RwLockReadGuard<'_, DesktopRuntimeState> {
+    self.state.read().expect("desktop runtime registry read lock poisoned")
+  }
+
+  fn write_state(&self) -> std::sync::RwLockWriteGuard<'_, DesktopRuntimeState> {
+    self.state.write().expect("desktop runtime registry write lock poisoned")
   }
 }
 

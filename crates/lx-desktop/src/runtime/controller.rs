@@ -139,5 +139,19 @@ pub fn DesktopRuntimeProvider(children: Element) -> Element {
 }
 
 pub fn use_desktop_runtime() -> DesktopRuntimeController {
-  use_context()
+  let controller = use_context::<DesktopRuntimeController>();
+  let registry = controller.registry.clone();
+  let mut revision = use_signal(|| registry.revision());
+
+  use_hook(move || {
+    let mut updates = registry.subscribe();
+    spawn(async move {
+      while updates.changed().await.is_ok() {
+        revision.set(*updates.borrow_and_update());
+      }
+    });
+  });
+
+  let _ = revision();
+  controller
 }
