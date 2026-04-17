@@ -45,6 +45,16 @@ impl DesktopRuntimeRegistry {
     self.notify_change();
   }
 
+  pub fn update_flow_run<F>(&self, flow_run_id: &str, update: F)
+  where
+    F: FnOnce(&mut DesktopFlowRun),
+  {
+    if let Some(flow_run) = self.write_state().flows.iter_mut().find(|flow| flow.id == flow_run_id) {
+      update(flow_run);
+    }
+    self.notify_change();
+  }
+
   pub fn update_agent<F>(&self, agent_id: &str, update: F)
   where
     F: FnOnce(&mut DesktopAgentRuntime),
@@ -139,12 +149,14 @@ impl DesktopRuntimeRegistry {
       .iter()
       .filter(|run| run.flow_id == flow_id)
       .filter_map(|run| {
-        let root_agent = self.find_agent(&run.root_agent_id)?;
+        let root_agent =
+          run.root_agent_id.as_deref().and_then(|agent_id| self.find_agent(agent_id)).or_else(|| self.agents_for_flow_run(&run.id).into_iter().next());
+        let root_agent = root_agent?;
         Some(DesktopFlowRunSummary {
           id: run.id.clone(),
           flow_id: run.flow_id.clone(),
           title: run.title.clone(),
-          root_agent_id: run.root_agent_id.clone(),
+          root_agent_id: root_agent.id.clone(),
           root_agent_name: root_agent.name.clone(),
           root_agent_status: root_agent.status,
           created_at: run.created_at.clone(),
@@ -162,6 +174,10 @@ impl DesktopRuntimeRegistry {
 
   pub fn agents_for_flow_run(&self, flow_run_id: &str) -> Vec<DesktopAgentRuntime> {
     self.all_agents().into_iter().filter(|agent| agent.flow_run_id.as_deref() == Some(flow_run_id)).collect()
+  }
+
+  pub fn agent_for_flow_run_node(&self, flow_run_id: &str, flow_node_id: &str) -> Option<DesktopAgentRuntime> {
+    self.agents_for_flow_run(flow_run_id).into_iter().find(|agent| agent.flow_node_id.as_deref() == Some(flow_node_id))
   }
 
   pub fn revision(&self) -> u64 {
@@ -233,7 +249,7 @@ mod tests {
     registry.register_flow_run(DesktopFlowRun {
       id: "run-1".to_string(),
       flow_id: "flow-a".to_string(),
-      root_agent_id: alpha.id.clone(),
+      root_agent_id: Some(alpha.id.clone()),
       title: "Run one".to_string(),
       created_at: now_ts(),
     });
@@ -247,7 +263,7 @@ mod tests {
     registry.register_flow_run(DesktopFlowRun {
       id: "run-2".to_string(),
       flow_id: "flow-a".to_string(),
-      root_agent_id: beta.id.clone(),
+      root_agent_id: Some(beta.id.clone()),
       title: "Run two".to_string(),
       created_at: now_ts(),
     });
@@ -257,5 +273,18 @@ mod tests {
     assert_eq!(summaries[0].id, "run-2");
     assert_eq!(summaries[1].id, "run-1");
     assert_eq!(registry.agents_for_flow_run("run-1").len(), 1);
+  }
+
+  #[test]
+  fn flow_run_nodes_are_addressable_by_flow_node_id() {
+    let registry = DesktopRuntimeRegistry::new();
+    let mut agent = DesktopAgentRuntime::new(&DesktopAgentLaunchSpec::new("Alpha", "a", "p"));
+    agent.id = "agent-alpha".to_string();
+    agent.flow_id = Some("flow-a".to_string());
+    agent.flow_run_id = Some("run-1".to_string());
+    agent.flow_node_id = Some("node-a".to_string());
+    registry.register_agent(agent.clone());
+
+    assert_eq!(registry.agent_for_flow_run_node("run-1", "node-a").map(|entry| entry.id), Some("agent-alpha".to_string()));
   }
 }

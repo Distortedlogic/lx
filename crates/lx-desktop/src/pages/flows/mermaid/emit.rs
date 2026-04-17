@@ -4,7 +4,10 @@ use super::types::{MermaidChart, MermaidNodeMetadata, MermaidSemanticKind};
 
 pub fn emit_chart(chart: &MermaidChart) -> String {
   let mut lines = vec![format!("flowchart {}", chart.direction.keyword())];
-  lines.push(format!("%% lx-flow: {}", serde_json::to_string(&serde_json::json!({ "title": chart.title, "notes": chart.notes })).expect("flow metadata should serialize")));
+  lines.push(format!(
+    "%% lx-flow: {}",
+    serde_json::to_string(&serde_json::json!({ "title": chart.title, "notes": chart.notes })).expect("flow metadata should serialize")
+  ));
   emit_subgraphs(chart, None, &mut lines);
   emit_root_nodes(chart, &mut lines);
   for edge in &chart.edges {
@@ -15,13 +18,7 @@ pub fn emit_chart(chart: &MermaidChart) -> String {
       None => lines.push(format!("    {left} --> {right}")),
     }
   }
-  for class_name in [
-    MermaidSemanticKind::Step,
-    MermaidSemanticKind::Agent,
-    MermaidSemanticKind::Decision,
-    MermaidSemanticKind::Tool,
-    MermaidSemanticKind::Io,
-  ] {
+  for class_name in [MermaidSemanticKind::Step, MermaidSemanticKind::Agent, MermaidSemanticKind::Decision, MermaidSemanticKind::Tool, MermaidSemanticKind::Io] {
     lines.push(format!("    classDef {} {}", class_name.class_name(), class_style(class_name)));
   }
   for (class_name, node_ids) in class_applications(chart) {
@@ -94,4 +91,21 @@ fn has_node_metadata(metadata: &MermaidNodeMetadata) -> bool {
 
 fn escape_label(label: &str) -> String {
   label.replace('"', "\\\"")
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::pages::flows::mermaid::parse_chart;
+
+  #[test]
+  fn emitted_chart_roundtrips() {
+    let source = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/flows/mermaid-mock-lx.mmd"));
+    let parsed = parse_chart("mermaid-mock-lx", source).chart.expect("sample chart should parse");
+    let emitted = emit_chart(&parsed);
+    let reparsed = parse_chart("mermaid-mock-lx", &emitted);
+
+    assert!(reparsed.diagnostics.is_empty());
+    assert_eq!(reparsed.chart.expect("emitted chart should parse").edges.len(), parsed.edges.len());
+  }
 }

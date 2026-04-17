@@ -11,7 +11,7 @@ use lx_graph_editor::protocol::{GraphWidgetDiagnostic, GraphWidgetDiagnosticSeve
 
 use super::controller::use_flow_editor_state;
 use super::product::{FlowCompileState, FlowCompileStatus, FlowProductKind};
-use super::sample::{DEFAULT_FLOW_ID, DEFAULT_LX_FLOW_ID};
+use super::sample::{DEFAULT_FLOW_ID, DEFAULT_LX_FLOW_ID, DEFAULT_MERMAID_FLOW_ID};
 use super::storage::use_flow_persistence;
 
 #[component]
@@ -96,6 +96,11 @@ pub fn FlowWorkspace() -> Element {
               label: "LX Sample".to_string(),
               flow_id: DEFAULT_LX_FLOW_ID.to_string(),
               active: product_kind == FlowProductKind::Lx,
+            }
+            ProductSampleButton {
+              label: "Mermaid Sample".to_string(),
+              flow_id: DEFAULT_MERMAID_FLOW_ID.to_string(),
+              active: product_kind == FlowProductKind::Mermaid,
             }
           }
         }

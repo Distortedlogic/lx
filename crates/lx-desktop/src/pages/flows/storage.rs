@@ -7,7 +7,8 @@ use dioxus::prelude::*;
 
 use lx_graph_editor::model::GraphDocument;
 
-use super::sample::{DEFAULT_FLOW_ID, sample_document};
+use super::mermaid::{chart_from_graph_document, chart_graph_document, emit_chart, parse_chart};
+use super::sample::{DEFAULT_FLOW_ID, DEFAULT_MERMAID_FLOW_ID, sample_document};
 
 pub trait FlowRepository: Send + Sync {
   fn load(&self, flow_id: &str) -> Result<Option<GraphDocument>>;
@@ -36,7 +37,7 @@ impl FlowPersistence {
     }
 
     let document = sample_document(flow_id);
-    if flow_id == DEFAULT_FLOW_ID {
+    if flow_id == DEFAULT_FLOW_ID || flow_id == DEFAULT_MERMAID_FLOW_ID {
       self.repository.save(&document)?;
     }
     Ok(document)
@@ -82,28 +83,60 @@ impl FileFlowRepository {
     Self { root }
   }
 
-  fn flow_path(&self, flow_id: &str) -> PathBuf {
+  fn json_path(&self, flow_id: &str) -> PathBuf {
     self.root.join(format!("{}.json", sanitize_flow_id(flow_id)))
+  }
+
+  fn mermaid_path(&self, flow_id: &str) -> PathBuf {
+    self.root.join(format!("{}.mmd", sanitize_flow_id(flow_id)))
+  }
+
+  fn flow_path(&self, document: &GraphDocument) -> PathBuf {
+    if is_mermaid_document(document) { self.mermaid_path(&document.id) } else { self.json_path(&document.id) }
   }
 }
 
 impl FlowRepository for FileFlowRepository {
   fn load(&self, flow_id: &str) -> Result<Option<GraphDocument>> {
-    let path = self.flow_path(flow_id);
-    if !path.exists() {
+    let mermaid_path = self.mermaid_path(flow_id);
+    if mermaid_path.exists() {
+      let source = fs::read_to_string(&mermaid_path).with_context(|| format!("failed to read `{}`", mermaid_path.display()))?;
+      let parsed = parse_chart(flow_id, &source);
+      let chart = parsed
+        .chart
+        .ok_or_else(|| anyhow::anyhow!(parsed.diagnostics.into_iter().map(|diagnostic| diagnostic.message).collect::<Vec<_>>().join("; ")))
+        .with_context(|| format!("failed to parse `{}`", mermaid_path.display()))?;
+      return Ok(Some(chart_graph_document(flow_id, &chart)));
+    }
+
+    let json_path = self.json_path(flow_id);
+    if !json_path.exists() {
       return Ok(None);
     }
-    let payload = fs::read_to_string(&path).with_context(|| format!("failed to read `{}`", path.display()))?;
-    let mut document: GraphDocument = serde_json::from_str(&payload).with_context(|| format!("failed to parse `{}`", path.display()))?;
+    let payload = fs::read_to_string(&json_path).with_context(|| format!("failed to read `{}`", json_path.display()))?;
+    let mut document: GraphDocument = serde_json::from_str(&payload).with_context(|| format!("failed to parse `{}`", json_path.display()))?;
     document.id = flow_id.to_string();
     Ok(Some(document))
   }
 
   fn save(&self, document: &GraphDocument) -> Result<()> {
     fs::create_dir_all(&self.root).with_context(|| format!("failed to create `{}`", self.root.display()))?;
-    let path = self.flow_path(&document.id);
-    let payload = serde_json::to_string_pretty(document).context("failed to serialize flow document")?;
-    fs::write(&path, payload).with_context(|| format!("failed to write `{}`", path.display()))?;
+    let path = self.flow_path(document);
+    if is_mermaid_document(document) {
+      let payload = emit_chart(&chart_from_graph_document(document));
+      fs::write(&path, payload).with_context(|| format!("failed to write `{}`", path.display()))?;
+      let json_path = self.json_path(&document.id);
+      if json_path.exists() {
+        let _ = fs::remove_file(json_path);
+      }
+    } else {
+      let payload = serde_json::to_string_pretty(document).context("failed to serialize flow document")?;
+      fs::write(&path, payload).with_context(|| format!("failed to write `{}`", path.display()))?;
+      let mermaid_path = self.mermaid_path(&document.id);
+      if mermaid_path.exists() {
+        let _ = fs::remove_file(mermaid_path);
+      }
+    }
     Ok(())
   }
 
@@ -120,7 +153,7 @@ impl FlowRepository for FileFlowRepository {
         .filter_map(|entry| {
           let path = entry.path();
           let extension = path.extension()?.to_str()?;
-          if extension != "json" {
+          if extension != "json" && extension != "mmd" {
             return None;
           }
           let metadata = entry.metadata().ok()?;
@@ -137,12 +170,16 @@ impl FlowRepository for FileFlowRepository {
     let base = sanitize_flow_id(base_flow_id);
     let mut candidate = format!("{base}-copy");
     let mut index = 2usize;
-    while self.flow_path(&candidate).exists() {
+    while self.json_path(&candidate).exists() || self.mermaid_path(&candidate).exists() {
       candidate = format!("{base}-copy-{index}");
       index += 1;
     }
     Ok(candidate)
   }
+}
+
+fn is_mermaid_document(document: &GraphDocument) -> bool {
+  document.metadata.tags.iter().any(|tag| tag.eq_ignore_ascii_case("mermaid"))
 }
 
 fn default_flows_root() -> PathBuf {
@@ -154,4 +191,26 @@ fn sanitize_flow_id(flow_id: &str) -> String {
   let sanitized: String = flow_id.chars().map(|ch| if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' { ch } else { '-' }).collect();
   let trimmed = sanitized.trim_matches('-');
   if trimmed.is_empty() { "flow".to_string() } else { trimmed.to_string() }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::pages::flows::sample::sample_document;
+
+  #[test]
+  fn mermaid_documents_save_and_load_as_mmd() {
+    let root = std::path::PathBuf::from("/tmp").join(format!("lx-mermaid-storage-{}", uuid::Uuid::new_v4()));
+    let repository = FileFlowRepository::new(root.clone());
+    let document = sample_document(DEFAULT_MERMAID_FLOW_ID);
+
+    repository.save(&document).expect("mermaid document should save");
+    let loaded = repository.load(DEFAULT_MERMAID_FLOW_ID).expect("mermaid document should load").expect("loaded document");
+
+    assert!(root.join(format!("{DEFAULT_MERMAID_FLOW_ID}.mmd")).exists());
+    assert!(loaded.metadata.tags.iter().any(|tag| tag == "mermaid"));
+    assert_eq!(loaded.edges.len(), document.edges.len());
+
+    let _ = fs::remove_dir_all(root);
+  }
 }

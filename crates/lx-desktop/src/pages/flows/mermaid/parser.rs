@@ -1,12 +1,13 @@
-use std::collections::{BTreeMap, BTreeSet};
+mod scan;
 
-use dioxus::prelude::*;
+use std::collections::BTreeSet;
+
 use mmdflux::builtins::default_registry;
 use mmdflux::graph::{Arrow, Direction, Stroke};
 use mmdflux::payload::Diagram;
-use serde::Deserialize;
 
-use super::types::{MermaidChart, MermaidDirection, MermaidEdge, MermaidNode, MermaidNodeMetadata, MermaidSemanticKind, MermaidSubgraph};
+use self::scan::{ScanResult, error_diagnostic, humanize_flow_id, scan_source};
+use super::types::{MermaidChart, MermaidDirection, MermaidEdge, MermaidNode, MermaidSemanticKind, MermaidSubgraph};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct MermaidParseResult {
@@ -14,17 +15,18 @@ pub struct MermaidParseResult {
   pub diagnostics: Vec<lx_graph_editor::protocol::GraphWidgetDiagnostic>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
-struct FlowMetadata {
-  title: Option<String>,
-  notes: Option<String>,
-}
-
 pub fn parse_chart(flow_id: &str, source: &str) -> MermaidParseResult {
   let scan = scan_source(source);
-  let mut diagnostics = scan.diagnostics;
+  let mut diagnostics = scan.diagnostics.clone();
   let chart = parse_with_mmdflux(flow_id, source, &scan, &mut diagnostics);
-  MermaidParseResult { chart: if diagnostics.iter().any(|diagnostic| diagnostic.severity == lx_graph_editor::protocol::GraphWidgetDiagnosticSeverity::Error) { None } else { chart }, diagnostics }
+  MermaidParseResult {
+    chart: if diagnostics.iter().any(|diagnostic| diagnostic.severity == lx_graph_editor::protocol::GraphWidgetDiagnosticSeverity::Error) {
+      None
+    } else {
+      chart
+    },
+    diagnostics,
+  }
 }
 
 fn parse_with_mmdflux(
@@ -34,28 +36,29 @@ fn parse_with_mmdflux(
   diagnostics: &mut Vec<lx_graph_editor::protocol::GraphWidgetDiagnostic>,
 ) -> Option<MermaidChart> {
   let registry = default_registry();
-  let resolved = match registry.resolve(source) {
-    Some(resolved) => resolved,
-    None => {
-      diagnostics.push(error_diagnostic("mermaid-missing-diagram", "The Mermaid file does not contain a supported diagram header.", None));
-      return None;
-    },
+  let Some(resolved) = registry.resolve(source) else {
+    diagnostics.push(error_diagnostic("mermaid-missing-diagram", "The Mermaid file does not contain a supported diagram header.", None));
+    return None;
   };
   if resolved.diagram_id() != "flowchart" {
     diagnostics.push(error_diagnostic("mermaid-non-flowchart", "Only Mermaid flowcharts are supported for this product mode.", None));
     return None;
   }
-  let instance = match registry.create(resolved.diagram_id()) {
-    Some(instance) => instance,
-    None => {
-      diagnostics.push(error_diagnostic("mermaid-flowchart-instance", "The Mermaid flowchart parser could not be constructed.", None));
+  let Some(instance) = registry.create(resolved.diagram_id()) else {
+    diagnostics.push(error_diagnostic("mermaid-flowchart-instance", "The Mermaid flowchart parser could not be constructed.", None));
+    return None;
+  };
+  let parsed = match instance.parse(source) {
+    Ok(parsed) => parsed,
+    Err(error) => {
+      diagnostics.push(error_diagnostic("mermaid-parse-error", format!("Failed to parse Mermaid flowchart: {error}"), None));
       return None;
     },
   };
-  let payload = match instance.parse(source).and_then(|parsed| parsed.into_payload()) {
+  let payload = match parsed.into_payload() {
     Ok(payload) => payload,
     Err(error) => {
-      diagnostics.push(error_diagnostic("mermaid-parse-error", format!("Failed to parse Mermaid flowchart: {error}"), None));
+      diagnostics.push(error_diagnostic("mermaid-payload-error", format!("Failed to build Mermaid payload: {error}"), None));
       return None;
     },
   };
@@ -73,7 +76,7 @@ fn parse_with_mmdflux(
     .values()
     .map(|node| {
       referenced_node_ids.insert(node.id.clone());
-      let semantic_kind = scan.semantic_classes.get(&node.id).copied().or_else(|| match node.shape {
+      let semantic_kind = scan.semantic_classes.get(&node.id).copied().or(match node.shape {
         mmdflux::graph::Shape::Diamond => Some(MermaidSemanticKind::Decision),
         _ => None,
       });
@@ -97,20 +100,12 @@ fn parse_with_mmdflux(
 
   for node_id in scan.semantic_classes.keys() {
     if !referenced_node_ids.contains(node_id) {
-      diagnostics.push(error_diagnostic(
-        format!("mermaid-class-target-{node_id}"),
-        format!("Class assignment referenced unknown node `{node_id}`."),
-        None,
-      ));
+      diagnostics.push(error_diagnostic(format!("mermaid-class-target-{node_id}"), format!("Class assignment referenced unknown node `{node_id}`."), None));
     }
   }
   for node_id in scan.node_metadata.keys() {
     if !referenced_node_ids.contains(node_id) {
-      diagnostics.push(error_diagnostic(
-        format!("mermaid-node-meta-{node_id}"),
-        format!("Node metadata referenced unknown node `{node_id}`."),
-        None,
-      ));
+      diagnostics.push(error_diagnostic(format!("mermaid-node-meta-{node_id}"), format!("Node metadata referenced unknown node `{node_id}`."), None));
     }
   }
 
@@ -119,7 +114,12 @@ fn parse_with_mmdflux(
     .iter()
     .enumerate()
     .map(|(index, edge)| {
-      if edge.from_subgraph.is_some() || edge.to_subgraph.is_some() || edge.stroke != Stroke::Solid || edge.arrow_start != Arrow::None || edge.arrow_end != Arrow::Normal {
+      if edge.from_subgraph.is_some()
+        || edge.to_subgraph.is_some()
+        || edge.stroke != Stroke::Solid
+        || edge.arrow_start != Arrow::None
+        || edge.arrow_end != Arrow::Normal
+      {
         diagnostics.push(error_diagnostic(
           format!("mermaid-edge-style-{index}"),
           "Only simple directed node-to-node edges using `-->` are supported.".to_string(),
@@ -148,8 +148,8 @@ fn parse_with_mmdflux(
   subgraphs.sort_by(|left, right| left.id.cmp(&right.id));
 
   Some(MermaidChart {
-    title: scan.flow_metadata.title.clone().unwrap_or_else(|| humanize_flow_id(flow_id)),
-    notes: scan.flow_metadata.notes.clone(),
+    title: scan.flow_title.clone().unwrap_or_else(|| humanize_flow_id(flow_id)),
+    notes: scan.flow_notes.clone(),
     direction: if graph.direction == Direction::LeftRight { MermaidDirection::LeftRight } else { MermaidDirection::TopDown },
     nodes,
     edges,
@@ -157,167 +157,30 @@ fn parse_with_mmdflux(
   })
 }
 
-#[derive(Default)]
-struct ScanResult {
-  diagnostics: Vec<lx_graph_editor::protocol::GraphWidgetDiagnostic>,
-  flow_metadata: FlowMetadata,
-  semantic_classes: BTreeMap<String, MermaidSemanticKind>,
-  node_metadata: BTreeMap<String, MermaidNodeMetadata>,
-}
+#[cfg(test)]
+mod tests {
+  use super::*;
 
-fn scan_source(source: &str) -> ScanResult {
-  let mut result = ScanResult::default();
-  let mut header_seen = false;
-  let mut subgraph_depth = 0usize;
+  const SAMPLE: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/flows/mermaid-mock-lx.mmd"));
 
-  for (index, line) in source.lines().enumerate() {
-    let trimmed = line.trim();
-    if trimmed.is_empty() {
-      continue;
-    }
-    if let Some(metadata) = trimmed.strip_prefix("%% lx-flow:") {
-      match serde_json::from_str::<FlowMetadata>(metadata.trim()) {
-        Ok(flow_metadata) => result.flow_metadata = flow_metadata,
-        Err(error) => result.diagnostics.push(error_diagnostic(format!("mermaid-flow-meta-{index}"), format!("Invalid flow metadata: {error}"), None)),
-      }
-      continue;
-    }
-    if let Some(metadata) = trimmed.strip_prefix("%% lx-node:") {
-      let mut parts = metadata.trim().splitn(2, char::is_whitespace);
-      let Some(node_id) = parts.next().filter(|value| !value.is_empty()) else {
-        result.diagnostics.push(error_diagnostic(format!("mermaid-node-meta-{index}"), "Node metadata must start with a node id.".to_string(), None));
-        continue;
-      };
-      let Some(json) = parts.next() else {
-        result.diagnostics.push(error_diagnostic(format!("mermaid-node-meta-json-{index}"), format!("Node metadata for `{node_id}` is missing a JSON payload."), None));
-        continue;
-      };
-      match serde_json::from_str::<MermaidNodeMetadata>(json.trim()) {
-        Ok(node_metadata) => {
-          result.node_metadata.insert(node_id.to_string(), node_metadata);
-        },
-        Err(error) => result.diagnostics.push(error_diagnostic(format!("mermaid-node-meta-json-{index}"), format!("Invalid node metadata for `{node_id}`: {error}"), None)),
-      }
-      continue;
-    }
-    if trimmed.starts_with("%%") {
-      continue;
-    }
-    if !header_seen {
-      header_seen = true;
-      if !matches!(trimmed.to_ascii_lowercase().as_str(), "flowchart td" | "flowchart lr") {
-        result.diagnostics.push(error_diagnostic("mermaid-header", "Only `flowchart TD` and `flowchart LR` headers are supported.".to_string(), None));
-      }
-      continue;
-    }
-    if let Some(class_names) = trimmed.strip_prefix("classDef ") {
-      for class_name in class_names.split_whitespace().next().unwrap_or_default().split(',').map(str::trim).filter(|value| !value.is_empty()) {
-        if MermaidSemanticKind::from_class_name(class_name).is_none() {
-          result.diagnostics.push(error_diagnostic(format!("mermaid-classdef-{class_name}-{index}"), format!("Unsupported Mermaid semantic class `{class_name}`."), None));
-        }
-      }
-      continue;
-    }
-    if let Some(rest) = trimmed.strip_prefix("class ") {
-      let mut parts = rest.splitn(2, char::is_whitespace);
-      let node_ids = parts.next().unwrap_or_default();
-      let class_name = parts.next().unwrap_or_default().trim();
-      let Some(kind) = MermaidSemanticKind::from_class_name(class_name) else {
-        result.diagnostics.push(error_diagnostic(format!("mermaid-class-{index}"), format!("Unsupported Mermaid semantic class `{class_name}`."), None));
-        continue;
-      };
-      for node_id in node_ids.split(',').map(str::trim).filter(|value| !value.is_empty()) {
-        if let Some(existing) = result.semantic_classes.insert(node_id.to_string(), kind) && existing != kind {
-          result.diagnostics.push(error_diagnostic(format!("mermaid-class-duplicate-{node_id}"), format!("Node `{node_id}` was assigned multiple semantic classes."), None));
-        }
-      }
-      continue;
-    }
-    if trimmed.eq("end") {
-      if subgraph_depth == 0 {
-        result.diagnostics.push(error_diagnostic(format!("mermaid-end-{index}"), "Encountered `end` without an open subgraph.".to_string(), None));
-      } else {
-        subgraph_depth -= 1;
-      }
-      continue;
-    }
-    if trimmed.starts_with("subgraph ") {
-      subgraph_depth += 1;
-      continue;
-    }
-    if is_supported_edge_statement(trimmed) || is_supported_node_statement(trimmed) {
-      continue;
-    }
-    result.diagnostics.push(error_diagnostic(format!("mermaid-statement-{index}"), format!("Unsupported Mermaid statement: `{trimmed}`"), None));
+  #[test]
+  fn parses_supported_mermaid_sample() {
+    let result = parse_chart("mermaid-mock-lx", SAMPLE);
+    assert!(result.chart.is_some());
+    assert!(result.diagnostics.is_empty());
   }
 
-  if !header_seen {
-    result.diagnostics.push(error_diagnostic("mermaid-header-missing", "The Mermaid file is missing a `flowchart TD` or `flowchart LR` header.".to_string(), None));
+  #[test]
+  fn rejects_unsupported_statements() {
+    let result = parse_chart("bad", "flowchart TD\nclick A callback\nA[Start]\nclass A step");
+    assert!(result.chart.is_none());
+    assert!(result.diagnostics.iter().any(|diagnostic| diagnostic.message.contains("Unsupported Mermaid statement")));
   }
-  if subgraph_depth != 0 {
-    result.diagnostics.push(error_diagnostic("mermaid-subgraph-balance", "Subgraph blocks must be closed with `end`.".to_string(), None));
+
+  #[test]
+  fn requires_supported_semantic_classes() {
+    let result = parse_chart("bad", "flowchart TD\nA[Start]\nA --> B[End]");
+    assert!(result.chart.is_none());
+    assert!(result.diagnostics.iter().any(|diagnostic| diagnostic.message.contains("missing a supported semantic class assignment")));
   }
-  result
-}
-
-fn is_supported_edge_statement(line: &str) -> bool {
-  let Some((left, right)) = line.split_once("-->") else {
-    return false;
-  };
-  if left.contains("&") || right.contains("&") || left.contains("<") || right.contains("<") || line.matches("-->").count() != 1 {
-    return false;
-  }
-  let right = if let Some(after_arrow) = right.trim().strip_prefix('|') {
-    let Some((_, target)) = after_arrow.split_once('|') else {
-      return false;
-    };
-    target.trim()
-  } else {
-    right.trim()
-  };
-  parse_endpoint_id(left.trim()).is_some() && parse_endpoint_id(right).is_some()
-}
-
-fn is_supported_node_statement(line: &str) -> bool {
-  parse_endpoint_id(line).is_some()
-}
-
-fn parse_endpoint_id(value: &str) -> Option<&str> {
-  let trimmed = value.trim();
-  let end = trimmed.find(['[', '{', '(', '/']).unwrap_or(trimmed.len());
-  let node_id = trimmed[..end].trim();
-  if node_id.is_empty() || !node_id.chars().all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.')) {
-    return None;
-  }
-  Some(node_id)
-}
-
-fn error_diagnostic(
-  id: impl Into<String>,
-  message: impl Into<String>,
-  target: Option<lx_graph_editor::model::GraphEntityRef>,
-) -> lx_graph_editor::protocol::GraphWidgetDiagnostic {
-  lx_graph_editor::protocol::GraphWidgetDiagnostic {
-    id: id.into(),
-    severity: lx_graph_editor::protocol::GraphWidgetDiagnosticSeverity::Error,
-    message: message.into(),
-    source: Some("mermaid".to_string()),
-    detail: None,
-    target,
-  }
-}
-
-fn humanize_flow_id(flow_id: &str) -> String {
-  flow_id
-    .split(['-', '_'])
-    .filter(|segment| !segment.is_empty())
-    .map(|segment| {
-      let mut chars = segment.chars();
-      match chars.next() {
-        Some(first) => format!("{}{}", first.to_uppercase(), chars.as_str()),
-        None => String::new(),
-      }
-    })
-    .collect::<Vec<_>>()
-    .join(" ")
 }

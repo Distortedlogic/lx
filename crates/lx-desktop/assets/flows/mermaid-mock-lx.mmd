@@ -1,0 +1,30 @@
+flowchart TD
+%% lx-flow: {"title":"Mermaid Mock LX","notes":"Mock lx program executed through the desktop Pi runtime adapter."}
+    subgraph ingest["Research Intake"]
+        goal[/"Goal Intake"/]
+        fetch[["Collect Evidence"]]
+    end
+    analyze(["Sensemaking Agent"])
+    decide{"Action Gate"}
+    act(["Execute Follow-up"])
+    archive["Archive Brief"]
+    goal --> fetch
+    fetch --> analyze
+    analyze --> decide
+    decide -->|"action"| act
+    decide -->|"archive"| archive
+    classDef step fill:#dbeafe,stroke:#2563eb,color:#0f172a
+    classDef agent fill:#e0f2fe,stroke:#0284c7,color:#0f172a
+    classDef decision fill:#ffedd5,stroke:#ea580c,color:#0f172a
+    classDef tool fill:#f3e8ff,stroke:#7c3aed,color:#0f172a
+    classDef io fill:#dcfce7,stroke:#16a34a,color:#0f172a
+    class goal,archive io;
+    class fetch tool;
+    class analyze,act agent;
+    class decide decision;
+    %% lx-node: goal {"task_summary":"Capture the active user objective.","prompt":"Summarize the research goal, constraints, and expected output."}
+    %% lx-node: fetch {"task_summary":"Collect supporting evidence.","prompt":"Use repository context and available tools to gather relevant evidence."}
+    %% lx-node: analyze {"task_summary":"Turn evidence into a draft brief.","prompt":"Synthesize the evidence into an actionable brief with citations."}
+    %% lx-node: decide {"task_summary":"Decide whether to act now or archive.","prompt":"Choose the next path based on whether the brief contains concrete follow-up work."}
+    %% lx-node: act {"task_summary":"Execute the approved follow-up work.","prompt":"Carry out the follow-up work described in the brief."}
+    %% lx-node: archive {"task_summary":"Archive the resulting brief.","prompt":"Store the brief summary and note why it does not require immediate action."}

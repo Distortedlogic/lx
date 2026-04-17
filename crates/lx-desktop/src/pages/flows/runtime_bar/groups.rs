@@ -88,7 +88,7 @@ mod tests {
     registry.register_flow_run(DesktopFlowRun {
       id: "run-1".to_string(),
       flow_id: "flow-a".to_string(),
-      root_agent_id: root.id.clone(),
+      root_agent_id: Some(root.id.clone()),
       title: "Run one".to_string(),
       created_at: now_ts(),
     });
@@ -109,7 +109,7 @@ mod tests {
     registry.register_flow_run(DesktopFlowRun {
       id: "run-2".to_string(),
       flow_id: "flow-a".to_string(),
-      root_agent_id: other.id.clone(),
+      root_agent_id: Some(other.id.clone()),
       title: "Run two".to_string(),
       created_at: now_ts(),
     });

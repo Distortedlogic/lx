@@ -13,6 +13,8 @@ use self::groups::{FlowRunGroup, flow_run_groups};
 use self::snapshot::build_flow_run_snapshot;
 use self::styles::{format_duration, run_snapshot_badge_style, run_snapshot_surface_style, run_status_label};
 use super::controller::use_flow_editor_state;
+use super::mermaid::MermaidRuntimeBar;
+use super::product::FlowProductKind;
 
 #[component]
 pub fn FlowRuntimeBar() -> Element {
@@ -25,6 +27,11 @@ pub fn FlowRuntimeBar() -> Element {
 
   let flow_id = state.flow_id.read().clone();
   let document = state.document.read().clone();
+  if *state.product_kind.read() == FlowProductKind::Mermaid {
+    return rsx! {
+      MermaidRuntimeBar { flow_id, document }
+    };
+  }
   let flow_agents = runtime.registry.agents_for_flow(&flow_id);
   let run_groups = flow_run_groups(&runtime.registry, &flow_id);
   let launch_prompt = flow_prompt(&document.title, document.metadata.notes.as_deref());

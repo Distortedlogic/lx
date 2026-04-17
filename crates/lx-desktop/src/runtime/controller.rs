@@ -44,15 +44,32 @@ impl DesktopRuntimeController {
     agent_id
   }
 
-  pub fn launch_flow_pi_agent(&self, flow_id: String, name: &str, prompt: String, cwd: Option<PathBuf>) -> String {
+  pub fn create_flow_run(&self, flow_id: String, title: String) -> String {
     let run_id = new_id("flow-run");
-    let mut spec = DesktopAgentLaunchSpec::new(name.to_string(), format!("Flow run for {flow_id}"), prompt);
-    spec.flow_id = Some(flow_id.clone());
-    spec.flow_run_id = Some(run_id.clone());
-    spec.cwd = cwd;
+    self.registry.register_flow_run(DesktopFlowRun { id: run_id.clone(), flow_id, root_agent_id: None, title, created_at: now_ts() });
+    run_id
+  }
+
+  pub fn launch_pi_agent_for_flow_run(&self, flow_id: String, flow_run_id: &str, spec: &DesktopAgentLaunchSpec) -> String {
+    let mut spec = spec.clone();
+    spec.flow_id = Some(flow_id);
+    spec.flow_run_id = Some(flow_run_id.to_string());
     let agent_id = self.launch_pi_agent(&spec);
-    self.registry.register_flow_run(DesktopFlowRun { id: run_id, flow_id, root_agent_id: agent_id.clone(), title: name.to_string(), created_at: now_ts() });
+    if spec.parent_id.is_none() {
+      self.registry.update_flow_run(flow_run_id, |run| {
+        if run.root_agent_id.is_none() {
+          run.root_agent_id = Some(agent_id.clone());
+        }
+      });
+    }
     agent_id
+  }
+
+  pub fn launch_flow_pi_agent(&self, flow_id: String, name: &str, prompt: String, cwd: Option<PathBuf>) -> String {
+    let run_id = self.create_flow_run(flow_id.clone(), name.to_string());
+    let mut spec = DesktopAgentLaunchSpec::new(name.to_string(), format!("Flow run for {flow_id}"), prompt);
+    spec.cwd = cwd;
+    self.launch_pi_agent_for_flow_run(flow_id, &run_id, &spec)
   }
 
   pub fn prompt(&self, agent_id: String, message: String) {
