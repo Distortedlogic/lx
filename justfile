@@ -61,6 +61,12 @@ desktop:
     set -euo pipefail
     dx serve -p lx-desktop
 
+# run nodeflow app (n8n-style workflow editor)
+nodeflow:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    dx serve -p nodeflow
+
 # run lx-mobile app
 mobile:
     #!/usr/bin/env bash

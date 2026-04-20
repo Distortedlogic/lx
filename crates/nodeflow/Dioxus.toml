@@ -1,0 +1,11 @@
+#:schema ./dioxus.schema.json
+
+[application]
+name = "nodeflow"
+
+[web.app]
+title = "nodeflow"
+
+[web.resource.dev]
+style = []
+script = []

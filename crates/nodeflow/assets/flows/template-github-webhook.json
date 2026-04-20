@@ -1,0 +1,26 @@
+{
+  "id": "github-webhook-template",
+  "title": "Webhook to GitHub Issue",
+  "metadata": { "notes": "Create a GitHub issue when a webhook fires.", "tags": [] },
+  "viewport": { "zoom": 1.0, "pan_x": 0.0, "pan_y": 0.0 },
+  "selection": { "node_ids": [], "edge_ids": [] },
+  "nodes": [
+    {
+      "id": "hook",
+      "template_id": "trigger_webhook",
+      "label": "incoming",
+      "position": { "x": 0.0, "y": 0.0 },
+      "properties": { "path": "issue", "method": "POST" }
+    },
+    {
+      "id": "create",
+      "template_id": "github_issue_create",
+      "label": "Create issue",
+      "position": { "x": 320.0, "y": 0.0 },
+      "properties": { "owner": "your-org", "repo": "your-repo", "title": "Webhook: {{ $json.note }}", "body": "See payload attached." }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "from": { "node_id": "hook", "port_id": "out" }, "to": { "node_id": "create", "port_id": "input" } }
+  ]
+}

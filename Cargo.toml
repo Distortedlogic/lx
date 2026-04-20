@@ -1,6 +1,6 @@
 [workspace]
 exclude = ["reference/chumsky"]
-members = ["crates/lx-api", "crates/lx-ast", "crates/lx-checker", "crates/lx-cli", "crates/lx-desktop", "crates/lx-desugar", "crates/lx-eval", "crates/lx-fmt", "crates/lx-graph-editor", "crates/lx-linter", "crates/lx-macros", "crates/lx-mobile", "crates/lx-parser", "crates/lx-span", "crates/lx-value"]
+members = ["crates/lx-api", "crates/lx-ast", "crates/lx-checker", "crates/lx-cli", "crates/lx-desktop", "crates/lx-desugar", "crates/lx-eval", "crates/lx-fmt", "crates/lx-graph-editor", "crates/lx-linter", "crates/lx-macros", "crates/lx-mobile", "crates/lx-parser", "crates/lx-span", "crates/lx-value", "crates/nodeflow"]
 resolver = "2"
 
 [workspace.package]
@@ -26,6 +26,12 @@ panic = "abort"
 
 [workspace.dependencies]
 anyhow = { version = "1.0.102" }
+argon2 = { version = "0.5" }
+axum = { version = "0.8" }
+chacha20poly1305 = { version = "0.10" }
+lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "rustls-tls", "tokio1-rustls-tls"] }
+rhai = { version = "1.19" }
+rusqlite = { version = "0.32", features = ["bundled"] }
 async-recursion = { version = "1.1.1" }
 async-trait = { version = "0.1.89" }
 base64 = { version = "0.22.1" }
@@ -51,6 +57,7 @@ num-integer = { version = "0.1.46" }
 num-traits = { version = "0.2.19" }
 parking_lot = { version = "0.12.5" }
 proc-macro2 = { version = "1" }
+rand = { version = "0.8" }
 pulldown-cmark = { version = "0.13.2", default-features = false, features = ["html"] }
 quote = { version = "1" }
 reqwest = { version = "0.13.2", features = ["json", "query"] }

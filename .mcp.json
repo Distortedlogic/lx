@@ -4,10 +4,6 @@
       "type": "http",
       "url": "http://localhost:9090/postgresql/mcp"
     },
-    "valkey": {
-      "type": "http",
-      "url": "http://localhost:9090/valkey/mcp"
-    },
     "influxdb": {
       "type": "http",
       "url": "http://localhost:9090/influxdb/mcp"
@@ -60,61 +56,13 @@
       "type": "http",
       "url": "http://localhost:9090/plane/mcp"
     },
-    "bytestash": {
-      "type": "http",
-      "url": "http://localhost:9090/bytestash/mcp"
-    },
     "pictshare": {
       "type": "http",
       "url": "http://localhost:9090/pictshare/mcp"
     },
-    "infisical": {
-      "type": "http",
-      "url": "http://localhost:9090/infisical/mcp"
-    },
     "gritql": {
       "type": "http",
       "url": "http://localhost:9090/gritql/mcp"
-    },
-    "whisper-inference": {
-      "type": "http",
-      "url": "http://localhost:9090/whisper-inference/mcp"
-    },
-    "kokoro-inference": {
-      "type": "http",
-      "url": "http://localhost:9090/kokoro-inference/mcp"
-    },
-    "embedding-inference": {
-      "type": "http",
-      "url": "http://localhost:9090/embedding-inference/mcp"
-    },
-    "musicgen-inference": {
-      "type": "http",
-      "url": "http://localhost:9090/musicgen-inference/mcp"
-    },
-    "audioldm2-inference": {
-      "type": "http",
-      "url": "http://localhost:9090/audioldm2-inference/mcp"
-    },
-    "flux-inference": {
-      "type": "http",
-      "url": "http://localhost:9090/flux-inference/mcp"
-    },
-    "llm-inference": {
-      "type": "http",
-      "url": "http://localhost:9090/llm-inference/mcp"
-    },
-    "context-engine": {
-      "type": "http",
-      "url": "http://localhost:9090/context-engine/mcp"
-    },
-    "workflow": {
-      "type": "http",
-      "url": "http://localhost:9090/workflow/mcp"
-    },
-    "openviking": {
-      "type": "http",
-      "url": "http://localhost:9090/openviking/mcp"
     }
   }
 }

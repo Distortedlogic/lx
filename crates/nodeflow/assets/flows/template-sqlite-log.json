@@ -1,0 +1,29 @@
+{
+  "id": "sqlite-log-template",
+  "title": "SQLite Log Writer",
+  "metadata": { "notes": "Manual trigger writes a row to a SQLite table.", "tags": [] },
+  "viewport": { "zoom": 1.0, "pan_x": 0.0, "pan_y": 0.0 },
+  "selection": { "node_ids": [], "edge_ids": [] },
+  "nodes": [
+    {
+      "id": "manual",
+      "template_id": "trigger_manual",
+      "label": "Start",
+      "position": { "x": 0.0, "y": 0.0 },
+      "properties": { "payload": "{\"message\":\"hello\"}" }
+    },
+    {
+      "id": "write",
+      "template_id": "sqlite_query",
+      "label": "Insert log",
+      "position": { "x": 320.0, "y": 0.0 },
+      "properties": {
+        "database_path": "/tmp/nodeflow-log.sqlite",
+        "query": "CREATE TABLE IF NOT EXISTS logs(ts TEXT, message TEXT); INSERT INTO logs(ts, message) VALUES(datetime('now'), '{{ $json.message }}')"
+      }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "from": { "node_id": "manual", "port_id": "out" }, "to": { "node_id": "write", "port_id": "input" } }
+  ]
+}

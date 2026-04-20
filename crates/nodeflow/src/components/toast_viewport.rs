@@ -1,0 +1,109 @@
+use dioxus::prelude::*;
+
+use crate::contexts::toast::{ToastItem, ToastState, ToastTone};
+
+fn tone_class(tone: ToastTone) -> &'static str {
+  match tone {
+    ToastTone::Info => "border-[var(--tertiary)]/25 bg-[var(--tertiary)]/10 text-[var(--tertiary)]",
+    ToastTone::Success => "border-[var(--success)]/25 bg-[var(--success)]/10 text-[var(--success)]",
+    ToastTone::Warn => "border-[var(--warning)]/25 bg-[var(--warning)]/10 text-[var(--warning)]",
+    ToastTone::Error => "border-[var(--error)]/30 bg-[var(--error)]/10 text-[var(--error)]",
+  }
+}
+
+fn dot_class(tone: ToastTone) -> &'static str {
+  match tone {
+    ToastTone::Info => "bg-[var(--tertiary)]",
+    ToastTone::Success => "bg-[var(--success)]",
+    ToastTone::Warn => "bg-[var(--warning)]",
+    ToastTone::Error => "bg-[var(--error)]",
+  }
+}
+
+fn render_toast(toast: &ToastItem, state: ToastState) -> Element {
+  let tc = tone_class(toast.tone);
+  let dc = dot_class(toast.tone);
+  let id = toast.id.clone();
+  let title = toast.title.clone();
+  let body = toast.body.clone();
+  let action = toast.action.clone();
+
+  rsx! {
+    li {
+      class: "pointer-events-auto rounded-sm border shadow-lg backdrop-blur-xl",
+      class: "{tc}",
+      class: if toast.dismissing { "animate-toast-exit" } else { "animate-toast-enter" },
+      div { class: "flex items-start gap-3 px-3 py-2.5",
+        span {
+          class: "mt-1 h-2 w-2 shrink-0 rounded-full",
+          class: "{dc}",
+        }
+        div { class: "min-w-0 flex-1",
+          p { class: "text-sm font-semibold leading-5", "{title}" }
+          if let Some(ref b) = body {
+            p { class: "mt-1 text-xs leading-4 opacity-70", "{b}" }
+          }
+          if let Some(ref act) = action {
+            Link {
+              to: "{act.href}",
+              class: "mt-2 inline-flex text-xs font-medium underline underline-offset-4 hover:opacity-90",
+              "{act.label}"
+            }
+          }
+        }
+        button {
+          class: "mt-0.5 shrink-0 rounded p-1 opacity-50 hover:bg-white/10 hover:opacity-100",
+          onclick: move |_| state.start_dismiss(&id),
+          span { class: "material-symbols-outlined text-sm", "close" }
+        }
+      }
+    }
+  }
+}
+
+fn timestamp_ms() -> u64 {
+  std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+}
+
+#[component]
+pub fn ToastViewport() -> Element {
+  let state = use_context::<ToastState>();
+  let toasts = state.toasts;
+
+  use_future(move || async move {
+    loop {
+      tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+      let now = timestamp_ms();
+
+      let to_start_dismiss: Vec<String> =
+        toasts.read().iter().filter(|t| !t.dismissing && now.saturating_sub(t.created_at) >= t.ttl_ms).map(|t| t.id.clone()).collect();
+
+      for id in &to_start_dismiss {
+        state.start_dismiss(id);
+      }
+
+      let to_remove: Vec<String> =
+        toasts.read().iter().filter(|t| t.dismissing && now.saturating_sub(t.created_at) >= t.ttl_ms + 300).map(|t| t.id.clone()).collect();
+
+      for id in to_remove {
+        state.dismiss(&id);
+      }
+    }
+  });
+
+  if toasts.read().is_empty() {
+    return rsx! {};
+  }
+
+  rsx! {
+    aside {
+      class: "pointer-events-none fixed bottom-3 left-3 z-[120] w-full max-w-sm px-1",
+      "aria-live": "polite",
+      ol { class: "flex w-full flex-col-reverse gap-2",
+        for toast in toasts.read().iter() {
+          {render_toast(toast, state)}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,354 @@
+@import "tailwindcss";
+
+@source "./src/**/*.rs";
+@source "../lx-graph-editor/src/**/*.rs";
+
+@theme {
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --radius-sm: 0rem;
+  --radius: 0rem;
+  --radius-md: 0rem;
+  --radius-lg: 0rem;
+  --radius-xl: 0rem;
+  --radius-2xl: 0rem;
+  --radius-3xl: 0rem;
+  --radius-full: 9999px;
+
+  --color-background: var(--surface);
+  --color-foreground: var(--on-surface);
+  --color-card: var(--surface-container);
+  --color-card-foreground: var(--on-surface);
+  --color-popover: var(--surface-container-high);
+  --color-popover-foreground: var(--on-surface);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--on-primary);
+  --color-secondary: var(--surface-container-high);
+  --color-secondary-foreground: var(--on-surface);
+  --color-muted: var(--surface-container);
+  --color-muted-foreground: var(--on-surface-variant);
+  --color-accent: var(--surface-container-high);
+  --color-accent-foreground: var(--on-surface);
+  --color-destructive: var(--error);
+  --color-border: var(--outline-variant);
+  --color-input: var(--outline-variant);
+  --color-ring: var(--primary);
+  --color-ring-offset: var(--surface);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+}
+
+:root, .dark {
+  --surface: #0e0e0e;
+  --surface-container-low: #131313;
+  --surface-container: #191919;
+  --surface-container-high: #1f1f1f;
+  --surface-container-highest: #262626;
+  --surface-container-lowest: #000000;
+  --surface-bright: #2c2c2c;
+  --sidebar-background: var(--surface-container-low);
+  --sidebar-foreground: var(--on-surface);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--on-primary);
+  --sidebar-border: var(--outline-variant);
+  --sidebar-accent: var(--surface-container-high);
+  --primary: #9cff93;
+  --primary-container: #00fc40;
+  --on-primary: #006413;
+  --on-surface: #ffffff;
+  --on-surface-variant: #ababab;
+  --outline: #757575;
+  --outline-variant: #484848;
+  --tertiary: #81ecff;
+  --error: #ff7351;
+  --warning: #fcaf00;
+  --success: #9cff93;
+  --color-chart-axis: #3A3A4A;
+  --color-chart-split: #2A2A3A;
+  --color-chart-tooltip: #191919;
+
+  --chart-1: #9cff93;
+  --chart-2: #81ecff;
+  --chart-3: #fcaf00;
+  --chart-4: #ff7351;
+  --chart-5: #c4b5fd;
+
+  --graph-canvas-bg-start: color-mix(in srgb, var(--surface-container-low) 82%, var(--tertiary) 18%);
+  --graph-canvas-bg-end: color-mix(in srgb, var(--surface-container-lowest) 88%, var(--primary) 12%);
+  --graph-canvas-tint-primary: color-mix(in srgb, var(--tertiary) 20%, transparent);
+  --graph-canvas-tint-secondary: color-mix(in srgb, var(--success) 14%, transparent);
+  --graph-canvas-top-fade: color-mix(in srgb, var(--surface-container-lowest) 44%, transparent);
+  --graph-grid-minor: color-mix(in srgb, var(--on-surface) 3%, transparent);
+  --graph-grid-major: color-mix(in srgb, var(--outline) 16%, transparent);
+
+  --graph-overlay-bg: color-mix(in srgb, var(--surface-container-lowest) 86%, transparent);
+  --graph-overlay-bg-strong: color-mix(in srgb, var(--surface-container-lowest) 92%, var(--surface-container-low) 8%);
+  --graph-overlay-border: color-mix(in srgb, var(--outline-variant) 82%, transparent);
+  --graph-overlay-text: color-mix(in srgb, var(--on-surface) 84%, transparent);
+  --graph-overlay-muted: color-mix(in srgb, var(--on-surface-variant) 92%, transparent);
+  --graph-overlay-scrim: rgba(0, 0, 0, 0.2);
+  --graph-overlay-shadow: 0 22px 60px rgba(0, 0, 0, 0.42);
+
+  --graph-selection-surface: color-mix(in srgb, var(--tertiary) 14%, var(--surface-container-lowest));
+  --graph-selection-border: color-mix(in srgb, var(--tertiary) 44%, transparent);
+  --graph-selection-text: color-mix(in srgb, var(--on-surface) 90%, var(--tertiary) 10%);
+  --graph-selection-glow: color-mix(in srgb, var(--tertiary) 20%, transparent);
+  --graph-selection-line: color-mix(in srgb, var(--tertiary) 80%, white 20%);
+
+  --graph-node-bg-start: var(--surface-container-low);
+  --graph-node-bg-end: var(--surface-container-lowest);
+  --graph-node-body-bg: color-mix(in srgb, var(--surface-container-lowest) 92%, var(--surface-container-low) 8%);
+  --graph-node-header-start: color-mix(in srgb, var(--surface-container) 92%, var(--tertiary) 8%);
+  --graph-node-header-end: color-mix(in srgb, var(--surface-container-low) 94%, var(--surface-container-lowest) 6%);
+  --graph-node-border: color-mix(in srgb, var(--outline-variant) 72%, transparent);
+  --graph-node-border-selected: color-mix(in srgb, var(--tertiary) 76%, white 8%);
+  --graph-node-shadow: 0 14px 34px rgba(0, 0, 0, 0.3);
+  --graph-node-shadow-selected: 0 0 0 2px color-mix(in srgb, var(--tertiary) 18%, transparent), 0 18px 42px rgba(0, 0, 0, 0.34);
+  --graph-node-topline: color-mix(in srgb, var(--outline) 40%, transparent);
+  --graph-node-topline-selected: color-mix(in srgb, var(--tertiary) 82%, white 12%);
+  --graph-node-category-bg: color-mix(in srgb, var(--surface-container-high) 72%, transparent);
+  --graph-node-category-border: color-mix(in srgb, var(--outline-variant) 78%, transparent);
+  --graph-node-category-text: color-mix(in srgb, var(--on-surface-variant) 78%, var(--tertiary) 22%);
+  --graph-node-subtitle: color-mix(in srgb, var(--on-surface-variant) 92%, transparent);
+
+  --graph-edge-default: color-mix(in srgb, var(--outline) 64%, var(--on-surface) 18%);
+  --graph-edge-selected: color-mix(in srgb, var(--tertiary) 76%, white 8%);
+  --graph-edge-error: color-mix(in srgb, var(--error) 82%, white 10%);
+  --graph-edge-underlay: color-mix(in srgb, var(--surface-container-lowest) 88%, transparent);
+  --graph-edge-label-bg: color-mix(in srgb, var(--surface-container-lowest) 92%, var(--surface-container-low) 8%);
+  --graph-edge-label-border: color-mix(in srgb, var(--outline-variant) 54%, transparent);
+  --graph-edge-label-text: color-mix(in srgb, var(--on-surface-variant) 88%, transparent);
+  --graph-connection-preview: color-mix(in srgb, var(--success) 76%, white 8%);
+
+  --graph-port-input-dot: color-mix(in srgb, var(--tertiary) 84%, white 10%);
+  --graph-port-input-bg: color-mix(in srgb, var(--tertiary) 12%, var(--surface-container-lowest));
+  --graph-port-input-border: color-mix(in srgb, var(--tertiary) 34%, transparent);
+  --graph-port-input-text: color-mix(in srgb, var(--on-surface) 86%, var(--tertiary) 14%);
+  --graph-port-output-dot: color-mix(in srgb, var(--success) 84%, white 10%);
+  --graph-port-output-bg: color-mix(in srgb, var(--success) 12%, var(--surface-container-lowest));
+  --graph-port-output-border: color-mix(in srgb, var(--success) 32%, transparent);
+  --graph-port-output-text: color-mix(in srgb, var(--on-surface) 86%, var(--success) 14%);
+
+  --graph-error-surface: color-mix(in srgb, var(--error) 18%, var(--surface-container-lowest));
+  --graph-error-border: color-mix(in srgb, var(--error) 38%, transparent);
+  --graph-error-text: color-mix(in srgb, var(--on-surface) 80%, var(--error) 20%);
+  --graph-warning-surface: color-mix(in srgb, var(--warning) 18%, var(--surface-container-lowest));
+  --graph-warning-border: color-mix(in srgb, var(--warning) 36%, transparent);
+  --graph-warning-text: color-mix(in srgb, var(--on-surface) 82%, var(--warning) 18%);
+  --graph-info-surface: color-mix(in srgb, var(--tertiary) 16%, var(--surface-container-lowest));
+  --graph-info-border: color-mix(in srgb, var(--tertiary) 36%, transparent);
+  --graph-info-text: color-mix(in srgb, var(--on-surface) 82%, var(--tertiary) 18%);
+}
+
+.light {
+  --surface: #ffffff;
+  --surface-container-low: #f5f5f5;
+  --surface-container: #eeeeee;
+  --surface-container-high: #e0e0e0;
+  --surface-container-highest: #d6d6d6;
+  --surface-container-lowest: #fafafa;
+  --surface-bright: #f0f0f0;
+  --sidebar-background: var(--surface-container-low);
+  --sidebar-foreground: var(--on-surface);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--on-primary);
+  --sidebar-border: var(--outline-variant);
+  --sidebar-accent: var(--surface-container-high);
+  --primary: #1a7d1a;
+  --primary-container: #a8f09a;
+  --on-primary: #ffffff;
+  --on-surface: #1a1a1a;
+  --on-surface-variant: #555555;
+  --outline: #888888;
+  --outline-variant: #cccccc;
+  --tertiary: #0077aa;
+  --error: #cc3300;
+  --warning: #cc8800;
+  --success: #1a7d1a;
+  --color-chart-axis: #cccccc;
+  --color-chart-split: #e0e0e0;
+  --color-chart-tooltip: #ffffff;
+
+  --chart-1: #15803d;
+  --chart-2: #0077aa;
+  --chart-3: #b45309;
+  --chart-4: #cc3300;
+  --chart-5: #7c3aed;
+
+  --graph-canvas-bg-start: color-mix(in srgb, var(--surface-container-lowest) 88%, var(--tertiary) 12%);
+  --graph-canvas-bg-end: color-mix(in srgb, var(--surface) 84%, var(--primary) 16%);
+  --graph-canvas-tint-primary: color-mix(in srgb, var(--tertiary) 12%, transparent);
+  --graph-canvas-tint-secondary: color-mix(in srgb, var(--success) 10%, transparent);
+  --graph-canvas-top-fade: color-mix(in srgb, var(--surface-container-low) 44%, transparent);
+  --graph-grid-minor: color-mix(in srgb, var(--on-surface) 6%, transparent);
+  --graph-grid-major: color-mix(in srgb, var(--outline) 18%, transparent);
+
+  --graph-overlay-bg: color-mix(in srgb, var(--surface) 88%, transparent);
+  --graph-overlay-bg-strong: color-mix(in srgb, var(--surface) 94%, var(--surface-container-high) 6%);
+  --graph-overlay-border: color-mix(in srgb, var(--outline-variant) 90%, transparent);
+  --graph-overlay-text: color-mix(in srgb, var(--on-surface) 86%, transparent);
+  --graph-overlay-muted: color-mix(in srgb, var(--on-surface-variant) 90%, transparent);
+  --graph-overlay-scrim: rgba(15, 23, 42, 0.08);
+  --graph-overlay-shadow: 0 18px 44px rgba(15, 23, 42, 0.12);
+
+  --graph-selection-surface: color-mix(in srgb, var(--tertiary) 10%, var(--surface));
+  --graph-selection-border: color-mix(in srgb, var(--tertiary) 42%, transparent);
+  --graph-selection-text: color-mix(in srgb, var(--on-surface) 84%, var(--tertiary) 16%);
+  --graph-selection-glow: color-mix(in srgb, var(--tertiary) 14%, transparent);
+  --graph-selection-line: color-mix(in srgb, var(--tertiary) 72%, white 16%);
+
+  --graph-node-bg-start: var(--surface);
+  --graph-node-bg-end: var(--surface-container-low);
+  --graph-node-body-bg: color-mix(in srgb, var(--surface) 92%, var(--surface-container-low) 8%);
+  --graph-node-header-start: color-mix(in srgb, var(--surface-container) 90%, var(--tertiary) 10%);
+  --graph-node-header-end: color-mix(in srgb, var(--surface-container-low) 92%, var(--surface) 8%);
+  --graph-node-border: color-mix(in srgb, var(--outline-variant) 90%, transparent);
+  --graph-node-border-selected: color-mix(in srgb, var(--tertiary) 78%, transparent);
+  --graph-node-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+  --graph-node-shadow-selected: 0 0 0 2px color-mix(in srgb, var(--tertiary) 12%, transparent), 0 18px 38px rgba(15, 23, 42, 0.12);
+  --graph-node-topline: color-mix(in srgb, var(--outline) 34%, transparent);
+  --graph-node-topline-selected: color-mix(in srgb, var(--tertiary) 72%, white 14%);
+  --graph-node-category-bg: color-mix(in srgb, var(--surface-container-high) 82%, transparent);
+  --graph-node-category-border: color-mix(in srgb, var(--outline-variant) 84%, transparent);
+  --graph-node-category-text: color-mix(in srgb, var(--on-surface-variant) 76%, var(--tertiary) 24%);
+  --graph-node-subtitle: color-mix(in srgb, var(--on-surface-variant) 92%, transparent);
+
+  --graph-edge-default: color-mix(in srgb, var(--outline) 68%, var(--on-surface) 14%);
+  --graph-edge-selected: color-mix(in srgb, var(--tertiary) 76%, transparent);
+  --graph-edge-error: color-mix(in srgb, var(--error) 80%, transparent);
+  --graph-edge-underlay: color-mix(in srgb, var(--surface-container-high) 72%, transparent);
+  --graph-edge-label-bg: color-mix(in srgb, var(--surface) 94%, var(--surface-container-low) 6%);
+  --graph-edge-label-border: color-mix(in srgb, var(--outline-variant) 70%, transparent);
+  --graph-edge-label-text: color-mix(in srgb, var(--on-surface-variant) 84%, transparent);
+  --graph-connection-preview: color-mix(in srgb, var(--success) 78%, transparent);
+
+  --graph-port-input-dot: color-mix(in srgb, var(--tertiary) 82%, transparent);
+  --graph-port-input-bg: color-mix(in srgb, var(--tertiary) 12%, var(--surface));
+  --graph-port-input-border: color-mix(in srgb, var(--tertiary) 34%, transparent);
+  --graph-port-input-text: color-mix(in srgb, var(--on-surface) 82%, var(--tertiary) 18%);
+  --graph-port-output-dot: color-mix(in srgb, var(--success) 82%, transparent);
+  --graph-port-output-bg: color-mix(in srgb, var(--success) 12%, var(--surface));
+  --graph-port-output-border: color-mix(in srgb, var(--success) 32%, transparent);
+  --graph-port-output-text: color-mix(in srgb, var(--on-surface) 82%, var(--success) 18%);
+
+  --graph-error-surface: color-mix(in srgb, var(--error) 12%, var(--surface));
+  --graph-error-border: color-mix(in srgb, var(--error) 28%, transparent);
+  --graph-error-text: color-mix(in srgb, var(--on-surface) 76%, var(--error) 24%);
+  --graph-warning-surface: color-mix(in srgb, var(--warning) 12%, var(--surface));
+  --graph-warning-border: color-mix(in srgb, var(--warning) 28%, transparent);
+  --graph-warning-text: color-mix(in srgb, var(--on-surface) 76%, var(--warning) 24%);
+  --graph-info-surface: color-mix(in srgb, var(--tertiary) 10%, var(--surface));
+  --graph-info-border: color-mix(in srgb, var(--tertiary) 28%, transparent);
+  --graph-info-text: color-mix(in srgb, var(--on-surface) 76%, var(--tertiary) 24%);
+}
+
+body {
+  background-color: var(--surface);
+  overflow: hidden;
+}
+
+.shadow-ambient {
+  box-shadow: 0 8px 32px rgba(30, 20, 10, 0.06);
+}
+
+.border-ghost {
+  border: 1px solid rgba(86, 67, 52, 0.15);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface-container-low);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--surface-container-highest);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--surface-bright);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fade-in 150ms ease-out;
+}
+
+@keyframes activity-row-enter {
+  0% {
+    opacity: 0;
+    background-color: color-mix(in srgb, var(--primary) 8%, transparent);
+  }
+  40% {
+    opacity: 1;
+    background-color: color-mix(in srgb, var(--primary) 6%, transparent);
+  }
+  100% {
+    opacity: 1;
+    background-color: transparent;
+  }
+}
+
+.animate-activity-enter {
+  animation: activity-row-enter 800ms ease-out both;
+}
+
+@keyframes toast-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-toast-enter {
+  animation: toast-slide-in 300ms ease-out both;
+}
+
+@keyframes toast-slide-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+}
+
+.animate-toast-exit {
+  animation: toast-slide-out 300ms ease-in both;
+}
+
+@keyframes transcript-block-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-transcript-enter {
+  animation: transcript-block-enter 300ms ease-out both;
+}
+
+.drag-active {
+  border-color: var(--primary) !important;
+  background-color: color-mix(in srgb, var(--primary) 4%, transparent);
+}

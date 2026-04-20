@@ -1,0 +1,45 @@
+{
+  "id": "slack-brief-template",
+  "title": "Slack Daily Brief",
+  "metadata": {
+    "notes": "Cron trigger every morning -> fetch URL -> Claude summarise -> Slack post.",
+    "tags": []
+  },
+  "viewport": { "zoom": 1.0, "pan_x": 0.0, "pan_y": 0.0 },
+  "selection": { "node_ids": [], "edge_ids": [] },
+  "nodes": [
+    {
+      "id": "cron",
+      "template_id": "trigger_cron",
+      "label": "8am daily",
+      "position": { "x": 0.0, "y": 0.0 },
+      "properties": { "cron_expression": "0 0 8 * * *" }
+    },
+    {
+      "id": "fetch",
+      "template_id": "http_request",
+      "label": "Fetch news",
+      "position": { "x": 280.0, "y": 0.0 },
+      "properties": { "url": "https://hacker-news.firebaseio.com/v0/topstories.json" }
+    },
+    {
+      "id": "summarise",
+      "template_id": "anthropic_messages",
+      "label": "Claude summary",
+      "position": { "x": 560.0, "y": 0.0 },
+      "properties": { "model": "claude-opus-4-7", "prompt": "Summarize: {{ $json.body }}", "max_tokens": 500 }
+    },
+    {
+      "id": "notify",
+      "template_id": "slack_post",
+      "label": "Slack",
+      "position": { "x": 840.0, "y": 0.0 },
+      "properties": { "channel": "#daily-brief" }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "from": { "node_id": "cron", "port_id": "out" }, "to": { "node_id": "fetch", "port_id": "input" } },
+    { "id": "e2", "from": { "node_id": "fetch", "port_id": "response" }, "to": { "node_id": "summarise", "port_id": "input" } },
+    { "id": "e3", "from": { "node_id": "summarise", "port_id": "response" }, "to": { "node_id": "notify", "port_id": "briefs" } }
+  ]
+}
