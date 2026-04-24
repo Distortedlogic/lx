@@ -9377,7 +9377,7 @@ var WidgetBridge = (function(exports) {
 			let fields = [];
 			let facets = Object.create(null);
 			let newCompartments = /* @__PURE__ */ new Map();
-			for (let ext of flatten(base, compartments, newCompartments)) if (ext instanceof StateField) fields.push(ext);
+			for (let ext of flatten$1(base, compartments, newCompartments)) if (ext instanceof StateField) fields.push(ext);
 			else (facets[ext.facet.id] || (facets[ext.facet.id] = [])).push(ext);
 			let address = Object.create(null);
 			let staticValues = [];
@@ -9412,7 +9412,7 @@ var WidgetBridge = (function(exports) {
 			return new Configuration(base, newCompartments, dynamicSlots.map((f) => f(address)), address, staticValues, facets);
 		}
 	};
-	function flatten(extension, compartments, newCompartments) {
+	function flatten$1(extension, compartments, newCompartments) {
 		let result = [
 			[],
 			[],
@@ -20850,7 +20850,7 @@ var WidgetBridge = (function(exports) {
 			return document.createTextNode(this.number);
 		}
 	};
-	function formatNumber(view, number) {
+	function formatNumber$1(view, number) {
 		return view.state.facet(lineNumberConfig).formatNumber(number, view.state);
 	}
 	var lineNumberGutter = /* @__PURE__ */ activeGutters.compute([lineNumberConfig], (state) => ({
@@ -20861,7 +20861,7 @@ var WidgetBridge = (function(exports) {
 		},
 		lineMarker(view, line, others) {
 			if (others.some((m) => m.toDOM)) return null;
-			return new NumberMarker(formatNumber(view, view.state.doc.lineAt(line.from).number));
+			return new NumberMarker(formatNumber$1(view, view.state.doc.lineAt(line.from).number));
 		},
 		widgetMarker: (view, widget, block) => {
 			for (let m of view.state.facet(lineNumberWidgetMarker)) {
@@ -20872,10 +20872,10 @@ var WidgetBridge = (function(exports) {
 		},
 		lineMarkerChange: (update) => update.startState.facet(lineNumberConfig) != update.state.facet(lineNumberConfig),
 		initialSpacer(view) {
-			return new NumberMarker(formatNumber(view, maxLineNumber(view.state.doc.lines)));
+			return new NumberMarker(formatNumber$1(view, maxLineNumber(view.state.doc.lines)));
 		},
 		updateSpacer(spacer, update) {
-			let max = formatNumber(update.view, maxLineNumber(update.view.state.doc.lines));
+			let max = formatNumber$1(update.view, maxLineNumber(update.view.state.doc.lines));
 			return max == spacer.number ? spacer : new NumberMarker(max);
 		},
 		domEventHandlers: state.facet(lineNumberConfig).domEventHandlers,
@@ -39825,6 +39825,1146 @@ registerProcessor('capture', Capture);
 		},
 		dispose(elementId) {
 			destroyDagEditorState(elementId);
+		}
+	});
+	//#endregion
+	//#region widgets/chart/types.ts
+	function ec() {
+		const e = window.echarts;
+		if (!e) throw new Error("echarts global not loaded — include the ECharts CDN script before widget-bridge.js");
+		return e;
+	}
+	//#endregion
+	//#region widgets/chart/theme.ts
+	var FALLBACK_PALETTE = [
+		"#60a5fa",
+		"#f472b6",
+		"#34d399",
+		"#fbbf24",
+		"#a78bfa",
+		"#f87171",
+		"#22d3ee",
+		"#fb923c"
+	];
+	function readVar(name, fallback) {
+		const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+		return v.length > 0 ? v : fallback;
+	}
+	function readPalette() {
+		const out = [];
+		for (let i = 1; i <= 8; i++) {
+			const v = getComputedStyle(document.documentElement).getPropertyValue(`--chart-${i}`).trim();
+			if (v.length > 0) out.push(v);
+		}
+		if (out.length >= 2) return out;
+		const seeded = [readVar("--primary", ""), readVar("--accent", "")].filter((c) => c.length > 0);
+		if (seeded.length >= 2) return seeded.concat(FALLBACK_PALETTE).slice(0, 8);
+		return FALLBACK_PALETTE;
+	}
+	function readTheme() {
+		return {
+			fg: readVar("--foreground", "#e5e7eb"),
+			bg: readVar("--background", "#0a0a0a"),
+			border: readVar("--border", "#404040"),
+			split: readVar("--border", "#262626"),
+			tooltipBg: readVar("--popover", readVar("--background", "#171717")),
+			palette: readPalette(),
+			up: readVar("--chart-up", "#22c55e"),
+			down: readVar("--chart-down", "#ef4444")
+		};
+	}
+	//#endregion
+	//#region widgets/chart/formatters.ts
+	function formatNumber(v) {
+		if (typeof v !== "number" || isNaN(v)) return String(v);
+		const a = Math.abs(v);
+		if (a >= 1e3) return v.toLocaleString(void 0, { maximumFractionDigits: 2 });
+		if (a >= 1) return v.toFixed(2);
+		if (a >= .001) return v.toFixed(4);
+		return v.toFixed(6);
+	}
+	function formatRound(v) {
+		return String(Math.round(v));
+	}
+	function formatFixed2(v) {
+		return v.toFixed(2);
+	}
+	function formatFixed4(v) {
+		return v.toFixed(4);
+	}
+	function formatFitness(v) {
+		if (Math.abs(v) >= 1e3) return v.toFixed(0);
+		return v.toFixed(2);
+	}
+	function formatPercent(v) {
+		return v + "%";
+	}
+	function formatMultiplier(v) {
+		if (typeof v !== "number" || isNaN(v)) return String(v);
+		return v.toFixed(4) + "x";
+	}
+	function formatMoney(v) {
+		if (typeof v !== "number" || isNaN(v)) return String(v);
+		const a = Math.abs(v);
+		const s = v < 0 ? "-" : "";
+		if (a >= 1e9) return s + "$" + (a / 1e9).toFixed(1) + "B";
+		if (a >= 1e6) return s + "$" + (a / 1e6).toFixed(1) + "M";
+		if (a >= 1e3) return s + "$" + (a / 1e3).toFixed(1) + "k";
+		return s + "$" + a.toFixed(2);
+	}
+	function formatMoneyFull(v) {
+		if (typeof v !== "number" || isNaN(v)) return String(v);
+		return (v < 0 ? "-$" : "$") + Math.abs(v).toLocaleString(void 0, {
+			minimumFractionDigits: 2,
+			maximumFractionDigits: 2
+		});
+	}
+	function abbreviateNumber(v) {
+		if (typeof v !== "number" || isNaN(v)) return String(v);
+		const a = Math.abs(v);
+		if (a >= 1e9) return (v / 1e9).toFixed(1) + "B";
+		if (a >= 1e6) return (v / 1e6).toFixed(1) + "M";
+		if (a >= 1e3) return (v / 1e3).toFixed(1) + "k";
+		if (a >= 100) return v.toFixed(0);
+		return v.toFixed(1);
+	}
+	function formatDurationMs(v) {
+		if (typeof v !== "number" || isNaN(v)) return String(v);
+		if (v < .1) return v.toFixed(4) + "ms";
+		if (v < 1) return v.toFixed(2) + "ms";
+		if (v < 1e3) return Math.round(v) + "ms";
+		if (v < 6e4) return (v / 1e3).toFixed(1) + "s";
+		if (v < 36e5) {
+			const m = Math.floor(v / 6e4);
+			const s = Math.floor(v % 6e4 / 1e3);
+			return m + "m " + s + "s";
+		}
+		const h = Math.floor(v / 36e5);
+		const mn = Math.floor(v % 36e5 / 6e4);
+		return h + "h " + mn + "m";
+	}
+	function formatTime(v) {
+		const n = typeof v === "string" ? Number(v) : v;
+		if (!Number.isFinite(n)) return String(v);
+		return new Date(n).toLocaleString(void 0, {
+			month: "short",
+			day: "numeric",
+			hour: "2-digit",
+			minute: "2-digit"
+		});
+	}
+	function formatIdentity(v) {
+		return String(v);
+	}
+	function formatterFor(hint) {
+		switch (hint) {
+			case "round": return formatRound;
+			case "fixed-2": return formatFixed2;
+			case "fixed-4": return formatFixed4;
+			case "abbreviate": return abbreviateNumber;
+			case "fitness": return formatFitness;
+			case "duration-ms": return formatDurationMs;
+			case "money": return formatMoney;
+			case "money-full": return formatMoneyFull;
+			case "percent": return formatPercent;
+			case "multiplier": return formatMultiplier;
+			case "time": return formatTime;
+			case "category": return formatIdentity;
+			default: return formatNumber;
+		}
+	}
+	//#endregion
+	//#region widgets/chart/axis.ts
+	function inferAxisType(hint, sample) {
+		if (hint === "time") return "time";
+		if (hint === "category") return "category";
+		if (sample.length === 0) return "category";
+		if (typeof sample[0] === "string") return "category";
+		return "value";
+	}
+	function buildAxis(theme, hint, sample, categoryData) {
+		const type = sample !== null ? inferAxisType(hint, sample) : "value";
+		const axis = {
+			type,
+			axisLine: { lineStyle: { color: theme.border } },
+			splitLine: {
+				show: true,
+				lineStyle: { color: theme.split }
+			},
+			axisTick: { lineStyle: { color: theme.border } },
+			axisLabel: {
+				color: theme.fg,
+				textBorderWidth: 0,
+				formatter: formatterFor(hint)
+			},
+			nameTextStyle: {
+				color: theme.fg,
+				textBorderWidth: 0
+			}
+		};
+		if (type === "category" && categoryData) axis.data = categoryData;
+		return axis;
+	}
+	//#endregion
+	//#region widgets/chart/tooltip.ts
+	function resolveSource(field, params, cfg) {
+		const src = field.source;
+		const idx = params.dataIndex ?? 0;
+		const val = params.value;
+		if (src === "x") {
+			if (Array.isArray(val)) return val[0];
+			return params.name ?? idx;
+		}
+		if (src === "y") {
+			if (Array.isArray(val)) return val[1];
+			return typeof val === "number" ? val : 0;
+		}
+		if (src === "value") {
+			if (Array.isArray(val)) return val[val.length - 1];
+			return typeof val === "number" ? val : 0;
+		}
+		if (src === "y-percent") return typeof val === "number" ? val : 0;
+		if (src === "x-label") {
+			const xi = Array.isArray(val) ? val[0] : idx;
+			if (cfg.x_labels) return cfg.x_labels[xi] ?? xi;
+			if (cfg.x_axis) return cfg.x_axis[xi] ?? xi;
+			return xi;
+		}
+		if (src === "y-label") {
+			const yi = Array.isArray(val) ? val[1] : idx;
+			return cfg.y_labels ? cfg.y_labels[yi] ?? yi : yi;
+		}
+		if (typeof src === "object" && "extra" in src) {
+			const arr = cfg.extras?.[src.extra];
+			if (!arr) return void 0;
+			return arr[idx];
+		}
+	}
+	function defaultHint(source, cfg) {
+		if (source === "x" || source === "x-label") return cfg.x_hint;
+		if (source === "y" || source === "y-label" || source === "value") return cfg.y_hint;
+		if (source === "y-percent") return "fixed-2";
+	}
+	function formatValue(value, fmt) {
+		if (value === void 0 || value === null) return "";
+		if (typeof value === "number") return fmt(value);
+		return String(value);
+	}
+	function buildTooltipFormatter(fields, cfg) {
+		return (p) => {
+			const params = Array.isArray(p) ? p[0] : p;
+			const lines = [];
+			for (const f of fields) {
+				const value = formatValue(resolveSource(f, params, cfg), formatterFor(f.hint ?? defaultHint(f.source, cfg)));
+				if (f.label === void 0) lines.push(value);
+				else if (f.label === "") if (lines.length > 0) lines[lines.length - 1] += " " + value;
+				else lines.push(value);
+				else lines.push(`${f.label}: ${value}`);
+			}
+			return lines.join("<br/>");
+		};
+	}
+	//#endregion
+	//#region widgets/chart/kinds/xy.ts
+	function seriesKind(defaultKind, s) {
+		return (s.kind ?? defaultKind) === "bar" ? "bar" : "line";
+	}
+	function seriesColor(s, palette, i) {
+		return s.color ?? palette[i % palette.length];
+	}
+	function dataWithColors(s, fallback) {
+		if (!s.colors) return s.data;
+		return s.data.map((v, i) => ({
+			value: v,
+			itemStyle: { color: s.colors[i] ?? fallback }
+		}));
+	}
+	function buildXYOption(cfg, theme) {
+		const isArea = cfg.kind === "area";
+		const defaultKind = cfg.kind === "bar" ? "bar" : "line";
+		const yFmt = formatterFor(cfg.y_hint);
+		const labelFmt = cfg.label_hint ? formatterFor(cfg.label_hint) : yFmt;
+		const series = cfg.series.map((s, i) => {
+			const color = seriesColor(s, theme.palette, i);
+			const type = seriesKind(defaultKind, s);
+			const base = {
+				name: s.name,
+				type,
+				data: dataWithColors(s, color),
+				itemStyle: { color }
+			};
+			if (s.hidden) {
+				base.silent = true;
+				base.tooltip = { show: false };
+				base.itemStyle = {
+					color,
+					opacity: 0
+				};
+			}
+			if (type === "line") {
+				const lineStyle = {
+					color,
+					width: 2
+				};
+				if (s.dashed) lineStyle.type = "dashed";
+				if (s.hidden) lineStyle.opacity = 0;
+				base.lineStyle = lineStyle;
+				base.smooth = cfg.smooth ?? false;
+				base.showSymbol = !s.hidden && s.data.length <= 80;
+				if (isArea || s.kind === "area") base.areaStyle = {
+					color,
+					opacity: .25
+				};
+			}
+			if (type === "bar" && cfg.stack) base.stack = "total";
+			if (type === "bar" && (cfg.label_hint || s.label_inside || cfg.label_inside)) base.label = {
+				show: true,
+				position: cfg.label_inside || s.label_inside ? "inside" : "top",
+				color: theme.fg,
+				textBorderWidth: 0,
+				formatter: (p) => labelFmt(typeof p.value === "number" ? p.value : p.value.value)
+			};
+			return base;
+		});
+		if (cfg.bands) {
+			const bandColor = theme.palette[cfg.series.length % theme.palette.length];
+			series.push({
+				name: cfg.bands.name ? `${cfg.bands.name} upper` : "upper",
+				type: "line",
+				data: cfg.bands.upper,
+				lineStyle: { opacity: 0 },
+				stack: "band",
+				symbol: "none",
+				silent: true,
+				tooltip: { show: false }
+			});
+			series.push({
+				name: cfg.bands.name ?? "confidence",
+				type: "line",
+				data: cfg.bands.lower.map((lo, i) => cfg.bands.upper[i] - lo),
+				lineStyle: { opacity: 0 },
+				areaStyle: {
+					color: bandColor,
+					opacity: .18
+				},
+				stack: "band",
+				symbol: "none",
+				silent: true,
+				tooltip: { show: false }
+			});
+		}
+		const markLines = [];
+		if (cfg.zero_line) markLines.push({ y: 0 });
+		if (cfg.mark_lines) markLines.push(...cfg.mark_lines);
+		if (markLines.length > 0) {
+			const first = series[0];
+			if (first) first.markLine = {
+				symbol: "none",
+				lineStyle: {
+					color: theme.border,
+					type: "dashed"
+				},
+				data: markLines.map((m) => ({
+					yAxis: m.y,
+					name: m.name ?? ""
+				})),
+				label: {
+					color: theme.fg,
+					show: markLines.some((m) => m.name),
+					position: "end"
+				}
+			};
+		}
+		const showLegend = cfg.legend ?? cfg.series.filter((s) => !s.hidden).length > 1;
+		const tooltipFormatter = cfg.tooltip ? buildTooltipFormatter(cfg.tooltip, cfg) : void 0;
+		return {
+			textStyle: { color: theme.fg },
+			title: cfg.title ? {
+				text: cfg.title,
+				subtext: cfg.subtitle,
+				textStyle: { color: theme.fg },
+				subtextStyle: { color: theme.fg }
+			} : void 0,
+			grid: {
+				left: 12,
+				right: 20,
+				top: cfg.title ? 50 : 20,
+				bottom: 30,
+				containLabel: true
+			},
+			legend: showLegend ? {
+				textStyle: { color: theme.fg },
+				top: cfg.title ? 28 : 6,
+				data: cfg.series.filter((s) => !s.hidden).map((s) => s.name)
+			} : void 0,
+			tooltip: {
+				trigger: "axis",
+				backgroundColor: theme.tooltipBg,
+				borderColor: theme.border,
+				textStyle: { color: theme.fg },
+				valueFormatter: yFmt,
+				...tooltipFormatter ? { formatter: tooltipFormatter } : {}
+			},
+			xAxis: {
+				...buildAxis(theme, cfg.x_hint, cfg.x_axis, cfg.x_axis),
+				...cfg.x_axis_hidden ? { show: false } : {}
+			},
+			yAxis: buildAxis(theme, cfg.y_hint, null),
+			series
+		};
+	}
+	function buildScatterOption(cfg, theme) {
+		const xFmt = formatterFor(cfg.x_hint);
+		const yFmt = formatterFor(cfg.y_hint);
+		const series = cfg.series.map((s, i) => {
+			const color = s.color ?? theme.palette[i % theme.palette.length];
+			const data = s.colors ? s.points.map((p, j) => ({
+				value: p,
+				itemStyle: { color: s.colors[j] ?? color }
+			})) : s.points;
+			return {
+				name: s.name,
+				type: "scatter",
+				data,
+				symbolSize: s.symbol_size ?? 8,
+				itemStyle: { color }
+			};
+		});
+		const showLegend = cfg.legend ?? cfg.series.length > 1;
+		const tooltipFormatter = cfg.tooltip ? buildTooltipFormatter(cfg.tooltip, cfg) : (p) => {
+			const v = Array.isArray(p.value) ? p.value : p.value.value;
+			return `${p.seriesName}<br/>${xFmt(v[0])}, ${yFmt(v[1])}`;
+		};
+		return {
+			textStyle: { color: theme.fg },
+			title: cfg.title ? {
+				text: cfg.title,
+				subtext: cfg.subtitle,
+				textStyle: { color: theme.fg }
+			} : void 0,
+			grid: {
+				left: 12,
+				right: 20,
+				top: cfg.title ? 50 : 20,
+				bottom: 30,
+				containLabel: true
+			},
+			legend: showLegend ? {
+				textStyle: { color: theme.fg },
+				top: cfg.title ? 28 : 6
+			} : void 0,
+			tooltip: {
+				trigger: "item",
+				backgroundColor: theme.tooltipBg,
+				borderColor: theme.border,
+				textStyle: { color: theme.fg },
+				formatter: tooltipFormatter
+			},
+			xAxis: buildAxis(theme, cfg.x_hint, null),
+			yAxis: buildAxis(theme, cfg.y_hint, null),
+			series
+		};
+	}
+	//#endregion
+	//#region widgets/chart/kinds/pie.ts
+	function buildPieOption(cfg, theme) {
+		const palette = theme.palette;
+		const data = cfg.slices.map((s, i) => ({
+			name: s.name,
+			value: s.value,
+			itemStyle: { color: s.color ?? palette[i % palette.length] }
+		}));
+		const total = cfg.slices.reduce((a, s) => a + s.value, 0) || 1;
+		const valueFmt = formatterFor(cfg.y_hint);
+		return {
+			textStyle: { color: theme.fg },
+			title: cfg.title ? {
+				text: cfg.title,
+				left: "center",
+				textStyle: { color: theme.fg }
+			} : void 0,
+			tooltip: {
+				trigger: "item",
+				backgroundColor: theme.tooltipBg,
+				borderColor: theme.border,
+				textStyle: { color: theme.fg },
+				formatter: (p) => `${p.name}<br/>${valueFmt(p.value)} (${(p.value / total * 100).toFixed(1)}%)`
+			},
+			legend: cfg.legend ?? cfg.slices.length > 1 ? {
+				textStyle: { color: theme.fg },
+				orient: "vertical",
+				left: "left"
+			} : void 0,
+			series: [{
+				type: "pie",
+				radius: cfg.donut ? ["40%", "70%"] : "65%",
+				center: ["50%", "55%"],
+				data,
+				label: {
+					color: theme.fg,
+					formatter: "{b}: {d}%"
+				},
+				labelLine: { lineStyle: { color: theme.border } }
+			}]
+		};
+	}
+	//#endregion
+	//#region widgets/chart/kinds/gauge.ts
+	function buildGaugeOption(cfg, theme) {
+		const valueFmt = formatterFor(cfg.y_hint);
+		const min = cfg.min ?? 0;
+		const max = cfg.max ?? 100;
+		return {
+			textStyle: { color: theme.fg },
+			title: cfg.title ? {
+				text: cfg.title,
+				left: "center",
+				textStyle: { color: theme.fg }
+			} : void 0,
+			series: [{
+				type: "gauge",
+				min,
+				max,
+				progress: {
+					show: true,
+					width: 18
+				},
+				axisLine: { lineStyle: {
+					width: 18,
+					color: [[1, theme.border]]
+				} },
+				axisTick: {
+					distance: -30,
+					length: 6,
+					lineStyle: { color: theme.fg }
+				},
+				splitLine: {
+					distance: -30,
+					length: 10,
+					lineStyle: { color: theme.fg }
+				},
+				axisLabel: {
+					color: theme.fg,
+					distance: 12
+				},
+				pointer: {
+					icon: "circle",
+					length: "10%",
+					width: 14,
+					offsetCenter: [0, "-55%"],
+					itemStyle: { color: theme.palette[0] }
+				},
+				title: {
+					color: theme.fg,
+					offsetCenter: [0, "90%"]
+				},
+				detail: {
+					color: theme.fg,
+					offsetCenter: [0, "40%"],
+					fontSize: 24,
+					fontWeight: "bold",
+					formatter: (v) => valueFmt(v)
+				},
+				data: [{
+					value: cfg.value,
+					name: cfg.label ?? ""
+				}]
+			}]
+		};
+	}
+	//#endregion
+	//#region widgets/chart/kinds/radar.ts
+	function buildRadarOption(cfg, theme) {
+		const valueFmt = formatterFor(cfg.y_hint);
+		const indicator = cfg.dimensions.map((d) => ({
+			name: d.name,
+			max: d.max ?? 1
+		}));
+		const data = cfg.series.map((s, i) => ({
+			name: s.name,
+			value: s.values,
+			itemStyle: { color: theme.palette[i % theme.palette.length] },
+			lineStyle: {
+				color: theme.palette[i % theme.palette.length],
+				width: 2
+			},
+			areaStyle: {
+				color: theme.palette[i % theme.palette.length],
+				opacity: .18
+			}
+		}));
+		const showLegend = cfg.legend ?? cfg.series.length > 1;
+		return {
+			textStyle: { color: theme.fg },
+			title: cfg.title ? {
+				text: cfg.title,
+				left: "center",
+				textStyle: { color: theme.fg }
+			} : void 0,
+			tooltip: {
+				trigger: "item",
+				backgroundColor: theme.tooltipBg,
+				borderColor: theme.border,
+				textStyle: { color: theme.fg },
+				formatter: (p) => `${p.name}<br/>${cfg.dimensions.map((d, i) => `${d.name}: ${valueFmt(p.value[i])}`).join("<br/>")}`
+			},
+			legend: showLegend ? {
+				textStyle: { color: theme.fg },
+				bottom: 0
+			} : void 0,
+			radar: {
+				indicator,
+				axisName: { color: theme.fg },
+				splitLine: { lineStyle: { color: theme.split } },
+				splitArea: { areaStyle: { color: ["transparent"] } },
+				axisLine: { lineStyle: { color: theme.border } }
+			},
+			series: [{
+				type: "radar",
+				data
+			}]
+		};
+	}
+	//#endregion
+	//#region widgets/chart/kinds/heatmap.ts
+	function buildHeatmapOption(cfg, theme) {
+		const values = cfg.cells.map((c) => c[2]);
+		const min = cfg.visual_min ?? (values.length ? Math.min(...values) : 0);
+		const max = cfg.visual_max ?? (values.length ? Math.max(...values) : 1);
+		const valueFmt = formatterFor(cfg.y_hint);
+		const defaultFormatter = (p) => {
+			const [xi, yi, v] = p.value;
+			return `${cfg.x_labels[xi] ?? xi} × ${cfg.y_labels[yi] ?? yi}<br/>${valueFmt(v)}`;
+		};
+		const tooltipFormatter = cfg.tooltip ? buildTooltipFormatter(cfg.tooltip, cfg) : defaultFormatter;
+		return {
+			textStyle: { color: theme.fg },
+			title: cfg.title ? {
+				text: cfg.title,
+				left: "center",
+				textStyle: { color: theme.fg }
+			} : void 0,
+			grid: {
+				left: 12,
+				right: 60,
+				top: cfg.title ? 50 : 20,
+				bottom: 40,
+				containLabel: true
+			},
+			xAxis: buildAxis(theme, cfg.x_hint, cfg.x_labels, cfg.x_labels),
+			yAxis: buildAxis(theme, cfg.y_hint, cfg.y_labels, cfg.y_labels),
+			tooltip: {
+				trigger: "item",
+				backgroundColor: theme.tooltipBg,
+				borderColor: theme.border,
+				textStyle: { color: theme.fg },
+				formatter: tooltipFormatter
+			},
+			visualMap: {
+				min,
+				max,
+				calculable: true,
+				orient: "vertical",
+				right: 0,
+				top: "center",
+				textStyle: { color: theme.fg },
+				inRange: { color: [
+					theme.down,
+					theme.split,
+					theme.palette[0],
+					theme.up
+				] }
+			},
+			series: [{
+				type: "heatmap",
+				data: cfg.cells,
+				label: { show: false },
+				emphasis: { itemStyle: {
+					borderColor: theme.fg,
+					borderWidth: 1
+				} }
+			}]
+		};
+	}
+	//#endregion
+	//#region widgets/chart/kinds/tree.ts
+	function toEchartsNode(n) {
+		const children = n.children?.map(toEchartsNode);
+		return {
+			name: n.name,
+			...children ? { children } : {}
+		};
+	}
+	function buildTreeOption(cfg, theme) {
+		return {
+			textStyle: { color: theme.fg },
+			title: cfg.title ? {
+				text: cfg.title,
+				left: "center",
+				textStyle: { color: theme.fg }
+			} : void 0,
+			tooltip: {
+				trigger: "item",
+				backgroundColor: theme.tooltipBg,
+				borderColor: theme.border,
+				textStyle: { color: theme.fg }
+			},
+			series: [{
+				type: "tree",
+				data: [toEchartsNode(cfg.root)],
+				layout: cfg.layout ?? "orthogonal",
+				orient: cfg.orient ?? "TB",
+				symbol: "circle",
+				symbolSize: 24,
+				roam: true,
+				initialTreeDepth: cfg.initial_depth ?? 3,
+				itemStyle: {
+					color: cfg.node_color ?? theme.palette[0],
+					borderColor: cfg.border_color ?? theme.bg,
+					borderWidth: 2
+				},
+				lineStyle: {
+					color: theme.border,
+					width: 1.2
+				},
+				label: {
+					show: true,
+					position: "top",
+					color: theme.fg,
+					fontSize: 10
+				},
+				leaves: { label: { position: "bottom" } }
+			}]
+		};
+	}
+	//#endregion
+	//#region widgets/chart/kinds/flame.ts
+	function hashColor(name, palette) {
+		let h = 0;
+		for (let i = 0; i < name.length; i++) h = h * 31 + name.charCodeAt(i) >>> 0;
+		return palette[h % palette.length];
+	}
+	function flatten(root, palette) {
+		const rows = [];
+		let maxDepth = 0;
+		const walk = (n, depth, xStart) => {
+			const color = hashColor(n.name, palette);
+			const xEnd = xStart + n.value;
+			rows.push([
+				xStart,
+				depth,
+				xEnd,
+				n.name,
+				color,
+				n.value
+			]);
+			if (depth > maxDepth) maxDepth = depth;
+			let cursor = xStart;
+			if (n.children) for (const c of n.children) cursor = walk(c, depth + 1, cursor);
+			return xEnd;
+		};
+		walk(root, 0, 0);
+		return {
+			rows,
+			maxDepth,
+			total: root.value
+		};
+	}
+	function buildFlameOption(cfg, theme) {
+		const { rows, maxDepth, total } = flatten(cfg.root, theme.palette);
+		const fmt = formatterFor(cfg.unit);
+		const echarts = ec();
+		return {
+			textStyle: { color: theme.fg },
+			title: cfg.title ? {
+				text: cfg.title,
+				subtext: cfg.subtitle,
+				textStyle: { color: theme.fg }
+			} : void 0,
+			tooltip: {
+				trigger: "item",
+				backgroundColor: theme.tooltipBg,
+				borderColor: theme.border,
+				textStyle: { color: theme.fg },
+				formatter: (p) => {
+					const v = p.value;
+					const pct = total > 0 ? (v[5] / total * 100).toFixed(1) + "%" : "";
+					return `${v[3]}<br/>${fmt(v[5])} ${pct}`;
+				}
+			},
+			grid: {
+				left: 12,
+				right: 20,
+				top: cfg.title ? 50 : 20,
+				bottom: 30,
+				containLabel: true
+			},
+			xAxis: {
+				type: "value",
+				axisLabel: {
+					color: theme.fg,
+					formatter: fmt
+				},
+				splitLine: { show: false },
+				axisLine: { lineStyle: { color: theme.border } }
+			},
+			yAxis: {
+				type: "value",
+				min: 0,
+				max: Math.max(maxDepth + 1, 1),
+				inverse: true,
+				show: false
+			},
+			series: [{
+				type: "custom",
+				renderItem: (params, api) => {
+					const xStart = api.value(0);
+					const depth = api.value(1);
+					const xEnd = api.value(2);
+					const label = api.value(3);
+					const color = api.value(4);
+					const s = api.coord([xStart, depth]);
+					const e = api.coord([xEnd, depth + .9]);
+					const shape = echarts.graphic.clipRectByRect({
+						x: s[0],
+						y: s[1],
+						width: e[0] - s[0],
+						height: e[1] - s[1]
+					}, {
+						x: params.coordSys.x,
+						y: params.coordSys.y,
+						width: params.coordSys.width,
+						height: params.coordSys.height
+					});
+					return shape && {
+						type: "rect",
+						shape,
+						style: api.style({
+							fill: color,
+							stroke: theme.bg,
+							text: String(label),
+							textFill: theme.fg,
+							fontSize: 11,
+							truncate: {
+								outerWidth: shape.width,
+								outerHeight: shape.height
+							}
+						})
+					};
+				},
+				encode: {
+					x: [0, 2],
+					y: 1
+				},
+				data: rows
+			}]
+		};
+	}
+	//#endregion
+	//#region widgets/chart/kinds/candlestick.ts
+	function maxAbs(xs) {
+		let m = 0;
+		for (const x of xs) if (Math.abs(x) > m) m = Math.abs(x);
+		return m || 1;
+	}
+	function overlaySeries(o, idx, theme) {
+		const color = o.color ?? theme.palette[(idx + 1) % theme.palette.length];
+		if (o.kind === "line") return {
+			name: o.name,
+			type: "line",
+			data: o.data,
+			lineStyle: {
+				color,
+				width: 1.5
+			},
+			itemStyle: { color },
+			showSymbol: false,
+			smooth: false,
+			z: 3
+		};
+		return {
+			name: o.name,
+			type: "scatter",
+			data: o.data,
+			itemStyle: { color },
+			symbolSize: o.symbol_size ?? 10,
+			z: 4
+		};
+	}
+	function buildCandlestickOption(cfg, theme) {
+		const volMax = cfg.volume ? maxAbs(cfg.volume) : 0;
+		const rows = cfg.ohlc.map((o, i) => {
+			const v = cfg.volume ? cfg.volume[i] / volMax : .5;
+			return [
+				cfg.x_axis[i],
+				o[0],
+				o[1],
+				o[2],
+				o[3],
+				v
+			];
+		});
+		const yFmt = formatterFor(cfg.y_hint ?? "money");
+		const series = [{
+			type: "custom",
+			name: cfg.title ?? "ohlc",
+			renderItem: (_p, api) => {
+				const x = api.value(0);
+				const open = api.value(1);
+				const close = api.value(2);
+				const low = api.value(3);
+				const high = api.value(4);
+				const rv = api.value(5);
+				const openPt = api.coord([x, open]);
+				const closePt = api.coord([x, close]);
+				const lowPt = api.coord([x, low]);
+				const highPt = api.coord([x, high]);
+				const halfW = api.size([1, 0])[0] * (.15 + .35 * rv);
+				const color = close >= open ? theme.up : theme.down;
+				const bodyTop = Math.min(openPt[1], closePt[1]);
+				const bodyHeight = Math.max(Math.abs(openPt[1] - closePt[1]), 1);
+				return {
+					type: "group",
+					children: [{
+						type: "line",
+						shape: {
+							x1: lowPt[0],
+							y1: lowPt[1],
+							x2: highPt[0],
+							y2: highPt[1]
+						},
+						style: {
+							stroke: color,
+							lineWidth: 1
+						}
+					}, {
+						type: "rect",
+						shape: {
+							x: openPt[0] - halfW,
+							y: bodyTop,
+							width: halfW * 2,
+							height: bodyHeight
+						},
+						style: {
+							fill: color,
+							stroke: color
+						}
+					}]
+				};
+			},
+			encode: {
+				x: 0,
+				y: [
+					1,
+					2,
+					3,
+					4
+				]
+			},
+			data: rows,
+			z: 2
+		}];
+		if (cfg.overlays) cfg.overlays.forEach((o, i) => series.push(overlaySeries(o, i, theme)));
+		const showLegend = cfg.legend ?? (cfg.overlays !== void 0 && cfg.overlays.length > 0);
+		return {
+			textStyle: { color: theme.fg },
+			title: cfg.title ? {
+				text: cfg.title,
+				subtext: cfg.subtitle,
+				textStyle: { color: theme.fg }
+			} : void 0,
+			grid: {
+				left: 12,
+				right: 20,
+				top: cfg.title ? 50 : 20,
+				bottom: 30,
+				containLabel: true
+			},
+			legend: showLegend ? {
+				textStyle: { color: theme.fg },
+				top: cfg.title ? 28 : 6
+			} : void 0,
+			tooltip: {
+				trigger: "item",
+				backgroundColor: theme.tooltipBg,
+				borderColor: theme.border,
+				textStyle: { color: theme.fg },
+				formatter: (p) => {
+					if (p.seriesType === "scatter" || p.seriesType === "line") {
+						const v = p.value;
+						if (Array.isArray(v)) return `${p.seriesName}<br/>${yFmt(v[1])}`;
+						return `${p.seriesName}<br/>${yFmt(v)}`;
+					}
+					const [x, o, c, l, h] = p.value;
+					return `${x}<br/>O ${yFmt(o)}<br/>C ${yFmt(c)}<br/>L ${yFmt(l)}<br/>H ${yFmt(h)}`;
+				}
+			},
+			xAxis: buildAxis(theme, cfg.x_hint, cfg.x_axis, cfg.x_axis),
+			yAxis: buildAxis(theme, cfg.y_hint ?? "money", null),
+			series
+		};
+	}
+	//#endregion
+	//#region widgets/chart/kinds/raw.ts
+	function themeAxis(axis, theme, fmt) {
+		if (!axis) return;
+		const arr = Array.isArray(axis) ? axis : [axis];
+		for (const ax of arr) {
+			ax.axisLine ??= {};
+			ax.axisLine.lineStyle ??= { color: theme.border };
+			ax.splitLine ??= {
+				show: true,
+				lineStyle: { color: theme.split }
+			};
+			ax.axisTick ??= { lineStyle: { color: theme.border } };
+			const label = ax.axisLabel ??= {};
+			label.color ??= theme.fg;
+			label.textBorderWidth ??= 0;
+			if (fmt && !label.formatter) label.formatter = fmt;
+			const name = ax.nameTextStyle ??= {};
+			name.color ??= theme.fg;
+			name.textBorderWidth ??= 0;
+		}
+	}
+	function buildRawOption(cfg, theme) {
+		const opt = { ...cfg.option };
+		if (!opt.textStyle) opt.textStyle = { color: theme.fg };
+		const grid = opt.grid ??= {};
+		if (grid.containLabel === void 0) grid.containLabel = true;
+		const xFmt = cfg.x_hint ? formatterFor(cfg.x_hint) : null;
+		const yFmt = cfg.y_hint ? formatterFor(cfg.y_hint) : null;
+		themeAxis(opt.xAxis, theme, xFmt);
+		themeAxis(opt.yAxis, theme, yFmt);
+		const tooltip = opt.tooltip ??= {};
+		tooltip.backgroundColor ??= theme.tooltipBg;
+		tooltip.borderColor ??= theme.border;
+		tooltip.textStyle ??= { color: theme.fg };
+		if (cfg.tooltip_hint && !tooltip.valueFormatter) tooltip.valueFormatter = formatterFor(cfg.tooltip_hint);
+		else if (yFmt && !tooltip.valueFormatter) tooltip.valueFormatter = yFmt;
+		if (opt.title) {
+			const t = Array.isArray(opt.title) ? opt.title[0] : opt.title;
+			const ts = t.textStyle ??= {};
+			ts.color ??= theme.fg;
+		}
+		const series = opt.series ? Array.isArray(opt.series) ? opt.series : [opt.series] : null;
+		if (series && cfg.label_hint) {
+			const labelFmt = formatterFor(cfg.label_hint);
+			for (const s of series) {
+				const label = s.label ??= {};
+				label.formatter ??= labelFmt;
+				label.color ??= theme.fg;
+				label.textBorderWidth ??= 0;
+			}
+		}
+		return opt;
+	}
+	//#endregion
+	//#region widgets/chart/index.ts
+	function deepMerge(base, over) {
+		if (!over) return base;
+		const out = { ...base };
+		for (const k of Object.keys(over)) {
+			const b = out[k];
+			const o = over[k];
+			if (b && o && typeof b === "object" && typeof o === "object" && !Array.isArray(b) && !Array.isArray(o)) out[k] = deepMerge(b, o);
+			else out[k] = o;
+		}
+		return out;
+	}
+	function buildOption(cfg) {
+		const theme = readTheme();
+		let base;
+		switch (cfg.kind) {
+			case "line":
+			case "area":
+			case "bar":
+				base = buildXYOption(cfg, theme);
+				break;
+			case "scatter":
+				base = buildScatterOption(cfg, theme);
+				break;
+			case "pie":
+				base = buildPieOption(cfg, theme);
+				break;
+			case "gauge":
+				base = buildGaugeOption(cfg, theme);
+				break;
+			case "radar":
+				base = buildRadarOption(cfg, theme);
+				break;
+			case "heatmap":
+				base = buildHeatmapOption(cfg, theme);
+				break;
+			case "tree":
+				base = buildTreeOption(cfg, theme);
+				break;
+			case "flame":
+				base = buildFlameOption(cfg, theme);
+				break;
+			case "candlestick":
+				base = buildCandlestickOption(cfg, theme);
+				break;
+			case "raw":
+				base = buildRawOption(cfg, theme);
+				break;
+			default: throw new Error(`unknown chart kind: ${cfg.kind}`);
+		}
+		return deepMerge(base, cfg.raw);
+	}
+	var attached = /* @__PURE__ */ new WeakMap();
+	function mergeUpdate(prev, data) {
+		const p = prev;
+		const d = data;
+		return {
+			...p,
+			...d
+		};
+	}
+	registerWidget("chart", {
+		mount(elementId, config, _dx) {
+			const el = document.getElementById(elementId);
+			if (!el) return;
+			const cfg = config;
+			const opt = buildOption(cfg);
+			const chart = ec().init(el);
+			chart.setOption(opt);
+			const ro = new ResizeObserver(() => chart.resize());
+			ro.observe(el);
+			attached.set(el, {
+				chart,
+				ro,
+				kind: cfg.kind,
+				last: cfg
+			});
+		},
+		update(elementId, data) {
+			const el = document.getElementById(elementId);
+			if (!el) return;
+			const a = attached.get(el);
+			if (!a) return;
+			const d = data;
+			if (d && typeof d === "object" && d._action) {
+				a.chart.dispatchAction(d._action);
+				return;
+			}
+			const merged = mergeUpdate(a.last, data);
+			a.last = merged;
+			a.chart.setOption(buildOption(merged), true);
+		},
+		resize(elementId) {
+			const el = document.getElementById(elementId);
+			if (!el) return;
+			attached.get(el)?.chart.resize();
+		},
+		dispose(elementId) {
+			const el = document.getElementById(elementId);
+			if (!el) return;
+			const a = attached.get(el);
+			if (a) {
+				a.ro.disconnect();
+				a.chart.dispose();
+				attached.delete(el);
+			}
 		}
 	});
 	//#endregion

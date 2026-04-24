@@ -8,7 +8,6 @@ use dioxus::prelude::*;
 use dioxus_widget_bridge::use_ts_widget;
 use serde_json::Value;
 use tokio::sync::broadcast::error::RecvError;
-use uuid::Uuid;
 
 use super::use_tabs_state;
 use crate::contexts::activity_log::ActivityLog;
@@ -212,28 +211,5 @@ pub fn CanvasView(canvas_id: String, widget_type: String, config: Value) -> Elem
       class: "w-full h-full bg-[var(--surface-container)]",
     }
 
-  }
-}
-
-#[component]
-pub fn ChartView(chart_id: String, chart_json: String, title: Option<String>) -> Element {
-  let div_id = use_hook(|| format!("chart-{}", Uuid::new_v4().simple()));
-  let id = div_id.clone();
-  use_effect(move || {
-    let json = chart_json.clone();
-    if json.is_empty() {
-      return;
-    }
-    document::eval(&format!("DioxusCharts.initChart('{id}', {json})"));
-  });
-  let id_drop = div_id.clone();
-  use_drop(move || {
-    document::eval(&format!("DioxusCharts.disposeChart('{id_drop}')"));
-  });
-  rsx! {
-    div {
-      id: "{div_id}",
-      class: "w-full h-full min-h-32 bg-[var(--surface-container)]",
-    }
   }
 }

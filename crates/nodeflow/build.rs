@@ -32,7 +32,6 @@ fn main() {
 
   let copies = [
     (widget_bridge_dir.join("dist/widget-bridge.js"), assets.join("widget-bridge.js")),
-    (dioxus_common.join("crates/common-charts/assets/charts.js"), assets.join("charts.js")),
   ];
 
   for (src, dst) in &copies {

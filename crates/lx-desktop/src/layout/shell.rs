@@ -26,8 +26,6 @@ use crate::terminal::{add_tab, use_provide_tabs};
 #[cfg(feature = "desktop")]
 const ECHARTS_JS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/echarts-5.5.1.min.js"));
 #[cfg(feature = "desktop")]
-const CHARTS_JS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/charts.js"));
-#[cfg(feature = "desktop")]
 const WIDGET_BRIDGE_JS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/widget-bridge.js"));
 
 pub struct TerminalSpawnRequest {
@@ -61,7 +59,6 @@ pub fn Shell() -> Element {
   #[cfg(feature = "desktop")]
   use_hook(|| {
     document::eval(ECHARTS_JS);
-    document::eval(CHARTS_JS);
     document::eval(WIDGET_BRIDGE_JS);
   });
   let spawn_channel = use_hook(|| {
