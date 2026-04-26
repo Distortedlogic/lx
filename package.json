@@ -8,6 +8,7 @@
     "clean": "pnpm -r clean"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.13",
     "@tailwindcss/cli": "^4.2.2",
     "tailwindcss": "^4.2.2",
     "typescript": "^5.8.0",

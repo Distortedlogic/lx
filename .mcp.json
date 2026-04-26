@@ -63,6 +63,14 @@
     "gritql": {
       "type": "http",
       "url": "http://localhost:9090/gritql/mcp"
+    },
+    "repo-rag": {
+      "type": "stdio",
+      "command": "/home/entropybender/repos/repo-rag-mcp/.venv/bin/repo-rag-mcp",
+      "args": [
+        "serve"
+      ],
+      "env": {}
     }
   }
 }

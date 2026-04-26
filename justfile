@@ -1,3 +1,4 @@
+import '../common.justfile'
 set shell := ["bash", "-uc"]
 set dotenv-load := true
 
@@ -12,42 +13,11 @@ clear:
     cargo clean
     rm *.lock
 
-fmt:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    for member in $(cargo metadata --no-deps --format-version 1 | jq -r '.packages[].name'); do
-      dx fmt -p "$member" > /dev/null
-    done
-    cargo fmt --all > /dev/null
-    eclint -exclude "reference" .
-    echo "fmt: ok"
-
 test:
     #!/usr/bin/env bash
     set -euo pipefail
     cargo test --workspace --exclude inference-server --exclude lx-desktop --all-targets --all-features -q 2>&1
     cargo run -p lx-cli -- test
-
-rust-diagnose:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    devdiag clippy
-
-py-diagnose:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    devdiag ruff
-    devdiag ty
-
-py-fix:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    devdiag ruff
-
-ts-diagnose:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    devdiag tsc
 
 # run lx-tui with a .lx file
 tui:
@@ -88,3 +58,4 @@ package-vscode:
     #!/usr/bin/env bash
     set -euo pipefail
     cd editors/vscode && pnpm install --frozen-lockfile && pnpm package
+
