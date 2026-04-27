@@ -20,6 +20,17 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/entropybender/repos/repo-rag-mcp/scripts/reindex-on-stop.sh"
+          }
+        ]
+      }
     ]
   }
 }

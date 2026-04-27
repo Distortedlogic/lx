@@ -43,16 +43,6 @@ mobile:
     set -euo pipefail
     dx serve -p lx-mobile --platform android
 
-# render all .mmd diagrams to .png recursively
-diagrams:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    shopt -s globstar nullglob
-    for f in **/*.mmd; do
-      mmdc -i "$f" -o "${f%.mmd}.png" -c mermaid.config.json -b "#000000" -s 8
-    done
-    echo "diagrams: ok"
-
 # build vscode extension vsix (install via VS Code UI: Ctrl+Shift+P > Install from VSIX)
 package-vscode:
     #!/usr/bin/env bash
