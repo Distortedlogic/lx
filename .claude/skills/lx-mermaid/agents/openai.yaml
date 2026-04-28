@@ -1,4 +1,0 @@
-interface:
-  display_name: "LX Mermaid"
-  short_description: "LX Mermaid workflow and rendering rules"
-  default_prompt: "Use $lx-mermaid to create or revise a Mermaid `.mmd` diagram in this repo and keep it aligned with `mermaid.config.json` and `just diagrams`."

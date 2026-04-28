@@ -1,59 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "WebSearch",
-      "WebFetch",
-      "WebFetch(domain:arxiv.org)",
-      "WebFetch(domain:crates.io)",
-      "WebFetch(domain:docs.rs)",
-      "WebFetch(domain:github.com)",
-      "WebFetch(domain:hub.docker.com)",
-      "WebFetch(domain:spacetimedb.com)",
-      "WebFetch(domain:anthropic.com)",
-      "Read(//tmp/**)",
-      "Bash(ls:*)",
-      "Bash(find:*)",
-      "Bash(grep:*)",
-      "Bash(rg:*)",
-      "Bash(just py-lint:*)",
-      "Bash(just py-fix:*)",
-      "Bash(git ls-tree:*)",
-      "Bash(git grep:*)",
-      "Bash(git submodule:*)",
-      "Bash(cargo shear:*)",
-      "Bash(uv sync:*)",
-      "Bash(uv run:*)",
-      "Bash(pnpm:*)",
-      "Bash(pnpm install:*)",
-      "Bash(docker-compose:*)",
-      "mcp__workflow__task_done",
-      "mcp__workflow__verify",
-      "mcp__workflow__audit",
-      "mcp__workflow__cleanup_work_item",
-      "mcp__workflow__fmt",
-      "mcp__workflow__create_task",
-      "mcp__workflow__update_task",
-      "mcp__workflow__list_tasks",
-      "mcp__workflow__get_task",
       "Bash(mkdir -p /home/entropybender/repos/lx/crates/pane-tree/src)",
       "Bash(mkdir -p /home/entropybender/repos/lx/crates/pty-mux/src)",
       "Bash(mkdir -p /home/entropybender/repos/lx/crates/widget-bridge/src)",
       "Bash(mkdir -p /home/entropybender/repos/lx/crates/widget-bridge/ts/src)",
       "Bash(mkdir -p /home/entropybender/repos/lx/crates/widget-bridge/ts/widgets)"
     ],
-    "deny": [
-      "Bash(git stash:*)",
-      "TaskCreate",
-      "Bash(git checkout:*)",
-      "TaskGet",
-      "TaskList",
-      "TaskOutput",
-      "TaskStop",
-      "TaskUpdate"
-    ]
-  },
-  "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": [
-    "workflow"
-  ]
+    "deny": ["Bash(git checkout:*)"]
+  }
 }

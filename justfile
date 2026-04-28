@@ -1,22 +1,17 @@
 import '../common.justfile'
 set shell := ["bash", "-uc"]
 set dotenv-load := true
+set allow-duplicate-recipes := true
 
 _default:
     #!/usr/bin/env bash
     set -euo pipefail
     just --choose
 
-clear:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    cargo clean
-    rm *.lock
-
 test:
     #!/usr/bin/env bash
     set -euo pipefail
-    cargo test --workspace --exclude inference-server --exclude lx-desktop --all-targets --all-features -q 2>&1
+    cargo test --workspace --exclude lx-desktop --all-targets --all-features -q 2>&1
     cargo run -p lx-cli -- test
 
 # run lx-tui with a .lx file
